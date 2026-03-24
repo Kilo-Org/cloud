@@ -116,10 +116,13 @@ function TownRow({ town }: { town: { id: string; name: string; created_at: strin
       <TableCell>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/admin/gastown/towns/${town.id}`}>
+            <Link href={`/gastown/${town.id}`}>
               <ExternalLink className="mr-1 h-3 w-3" />
-              Inspect
+              View Town
             </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/admin/gastown/towns/${town.id}`}>Inspect</Link>
           </Button>
           <Button
             variant="outline"
@@ -152,7 +155,7 @@ export function UserAdminGastown({ userId }: { userId: string }) {
   return (
     <Card className="col-span-1 lg:col-span-4">
       <CardHeader>
-        <CardTitle>Gastown</CardTitle>
+        <CardTitle>Gas Town</CardTitle>
         <CardDescription>Towns and rigs owned by this user</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

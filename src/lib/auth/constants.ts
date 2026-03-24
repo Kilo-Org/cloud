@@ -17,6 +17,7 @@ export const hosted_domain_specials = {
   github: '@@github@@',
   gitlab: '@@gitlab@@',
   linkedin: '@@linkedin@@',
+  discord: '@@discord@@',
   email: '@@email@@',
   fake_devonly: '@@fake@@',
   kilocode_admin: 'kilocode.ai',

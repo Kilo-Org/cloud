@@ -8,6 +8,6 @@ export default async function MailPage({ params }: { params: Promise<{ townId: s
   const user = await getUserFromAuthOrRedirect(
     `/users/sign_in?callbackPath=/gastown/${townId}/mail`
   );
-  if (!(await isGastownEnabled(user.id))) return notFound();
+  if (!(await isGastownEnabled(user.id, { isAdmin: user.is_admin }))) return notFound();
   return <MailPageClient townId={townId} />;
 }

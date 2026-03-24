@@ -149,6 +149,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         const result = await client.prepareSession({
           ...restInput,
           ...gitParams,
+          createdOnPlatform: 'cloud-agent-web',
           kilocodeOrganizationId: organizationId,
           envVars: merged.envVars,
           encryptedSecrets: merged.encryptedSecrets,

@@ -10,6 +10,7 @@ import { createKilo, type KiloClient } from '@kilocode/sdk';
 import { z } from 'zod';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted } from './completion-reporter';
+import { buildKiloConfigContent, kiloModel } from './agent-runner';
 import { log } from './logger';
 
 const MANAGER_LOG = '[process-manager]';
@@ -368,12 +369,20 @@ async function handleIdleEvent(agent: ManagedAgent, onExit: () => void): Promise
     return;
   }
 
-  // No nudges (or fetch error) — (re)start the idle timeout
+  // No nudges (or fetch error) — (re)start the idle timeout.
+  // Refineries get a longer timeout because their workflow is multi-step
+  // (diff → analyze → decide → merge/rework). The 2-min default kills the
+  // session between LLM turns when the refinery responds with text before
+  // issuing a tool call. See #1342.
   clearIdleTimer(agentId);
   const timeoutMs =
-    process.env.AGENT_IDLE_TIMEOUT_MS !== undefined
-      ? Number(process.env.AGENT_IDLE_TIMEOUT_MS)
-      : 120_000;
+    agent.role === 'refinery'
+      ? process.env.REFINERY_IDLE_TIMEOUT_MS !== undefined
+        ? Number(process.env.REFINERY_IDLE_TIMEOUT_MS)
+        : 600_000
+      : process.env.AGENT_IDLE_TIMEOUT_MS !== undefined
+        ? Number(process.env.AGENT_IDLE_TIMEOUT_MS)
+        : 120_000;
 
   console.log(
     `${MANAGER_LOG} handleIdleEvent: no nudges for ${agentId}, idle timeout in ${timeoutMs}ms`
@@ -719,6 +728,174 @@ export async function sendMessage(agentId: string, prompt: string): Promise<void
 
   agent.messageCount++;
   agent.lastActivityAt = new Date().toISOString();
+}
+
+/**
+ * Update the model for a running agent by restarting its SDK server with
+ * new KILO_CONFIG_CONTENT. The kilo serve child process reads the model
+ * from KILO_CONFIG_CONTENT at startup (highest config precedence after
+ * enterprise managed config), so the only reliable way to change it is
+ * to restart the server process.
+ *
+ * The agent's session is re-created on the new server. The session history
+ * is persisted on disk by kilo serve, so it survives the restart.
+ *
+ * @param model OpenRouter-style model ID (e.g. "anthropic/claude-sonnet-4.6")
+ * @param smallModel Optional small model in the same format
+ */
+/**
+ * Extract the organizationId from the current KILO_CONFIG_CONTENT env var.
+ * The org ID is embedded as `provider.kilo.options.kilocodeOrganizationId`
+ * by `buildKiloConfigContent` at agent startup.
+ */
+function extractOrganizationId(): string | undefined {
+  const raw = process.env.KILO_CONFIG_CONTENT;
+  if (!raw) return undefined;
+  try {
+    const config = JSON.parse(raw) as Record<string, unknown>;
+    const provider = config.provider as Record<string, unknown> | undefined;
+    const kilo = provider?.kilo as Record<string, unknown> | undefined;
+    const options = kilo?.options as Record<string, unknown> | undefined;
+    const orgId = options?.kilocodeOrganizationId;
+    return typeof orgId === 'string' ? orgId : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const MAYOR_STARTUP_PROMPT = 'Mayor ready. Waiting for instructions.';
+
+/**
+ * Update the model for a running agent by restarting its SDK server with
+ * new KILO_CONFIG_CONTENT. The kilo serve child process reads the model
+ * from KILO_CONFIG_CONTENT at startup (highest config precedence after
+ * enterprise managed config), so the only reliable way to change it is
+ * to restart the server process.
+ *
+ * The agent's session is re-created on the new server and given the
+ * startup prompt so the mayor is ready for instructions.
+ *
+ * @param model OpenRouter-style model ID (e.g. "anthropic/claude-sonnet-4.6")
+ * @param smallModel Optional small model in the same format
+ */
+export async function updateAgentModel(
+  agentId: string,
+  model: string,
+  smallModel?: string
+): Promise<void> {
+  const agent = agents.get(agentId);
+  if (!agent) throw new Error(`Agent ${agentId} not found`);
+  if (agent.status !== 'running' && agent.status !== 'starting') {
+    throw new Error(`Agent ${agentId} is not running (status: ${agent.status})`);
+  }
+
+  const oldInstance = sdkInstances.get(agent.workdir);
+  if (!oldInstance) throw new Error(`No SDK instance for agent ${agentId}`);
+
+  const oldSessionId = agent.sessionId;
+  const oldPort = agent.serverPort;
+  const oldModel = agent.model;
+  const prevConfigContent = process.env.KILO_CONFIG_CONTENT;
+  const prevOpenCodeContent = process.env.OPENCODE_CONFIG_CONTENT;
+
+  console.log(
+    `${MANAGER_LOG} updateAgentModel: restarting SDK server for agent ${agentId} with model=${model}`
+  );
+
+  // 1. Preserve organizationId from the current config before we replace it
+  const organizationId = extractOrganizationId();
+
+  // 2. Rebuild KILO_CONFIG_CONTENT with the new model and update process.env
+  //    so the next createKilo() spawns kilo serve with fresh config.
+  const kilocodeToken = process.env.KILOCODE_TOKEN;
+  if (kilocodeToken) {
+    const configJson = buildKiloConfigContent(
+      kilocodeToken,
+      model,
+      smallModel ?? 'anthropic/claude-haiku-4.5',
+      organizationId
+    );
+    process.env.KILO_CONFIG_CONTENT = configJson;
+    process.env.OPENCODE_CONFIG_CONTENT = configJson;
+  }
+
+  // 3. Remove the old instance from the map so ensureSDKServer creates a
+  //    new one — but DON'T close the old server yet. If the new server
+  //    fails to start we can restore the old one.
+  sdkInstances.delete(agent.workdir);
+  agent.model = model;
+
+  try {
+    // 4. Create a new SDK server (spawns a fresh kilo serve with updated env)
+    const { client, port } = await ensureSDKServer(agent.workdir, {});
+    agent.serverPort = port;
+
+    // 5. Create a new session and send the startup prompt.
+    //    The system prompt lives in AGENTS.md (on disk), so kilo serve picks
+    //    it up automatically for every session.
+    const sessionResult = await client.session.create({ body: {} });
+    const rawSession: unknown = sessionResult.data ?? sessionResult;
+    const parsed = SessionResponse.safeParse(rawSession);
+    if (!parsed.success) {
+      throw new Error('SDK session.create response missing required "id" field');
+    }
+    agent.sessionId = parsed.data.id;
+
+    const newInstance = sdkInstances.get(agent.workdir);
+    if (newInstance) {
+      newInstance.sessionCount++;
+    }
+
+    // Send the startup prompt so the mayor is ready for instructions.
+    const modelParam = { providerID: 'kilo', modelID: model };
+    await client.session.prompt({
+      path: { id: agent.sessionId },
+      body: {
+        parts: [{ type: 'text', text: MAYOR_STARTUP_PROMPT }],
+        model: modelParam,
+      },
+    });
+    agent.messageCount = 1;
+
+    // 6. New server is healthy — now tear down the old one.
+    const oldController = eventAbortControllers.get(agentId);
+    if (oldController) oldController.abort();
+    oldInstance.server.close();
+
+    // 7. Re-subscribe to events on the new session
+    void subscribeToEvents(client, agent, {
+      agentId: agent.agentId,
+      role: agent.role,
+      name: agent.name,
+      model,
+      prompt: MAYOR_STARTUP_PROMPT,
+      rigId: agent.rigId,
+      townId: agent.townId,
+      identity: '',
+      gitUrl: '',
+      branch: '',
+      defaultBranch: '',
+    });
+
+    console.log(
+      `${MANAGER_LOG} updateAgentModel: SDK server restarted for agent ${agentId}, ` +
+        `old session=${oldSessionId} new session=${agent.sessionId} model=${model}`
+    );
+  } catch (err) {
+    // Restore the old server so the mayor keeps running on the previous model
+    console.warn(
+      `${MANAGER_LOG} updateAgentModel: failed for ${agentId}, restoring old server:`,
+      err
+    );
+    sdkInstances.set(agent.workdir, oldInstance);
+    agent.model = oldModel;
+    agent.sessionId = oldSessionId;
+    agent.serverPort = oldPort;
+    if (prevConfigContent !== undefined) process.env.KILO_CONFIG_CONTENT = prevConfigContent;
+    if (prevOpenCodeContent !== undefined)
+      process.env.OPENCODE_CONFIG_CONTENT = prevOpenCodeContent;
+    throw err;
+  }
 }
 
 export function getAgentStatus(agentId: string): ManagedAgent | null {

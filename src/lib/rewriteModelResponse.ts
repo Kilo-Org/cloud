@@ -72,9 +72,11 @@ export async function rewriteFreeModelResponse_ChatCompletions(response: Respons
         return;
       }
 
+      let doneReceived = false;
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
           if (event.data === '[DONE]') {
+            doneReceived = true;
             return;
           }
           const json = JSON.parse(event.data) as ChatCompletionChunk;
@@ -112,7 +114,9 @@ export async function rewriteFreeModelResponse_ChatCompletions(response: Respons
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-          controller.enqueue('data: [DONE]\n\n');
+          if (doneReceived) {
+            controller.enqueue('data: [DONE]\n\n');
+          }
           controller.close();
           break;
         }
@@ -181,6 +185,10 @@ export async function rewriteFreeModelResponse_Messages(response: Response, mode
 
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
+          if (event.data === '[DONE]') {
+            // OpenRouter sends [DONE], but this is not standard for Anthropic-style APIs
+            return;
+          }
           const json = JSON.parse(event.data) as
             | MessagesApiMessageStart
             | MessagesApiMessageDelta
@@ -263,9 +271,11 @@ export async function rewriteFreeModelResponse_Responses(response: Response, mod
         return;
       }
 
+      let doneReceived = false;
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
           if (event.data === '[DONE]') {
+            doneReceived = true;
             return;
           }
           const json = JSON.parse(event.data) as ResponsesApiEvent;
@@ -288,6 +298,9 @@ export async function rewriteFreeModelResponse_Responses(response: Response, mod
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
+          if (doneReceived) {
+            controller.enqueue('data: [DONE]\n\n');
+          }
           controller.close();
           break;
         }

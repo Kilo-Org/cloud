@@ -6,14 +6,33 @@ import { useRouter } from 'next/navigation';
 import { useGastownTRPC, gastownWsUrl } from '@/lib/gastown/trpc';
 
 import { useSidebar } from '@/components/ui/sidebar';
-import { useTerminalBar } from './TerminalBarContext';
+import {
+  useTerminalBar,
+  COLLAPSED_SIZE,
+  isHorizontal,
+  clampSize,
+  type TerminalPosition,
+} from './TerminalBarContext';
 import { useDrawerStack } from './DrawerStack';
 import { useXtermPty } from './useXtermPty';
-import { ChevronDown, ChevronUp, Crown, Activity, Terminal as TerminalIcon, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  Crown,
+  Activity,
+  Terminal as TerminalIcon,
+  X,
+  PanelBottom,
+  PanelTop,
+  PanelLeft,
+  PanelRight,
+  Bug,
+  Github,
+  MessageCircle,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-
-const COLLAPSED_HEIGHT = 38;
-const EXPANDED_HEIGHT = 300;
 
 type TerminalBarProps = {
   townId: string;
@@ -22,8 +41,9 @@ type TerminalBarProps = {
 };
 
 /**
- * Unified bottom terminal bar. Always shows a Mayor tab (non-closeable).
+ * Unified terminal bar. Always shows a Mayor tab (non-closeable).
  * Agent terminal tabs are opened/closed via TerminalBarContext.
+ * Can be positioned at bottom/top/right/left with drag-to-resize.
  */
 export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarProps) {
   const townBasePath = basePathOverride ?? `/gastown/${townId}`;
@@ -32,17 +52,19 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
     tabs: agentTabs,
     activeTabId,
     collapsed,
+    position,
+    size,
     closeTab,
     setActiveTabId,
     setCollapsed,
+    setPosition,
+    setSize,
   } = useTerminalBar();
   const queryClient = useQueryClient();
   const drawerStack = useDrawerStack();
   const router = useRouter();
 
   // ── Always-on WebSocket for alarm status + UI action dispatch ──────
-  // Lifted here so the connection persists regardless of which tab is active.
-
   const handleAgentStatus = useCallback(
     (_event: AgentStatusEvent) => {
       void queryClient.invalidateQueries({
@@ -92,7 +114,6 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
             };
             const path = pageMap[action.page];
             if (path) {
-              // Close any open drawers so they don't cover the new page
               drawerStack.closeAll();
               router.push(path);
             }
@@ -105,7 +126,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
           break;
       }
     },
-    [drawerStack, router, townId]
+    [drawerStack, router, townBasePath]
   );
 
   const alarmWs = useAlarmStatusWs(townId, {
@@ -114,6 +135,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
   });
 
   const sidebarLeft = isMobile ? '0px' : sidebarState === 'expanded' ? '16rem' : '3rem';
+  const horizontal = isHorizontal(position);
 
   const allTabs = [
     { id: 'status', label: 'Status', kind: 'status' as const, agentId: '' },
@@ -121,105 +143,651 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
     ...agentTabs,
   ];
 
-  // Default to mayor tab if nothing selected
   const effectiveActiveId = activeTabId ?? 'mayor';
   const activeTab = allTabs.find(t => t.id === effectiveActiveId) ?? allTabs[0];
 
+  // ── Resize drag logic ──────────────────────────────────────────────
+  const isDragging = useRef(false);
+  const startPos = useRef(0);
+  const startSize = useRef(0);
+
+  const onResizePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      isDragging.current = true;
+      startSize.current = size;
+      startPos.current = horizontal ? e.clientY : e.clientX;
+
+      const onPointerMove = (ev: PointerEvent) => {
+        if (!isDragging.current) return;
+        const currentPos = horizontal ? ev.clientY : ev.clientX;
+        // For bottom/right, dragging toward start of viewport increases size.
+        // For top/left, dragging away from start of viewport increases size.
+        const delta =
+          position === 'bottom' || position === 'right'
+            ? startPos.current - currentPos
+            : currentPos - startPos.current;
+        const newSize = clampSize(startSize.current + delta, position);
+        setSize(newSize);
+      };
+
+      const onPointerUp = () => {
+        isDragging.current = false;
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+      };
+
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = horizontal ? 'ns-resize' : 'ew-resize';
+      document.addEventListener('pointermove', onPointerMove);
+      document.addEventListener('pointerup', onPointerUp);
+    },
+    [size, position, horizontal, setSize]
+  );
+
+  // ── Compute container styles ───────────────────────────────────────
+  const totalSize = collapsed ? COLLAPSED_SIZE : COLLAPSED_SIZE + size;
+
+  const containerStyle = (() => {
+    const base: React.CSSProperties = { zIndex: 50 };
+
+    if (position === 'bottom') {
+      return {
+        ...base,
+        left: sidebarLeft,
+        right: 0,
+        bottom: 0,
+        height: totalSize,
+      };
+    }
+    if (position === 'top') {
+      return {
+        ...base,
+        left: sidebarLeft,
+        right: 0,
+        top: 0,
+        height: totalSize,
+      };
+    }
+    if (position === 'right') {
+      return {
+        ...base,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: totalSize,
+      };
+    }
+    // left
+    return {
+      ...base,
+      left: sidebarLeft,
+      top: 0,
+      bottom: 0,
+      width: totalSize,
+    };
+  })();
+
+  // Border class depends on which edge faces content
+  const borderClass = {
+    bottom: 'border-t',
+    top: 'border-b',
+    right: 'border-l',
+    left: 'border-r',
+  }[position];
+
+  // Resize handle — rendered as a flex child so it naturally sits at the correct edge
+  // and doesn't compete with content stacking contexts for pointer events.
+  const isVerticalHandle = !horizontal;
+  const resizeHandleClass = [
+    'group/resize shrink-0 flex items-center justify-center',
+    isVerticalHandle ? 'h-full w-2 cursor-ew-resize' : 'w-full h-2 cursor-ns-resize',
+  ].join(' ');
+  const resizeHandleIndicator = isVerticalHandle
+    ? 'h-8 w-0.5 rounded-full bg-white/0 group-hover/resize:bg-white/25 transition-colors'
+    : 'w-8 h-0.5 rounded-full bg-white/0 group-hover/resize:bg-white/25 transition-colors';
+
+  // ── Collapse chevron direction ─────────────────────────────────────
+  const CollapseIcon = (() => {
+    if (collapsed) {
+      // Show icon pointing toward expansion
+      return { bottom: ChevronUp, top: ChevronDown, right: ChevronLeft, left: ChevronRight }[
+        position
+      ];
+    }
+    // Show icon pointing toward collapse
+    return { bottom: ChevronDown, top: ChevronUp, right: ChevronRight, left: ChevronLeft }[
+      position
+    ];
+  })();
+
+  // ── Layout direction ───────────────────────────────────────────────
+  // Horizontal: tab bar is a row at top (bottom position) or bottom (top position),
+  //             content fills remaining height.
+  // Vertical:   tab bar is a column at top, content fills remaining width.
+
   return (
     <div
-      className="fixed right-0 bottom-0 z-50 border-t border-white/[0.08] bg-[#0a0a0a] transition-[left] duration-200 ease-linear"
-      style={{
-        left: sidebarLeft,
-        height: collapsed ? COLLAPSED_HEIGHT : COLLAPSED_HEIGHT + EXPANDED_HEIGHT,
-      }}
+      className={`fixed ${borderClass} border-white/[0.08] bg-[#0a0a0a] transition-[left] duration-200 ease-linear`}
+      style={containerStyle}
     >
-      {/* Tab bar */}
-      <div
-        className="flex items-center border-b border-white/[0.06]"
-        style={{ height: COLLAPSED_HEIGHT }}
+      <div className={`flex h-full w-full ${horizontal ? 'flex-col' : 'flex-row'}`}>
+        {position === 'bottom' && (
+          <>
+            {!collapsed && (
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+                <div className={resizeHandleIndicator} />
+              </div>
+            )}
+            <TabBar
+              allTabs={allTabs}
+              effectiveActiveId={effectiveActiveId}
+              collapsed={collapsed}
+              horizontal={horizontal}
+              position={position}
+              CollapseIcon={CollapseIcon}
+              setActiveTabId={setActiveTabId}
+              setCollapsed={setCollapsed}
+              setPosition={setPosition}
+              closeTab={closeTab}
+            />
+            <TerminalContent
+              activeTab={activeTab}
+              collapsed={collapsed}
+              horizontal={horizontal}
+              size={size}
+              townId={townId}
+              alarmWs={alarmWs}
+            />
+          </>
+        )}
+        {position === 'top' && (
+          <>
+            <TerminalContent
+              activeTab={activeTab}
+              collapsed={collapsed}
+              horizontal={horizontal}
+              size={size}
+              townId={townId}
+              alarmWs={alarmWs}
+            />
+            <TabBar
+              allTabs={allTabs}
+              effectiveActiveId={effectiveActiveId}
+              collapsed={collapsed}
+              horizontal={horizontal}
+              position={position}
+              CollapseIcon={CollapseIcon}
+              setActiveTabId={setActiveTabId}
+              setCollapsed={setCollapsed}
+              setPosition={setPosition}
+              closeTab={closeTab}
+            />
+            {!collapsed && (
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+                <div className={resizeHandleIndicator} />
+              </div>
+            )}
+          </>
+        )}
+        {position === 'right' && (
+          <>
+            {!collapsed && (
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+                <div className={resizeHandleIndicator} />
+              </div>
+            )}
+            <TabBar
+              allTabs={allTabs}
+              effectiveActiveId={effectiveActiveId}
+              collapsed={collapsed}
+              horizontal={horizontal}
+              position={position}
+              CollapseIcon={CollapseIcon}
+              setActiveTabId={setActiveTabId}
+              setCollapsed={setCollapsed}
+              setPosition={setPosition}
+              closeTab={closeTab}
+            />
+            <TerminalContent
+              activeTab={activeTab}
+              collapsed={collapsed}
+              horizontal={horizontal}
+              size={size}
+              townId={townId}
+              alarmWs={alarmWs}
+            />
+          </>
+        )}
+        {position === 'left' && (
+          <>
+            <TabBar
+              allTabs={allTabs}
+              effectiveActiveId={effectiveActiveId}
+              collapsed={collapsed}
+              horizontal={horizontal}
+              position={position}
+              CollapseIcon={CollapseIcon}
+              setActiveTabId={setActiveTabId}
+              setCollapsed={setCollapsed}
+              setPosition={setPosition}
+              closeTab={closeTab}
+            />
+            <TerminalContent
+              activeTab={activeTab}
+              collapsed={collapsed}
+              horizontal={horizontal}
+              size={size}
+              townId={townId}
+              alarmWs={alarmWs}
+            />
+            {!collapsed && (
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+                <div className={resizeHandleIndicator} />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Tab Bar ──────────────────────────────────────────────────────────────
+
+type TabDef = {
+  id: string;
+  label: string;
+  kind: 'mayor' | 'agent' | 'status';
+  agentId: string;
+};
+
+function TabBar({
+  allTabs,
+  effectiveActiveId,
+  collapsed,
+  horizontal,
+  position,
+  CollapseIcon,
+  setActiveTabId,
+  setCollapsed,
+  setPosition,
+  closeTab,
+}: {
+  allTabs: TabDef[];
+  effectiveActiveId: string;
+  collapsed: boolean;
+  horizontal: boolean;
+  position: TerminalPosition;
+  CollapseIcon: React.ComponentType<{ className?: string }>;
+  setActiveTabId: (id: string) => void;
+  setCollapsed: (collapsed: boolean) => void;
+  setPosition: (position: TerminalPosition) => void;
+  closeTab: (tabId: string) => void;
+}) {
+  const [showPositionPicker, setShowPositionPicker] = useState(false);
+  const [showBugMenu, setShowBugMenu] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const bugMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close picker on outside click
+  useEffect(() => {
+    if (!showPositionPicker && !showBugMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        showPositionPicker &&
+        pickerRef.current &&
+        !pickerRef.current.contains(e.target as Node)
+      ) {
+        setShowPositionPicker(false);
+      }
+      if (showBugMenu && bugMenuRef.current && !bugMenuRef.current.contains(e.target as Node)) {
+        setShowBugMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showPositionPicker, showBugMenu]);
+
+  const borderClass = horizontal ? 'border-b border-white/[0.06]' : 'border-r border-white/[0.06]';
+
+  return (
+    <div
+      className={`flex ${horizontal ? 'items-center' : 'flex-col items-stretch'} ${borderClass} shrink-0`}
+      style={horizontal ? { height: COLLAPSED_SIZE } : { width: COLLAPSED_SIZE }}
+    >
+      {/* Collapse toggle */}
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className={`flex items-center justify-center gap-1.5 text-white/40 transition-colors hover:text-white/60 ${
+          horizontal ? 'h-full px-3' : 'w-full py-3'
+        }`}
       >
-        {/* Collapse toggle */}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="flex h-full items-center gap-1.5 px-3 text-white/40 transition-colors hover:text-white/60"
-        >
-          <TerminalIcon className="size-3" />
-          {collapsed ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-        </button>
+        <TerminalIcon className="size-3" />
+        <CollapseIcon className="size-3" />
+      </button>
 
-        {/* Tabs */}
-        <div className="flex flex-1 items-center gap-0.5 overflow-x-auto px-1">
-          <AnimatePresence initial={false}>
-            {allTabs.map(tab => {
-              const isActive = tab.id === effectiveActiveId;
-              const isMayor = tab.kind === 'mayor';
+      {/* Tabs */}
+      <div
+        className={`flex ${horizontal ? 'flex-1 items-center gap-0.5 overflow-x-auto px-1' : 'flex-1 flex-col gap-0.5 overflow-y-auto py-1'}`}
+      >
+        <AnimatePresence initial={false}>
+          {allTabs.map(tab => {
+            const isActive = tab.id === effectiveActiveId;
+            const isMayor = tab.kind === 'mayor';
 
-              return (
-                <motion.div
-                  key={tab.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.85, width: 0 }}
-                  animate={{ opacity: 1, scale: 1, width: 'auto' }}
-                  exit={{ opacity: 0, scale: 0.85, width: 0 }}
-                  transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                  onClick={() => {
-                    setActiveTabId(tab.id);
-                    if (collapsed) setCollapsed(false);
-                  }}
-                  className={`group flex cursor-pointer items-center gap-1.5 overflow-hidden rounded-t-md px-3 py-1 text-[11px] whitespace-nowrap transition-colors ${
-                    isActive
-                      ? 'bg-white/[0.06] text-white/80'
-                      : 'text-white/35 hover:bg-white/[0.03] hover:text-white/55'
-                  }`}
-                >
-                  {isMayor && (
-                    <Crown className="size-3 shrink-0 text-[color:oklch(95%_0.15_108_/_0.6)]" />
-                  )}
-                  {tab.kind === 'status' && (
-                    <Activity className="size-3 shrink-0 text-[color:oklch(85%_0.12_200_/_0.6)]" />
-                  )}
-                  <span className="max-w-[120px] truncate">{tab.label}</span>
-                  {!isMayor && tab.kind !== 'status' && (
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        closeTab(tab.id);
-                      }}
-                      className="shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-white/10"
-                    >
-                      <X className="size-2.5" />
-                    </button>
-                  )}
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        </div>
+            return (
+              <motion.div
+                key={tab.id}
+                layout
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.85 }}
+                transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                onClick={() => {
+                  setActiveTabId(tab.id);
+                  if (collapsed) setCollapsed(false);
+                }}
+                className={`group flex cursor-pointer items-center whitespace-nowrap transition-colors ${
+                  horizontal
+                    ? `gap-1.5 overflow-hidden rounded-t-md px-3 py-1 text-[11px]`
+                    : `relative justify-center overflow-visible rounded-md px-1 py-2`
+                } ${
+                  isActive
+                    ? 'bg-white/[0.06] text-white/80'
+                    : 'text-white/35 hover:bg-white/[0.03] hover:text-white/55'
+                }`}
+                title={horizontal ? undefined : tab.label}
+              >
+                {isMayor && (
+                  <Crown
+                    className={`shrink-0 text-[color:oklch(95%_0.15_108_/_0.6)] ${horizontal ? 'size-3' : 'size-3.5'}`}
+                  />
+                )}
+                {tab.kind === 'status' && (
+                  <Activity
+                    className={`shrink-0 text-[color:oklch(85%_0.12_200_/_0.6)] ${horizontal ? 'size-3' : 'size-3.5'}`}
+                  />
+                )}
+                {tab.kind === 'agent' && !horizontal && (
+                  <TerminalIcon className="size-3.5 shrink-0" />
+                )}
+                {horizontal && <span className="max-w-[120px] truncate">{tab.label}</span>}
+                {!isMayor && tab.kind !== 'status' && (
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      closeTab(tab.id);
+                    }}
+                    className={`shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-white/10 ${
+                      horizontal ? '' : 'absolute -top-1 -right-1'
+                    }`}
+                  >
+                    <X className="size-2.5" />
+                  </button>
+                )}
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
       </div>
 
-      {/* Terminal content area */}
-      <AnimatePresence mode="wait">
-        {!collapsed && activeTab && (
-          <motion.div
-            key={activeTab.id}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            style={{ height: EXPANDED_HEIGHT }}
-            className="overflow-hidden"
+      {/* Bug report dropdown */}
+      {horizontal && (
+        <div ref={bugMenuRef} className="relative shrink-0">
+          <button
+            onClick={() => setShowBugMenu(p => !p)}
+            className="mr-2 flex items-center gap-1 rounded px-2 py-1 text-[10px] text-white/30 transition-colors hover:bg-white/[0.04] hover:text-white/50"
           >
-            {activeTab.kind === 'mayor' ? (
-              <MayorTerminalPane townId={townId} collapsed={collapsed} />
-            ) : activeTab.kind === 'status' ? (
-              <AlarmStatusPane townId={townId} alarmWs={alarmWs} />
-            ) : (
-              <AgentTerminalPane townId={townId} agentId={activeTab.agentId} />
-            )}
-          </motion.div>
+            <Bug className="size-3" />
+            <span className="hidden sm:inline">Report a Bug</span>
+          </button>
+          {showBugMenu && (
+            <BugReportMenu
+              position={position}
+              triggerRef={bugMenuRef}
+              onClose={() => setShowBugMenu(false)}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Position picker */}
+      <div ref={pickerRef}>
+        <button
+          onClick={() => setShowPositionPicker(p => !p)}
+          className={`flex items-center justify-center text-white/30 transition-colors hover:text-white/50 ${
+            horizontal ? 'h-full px-2' : 'w-full py-2'
+          }`}
+          title="Change terminal position"
+        >
+          {position === 'bottom' && <PanelBottom className="size-3.5" />}
+          {position === 'top' && <PanelTop className="size-3.5" />}
+          {position === 'left' && <PanelLeft className="size-3.5" />}
+          {position === 'right' && <PanelRight className="size-3.5" />}
+        </button>
+        {showPositionPicker && (
+          <PositionPicker
+            current={position}
+            onSelect={p => {
+              setPosition(p);
+              setShowPositionPicker(false);
+            }}
+            position={position}
+            triggerRef={pickerRef}
+          />
         )}
-      </AnimatePresence>
+      </div>
     </div>
+  );
+}
+
+// ── Position Picker Popup ────────────────────────────────────────────────
+
+const POSITION_OPTIONS: { value: TerminalPosition; label: string; Icon: typeof PanelBottom }[] = [
+  { value: 'bottom', label: 'Bottom', Icon: PanelBottom },
+  { value: 'top', label: 'Top', Icon: PanelTop },
+  { value: 'left', label: 'Left', Icon: PanelLeft },
+  { value: 'right', label: 'Right', Icon: PanelRight },
+];
+
+function PositionPicker({
+  current,
+  onSelect,
+  position,
+  triggerRef,
+}: {
+  current: TerminalPosition;
+  onSelect: (p: TerminalPosition) => void;
+  position: TerminalPosition;
+  triggerRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<React.CSSProperties>({ opacity: 0 });
+
+  useEffect(() => {
+    const trigger = triggerRef.current;
+    const popover = popoverRef.current;
+    if (!trigger || !popover) return;
+    const tr = trigger.getBoundingClientRect();
+    const pr = popover.getBoundingClientRect();
+    const gap = 4;
+
+    let top: number;
+    let left: number;
+
+    if (position === 'bottom') {
+      top = tr.top - pr.height - gap;
+      left = tr.right - pr.width;
+    } else if (position === 'top') {
+      top = tr.bottom + gap;
+      left = tr.right - pr.width;
+    } else if (position === 'left') {
+      top = tr.top;
+      left = tr.right + gap;
+    } else {
+      // right
+      top = tr.top;
+      left = tr.left - pr.width - gap;
+    }
+
+    // Clamp to viewport
+    top = Math.max(4, Math.min(top, window.innerHeight - pr.height - 4));
+    left = Math.max(4, Math.min(left, window.innerWidth - pr.width - 4));
+
+    setStyle({ top, left, opacity: 1 });
+  }, [position, triggerRef]);
+
+  return (
+    <div
+      ref={popoverRef}
+      className="fixed z-[60] w-max rounded-lg border border-white/[0.15] bg-[#1e1e1e] p-1.5 shadow-2xl backdrop-blur-sm"
+      style={style}
+    >
+      <div className="grid grid-cols-2 gap-1">
+        {POSITION_OPTIONS.map(({ value, label, Icon }) => (
+          <button
+            key={value}
+            onClick={() => onSelect(value)}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-[11px] whitespace-nowrap transition-colors ${
+              current === value
+                ? 'bg-white/[0.12] text-white/90'
+                : 'text-white/50 hover:bg-white/[0.07] hover:text-white/70'
+            }`}
+          >
+            <Icon className="size-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Bug Report Menu ──────────────────────────────────────────────────────
+
+const BUG_REPORT_OPTIONS = [
+  {
+    label: 'New GitHub Issue',
+    href: 'https://github.com/Kilo-Org/cloud/issues/new?template=gastown-bug.yml&labels=gastown,bug',
+    Icon: Github,
+  },
+  {
+    label: 'Discord Channel',
+    href: 'https://discord.com/channels/1349288496988160052/1485796776635142174',
+    Icon: MessageCircle,
+  },
+];
+
+function BugReportMenu({
+  position,
+  triggerRef,
+  onClose,
+}: {
+  position: TerminalPosition;
+  triggerRef: React.RefObject<HTMLDivElement | null>;
+  onClose: () => void;
+}) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<React.CSSProperties>({ opacity: 0 });
+
+  useEffect(() => {
+    const trigger = triggerRef.current;
+    const popover = popoverRef.current;
+    if (!trigger || !popover) return;
+    const tr = trigger.getBoundingClientRect();
+    const pr = popover.getBoundingClientRect();
+    const gap = 4;
+
+    let top: number;
+    let left: number;
+
+    if (position === 'bottom') {
+      top = tr.top - pr.height - gap;
+      left = tr.left;
+    } else if (position === 'top') {
+      top = tr.bottom + gap;
+      left = tr.left;
+    } else if (position === 'left') {
+      top = tr.top;
+      left = tr.right + gap;
+    } else {
+      top = tr.top;
+      left = tr.left - pr.width - gap;
+    }
+
+    top = Math.max(4, Math.min(top, window.innerHeight - pr.height - 4));
+    left = Math.max(4, Math.min(left, window.innerWidth - pr.width - 4));
+
+    setStyle({ top, left, opacity: 1 });
+  }, [position, triggerRef]);
+
+  return (
+    <div
+      ref={popoverRef}
+      className="fixed z-[60] w-max rounded-lg border border-white/[0.15] bg-[#1e1e1e] p-1.5 shadow-2xl backdrop-blur-sm"
+      style={style}
+    >
+      <div className="flex flex-col gap-0.5">
+        {BUG_REPORT_OPTIONS.map(({ label, href, Icon }) => (
+          <a
+            key={label}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onClose}
+            className="flex items-center gap-2 rounded-md px-3 py-2 text-[11px] text-white/50 whitespace-nowrap transition-colors hover:bg-white/[0.07] hover:text-white/70"
+          >
+            <Icon className="size-3.5" />
+            {label}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Terminal Content Area ─────────────────────────────────────────────────
+
+function TerminalContent({
+  activeTab,
+  collapsed,
+  horizontal,
+  size,
+  townId,
+  alarmWs,
+}: {
+  activeTab: TabDef;
+  collapsed: boolean;
+  horizontal: boolean;
+  size: number;
+  townId: string;
+  alarmWs: AlarmWsResult;
+}) {
+  if (collapsed) return null;
+
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={activeTab.id}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        style={horizontal ? { height: size } : { width: size }}
+        className={`overflow-hidden ${horizontal ? '' : 'h-full'}`}
+      >
+        {activeTab.kind === 'mayor' ? (
+          <MayorTerminalPane townId={townId} collapsed={collapsed} />
+        ) : activeTab.kind === 'status' ? (
+          <AlarmStatusPane townId={townId} alarmWs={alarmWs} horizontal={horizontal} />
+        ) : (
+          <AgentTerminalPane townId={townId} agentId={activeTab.agentId} />
+        )}
+      </motion.div>
+    </AnimatePresence>
   );
 }
 
@@ -315,16 +883,10 @@ function useAlarmStatusWs(
         const msg = parsed as Record<string, unknown>;
 
         if (msg.type === 'agent_status') {
-          // Lightweight agent_status event — dispatch to callback, don't
-          // overwrite the alarm status snapshot.
           onAgentStatusRef.current?.(parsed as AgentStatusEvent);
         } else if (msg.channel === 'ui_action') {
-          // UI action from the mayor — dispatch to callback for DrawerStack/router.
           onUiActionRef.current?.(parsed as UiActionEvent);
         } else if ('alarm' in msg) {
-          // Only alarm snapshots have an `alarm` field. Bead, convoy,
-          // and other channel frames are silently ignored here to avoid
-          // overwriting the status data with the wrong shape.
           setData(parsed as AlarmStatus);
         }
       } catch {
@@ -335,7 +897,6 @@ function useAlarmStatusWs(
     ws.onclose = () => {
       if (!mountedRef.current) return;
       setConnected(false);
-      // Reconnect after 3s
       reconnectTimerRef.current = setTimeout(connect, 3_000);
     };
 
@@ -365,14 +926,19 @@ type AlarmWsResult = {
   error: string | null;
 };
 
-function AlarmStatusPane({ townId, alarmWs }: { townId: string; alarmWs: AlarmWsResult }) {
+function AlarmStatusPane({
+  townId,
+  alarmWs,
+  horizontal,
+}: {
+  townId: string;
+  alarmWs: AlarmWsResult;
+  horizontal: boolean;
+}) {
   const trpc = useGastownTRPC();
 
   const { data: wsData, connected: wsConnected, error: wsError } = alarmWs;
 
-  // Fall back to polling when WebSocket is unavailable (blocked, errored,
-  // or never connected). The tRPC query is disabled while the WS is
-  // providing data to avoid redundant requests.
   const wsFailed = !!wsError && !wsData;
   const pollingQuery = useQuery({
     ...trpc.gastown.getAlarmStatus.queryOptions({ townId }),
@@ -404,143 +970,174 @@ function AlarmStatusPane({ townId, alarmWs }: { townId: string; alarmWs: AlarmWs
     data.patrol.stalledAgents > 0 ||
     data.patrol.orphanedHooks > 0;
 
+  // Vertical orientation: single-column stacked layout
+  if (!horizontal) {
+    return (
+      <div className="relative flex h-full flex-col gap-2 overflow-y-auto p-3 text-[11px] text-white/70">
+        <ConnectionIndicator connected={wsConnected} failed={wsFailed} />
+        <StatusCards data={data} hasIssues={hasIssues} />
+        <EventFeed events={data.recentEvents} />
+      </div>
+    );
+  }
+
+  // Horizontal: two-column layout
   return (
     <div className="relative flex h-full gap-3 overflow-hidden p-3 text-[11px] text-white/70">
-      {/* Connection indicator */}
-      <div className="absolute top-1.5 right-3 z-10 flex items-center gap-1.5">
-        <span
-          className={`size-1.5 rounded-full ${wsConnected ? 'bg-emerald-400' : wsFailed ? 'bg-blue-400' : 'animate-pulse bg-yellow-400'}`}
-        />
-        <span className="text-[10px] text-white/35">
-          {wsConnected ? 'Live' : wsFailed ? 'Polling' : 'Reconnecting...'}
-        </span>
-      </div>
+      <ConnectionIndicator connected={wsConnected} failed={wsFailed} />
 
       {/* Left column: status cards */}
       <div className="flex w-[340px] shrink-0 flex-col gap-2 overflow-y-auto">
-        {/* Alarm */}
-        <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2">
-          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
-            <Activity className="size-3" />
-            Alarm Loop
-          </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            <StatusRow label="Interval" value={data.alarm.intervalLabel} />
-            <StatusRow
-              label="Next fire"
-              value={data.alarm.nextFireAt ? formatRelativeTime(data.alarm.nextFireAt) : 'not set'}
-              warn={!data.alarm.nextFireAt}
-            />
-          </div>
-        </div>
-
-        {/* Agents */}
-        <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2">
-          <div className="mb-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
-            Agents ({data.agents.total})
-          </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            <StatusRow
-              label="Working"
-              value={data.agents.working}
-              highlight={data.agents.working > 0}
-            />
-            <StatusRow label="Idle" value={data.agents.idle} />
-            <StatusRow label="Stalled" value={data.agents.stalled} warn={data.agents.stalled > 0} />
-            <StatusRow label="Dead" value={data.agents.dead} warn={data.agents.dead > 0} />
-          </div>
-        </div>
-
-        {/* Beads */}
-        <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2">
-          <div className="mb-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
-            Beads
-          </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            <StatusRow label="Open" value={data.beads.open} />
-            <StatusRow
-              label="In Progress"
-              value={data.beads.inProgress}
-              highlight={data.beads.inProgress > 0}
-            />
-            <StatusRow
-              label="In Review"
-              value={data.beads.inReview}
-              highlight={data.beads.inReview > 0}
-            />
-            <StatusRow label="Failed" value={data.beads.failed} warn={data.beads.failed > 0} />
-            <StatusRow
-              label="Triage"
-              value={data.beads.triageRequests}
-              warn={data.beads.triageRequests > 0}
-            />
-          </div>
-        </div>
-
-        {/* Patrol */}
-        <div
-          className={`rounded-md border p-2 ${
-            hasIssues
-              ? 'border-yellow-500/20 bg-yellow-500/[0.03]'
-              : 'border-white/[0.06] bg-white/[0.02]'
-          }`}
-        >
-          <div className="mb-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
-            Patrol {hasIssues ? '(issues detected)' : ''}
-          </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            <StatusRow
-              label="GUPP Warns"
-              value={data.patrol.guppWarnings}
-              warn={data.patrol.guppWarnings > 0}
-            />
-            <StatusRow
-              label="GUPP Escalations"
-              value={data.patrol.guppEscalations}
-              warn={data.patrol.guppEscalations > 0}
-            />
-            <StatusRow
-              label="Stalled"
-              value={data.patrol.stalledAgents}
-              warn={data.patrol.stalledAgents > 0}
-            />
-            <StatusRow
-              label="Orphaned Hooks"
-              value={data.patrol.orphanedHooks}
-              warn={data.patrol.orphanedHooks > 0}
-            />
-          </div>
-        </div>
+        <StatusCards data={data} hasIssues={hasIssues} />
       </div>
 
       {/* Right column: event feed */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-white/[0.06] bg-white/[0.02]">
-        <div className="border-b border-white/[0.06] px-2.5 py-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
-          Recent Events
+      <EventFeed events={data.recentEvents} />
+    </div>
+  );
+}
+
+function ConnectionIndicator({ connected, failed }: { connected: boolean; failed: boolean }) {
+  return (
+    <div className="absolute top-1.5 right-3 z-10 flex items-center gap-1.5">
+      <span
+        className={`size-1.5 rounded-full ${connected ? 'bg-emerald-400' : failed ? 'bg-blue-400' : 'animate-pulse bg-yellow-400'}`}
+      />
+      <span className="text-[10px] text-white/35">
+        {connected ? 'Live' : failed ? 'Polling' : 'Reconnecting...'}
+      </span>
+    </div>
+  );
+}
+
+function StatusCards({ data, hasIssues }: { data: AlarmStatus; hasIssues: boolean }) {
+  return (
+    <>
+      {/* Alarm */}
+      <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2">
+        <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
+          <Activity className="size-3" />
+          Alarm Loop
         </div>
-        <div className="flex-1 overflow-y-auto">
-          {data.recentEvents.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-white/20">
-              No recent events
-            </div>
-          ) : (
-            <div className="divide-y divide-white/[0.04]">
-              {data.recentEvents.map((event, i) => (
-                <div key={i} className="flex items-baseline gap-2 px-2.5 py-1.5">
-                  <span className="shrink-0 text-[10px] text-white/25 tabular-nums">
-                    {formatTime(event.time)}
-                  </span>
-                  <span
-                    className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-medium ${eventTypeColor(event.type)}`}
-                  >
-                    {event.type}
-                  </span>
-                  <span className="min-w-0 truncate">{event.message}</span>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+          <StatusRow label="Interval" value={data.alarm.intervalLabel} />
+          <StatusRow
+            label="Next fire"
+            value={data.alarm.nextFireAt ? formatRelativeTime(data.alarm.nextFireAt) : 'not set'}
+            warn={!data.alarm.nextFireAt}
+          />
         </div>
+      </div>
+
+      {/* Agents */}
+      <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2">
+        <div className="mb-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
+          Agents ({data.agents.total})
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+          <StatusRow
+            label="Working"
+            value={data.agents.working}
+            highlight={data.agents.working > 0}
+          />
+          <StatusRow label="Idle" value={data.agents.idle} />
+          <StatusRow label="Stalled" value={data.agents.stalled} warn={data.agents.stalled > 0} />
+          <StatusRow label="Dead" value={data.agents.dead} warn={data.agents.dead > 0} />
+        </div>
+      </div>
+
+      {/* Beads */}
+      <div className="rounded-md border border-white/[0.06] bg-white/[0.02] p-2">
+        <div className="mb-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
+          Beads
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+          <StatusRow label="Open" value={data.beads.open} />
+          <StatusRow
+            label="In Progress"
+            value={data.beads.inProgress}
+            highlight={data.beads.inProgress > 0}
+          />
+          <StatusRow
+            label="In Review"
+            value={data.beads.inReview}
+            highlight={data.beads.inReview > 0}
+          />
+          <StatusRow label="Failed" value={data.beads.failed} warn={data.beads.failed > 0} />
+          <StatusRow
+            label="Triage"
+            value={data.beads.triageRequests}
+            warn={data.beads.triageRequests > 0}
+          />
+        </div>
+      </div>
+
+      {/* Patrol */}
+      <div
+        className={`rounded-md border p-2 ${
+          hasIssues
+            ? 'border-yellow-500/20 bg-yellow-500/[0.03]'
+            : 'border-white/[0.06] bg-white/[0.02]'
+        }`}
+      >
+        <div className="mb-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
+          Patrol {hasIssues ? '(issues detected)' : ''}
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+          <StatusRow
+            label="GUPP Warns"
+            value={data.patrol.guppWarnings}
+            warn={data.patrol.guppWarnings > 0}
+          />
+          <StatusRow
+            label="GUPP Escalations"
+            value={data.patrol.guppEscalations}
+            warn={data.patrol.guppEscalations > 0}
+          />
+          <StatusRow
+            label="Stalled"
+            value={data.patrol.stalledAgents}
+            warn={data.patrol.stalledAgents > 0}
+          />
+          <StatusRow
+            label="Orphaned Hooks"
+            value={data.patrol.orphanedHooks}
+            warn={data.patrol.orphanedHooks > 0}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function EventFeed({ events }: { events: Array<{ time: string; type: string; message: string }> }) {
+  return (
+    <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-white/[0.06] bg-white/[0.02]">
+      <div className="border-b border-white/[0.06] px-2.5 py-1.5 text-[10px] font-medium tracking-wide text-white/40 uppercase">
+        Recent Events
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {events.length === 0 ? (
+          <div className="flex h-full items-center justify-center text-white/20">
+            No recent events
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.04]">
+            {events.map((event, i) => (
+              <div key={i} className="flex items-baseline gap-2 px-2.5 py-1.5">
+                <span className="shrink-0 text-[10px] text-white/25 tabular-nums">
+                  {formatTime(event.time)}
+                </span>
+                <span
+                  className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-medium ${eventTypeColor(event.type)}`}
+                >
+                  {event.type}
+                </span>
+                <span className="min-w-0 truncate">{event.message}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -675,13 +1272,14 @@ function MayorTerminalPane({ townId, collapsed }: { townId: string; collapsed: b
   });
 
   const { state: sidebarState } = useSidebar();
+  const { position, size } = useTerminalBar();
 
-  // Re-fit terminal when expanding or sidebar changes
+  // Re-fit terminal when expanding, sidebar changes, or size/position changes
   useEffect(() => {
     if (collapsed || !fitAddonRef.current) return;
     const t = setTimeout(() => fitAddonRef.current?.fit(), 50);
     return () => clearTimeout(t);
-  }, [collapsed, sidebarState]);
+  }, [collapsed, sidebarState, position, size]);
 
   return (
     <div className="relative h-full">

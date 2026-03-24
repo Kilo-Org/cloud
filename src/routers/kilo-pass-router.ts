@@ -85,6 +85,7 @@ const KiloPassSubscriptionStateSchema = KiloPassSubscriptionStateBaseSchema.exte
 
 const GetStateOutputSchema = z.object({
   subscription: KiloPassSubscriptionStateSchema.nullable(),
+  isEligibleForFirstMonthPromo: z.boolean(),
 });
 
 const GetAverageMonthlyUsageLast3MonthsOutputSchema = z.object({
@@ -233,10 +234,6 @@ const CreateCheckoutSessionOutputSchema = z.object({
   url: z.url().nullable(),
 });
 
-const FirstMonthPromoEligibilityOutputSchema = z.object({
-  eligible: z.boolean(),
-});
-
 const CancelSubscriptionOutputSchema = z.object({
   success: z.boolean(),
 });
@@ -311,7 +308,7 @@ export const kiloPassRouter = createTRPCRouter({
   getState: baseProcedure.output(GetStateOutputSchema).query(async ({ ctx }) => {
     const subscriptionBase = await getKiloPassStateForUser(db, ctx.user.id);
     if (!subscriptionBase) {
-      return { subscription: null };
+      return { subscription: null, isEligibleForFirstMonthPromo: true };
     }
 
     const stripeCustomerId = ctx.user.stripe_customer_id;
@@ -346,6 +343,7 @@ export const kiloPassRouter = createTRPCRouter({
           isBonusUnlocked: false,
           refillAt: null,
         },
+        isEligibleForFirstMonthPromo: false,
       };
     }
 
@@ -473,6 +471,7 @@ export const kiloPassRouter = createTRPCRouter({
         isBonusUnlocked,
         refillAt,
       },
+      isEligibleForFirstMonthPromo: false,
     };
   }),
 
@@ -507,14 +506,6 @@ export const kiloPassRouter = createTRPCRouter({
         subscription,
         creditsAwarded: issuedBaseCredits.length > 0,
       };
-    }),
-
-  getFirstMonthPromoEligibility: baseProcedure
-    .output(FirstMonthPromoEligibilityOutputSchema)
-    .query(async ({ ctx }) => {
-      const subscription = await getKiloPassStateForUser(db, ctx.user.id);
-
-      return { eligible: !subscription };
     }),
 
   getCustomerPortalUrl: baseProcedure
@@ -824,6 +815,7 @@ export const kiloPassRouter = createTRPCRouter({
         }
 
         const updatedSchedule = await stripe.subscriptionSchedules.update(schedule.id, {
+          metadata: { origin: 'kilo-pass-switch' },
           // We want the subscription to continue normally after the final phase starts.
           // Without this, Stripe may require the last phase to specify `duration`/`end_date`.
           end_behavior: 'release',

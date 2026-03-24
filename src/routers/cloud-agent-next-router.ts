@@ -100,6 +100,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         const result = await client.prepareSession({
           ...restInput,
           ...gitParams,
+          createdOnPlatform: 'cloud-agent-web',
           envVars: merged.envVars,
           encryptedSecrets: merged.encryptedSecrets,
           setupCommands: merged.setupCommands,

@@ -8,6 +8,6 @@ export default async function AgentsPage({ params }: { params: Promise<{ townId:
   const user = await getUserFromAuthOrRedirect(
     `/users/sign_in?callbackPath=/gastown/${townId}/agents`
   );
-  if (!(await isGastownEnabled(user.id))) return notFound();
+  if (!(await isGastownEnabled(user.id, { isAdmin: user.is_admin }))) return notFound();
   return <AgentsPageClient townId={townId} />;
 }

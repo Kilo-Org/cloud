@@ -358,10 +358,24 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
       };
     }),
   getAutocomplete: organizationMemberProcedure
-    .input(OrganizationIdInputSchema)
+    .input(
+      OrganizationIdInputSchema.extend({
+        period: TimePeriodSchema.default('month'),
+      })
+    )
     .output(AutocompleteMetricsOutputSchema)
     .query(async ({ input }) => {
-      const { organizationId } = input;
+      const { organizationId, period } = input;
+
+      const dateThreshold = getDateThreshold(period);
+
+      const whereConditions = [
+        eq(microdollar_usage.organization_id, organizationId),
+        eq(microdollar_usage.model, AUTOCOMPLETE_MODEL),
+      ];
+      if (dateThreshold) {
+        whereConditions.push(gte(microdollar_usage.created_at, dateThreshold));
+      }
 
       const result = await timedUsageQuery(
         {
@@ -369,7 +383,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
           route: 'organizations.usageDetails.getAutocomplete',
           queryLabel: 'org_autocomplete_aggregate',
           scope: 'org',
-          period: null,
+          period,
         },
         tx =>
           tx
@@ -379,12 +393,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               total_tokens: sql<number>`COALESCE(SUM(${microdollar_usage.input_tokens}) + SUM(${microdollar_usage.output_tokens}), 0)::float`,
             })
             .from(microdollar_usage)
-            .where(
-              and(
-                eq(microdollar_usage.organization_id, organizationId),
-                eq(microdollar_usage.model, AUTOCOMPLETE_MODEL)
-              )
-            )
+            .where(and(...whereConditions))
       );
 
       const metrics = result[0] || { total_cost: 0, request_count: 0, total_tokens: 0 };

@@ -11,7 +11,7 @@ export default async function TownOverviewPage({
   const { townId } = await params;
   const user = await getUserFromAuthOrRedirect(`/users/sign_in?callbackPath=/gastown/${townId}`);
 
-  if (!(await isGastownEnabled(user.id))) {
+  if (!(await isGastownEnabled(user.id, { isAdmin: user.is_admin }))) {
     return notFound();
   }
 

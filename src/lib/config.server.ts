@@ -110,11 +110,17 @@ export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
 export const SLACK_CLIENT_SECRET = getEnvVariable('SLACK_CLIENT_SECRET');
 export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
 
-// Discord
+// Discord (bot integration — existing)
 export const DISCORD_CLIENT_ID = getEnvVariable('DISCORD_CLIENT_ID');
 export const DISCORD_CLIENT_SECRET = getEnvVariable('DISCORD_CLIENT_SECRET');
 export const DISCORD_BOT_TOKEN = getEnvVariable('DISCORD_BOT_TOKEN');
 export const DISCORD_PUBLIC_KEY = getEnvVariable('DISCORD_PUBLIC_KEY');
+
+// Discord (OAuth user-linking app — separate application for auth + guild membership)
+export const DISCORD_OAUTH_CLIENT_ID = getEnvVariable('DISCORD_OAUTH_CLIENT_ID');
+export const DISCORD_OAUTH_CLIENT_SECRET = getEnvVariable('DISCORD_OAUTH_CLIENT_SECRET');
+export const DISCORD_OAUTH_BOT_TOKEN = getEnvVariable('DISCORD_OAUTH_BOT_TOKEN');
+export const DISCORD_SERVER_ID = getEnvVariable('DISCORD_SERVER_ID');
 
 // Posts user feedback into a fixed Slack channel in the Kilo workspace.
 // Expected to be a Slack Incoming Webhook URL.
@@ -183,21 +189,9 @@ export const STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID = getEnvVariable(
 export const STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID = getEnvVariable(
   'STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID'
 );
-export const STRIPE_KILOCLAW_STANDARD_FIRST_MONTH_COUPON_ID = getEnvVariable(
-  'STRIPE_KILOCLAW_STANDARD_FIRST_MONTH_COUPON_ID'
+export const STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID = getEnvVariable(
+  'STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID'
 );
-
-// KiloClaw Billing — ISO 8601 date after which new checkouts are billed immediately
-// (before this date, new subscriptions get a delayed trial_end so billing starts on launch day).
-// Validated at startup so a malformed value causes a clear error instead of silently
-// falling back to immediate billing.
-const rawBillingStart = getEnvVariable('STRIPE_KILOCLAW_BILLING_START');
-if (rawBillingStart && Number.isNaN(new Date(rawBillingStart).getTime())) {
-  throw new Error(
-    `Invalid STRIPE_KILOCLAW_BILLING_START: '${rawBillingStart}'. Must be a valid ISO 8601 date or left empty.`
-  );
-}
-export const STRIPE_KILOCLAW_BILLING_START = rawBillingStart;
 
 // KiloClaw Billing Enforcement — opt-in gate for subscription/trial/earlybird checks.
 // When false (default), all billing gates are no-ops so users are never blocked.

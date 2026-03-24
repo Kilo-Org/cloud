@@ -4,7 +4,10 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { readDb } from '@/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
 import { microdollar_usage } from '@kilocode/db/schema';
-import { eq, sql, desc, isNull, and } from 'drizzle-orm';
+import { eq, sql, desc, isNull, and, gte } from 'drizzle-orm';
+import { getDateThreshold, type Period } from '@/routers/user-router';
+
+const VALID_PERIODS = new Set(['week', 'month', 'year', 'all']);
 
 export async function GET(request: NextRequest) {
   const { user, authFailedResponse } = await getUserFromAuth({
@@ -16,6 +19,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const groupByModel = searchParams.get('groupByModel') === 'true';
   const viewType = searchParams.get('viewType') || 'personal'; // 'personal', 'all', or organization ID
+  const periodParam = searchParams.get('period') || 'week';
+  const period: Period = VALID_PERIODS.has(periodParam) ? (periodParam as Period) : 'week';
 
   const userId = user.id;
 
@@ -41,23 +46,18 @@ export async function GET(request: NextRequest) {
     ...(groupByModel ? [microdollar_usage.model] : []),
   ];
 
-  // Build where clause based on view type
-  let whereClause;
+  // Build where conditions based on view type
+  const conditions = [eq(microdollar_usage.kilo_user_id, userId)];
+
   if (viewType === 'personal') {
-    // Personal usage only (no org)
-    whereClause = and(
-      eq(microdollar_usage.kilo_user_id, userId),
-      isNull(microdollar_usage.organization_id)
-    );
-  } else if (viewType === 'all') {
-    // All usage for this user (both personal and org)
-    whereClause = eq(microdollar_usage.kilo_user_id, userId);
-  } else {
-    // Specific organization usage (viewType is the organization ID)
-    whereClause = and(
-      eq(microdollar_usage.kilo_user_id, userId),
-      eq(microdollar_usage.organization_id, viewType)
-    );
+    conditions.push(isNull(microdollar_usage.organization_id));
+  } else if (viewType !== 'all') {
+    conditions.push(eq(microdollar_usage.organization_id, viewType));
+  }
+
+  const dateThreshold = getDateThreshold(period);
+  if (dateThreshold) {
+    conditions.push(gte(microdollar_usage.created_at, dateThreshold));
   }
 
   // Query usage data
@@ -67,13 +67,13 @@ export async function GET(request: NextRequest) {
       route: 'profile/usage',
       queryLabel: 'profile_usage_by_date',
       scope: 'user',
-      period: null,
+      period,
     },
     tx =>
       tx
         .select(selectFields)
         .from(microdollar_usage)
-        .where(whereClause)
+        .where(and(...conditions))
         .groupBy(...groupByClause)
         .orderBy(...orderByClause)
   );

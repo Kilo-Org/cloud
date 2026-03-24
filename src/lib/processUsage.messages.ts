@@ -1,5 +1,3 @@
-// TODO review this file
-
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
@@ -11,29 +9,34 @@ import type {
   MicrodollarUsageStats,
   NotYetCostedUsageStats,
   PromptInfo,
+  VercelProviderMetaData,
 } from '@/lib/processUsage.types';
 import type { GatewayMessagesRequest } from '@/lib/providers/openrouter/types';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/processUsage.constants';
 import type Anthropic from '@anthropic-ai/sdk';
 
-// ref: https://docs.anthropic.com/en/api/messages
+type MaybeHasVercelProviderMetadata = {
+  provider_metadata?: VercelProviderMetaData;
+};
+
 // Anthropic usage combined with OpenRouter cost fields
 // ref: https://docs.anthropic.com/en/api/messages
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
-type MessagesApiUsage = Anthropic.Messages.Usage & {
+type MessagesApiUsage = Anthropic.Messages.MessageDeltaUsage & {
   cost?: number;
   is_byok?: boolean | null;
   cost_details?: { upstream_inference_cost: number };
 };
 
-function processMessagesApiUsage(
+export function processMessagesApiUsage(
   usage: MessagesApiUsage | null | undefined,
+  providerMetadata: VercelProviderMetaData | null | undefined,
   coreProps: NotYetCostedUsageStats
 ): JustTheCostsUsageStats {
-  const inputTokens = usage?.input_tokens ?? 0;
-  const outputTokens = usage?.output_tokens ?? 0;
   const cacheHitTokens = usage?.cache_read_input_tokens ?? 0;
   const cacheWriteTokens = usage?.cache_creation_input_tokens ?? 0;
+  const inputTokens = (usage?.input_tokens ?? 0) + cacheHitTokens + cacheWriteTokens;
+  const outputTokens = usage?.output_tokens ?? 0;
 
   // OpenRouter path: cost fields are present directly in usage
   if (usage?.cost != null || usage?.is_byok != null) {
@@ -63,6 +66,21 @@ function processMessagesApiUsage(
       });
     }
     return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, cost_mUsd, is_byok };
+  }
+
+  // Vercel path: cost is in provider_metadata.gateway
+  const vercelGateway = providerMetadata?.gateway;
+  if (vercelGateway?.marketCost != null || vercelGateway?.cost != null) {
+    const marketCost_USD = parseFloat(vercelGateway.marketCost ?? vercelGateway.cost ?? '0');
+    const cost_mUsd = toMicrodollars(isNaN(marketCost_USD) ? 0 : marketCost_USD);
+    return {
+      inputTokens,
+      outputTokens,
+      cacheHitTokens,
+      cacheWriteTokens,
+      cost_mUsd,
+      is_byok: null,
+    };
   }
 
   // No cost info available
@@ -99,9 +117,10 @@ export async function parseMessagesMicrodollarUsageFromStream(
   const reportedError = statusCode >= 400;
   const startedAt = performance.now();
   let firstTokenReceived = false;
-  let inputUsage: MessagesApiUsage | null = null;
-  let outputTokens = 0;
+  let usage: MessagesApiUsage | null = null;
   let finish_reason: string | null = null;
+  let providerMetadata: VercelProviderMetaData | null = null;
+  let inference_provider: string | null = null;
 
   const reader = stream.getReader();
   const decoder = new TextDecoder();
@@ -117,6 +136,10 @@ export async function parseMessagesMicrodollarUsageFromStream(
         timeToFirstTokenSpan.end();
       }
 
+      if (event.data === '[DONE]') {
+        return;
+      }
+
       const json = JSON.parse(event.data) as Anthropic.Messages.MessageStreamEvent;
 
       if (!json) {
@@ -126,19 +149,9 @@ export async function parseMessagesMicrodollarUsageFromStream(
         return;
       }
 
-      //if (json.type === 'error') {
-      //  reportedError = true;
-      //  captureException(new Error(`Messages API error: ${json.error.message}`), {
-      //    tags: { source: 'messages_sse_processing' },
-      //    extra: { json, event },
-      //  });
-      //  return;
-      //}
-
       if (json.type === 'message_start') {
         messageId = json.message.id;
         model = json.message.model;
-        inputUsage = json.message.usage;
       }
 
       if (
@@ -151,7 +164,12 @@ export async function parseMessagesMicrodollarUsageFromStream(
 
       if (json.type === 'message_delta') {
         finish_reason = json.delta.stop_reason;
-        outputTokens = json.usage.output_tokens;
+        usage = json.usage ?? usage;
+        const meta = (json as MaybeHasVercelProviderMetadata).provider_metadata;
+        if (meta) {
+          providerMetadata = meta;
+          inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
+        }
       }
     },
   });
@@ -174,7 +192,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
     streamProcessingSpan.end();
   }
 
-  if (!reportedError && !inputUsage) {
+  if (!reportedError && !usage) {
     captureMessage('SUSPICIOUS: No usage in Messages API stream', {
       level: 'warning',
       tags: { source: 'messages_usage_processing' },
@@ -182,16 +200,12 @@ export async function parseMessagesMicrodollarUsageFromStream(
     });
   }
 
-  // Merge input and output usage together
-  const usage: MessagesApiUsage | null =
-    inputUsage !== null ? Object.assign({}, inputUsage, { output_tokens: outputTokens }) : null;
-
   const coreProps = {
     messageId,
     hasError: reportedError || wasAborted,
     model,
     responseContent,
-    inference_provider: null,
+    inference_provider,
     finish_reason,
     upstream_id: null,
     latency: null,
@@ -201,7 +215,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
     cancelled: null,
   } satisfies NotYetCostedUsageStats;
 
-  const costs = processMessagesApiUsage(usage, coreProps);
+  const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
   return { ...coreProps, ...costs };
 }
 
@@ -209,9 +223,13 @@ export function parseMessagesMicrodollarUsageFromString(
   fullResponse: string,
   statusCode: number
 ): MicrodollarUsageStats {
-  const responseJson = JSON.parse(fullResponse) as Anthropic.Messages.Message | null;
+  const responseJson = JSON.parse(fullResponse) as
+    | (Anthropic.Messages.Message & MaybeHasVercelProviderMetadata)
+    | null;
 
   const usage = responseJson?.usage;
+  const providerMetadata = responseJson?.provider_metadata ?? null;
+  const inference_provider = providerMetadata?.gateway?.routing?.finalProvider ?? null;
 
   const responseContent =
     responseJson?.content
@@ -224,7 +242,7 @@ export function parseMessagesMicrodollarUsageFromString(
     hasError: !responseJson?.model || statusCode >= 400,
     model: responseJson?.model ?? null,
     responseContent,
-    inference_provider: null,
+    inference_provider,
     upstream_id: null,
     finish_reason: responseJson?.stop_reason ?? null,
     latency: null,
@@ -234,7 +252,7 @@ export function parseMessagesMicrodollarUsageFromString(
     cancelled: null,
   } satisfies NotYetCostedUsageStats;
 
-  const costs = processMessagesApiUsage(usage, coreProps);
+  const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
   return { ...coreProps, ...costs };
 }
 

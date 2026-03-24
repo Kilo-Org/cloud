@@ -1,6 +1,29 @@
-pnpm format:check
-pnpm lint
-pnpm typecheck
+pnpm format:check &
+pid_format=$!
+
+pnpm lint:oxlint &
+pid_oxlint=$!
+
+pnpm lint:eslint:fallback &
+pid_eslint=$!
+
+pnpm -r --filter '!kilocode-backend' --filter '!storybook' run lint &
+pid_workspace_lint=$!
+
+pnpm typecheck &
+pid_typecheck=$!
+
+failed=""
+wait $pid_format      || failed="$failed format:check"
+wait $pid_oxlint      || failed="$failed lint:oxlint"
+wait $pid_eslint      || failed="$failed lint:eslint:fallback"
+wait $pid_workspace_lint || failed="$failed workspace-lint"
+wait $pid_typecheck   || failed="$failed typecheck"
+
+if [ -n "$failed" ]; then
+  printf >&2 "\npre-push checks failed:%s\n" "$failed"
+  exit 1
+fi
 
 command -v git-lfs >/dev/null 2>&1 || { printf >&2 "\nThis repository is configured for Git LFS but 'git-lfs' was not found on your path.\n\n"; exit 2; }
 git lfs pre-push "$@"

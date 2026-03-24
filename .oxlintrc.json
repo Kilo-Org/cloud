@@ -1,6 +1,9 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["oxc", "typescript", "unicorn", "nextjs"],
+  "options": {
+    "typeAware": true
+  },
   "categories": {
     "correctness": "off"
   },
@@ -138,7 +141,14 @@
         "@typescript-eslint/triple-slash-reference": "error",
         "@typescript-eslint/no-var-requires": "error",
         "@typescript-eslint/consistent-type-imports": "error",
-        "@typescript-eslint/no-non-null-assertion": "error"
+        "@typescript-eslint/no-non-null-assertion": "error",
+        "@typescript-eslint/no-floating-promises": "error",
+        "@typescript-eslint/no-misused-promises": [
+          "error",
+          {
+            "checksVoidReturn": false
+          }
+        ]
       }
     },
     {

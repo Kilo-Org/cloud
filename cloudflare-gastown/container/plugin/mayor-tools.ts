@@ -472,5 +472,134 @@ export function createMayorTools(client: MayorGastownClient) {
         return `Nudge queued: ${result.nudge_id} (mode: ${args.mode ?? 'wait-idle'})`;
       },
     }),
+
+    gt_report_bug: tool({
+      description:
+        'File a bug report on the Kilo-Org/cloud GitHub repo. ' +
+        'Searches existing issues first to avoid duplicates. ' +
+        'Use this when a user reports a bug or you encounter a repeating system error. ' +
+        'Do NOT file bugs for user errors, expected behavior, or issues you can resolve yourself ' +
+        '(e.g. re-slinging a failed bead). Do NOT file bugs about yourself being unable to start.',
+      args: {
+        title: tool.schema.string().describe('Concise bug title'),
+        description: tool.schema
+          .string()
+          .describe('What happened vs. what was expected. Include error messages if available.'),
+        area: tool.schema
+          .enum([
+            'Mayor / Chat',
+            'Terminal UI',
+            'Bead Board / Dashboard',
+            'Convoys',
+            'Merge Queue / Refinery',
+            'Agent Dispatch / Scheduling',
+            'Container / Git',
+            'Other',
+          ])
+          .describe('Which area of Gastown is affected'),
+        rig_id: tool.schema
+          .string()
+          .describe('The rig ID where the bug was observed, if applicable')
+          .optional(),
+        recent_errors: tool.schema
+          .string()
+          .describe('Recent error messages or log snippets for context')
+          .optional(),
+      },
+      async execute(args) {
+        const ghToken = process.env.GH_TOKEN;
+        if (!ghToken) {
+          return 'Cannot file bug report: GH_TOKEN is not available in this container. Ask the user to file manually at https://github.com/Kilo-Org/cloud/issues/new?template=gastown-bug.yml';
+        }
+
+        const repo = 'Kilo-Org/cloud';
+        const headers = {
+          Authorization: `Bearer ${ghToken}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Content-Type': 'application/json',
+        };
+
+        // Search for potential duplicates (match both Mayor-filed and user-filed bug issues)
+        const searchKeywords = args.title.split(/\s+/).slice(0, 5).join(' ');
+        const searchQuery = encodeURIComponent(
+          `repo:${repo} is:issue is:open label:bug ${searchKeywords}`
+        );
+
+        let duplicates: Array<{ number: number; title: string; html_url: string }> = [];
+        try {
+          const searchRes = await fetch(
+            `https://api.github.com/search/issues?q=${searchQuery}&per_page=5`,
+            { headers }
+          );
+          if (searchRes.ok) {
+            const searchData = (await searchRes.json()) as {
+              items: Array<{ number: number; title: string; html_url: string }>;
+            };
+            duplicates = searchData.items;
+          }
+        } catch {
+          // Search failure is non-fatal — proceed to create
+        }
+
+        if (duplicates.length > 0) {
+          const list = duplicates
+            .map(d => `  - #${d.number}: ${d.title} (${d.html_url})`)
+            .join('\n');
+          return [
+            `Found ${duplicates.length} potentially related open issue(s):`,
+            list,
+            '',
+            'Review these before filing a new issue. If none match, call gt_report_bug again with a more specific title.',
+          ].join('\n');
+        }
+
+        // Build issue body with structured context
+        const townId = process.env.GASTOWN_TOWN_ID ?? 'unknown';
+        const agentId = process.env.GASTOWN_AGENT_ID ?? 'unknown';
+        const bodyParts = [
+          `## What happened?\n\n${args.description}`,
+          `## Area\n\n${args.area}`,
+          `## Context\n\n- **Town ID:** ${townId}\n- **Agent:** Mayor (${agentId})`,
+        ];
+        if (args.rig_id) {
+          bodyParts[bodyParts.length - 1] += `\n- **Rig ID:** ${args.rig_id}`;
+        }
+        if (args.recent_errors) {
+          bodyParts.push(`## Recent Errors\n\n\`\`\`\n${args.recent_errors}\n\`\`\``);
+        }
+        bodyParts.push('*Filed automatically by the Mayor via `gt_report_bug`.*');
+        const body = bodyParts.join('\n\n');
+
+        const issuePayload = {
+          title: `[Gastown] ${args.title}`,
+          body,
+          labels: ['bug', 'gt:mayor'],
+        };
+
+        let createRes = await fetch(`https://api.github.com/repos/${repo}/issues`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(issuePayload),
+        });
+
+        // If labeling failed (e.g. token lacks label permissions), retry without labels
+        if (!createRes.ok && createRes.status === 422) {
+          createRes = await fetch(`https://api.github.com/repos/${repo}/issues`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ title: issuePayload.title, body: issuePayload.body }),
+          });
+        }
+
+        if (!createRes.ok) {
+          const errText = await createRes.text();
+          return `Failed to create issue (HTTP ${createRes.status}): ${errText}`;
+        }
+
+        const issue = (await createRes.json()) as { number: number; html_url: string };
+        return `Bug report filed: #${issue.number} — ${issue.html_url}`;
+      },
+    }),
   };
 }

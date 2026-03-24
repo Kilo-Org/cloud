@@ -236,7 +236,7 @@ export async function addUserToOrganization(
 export async function removeUserFromOrganization(
   organizationId: Organization['id'],
   userId: User['id']
-) {
+): Promise<{ rowCount: number | null }> {
   return await db
     .delete(organization_memberships)
     .where(

@@ -106,7 +106,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
 
   // Fetch autocomplete metrics
   const { data: autocompleteMetrics, isLoading: isLoadingAutocompleteMetrics } =
-    useOrganizationAutocompleteMetrics(organizationId);
+    useOrganizationAutocompleteMetrics(organizationId, timePeriod);
 
   // Apply filters using custom hook
   const {

@@ -185,7 +185,7 @@ export function modelNotAllowedResponse() {
 }
 
 export function forbiddenFreeModelResponse() {
-  const error = `This is not a free model. Please use ${KILO_AUTO_BALANCED_MODEL.id} for affordable inference or ${KILO_AUTO_FREE_MODEL.id} for limited free inference.`;
+  const error = `The free period of this model ended. Please use ${KILO_AUTO_BALANCED_MODEL.id} for affordable inference or ${KILO_AUTO_FREE_MODEL.id} for limited free inference.`;
   return NextResponse.json({ error, message: error }, { status: 404 });
 }
 
@@ -197,6 +197,11 @@ export function modelDoesNotExistResponse() {
     },
     { status: 404 }
   );
+}
+
+export function previousResponseIdIsNotSupported() {
+  const error = 'The previous_response_id field is not supported.';
+  return NextResponse.json({ error, message: error }, { status: 400 });
 }
 
 export function getOutputHeaders(response: Response) {

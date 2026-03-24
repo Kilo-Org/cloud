@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { MayorGastownClient } from './client';
 import type {
   Agent,
@@ -408,6 +408,154 @@ describe('mayor tools', () => {
       expect(result).toContain('Convoy started');
       expect(result).toContain('2 bead(s)');
       expect(client.startConvoy).toHaveBeenCalledWith('convoy-staged-1');
+    });
+  });
+
+  describe('gt_report_bug', () => {
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      process.env = {
+        ...originalEnv,
+        GH_TOKEN: 'fake-gh-token',
+        GASTOWN_TOWN_ID: 'town-123',
+        GASTOWN_AGENT_ID: 'mayor-agent-1',
+      };
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+      vi.restoreAllMocks();
+    });
+
+    it('returns fallback message when GH_TOKEN is not set', async () => {
+      delete process.env.GH_TOKEN;
+      const result = await tools.gt_report_bug.execute(
+        {
+          title: 'Test bug',
+          description: 'Something broke',
+          area: 'Mayor / Chat' as const,
+        },
+        CTX
+      );
+      expect(result).toContain('GH_TOKEN is not available');
+      expect(result).toContain('github.com/Kilo-Org/cloud/issues/new');
+    });
+
+    it('reports potential duplicates when search finds matches', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [
+              {
+                number: 42,
+                title: 'Similar bug',
+                html_url: 'https://github.com/Kilo-Org/cloud/issues/42',
+              },
+            ],
+          }),
+          { status: 200 }
+        )
+      );
+
+      const result = await tools.gt_report_bug.execute(
+        {
+          title: 'Similar bug report',
+          description: 'Something broke',
+          area: 'Mayor / Chat' as const,
+        },
+        CTX
+      );
+
+      expect(result).toContain('potentially related');
+      expect(result).toContain('#42');
+      expect(fetchSpy).toHaveBeenCalledOnce();
+    });
+
+    it('creates issue when no duplicates found', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }))
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({ number: 99, html_url: 'https://github.com/Kilo-Org/cloud/issues/99' }),
+            { status: 201 }
+          )
+        );
+
+      const result = await tools.gt_report_bug.execute(
+        {
+          title: 'New bug',
+          description: 'Something broke',
+          area: 'Container / Git' as const,
+          rig_id: 'rig-5',
+          recent_errors: 'Error: connection refused',
+        },
+        CTX
+      );
+
+      expect(result).toContain('#99');
+      expect(result).toContain('Bug report filed');
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+      // Verify the create call body
+      const createCall = fetchSpy.mock.calls[1];
+      const body = JSON.parse(createCall[1]?.body as string);
+      expect(body.title).toBe('[Gastown] New bug');
+      expect(body.labels).toEqual(['bug', 'gt:mayor']);
+      expect(body.body).toContain('town-123');
+      expect(body.body).toContain('rig-5');
+      expect(body.body).toContain('connection refused');
+    });
+
+    it('retries without labels on 422 (label permission error)', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }))
+        .mockResolvedValueOnce(
+          new Response('Validation Failed: label permissions', { status: 422 })
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              number: 100,
+              html_url: 'https://github.com/Kilo-Org/cloud/issues/100',
+            }),
+            { status: 201 }
+          )
+        );
+
+      const result = await tools.gt_report_bug.execute(
+        { title: 'Label bug', description: 'Labels fail', area: 'Other' as const },
+        CTX
+      );
+
+      expect(result).toContain('#100');
+      expect(result).toContain('Bug report filed');
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+      // Retry call should omit labels
+      const retryCall = fetchSpy.mock.calls[2];
+      const retryBody = JSON.parse(retryCall[1]?.body as string);
+      expect(retryBody.labels).toBeUndefined();
+    });
+
+    it('handles create failure gracefully', async () => {
+      vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }))
+        .mockResolvedValueOnce(new Response('Forbidden', { status: 403 }));
+
+      const result = await tools.gt_report_bug.execute(
+        {
+          title: 'Bug',
+          description: 'Broken',
+          area: 'Other' as const,
+        },
+        CTX
+      );
+
+      expect(result).toContain('Failed to create issue');
+      expect(result).toContain('403');
     });
   });
 

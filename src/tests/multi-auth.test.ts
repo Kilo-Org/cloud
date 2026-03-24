@@ -56,6 +56,7 @@ describe('Multi-Auth System', () => {
         provider_account_id: 'github-123',
         email: 'test@example.com',
         avatar_url: 'https://example.com/avatar.jpg',
+        display_name: null,
         hosted_domain: null,
       });
 
@@ -78,6 +79,7 @@ describe('Multi-Auth System', () => {
         provider_account_id: 'google-456',
         email: 'test2@example.com',
         avatar_url: 'https://example.com/avatar2.jpg',
+        display_name: null,
         hosted_domain: null,
       });
 
@@ -99,6 +101,7 @@ describe('Multi-Auth System', () => {
           provider_account_id: testUserGoogleProviderId, // Same as original user
           email: 'test3@example.com',
           avatar_url: 'https://example.com/avatar3.jpg',
+          display_name: null,
           hosted_domain: null,
         });
 
@@ -125,6 +128,7 @@ describe('Multi-Auth System', () => {
         provider_account_id: 'github-123',
         email: 'test@example.com',
         avatar_url: 'https://example.com/avatar.jpg',
+        display_name: null,
         hosted_domain: null,
       });
     });

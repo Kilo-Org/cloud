@@ -92,14 +92,24 @@ function ActiveSubscriptionCard({
 
       <div className="mt-4 flex flex-wrap gap-2">
         {hasUserRequestedSwitch ? (
-          <Button variant="outline" size="sm" onClick={handleCancelSwitch}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCancelSwitch}
+            disabled={cancelSwitchMutation.isPending}
+          >
             Cancel Switch
           </Button>
-        ) : !sub.scheduledPlan ? (
-          <Button variant="outline" size="sm" onClick={handleSwitchPlan}>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSwitchPlan}
+            disabled={switchPlanMutation.isPending}
+          >
             Switch to {otherPlan}
           </Button>
-        ) : null}
+        )}
         <Button variant="outline" size="sm" onClick={onCancelClick}>
           Cancel
         </Button>
@@ -207,9 +217,6 @@ export function SubscriptionCard({ billing, onCancelClick }: SubscriptionCardPro
     window.location.href = result.url;
   }
 
-  // Trial is handled by BillingBanner — no card needed here
-
-  // Active subscription
   if (billing.subscription) {
     if (billing.subscription.status === 'past_due' || billing.subscription.status === 'unpaid') {
       return (

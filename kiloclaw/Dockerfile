@@ -111,7 +111,7 @@ RUN mkdir -p /root/.openclaw \
 
 # Copy helper scripts (used at runtime by the controller/gateway)
 # Build cache bust: 2026-03-17-v65-remove-startup-script
-RUN echo "10"
+RUN echo "11"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

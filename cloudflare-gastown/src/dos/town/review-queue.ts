@@ -12,6 +12,7 @@ import { review_metadata } from '../../db/tables/review-metadata.table';
 import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
 import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { convoy_metadata } from '../../db/tables/convoy-metadata.table';
+import { bead_events } from '../../db/tables/bead-events.table';
 import { query } from '../../util/query.util';
 import {
   logBeadEvent,
@@ -24,7 +25,7 @@ import {
   getConvoyFeatureBranch,
   getConvoyMergeMode,
 } from './beads';
-import { getAgent, unhookBead } from './agents';
+import { getAgent, unhookBead, updateAgentStatus } from './agents';
 import { getRig } from './rigs';
 import type { ReviewQueueInput, ReviewQueueEntry, AgentDoneInput, Molecule } from '../../types';
 
@@ -621,6 +622,11 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
     }
 
     unhookBead(sql, agentId);
+    // Set refinery to idle immediately — the review is done and the
+    // refinery is available for new work. Without this, processReviewQueue
+    // sees the refinery as 'working' and won't pop the next MR bead until
+    // agentCompleted fires (when the container process eventually exits).
+    updateAgentStatus(sql, agentId, 'idle');
     return;
   }
 
@@ -722,19 +728,564 @@ export function agentCompleted(
     }
   }
 
-  // Mark agent idle
+  // Mark agent idle — but ONLY if it hasn't been re-dispatched (status
+  // still 'working' on new work) since gt_done ran. agentCompleted can
+  // arrive after the agent has been re-hooked and dispatched for a new
+  // bead. Without this guard, the stale completion event would clobber
+  // the live dispatch.
+  // For refineries, preserve dispatch_attempts so Rule 6's circuit-breaker
+  // can track cumulative re-dispatch attempts across idle→dispatch cycles.
+  // Resetting to 0 here was enabling infinite loops (#1342). Non-refineries
+  // reset to 0 because they unhook above and get a fresh counter on hookBead.
   query(
     sql,
     /* sql */ `
       UPDATE ${agent_metadata}
       SET ${agent_metadata.columns.status} = 'idle',
-          ${agent_metadata.columns.dispatch_attempts} = 0
+          ${agent_metadata.columns.dispatch_attempts} = CASE
+            WHEN ${agent_metadata.columns.role} = 'refinery' THEN ${agent_metadata.columns.dispatch_attempts}
+            ELSE 0
+          END
       WHERE ${agent_metadata.bead_id} = ?
+        AND NOT (
+          ${agent_metadata.columns.status} = 'working'
+          AND ${agent_metadata.columns.current_hook_bead_id} IS NOT NULL
+        )
     `,
     [agentId]
   );
 
   return result;
+}
+
+// ── Merge Queue Data ────────────────────────────────────────────────
+
+/**
+ * 24 hours in milliseconds — MR beads in_review longer than this are "stale".
+ */
+const STALE_PR_THRESHOLD_MS = 24 * 60 * 60 * 1000;
+
+/** Zod schema for a single enriched MR bead row from the needsAttention query. */
+const MrBeadRow = z.object({
+  bead_id: z.string(),
+  status: z.string(),
+  title: z.string(),
+  body: z.string().nullable(),
+  rig_id: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  metadata: z.string().transform((v): Record<string, unknown> => {
+    try {
+      return JSON.parse(v) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }),
+  // review_metadata columns
+  branch: z.string(),
+  target_branch: z.string(),
+  merge_commit: z.string().nullable(),
+  pr_url: z.string().nullable(),
+  retry_count: z.number(),
+  // source bead (via bead_dependencies tracks)
+  source_bead_id: z.string().nullable(),
+  source_bead_title: z.string().nullable(),
+  source_bead_status: z.string().nullable(),
+  source_bead_body: z.string().nullable(),
+  // convoy info (via metadata.convoy_id → convoy_metadata)
+  convoy_id: z.string().nullable(),
+  convoy_title: z.string().nullable(),
+  convoy_total_beads: z.number().nullable(),
+  convoy_closed_beads: z.number().nullable(),
+  convoy_feature_branch: z.string().nullable(),
+  convoy_merge_mode: z.string().nullable(),
+  // agent info (via metadata.source_agent_id → agent_metadata)
+  agent_id: z.string().nullable(),
+  agent_name: z.string().nullable(),
+  agent_role: z.string().nullable(),
+  // rig name
+  rig_name: z.string().nullable(),
+  // failure event metadata (correlated subquery for failed MR beads)
+  failure_event_metadata: z
+    .string()
+    .nullable()
+    .transform((v): Record<string, unknown> | null => {
+      if (!v) return null;
+      try {
+        return JSON.parse(v) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
+    }),
+});
+
+/** Zod schema for an enriched activity log event row. */
+const ActivityLogRow = z.object({
+  bead_event_id: z.string(),
+  bead_id: z.string(),
+  agent_id: z.string().nullable(),
+  event_type: z.string(),
+  old_value: z.string().nullable(),
+  new_value: z.string().nullable(),
+  event_metadata: z.string().transform((v): Record<string, unknown> => {
+    try {
+      return JSON.parse(v) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }),
+  event_created_at: z.string(),
+  // associated bead info
+  bead_title: z.string().nullable(),
+  bead_type: z.string().nullable(),
+  bead_status: z.string().nullable(),
+  bead_rig_id: z.string().nullable(),
+  bead_metadata: z
+    .string()
+    .nullable()
+    .transform((v): Record<string, unknown> => {
+      try {
+        return v ? (JSON.parse(v) as Record<string, unknown>) : {};
+      } catch {
+        return {};
+      }
+    }),
+  // agent info
+  agent_name: z.string().nullable(),
+  agent_role: z.string().nullable(),
+  // rig info
+  rig_name: z.string().nullable(),
+  // source bead (resolved via bead_dependencies tracks join)
+  source_bead_id: z.string().nullable(),
+  source_bead_title: z.string().nullable(),
+  source_bead_status: z.string().nullable(),
+  // review metadata
+  rm_branch: z.string().nullable(),
+  rm_target_branch: z.string().nullable(),
+  rm_merge_commit: z.string().nullable(),
+  rm_pr_url: z.string().nullable(),
+  // convoy info
+  convoy_id: z.string().nullable(),
+  convoy_title: z.string().nullable(),
+  convoy_total_beads: z.number().nullable(),
+  convoy_closed_beads: z.number().nullable(),
+  convoy_feature_branch: z.string().nullable(),
+  convoy_merge_mode: z.string().nullable(),
+});
+
+export type MergeQueueParams = {
+  rigId?: string;
+  limit?: number;
+  since?: string;
+};
+
+export type MergeQueueData = {
+  needsAttention: {
+    openPRs: MergeQueueItem[];
+    failedReviews: MergeQueueItem[];
+    stalePRs: MergeQueueItem[];
+  };
+  activityLog: ActivityLogEntry[];
+};
+
+export type MergeQueueItem = {
+  mrBead: {
+    bead_id: string;
+    status: string;
+    title: string;
+    body: string | null;
+    rig_id: string | null;
+    created_at: string;
+    updated_at: string;
+    metadata: Record<string, unknown>;
+  };
+  reviewMetadata: {
+    branch: string;
+    target_branch: string;
+    merge_commit: string | null;
+    pr_url: string | null;
+    retry_count: number;
+  };
+  sourceBead: {
+    bead_id: string;
+    title: string;
+    status: string;
+    body: string | null;
+  } | null;
+  convoy: {
+    convoy_id: string;
+    title: string;
+    total_beads: number;
+    closed_beads: number;
+    feature_branch: string | null;
+    merge_mode: string | null;
+  } | null;
+  agent: {
+    agent_id: string;
+    name: string;
+    role: string;
+  } | null;
+  rigName: string | null;
+  staleSince: string | null;
+  failureReason: string | null;
+};
+
+export type ActivityLogEntry = {
+  event: {
+    bead_event_id: string;
+    bead_id: string;
+    agent_id: string | null;
+    event_type: string;
+    old_value: string | null;
+    new_value: string | null;
+    metadata: Record<string, unknown>;
+    created_at: string;
+  };
+  mrBead: {
+    bead_id: string;
+    title: string;
+    type: string;
+    status: string;
+    rig_id: string | null;
+    metadata: Record<string, unknown>;
+  } | null;
+  sourceBead: {
+    bead_id: string;
+    title: string;
+    status: string;
+  } | null;
+  convoy: {
+    convoy_id: string;
+    title: string;
+    total_beads: number;
+    closed_beads: number;
+    feature_branch: string | null;
+    merge_mode: string | null;
+  } | null;
+  agent: {
+    agent_id: string;
+    name: string;
+    role: string;
+  } | null;
+  rigName: string | null;
+  reviewMetadata: {
+    pr_url: string | null;
+    branch: string | null;
+    target_branch: string | null;
+    merge_commit: string | null;
+  } | null;
+};
+
+/**
+ * Query all data the Merge Queue page needs: MR beads needing attention
+ * (open PRs, failed reviews, stale PRs) and a recent activity log.
+ */
+export function getMergeQueueData(sql: SqlStorage, params: MergeQueueParams): MergeQueueData {
+  const rigId = params.rigId ?? null;
+
+  // ── 1. Query MR beads with full joins ───────────────────────────────
+  // Statuses: in_progress = "in review" (PR created, awaiting merge),
+  //           open = pending review, failed = review failed
+  // We fetch all non-closed MR beads for the needs-attention section.
+  const mrRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT
+          ${beads.bead_id},
+          ${beads.status},
+          ${beads.title},
+          ${beads.body},
+          ${beads.rig_id},
+          ${beads.created_at},
+          ${beads.updated_at},
+          ${beads.metadata},
+          ${review_metadata.branch},
+          ${review_metadata.target_branch},
+          ${review_metadata.merge_commit},
+          ${review_metadata.pr_url},
+          ${review_metadata.retry_count},
+          src.${beads.columns.bead_id} AS source_bead_id,
+          src.${beads.columns.title} AS source_bead_title,
+          src.${beads.columns.status} AS source_bead_status,
+          src.${beads.columns.body} AS source_bead_body,
+          cm.${convoy_metadata.columns.bead_id} AS convoy_id,
+          convoy_bead.${beads.columns.title} AS convoy_title,
+          cm.${convoy_metadata.columns.total_beads} AS convoy_total_beads,
+          cm.${convoy_metadata.columns.closed_beads} AS convoy_closed_beads,
+          cm.${convoy_metadata.columns.feature_branch} AS convoy_feature_branch,
+          cm.${convoy_metadata.columns.merge_mode} AS convoy_merge_mode,
+          am.${agent_metadata.columns.bead_id} AS agent_id,
+          agent_bead.${beads.columns.title} AS agent_name,
+          am.${agent_metadata.columns.role} AS agent_role,
+          rig.name AS rig_name,
+          (SELECT ${bead_events.metadata}
+           FROM ${bead_events}
+           WHERE ${bead_events.bead_id} = ${beads.bead_id}
+             AND ${bead_events.event_type} IN ('review_completed', 'pr_creation_failed')
+           ORDER BY ${bead_events.created_at} DESC
+           LIMIT 1) AS failure_event_metadata
+        FROM ${beads}
+        INNER JOIN ${review_metadata}
+          ON ${beads.bead_id} = ${review_metadata.bead_id}
+        LEFT JOIN ${bead_dependencies} AS dep
+          ON dep.${bead_dependencies.columns.bead_id} = ${beads.bead_id}
+          AND dep.${bead_dependencies.columns.dependency_type} = 'tracks'
+        LEFT JOIN ${beads} AS src
+          ON src.${beads.columns.bead_id} = dep.${bead_dependencies.columns.depends_on_bead_id}
+        LEFT JOIN ${convoy_metadata} AS cm
+          ON cm.${convoy_metadata.columns.bead_id} = json_extract(${beads.metadata}, '$.convoy_id')
+        LEFT JOIN ${beads} AS convoy_bead
+          ON convoy_bead.${beads.columns.bead_id} = cm.${convoy_metadata.columns.bead_id}
+        LEFT JOIN ${agent_metadata} AS am
+          ON am.${agent_metadata.columns.bead_id} = json_extract(${beads.metadata}, '$.source_agent_id')
+        LEFT JOIN ${beads} AS agent_bead
+          ON agent_bead.${beads.columns.bead_id} = am.${agent_metadata.columns.bead_id}
+        LEFT JOIN rigs AS rig
+          ON rig.id = ${beads.rig_id}
+        WHERE ${beads.type} = 'merge_request'
+          AND ${beads.status} IN ('open', 'in_progress', 'in_review', 'failed')
+          AND (? IS NULL OR ${beads.rig_id} = ?)
+        ORDER BY ${beads.created_at} DESC
+      `,
+      [rigId, rigId]
+    ),
+  ];
+
+  const parsedMrRows = MrBeadRow.array().parse(mrRows);
+  const staleThreshold = new Date(Date.now() - STALE_PR_THRESHOLD_MS).toISOString();
+
+  const openPRs: MergeQueueItem[] = [];
+  const failedReviews: MergeQueueItem[] = [];
+  const stalePRs: MergeQueueItem[] = [];
+
+  for (const row of parsedMrRows) {
+    const item = mrBeadRowToItem(row);
+
+    if (row.status === 'failed') {
+      failedReviews.push(item);
+    } else if (row.pr_url && row.status === 'in_progress') {
+      // in_progress with pr_url = PR created, awaiting human merge
+      if (row.updated_at < staleThreshold) {
+        item.staleSince = row.updated_at;
+        stalePRs.push(item);
+      } else {
+        openPRs.push(item);
+      }
+    }
+    // open/in_review without pr_url are pending queue items, not shown in needs-attention
+  }
+
+  // ── 2. Query activity log events ────────────────────────────────────
+  const limit = params.limit ?? 50;
+  const since = params.since ?? null;
+
+  const eventRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT
+          ${bead_events.bead_event_id},
+          ${bead_events.bead_id},
+          ${bead_events.agent_id},
+          ${bead_events.event_type},
+          ${bead_events.old_value},
+          ${bead_events.new_value},
+          ${bead_events.metadata} AS event_metadata,
+          ${bead_events.created_at} AS event_created_at,
+          b.${beads.columns.title} AS bead_title,
+          b.${beads.columns.type} AS bead_type,
+          b.${beads.columns.status} AS bead_status,
+          b.${beads.columns.rig_id} AS bead_rig_id,
+          b.${beads.columns.metadata} AS bead_metadata,
+          agent_bead.${beads.columns.title} AS agent_name,
+          am.${agent_metadata.columns.role} AS agent_role,
+          rig.name AS rig_name,
+          src.${beads.columns.bead_id} AS source_bead_id,
+          src.${beads.columns.title} AS source_bead_title,
+          src.${beads.columns.status} AS source_bead_status,
+          rm.${review_metadata.columns.branch} AS rm_branch,
+          rm.${review_metadata.columns.target_branch} AS rm_target_branch,
+          rm.${review_metadata.columns.merge_commit} AS rm_merge_commit,
+          rm.${review_metadata.columns.pr_url} AS rm_pr_url,
+          cm.${convoy_metadata.columns.bead_id} AS convoy_id,
+          convoy_bead.${beads.columns.title} AS convoy_title,
+          cm.${convoy_metadata.columns.total_beads} AS convoy_total_beads,
+          cm.${convoy_metadata.columns.closed_beads} AS convoy_closed_beads,
+          cm.${convoy_metadata.columns.feature_branch} AS convoy_feature_branch,
+          cm.${convoy_metadata.columns.merge_mode} AS convoy_merge_mode
+        FROM ${bead_events}
+        INNER JOIN ${beads} AS b
+          ON b.${beads.columns.bead_id} = ${bead_events.bead_id}
+        LEFT JOIN ${agent_metadata} AS am
+          ON am.${agent_metadata.columns.bead_id} = ${bead_events.agent_id}
+        LEFT JOIN ${beads} AS agent_bead
+          ON agent_bead.${beads.columns.bead_id} = ${bead_events.agent_id}
+        LEFT JOIN ${bead_dependencies} AS dep
+          ON dep.${bead_dependencies.columns.bead_id} = b.${beads.columns.bead_id}
+          AND dep.${bead_dependencies.columns.dependency_type} = 'tracks'
+        LEFT JOIN ${beads} AS src
+          ON src.${beads.columns.bead_id} = dep.${bead_dependencies.columns.depends_on_bead_id}
+        LEFT JOIN ${review_metadata} AS rm
+          ON rm.${review_metadata.columns.bead_id} = ${bead_events.bead_id}
+        LEFT JOIN ${convoy_metadata} AS cm
+          ON cm.${convoy_metadata.columns.bead_id} = json_extract(b.${beads.columns.metadata}, '$.convoy_id')
+        LEFT JOIN ${beads} AS convoy_bead
+          ON convoy_bead.${beads.columns.bead_id} = cm.${convoy_metadata.columns.bead_id}
+        LEFT JOIN rigs AS rig
+          ON rig.id = b.${beads.columns.rig_id}
+        WHERE ${bead_events.event_type} IN (
+          'review_submitted', 'review_completed', 'pr_created',
+          'pr_creation_failed', 'rework_requested', 'status_changed'
+        )
+          AND (? IS NULL OR b.${beads.columns.rig_id} = ?)
+          AND (? IS NULL OR ${bead_events.created_at} > ?)
+        ORDER BY ${bead_events.created_at} DESC
+        LIMIT ?
+      `,
+      [rigId, rigId, since, since, limit]
+    ),
+  ];
+
+  const parsedEventRows = ActivityLogRow.array().parse(eventRows);
+
+  const activityLog: ActivityLogEntry[] = parsedEventRows.map(eventRowToEntry);
+
+  return {
+    needsAttention: { openPRs, failedReviews, stalePRs },
+    activityLog,
+  };
+}
+
+function mrBeadRowToItem(row: z.output<typeof MrBeadRow>): MergeQueueItem {
+  return {
+    mrBead: {
+      bead_id: row.bead_id,
+      status: row.status,
+      title: row.title,
+      body: row.body,
+      rig_id: row.rig_id,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      metadata: row.metadata,
+    },
+    reviewMetadata: {
+      branch: row.branch,
+      target_branch: row.target_branch,
+      merge_commit: row.merge_commit,
+      pr_url: row.pr_url,
+      retry_count: row.retry_count,
+    },
+    sourceBead: row.source_bead_id
+      ? {
+          bead_id: row.source_bead_id,
+          title: row.source_bead_title ?? '',
+          status: row.source_bead_status ?? '',
+          body: row.source_bead_body ?? null,
+        }
+      : null,
+    convoy: row.convoy_id
+      ? {
+          convoy_id: row.convoy_id,
+          title: row.convoy_title ?? '',
+          total_beads: row.convoy_total_beads ?? 0,
+          closed_beads: row.convoy_closed_beads ?? 0,
+          feature_branch: row.convoy_feature_branch,
+          merge_mode: row.convoy_merge_mode,
+        }
+      : null,
+    agent: row.agent_id
+      ? {
+          agent_id: row.agent_id,
+          name: row.agent_name ?? '',
+          role: row.agent_role ?? '',
+        }
+      : null,
+    rigName: row.rig_name,
+    staleSince: null,
+    failureReason:
+      row.status === 'failed' && row.failure_event_metadata
+        ? typeof row.failure_event_metadata.message === 'string'
+          ? row.failure_event_metadata.message
+          : null
+        : null,
+  };
+}
+
+function eventRowToEntry(row: z.output<typeof ActivityLogRow>): ActivityLogEntry {
+  // Source bead resolution:
+  // - Events on MR beads (pr_created, pr_creation_failed, rework_requested):
+  //   resolved via bead_dependencies LEFT JOIN (source_bead_id/title/status columns)
+  // - Events on source beads (review_submitted, review_completed):
+  //   the event's bead IS the source bead — use the bead columns directly
+  const isMrBeadEvent = row.bead_type === 'merge_request';
+
+  const resolvedSourceBead = isMrBeadEvent
+    ? row.source_bead_id
+      ? {
+          bead_id: row.source_bead_id,
+          title: row.source_bead_title ?? '',
+          status: row.source_bead_status ?? '',
+        }
+      : null
+    : row.bead_title
+      ? {
+          bead_id: row.bead_id,
+          title: row.bead_title,
+          status: row.bead_status ?? '',
+        }
+      : null;
+
+  return {
+    event: {
+      bead_event_id: row.bead_event_id,
+      bead_id: row.bead_id,
+      agent_id: row.agent_id,
+      event_type: row.event_type,
+      old_value: row.old_value,
+      new_value: row.new_value,
+      metadata: row.event_metadata,
+      created_at: row.event_created_at,
+    },
+    mrBead: row.bead_title
+      ? {
+          bead_id: row.bead_id,
+          title: row.bead_title,
+          type: row.bead_type ?? 'merge_request',
+          status: row.bead_status ?? '',
+          rig_id: row.bead_rig_id,
+          metadata: row.bead_metadata,
+        }
+      : null,
+    sourceBead: resolvedSourceBead,
+    convoy: row.convoy_id
+      ? {
+          convoy_id: row.convoy_id,
+          title: row.convoy_title ?? '',
+          total_beads: row.convoy_total_beads ?? 0,
+          closed_beads: row.convoy_closed_beads ?? 0,
+          feature_branch: row.convoy_feature_branch,
+          merge_mode: row.convoy_merge_mode,
+        }
+      : null,
+    agent: row.agent_id
+      ? {
+          agent_id: row.agent_id,
+          name: row.agent_name ?? '',
+          role: row.agent_role ?? '',
+        }
+      : null,
+    rigName: row.rig_name,
+    reviewMetadata:
+      row.rm_branch !== null
+        ? {
+            pr_url: row.rm_pr_url,
+            branch: row.rm_branch,
+            target_branch: row.rm_target_branch,
+            merge_commit: row.rm_merge_commit,
+          }
+        : null,
+  };
 }
 
 // ── Molecules ───────────────────────────────────────────────────────

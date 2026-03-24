@@ -891,3 +891,609 @@ export declare const RpcRigDetailOutput: z.ZodPipe<
     z.core.$strip
   >
 >;
+export declare const MergeQueueDataOutput: z.ZodObject<
+  {
+    needsAttention: z.ZodObject<
+      {
+        openPRs: z.ZodArray<
+          z.ZodObject<
+            {
+              mrBead: z.ZodObject<
+                {
+                  bead_id: z.ZodString;
+                  status: z.ZodString;
+                  title: z.ZodString;
+                  body: z.ZodNullable<z.ZodString>;
+                  rig_id: z.ZodNullable<z.ZodString>;
+                  created_at: z.ZodString;
+                  updated_at: z.ZodString;
+                  metadata: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+                },
+                z.core.$strip
+              >;
+              reviewMetadata: z.ZodObject<
+                {
+                  branch: z.ZodString;
+                  target_branch: z.ZodString;
+                  merge_commit: z.ZodNullable<z.ZodString>;
+                  pr_url: z.ZodNullable<z.ZodString>;
+                  retry_count: z.ZodNumber;
+                },
+                z.core.$strip
+              >;
+              sourceBead: z.ZodNullable<
+                z.ZodObject<
+                  {
+                    bead_id: z.ZodString;
+                    title: z.ZodString;
+                    status: z.ZodString;
+                    body: z.ZodNullable<z.ZodString>;
+                  },
+                  z.core.$strip
+                >
+              >;
+              convoy: z.ZodNullable<
+                z.ZodObject<
+                  {
+                    convoy_id: z.ZodString;
+                    title: z.ZodString;
+                    total_beads: z.ZodNumber;
+                    closed_beads: z.ZodNumber;
+                    feature_branch: z.ZodNullable<z.ZodString>;
+                    merge_mode: z.ZodNullable<z.ZodString>;
+                  },
+                  z.core.$strip
+                >
+              >;
+              agent: z.ZodNullable<
+                z.ZodObject<
+                  {
+                    agent_id: z.ZodString;
+                    name: z.ZodString;
+                    role: z.ZodString;
+                  },
+                  z.core.$strip
+                >
+              >;
+              rigName: z.ZodNullable<z.ZodString>;
+              staleSince: z.ZodNullable<z.ZodString>;
+              failureReason: z.ZodNullable<z.ZodString>;
+            },
+            z.core.$strip
+          >
+        >;
+        failedReviews: z.ZodArray<
+          z.ZodObject<
+            {
+              mrBead: z.ZodObject<
+                {
+                  bead_id: z.ZodString;
+                  status: z.ZodString;
+                  title: z.ZodString;
+                  body: z.ZodNullable<z.ZodString>;
+                  rig_id: z.ZodNullable<z.ZodString>;
+                  created_at: z.ZodString;
+                  updated_at: z.ZodString;
+                  metadata: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+                },
+                z.core.$strip
+              >;
+              reviewMetadata: z.ZodObject<
+                {
+                  branch: z.ZodString;
+                  target_branch: z.ZodString;
+                  merge_commit: z.ZodNullable<z.ZodString>;
+                  pr_url: z.ZodNullable<z.ZodString>;
+                  retry_count: z.ZodNumber;
+                },
+                z.core.$strip
+              >;
+              sourceBead: z.ZodNullable<
+                z.ZodObject<
+                  {
+                    bead_id: z.ZodString;
+                    title: z.ZodString;
+                    status: z.ZodString;
+                    body: z.ZodNullable<z.ZodString>;
+                  },
+                  z.core.$strip
+                >
+              >;
+              convoy: z.ZodNullable<
+                z.ZodObject<
+                  {
+                    convoy_id: z.ZodString;
+                    title: z.ZodString;
+                    total_beads: z.ZodNumber;
+                    closed_beads: z.ZodNumber;
+                    feature_branch: z.ZodNullable<z.ZodString>;
+                    merge_mode: z.ZodNullable<z.ZodString>;
+                  },
+                  z.core.$strip
+                >
+              >;
+              agent: z.ZodNullable<
+                z.ZodObject<
+                  {
+                    agent_id: z.ZodString;
+                    name: z.ZodString;
+                    role: z.ZodString;
+                  },
+                  z.core.$strip
+                >
+              >;
+              rigName: z.ZodNullable<z.ZodString>;
+              staleSince: z.ZodNullable<z.ZodString>;
+              failureReason: z.ZodNullable<z.ZodString>;
+            },
+            z.core.$strip
+          >
+        >;
+        stalePRs: z.ZodArray<
+          z.ZodObject<
+            {
+              mrBead: z.ZodObject<
+                {
+                  bead_id: z.ZodString;
+                  status: z.ZodString;
+                  title: z.ZodString;
+                  body: z.ZodNullable<z.ZodString>;
+                  rig_id: z.ZodNullable<z.ZodString>;
+                  created_at: z.ZodString;
+                  updated_at: z.ZodString;
+                  metadata: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+                },
+                z.core.$strip
+              >;
+              reviewMetadata: z.ZodObject<
+                {
+                  branch: z.ZodString;
+                  target_branch: z.ZodString;
+                  merge_commit: z.ZodNullable<z.ZodString>;
+                  pr_url: z.ZodNullable<z.ZodString>;
+                  retry_count: z.ZodNumber;
+                },
+                z.core.$strip
+              >;
+              sourceBead: z.ZodNullable<
+                z.ZodObject<
+                  {
+                    bead_id: z.ZodString;
+                    title: z.ZodString;
+                    status: z.ZodString;
+                    body: z.ZodNullable<z.ZodString>;
+                  },
+                  z.core.$strip
+                >
+              >;
+              convoy: z.ZodNullable<
+                z.ZodObject<
+                  {
+                    convoy_id: z.ZodString;
+                    title: z.ZodString;
+                    total_beads: z.ZodNumber;
+                    closed_beads: z.ZodNumber;
+                    feature_branch: z.ZodNullable<z.ZodString>;
+                    merge_mode: z.ZodNullable<z.ZodString>;
+                  },
+                  z.core.$strip
+                >
+              >;
+              agent: z.ZodNullable<
+                z.ZodObject<
+                  {
+                    agent_id: z.ZodString;
+                    name: z.ZodString;
+                    role: z.ZodString;
+                  },
+                  z.core.$strip
+                >
+              >;
+              rigName: z.ZodNullable<z.ZodString>;
+              staleSince: z.ZodNullable<z.ZodString>;
+              failureReason: z.ZodNullable<z.ZodString>;
+            },
+            z.core.$strip
+          >
+        >;
+      },
+      z.core.$strip
+    >;
+    activityLog: z.ZodArray<
+      z.ZodObject<
+        {
+          event: z.ZodObject<
+            {
+              bead_event_id: z.ZodString;
+              bead_id: z.ZodString;
+              agent_id: z.ZodNullable<z.ZodString>;
+              event_type: z.ZodString;
+              old_value: z.ZodNullable<z.ZodString>;
+              new_value: z.ZodNullable<z.ZodString>;
+              metadata: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+              created_at: z.ZodString;
+            },
+            z.core.$strip
+          >;
+          mrBead: z.ZodNullable<
+            z.ZodObject<
+              {
+                bead_id: z.ZodString;
+                title: z.ZodString;
+                type: z.ZodString;
+                status: z.ZodString;
+                rig_id: z.ZodNullable<z.ZodString>;
+                metadata: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+              },
+              z.core.$strip
+            >
+          >;
+          sourceBead: z.ZodNullable<
+            z.ZodObject<
+              {
+                bead_id: z.ZodString;
+                title: z.ZodString;
+                status: z.ZodString;
+              },
+              z.core.$strip
+            >
+          >;
+          convoy: z.ZodNullable<
+            z.ZodObject<
+              {
+                convoy_id: z.ZodString;
+                title: z.ZodString;
+                total_beads: z.ZodNumber;
+                closed_beads: z.ZodNumber;
+                feature_branch: z.ZodNullable<z.ZodString>;
+                merge_mode: z.ZodNullable<z.ZodString>;
+              },
+              z.core.$strip
+            >
+          >;
+          agent: z.ZodNullable<
+            z.ZodObject<
+              {
+                agent_id: z.ZodString;
+                name: z.ZodString;
+                role: z.ZodString;
+              },
+              z.core.$strip
+            >
+          >;
+          rigName: z.ZodNullable<z.ZodString>;
+          reviewMetadata: z.ZodNullable<
+            z.ZodObject<
+              {
+                pr_url: z.ZodNullable<z.ZodString>;
+                branch: z.ZodNullable<z.ZodString>;
+                target_branch: z.ZodNullable<z.ZodString>;
+                merge_commit: z.ZodNullable<z.ZodString>;
+              },
+              z.core.$strip
+            >
+          >;
+        },
+        z.core.$strip
+      >
+    >;
+  },
+  z.core.$strip
+>;
+export declare const RpcMergeQueueDataOutput: z.ZodPipe<
+  z.ZodAny,
+  z.ZodObject<
+    {
+      needsAttention: z.ZodObject<
+        {
+          openPRs: z.ZodArray<
+            z.ZodObject<
+              {
+                mrBead: z.ZodObject<
+                  {
+                    bead_id: z.ZodString;
+                    status: z.ZodString;
+                    title: z.ZodString;
+                    body: z.ZodNullable<z.ZodString>;
+                    rig_id: z.ZodNullable<z.ZodString>;
+                    created_at: z.ZodString;
+                    updated_at: z.ZodString;
+                    metadata: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+                  },
+                  z.core.$strip
+                >;
+                reviewMetadata: z.ZodObject<
+                  {
+                    branch: z.ZodString;
+                    target_branch: z.ZodString;
+                    merge_commit: z.ZodNullable<z.ZodString>;
+                    pr_url: z.ZodNullable<z.ZodString>;
+                    retry_count: z.ZodNumber;
+                  },
+                  z.core.$strip
+                >;
+                sourceBead: z.ZodNullable<
+                  z.ZodObject<
+                    {
+                      bead_id: z.ZodString;
+                      title: z.ZodString;
+                      status: z.ZodString;
+                      body: z.ZodNullable<z.ZodString>;
+                    },
+                    z.core.$strip
+                  >
+                >;
+                convoy: z.ZodNullable<
+                  z.ZodObject<
+                    {
+                      convoy_id: z.ZodString;
+                      title: z.ZodString;
+                      total_beads: z.ZodNumber;
+                      closed_beads: z.ZodNumber;
+                      feature_branch: z.ZodNullable<z.ZodString>;
+                      merge_mode: z.ZodNullable<z.ZodString>;
+                    },
+                    z.core.$strip
+                  >
+                >;
+                agent: z.ZodNullable<
+                  z.ZodObject<
+                    {
+                      agent_id: z.ZodString;
+                      name: z.ZodString;
+                      role: z.ZodString;
+                    },
+                    z.core.$strip
+                  >
+                >;
+                rigName: z.ZodNullable<z.ZodString>;
+                staleSince: z.ZodNullable<z.ZodString>;
+                failureReason: z.ZodNullable<z.ZodString>;
+              },
+              z.core.$strip
+            >
+          >;
+          failedReviews: z.ZodArray<
+            z.ZodObject<
+              {
+                mrBead: z.ZodObject<
+                  {
+                    bead_id: z.ZodString;
+                    status: z.ZodString;
+                    title: z.ZodString;
+                    body: z.ZodNullable<z.ZodString>;
+                    rig_id: z.ZodNullable<z.ZodString>;
+                    created_at: z.ZodString;
+                    updated_at: z.ZodString;
+                    metadata: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+                  },
+                  z.core.$strip
+                >;
+                reviewMetadata: z.ZodObject<
+                  {
+                    branch: z.ZodString;
+                    target_branch: z.ZodString;
+                    merge_commit: z.ZodNullable<z.ZodString>;
+                    pr_url: z.ZodNullable<z.ZodString>;
+                    retry_count: z.ZodNumber;
+                  },
+                  z.core.$strip
+                >;
+                sourceBead: z.ZodNullable<
+                  z.ZodObject<
+                    {
+                      bead_id: z.ZodString;
+                      title: z.ZodString;
+                      status: z.ZodString;
+                      body: z.ZodNullable<z.ZodString>;
+                    },
+                    z.core.$strip
+                  >
+                >;
+                convoy: z.ZodNullable<
+                  z.ZodObject<
+                    {
+                      convoy_id: z.ZodString;
+                      title: z.ZodString;
+                      total_beads: z.ZodNumber;
+                      closed_beads: z.ZodNumber;
+                      feature_branch: z.ZodNullable<z.ZodString>;
+                      merge_mode: z.ZodNullable<z.ZodString>;
+                    },
+                    z.core.$strip
+                  >
+                >;
+                agent: z.ZodNullable<
+                  z.ZodObject<
+                    {
+                      agent_id: z.ZodString;
+                      name: z.ZodString;
+                      role: z.ZodString;
+                    },
+                    z.core.$strip
+                  >
+                >;
+                rigName: z.ZodNullable<z.ZodString>;
+                staleSince: z.ZodNullable<z.ZodString>;
+                failureReason: z.ZodNullable<z.ZodString>;
+              },
+              z.core.$strip
+            >
+          >;
+          stalePRs: z.ZodArray<
+            z.ZodObject<
+              {
+                mrBead: z.ZodObject<
+                  {
+                    bead_id: z.ZodString;
+                    status: z.ZodString;
+                    title: z.ZodString;
+                    body: z.ZodNullable<z.ZodString>;
+                    rig_id: z.ZodNullable<z.ZodString>;
+                    created_at: z.ZodString;
+                    updated_at: z.ZodString;
+                    metadata: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+                  },
+                  z.core.$strip
+                >;
+                reviewMetadata: z.ZodObject<
+                  {
+                    branch: z.ZodString;
+                    target_branch: z.ZodString;
+                    merge_commit: z.ZodNullable<z.ZodString>;
+                    pr_url: z.ZodNullable<z.ZodString>;
+                    retry_count: z.ZodNumber;
+                  },
+                  z.core.$strip
+                >;
+                sourceBead: z.ZodNullable<
+                  z.ZodObject<
+                    {
+                      bead_id: z.ZodString;
+                      title: z.ZodString;
+                      status: z.ZodString;
+                      body: z.ZodNullable<z.ZodString>;
+                    },
+                    z.core.$strip
+                  >
+                >;
+                convoy: z.ZodNullable<
+                  z.ZodObject<
+                    {
+                      convoy_id: z.ZodString;
+                      title: z.ZodString;
+                      total_beads: z.ZodNumber;
+                      closed_beads: z.ZodNumber;
+                      feature_branch: z.ZodNullable<z.ZodString>;
+                      merge_mode: z.ZodNullable<z.ZodString>;
+                    },
+                    z.core.$strip
+                  >
+                >;
+                agent: z.ZodNullable<
+                  z.ZodObject<
+                    {
+                      agent_id: z.ZodString;
+                      name: z.ZodString;
+                      role: z.ZodString;
+                    },
+                    z.core.$strip
+                  >
+                >;
+                rigName: z.ZodNullable<z.ZodString>;
+                staleSince: z.ZodNullable<z.ZodString>;
+                failureReason: z.ZodNullable<z.ZodString>;
+              },
+              z.core.$strip
+            >
+          >;
+        },
+        z.core.$strip
+      >;
+      activityLog: z.ZodArray<
+        z.ZodObject<
+          {
+            event: z.ZodObject<
+              {
+                bead_event_id: z.ZodString;
+                bead_id: z.ZodString;
+                agent_id: z.ZodNullable<z.ZodString>;
+                event_type: z.ZodString;
+                old_value: z.ZodNullable<z.ZodString>;
+                new_value: z.ZodNullable<z.ZodString>;
+                metadata: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+                created_at: z.ZodString;
+              },
+              z.core.$strip
+            >;
+            mrBead: z.ZodNullable<
+              z.ZodObject<
+                {
+                  bead_id: z.ZodString;
+                  title: z.ZodString;
+                  type: z.ZodString;
+                  status: z.ZodString;
+                  rig_id: z.ZodNullable<z.ZodString>;
+                  metadata: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+                },
+                z.core.$strip
+              >
+            >;
+            sourceBead: z.ZodNullable<
+              z.ZodObject<
+                {
+                  bead_id: z.ZodString;
+                  title: z.ZodString;
+                  status: z.ZodString;
+                },
+                z.core.$strip
+              >
+            >;
+            convoy: z.ZodNullable<
+              z.ZodObject<
+                {
+                  convoy_id: z.ZodString;
+                  title: z.ZodString;
+                  total_beads: z.ZodNumber;
+                  closed_beads: z.ZodNumber;
+                  feature_branch: z.ZodNullable<z.ZodString>;
+                  merge_mode: z.ZodNullable<z.ZodString>;
+                },
+                z.core.$strip
+              >
+            >;
+            agent: z.ZodNullable<
+              z.ZodObject<
+                {
+                  agent_id: z.ZodString;
+                  name: z.ZodString;
+                  role: z.ZodString;
+                },
+                z.core.$strip
+              >
+            >;
+            rigName: z.ZodNullable<z.ZodString>;
+            reviewMetadata: z.ZodNullable<
+              z.ZodObject<
+                {
+                  pr_url: z.ZodNullable<z.ZodString>;
+                  branch: z.ZodNullable<z.ZodString>;
+                  target_branch: z.ZodNullable<z.ZodString>;
+                  merge_commit: z.ZodNullable<z.ZodString>;
+                },
+                z.core.$strip
+              >
+            >;
+          },
+          z.core.$strip
+        >
+      >;
+    },
+    z.core.$strip
+  >
+>;
+export declare const OrgTownOutput: z.ZodObject<
+  {
+    id: z.ZodString;
+    name: z.ZodString;
+    owner_org_id: z.ZodString;
+    created_by_user_id: z.ZodString;
+    created_at: z.ZodString;
+    updated_at: z.ZodString;
+  },
+  z.core.$strip
+>;
+export declare const RpcOrgTownOutput: z.ZodPipe<
+  z.ZodAny,
+  z.ZodObject<
+    {
+      id: z.ZodString;
+      name: z.ZodString;
+      owner_org_id: z.ZodString;
+      created_by_user_id: z.ZodString;
+      created_at: z.ZodString;
+      updated_at: z.ZodString;
+    },
+    z.core.$strip
+  >
+>;

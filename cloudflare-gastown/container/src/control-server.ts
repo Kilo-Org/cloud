@@ -4,6 +4,7 @@ import { runAgent, resolveGitCredentials } from './agent-runner';
 import {
   stopAgent,
   sendMessage,
+  updateAgentModel,
   getAgentStatus,
   activeAgentCount,
   activeServerCount,
@@ -15,7 +16,13 @@ import {
 import { startHeartbeat, stopHeartbeat } from './heartbeat';
 import { pushContext as pushDashboardContext } from './dashboard-context';
 import { mergeBranch, setupRigBrowseWorktree } from './git-manager';
-import { StartAgentRequest, SendMessageRequest, MergeRequest, SetupRepoRequest } from './types';
+import {
+  StartAgentRequest,
+  SendMessageRequest,
+  UpdateAgentModelRequest,
+  MergeRequest,
+  SetupRepoRequest,
+} from './types';
 import type {
   AgentStatusResponse,
   HealthResponse,
@@ -189,6 +196,23 @@ app.post('/agents/:agentId/message', async c => {
 
   await sendMessage(agentId, parsed.data.prompt);
   return c.json({ sent: true });
+});
+
+// PATCH /agents/:agentId/model
+// Hot-update the model for a running agent without restarting the session.
+app.patch('/agents/:agentId/model', async c => {
+  const { agentId } = c.req.param();
+  if (!getAgentStatus(agentId)) {
+    return c.json({ error: `Agent ${agentId} not found` }, 404);
+  }
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = UpdateAgentModelRequest.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
+  }
+
+  await updateAgentModel(agentId, parsed.data.model, parsed.data.smallModel);
+  return c.json({ updated: true });
 });
 
 // GET /agents/:agentId/status

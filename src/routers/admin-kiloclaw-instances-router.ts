@@ -1,6 +1,6 @@
 import { adminProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { kiloclaw_instances, kilocode_users } from '@kilocode/db/schema';
+import { kiloclaw_instances, kiloclaw_subscriptions, kilocode_users } from '@kilocode/db/schema';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import {
@@ -29,7 +29,7 @@ const ListInstancesSchema = z.object({
   sortBy: z.enum(['created_at', 'destroyed_at']).default('created_at'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   search: z.string().optional(),
-  status: z.enum(['all', 'active', 'destroyed']).default('all'),
+  status: z.enum(['all', 'active', 'suspended', 'destroyed']).default('all'),
 });
 
 const GetInstanceSchema = z.object({
@@ -123,6 +123,7 @@ export type AdminKiloclawInstance = {
   sandbox_id: string;
   created_at: string;
   destroyed_at: string | null;
+  suspended_at: string | null;
   user_email: string | null;
 };
 
@@ -138,9 +139,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .select({
         instance: kiloclaw_instances,
         user_email: kilocode_users.google_user_email,
+        suspended_at: kiloclaw_subscriptions.suspended_at,
       })
       .from(kiloclaw_instances)
       .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
+      .leftJoin(
+        kiloclaw_subscriptions,
+        eq(kiloclaw_instances.user_id, kiloclaw_subscriptions.user_id)
+      )
       .where(eq(kiloclaw_instances.id, input.id))
       .limit(1);
 
@@ -154,6 +160,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       sandbox_id: result.instance.sandbox_id,
       created_at: result.instance.created_at,
       destroyed_at: result.instance.destroyed_at,
+      suspended_at: result.suspended_at ?? null,
       user_email: result.user_email,
     };
 
@@ -212,6 +219,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
     if (status === 'active') {
       conditions.push(isNull(kiloclaw_instances.destroyed_at));
+      conditions.push(isNull(kiloclaw_subscriptions.suspended_at));
+    } else if (status === 'suspended') {
+      conditions.push(isNull(kiloclaw_instances.destroyed_at));
+      conditions.push(isNotNull(kiloclaw_subscriptions.suspended_at));
     } else if (status === 'destroyed') {
       conditions.push(isNotNull(kiloclaw_instances.destroyed_at));
     }
@@ -225,9 +236,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .select({
         instance: kiloclaw_instances,
         user_email: kilocode_users.google_user_email,
+        suspended_at: kiloclaw_subscriptions.suspended_at,
       })
       .from(kiloclaw_instances)
       .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
+      .leftJoin(
+        kiloclaw_subscriptions,
+        eq(kiloclaw_instances.user_id, kiloclaw_subscriptions.user_id)
+      )
       .where(whereCondition)
       .orderBy(orderCondition)
       .limit(limit)
@@ -237,6 +253,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(kiloclaw_instances)
       .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
+      .leftJoin(
+        kiloclaw_subscriptions,
+        eq(kiloclaw_instances.user_id, kiloclaw_subscriptions.user_id)
+      )
       .where(whereCondition);
 
     const totalCount = totalCountResult[0]?.count || 0;
@@ -248,6 +268,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       sandbox_id: row.instance.sandbox_id,
       created_at: row.instance.created_at,
       destroyed_at: row.instance.destroyed_at,
+      suspended_at: row.suspended_at ?? null,
       user_email: row.user_email,
     }));
 
@@ -265,15 +286,20 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
   stats: adminProcedure.input(StatsSchema).query(async ({ input }) => {
     const { days } = input;
 
-    // Overview counts
+    // Overview counts (join subscriptions to derive suspended state)
     const [overview] = await db
       .select({
         total_instances: sql<number>`COUNT(*)::int`,
-        active_instances: sql<number>`COUNT(CASE WHEN ${kiloclaw_instances.destroyed_at} IS NULL THEN 1 END)::int`,
+        active_instances: sql<number>`COUNT(CASE WHEN ${kiloclaw_instances.destroyed_at} IS NULL AND ${kiloclaw_subscriptions.suspended_at} IS NULL THEN 1 END)::int`,
+        suspended_instances: sql<number>`COUNT(CASE WHEN ${kiloclaw_instances.destroyed_at} IS NULL AND ${kiloclaw_subscriptions.suspended_at} IS NOT NULL THEN 1 END)::int`,
         destroyed_instances: sql<number>`COUNT(CASE WHEN ${kiloclaw_instances.destroyed_at} IS NOT NULL THEN 1 END)::int`,
         unique_users: sql<number>`COUNT(DISTINCT ${kiloclaw_instances.user_id})::int`,
       })
-      .from(kiloclaw_instances);
+      .from(kiloclaw_instances)
+      .leftJoin(
+        kiloclaw_subscriptions,
+        eq(kiloclaw_instances.user_id, kiloclaw_subscriptions.user_id)
+      );
 
     // Time-windowed counts
     const [last24h] = await db
@@ -352,6 +378,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       overview: {
         totalInstances: overview?.total_instances ?? 0,
         activeInstances: overview?.active_instances ?? 0,
+        suspendedInstances: overview?.suspended_instances ?? 0,
         destroyedInstances: overview?.destroyed_instances ?? 0,
         uniqueUsers: overview?.unique_users ?? 0,
         last24hCreated: last24h?.count ?? 0,
@@ -540,9 +567,20 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const fallbackMessage = 'Failed to start machine';
     try {
       const client = new KiloClawInternalClient();
-      return await client.start(input.userId);
+      return await client.start(input.userId, { skipCooldown: true });
     } catch (err) {
       console.error('Failed to start machine for user:', input.userId, err);
+      throwKiloclawAdminError(err, fallbackMessage);
+    }
+  }),
+
+  forceRetryRecovery: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
+    const fallbackMessage = 'Failed to retry recovery';
+    try {
+      const client = new KiloClawInternalClient();
+      return await client.forceRetryRecovery(input.userId);
+    } catch (err) {
+      console.error('Failed to retry recovery for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
     }
   }),
@@ -661,6 +699,51 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         throwKiloclawAdminError(err, 'Failed to list candidate volumes');
       }
     }),
+
+  devNukeAll: adminProcedure.mutation(async ({ ctx }) => {
+    if (process.env.NODE_ENV !== 'development') {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'This endpoint is only available in development mode',
+      });
+    }
+
+    const activeInstances = await db
+      .select({
+        id: kiloclaw_instances.id,
+        user_id: kiloclaw_instances.user_id,
+      })
+      .from(kiloclaw_instances)
+      .where(isNull(kiloclaw_instances.destroyed_at));
+
+    console.log(
+      `[admin-kiloclaw] DevNukeAll triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}): ${activeInstances.length} active instances`
+    );
+
+    const client = new KiloClawInternalClient();
+    let destroyed = 0;
+    const errors: Array<{ userId: string; error: string }> = [];
+
+    for (const instance of activeInstances) {
+      const destroyedRow = await markActiveInstanceDestroyed(instance.user_id);
+      try {
+        await client.destroy(instance.user_id);
+        destroyed++;
+      } catch (err) {
+        if (destroyedRow) {
+          await restoreDestroyedInstance(destroyedRow.id);
+        }
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        errors.push({ userId: instance.user_id, error: message });
+        console.error(
+          `[admin-kiloclaw] DevNukeAll: failed to destroy instance ${instance.id} (user: ${instance.user_id}):`,
+          err
+        );
+      }
+    }
+
+    return { total: activeInstances.length, destroyed, errors };
+  }),
 
   reassociateVolume: adminProcedure
     .input(

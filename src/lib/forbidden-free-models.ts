@@ -1,14 +1,9 @@
-/**
- * Models that are so heavily rate-limited by their providers that they are
- * effectively unusable.  We hide them from the model list and reject requests
- * for them at the proxy layer so users get a clear error instead of endless
- * 429s.
- */
-
 const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'arcee-ai/trinity-mini:free',
   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
   'deepseek/deepseek-r1-0528:free',
+  'giga-potato',
+  'giga-potato-thinking',
   'google/gemma-3-12b-it:free',
   'google/gemma-3-27b-it:free',
   'google/gemma-3-4b-it:free',

@@ -16,6 +16,9 @@ import { format } from 'date-fns';
 import type { TemplateName } from '@/lib/email';
 import { send as sendEmail } from '@/lib/email';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { ensureAutoIntroSchedule } from '@/lib/kiloclaw/stripe-handlers';
+import { isIntroPriceId } from '@/lib/kiloclaw/stripe-price-ids.server';
+import { client as stripe } from '@/lib/stripe-client';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import { NEXTAUTH_URL, KILOCLAW_BILLING_ENFORCEMENT } from '@/lib/config.server';
 import { sentryLogger } from '@/lib/utils.server';
@@ -42,6 +45,7 @@ type CronSummary = {
   destruction_warnings: number;
   sweep3_instance_destruction: number;
   sweep4_past_due_cleanup: number;
+  sweep5_intro_schedules_repaired: number;
   emails_sent: number;
   emails_skipped: number;
   errors: number;
@@ -104,6 +108,7 @@ export async function runKiloClawBillingLifecycleCron(
     destruction_warnings: 0,
     sweep3_instance_destruction: 0,
     sweep4_past_due_cleanup: 0,
+    sweep5_intro_schedules_repaired: 0,
     emails_sent: 0,
     emails_skipped: 0,
     errors: 0,
@@ -571,6 +576,47 @@ export async function runKiloClawBillingLifecycleCron(
       summary.errors++;
       captureException(error);
       logError('Sweep 4 (past-due cleanup) failed for user', {
+        user_id: row.user_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  // ── Sweep 5: Repair stranded intro-price subscriptions ─────────────
+  const strandedIntroRows = await database
+    .select({
+      user_id: kiloclaw_subscriptions.user_id,
+      stripe_subscription_id: kiloclaw_subscriptions.stripe_subscription_id,
+    })
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.status, 'active'),
+        isNull(kiloclaw_subscriptions.stripe_schedule_id),
+        isNotNull(kiloclaw_subscriptions.stripe_subscription_id),
+        eq(kiloclaw_subscriptions.cancel_at_period_end, false)
+      )
+    );
+
+  for (const row of strandedIntroRows) {
+    try {
+      const stripeSubId = row.stripe_subscription_id;
+      if (!stripeSubId) continue;
+      const liveSub = await stripe.subscriptions.retrieve(stripeSubId);
+      const priceId = liveSub.items.data[0]?.price?.id;
+      if (!priceId || !isIntroPriceId(priceId)) continue;
+      if (liveSub.schedule) continue;
+
+      await ensureAutoIntroSchedule(stripeSubId, row.user_id);
+      summary.sweep5_intro_schedules_repaired++;
+      logInfo('Sweep 5: repaired stranded intro-price subscription', {
+        user_id: row.user_id,
+        stripe_subscription_id: row.stripe_subscription_id,
+      });
+    } catch (error) {
+      summary.errors++;
+      captureException(error);
+      logError('Sweep 5 (intro schedule repair) failed for user', {
         user_id: row.user_id,
         error: error instanceof Error ? error.message : String(error),
       });

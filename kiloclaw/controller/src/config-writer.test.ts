@@ -255,6 +255,27 @@ describe('generateBaseConfig', () => {
     expect(config.agents.defaults.model.primary).toBe('kilocode/openai/gpt-5');
   });
 
+  it('preserves agent model fallback settings on restart', () => {
+    const existing = JSON.stringify({
+      agents: {
+        defaults: {
+          model: {
+            primary: 'kilocode/anthropic/claude-opus-4.6',
+            fallback: 'kilocode/openai/gpt-5',
+            customSetting: 'user-value',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), KILOCODE_DEFAULT_MODEL: 'kilocode/openai/gpt-5' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.agents.defaults.model.primary).toBe('kilocode/openai/gpt-5');
+    expect(config.agents.defaults.model.fallback).toBe('kilocode/openai/gpt-5');
+    expect(config.agents.defaults.model.customSetting).toBe('user-value');
+  });
+
   it('does not set default model when KILOCODE_DEFAULT_MODEL is not set', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
@@ -287,6 +308,28 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.entries.telegram.enabled).toBe(true);
   });
 
+  it('preserves user Telegram customizations on restart', () => {
+    const existing = JSON.stringify({
+      channels: {
+        telegram: {
+          botToken: 'tg-token-old',
+          enabled: true,
+          dmPolicy: 'pairing',
+          groupPolicy: 'restricted',
+          customField: 'user-value',
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), TELEGRAM_BOT_TOKEN: 'tg-token-new' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.channels.telegram.botToken).toBe('tg-token-new');
+    expect(config.channels.telegram.enabled).toBe(true);
+    expect(config.channels.telegram.groupPolicy).toBe('restricted');
+    expect(config.channels.telegram.customField).toBe('user-value');
+  });
+
   it('configures Telegram with open DM policy and allowFrom wildcard', () => {
     const { deps } = fakeDeps();
     const env = {
@@ -311,6 +354,26 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.entries.discord.enabled).toBe(true);
   });
 
+  it('preserves user Discord customizations on restart', () => {
+    const existing = JSON.stringify({
+      channels: {
+        discord: {
+          token: 'dc-token-old',
+          enabled: true,
+          dm: { policy: 'pairing' },
+          guilds: { '123456': { name: 'My Server' } },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), DISCORD_BOT_TOKEN: 'dc-token-new' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.channels.discord.token).toBe('dc-token-new');
+    expect(config.channels.discord.enabled).toBe(true);
+    expect(config.channels.discord.guilds).toEqual({ '123456': { name: 'My Server' } });
+  });
+
   it('configures Slack channel when both tokens present', () => {
     const { deps } = fakeDeps();
     const env = {
@@ -324,6 +387,33 @@ describe('generateBaseConfig', () => {
     expect(config.channels.slack.appToken).toBe('slack-app');
     expect(config.channels.slack.enabled).toBe(true);
     expect(config.plugins.entries.slack.enabled).toBe(true);
+  });
+
+  it('preserves user Slack customizations on restart', () => {
+    const existing = JSON.stringify({
+      channels: {
+        slack: {
+          botToken: 'slack-bot-old',
+          appToken: 'slack-app-old',
+          enabled: true,
+          slashCommands: ['/deploy', '/status'],
+          customField: 'preserved',
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      SLACK_BOT_TOKEN: 'slack-bot-new',
+      SLACK_APP_TOKEN: 'slack-app-new',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.channels.slack.botToken).toBe('slack-bot-new');
+    expect(config.channels.slack.appToken).toBe('slack-app-new');
+    expect(config.channels.slack.enabled).toBe(true);
+    expect(config.channels.slack.slashCommands).toEqual(['/deploy', '/status']);
+    expect(config.channels.slack.customField).toBe('preserved');
   });
 
   it('does not configure Slack when only bot token present', () => {

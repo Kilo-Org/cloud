@@ -22,11 +22,6 @@ export function ProfileKiloPassSection() {
   const hasActiveSubscription =
     subscriptionFromQuery != null && !isStripeSubscriptionEnded(subscriptionFromQuery.status);
 
-  const promoEligibilityQuery = useQuery({
-    ...trpc.kiloPass.getFirstMonthPromoEligibility.queryOptions(),
-    enabled: query.isSuccess && !hasActiveSubscription,
-  });
-
   const averageMonthlyUsageQuery = useQuery({
     ...trpc.kiloPass.getAverageMonthlyUsageLast3Months.queryOptions(),
     enabled: query.isSuccess && !hasActiveSubscription,
@@ -63,7 +58,7 @@ export function ProfileKiloPassSection() {
 
   if (!activeSubscription) {
     const pending = checkoutMutation.isPending;
-    const showFirstMonthPromo = promoEligibilityQuery.data?.eligible === true;
+    const showFirstMonthPromo = query.data.isEligibleForFirstMonthPromo;
     const showSecondMonthPromo =
       showFirstMonthPromo && dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
     const averageMonthlyUsageUsd = averageMonthlyUsageQuery.data?.averageMonthlyUsageUsd;

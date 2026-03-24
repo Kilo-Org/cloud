@@ -28,7 +28,7 @@
     "@kilocode/db": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@sentry/cloudflare": "^9",
-    "@trpc/server": "^11.0.0",
+    "@trpc/server": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "itty-time": "^1.0.6",

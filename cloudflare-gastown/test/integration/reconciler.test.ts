@@ -126,6 +126,77 @@ describe('Reconciler', () => {
     });
   });
 
+  // ── #1358: Heartbeat restores working status ────────────────────────
+
+  describe('#1358: dispatch timeout race recovery', () => {
+    it('should restore idle agent to working on heartbeat', async () => {
+      const agent = await town.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `heartbeat-restore-${townName}`,
+        rig_id: 'rig-1',
+      });
+      const bead = await town.createBead({
+        type: 'issue',
+        title: 'Heartbeat test',
+        rig_id: 'rig-1',
+      });
+
+      // Simulate dispatch timeout race: agent is hooked + idle
+      // (dispatchAgent set it to working, then timeout set it back to idle)
+      await town.hookBead(agent.id, bead.bead_id);
+      await town.updateAgentStatus(agent.id, 'idle');
+
+      const before = await town.getAgentAsync(agent.id);
+      expect(before?.status).toBe('idle');
+
+      // Agent sends a heartbeat (proving it's alive in the container)
+      await town.touchAgentHeartbeat(agent.id);
+
+      // Status should be restored to working
+      const after = await town.getAgentAsync(agent.id);
+      expect(after?.status).toBe('working');
+    });
+
+    it('should not change status of a working agent on heartbeat', async () => {
+      const agent = await town.registerAgent({
+        role: 'polecat',
+        name: 'P2',
+        identity: `heartbeat-noop-${townName}`,
+        rig_id: 'rig-1',
+      });
+      const bead = await town.createBead({
+        type: 'issue',
+        title: 'Heartbeat noop test',
+        rig_id: 'rig-1',
+      });
+
+      await town.hookBead(agent.id, bead.bead_id);
+      await town.updateAgentStatus(agent.id, 'working');
+
+      await town.touchAgentHeartbeat(agent.id);
+
+      const after = await town.getAgentAsync(agent.id);
+      expect(after?.status).toBe('working');
+    });
+
+    it('should not change status of an exited agent on heartbeat', async () => {
+      const agent = await town.registerAgent({
+        role: 'polecat',
+        name: 'P3',
+        identity: `heartbeat-exited-${townName}`,
+        rig_id: 'rig-1',
+      });
+
+      await town.updateAgentStatus(agent.id, 'exited');
+
+      await town.touchAgentHeartbeat(agent.id);
+
+      const after = await town.getAgentAsync(agent.id);
+      expect(after?.status).toBe('exited');
+    });
+  });
+
   // ── Event-driven agentDone ──────────────────────────────────────────
 
   describe('event-driven agentDone', () => {
@@ -211,6 +282,67 @@ describe('Reconciler', () => {
       // A refinery agent should exist
       const agentsList = await town.listAgents({ role: 'refinery' });
       expect(agentsList.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ── reconcileReviewQueue Rule 6: Refinery re-dispatch limits (#1342) ─
+
+  describe('reconcileReviewQueue Rule 6: refinery re-dispatch limits', () => {
+    it('should fail MR bead after refinery exceeds max dispatch attempts', async () => {
+      const result = await town.slingConvoy({
+        rigId: 'rig-1',
+        convoyTitle: 'Rule 6 limit test',
+        tasks: [{ title: 'Dispatch limit test' }],
+      });
+
+      const beadId = result.beads[0].bead.bead_id;
+
+      // Assign agent and dispatch
+      await runDurableObjectAlarm(town);
+
+      const assigned = await town.getBeadAsync(beadId);
+      const agentId = assigned?.assignee_agent_bead_id!;
+      expect(agentId).toBeTruthy();
+
+      // Agent finishes work → creates MR bead
+      await town.agentDone(agentId, {
+        branch: 'gt/polecat/test-rule6',
+        summary: 'Ready for review',
+      });
+      await runDurableObjectAlarm(town);
+
+      // Find the MR bead and its refinery
+      const mrBeads = await town.listBeads({ type: 'merge_request' });
+      const mrBead = mrBeads.find(b => b.metadata?.source_bead_id === beadId);
+      expect(mrBead).toBeTruthy();
+
+      // Run alarm to dispatch the refinery
+      await runDurableObjectAlarm(town);
+
+      const refineries = await town.listAgents({ role: 'refinery' });
+      expect(refineries.length).toBeGreaterThan(0);
+      const refinery = refineries[0];
+
+      // Simulate repeated idle→re-dispatch cycles by setting dispatch_attempts
+      // past the limit (MAX_DISPATCH_ATTEMPTS = 20) and backdating last_activity_at
+      // so the DISPATCH_COOLDOWN_MS check passes.
+      const pastTimestamp = new Date(Date.now() - 5 * 60_000).toISOString();
+      await town.setAgentDispatchAttempts(refinery.id, 25, pastTimestamp);
+
+      // Set agent to idle (simulating agentCompleted) and ensure MR is in_progress
+      await town.updateAgentStatus(refinery.id, 'idle');
+      const mrBefore = await town.getBeadAsync(mrBead!.bead_id);
+      expect(mrBefore?.status).toBe('in_progress');
+
+      // Run alarm — Rule 6 should see dispatch_attempts >= 20 and fail the MR bead
+      await runDurableObjectAlarm(town);
+
+      const mrAfter = await town.getBeadAsync(mrBead!.bead_id);
+      expect(mrAfter?.status).toBe('failed');
+
+      // Refinery should be unhooked
+      const refineryAfter = await town.getAgentAsync(refinery.id);
+      expect(refineryAfter?.current_hook_bead_id).toBeNull();
     });
   });
 

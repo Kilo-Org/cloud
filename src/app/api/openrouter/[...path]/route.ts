@@ -37,6 +37,7 @@ import {
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
   forbiddenFreeModelResponse,
+  previousResponseIdIsNotSupported,
 } from '@/lib/llm-proxy-helpers';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
@@ -89,6 +90,8 @@ function validatePath(
   | { path: '/chat/completions' | '/responses' | '/messages' }
   | { errorResponse: ReturnType<typeof invalidPathResponse> } {
   const pathSuffix =
+    stripRequiredPrefix(url.pathname, '/api/gateway/v1') ??
+    stripRequiredPrefix(url.pathname, '/api/openrouter/v1') ??
     stripRequiredPrefix(url.pathname, '/api/gateway') ??
     stripRequiredPrefix(url.pathname, '/api/openrouter');
 
@@ -278,6 +281,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
+  if (requestBodyParsed.kind === 'responses' && requestBodyParsed.body.previous_response_id) {
+    return previousResponseIdIsNotSupported();
+  }
+
   // Log to free_model_usage for rate limiting (at request start, before processing)
   if (isKiloFreeModel(originalModelIdLowerCased)) {
     await logFreeModelRequest(
@@ -292,7 +299,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
   const { provider, userByok, customLlm } = await getProvider(
     originalModelIdLowerCased,
-    requestBodyParsed.body,
+    requestBodyParsed,
     user,
     organizationId,
     taskId

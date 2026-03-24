@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
 import { Check, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import {
@@ -75,9 +76,40 @@ export function ClawDashboard({
   const onSecretsChanged = useCallback((entryId: string) => {
     setDirtySecrets(prev => new Set([...prev, entryId]));
   }, []);
+  const [upgradeRequested, setUpgradeRequested] = useState(false);
+  const onRequestUpgrade = useCallback(() => setUpgradeRequested(true), []);
+  const onUpgradeHandled = useCallback(() => setUpgradeRequested(false), []);
+
   const onRedeploySuccess = useCallback(() => {
     setDirtySecrets(new Set());
   }, []);
+
+  const onRedeploy = useCallback(() => {
+    mutations.restartMachine.mutate(undefined, {
+      onSuccess: () => {
+        toast.success('Redeploying');
+        onRedeploySuccess();
+      },
+      onError: err => {
+        toast.error(err.message, { duration: 10000 });
+      },
+    });
+  }, [mutations.restartMachine, onRedeploySuccess]);
+
+  const onUpgrade = useCallback(() => {
+    mutations.restartMachine.mutate(
+      { imageTag: 'latest' },
+      {
+        onSuccess: () => {
+          toast.success('Upgrading to latest image');
+          onRedeploySuccess();
+        },
+        onError: err => {
+          toast.error(err.message, { duration: 10000 });
+        },
+      }
+    );
+  }, [mutations.restartMachine, onRedeploySuccess]);
 
   // Billing gating (welcome page for new users, loading spinner) is handled
   // by page.tsx before this component mounts. ClawDashboard always renders
@@ -236,6 +268,8 @@ export function ClawDashboard({
                 status={instanceStatus}
                 mutations={mutations}
                 onRedeploySuccess={onRedeploySuccess}
+                upgradeRequested={upgradeRequested}
+                onUpgradeHandled={onUpgradeHandled}
               />
             </CardContent>
             <Tabs defaultValue="instance">
@@ -276,6 +310,9 @@ export function ClawDashboard({
                     mutations={mutations}
                     onSecretsChanged={onSecretsChanged}
                     dirtySecrets={dirtySecrets}
+                    onRedeploy={onRedeploy}
+                    onUpgrade={onUpgrade}
+                    onRequestUpgrade={onRequestUpgrade}
                   />
                 </TabsContent>
                 <TabsContent value="changelog" className="mt-0">

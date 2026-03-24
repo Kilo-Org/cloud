@@ -133,16 +133,21 @@ export async function dispatchAgent(
     });
 
     if (started) {
-      // Best-effort: may be dropped if I/O gate is closed
-      query(
-        ctx.sql,
-        /* sql */ `
-          UPDATE ${agent_metadata}
-          SET ${agent_metadata.columns.dispatch_attempts} = 0
-          WHERE ${agent_metadata.bead_id} = ?
-        `,
-        [agent.id]
-      );
+      // Reset dispatch_attempts on successful start — but NOT for refineries.
+      // Refineries can loop (idle-timeout → re-dispatch) many times on the
+      // same MR bead, so we keep the counter monotonically increasing until
+      // the bead is closed or the agent hooks a new bead (#1342).
+      if (agent.role !== 'refinery') {
+        query(
+          ctx.sql,
+          /* sql */ `
+            UPDATE ${agent_metadata}
+            SET ${agent_metadata.columns.dispatch_attempts} = 0
+            WHERE ${agent_metadata.bead_id} = ?
+          `,
+          [agent.id]
+        );
+      }
       console.log(`${LOG} dispatchAgent: started agent=${agent.name}(${agent.id})`);
       ctx.emitEvent({
         event: 'agent.spawned',
@@ -154,20 +159,11 @@ export async function dispatchAgent(
       });
     } else {
       // Container start returned false — but the container may have
-      // actually started the agent (timeout race). DON'T roll back
-      // the bead to open. Leave it in_progress with the agent idle+hooked.
-      // If the agent truly failed: rehookOrphanedBeads recovers after 2 min.
-      // If the agent actually started: it works and calls gt_done normally.
-      query(
-        ctx.sql,
-        /* sql */ `
-          UPDATE ${agent_metadata}
-          SET ${agent_metadata.columns.status} = 'idle',
-              ${agent_metadata.columns.last_activity_at} = ?
-          WHERE ${agent_metadata.bead_id} = ?
-        `,
-        [now(), agent.id]
-      );
+      // actually started the agent (timeout race). Leave the agent
+      // as 'working' so the reconciler doesn't treat it as lost.
+      // If the agent truly didn't start: reconcileAgents catches it
+      // after 90s of missing heartbeats and transitions to 'idle'.
+      // If the agent actually started: heartbeats keep it alive. (#1358)
       ctx.emitEvent({
         event: 'agent.dispatch_failed',
         townId: ctx.townId,
@@ -180,7 +176,9 @@ export async function dispatchAgent(
     return started;
   } catch (err) {
     console.error(`${LOG} dispatchAgent: failed for agent=${agent.id}:`, err);
-    Sentry.captureException(err, { extra: { agentId: agent.id, beadId: bead.bead_id } });
+    Sentry.captureException(err, {
+      extra: { agentId: agent.id, beadId: bead.bead_id },
+    });
     try {
       query(
         ctx.sql,

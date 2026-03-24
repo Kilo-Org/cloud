@@ -15,13 +15,15 @@ import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 
 import type { AppEnv, KiloClawEnv } from './types';
-import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform } from './routes';
+import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform, controller } from './routes';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
 import { registerVersionIfNeeded } from './lib/image-version';
 import { startingUpPage } from './pages/starting-up';
 import { buildForwardHeaders } from './utils/proxy-headers';
+import { timingMiddleware } from './middleware/analytics';
+import { writeEvent } from './utils/analytics';
 
 // Export DOs (match wrangler.jsonc class_name bindings)
 export { KiloClawInstance } from './durable-objects/kiloclaw-instance';
@@ -134,11 +136,15 @@ async function deriveSandboxId(c: Context<AppEnv>, next: Next) {
 const app = new Hono<AppEnv>();
 
 // Global middleware (all routes)
+app.use('*', timingMiddleware);
 app.use('*', logRequest);
 
 // Public routes (no auth)
 app.route('/', publicRoutes);
 app.route('/', accessGatewayRoutes);
+
+// Controller check-in routes (machine-to-worker, custom auth)
+app.route('/api/controller', controller);
 
 // Debug routes are removed.
 app.all('/debug', c => c.notFound());
@@ -168,6 +174,7 @@ app.route('/api/platform', platform);
 async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
   const userId = c.get('userId');
   if (!userId) return false;
+  const startedAt = performance.now();
 
   try {
     const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
@@ -179,9 +186,30 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
 
     // Machine dead despite running status -- restart
     console.log('[PROXY] Instance status is running but machine unreachable, restarting');
-    await stub.start(userId);
+    const { started } = await stub.start(userId);
+    if (started) {
+      const freshStatus = await stub.getStatus();
+      writeEvent(c.env, {
+        event: 'instance.crash_recovery_succeeded',
+        delivery: 'http',
+        userId,
+        sandboxId: c.get('sandboxId') ?? undefined,
+        flyMachineId: freshStatus.flyMachineId ?? undefined,
+        flyAppName: freshStatus.flyAppName ?? undefined,
+        status: freshStatus.status ?? undefined,
+        durationMs: performance.now() - startedAt,
+      });
+    }
     return true;
   } catch (err) {
+    writeEvent(c.env, {
+      event: 'instance.crash_recovery_failed',
+      delivery: 'http',
+      userId,
+      sandboxId: c.get('sandboxId') ?? undefined,
+      error: err instanceof Error ? err.message : String(err),
+      durationMs: performance.now() - startedAt,
+    });
     console.error('[PROXY] Crash recovery failed:', err);
   }
   return false;

@@ -31,3 +31,7 @@ export const minimax_m21_free_model: KiloFreeModel = {
 export function isMinimaxModel(model: string) {
   return model.startsWith('minimax/');
 }
+
+export const MINIMAX_CURRENT_MODEL_ID = 'minimax/minimax-m2.7';
+
+export const MINIMAX_CURRENT_MODEL_NAME = 'MiniMax M2.7';

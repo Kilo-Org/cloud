@@ -206,6 +206,7 @@ export const kilocode_users = pgTable(
     completed_welcome_form: boolean().default(false).notNull(),
     linkedin_url: text(),
     github_url: text(),
+    discord_server_membership_verified_at: timestamp({ withTimezone: true, mode: 'string' }),
     openrouter_upstream_safety_identifier: text(),
     customer_source: text(),
   },
@@ -519,6 +520,7 @@ export const user_auth_provider = pgTable(
     email: text().notNull(),
     avatar_url: text().notNull(),
 
+    display_name: text(),
     hosted_domain: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },

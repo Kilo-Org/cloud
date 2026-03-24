@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Cpu, HardDrive, Play, RefreshCw, RotateCw, Stethoscope } from 'lucide-react';
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
@@ -37,10 +37,14 @@ export function InstanceControls({
   status,
   mutations,
   onRedeploySuccess,
+  upgradeRequested,
+  onUpgradeHandled,
 }: {
   status: KiloClawDashboardStatus;
   mutations: ClawMutations;
   onRedeploySuccess?: () => void;
+  upgradeRequested?: boolean;
+  onUpgradeHandled?: () => void;
 }) {
   const posthog = usePostHog();
   const isRunning = status.status === 'running';
@@ -56,6 +60,17 @@ export function InstanceControls({
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [confirmRedeploy, setConfirmRedeploy] = useState(false);
   const [redeployMode, setRedeployMode] = useState<'redeploy' | 'upgrade'>('redeploy');
+
+  // Toggle-flag pattern: parent sets upgradeRequested=true, we open the dialog
+  // with "upgrade" preselected, then immediately reset via onUpgradeHandled.
+  // Safe for single-click flows; won't re-fire if already true (no state change).
+  useEffect(() => {
+    if (upgradeRequested) {
+      setRedeployMode('upgrade');
+      setConfirmRedeploy(true);
+      onUpgradeHandled?.();
+    }
+  }, [upgradeRequested, onUpgradeHandled]);
 
   return (
     <div>

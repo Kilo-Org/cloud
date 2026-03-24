@@ -1,6 +1,7 @@
 import { TerminalBarProvider } from '@/components/gastown/TerminalBarContext';
 import { DrawerStackProvider } from '@/components/gastown/DrawerStack';
 import { renderDrawerContent } from '@/components/gastown/DrawerStackContent';
+import { TerminalBarPadding } from '@/components/gastown/TerminalBarPadding';
 import { MayorTerminalBar } from '@/app/(app)/gastown/[townId]/MayorTerminalBar';
 
 export default async function OrgTownLayout({
@@ -16,11 +17,7 @@ export default async function OrgTownLayout({
   return (
     <TerminalBarProvider>
       <DrawerStackProvider renderContent={renderDrawerContent}>
-        {/* Fullscreen edge-to-edge layout for gastown town pages.
-            Bottom padding clears the fixed terminal bar. */}
-        <div className="flex min-h-screen flex-col pb-[340px]">
-          <div className="flex-1">{children}</div>
-        </div>
+        <TerminalBarPadding>{children}</TerminalBarPadding>
         <MayorTerminalBar params={params} basePath={basePath} />
       </DrawerStackProvider>
     </TerminalBarProvider>

@@ -21,6 +21,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import GithubProvider from 'next-auth/providers/github';
 import GitlabProvider from 'next-auth/providers/gitlab';
 import LinkedInProvider from 'next-auth/providers/linkedin';
+import DiscordProvider from 'next-auth/providers/discord';
 import WorkOSProvider from 'next-auth/providers/workos';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { allow_fake_login, ORGANIZATION_ID_HEADER } from './constants';
@@ -32,6 +33,7 @@ import { secondsInDay } from 'date-fns/constants';
 import type { AdapterUser } from 'next-auth/adapters';
 import assert from 'node:assert';
 import type { Organization, User } from '@kilocode/db/schema';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 import PostHogClient from '@/lib/posthog';
 import { captureException } from '@sentry/nextjs';
 import {
@@ -58,6 +60,8 @@ import {
   NEXTAUTH_SECRET,
   GITLAB_CLIENT_ID,
   GITLAB_CLIENT_SECRET,
+  DISCORD_OAUTH_CLIENT_ID,
+  DISCORD_OAUTH_CLIENT_SECRET,
   BLACKLIST_TLDS,
 } from '@/lib/config.server';
 import jwt from 'jsonwebtoken';
@@ -161,6 +165,24 @@ function createLinkedInAccountInfo(
   };
 }
 
+function createDiscordAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== 'discord') return null;
+  if (!user.email) return null;
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || '',
+    hosted_domain: hosted_domain_specials.discord,
+    google_user_image_url: user.image || '',
+    provider: account.provider as AuthProviderId,
+    provider_account_id: account.providerAccountId,
+    display_name: user.name || null,
+  };
+}
+
 function createFakeAccountInfo(
   account: Account,
   user: NextUser | AdapterUser
@@ -252,6 +274,7 @@ function createAccountInfo(
     createGitHubAccountInfo(account, user) ??
     createGitlabAccountInfo(account, user) ??
     createLinkedInAccountInfo(account, user) ??
+    createDiscordAccountInfo(account, user) ??
     createEmailAccountInfo(account, user) ??
     createFakeAccountInfo(account, user) ??
     createSSOAccountInfo(account, user, profile);
@@ -288,6 +311,10 @@ const authOptions: NextAuthOptions = {
     GitlabProvider({
       clientId: GITLAB_CLIENT_ID,
       clientSecret: GITLAB_CLIENT_SECRET,
+    }),
+    DiscordProvider({
+      clientId: DISCORD_OAUTH_CLIENT_ID ?? '',
+      clientSecret: DISCORD_OAUTH_CLIENT_SECRET ?? '',
     }),
     LinkedInProvider({
       clientId: LINKEDIN_CLIENT_ID,

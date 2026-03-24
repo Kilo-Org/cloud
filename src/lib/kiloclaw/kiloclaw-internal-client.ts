@@ -128,12 +128,12 @@ export class KiloClawInternalClient {
     );
   }
 
-  async start(userId: string): Promise<{ ok: true }> {
+  async start(userId: string, options?: { skipCooldown?: boolean }): Promise<{ ok: true }> {
     return this.request(
       '/api/platform/start',
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, ...options }),
       },
       { userId }
     );
@@ -462,6 +462,17 @@ export class KiloClawInternalClient {
       `/api/platform/gmail-notifications?userId=${encodeURIComponent(userId)}`,
       {
         method: 'DELETE',
+      },
+      { userId }
+    );
+  }
+
+  async forceRetryRecovery(userId: string): Promise<{ ok: true }> {
+    return this.request(
+      '/api/platform/force-retry-recovery',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
       },
       { userId }
     );

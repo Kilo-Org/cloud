@@ -48,7 +48,7 @@ export function SessionsList({ sessions, organizationId, onSessionClick }: Sessi
         const platform = session.createdOnPlatform;
         let badge: React.ReactNode;
 
-        if (platform === 'cloud-agent') {
+        if (platform === 'cloud-agent' || platform === 'cloud-agent-web') {
           badge = (
             <span className="inline-flex shrink-0 items-center gap-1 rounded bg-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-400">
               <Cloud className="h-3 w-3" />

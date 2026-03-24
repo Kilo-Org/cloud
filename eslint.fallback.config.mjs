@@ -1,12 +1,7 @@
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
 import drizzlePlugin from 'eslint-plugin-drizzle';
 import tseslint from 'typescript-eslint';
 import { defineConfig } from 'eslint/config';
 import tanstackQueryPlugin from '@tanstack/eslint-plugin-query';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 export default defineConfig([
   {
@@ -29,25 +24,12 @@ export default defineConfig([
     files: ['src/**/*.{ts,tsx}'],
     languageOptions: {
       parser: tseslint.parser,
-      parserOptions: {
-        projectService: {
-          allowDefaultProject: ['*.js', '*.mjs'],
-        },
-        tsconfigRootDir: __dirname,
-      },
     },
     plugins: {
       '@typescript-eslint': tseslint.plugin,
       drizzle: drizzlePlugin,
     },
     rules: {
-      '@typescript-eslint/no-floating-promises': 'error',
-      '@typescript-eslint/no-misused-promises': [
-        'error',
-        {
-          checksVoidReturn: false,
-        },
-      ],
       'drizzle/enforce-delete-with-where': [
         'error',
         {

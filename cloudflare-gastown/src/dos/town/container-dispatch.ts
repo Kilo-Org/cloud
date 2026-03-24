@@ -656,3 +656,27 @@ export async function sendMessageToAgent(
     return false;
   }
 }
+
+/**
+ * Hot-update the model for a running agent without restarting the session.
+ * Best-effort — returns false if the container is down or the agent is not running.
+ */
+export async function updateAgentModelInContainer(
+  env: Env,
+  townId: string,
+  agentId: string,
+  model: string,
+  smallModel?: string
+): Promise<boolean> {
+  try {
+    const container = getTownContainerStub(env, townId);
+    const response = await container.fetch(`http://container/agents/${agentId}/model`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, ...(smallModel ? { smallModel } : {}) }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}

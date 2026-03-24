@@ -3,8 +3,10 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getStripeTopUpCheckoutUrl } from '@/lib/stripe';
 import { MAXIMUM_TOP_UP_AMOUNT, MINIMUM_TOP_UP_AMOUNT } from '@/lib/constants';
+import { isValidReturnUrl } from '@/lib/payment-return-url';
 import { captureException } from '@sentry/nextjs';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
+import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 
 /**
  * NOTE: Crypto payment support (Coinbase Commerce) was removed in January 2026.
@@ -62,17 +64,27 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
     return NextResponse.json({ error: 'Invalid org id' }, { status: 400 });
   }
 
-  const stripeCustomerId = organizationId
-    ? // TODO(bmc): should we check user permission to organization here?
-      await getOrCreateStripeCustomerIdForOrganization(organizationId)
-    : currentUser.stripe_customer_id;
+  let stripeCustomerId: string | null | undefined;
+  if (organizationId) {
+    const orgContext = await getAuthorizedOrgContext(organizationId, ['owner', 'billing_manager']);
+    if (!orgContext.success) {
+      return orgContext.nextResponse;
+    }
+    stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
+  } else {
+    stripeCustomerId = currentUser.stripe_customer_id;
+  }
+
+  const cancelPathRaw = searchParams.get('cancel-path');
+  const cancelPath = cancelPathRaw && isValidReturnUrl(cancelPathRaw) ? cancelPathRaw : null;
 
   const url = await getStripeTopUpCheckoutUrl(
     currentUser.id,
     stripeCustomerId,
     validationResult.amount as number,
     origin,
-    organizationId
+    organizationId,
+    cancelPath
   );
 
   if (!url) {

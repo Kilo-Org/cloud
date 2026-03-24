@@ -42,6 +42,16 @@ export type GastownEventData = {
   durationMs?: number;
   value?: number;
   label?: string;
+  // Additional doubles for reconciler_tick events (double3–double10).
+  // Analytics Engine supports up to 20 doubles per data point.
+  double3?: number;
+  double4?: number;
+  double5?: number;
+  double6?: number;
+  double7?: number;
+  double8?: number;
+  double9?: number;
+  double10?: number;
 };
 
 /**
@@ -70,7 +80,18 @@ export function writeEvent(
         data.role ?? '', // blob12
         data.beadType ?? '', // blob13
       ],
-      doubles: [data.durationMs ?? 0, data.value ?? 0],
+      doubles: [
+        data.durationMs ?? 0, // double1
+        data.value ?? 0, // double2
+        data.double3 ?? 0, // double3
+        data.double4 ?? 0, // double4
+        data.double5 ?? 0, // double5
+        data.double6 ?? 0, // double6
+        data.double7 ?? 0, // double7
+        data.double8 ?? 0, // double8
+        data.double9 ?? 0, // double9
+        data.double10 ?? 0, // double10
+      ],
       indexes: [data.event],
     });
   } catch {

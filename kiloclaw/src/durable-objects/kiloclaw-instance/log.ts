@@ -7,6 +7,7 @@ import {
   ALARM_INTERVAL_IDLE_MS,
   ALARM_JITTER_MS,
 } from '../../config';
+import { writeEvent, eventContextFromState } from '../../utils/analytics';
 
 /**
  * Structured reconciliation logging — emits a JSON line tagged for
@@ -25,6 +26,61 @@ export function reconcileLog(
       ...details,
     })
   );
+}
+
+// ── ReconcileContext ──────────────────────────────────────────────────
+//
+// Bundles state + env + reason so every reconcileLog call site
+// automatically emits to Cloudflare Analytics Engine without needing
+// to thread env/state through every function signature.
+
+export type ReconcileContext = {
+  readonly state: InstanceMutableState;
+  readonly env: { KILOCLAW_AE?: AnalyticsEngineDataset };
+  readonly reason: string;
+  /** Log a reconcile action to both console and Analytics Engine. */
+  log: (action: string, details?: Record<string, unknown>) => void;
+};
+
+export function createReconcileContext(
+  state: InstanceMutableState,
+  env: { KILOCLAW_AE?: AnalyticsEngineDataset },
+  reason: string
+): ReconcileContext {
+  return {
+    state,
+    env,
+    reason,
+    log(action: string, details: Record<string, unknown> = {}) {
+      reconcileLog(reason, action, details);
+
+      const rawErr = details.error;
+      let errorStr: string | undefined;
+      if (rawErr !== undefined) {
+        try {
+          errorStr = (
+            rawErr instanceof Error
+              ? rawErr.message
+              : typeof rawErr === 'string'
+                ? rawErr
+                : JSON.stringify(rawErr)
+          ).slice(0, 200);
+        } catch {
+          errorStr = '[unserializable error]';
+        }
+      }
+
+      writeEvent(env, {
+        event: `reconcile.${action}`,
+        delivery: 'reconcile',
+        label: typeof details.label === 'string' ? details.label : '',
+        error: errorStr,
+        durationMs: typeof details.durationMs === 'number' ? details.durationMs : undefined,
+        value: typeof details.value === 'number' ? details.value : undefined,
+        ...eventContextFromState(state),
+      });
+    },
+  };
 }
 
 // ── Structured error/warn logging ────────────────────────────────────

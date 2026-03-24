@@ -576,7 +576,11 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     }
 
     case 'send_nudge': {
-      // Insert nudge record synchronously
+      // Insert nudge record synchronously.
+      // Explicitly set created_at to ISO 8601 so it matches the format used
+      // by hasRecentNudge's cutoff comparison (#1412). SQLite's default
+      // datetime('now') produces 'YYYY-MM-DD HH:MM:SS' (space separator)
+      // which compares incorrectly against JS toISOString().
       const nudgeId = crypto.randomUUID();
       query(
         sql,
@@ -588,10 +592,18 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             ${agent_nudges.columns.mode},
             ${agent_nudges.columns.priority},
             ${agent_nudges.columns.source},
+            ${agent_nudges.columns.created_at},
             ${agent_nudges.columns.expires_at}
-          ) VALUES (?, ?, ?, 'immediate', 'urgent', ?, ?)
+          ) VALUES (?, ?, ?, 'immediate', 'urgent', ?, ?, ?)
         `,
-        [nudgeId, action.agent_id, action.message, `reconciler:${action.tier}`, null]
+        [
+          nudgeId,
+          action.agent_id,
+          action.message,
+          `reconciler:${action.tier}`,
+          new Date().toISOString(),
+          null,
+        ]
       );
 
       return async () => {

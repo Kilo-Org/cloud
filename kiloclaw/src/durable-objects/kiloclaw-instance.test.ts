@@ -180,6 +180,7 @@ function createFakeAppStub() {
 
 function createFakeEnv() {
   const appStub = createFakeAppStub();
+  const writeDataPoint = vi.fn();
   return {
     FLY_API_TOKEN: 'test-token',
     FLY_APP_NAME: 'test-app',
@@ -198,7 +199,25 @@ function createFakeEnv() {
       put: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
     } as unknown,
+    KILOCLAW_AE: {
+      writeDataPoint,
+    } as unknown,
   };
+}
+
+function analyticsEvents(env: ReturnType<typeof createFakeEnv>): Record<string, unknown>[] {
+  const dataset = env.KILOCLAW_AE as { writeDataPoint: Mock };
+  return dataset.writeDataPoint.mock.calls.map(call => call[0] as Record<string, unknown>);
+}
+
+function analyticsEventsByName(
+  env: ReturnType<typeof createFakeEnv>,
+  eventName: string
+): Record<string, unknown>[] {
+  return analyticsEvents(env).filter(call => {
+    const blobs = call.blobs;
+    return Array.isArray(blobs) && blobs[0] === eventName;
+  });
 }
 
 function createInstance(
@@ -322,6 +341,20 @@ afterEach(() => {
 });
 
 describe('two-phase destroy', () => {
+  it('throws with status 404 when instance was never provisioned', async () => {
+    const { instance } = createInstance();
+
+    const err: Error & { status?: number } = await instance.destroy().then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      (e: Error & { status?: number }) => e
+    );
+
+    expect(err.message).toBe('Instance not provisioned');
+    expect(err.status).toBe(404);
+  });
+
   it('clears all state when both Fly deletes succeed', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage);
@@ -1243,6 +1276,22 @@ describe('alarm runs for all live statuses', () => {
     expect(flyClient.getVolume).toHaveBeenCalled();
     expect(flyClient.getMachine).toHaveBeenCalled();
     expect(storage._getAlarm()).not.toBeNull();
+  });
+});
+
+describe('start: not provisioned', () => {
+  it('throws with status 404 when instance was never provisioned', async () => {
+    const { instance } = createInstance();
+
+    const err: Error & { status?: number } = await instance.start('user-1').then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      (e: Error & { status?: number }) => e
+    );
+
+    expect(err.message).toBe('Instance not provisioned');
+    expect(err.status).toBe(404);
   });
 });
 
@@ -2615,7 +2664,8 @@ describe('start: 412 insufficient resources recovery', () => {
   });
 
   it('fresh provision (never started): deletes volume and creates fresh with deprioritized regions', async () => {
-    const { instance, storage } = createInstance();
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
     await seedProvisioned(storage, { flyMachineId: null, lastStartedAt: null });
 
     // First createMachine fails with 412
@@ -2657,6 +2707,13 @@ describe('start: 412 insufficient resources recovery', () => {
     expect(storage._store.get('flyVolumeId')).toBe('vol-new');
     expect(storage._store.get('flyRegion')).toBe('cdg');
     expect(storage._store.get('status')).toBe('running');
+
+    const recoveryEvents = analyticsEventsByName(env, 'instance.start_capacity_recovery');
+    expect(recoveryEvents).toHaveLength(1);
+    expect(recoveryEvents[0].blobs).toEqual(
+      expect.arrayContaining(['instance.start_capacity_recovery', 'user-1', 'do'])
+    );
+    expect(recoveryEvents[0].blobs).toContain('fly_412_insufficient_resources');
   });
 
   it('existing instance (has user data): forks volume to preserve data', async () => {
@@ -2887,6 +2944,20 @@ describe('stop: error propagation', () => {
 
     expect(storage._store.get('status')).toBe('stopped');
     expect(storage._store.get('lastStoppedAt')).toBeDefined();
+  });
+
+  it('throws with status 404 when instance was never provisioned', async () => {
+    const { instance } = createInstance();
+
+    const err: Error & { status?: number } = await instance.stop().then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      (e: Error & { status?: number }) => e
+    );
+
+    expect(err.message).toBe('Instance not provisioned');
+    expect(err.status).toBe(404);
   });
 });
 
@@ -3835,7 +3906,8 @@ describe('provision: auto-start after fresh provision', () => {
 
 describe('startAsync: catch handler writes stopped state on pre-machine failure', () => {
   it('transitions to stopped immediately when start() throws before machine creation', async () => {
-    const { instance, storage, waitUntilPromises } = createInstance();
+    const env = createFakeEnv();
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
 
     (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
       id: 'vol-1',
@@ -3857,6 +3929,11 @@ describe('startAsync: catch handler writes stopped state on pre-machine failure'
     expect(storage._store.get('flyMachineId')).toBeFalsy();
     expect(storage._store.get('lastStartErrorMessage')).toBe('Fly API unavailable');
     expect(storage._store.get('lastStartErrorAt')).toBeGreaterThan(0);
+
+    const failedEvents = analyticsEventsByName(env, 'instance.provisioning_failed');
+    expect(failedEvents).toHaveLength(1);
+    expect(failedEvents[0].blobs).toContain('no_machine_created');
+    expect(failedEvents[0].blobs).toContain('Fly API unavailable');
   });
 
   it('does NOT overwrite state when start() fails after machine ID is persisted', async () => {
@@ -3880,6 +3957,124 @@ describe('startAsync: catch handler writes stopped state on pre-machine failure'
     expect(storage._store.get('status')).toBe('starting');
     // Error fields should NOT be populated for post-machine failures
     expect(storage._store.get('lastStartErrorMessage')).toBeFalsy();
+  });
+});
+
+describe('start failure analytics events', () => {
+  it('emits instance.provisioning_failed when reconcile times out with no machine', async () => {
+    vi.useFakeTimers();
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
+    await seedStarting(storage, {
+      flyMachineId: null,
+      startingAt: Date.now() - STARTING_TIMEOUT_MS - 1,
+      lastStartErrorMessage: 'timed out bootstrapping',
+    });
+
+    await instance.alarm();
+
+    const failedEvents = analyticsEventsByName(env, 'instance.provisioning_failed');
+    expect(failedEvents).toHaveLength(1);
+    expect(failedEvents[0].blobs).toContain('starting_timeout');
+    expect(failedEvents[0].blobs).toContain('timed out bootstrapping');
+  });
+
+  it('emits instance.provisioning_failed when Fly reports failed state during reconcile', async () => {
+    vi.useFakeTimers();
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
+    await seedStarting(storage, {
+      flyMachineId: 'machine-1',
+      startingAt: Date.now() - 1_000,
+    });
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'failed' });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+
+    await instance.alarm();
+
+    const failedEvents = analyticsEventsByName(env, 'instance.provisioning_failed');
+    expect(failedEvents).toHaveLength(1);
+    expect(failedEvents[0].blobs).toContain('fly_failed_state');
+    expect(failedEvents[0].blobs).toContain('fly machine entered failed state');
+  });
+
+  it('does not emit instance.provisioning_failed for a running machine that later fails', async () => {
+    vi.useFakeTimers();
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      flyMachineId: 'machine-1',
+    });
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'failed' });
+
+    await instance.alarm();
+
+    const failedEvents = analyticsEventsByName(env, 'instance.provisioning_failed');
+    expect(failedEvents).toHaveLength(0);
+  });
+});
+
+describe('manual and crash recovery analytics events', () => {
+  it('can record manual start success events through Analytics Engine payloads', () => {
+    const env = createFakeEnv();
+    const dataset = env.KILOCLAW_AE as { writeDataPoint: Mock };
+
+    dataset.writeDataPoint({
+      blobs: [
+        'instance.manual_start_succeeded',
+        'user-1',
+        'http',
+        '/api/platform/start',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+      ],
+      doubles: [12, 0],
+      indexes: ['instance.manual_start_succeeded'],
+    });
+
+    const successEvents = analyticsEventsByName(env, 'instance.manual_start_succeeded');
+    expect(successEvents).toHaveLength(1);
+    expect(successEvents[0].blobs).toEqual(
+      expect.arrayContaining(['instance.manual_start_succeeded', 'user-1', 'http'])
+    );
+  });
+
+  it('can record crash recovery failure events through Analytics Engine payloads', () => {
+    const env = createFakeEnv();
+    const dataset = env.KILOCLAW_AE as { writeDataPoint: Mock };
+
+    dataset.writeDataPoint({
+      blobs: [
+        'instance.crash_recovery_failed',
+        'user-1',
+        'http',
+        '',
+        'restart failed',
+        'acct-test',
+        'machine-1',
+        'sandbox-1',
+        'running',
+        '',
+        '',
+        '',
+        '',
+      ],
+      doubles: [34, 0],
+      indexes: ['instance.crash_recovery_failed'],
+    });
+
+    const failureEvents = analyticsEventsByName(env, 'instance.crash_recovery_failed');
+    expect(failureEvents).toHaveLength(1);
+    expect(failureEvents[0].blobs).toEqual(
+      expect.arrayContaining(['instance.crash_recovery_failed', 'user-1', 'http', 'restart failed'])
+    );
   });
 });
 

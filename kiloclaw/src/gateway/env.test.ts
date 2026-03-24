@@ -418,8 +418,9 @@ describe('buildEnvVars', () => {
       instanceFeatures: ['nonexistent-feature'],
     });
 
-    // No KILOCLAW_* feature vars should be set (only platform defaults)
-    const featureVars = Object.keys(result.env).filter(k => k.startsWith('KILOCLAW_'));
+    // No feature-flag env vars should be set.
+    const knownFeatureVars = new Set(Object.values(FEATURE_TO_ENV_VAR));
+    const featureVars = Object.keys(result.env).filter(k => knownFeatureVars.has(k));
     expect(featureVars).toEqual([]);
   });
 

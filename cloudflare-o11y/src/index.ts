@@ -4,7 +4,7 @@ import { registerApiMetricsRoutes } from './api-metrics-routes';
 import { evaluateAlerts } from './alerting/evaluate';
 import { registerAlertingConfigRoutes } from './alerting/config-routes';
 import { SessionMetricsParamsSchema } from './session-metrics-schema';
-import type { SessionMetricsParams } from './session-metrics-schema';
+import type { SessionMetricsParamsInput } from './session-metrics-schema';
 import { writeSessionMetricsDataPoint } from './session-metrics-analytics';
 
 export { AlertConfigDO } from './alerting/AlertConfigDO';
@@ -24,7 +24,7 @@ export default class extends WorkerEntrypoint<Env> {
   }
 
   /** RPC method called by session-ingest via service binding. */
-  async ingestSessionMetrics(params: SessionMetricsParams): Promise<void> {
+  async ingestSessionMetrics(params: SessionMetricsParamsInput): Promise<void> {
     const parsed = SessionMetricsParamsSchema.parse(params);
     await writeSessionMetricsDataPoint(parsed, this.env);
   }

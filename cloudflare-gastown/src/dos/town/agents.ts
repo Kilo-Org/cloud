@@ -546,11 +546,20 @@ export function touchAgent(
     activeTools?: string[];
   }
 ): void {
+  // A heartbeat is proof the agent is alive in the container.
+  // If the agent's status is 'idle' (e.g. due to a dispatch timeout
+  // race — see #1358), restore it to 'working'. This prevents the
+  // reconciler from treating the agent as lost while it's actively
+  // sending heartbeats.
   query(
     sql,
     /* sql */ `
       UPDATE ${agent_metadata}
       SET ${agent_metadata.columns.last_activity_at} = ?,
+          ${agent_metadata.columns.status} = CASE
+            WHEN ${agent_metadata.columns.status} = 'idle' THEN 'working'
+            ELSE ${agent_metadata.columns.status}
+          END,
           ${agent_metadata.columns.last_event_type} = COALESCE(?, ${agent_metadata.columns.last_event_type}),
           ${agent_metadata.columns.last_event_at} = COALESCE(?, ${agent_metadata.columns.last_event_at}),
           ${agent_metadata.columns.active_tools} = COALESCE(?, ${agent_metadata.columns.active_tools})

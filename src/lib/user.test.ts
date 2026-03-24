@@ -104,6 +104,7 @@ describe('User', () => {
       expect(softDeleted!.hosted_domain).toBeNull();
       expect(softDeleted!.linkedin_url).toBeNull();
       expect(softDeleted!.github_url).toBeNull();
+      expect(softDeleted!.discord_server_membership_verified_at).toBeNull();
       expect(softDeleted!.openrouter_upstream_safety_identifier).toBeNull();
       expect(softDeleted!.customer_source).toBeNull();
       expect(softDeleted!.api_token_pepper).toBeNull();

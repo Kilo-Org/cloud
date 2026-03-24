@@ -152,6 +152,7 @@ export type KiloClawSubscriptionStatus =
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.reassociate',
   'kiloclaw.subscription.update_trial_end',
+  'kiloclaw.subscription.reset_trial',
   'kiloclaw.machine.start',
   'kiloclaw.machine.stop',
   'kiloclaw.instance.destroy',
@@ -280,6 +281,7 @@ export type AuthProviderId =
   | 'github'
   | 'gitlab'
   | 'linkedin'
+  | 'discord'
   | 'fake-login'
   | 'workos';
 
@@ -908,8 +910,9 @@ export type StripeSubscriptionStatus =
 
 /**
  * Valid values for cloud_agent_code_reviews.terminal_reason.
- * Canonical list — keep in sync with CloudAgentTerminalReason in
- * packages/worker-utils/src/cloud-agent-next-client.ts if that copy diverges.
+ * KEEP IN SYNC with CloudAgentTerminalReason in
+ * packages/worker-utils/src/cloud-agent-next-client.ts — both lists must
+ * contain the same literal values.
  */
 export const CODE_REVIEW_TERMINAL_REASONS = [
   'billing',

@@ -29,6 +29,8 @@ import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import {
   addReactionToPR,
+  createPRComment,
+  hasPRCommentWithMarker,
   findKiloReviewComment,
   updateKiloReviewComment,
   updateCheckRun,
@@ -36,6 +38,8 @@ import {
 import type { CheckRunConclusion } from '@/lib/integrations/platforms/github/adapter';
 import {
   addReactionToMR,
+  createMRNote,
+  hasMRNoteWithMarker,
   findKiloReviewNote,
   updateKiloReviewNote,
   setCommitStatus,
@@ -99,7 +103,8 @@ function normalizePayload(raw: StatusUpdatePayload): {
   gateResult?: 'pass' | 'fail';
 } {
   // Map cloud-agent-next 'interrupted' → 'cancelled'
-  const status = raw.status === 'interrupted' ? 'cancelled' : raw.status;
+  let status: 'running' | 'completed' | 'failed' | 'cancelled' =
+    raw.status === 'interrupted' ? 'cancelled' : raw.status;
 
   // Map cloud-agent-next 'kiloSessionId' → 'cliSessionId'
   const cliSessionId =
@@ -115,8 +120,18 @@ function normalizePayload(raw: StatusUpdatePayload): {
 
   // Validate terminalReason against allowlist to prevent free-form text in the DB
   const validReasons: ReadonlySet<string> = new Set(CODE_REVIEW_TERMINAL_REASONS);
-  const terminalReason =
+  let terminalReason: CodeReviewTerminalReason | undefined =
     raw.terminalReason && validReasons.has(raw.terminalReason) ? raw.terminalReason : undefined;
+
+  // Infer billing when no explicit terminalReason was provided.
+  // v1: billing errors arrive as 'interrupted' (→ cancelled) with billing error text
+  // v2: billing errors arrive as 'failed' with billing error text (after wrapper fix)
+  if (!terminalReason && isBillingCodeReviewTerminalReason(undefined, raw.errorMessage)) {
+    if (status === 'cancelled') {
+      status = 'failed'; // billing is not a user cancellation
+    }
+    terminalReason = 'billing';
+  }
 
   return {
     status,
@@ -145,6 +160,13 @@ function isBillingCodeReviewTerminalReason(
     message.includes(pattern)
   );
 }
+
+const BILLING_NOTICE_MARKER = '<!-- kilo-billing-notice -->';
+
+const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
+**Kilo Code Review could not run — your account is out of credits.**
+
+Add credits at [app.kilo.ai](https://app.kilo.ai/) to enable reviews on this change.`;
 
 /**
  * Read a review's usage data.
@@ -654,6 +676,32 @@ export async function POST(
                 `[code-review-status] Added ${reaction} reaction to ${review.repo_full_name}#${review.pr_number}`
               );
 
+              // Billing notice (failed + billing only)
+              if (
+                status === 'failed' &&
+                isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
+              ) {
+                const alreadyPosted = await hasPRCommentWithMarker(
+                  integration.platform_installation_id,
+                  repoOwner,
+                  repoName,
+                  review.pr_number,
+                  BILLING_NOTICE_MARKER
+                );
+                if (!alreadyPosted) {
+                  await createPRComment(
+                    integration.platform_installation_id,
+                    repoOwner,
+                    repoName,
+                    review.pr_number,
+                    BILLING_NOTICE_BODY
+                  );
+                  logExceptInTest(
+                    `[code-review-status] Posted billing notice on ${review.repo_full_name}#${review.pr_number}`
+                  );
+                }
+              }
+
               // Usage footer (completed only)
               if (status === 'completed') {
                 const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
@@ -713,6 +761,32 @@ export async function POST(
               logExceptInTest(
                 `[code-review-status] Added ${emoji} reaction to GitLab MR ${review.repo_full_name}!${review.pr_number}`
               );
+
+              // Billing notice (failed + billing only)
+              if (
+                status === 'failed' &&
+                isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
+              ) {
+                const alreadyPosted = await hasMRNoteWithMarker(
+                  accessToken,
+                  review.repo_full_name,
+                  review.pr_number,
+                  BILLING_NOTICE_MARKER,
+                  instanceUrl
+                );
+                if (!alreadyPosted) {
+                  await createMRNote(
+                    accessToken,
+                    review.repo_full_name,
+                    review.pr_number,
+                    BILLING_NOTICE_BODY,
+                    instanceUrl
+                  );
+                  logExceptInTest(
+                    `[code-review-status] Posted billing notice on GitLab MR ${review.repo_full_name}!${review.pr_number}`
+                  );
+                }
+              }
 
               // Usage footer (completed only)
               if (status === 'completed') {

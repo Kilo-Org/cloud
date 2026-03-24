@@ -3,8 +3,8 @@
  * wire data and typed internal code. Validates shape via Zod schemas then uses
  * boundary `as` casts so downstream code receives properly typed NormalizedEvents.
  */
-import type { Part, Session, SessionStatus, QuestionInfo, Message } from '@/types/opencode.gen';
-import type { CloudStatus, QuestionState, PermissionState } from './types';
+import type { Part, SessionStatus, QuestionInfo, Message } from '@/types/opencode.gen';
+import type { SessionInfo, CloudStatus, QuestionState, PermissionState } from './types';
 import {
   cloudAgentEventSchema,
   kilocodePayloadSchema,
@@ -55,8 +55,8 @@ export type ChatEvent =
 /** Service events — lifecycle, status, questions, autocommit, preparation. */
 export type ServiceEvent =
   | { type: 'session.status'; sessionId: string; status: SessionStatus }
-  | { type: 'session.created'; info: Session }
-  | { type: 'session.updated'; info: Session }
+  | { type: 'session.created'; info: SessionInfo }
+  | { type: 'session.updated'; info: SessionInfo }
   | { type: 'session.error'; error: string; sessionId?: string }
   | { type: 'session.idle'; sessionId: string }
   | { type: 'session.turn.close'; sessionId?: string; reason?: string }
@@ -189,13 +189,27 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     case 'session.created': {
       const r = sessionCreatedDataSchema.safeParse(data);
       if (!r.success || r.data.info.id === undefined) return null;
-      return { type: 'session.created', info: r.data.info as Session };
+      const rawCreated = r.data.info;
+      return {
+        type: 'session.created',
+        info: {
+          id: String(rawCreated.id),
+          parentID: rawCreated.parentID != null ? String(rawCreated.parentID) : undefined,
+        },
+      };
     }
 
     case 'session.updated': {
       const r = sessionUpdatedDataSchema.safeParse(data);
       if (!r.success || r.data.info.id === undefined) return null;
-      return { type: 'session.updated', info: r.data.info as Session };
+      const rawUpdated = r.data.info;
+      return {
+        type: 'session.updated',
+        info: {
+          id: String(rawUpdated.id),
+          parentID: rawUpdated.parentID != null ? String(rawUpdated.parentID) : undefined,
+        },
+      };
     }
 
     case 'session.error': {

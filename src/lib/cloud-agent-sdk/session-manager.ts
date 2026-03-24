@@ -10,6 +10,7 @@ import type {
   KiloSessionId,
   ResolvedSession,
   SessionSnapshot,
+  SessionInfo,
   SessionActivity,
   AgentStatus,
   CloudStatus,
@@ -18,7 +19,7 @@ import type {
   MessageInfo,
   Part,
 } from './types';
-import type { Session, QuestionInfo } from '@/types/opencode.gen';
+import type { QuestionInfo } from '@/types/opencode.gen';
 import { splitByContiguousPrefix } from '@/lib/utils/splitByContiguousPrefix';
 
 // ---------------------------------------------------------------------------
@@ -116,7 +117,7 @@ type SessionManagerAtoms = {
   error: W<string | null>;
   question: W<QuestionState | null>;
   questionRequestIds: W<Map<string, string>>;
-  sessionInfo: W<Session | null>;
+  sessionInfo: W<SessionInfo | null>;
   sessionId: W<CloudAgentSessionId | null>;
   activity: W<SessionActivity>;
   agentStatus: W<AgentStatus>;
@@ -241,7 +242,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const errorAtom = atom<string | null>(null);
   const questionAtom = atom<QuestionState | null>(null);
   const questionRequestIdsAtom = atom<Map<string, string>>(new Map());
-  const sessionInfoAtom = atom<Session | null>(null);
+  const sessionInfoAtom = atom<SessionInfo | null>(null);
   const sessionIdAtom = atom<CloudAgentSessionId | null>(null);
   const activityAtom = atom<SessionActivity>({ type: 'connecting' });
   const agentStatusAtom = atom<AgentStatus>({ type: 'idle' });

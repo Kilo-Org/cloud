@@ -71,6 +71,7 @@ export type {
   QuestionState,
   PermissionState,
   ServiceStateSnapshot,
+  SessionInfo,
   KiloSessionId,
   CloudAgentSessionId,
   ResolvedSession,

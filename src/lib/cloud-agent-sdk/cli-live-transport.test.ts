@@ -390,7 +390,7 @@ describe('CliLiveTransport system events', () => {
 
 describe('CliLiveTransport snapshot preload', () => {
   it('replays snapshot history before WebSocket events', async () => {
-    const snapshot: SessionSnapshot = makeSnapshot({ id: KILO_SESSION_ID, title: 'Test Session' }, [
+    const snapshot: SessionSnapshot = makeSnapshot({ id: KILO_SESSION_ID }, [
       {
         info: stubUserMessage({ id: 'msg-1', sessionID: KILO_SESSION_ID }),
         parts: [stubTextPart({ id: 'part-1', sessionID: KILO_SESSION_ID, messageID: 'msg-1' })],

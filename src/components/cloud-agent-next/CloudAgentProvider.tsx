@@ -6,6 +6,7 @@ import { useRawTRPCClient } from '@/lib/trpc/utils';
 import {
   createSessionManager,
   type SessionManager,
+  type SessionSnapshot,
   type ResolvedSession,
   type FetchedSessionData,
   type KiloSessionId,
@@ -82,8 +83,13 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           trpcClient.cliSessionsV2.getSessionMessages.query({ session_id: id }),
         ]);
         return {
-          info: { ...sessionData, id: sessionData.session_id },
-          messages: messagesResult.messages,
+          info: {
+            id: sessionData.session_id,
+            parentID: sessionData.parent_session_id ?? undefined,
+          },
+          // Zod .passthrough() adds index signatures that TS can't prove assignable to strict types.
+          // The tRPC/Zod layer has already validated the shape, so this cast is safe at this boundary.
+          messages: messagesResult.messages as SessionSnapshot['messages'],
         };
       },
 

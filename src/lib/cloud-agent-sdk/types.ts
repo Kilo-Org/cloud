@@ -40,6 +40,12 @@ export type ProcessedMessage = {
   parts: Part[];
 };
 
+/** Minimal session identity — only the fields the SDK actually reads. */
+export type SessionInfo = {
+  id: string;
+  parentID?: string;
+};
+
 export type SessionPhase =
   | { status: 'connecting' }
   | { status: 'streaming' }
@@ -51,7 +57,7 @@ export type SessionPhase =
 // Service state types — separated from chat data
 // ---------------------------------------------------------------------------
 
-import type { Session, QuestionInfo } from '@/types/opencode.gen';
+import type { QuestionInfo } from '@/types/opencode.gen';
 
 /** Real-time activity indicator — renders as a separate spinner/indicator. */
 export type SessionActivity =
@@ -95,7 +101,7 @@ export type ServiceStateSnapshot = {
   activity: SessionActivity;
   status: AgentStatus;
   cloudStatus: CloudStatus | null;
-  sessionInfo: Session | null;
+  sessionInfo: SessionInfo | null;
   question: QuestionState | null;
   permission: PermissionState | null;
 };
@@ -115,7 +121,7 @@ export type ResolvedSession = {
 // ---------------------------------------------------------------------------
 
 export type SessionSnapshot = {
-  info: Session;
+  info: SessionInfo;
   messages: Array<{
     info: MessageInfo;
     parts: Part[];

@@ -90,6 +90,13 @@ ${formatGitLabRepositoriesForPrompt(gitlabContext)}
 
 Treat this context as authoritative. Prefer selecting a repo from the provided repository list. If the user requests work on a repo that isn't in the list, ask them to confirm the exact owner/repo (or group/project for GitLab) and ensure it's accessible to the integration. Never invent repository names.
 
+## Choosing the correct Cloud Agent mode
+When using the spawnCloudAgentSession tool, you MUST explicitly decide the mode BEFORE calling the tool:
+- **code**: Use ONLY when the user explicitly asks for code changes, bug fixes, feature implementations, refactoring, PR/MR creation, or any task that requires modifying files in a repository. This mode creates a PR/MR.
+- **ask**: Use when the user is asking a question, requesting analysis or explanation, asking for options/recommendations, reviewing code for understanding, or any task that does NOT require creating or modifying code. This mode does NOT create a PR/MR.
+
+Never default to "code" mode. Always analyze the user's intent first. If uncertain, prefer "ask" mode or ask the user to clarify.
+
 ## Accuracy & safety
 - Don't claim you ran tools, changed code, or created a PR/MR unless the tool results confirm it.
 - Don't fabricate links (including PR/MR URLs).
@@ -147,7 +154,13 @@ export async function processMessage({
     stopWhen: stepCountIs(MAX_ITERATIONS),
     tools: {
       spawnCloudAgentSession: tool({
-        description: `Spawn a Cloud Agent session to perform coding tasks on a GitHub repository or GitLab project. The agent can make code changes, fix bugs, implement features, review/analyze code, run tests, or open PRs/MRs. Do NOT use it for questions you can answer directly.
+        description: `Spawn a Cloud Agent session on a GitHub repository or GitLab project. Do NOT use it for questions you can answer directly.
+
+IMPORTANT — you MUST set the "mode" parameter explicitly:
+- "code": Use ONLY when the user explicitly asks for code changes, bug fixes, feature implementations, refactoring, or any task that requires modifying files. This creates a PR/MR.
+- "ask": Use when the user wants analysis, explanations, questions answered, options/recommendations, or any task that does NOT require creating or modifying code. This does NOT create a PR/MR.
+
+Choose the mode carefully BEFORE calling this tool. Defaulting to "code" wastes resources by creating unnecessary PRs.
 
 After the tool returns, if mode was "code", check the result for a PR/MR URL and share it with the user — this is the most important output.`,
         inputSchema: spawnCloudAgentInputSchema,

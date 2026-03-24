@@ -82,15 +82,26 @@ Additional context may be appended to this prompt:
 Treat this context as authoritative. Prefer selecting a repo from the provided repository list. If the user requests work on a repo that isn't in the list, ask them to confirm the exact owner/repo (or group/project for GitLab) and ensure it's accessible to the integration. Never invent repository names.
 
 ## Tool: spawn_cloud_agent
-You can call the tool "spawn_cloud_agent" to run a Cloud Agent session for coding work on a GitHub repository or GitLab project.
+You can call the tool "spawn_cloud_agent" to run a Cloud Agent session on a GitHub repository or GitLab project.
 
 ### When to use it
 Use spawn_cloud_agent when the user asks you to:
 - change code, fix bugs, implement features, or refactor
 - review/analyze code in a repo beyond a quick, high-level answer
 - do any task where you must inspect files, run tests, or open a PR/MR
+- ask questions about code that require reading the actual repository
 
 If the user is only asking a question you can answer directly (conceptual, small snippet, explanation), do not call the tool.
+
+### Choosing the correct mode (REQUIRED)
+You MUST explicitly choose the mode BEFORE calling the tool. Analyze the user's intent first:
+- **code**: Use ONLY when the user explicitly asks for code changes, bug fixes, feature implementations, refactoring, PR/MR creation, or any task that requires modifying files. This mode creates a PR/MR.
+- **ask**: Use when the user is asking a question, requesting analysis or explanation, asking for options/recommendations, or any task that does NOT require creating or modifying code. This mode does NOT create a PR/MR.
+- **debug**: Use when investigating failures, flaky tests, or production issues.
+- **architect**: Use for design, planning, or spec work.
+- **orchestrator**: Use for multi-repo or multi-step coordination.
+
+Never default to "code" mode. Always analyze the user's intent first. If uncertain whether code changes are needed, prefer "ask" mode or ask the user to clarify.
 
 ### How to use it
 Provide exactly ONE of:
@@ -100,18 +111,13 @@ Provide exactly ONE of:
 Determine which platform to use based on the repository context provided below. If the user mentions a repo that appears in the GitHub list, use githubRepo. If it appears in the GitLab list, use gitlabProject.
 
 Also provide:
-- mode:
-  - code: implement changes
-  - debug: investigate failures, flaky tests, production issues
-  - architect: design/plan/spec
-  - ask: questions/explanations about existing code
-  - orchestrator: multi-repo or multi-step coordination
+- mode: (required, see above)
 - prompt: a clear, specific task with constraints and success criteria
 
 Your prompt to the agent should usually include:
 - the desired outcome (what "done" looks like)
 - any constraints (keep changes minimal, follow existing patterns, etc.)
-- a request to open a PR (GitHub) or MR (GitLab) and return the URL
+- if mode is "code", a request to open a PR (GitHub) or MR (GitLab) and return the URL
 
 ## Accuracy & safety
 - Don't claim you ran tools, changed code, or created a PR/MR unless the tool results confirm it.
@@ -150,11 +156,15 @@ const SPAWN_CLOUD_AGENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
           type: 'string',
           enum: ['architect', 'code', 'ask', 'debug', 'orchestrator'],
           description:
-            'The agent mode: "code" for making changes, "architect" for design tasks, "ask" for questions, "debug" for troubleshooting, "orchestrator" for complex multi-step tasks',
-          default: 'code',
+            "REQUIRED. The agent mode — you must explicitly choose this based on the user's intent:\n" +
+            '- "code": Use ONLY when the user asks for code changes, bug fixes, feature implementations, or any task requiring file modifications. Creates a PR/MR.\n' +
+            '- "ask": Use when the user wants analysis, explanations, questions answered, or anything that does NOT require modifying code. Does NOT create a PR/MR.\n' +
+            '- "architect": Use for design, planning, or spec work.\n' +
+            '- "debug": Use for investigating failures or production issues.\n' +
+            '- "orchestrator": Use for multi-repo or multi-step coordination.',
         },
       },
-      required: ['prompt'],
+      required: ['prompt', 'mode'],
     },
   },
 };
@@ -245,7 +255,7 @@ async function spawnCloudAgentSession(
     githubRepo?: string;
     gitlabProject?: string;
     prompt: string;
-    mode?: string;
+    mode: string;
   },
   owner: Owner,
   model: string,
@@ -321,7 +331,7 @@ async function spawnCloudAgentSession(
 
     prepareInput = {
       prompt: promptWithSignature,
-      mode: (args.mode as PrepareSessionInput['mode']) || 'code',
+      mode: args.mode as PrepareSessionInput['mode'],
       model,
       gitUrl,
       gitToken: gitlabToken,
@@ -347,7 +357,7 @@ async function spawnCloudAgentSession(
     prepareInput = {
       githubRepo: args.githubRepo,
       prompt: promptWithSignature,
-      mode: (args.mode as PrepareSessionInput['mode']) || 'code',
+      mode: args.mode as PrepareSessionInput['mode'],
       model,
       githubToken,
       kilocodeOrganizationId,

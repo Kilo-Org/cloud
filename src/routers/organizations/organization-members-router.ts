@@ -226,6 +226,11 @@ export const organizationsMembersRouter = createTRPCRouter({
     });
 
     if (!emailResult.sent) {
+      // Expire the invitation so it doesn't block future invites to the same email
+      await db
+        .update(organization_invitations)
+        .set({ expires_at: sql`NOW()` })
+        .where(eq(organization_invitations.id, invitation.id));
       throw new TRPCError({
         code: 'BAD_REQUEST',
         message:

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   reconstructConversation,
+  formatTranscriptForRedispatch,
   type ConversationTurn,
 } from '../../src/util/reconstruct-conversation.util';
 import { type RigAgentEventRecord } from '../../src/db/tables/rig-agent-events.table';
@@ -53,7 +54,11 @@ function textPartUpdated(
   });
 }
 
-function toolPartUpdated(messageID: string, partId: string) {
+function toolPartUpdated(
+  messageID: string,
+  partId: string,
+  overrides: Record<string, unknown> = {}
+) {
   return makeEvent('message_part.updated', {
     sessionID: 'sess-1',
     part: {
@@ -70,6 +75,7 @@ function toolPartUpdated(messageID: string, partId: string) {
         metadata: {},
         time: { start: 1, end: 2 },
       },
+      ...overrides,
     },
   });
 }
@@ -78,7 +84,7 @@ function toolPartUpdated(messageID: string, partId: string) {
 
 describe('reconstructConversation', () => {
   describe('basic happy path', () => {
-    it('reconstructs a simple user → assistant exchange', () => {
+    it('reconstructs a simple user -> assistant exchange', () => {
       const events = [
         textPartUpdated('msg-u1', 'part-u1', 'Hello, world!'),
         messageUpdated('msg-u1', 'user'),
@@ -89,8 +95,8 @@ describe('reconstructConversation', () => {
       const turns = reconstructConversation(events);
 
       expect(turns).toEqual<ConversationTurn[]>([
-        { role: 'user', content: 'Hello, world!' },
-        { role: 'assistant', content: 'Hi there!' },
+        { role: 'user', content: 'Hello, world!', toolCalls: [] },
+        { role: 'assistant', content: 'Hi there!', toolCalls: [] },
       ]);
     });
 
@@ -105,7 +111,8 @@ describe('reconstructConversation', () => {
       const turns = reconstructConversation(events);
 
       expect(turns).toHaveLength(1);
-      expect(turns[0]).toEqual({ role: 'assistant', content: 'First second third' });
+      expect(turns[0]?.content).toBe('First second third');
+      expect(turns[0]?.toolCalls).toEqual([]);
     });
 
     it('uses the most recent text for a part when updated multiple times', () => {
@@ -156,7 +163,8 @@ describe('reconstructConversation', () => {
       ];
 
       const turns = reconstructConversation(events);
-      expect(turns).toEqual([{ role: 'assistant', content: 'Done.' }]);
+      expect(turns[0]?.content).toBe('Done.');
+      expect(turns[0]?.toolCalls).toEqual([]);
     });
 
     it('handles message.part.updated (dot variant) as well as message_part.updated', () => {
@@ -169,7 +177,7 @@ describe('reconstructConversation', () => {
       ];
 
       const turns = reconstructConversation(events);
-      expect(turns).toEqual([{ role: 'assistant', content: 'dot variant' }]);
+      expect(turns[0]?.content).toBe('dot variant');
     });
 
     it('accepts parts before the message info event arrives', () => {
@@ -180,22 +188,12 @@ describe('reconstructConversation', () => {
       ];
 
       const turns = reconstructConversation(events);
-      expect(turns).toEqual([{ role: 'assistant', content: 'early text' }]);
+      expect(turns[0]?.content).toBe('early text');
     });
   });
 
-  describe('edge cases', () => {
-    it('skips tool-only assistant turns (no text content)', () => {
-      const events = [
-        toolPartUpdated('msg-a1', 'tool-p1'),
-        messageCompleted('msg-a1', 'assistant'),
-      ];
-
-      const turns = reconstructConversation(events);
-      expect(turns).toHaveLength(0);
-    });
-
-    it('includes assistant turns that mix text and tool calls', () => {
+  describe('tool call tracking', () => {
+    it('captures tool call summaries in assistant turns with text', () => {
       const events = [
         textPartUpdated('msg-a1', 'p-text', 'Let me run that for you.'),
         toolPartUpdated('msg-a1', 'p-tool'),
@@ -204,9 +202,89 @@ describe('reconstructConversation', () => {
 
       const turns = reconstructConversation(events);
       expect(turns).toHaveLength(1);
-      expect(turns[0]).toEqual({ role: 'assistant', content: 'Let me run that for you.' });
+      expect(turns[0]?.content).toBe('Let me run that for you.');
+      expect(turns[0]?.toolCalls).toHaveLength(1);
+      expect(turns[0]?.toolCalls[0]?.tool).toBe('bash');
+      expect(turns[0]?.toolCalls[0]?.status).toBe('completed');
+      expect(turns[0]?.toolCalls[0]?.summary).toContain('bash');
     });
 
+    it('includes tool-only assistant turns with tool call summaries as content', () => {
+      const events = [
+        toolPartUpdated('msg-a1', 'tool-p1'),
+        messageCompleted('msg-a1', 'assistant'),
+      ];
+
+      const turns = reconstructConversation(events);
+      expect(turns).toHaveLength(1);
+      expect(turns[0]?.toolCalls).toHaveLength(1);
+      expect(turns[0]?.content).toContain('bash');
+    });
+
+    it('captures multiple tool calls per turn', () => {
+      const events = [
+        textPartUpdated('msg-a1', 'p-text', 'Running commands.'),
+        toolPartUpdated('msg-a1', 'tool-1', {
+          tool: 'bash',
+          state: { status: 'completed', title: 'git status', output: 'clean' },
+        }),
+        toolPartUpdated('msg-a1', 'tool-2', {
+          tool: 'edit',
+          state: { status: 'completed', title: 'src/foo.ts' },
+        }),
+        messageCompleted('msg-a1', 'assistant'),
+      ];
+
+      const turns = reconstructConversation(events);
+      expect(turns).toHaveLength(1);
+      expect(turns[0]?.toolCalls).toHaveLength(2);
+      expect(turns[0]?.toolCalls[0]?.tool).toBe('bash');
+      expect(turns[0]?.toolCalls[0]?.summary).toContain('git status');
+      expect(turns[0]?.toolCalls[1]?.tool).toBe('edit');
+      expect(turns[0]?.toolCalls[1]?.summary).toContain('src/foo.ts');
+    });
+
+    it('handles tool parts without state gracefully', () => {
+      const events = [
+        makeEvent('message_part.updated', {
+          sessionID: 'sess-1',
+          part: {
+            id: 'tool-p1',
+            messageID: 'msg-a1',
+            type: 'tool',
+            tool: 'read',
+          },
+        }),
+        messageCompleted('msg-a1', 'assistant'),
+      ];
+
+      const turns = reconstructConversation(events);
+      expect(turns).toHaveLength(1);
+      expect(turns[0]?.toolCalls[0]?.tool).toBe('read');
+      expect(turns[0]?.toolCalls[0]?.status).toBe('unknown');
+    });
+
+    it('handles tool parts without tool name gracefully', () => {
+      const events = [
+        makeEvent('message_part.updated', {
+          sessionID: 'sess-1',
+          part: {
+            id: 'tool-p1',
+            messageID: 'msg-a1',
+            type: 'tool',
+            state: { status: 'completed', output: 'done' },
+          },
+        }),
+        messageCompleted('msg-a1', 'assistant'),
+      ];
+
+      const turns = reconstructConversation(events);
+      expect(turns).toHaveLength(1);
+      expect(turns[0]?.toolCalls[0]?.tool).toBe('unknown');
+    });
+  });
+
+  describe('edge cases', () => {
     it('skips synthetic text parts', () => {
       const events = [
         textPartUpdated('msg-a1', 'p-synth', 'injected context', { synthetic: true }),
@@ -252,7 +330,8 @@ describe('reconstructConversation', () => {
       ];
 
       const turns = reconstructConversation(events);
-      expect(turns).toEqual([{ role: 'user', content: 'What is 2+2?' }]);
+      expect(turns[0]?.content).toBe('What is 2+2?');
+      expect(turns[0]?.toolCalls).toEqual([]);
     });
 
     it('handles malformed events gracefully (non-object data)', () => {
@@ -263,7 +342,7 @@ describe('reconstructConversation', () => {
       ];
 
       const turns = reconstructConversation(events);
-      expect(turns).toEqual([{ role: 'assistant', content: 'still works' }]);
+      expect(turns[0]?.content).toBe('still works');
     });
 
     it('handles unknown event types gracefully', () => {
@@ -275,7 +354,7 @@ describe('reconstructConversation', () => {
       ];
 
       const turns = reconstructConversation(events);
-      expect(turns).toEqual([{ role: 'assistant', content: 'the answer' }]);
+      expect(turns[0]?.content).toBe('the answer');
     });
 
     it('returns empty array for empty event list', () => {
@@ -324,7 +403,7 @@ describe('reconstructConversation', () => {
       ];
 
       const turns = reconstructConversation(events, 1);
-      expect(turns).toEqual([{ role: 'assistant', content: 'last' }]);
+      expect(turns[0]?.content).toBe('last');
     });
 
     it('uses default maxTurns of 50', () => {
@@ -338,5 +417,63 @@ describe('reconstructConversation', () => {
       expect(turns).toHaveLength(50);
       expect(turns[49]?.content).toBe('turn 59');
     });
+  });
+});
+
+describe('formatTranscriptForRedispatch', () => {
+  it('formats turns with role labels', () => {
+    const turns: ConversationTurn[] = [
+      { role: 'user', content: 'Fix the bug', toolCalls: [] },
+      { role: 'assistant', content: 'Looking into it.', toolCalls: [] },
+    ];
+
+    const result = formatTranscriptForRedispatch(turns);
+    expect(result).toContain('[User]: Fix the bug');
+    expect(result).toContain('[Assistant]: Looking into it.');
+  });
+
+  it('includes tool call summaries', () => {
+    const turns: ConversationTurn[] = [
+      {
+        role: 'assistant',
+        content: 'Let me check.',
+        toolCalls: [
+          { tool: 'bash', status: 'completed', summary: 'bash: git status -> clean' },
+          { tool: 'edit', status: 'completed', summary: 'edit: src/foo.ts -> completed' },
+        ],
+      },
+    ];
+
+    const result = formatTranscriptForRedispatch(turns);
+    expect(result).toContain('[Tool calls]:');
+    expect(result).toContain('  - bash: git status -> clean');
+    expect(result).toContain('  - edit: src/foo.ts -> completed');
+  });
+
+  it('truncates to fit maxChars budget from the most recent turns', () => {
+    const turns: ConversationTurn[] = [];
+    for (let i = 0; i < 100; i++) {
+      turns.push({ role: 'user', content: `question ${i} ${'x'.repeat(200)}`, toolCalls: [] });
+      turns.push({ role: 'assistant', content: `answer ${i} ${'y'.repeat(200)}`, toolCalls: [] });
+    }
+
+    const result = formatTranscriptForRedispatch(turns, 2000);
+    // Should contain later turns, not earlier ones
+    expect(result).toContain('question 99');
+    expect(result).not.toContain('question 0');
+    expect(result.length).toBeLessThanOrEqual(2500); // some headroom for the last included turn
+  });
+
+  it('returns empty string for empty turns', () => {
+    expect(formatTranscriptForRedispatch([])).toBe('');
+  });
+
+  it('always includes at least the most recent turn even if it exceeds budget', () => {
+    const turns: ConversationTurn[] = [
+      { role: 'assistant', content: 'x'.repeat(500), toolCalls: [] },
+    ];
+
+    const result = formatTranscriptForRedispatch(turns, 100);
+    expect(result).toContain('x'.repeat(500));
   });
 });

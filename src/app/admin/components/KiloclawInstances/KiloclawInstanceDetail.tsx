@@ -1053,7 +1053,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
   const { mutateAsync: updateMachineSize, isPending: isUpdatingMachineSize } = useMutation(
     trpc.admin.kiloclawInstances.updateMachineSize.mutationOptions({
-      onSuccess: (result) => {
+      onSuccess: result => {
         if (result?.applied) {
           toast.success('Machine size updated and applied immediately.');
         } else {

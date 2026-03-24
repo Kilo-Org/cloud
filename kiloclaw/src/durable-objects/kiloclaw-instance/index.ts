@@ -373,12 +373,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       };
 
       await fly.updateMachine(flyConfig, this.s.flyMachineId, updatedConfig);
-      await fly.waitForState(
-        flyConfig,
-        this.s.flyMachineId,
-        'started',
-        STARTUP_TIMEOUT_SECONDS
-      );
+      await fly.waitForState(flyConfig, this.s.flyMachineId, 'started', STARTUP_TIMEOUT_SECONDS);
       console.log('[DO] Machine size applied immediately:', this.s.flyMachineId);
       applied = true;
     }

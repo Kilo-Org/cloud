@@ -537,6 +537,10 @@ export class TownDO extends DurableObject<Env> {
   private _townId: string | null = null;
   private _lastReconcilerMetrics: reconciler.ReconcilerMetrics | null = null;
   private _dashboardContext: string | null = null;
+  /** Monotonic timestamp of the last working → transition for the mayor.
+   *  Used to reject stale session.idle callbacks that arrive after a new
+   *  prompt has already re-activated the mayor. */
+  private _mayorWorkingSince = 0;
 
   private get townId(): string {
     return this._townId ?? this.ctx.id.name ?? this.ctx.id.toString();
@@ -1428,7 +1432,13 @@ export class TownDO extends DurableObject<Env> {
 
     // Only transition from working → waiting. If the agent has already
     // been set to idle/stalled/dead by another path, don't overwrite.
+    // Guard against stale session.idle callbacks: reportMayorWaiting is
+    // fire-and-forget, so a callback from the previous turn can arrive
+    // after sendMayorMessage has already re-activated the mayor. Reject
+    // transitions that arrive within 5s of the mayor being set to working.
     if (agent.status === 'working') {
+      const STALE_GUARD_MS = 5_000;
+      if (Date.now() - this._mayorWorkingSince < STALE_GUARD_MS) return;
       agents.updateAgentStatus(this.sql, resolvedAgentId, 'waiting');
     }
   }
@@ -1925,6 +1935,7 @@ export class TownDO extends DurableObject<Env> {
         // the reconciler/health-check loop to resume promptly.
         if (mayor.status === 'waiting') {
           agents.updateAgentStatus(this.sql, mayor.id, 'working');
+          this._mayorWorkingSince = Date.now();
           await this.ctx.storage.setAlarm(Date.now() + ACTIVE_ALARM_INTERVAL_MS);
         }
         sessionStatus = 'active';
@@ -1976,6 +1987,7 @@ export class TownDO extends DurableObject<Env> {
 
       if (started) {
         agents.updateAgentStatus(this.sql, mayor.id, 'working');
+        this._mayorWorkingSince = Date.now();
         sessionStatus = 'starting';
       } else {
         sessionStatus = 'idle';
@@ -2078,6 +2090,7 @@ export class TownDO extends DurableObject<Env> {
 
     if (started) {
       agents.updateAgentStatus(this.sql, mayor.id, 'working');
+      this._mayorWorkingSince = Date.now();
       return { agentId: mayor.id, sessionStatus: 'starting' };
     }
 
@@ -3954,7 +3967,7 @@ export class TownDO extends DurableObject<Env> {
       alarm: {
         nextFireAt: currentAlarm ? new Date(Number(currentAlarm)).toISOString() : null,
         intervalMs,
-        intervalLabel: active ? 'active (5s)' : 'idle (60s)',
+        intervalLabel: active ? 'active (5s)' : 'idle (5m)',
       },
       agents: agentCounts,
       beads: beadCounts,

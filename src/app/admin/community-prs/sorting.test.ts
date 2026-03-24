@@ -18,6 +18,7 @@ function row(partial: Partial<ExternalOpenPullRequestRow>): ExternalOpenPullRequ
     commentCount: partial.commentCount ?? 0,
     teamCommented: partial.teamCommented ?? false,
     reviewStatus: partial.reviewStatus ?? 'no_reviews',
+    repo: partial.repo ?? 'kilocode',
   };
 }
 
@@ -28,6 +29,7 @@ function mergedRow(partial: Partial<ExternalMergedPullRequestRow>): ExternalMerg
     url: partial.url ?? 'https://example.com',
     authorLogin: partial.authorLogin ?? 'a',
     mergedAt: partial.mergedAt ?? new Date('2020-01-01T00:00:00.000Z').toISOString(),
+    repo: partial.repo ?? 'kilocode',
   };
 }
 
@@ -46,6 +48,7 @@ function closedRow(partial: Partial<ExternalClosedPullRequestRow>): ExternalClos
     mergedAt,
     status,
     displayDate,
+    repo: partial.repo ?? 'kilocode',
   };
 }
 

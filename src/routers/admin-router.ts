@@ -62,8 +62,8 @@ import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   getKilocodeRepoOpenPullRequestCounts,
-  getKilocodeRepoOpenPullRequestsSummary,
-  getKilocodeRepoRecentlyClosedExternalPRs,
+  getMultiRepoOpenPullRequestsSummary,
+  getMultiRepoRecentlyClosedExternalPRs,
   getKilocodeRepoRecentlyMergedExternalPRs,
 } from '@/lib/github/open-pull-request-counts';
 
@@ -184,7 +184,7 @@ export const adminRouter = createTRPCRouter({
     getKilocodeOpenPullRequestsSummary: adminProcedure
       .input(z.object({ includeDrafts: z.boolean().optional() }).optional())
       .query(async ({ input }) => {
-        return getKilocodeRepoOpenPullRequestsSummary({
+        return getMultiRepoOpenPullRequestsSummary({
           ttlMs: 2 * 60_000,
           includeDrafts: input?.includeDrafts ?? false,
         });
@@ -195,7 +195,7 @@ export const adminRouter = createTRPCRouter({
     }),
 
     getKilocodeRecentlyClosedExternalPRs: adminProcedure.query(async () => {
-      return getKilocodeRepoRecentlyClosedExternalPRs({ ttlMs: 2 * 60_000, maxResults: 50 });
+      return getMultiRepoRecentlyClosedExternalPRs({ ttlMs: 2 * 60_000, maxResults: 50 });
     }),
   }),
 

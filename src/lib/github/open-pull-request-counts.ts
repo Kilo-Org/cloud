@@ -25,6 +25,7 @@ type ExternalOpenPullRequest = {
   commentCount: number;
   teamCommented: boolean;
   reviewStatus: PullRequestReviewStatus;
+  repo: string;
 };
 
 type OpenPullRequestsSummary = OpenPullRequestCounts & {
@@ -39,6 +40,7 @@ type ExternalMergedPullRequest = {
   url: string;
   authorLogin: string;
   mergedAt: string;
+  repo: string;
 };
 
 export type { ExternalMergedPullRequest };
@@ -54,6 +56,7 @@ type ExternalClosedPullRequest = {
   mergedAt: string | null;
   status: ExternalClosedPullRequestStatus;
   displayDate: string;
+  repo: string;
 };
 
 export type { ExternalClosedPullRequest, ExternalClosedPullRequestStatus };
@@ -314,11 +317,18 @@ const ORG = 'Kilo-Org';
 const REPO_OWNER = 'Kilo-Org';
 const REPO_NAME = 'kilocode';
 
+type RepoRef = { owner: string; name: string };
+
+const COMMUNITY_PR_REPOS: readonly RepoRef[] = [
+  { owner: REPO_OWNER, name: 'kilocode' },
+  { owner: REPO_OWNER, name: 'cloud' },
+];
+
 const countsCacheByIncludeDrafts = new Map<boolean, CacheEntry<OpenPullRequestCounts>>();
 const countsInFlightByIncludeDrafts = new Map<boolean, Promise<OpenPullRequestCounts>>();
 
-const summaryCacheByIncludeDrafts = new Map<boolean, CacheEntry<OpenPullRequestsSummary>>();
-const summaryInFlightByIncludeDrafts = new Map<boolean, Promise<OpenPullRequestsSummary>>();
+const summaryCacheByRepoAndDrafts = new Map<string, CacheEntry<OpenPullRequestsSummary>>();
+const summaryInFlightByRepoAndDrafts = new Map<string, Promise<OpenPullRequestsSummary>>();
 
 const orgMemberCache = new Map<string, CacheEntry<boolean>>();
 
@@ -327,7 +337,7 @@ type PullRequestTeamInteraction = {
   reviewStatus: PullRequestReviewStatus;
 };
 
-const teamCommentedCache = new Map<number, CacheEntry<PullRequestTeamInteraction>>();
+const teamCommentedCache = new Map<string, CacheEntry<PullRequestTeamInteraction>>();
 
 function isBotGithubUser(user: GithubUserLite): boolean {
   return user.type === 'Bot';
@@ -364,12 +374,14 @@ async function githubRequest(url: string, init?: RequestInit): Promise<Response>
 
 async function listOpenPullRequestAuthors(options: {
   includeDrafts: boolean;
+  repo?: RepoRef;
 }): Promise<GithubUserLite[]> {
+  const { owner, name } = options.repo ?? { owner: REPO_OWNER, name: REPO_NAME };
   const perPage = 100;
   const authors: GithubUserLite[] = [];
 
   for (let page = 1; ; page += 1) {
-    const url = new URL(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls`);
+    const url = new URL(`https://api.github.com/repos/${owner}/${name}/pulls`);
     url.searchParams.set('state', 'open');
     url.searchParams.set('per_page', String(perPage));
     url.searchParams.set('page', String(page));
@@ -405,12 +417,14 @@ export function parseGithubListPullRequestsSummaryResponse(
 
 async function listOpenPullRequests(options: {
   includeDrafts: boolean;
+  repo?: RepoRef;
 }): Promise<OpenPullRequestApiSummary[]> {
+  const { owner, name } = options.repo ?? { owner: REPO_OWNER, name: REPO_NAME };
   const perPage = 100;
   const prs: OpenPullRequestApiSummary[] = [];
 
   for (let page = 1; ; page += 1) {
-    const url = new URL(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls`);
+    const url = new URL(`https://api.github.com/repos/${owner}/${name}/pulls`);
     url.searchParams.set('state', 'open');
     url.searchParams.set('per_page', String(perPage));
     url.searchParams.set('page', String(page));
@@ -504,9 +518,11 @@ async function listIssueCommentAuthorLoginsForPullRequest(options: {
   prNumber: number;
   page: number;
   perPage: number;
+  repo?: RepoRef;
 }): Promise<string[]> {
+  const { owner, name } = options.repo ?? { owner: REPO_OWNER, name: REPO_NAME };
   const url = new URL(
-    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${options.prNumber}/comments`
+    `https://api.github.com/repos/${owner}/${name}/issues/${options.prNumber}/comments`
   );
   url.searchParams.set('per_page', String(options.perPage));
   url.searchParams.set('page', String(options.page));
@@ -532,9 +548,11 @@ async function listReviewCommentAuthorLoginsForPullRequest(options: {
   prNumber: number;
   page: number;
   perPage: number;
+  repo?: RepoRef;
 }): Promise<string[]> {
+  const { owner, name } = options.repo ?? { owner: REPO_OWNER, name: REPO_NAME };
   const url = new URL(
-    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${options.prNumber}/comments`
+    `https://api.github.com/repos/${owner}/${name}/pulls/${options.prNumber}/comments`
   );
   url.searchParams.set('per_page', String(options.perPage));
   url.searchParams.set('page', String(options.page));
@@ -560,9 +578,11 @@ async function listPullRequestReviewApproverLoginsForPullRequest(options: {
   prNumber: number;
   page: number;
   perPage: number;
+  repo?: RepoRef;
 }): Promise<{ reviews: Array<{ state: string; userLogin: string }>; totalReviews: number }> {
+  const { owner, name } = options.repo ?? { owner: REPO_OWNER, name: REPO_NAME };
   const url = new URL(
-    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${options.prNumber}/reviews`
+    `https://api.github.com/repos/${owner}/${name}/pulls/${options.prNumber}/reviews`
   );
   url.searchParams.set('per_page', String(options.perPage));
   url.searchParams.set('page', String(options.page));
@@ -599,6 +619,7 @@ async function hasOrgMemberReviewedPullRequest(options: {
   org: string;
   prNumber: number;
   maxPullRequestReviewPages: number;
+  repo?: RepoRef;
 }): Promise<boolean> {
   // Best-effort: bounded review checks to avoid rate-limit issues.
   // Stop early if we find a team approval.
@@ -609,6 +630,7 @@ async function hasOrgMemberReviewedPullRequest(options: {
       prNumber: options.prNumber,
       page,
       perPage,
+      repo: options.repo,
     });
 
     if (
@@ -630,6 +652,7 @@ async function getPullRequestReviewStatus(options: {
   org: string;
   prNumber: number;
   maxPullRequestReviewPages: number;
+  repo?: RepoRef;
 }): Promise<PullRequestReviewStatus> {
   const perPage = 100;
 
@@ -640,6 +663,7 @@ async function getPullRequestReviewStatus(options: {
       prNumber: options.prNumber,
       page,
       perPage,
+      repo: options.repo,
     });
 
     for (const review of reviews) {
@@ -683,9 +707,12 @@ async function hasOrgMemberCommentedOnPullRequest(options: {
   maxIssueCommentPages: number;
   maxReviewCommentPages: number;
   maxPullRequestReviewPages: number;
+  repo?: RepoRef;
 }): Promise<PullRequestTeamInteraction> {
+  const repoName = options.repo?.name ?? REPO_NAME;
+  const cacheKey = `${repoName}:${options.prNumber}`;
   const now = Date.now();
-  const cached = teamCommentedCache.get(options.prNumber);
+  const cached = teamCommentedCache.get(cacheKey);
   if (cached && cached.expiresAtMs > now) {
     return cached.value;
   }
@@ -699,15 +726,17 @@ async function hasOrgMemberCommentedOnPullRequest(options: {
       prNumber: options.prNumber,
       page,
       perPage,
+      repo: options.repo,
     });
     if (await anyOrgMemberInLogins(options.org, logins)) {
       const reviewStatus = await getPullRequestReviewStatus({
         org: options.org,
         prNumber: options.prNumber,
         maxPullRequestReviewPages: options.maxPullRequestReviewPages,
+        repo: options.repo,
       });
       const value: PullRequestTeamInteraction = { teamCommented: true, reviewStatus };
-      teamCommentedCache.set(options.prNumber, { value, expiresAtMs: now + options.ttlMs });
+      teamCommentedCache.set(cacheKey, { value, expiresAtMs: now + options.ttlMs });
       return value;
     }
     if (logins.length < perPage) break;
@@ -717,17 +746,19 @@ async function hasOrgMemberCommentedOnPullRequest(options: {
     org: options.org,
     prNumber: options.prNumber,
     maxPullRequestReviewPages: options.maxPullRequestReviewPages,
+    repo: options.repo,
   });
 
   const teamReviewed = await hasOrgMemberReviewedPullRequest({
     org: options.org,
     prNumber: options.prNumber,
     maxPullRequestReviewPages: options.maxPullRequestReviewPages,
+    repo: options.repo,
   });
 
   if (teamReviewed) {
     const value: PullRequestTeamInteraction = { teamCommented: true, reviewStatus };
-    teamCommentedCache.set(options.prNumber, { value, expiresAtMs: now + options.ttlMs });
+    teamCommentedCache.set(cacheKey, { value, expiresAtMs: now + options.ttlMs });
     return value;
   }
 
@@ -736,17 +767,18 @@ async function hasOrgMemberCommentedOnPullRequest(options: {
       prNumber: options.prNumber,
       page,
       perPage,
+      repo: options.repo,
     });
     if (await anyOrgMemberInLogins(options.org, logins)) {
       const value: PullRequestTeamInteraction = { teamCommented: true, reviewStatus };
-      teamCommentedCache.set(options.prNumber, { value, expiresAtMs: now + options.ttlMs });
+      teamCommentedCache.set(cacheKey, { value, expiresAtMs: now + options.ttlMs });
       return value;
     }
     if (logins.length < perPage) break;
   }
 
   const value: PullRequestTeamInteraction = { teamCommented: false, reviewStatus };
-  teamCommentedCache.set(options.prNumber, { value, expiresAtMs: now + options.ttlMs });
+  teamCommentedCache.set(cacheKey, { value, expiresAtMs: now + options.ttlMs });
   return value;
 }
 
@@ -830,26 +862,31 @@ export async function getKilocodeRepoOpenPullRequestsSummary(options?: {
   maxIssueCommentPages?: number;
   maxReviewCommentPages?: number;
   maxPullRequestReviewPages?: number;
+  repo?: RepoRef;
 }): Promise<OpenPullRequestsSummary> {
+  const repo = options?.repo ?? { owner: REPO_OWNER, name: REPO_NAME };
+  const repoLabel = repo.name;
   const ttlMs = options?.ttlMs ?? 2 * 60_000;
   const includeDrafts = options?.includeDrafts ?? false;
   const shouldUseCache = ttlMs > 0;
   const now = Date.now();
 
+  const cacheKey = `${repoLabel}:${includeDrafts}`;
+
   if (shouldUseCache) {
-    const cached = summaryCacheByIncludeDrafts.get(includeDrafts);
+    const cached = summaryCacheByRepoAndDrafts.get(cacheKey);
     if (cached && cached.expiresAtMs > now) {
       return cached.value;
     }
   }
 
-  const inFlight = summaryInFlightByIncludeDrafts.get(includeDrafts);
+  const inFlight = summaryInFlightByRepoAndDrafts.get(cacheKey);
   if (inFlight) {
     return inFlight;
   }
 
   const promise = (async () => {
-    const prs = await listOpenPullRequests({ includeDrafts });
+    const prs = await listOpenPullRequests({ includeDrafts, repo });
     const prsWithoutDrafts = includeDrafts ? prs : prs.filter(pr => !pr.draft);
 
     const prsWithAuthors = prsWithoutDrafts.flatMap(pr => {
@@ -924,6 +961,7 @@ export async function getKilocodeRepoOpenPullRequestsSummary(options?: {
         commentCount,
         teamCommented: false,
         reviewStatus: 'no_reviews',
+        repo: repoLabel,
       };
     });
 
@@ -938,6 +976,7 @@ export async function getKilocodeRepoOpenPullRequestsSummary(options?: {
         maxIssueCommentPages,
         maxReviewCommentPages,
         maxPullRequestReviewPages,
+        repo,
       });
     });
 
@@ -971,35 +1010,70 @@ export async function getKilocodeRepoOpenPullRequestsSummary(options?: {
     };
 
     if (shouldUseCache) {
-      summaryCacheByIncludeDrafts.set(includeDrafts, { value, expiresAtMs: Date.now() + ttlMs });
+      summaryCacheByRepoAndDrafts.set(cacheKey, { value, expiresAtMs: Date.now() + ttlMs });
     }
     return value;
   })();
 
-  summaryInFlightByIncludeDrafts.set(includeDrafts, promise);
+  summaryInFlightByRepoAndDrafts.set(cacheKey, promise);
 
   try {
     return await promise;
   } finally {
-    summaryInFlightByIncludeDrafts.delete(includeDrafts);
+    summaryInFlightByRepoAndDrafts.delete(cacheKey);
   }
 }
 
-const mergedPrsCache = new Map<number, CacheEntry<ExternalMergedPullRequest[]>>();
-const mergedPrsInFlight = new Map<number, Promise<ExternalMergedPullRequest[]>>();
+export async function getMultiRepoOpenPullRequestsSummary(options?: {
+  ttlMs?: number;
+  includeDrafts?: boolean;
+  commentConcurrency?: number;
+  maxIssueCommentPages?: number;
+  maxReviewCommentPages?: number;
+  maxPullRequestReviewPages?: number;
+}): Promise<OpenPullRequestsSummary> {
+  const summaries = await Promise.all(
+    COMMUNITY_PR_REPOS.map(repo => getKilocodeRepoOpenPullRequestsSummary({ ...options, repo }))
+  );
 
-const closedPrsCache = new Map<number, CacheEntry<ExternalClosedPullRequestsWithWeekStats>>();
-const closedPrsInFlight = new Map<number, Promise<ExternalClosedPullRequestsWithWeekStats>>();
+  let totalOpenPullRequests = 0;
+  let teamOpenPullRequests = 0;
+  let externalOpenPullRequests = 0;
+  const allExternalPrs: ExternalOpenPullRequest[] = [];
+
+  for (const s of summaries) {
+    totalOpenPullRequests += s.totalOpenPullRequests;
+    teamOpenPullRequests += s.teamOpenPullRequests;
+    externalOpenPullRequests += s.externalOpenPullRequests;
+    allExternalPrs.push(...s.externalOpenPullRequestsList);
+  }
+
+  return {
+    totalOpenPullRequests,
+    teamOpenPullRequests,
+    externalOpenPullRequests,
+    externalOpenPullRequestsList: allExternalPrs,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+const mergedPrsCacheByRepo = new Map<string, CacheEntry<ExternalMergedPullRequest[]>>();
+const mergedPrsInFlightByRepo = new Map<string, Promise<ExternalMergedPullRequest[]>>();
+
+const closedPrsCacheByRepo = new Map<string, CacheEntry<ExternalClosedPullRequestsWithWeekStats>>();
+const closedPrsInFlightByRepo = new Map<string, Promise<ExternalClosedPullRequestsWithWeekStats>>();
 
 async function listMergedPullRequests(options: {
   maxResults: number;
+  repo?: RepoRef;
 }): Promise<z.infer<typeof CLOSED_PULL_REQUEST_ITEM_SCHEMA>[]> {
+  const { owner, name } = options.repo ?? { owner: REPO_OWNER, name: REPO_NAME };
   const perPage = 100;
   const prs: z.infer<typeof CLOSED_PULL_REQUEST_ITEM_SCHEMA>[] = [];
   const maxPages = Math.ceil(options.maxResults / perPage);
 
   for (let page = 1; page <= maxPages; page += 1) {
-    const url = new URL(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls`);
+    const url = new URL(`https://api.github.com/repos/${owner}/${name}/pulls`);
     url.searchParams.set('state', 'closed');
     url.searchParams.set('sort', 'updated');
     url.searchParams.set('direction', 'desc');
@@ -1037,26 +1111,31 @@ async function listMergedPullRequests(options: {
 export async function getKilocodeRepoRecentlyMergedExternalPRs(options?: {
   ttlMs?: number;
   maxResults?: number;
+  repo?: RepoRef;
 }): Promise<ExternalMergedPullRequest[]> {
+  const repo = options?.repo ?? { owner: REPO_OWNER, name: REPO_NAME };
+  const repoLabel = repo.name;
   const ttlMs = options?.ttlMs ?? 2 * 60_000;
   const maxResults = options?.maxResults ?? 50;
   const shouldUseCache = ttlMs > 0;
   const now = Date.now();
 
+  const cacheKey = `${repoLabel}:${maxResults}`;
+
   if (shouldUseCache) {
-    const cached = mergedPrsCache.get(maxResults);
+    const cached = mergedPrsCacheByRepo.get(cacheKey);
     if (cached && cached.expiresAtMs > now) {
       return cached.value;
     }
   }
 
-  const inFlight = mergedPrsInFlight.get(maxResults);
+  const inFlight = mergedPrsInFlightByRepo.get(cacheKey);
   if (inFlight) {
     return inFlight;
   }
 
   const promise = (async () => {
-    const prs = await listMergedPullRequests({ maxResults });
+    const prs = await listMergedPullRequests({ maxResults, repo });
 
     const prsWithAuthors = prs.flatMap(pr => {
       const user = pr.user;
@@ -1099,6 +1178,7 @@ export async function getKilocodeRepoRecentlyMergedExternalPRs(options?: {
           url: pr.html_url,
           authorLogin: author.login,
           mergedAt,
+          repo: repoLabel,
         });
       }
     }
@@ -1111,23 +1191,25 @@ export async function getKilocodeRepoRecentlyMergedExternalPRs(options?: {
     });
 
     if (shouldUseCache) {
-      mergedPrsCache.set(maxResults, { value: external, expiresAtMs: Date.now() + ttlMs });
+      mergedPrsCacheByRepo.set(cacheKey, { value: external, expiresAtMs: Date.now() + ttlMs });
     }
     return external;
   })();
 
-  mergedPrsInFlight.set(maxResults, promise);
+  mergedPrsInFlightByRepo.set(cacheKey, promise);
 
   try {
     return await promise;
   } finally {
-    mergedPrsInFlight.delete(maxResults);
+    mergedPrsInFlightByRepo.delete(cacheKey);
   }
 }
 
 async function listRecentlyClosedPullRequests(options: {
   maxResults: number;
+  repo?: RepoRef;
 }): Promise<z.infer<typeof CLOSED_PULL_REQUEST_ITEM_SCHEMA>[]> {
+  const { owner, name } = options.repo ?? { owner: REPO_OWNER, name: REPO_NAME };
   const perPage = 100;
   const prs: z.infer<typeof CLOSED_PULL_REQUEST_ITEM_SCHEMA>[] = [];
 
@@ -1135,7 +1217,7 @@ async function listRecentlyClosedPullRequests(options: {
   const maxPages = Math.ceil((options.maxResults * 4) / perPage);
 
   for (let page = 1; page <= maxPages; page += 1) {
-    const url = new URL(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls`);
+    const url = new URL(`https://api.github.com/repos/${owner}/${name}/pulls`);
     url.searchParams.set('state', 'closed');
     url.searchParams.set('sort', 'updated');
     url.searchParams.set('direction', 'desc');
@@ -1164,7 +1246,10 @@ export async function getKilocodeRepoRecentlyClosedExternalPRs(options?: {
   maxResults?: number;
   now?: Date;
   timeZone?: string;
+  repo?: RepoRef;
 }): Promise<ExternalClosedPullRequestsWithWeekStats> {
+  const repo = options?.repo ?? { owner: REPO_OWNER, name: REPO_NAME };
+  const repoLabel = repo.name;
   const ttlMs = options?.ttlMs ?? 2 * 60_000;
   const maxResults = options?.maxResults ?? 50;
   const nowDate = options?.now ?? new Date();
@@ -1173,20 +1258,22 @@ export async function getKilocodeRepoRecentlyClosedExternalPRs(options?: {
   const shouldUseCache = ttlMs > 0;
   const now = Date.now();
 
+  const cacheKey = `${repoLabel}:${maxResults}`;
+
   if (shouldUseCache) {
-    const cached = closedPrsCache.get(maxResults);
+    const cached = closedPrsCacheByRepo.get(cacheKey);
     if (cached && cached.expiresAtMs > now) {
       return cached.value;
     }
   }
 
-  const inFlight = closedPrsInFlight.get(maxResults);
+  const inFlight = closedPrsInFlightByRepo.get(cacheKey);
   if (inFlight) {
     return inFlight;
   }
 
   const promise = (async () => {
-    const prs = await listRecentlyClosedPullRequests({ maxResults });
+    const prs = await listRecentlyClosedPullRequests({ maxResults, repo });
 
     const prsWithAuthors = prs.flatMap(pr => {
       const user = pr.user;
@@ -1238,6 +1325,7 @@ export async function getKilocodeRepoRecentlyClosedExternalPRs(options?: {
         mergedAt,
         status,
         displayDate,
+        repo: repoLabel,
       });
     }
 
@@ -1270,17 +1358,55 @@ export async function getKilocodeRepoRecentlyClosedExternalPRs(options?: {
     };
 
     if (shouldUseCache) {
-      closedPrsCache.set(maxResults, { value, expiresAtMs: Date.now() + ttlMs });
+      closedPrsCacheByRepo.set(cacheKey, { value, expiresAtMs: Date.now() + ttlMs });
     }
 
     return value;
   })();
 
-  closedPrsInFlight.set(maxResults, promise);
+  closedPrsInFlightByRepo.set(cacheKey, promise);
 
   try {
     return await promise;
   } finally {
-    closedPrsInFlight.delete(maxResults);
+    closedPrsInFlightByRepo.delete(cacheKey);
   }
+}
+
+export async function getMultiRepoRecentlyClosedExternalPRs(options?: {
+  ttlMs?: number;
+  maxResults?: number;
+  now?: Date;
+  timeZone?: string;
+}): Promise<ExternalClosedPullRequestsWithWeekStats> {
+  const maxResults = options?.maxResults ?? 50;
+
+  const results = await Promise.all(
+    COMMUNITY_PR_REPOS.map(repo => getKilocodeRepoRecentlyClosedExternalPRs({ ...options, repo }))
+  );
+
+  const allPrs: ExternalClosedPullRequest[] = [];
+  let thisWeekMergedCount = 0;
+  let thisWeekClosedCount = 0;
+
+  for (const r of results) {
+    allPrs.push(...r.prs);
+    thisWeekMergedCount += r.thisWeekMergedCount;
+    thisWeekClosedCount += r.thisWeekClosedCount;
+  }
+
+  // Re-sort merged results by displayDate descending
+  allPrs.sort((a, b) => {
+    const dateA = new Date(a.displayDate).getTime();
+    const dateB = new Date(b.displayDate).getTime();
+    return dateB - dateA;
+  });
+
+  return {
+    prs: allPrs.slice(0, maxResults),
+    thisWeekMergedCount,
+    thisWeekClosedCount,
+    weekStart: results[0]?.weekStart ?? new Date().toISOString(),
+    weekEnd: results[0]?.weekEnd,
+  };
 }

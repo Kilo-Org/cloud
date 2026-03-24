@@ -112,10 +112,14 @@ export default function GithubPrCountsAdminPage() {
     };
   }, []);
 
-  const externalPrHref = useCallback((pr: { number: number; url?: string | null }) => {
-    if (pr.url) return pr.url;
-    return `https://github.com/Kilo-Org/kilocode/pull/${pr.number}`;
-  }, []);
+  const externalPrHref = useCallback(
+    (pr: { number: number; url?: string | null; repo?: string }) => {
+      if (pr.url) return pr.url;
+      const repoName = pr.repo ?? 'kilocode';
+      return `https://github.com/Kilo-Org/${repoName}/pull/${pr.number}`;
+    },
+    []
+  );
 
   const reviewStatusLabel = useCallback((reviewStatus: string) => {
     if (reviewStatus === 'changes_requested') return 'Changes requested';
@@ -136,9 +140,10 @@ export default function GithubPrCountsAdminPage() {
     >
       <div className="flex w-full flex-col gap-y-6">
         <div>
-          <h2 className="text-2xl font-bold">kilocode repo – open PRs</h2>
+          <h2 className="text-2xl font-bold">Community PRs</h2>
           <p className="text-muted-foreground mt-1">
-            Counts are split by whether the PR author is a member of the GitHub org “Kilo-Org”.
+            PRs from kilocode and cloud repos. Counts are split by whether the PR author is a member
+            of the GitHub org "Kilo-Org".
           </p>
         </div>
 
@@ -256,6 +261,7 @@ export default function GithubPrCountsAdminPage() {
                     <table className="w-full border-collapse text-sm">
                       <thead>
                         <tr className="text-muted-foreground border-b">
+                          <th className="px-2 py-2 text-left font-medium">Repo</th>
                           <th className="px-2 py-2 text-left font-medium">PR</th>
                           <th className="px-2 py-2 text-left font-medium">Author</th>
                           <th className="px-2 py-2 text-left font-medium">Age</th>
@@ -270,9 +276,14 @@ export default function GithubPrCountsAdminPage() {
                           const prHref = externalPrHref(pr);
                           return (
                             <tr
-                              key={pr.number}
+                              key={`${pr.repo}-${pr.number}`}
                               className={`border-b border-l-4 ${urgency.rowBorder} hover:bg-muted/30`}
                             >
+                              <td className="px-2 py-3 align-top">
+                                <Badge variant="outline" className="text-xs">
+                                  {pr.repo}
+                                </Badge>
+                              </td>
                               <td className="px-2 py-3 align-top">
                                 <a
                                   href={prHref}
@@ -373,6 +384,7 @@ export default function GithubPrCountsAdminPage() {
                     <table className="w-full border-collapse text-sm">
                       <thead>
                         <tr className="text-muted-foreground border-b">
+                          <th className="px-2 py-2 text-left font-medium">Repo</th>
                           <th className="px-2 py-2 text-left font-medium">PR</th>
                           <th className="px-2 py-2 text-left font-medium">Author</th>
                           <th className="px-2 py-2 text-left font-medium">Date</th>
@@ -388,7 +400,15 @@ export default function GithubPrCountsAdminPage() {
                               : 'border-red-600/40 bg-red-600/10 text-red-200';
 
                           return (
-                            <tr key={pr.number} className="hover:bg-muted/30 border-b">
+                            <tr
+                              key={`${pr.repo}-${pr.number}`}
+                              className="hover:bg-muted/30 border-b"
+                            >
+                              <td className="px-2 py-3 align-top">
+                                <Badge variant="outline" className="text-xs">
+                                  {pr.repo}
+                                </Badge>
+                              </td>
                               <td className="px-2 py-3 align-top">
                                 <a
                                   href={pr.url}

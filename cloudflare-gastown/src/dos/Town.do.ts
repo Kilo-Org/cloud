@@ -25,6 +25,7 @@ import * as reviewQueue from './town/review-queue';
 import * as config from './town/config';
 import * as rigs from './town/rigs';
 import * as dispatch from './town/container-dispatch';
+import * as conversation from './town/conversation';
 import * as patrol from './town/patrol';
 import * as scheduling from './town/scheduling';
 import * as events from './town/events';
@@ -1062,6 +1063,25 @@ export class TownDO extends DurableObject<Env> {
     return agentDO.getEvents(afterId, limit);
   }
 
+  /**
+   * Reconstruct a conversation transcript from an agent's persisted
+   * streaming events. Returns a formatted string for prompt injection,
+   * or an empty string if no conversation history exists.
+   */
+  async reconstructConversation(agentId: string): Promise<string> {
+    try {
+      const rawEvents = await this.getAgentEvents(agentId, 0, 10_000);
+      const turns = conversation.reconstructConversation(rawEvents);
+      return conversation.formatTranscriptForPrompt(turns);
+    } catch (err) {
+      console.error(
+        `${TOWN_LOG} reconstructConversation: failed for agent=${agentId}:`,
+        err instanceof Error ? err.message : err
+      );
+      return '';
+    }
+  }
+
   // ── Prime & Checkpoint ────────────────────────────────────────────
 
   async prime(agentId: string): Promise<PrimeContext> {
@@ -1880,7 +1900,8 @@ export class TownDO extends DurableObject<Env> {
         beadId: '',
         beadTitle: message,
         beadBody: '',
-        checkpoint: null,
+        checkpoint: agents.readCheckpoint(this.sql, mayor.id),
+        conversationHistory: await this.reconstructConversation(mayor.id),
         gitUrl: rigConfig?.gitUrl ?? '',
         defaultBranch: rigConfig?.defaultBranch ?? 'main',
         kilocodeToken,
@@ -1966,7 +1987,8 @@ export class TownDO extends DurableObject<Env> {
       beadId: '',
       beadTitle: 'Mayor ready. Waiting for instructions.',
       beadBody: '',
-      checkpoint: null,
+      checkpoint: agents.readCheckpoint(this.sql, mayor.id),
+      conversationHistory: await this.reconstructConversation(mayor.id),
       gitUrl: rigConfig?.gitUrl ?? '',
       defaultBranch: rigConfig?.defaultBranch ?? 'main',
       kilocodeToken,

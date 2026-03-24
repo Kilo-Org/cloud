@@ -1981,6 +1981,29 @@ export class TownDO extends DurableObject<Env> {
     return { agentId: mayor.id, sessionStatus: 'idle' };
   }
 
+  /**
+   * Restart the mayor session so it picks up new config (e.g. a model change).
+   * Stops the running mayor process and re-dispatches with fresh town config.
+   * The mayor's conversation history is preserved in AgentDO events.
+   */
+  async restartMayor(): Promise<void> {
+    const townId = this.townId;
+    const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0];
+    if (!mayor) return;
+
+    const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
+    const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
+
+    if (isAlive) {
+      console.log(`${TOWN_LOG} restartMayor: stopping mayor ${mayor.id}`);
+      await dispatch.stopAgentInContainer(this.env, townId, mayor.id);
+      agents.updateAgentStatus(this.sql, mayor.id, 'idle');
+    }
+
+    // Re-dispatch with current config (which now has the updated model)
+    await this.ensureMayor();
+  }
+
   async getMayorStatus(): Promise<{
     configured: boolean;
     townId: string;

@@ -824,12 +824,12 @@ export const gastownRouter = router({
       } = input.config;
 
       const townStub = getTownDOStub(ctx.env, input.townId);
+      const existingConfig = await townStub.getTownConfig();
 
       // For org towns, only owners or the town creator can update config
       if (ownership.type === 'org') {
         const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
         const isOrgOwner = membership?.role === 'owner';
-        const existingConfig = await townStub.getTownConfig();
         const isTownCreator = ctx.userId === existingConfig.created_by_user_id;
         if (!isOrgOwner && !isTownCreator) {
           throw new TRPCError({
@@ -846,6 +846,19 @@ export const gastownRouter = router({
         await townStub.syncConfigToContainer();
       } catch (err) {
         console.warn('[gastown-trpc] updateTownConfig: syncConfigToContainer failed:', err);
+      }
+
+      // If the model changed, restart the mayor so it picks up the new model.
+      // The mayor's conversation history is preserved in AgentDO events.
+      const modelChanged =
+        result.default_model !== existingConfig.default_model ||
+        result.small_model !== existingConfig.small_model;
+      if (modelChanged) {
+        try {
+          await townStub.restartMayor();
+        } catch (err) {
+          console.warn('[gastown-trpc] updateTownConfig: restartMayor failed:', err);
+        }
       }
 
       return result;

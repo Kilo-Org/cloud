@@ -1,0 +1,1 @@
+ALTER TABLE "kilocode_users" ADD COLUMN "read_notification_ids" jsonb DEFAULT '[]'::jsonb NOT NULL;

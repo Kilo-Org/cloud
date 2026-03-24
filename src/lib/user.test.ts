@@ -92,6 +92,7 @@ describe('User', () => {
         openrouter_upstream_safety_identifier: 'openrouter_upstream_safety_identifier',
         customer_source: 'A YouTube video',
         is_admin: true,
+        read_notification_ids: ['low-credit-warning', 'kilo-cli-jan-5'],
       });
 
       await softDeleteUser(user.id);
@@ -112,6 +113,7 @@ describe('User', () => {
       expect(softDeleted!.auto_top_up_enabled).toBe(false);
       expect(softDeleted!.completed_welcome_form).toBe(false);
       expect(softDeleted!.is_admin).toBe(false);
+      expect(softDeleted!.read_notification_ids).toEqual([]);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);
     });

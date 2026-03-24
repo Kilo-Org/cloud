@@ -208,6 +208,8 @@ export const kilocode_users = pgTable(
     github_url: text(),
     openrouter_upstream_safety_identifier: text(),
     customer_source: text(),
+    /** IDs of notifications the user has dismissed / marked as read on the web app. */
+    read_notification_ids: jsonb().$type<string[]>().default([]).notNull(),
   },
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),

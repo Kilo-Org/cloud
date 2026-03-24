@@ -34,6 +34,7 @@ export function defineTestUser(userData: Partial<User> = {}): User {
     github_url: null,
     openrouter_upstream_safety_identifier: null,
     customer_source: null,
+    read_notification_ids: [],
     ...userData,
   } satisfies User;
 }

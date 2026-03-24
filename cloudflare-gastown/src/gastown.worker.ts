@@ -118,6 +118,7 @@ import {
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { townAuthMiddleware } from './middleware/town-auth.middleware';
 import { orgAuthMiddleware } from './middleware/org-auth.middleware';
+import { adminAuditMiddleware } from './middleware/admin-audit.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
 import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
 import {
@@ -432,10 +433,12 @@ app.post('/api/towns/:townId/rigs/:rigId/triage/resolve', c =>
 app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
   kiloAuthMiddleware(c, next)
 );
-// Town routes: kilo auth + town ownership check (supports both personal and org-owned towns).
+// Town routes: kilo auth + admin audit + town ownership check (supports both personal and org-owned towns).
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) =>
   kiloAuthMiddleware(c, async () => {
-    await townAuthMiddleware(c, next);
+    await adminAuditMiddleware(c, async () => {
+      await townAuthMiddleware(c, next);
+    });
   })
 );
 

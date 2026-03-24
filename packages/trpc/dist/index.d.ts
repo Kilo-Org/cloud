@@ -3394,6 +3394,7 @@ type AdminKiloclawInstance = {
     sandbox_id: string;
     created_at: string;
     destroyed_at: string | null;
+    suspended_at: string | null;
     user_email: string | null;
 };
 
@@ -8068,6 +8069,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                         expiresAt: string;
                         daysRemaining: number;
                     } | null;
+                    activeInstanceId: string | null;
                 };
                 meta: object;
             }>;
@@ -9761,6 +9763,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     sandbox_id: string;
                     created_at: string;
                     destroyed_at: string | null;
+                    suspended_at: string | null;
                     user_email: string | null;
                 };
                 meta: object;
@@ -9772,7 +9775,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     sortBy?: "created_at" | "destroyed_at" | undefined;
                     sortOrder?: "asc" | "desc" | undefined;
                     search?: string | undefined;
-                    status?: "active" | "all" | "destroyed" | undefined;
+                    status?: "active" | "all" | "suspended" | "destroyed" | undefined;
                 };
                 output: {
                     instances: AdminKiloclawInstance[];
@@ -9793,6 +9796,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     overview: {
                         totalInstances: number;
                         activeInstances: number;
+                        suspendedInstances: number;
                         destroyedInstances: number;
                         uniqueUsers: number;
                         last24hCreated: number;
@@ -9941,7 +9945,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     message: string;
                     id: string;
                     created_at: string;
-                    action: "kiloclaw.volume.reassociate" | "kiloclaw.subscription.update_trial_end" | "kiloclaw.machine.start" | "kiloclaw.machine.stop" | "kiloclaw.instance.destroy" | "kiloclaw.gateway.start" | "kiloclaw.gateway.stop" | "kiloclaw.gateway.restart" | "kiloclaw.config.restore" | "kiloclaw.doctor.run";
+                    action: "kiloclaw.volume.reassociate" | "kiloclaw.subscription.update_trial_end" | "kiloclaw.subscription.reset_trial" | "kiloclaw.machine.start" | "kiloclaw.machine.stop" | "kiloclaw.instance.destroy" | "kiloclaw.gateway.start" | "kiloclaw.gateway.stop" | "kiloclaw.gateway.restart" | "kiloclaw.config.restore" | "kiloclaw.doctor.run";
                     actor_id: string | null;
                     actor_email: string | null;
                     actor_name: string | null;
@@ -10530,7 +10534,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
             list: _trpc_server.TRPCQueryProcedure<{
                 input: {
                     page?: number | undefined;
-                    limit?: 10 | 100 | 50 | 25 | undefined;
+                    limit?: 100 | 50 | 10 | 25 | undefined;
                 };
                 output: {
                     requests: {
@@ -10545,7 +10549,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     }[];
                     pagination: {
                         page: number;
-                        limit: 10 | 100 | 50 | 25;
+                        limit: 100 | 50 | 10 | 25;
                         total: number;
                         totalPages: number;
                     };
@@ -11515,7 +11519,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
             input: {
                 cursor?: string | undefined;
                 limit?: number | undefined;
-                createdOnPlatform?: string | undefined;
+                createdOnPlatform?: string | string[] | undefined;
                 orderBy?: "updated_at" | "created_at" | undefined;
                 organizationId?: string | null | undefined;
             };
@@ -11543,7 +11547,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                 search_string: string;
                 limit?: number | undefined;
                 offset?: number | undefined;
-                createdOnPlatform?: string | undefined;
+                createdOnPlatform?: string | string[] | undefined;
                 organizationId?: string | null | undefined;
             };
             output: {
@@ -15753,7 +15757,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
             input: {
                 cursor?: string | undefined;
                 limit?: number | undefined;
-                createdOnPlatform?: string | undefined;
+                createdOnPlatform?: string | string[] | undefined;
                 orderBy?: "updated_at" | "created_at" | undefined;
                 organizationId?: string | null | undefined;
                 includeSubSessions?: boolean | undefined;
@@ -15784,7 +15788,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                 search_string: string;
                 limit?: number | undefined;
                 offset?: number | undefined;
-                createdOnPlatform?: string | undefined;
+                createdOnPlatform?: string | string[] | undefined;
                 organizationId?: string | null | undefined;
                 includeSubSessions?: boolean | undefined;
             };

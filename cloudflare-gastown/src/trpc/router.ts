@@ -114,16 +114,7 @@ type RigOwnerStub = {
   deleteTown(townId: string): Promise<boolean>;
 };
 
-/**
- * Core ownership resolution shared by resolveRigOwnerStub and verifyTownOwnership.
- * Returns the owning DO stub and, for personal towns, the town record.
- */
-async function resolveTownOwnership(
-  env: Env,
-  userId: string,
-  townId: string,
-  memberships: JwtOrgMembership[]
-): Promise<
+type TownOwnershipResult =
   | {
       type: 'user';
       stub: RigOwnerStub;
@@ -136,12 +127,30 @@ async function resolveTownOwnership(
       };
     }
   | { type: 'org'; stub: RigOwnerStub; orgId: string }
-> {
+  | { type: 'admin' };
+
+/**
+ * Core ownership resolution shared by resolveRigOwnerStub and verifyTownOwnership.
+ * Returns the owning DO stub and, for personal towns, the town record.
+ *
+ * Admins bypass ownership checks entirely — they can access any town for
+ * support/debugging purposes. The caller is responsible for restricting
+ * destructive mutations (delete, billing config) when the result type is 'admin'.
+ */
+async function resolveTownOwnership(
+  env: Env,
+  ctx: TRPCContext,
+  townId: string
+): Promise<TownOwnershipResult> {
+  const { userId, isAdmin, orgMemberships: memberships } = ctx;
+
   // Fast path: personal town lookup
   const userStub = getGastownUserStub(env, userId);
   const personalTown = await userStub.getTownAsync(townId);
   if (personalTown) {
     if (personalTown.owner_user_id !== userId) {
+      // Admin bypass: allow access without ownership
+      if (isAdmin) return { type: 'admin' };
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your town' });
     }
     return { type: 'user', stub: userStub, town: personalTown };
@@ -153,12 +162,15 @@ async function resolveTownOwnership(
   try {
     config = await townStub.getTownConfig();
   } catch {
+    if (isAdmin) return { type: 'admin' };
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
   }
 
   if (config.owner_type === 'org' && config.organization_id) {
     const membership = getOrgMembership(memberships, config.organization_id);
     if (!membership || membership.role === 'billing_manager') {
+      // Admin bypass: allow access without org membership
+      if (isAdmin) return { type: 'admin' };
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Not an org member' });
     }
     return {
@@ -168,17 +180,31 @@ async function resolveTownOwnership(
     };
   }
 
+  // No owner found — admins can still access the town for debugging
+  if (isAdmin) return { type: 'admin' };
   throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
 }
 
 /** Resolve the DO stub that owns rigs/towns. Verifies access via JWT claims. */
 async function resolveRigOwnerStub(
   env: Env,
-  userId: string,
-  townId: string,
-  memberships: JwtOrgMembership[]
+  ctx: TRPCContext,
+  townId: string
 ): Promise<RigOwnerStub> {
-  const result = await resolveTownOwnership(env, userId, townId, memberships);
+  const result = await resolveTownOwnership(env, ctx, townId);
+  if (result.type === 'admin') {
+    // Admin doesn't own the town — resolve the real owner from TownDO config
+    // so we can still read rigs/towns from the correct DO.
+    const townStub = getTownDOStub(env, townId);
+    const config = await townStub.getTownConfig();
+    if (config.owner_type === 'org' && config.organization_id) {
+      return getGastownOrgStub(env, config.organization_id);
+    }
+    if (config.owner_user_id) {
+      return getGastownUserStub(env, config.owner_user_id);
+    }
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Town owner not found' });
+  }
   return result.stub;
 }
 
@@ -186,14 +212,35 @@ async function resolveRigOwnerStub(
  * Verify that a user has access to a town and return a record matching
  * RpcTownOutput (used by the getTown procedure).
  */
-async function verifyTownOwnership(
-  env: Env,
-  userId: string,
-  townId: string,
-  memberships: JwtOrgMembership[]
-) {
-  const result = await resolveTownOwnership(env, userId, townId, memberships);
+async function verifyTownOwnership(env: Env, ctx: TRPCContext, townId: string) {
+  const result = await resolveTownOwnership(env, ctx, townId);
   if (result.type === 'user') return result.town;
+
+  if (result.type === 'admin') {
+    // Admin bypass: resolve town metadata from TownDO config and the owner's DO
+    const townStub = getTownDOStub(env, townId);
+    const config = await townStub.getTownConfig();
+
+    // Try to look up the town name from the owner's DO
+    let name = townId;
+    if (config.owner_type === 'org' && config.organization_id) {
+      const orgStub = getGastownOrgStub(env, config.organization_id);
+      const orgTown = await orgStub.getTownAsync(townId);
+      if (orgTown) name = orgTown.name;
+    } else if (config.owner_user_id) {
+      const userStub = getGastownUserStub(env, config.owner_user_id);
+      const userTown = await userStub.getTownAsync(townId);
+      if (userTown) name = userTown.name;
+    }
+
+    return {
+      id: townId,
+      name,
+      owner_user_id: config.owner_user_id ?? ctx.userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
 
   // Fetch the org town record for name/timestamps
   const orgStub = getGastownOrgStub(env, result.orgId);
@@ -201,7 +248,7 @@ async function verifyTownOwnership(
   return {
     id: townId,
     name: orgTown?.name ?? townId,
-    owner_user_id: orgTown?.created_by_user_id ?? userId,
+    owner_user_id: orgTown?.created_by_user_id ?? ctx.userId,
     created_at: orgTown?.created_at ?? new Date().toISOString(),
     updated_at: orgTown?.updated_at ?? new Date().toISOString(),
   };
@@ -210,13 +257,11 @@ async function verifyTownOwnership(
 /**
  * Verify that a user has access to a rig — either through their personal DO
  * or through an org that owns the rig's town (checked via JWT claims).
+ * Admins can access any rig by resolving the owner from TownDO config.
  */
-async function verifyRigOwnership(
-  env: Env,
-  userId: string,
-  rigId: string,
-  memberships: JwtOrgMembership[]
-) {
+async function verifyRigOwnership(env: Env, ctx: TRPCContext, rigId: string) {
+  const { userId, isAdmin, orgMemberships: memberships } = ctx;
+
   // Fast path: personal rig lookup
   const userStub = getGastownUserStub(env, userId);
   const personalRig = await userStub.getRigAsync(rigId);
@@ -230,6 +275,20 @@ async function verifyRigOwnership(
     );
     const orgRig = results.find(r => r !== null);
     if (orgRig) return orgRig;
+  }
+
+  // Admin bypass: try to find the rig by scanning all org stubs is impractical.
+  // Instead, for admin access we rely on the townId being passed alongside
+  // the rigId in procedures that need it. For procedures that only pass rigId,
+  // admins can use the admin-specific endpoints instead.
+  if (isAdmin) {
+    // This is a fallback — admin procedures that need rig access should
+    // prefer using town-scoped admin endpoints. Throw NOT_FOUND if we
+    // genuinely can't locate the rig.
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Rig not found (admin: use town-scoped admin endpoints for cross-user rig access)',
+    });
   }
 
   throw new TRPCError({ code: 'NOT_FOUND', message: 'Rig not found' });
@@ -288,23 +347,61 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcTownOutput)
     .query(async ({ ctx, input }) => {
-      return verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      return verifyTownOwnership(ctx.env, ctx, input.townId);
+    }),
+
+  /**
+   * Check whether the current user is an admin viewing a town they don't own.
+   * Used by the frontend to show an admin banner.
+   */
+  checkAdminAccess: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .output(
+      z.object({
+        isAdminViewing: z.boolean(),
+        ownerUserId: z.string().nullable(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      if (!ctx.isAdmin) return { isAdminViewing: false, ownerUserId: null };
+      const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
+      if (ownership.type === 'admin') {
+        // Admin is viewing a town they don't own — resolve the real owner
+        const townStub = getTownDOStub(ctx.env, input.townId);
+        const config = await townStub.getTownConfig();
+        return {
+          isAdminViewing: true,
+          ownerUserId: config.owner_user_id ?? null,
+        };
+      }
+      return { isAdminViewing: false, ownerUserId: null };
     }),
 
   deleteTown: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const ownership = await resolveTownOwnership(
-        ctx.env,
-        ctx.userId,
-        input.townId,
-        ctx.orgMemberships
-      );
+      // Admins cannot delete towns — they should use admin intervention endpoints
+      if (ctx.isAdmin) {
+        const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
+        if (ownership.type === 'admin') {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Admins cannot delete towns they do not own',
+          });
+        }
+      }
+      const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
       if (ownership.type === 'org') {
         const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
         if (!membership || membership.role !== 'owner') {
           throw new TRPCError({ code: 'FORBIDDEN', message: 'Only org owners can delete towns' });
         }
+      }
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot delete towns they do not own',
+        });
       }
       const ownerStub = ownership.stub;
 
@@ -333,12 +430,13 @@ export const gastownRouter = router({
     .output(RpcRigOutput)
     .mutation(async ({ ctx, input }) => {
       const user = userFromCtx(ctx);
-      const ownership = await resolveTownOwnership(
-        ctx.env,
-        user.id,
-        input.townId,
-        ctx.orgMemberships
-      );
+      const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot create rigs on towns they do not own',
+        });
+      }
       const ownerStub = ownership.stub;
 
       const townStub = getTownDOStub(ctx.env, input.townId);
@@ -416,12 +514,7 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(z.array(RpcRigOutput))
     .query(async ({ ctx, input }) => {
-      const ownerStub = await resolveRigOwnerStub(
-        ctx.env,
-        ctx.userId,
-        input.townId,
-        ctx.orgMemberships
-      );
+      const ownerStub = await resolveRigOwnerStub(ctx.env, ctx, input.townId);
       return ownerStub.listRigs(input.townId);
     }),
 
@@ -429,7 +522,7 @@ export const gastownRouter = router({
     .input(z.object({ rigId: z.string().uuid() }))
     .output(RpcRigDetailOutput)
     .query(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       // Sequential to avoid "excessively deep" type inference with Rpc.Promisified DO stubs.
       const agentList = await townStub.listAgents({ rig_id: rig.id });
@@ -440,13 +533,14 @@ export const gastownRouter = router({
   deleteRig: gastownProcedure
     .input(z.object({ rigId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
-      const ownership = await resolveTownOwnership(
-        ctx.env,
-        ctx.userId,
-        rig.town_id,
-        ctx.orgMemberships
-      );
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
+      const ownership = await resolveTownOwnership(ctx.env, ctx, rig.town_id);
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot delete rigs on towns they do not own',
+        });
+      }
       if (ownership.type === 'org') {
         const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
         if (!membership || membership.role !== 'owner') {
@@ -473,7 +567,7 @@ export const gastownRouter = router({
     )
     .output(z.array(RpcBeadOutput))
     .query(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       return townStub.listBeads({ rig_id: rig.id, status: input.status });
     }),
@@ -481,7 +575,7 @@ export const gastownRouter = router({
   deleteBead: gastownProcedure
     .input(z.object({ rigId: z.string().uuid(), beadId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       await townStub.deleteBead(input.beadId);
     }),
@@ -516,7 +610,7 @@ export const gastownRouter = router({
     )
     .output(RpcBeadOutput)
     .mutation(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
 
       // Verify the bead belongs to this rig
@@ -538,7 +632,7 @@ export const gastownRouter = router({
     .input(z.object({ rigId: z.string().uuid() }))
     .output(z.array(RpcAgentOutput))
     .query(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       return townStub.listAgents({ rig_id: rig.id });
     }),
@@ -546,7 +640,7 @@ export const gastownRouter = router({
   deleteAgent: gastownProcedure
     .input(z.object({ rigId: z.string().uuid(), agentId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       await townStub.deleteAgent(input.agentId);
     }),
@@ -565,7 +659,7 @@ export const gastownRouter = router({
     .output(RpcSlingResultOutput)
     .mutation(async ({ ctx, input }) => {
       const user = userFromCtx(ctx);
-      const rig = await verifyRigOwnership(ctx.env, user.id, input.rigId, ctx.orgMemberships);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
 
       // Best-effort: refresh git credentials using the town owner's identity
       const townConfig = await getTownDOStub(ctx.env, rig.town_id).getTownConfig();
@@ -605,7 +699,7 @@ export const gastownRouter = router({
     )
     .output(RpcMayorSendResultOutput)
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
 
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.sendMayorMessage(input.message, input.model, input.uiContext);
@@ -615,7 +709,7 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcMayorStatusOutput)
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.getMayorStatus();
     }),
@@ -624,7 +718,7 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcAlarmStatusOutput)
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.getAlarmStatus();
     }),
@@ -633,12 +727,7 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcMayorSendResultOutput)
     .mutation(async ({ ctx, input }) => {
-      const ownerStub = await resolveRigOwnerStub(
-        ctx.env,
-        ctx.userId,
-        input.townId,
-        ctx.orgMemberships
-      );
+      const ownerStub = await resolveRigOwnerStub(ctx.env, ctx, input.townId);
 
       // Best-effort: refresh git credentials using the town owner's identity
       const townConfig = await getTownDOStub(ctx.env, input.townId).getTownConfig();
@@ -671,7 +760,7 @@ export const gastownRouter = router({
     .input(z.object({ agentId: z.string().uuid(), townId: z.string().uuid() }))
     .output(RpcStreamTicketOutput)
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
 
       // Proxy to container control server to get a stream ticket
       const containerStub = getTownContainerStub(ctx.env, input.townId);
@@ -701,7 +790,7 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid(), agentId: z.string().uuid() }))
     .output(RpcPtySessionOutput)
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
 
       // Proxy to container control server to create a PTY session
       const containerStub = getTownContainerStub(ctx.env, input.townId);
@@ -737,7 +826,7 @@ export const gastownRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
 
       const containerStub = getTownContainerStub(ctx.env, input.townId);
       const response = await containerStub.fetch(
@@ -762,14 +851,27 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcTownConfigSchema)
     .query(async ({ ctx, input }) => {
-      const ownership = await resolveTownOwnership(
-        ctx.env,
-        ctx.userId,
-        input.townId,
-        ctx.orgMemberships
-      );
+      const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       const config = await townStub.getTownConfig();
+
+      // Admins see masked secrets (read-only access, no secret exposure)
+      if (ownership.type === 'admin') {
+        const mask = (s?: string) => (s ? '****' + s.slice(-4) : undefined);
+        return {
+          ...config,
+          kilocode_token: mask(config.kilocode_token),
+          github_cli_pat: mask(config.github_cli_pat),
+          git_auth: {
+            ...config.git_auth,
+            github_token: mask(config.git_auth?.github_token),
+            gitlab_token: mask(config.git_auth?.gitlab_token),
+          },
+          env_vars: Object.fromEntries(
+            Object.entries(config.env_vars).map(([k, v]) => [k, '****' + v.slice(-4)])
+          ),
+        };
+      }
 
       // Mask secrets for non-owner, non-creator org members
       if (ownership.type === 'org') {
@@ -806,12 +908,15 @@ export const gastownRouter = router({
     )
     .output(RpcTownConfigSchema)
     .mutation(async ({ ctx, input }) => {
-      const ownership = await resolveTownOwnership(
-        ctx.env,
-        ctx.userId,
-        input.townId,
-        ctx.orgMemberships
-      );
+      const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
+
+      // Admins cannot modify town config via this endpoint (read-only access)
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot modify town configuration for towns they do not own',
+        });
+      }
 
       // Strip ownership fields — only the system (createTown flows) should set these
       const {
@@ -854,7 +959,7 @@ export const gastownRouter = router({
   refreshContainerToken: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.forceRefreshContainerToken();
     }),
@@ -872,7 +977,7 @@ export const gastownRouter = router({
     )
     .output(z.array(RpcBeadEventOutput))
     .query(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx.userId, input.rigId, ctx.orgMemberships);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       return townStub.listBeadEvents({
         beadId: input.beadId,
@@ -891,7 +996,7 @@ export const gastownRouter = router({
     )
     .output(z.array(RpcBeadEventOutput))
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.listBeadEvents({
         since: input.since,
@@ -910,7 +1015,7 @@ export const gastownRouter = router({
     )
     .output(RpcMergeQueueDataOutput)
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.getMergeQueueData({
         rigId: input.rigId,
@@ -927,7 +1032,7 @@ export const gastownRouter = router({
     )
     .output(z.array(RpcConvoyDetailOutput))
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.listConvoysDetailed();
     }),
@@ -941,7 +1046,7 @@ export const gastownRouter = router({
     )
     .output(RpcConvoyDetailOutput.nullable())
     .query(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.getConvoyStatus(input.convoyId);
     }),
@@ -955,7 +1060,7 @@ export const gastownRouter = router({
     )
     .output(RpcConvoyDetailOutput.nullable())
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       const convoy = await townStub.closeConvoy(input.convoyId);
       if (!convoy) return null;
@@ -972,7 +1077,7 @@ export const gastownRouter = router({
     )
     .output(RpcConvoyDetailOutput.nullable())
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.startConvoy(input.convoyId);
       const status = await townStub.getConvoyStatus(input.convoyId);

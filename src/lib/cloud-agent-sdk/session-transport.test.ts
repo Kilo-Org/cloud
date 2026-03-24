@@ -360,3 +360,41 @@ describe('session capabilities', () => {
     session.destroy();
   });
 });
+
+describe('disconnect during resolution', () => {
+  it('disconnect() before resolveSession settles prevents transport from attaching', async () => {
+    let resolveSession!: (value: {
+      kiloSessionId: typeof kiloSessionId;
+      cloudAgentSessionId: typeof cloudAgentSessionId;
+      isLive: boolean;
+    }) => void;
+    const resolvePromise = new Promise<{
+      kiloSessionId: typeof kiloSessionId;
+      cloudAgentSessionId: typeof cloudAgentSessionId;
+      isLive: boolean;
+    }>(r => {
+      resolveSession = r;
+    });
+
+    const session = createCloudAgentSession({
+      kiloSessionId,
+      resolveSession: () => resolvePromise,
+      transport: { getTicket: () => 'ticket' },
+      websocketBaseUrl: 'ws://localhost:9999',
+    });
+
+    session.connect();
+    // disconnect while resolveSession is still pending
+    session.disconnect();
+
+    // Now let the resolution complete
+    resolveSession({ kiloSessionId, cloudAgentSessionId, isLive: true });
+    await resolvePromise;
+    // Flush microtasks so resolveAndConnect can run its post-resolve code
+    await new Promise(r => setTimeout(r, 0));
+
+    // No WebSocket should have been created — the stale generation bailed out
+    expect(jest.mocked(global.WebSocket).mock.calls.length).toBe(0);
+    session.destroy();
+  });
+});

@@ -362,12 +362,14 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       void resolveAndConnect(connectGeneration);
     },
     disconnect() {
+      connectGeneration += 1;
       if (transport) {
         transport.disconnect();
         transport = null;
       }
     },
     destroy() {
+      connectGeneration += 1;
       if (transport) {
         transport.destroy();
         transport = null;

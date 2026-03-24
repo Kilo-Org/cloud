@@ -743,6 +743,41 @@ export async function sendMessage(agentId: string, prompt: string): Promise<void
  * @param model OpenRouter-style model ID (e.g. "anthropic/claude-sonnet-4.6")
  * @param smallModel Optional small model in the same format
  */
+/**
+ * Extract the organizationId from the current KILO_CONFIG_CONTENT env var.
+ * The org ID is embedded as `provider.kilo.options.kilocodeOrganizationId`
+ * by `buildKiloConfigContent` at agent startup.
+ */
+function extractOrganizationId(): string | undefined {
+  const raw = process.env.KILO_CONFIG_CONTENT;
+  if (!raw) return undefined;
+  try {
+    const config = JSON.parse(raw) as Record<string, unknown>;
+    const provider = config.provider as Record<string, unknown> | undefined;
+    const kilo = provider?.kilo as Record<string, unknown> | undefined;
+    const options = kilo?.options as Record<string, unknown> | undefined;
+    const orgId = options?.kilocodeOrganizationId;
+    return typeof orgId === 'string' ? orgId : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const MAYOR_STARTUP_PROMPT = 'Mayor ready. Waiting for instructions.';
+
+/**
+ * Update the model for a running agent by restarting its SDK server with
+ * new KILO_CONFIG_CONTENT. The kilo serve child process reads the model
+ * from KILO_CONFIG_CONTENT at startup (highest config precedence after
+ * enterprise managed config), so the only reliable way to change it is
+ * to restart the server process.
+ *
+ * The agent's session is re-created on the new server and given the
+ * startup prompt so the mayor is ready for instructions.
+ *
+ * @param model OpenRouter-style model ID (e.g. "anthropic/claude-sonnet-4.6")
+ * @param smallModel Optional small model in the same format
+ */
 export async function updateAgentModel(
   agentId: string,
   model: string,
@@ -763,15 +798,18 @@ export async function updateAgentModel(
     `${MANAGER_LOG} updateAgentModel: restarting SDK server for agent ${agentId} with model=${model}`
   );
 
-  // 1. Abort the event subscription so it doesn't interfere with shutdown
+  // 1. Preserve organizationId from the current config before we replace it
+  const organizationId = extractOrganizationId();
+
+  // 2. Abort the event subscription so it doesn't interfere with shutdown
   const controller = eventAbortControllers.get(agentId);
   if (controller) controller.abort();
 
-  // 2. Close the old SDK server (kills the kilo serve child process)
+  // 3. Close the old SDK server (kills the kilo serve child process)
   oldInstance.server.close();
   sdkInstances.delete(agent.workdir);
 
-  // 3. Rebuild KILO_CONFIG_CONTENT with the new model and update process.env
+  // 4. Rebuild KILO_CONFIG_CONTENT with the new model and update process.env
   //    so the next createKilo() spawns kilo serve with fresh config.
   const kilocodeToken = process.env.KILOCODE_TOKEN;
   if (kilocodeToken) {
@@ -779,20 +817,22 @@ export async function updateAgentModel(
       kilocodeToken,
       model,
       smallModel ?? 'anthropic/claude-haiku-4.5',
-      process.env.GASTOWN_ORGANIZATION_ID
+      organizationId
     );
     process.env.KILO_CONFIG_CONTENT = configJson;
     process.env.OPENCODE_CONFIG_CONTENT = configJson;
   }
 
-  // 4. Update the agent's model field for per-message overrides
+  // 5. Update the agent's model field for per-message overrides
   agent.model = model;
 
-  // 5. Create a new SDK server (spawns a fresh kilo serve with updated env)
+  // 6. Create a new SDK server (spawns a fresh kilo serve with updated env)
   const { client, port } = await ensureSDKServer(agent.workdir, {});
   agent.serverPort = port;
 
-  // 6. Create a new session on the fresh server
+  // 7. Create a new session and send the startup prompt
+  //    The system prompt lives in AGENTS.md (on disk), so kilo serve picks
+  //    it up automatically for every session.
   const sessionResult = await client.session.create({ body: {} });
   const rawSession: unknown = sessionResult.data ?? sessionResult;
   const parsed = SessionResponse.safeParse(rawSession);
@@ -807,13 +847,25 @@ export async function updateAgentModel(
     newInstance.sessionCount++;
   }
 
-  // 7. Re-subscribe to events on the new session
+  // Send the startup prompt so the mayor is ready for instructions.
+  // This mirrors the initial dispatch in ensureMayor().
+  const modelParam = { providerID: 'kilo', modelID: model };
+  await client.session.prompt({
+    path: { id: agent.sessionId },
+    body: {
+      parts: [{ type: 'text', text: MAYOR_STARTUP_PROMPT }],
+      model: modelParam,
+    },
+  });
+  agent.messageCount = 1;
+
+  // 8. Re-subscribe to events on the new session
   void subscribeToEvents(client, agent, {
     agentId: agent.agentId,
     role: agent.role,
     name: agent.name,
     model,
-    prompt: '',
+    prompt: MAYOR_STARTUP_PROMPT,
     rigId: agent.rigId,
     townId: agent.townId,
     identity: '',

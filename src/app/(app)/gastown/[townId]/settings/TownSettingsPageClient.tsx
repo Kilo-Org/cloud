@@ -119,13 +119,27 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
 
   const effectiveReadOnly = readOnly && currentUser?.id !== configQuery.data?.created_by_user_id;
 
+  // Track the server-side model so we can detect changes on save
+  const savedModelRef = useRef<string>('');
+
   const updateConfig = useMutation(
     trpc.gastown.updateTownConfig.mutationOptions({
       onSuccess: () => {
         void queryClient.invalidateQueries({
           queryKey: trpc.gastown.getTownConfig.queryKey({ townId }),
         });
-        toast.success('Configuration saved');
+
+        const modelChanged = defaultModel !== savedModelRef.current;
+        savedModelRef.current = defaultModel;
+
+        if (modelChanged) {
+          toast.success('Configuration saved — reloading for model change…');
+          // Reload after a brief delay so the server-side model update
+          // (SDK server restart + new session) has time to complete.
+          setTimeout(() => window.location.reload(), 2000);
+        } else {
+          toast.success('Configuration saved');
+        }
       },
       onError: err => toast.error(err.message),
     })
@@ -164,6 +178,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
     setGitlabToken(cfg.git_auth?.gitlab_token ?? '');
     setGitlabInstanceUrl(cfg.git_auth?.gitlab_instance_url ?? '');
     setDefaultModel(cfg.default_model ?? '');
+    savedModelRef.current = cfg.default_model ?? '';
     setMaxPolecats(cfg.max_polecats_per_rig);
     setRefineryGates(cfg.refinery?.gates ?? []);
     setAutoMerge(cfg.refinery?.auto_merge ?? true);

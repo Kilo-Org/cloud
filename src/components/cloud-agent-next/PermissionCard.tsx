@@ -15,7 +15,10 @@ type PermissionContextValue = {
   cloudAgentSessionId: string | null;
   organizationId: string | null;
   /** When set, PermissionCard routes through the session manager instead of tRPC. */
-  respondToPermission?: (requestId: string, response: 'once' | 'always' | 'reject') => Promise<void>;
+  respondToPermission?: (
+    requestId: string,
+    response: 'once' | 'always' | 'reject'
+  ) => Promise<void>;
 };
 
 const PermissionContext = createContext<PermissionContextValue>({
@@ -69,7 +72,11 @@ export function PermissionCard({
   const [error, setError] = useState<string | null>(null);
 
   const trpcClient = useRawTRPCClient();
-  const { cloudAgentSessionId: sessionId, organizationId, respondToPermission } = usePermissionContext();
+  const {
+    cloudAgentSessionId: sessionId,
+    organizationId,
+    respondToPermission,
+  } = usePermissionContext();
 
   const respond = useCallback(
     async (response: PermissionResponse) => {

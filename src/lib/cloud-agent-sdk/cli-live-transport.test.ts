@@ -400,7 +400,12 @@ describe('CliLiveTransport system events', () => {
       data: {
         connectionId: 'owner-conn',
         sessions: [
-          { id: KILO_SESSION_ID, status: 'active', title: 'My Session', connectionId: 'owner-conn' },
+          {
+            id: KILO_SESSION_ID,
+            status: 'active',
+            title: 'My Session',
+            connectionId: 'owner-conn',
+          },
         ],
       },
     });
@@ -433,7 +438,12 @@ describe('CliLiveTransport system events', () => {
       data: {
         connectionId: 'owner-conn',
         sessions: [
-          { id: KILO_SESSION_ID, status: 'active', title: 'My Session', connectionId: 'owner-conn' },
+          {
+            id: KILO_SESSION_ID,
+            status: 'active',
+            title: 'My Session',
+            connectionId: 'owner-conn',
+          },
         ],
       },
     });

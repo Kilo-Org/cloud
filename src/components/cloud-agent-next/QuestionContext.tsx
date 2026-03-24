@@ -34,7 +34,13 @@ export function QuestionContextProvider({
   children,
 }: QuestionContextProviderProps) {
   const value = useMemo(
-    () => ({ questionRequestIds, cloudAgentSessionId, organizationId, answerQuestion, rejectQuestion }),
+    () => ({
+      questionRequestIds,
+      cloudAgentSessionId,
+      organizationId,
+      answerQuestion,
+      rejectQuestion,
+    }),
     [questionRequestIds, cloudAgentSessionId, organizationId, answerQuestion, rejectQuestion]
   );
   return <QuestionContext.Provider value={value}>{children}</QuestionContext.Provider>;

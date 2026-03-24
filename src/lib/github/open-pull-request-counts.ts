@@ -25,6 +25,7 @@ type ExternalOpenPullRequest = {
   commentCount: number;
   teamCommented: boolean;
   reviewStatus: PullRequestReviewStatus;
+  repository: RepositoryKey;
 };
 
 type OpenPullRequestsSummary = OpenPullRequestCounts & {
@@ -39,6 +40,7 @@ type ExternalMergedPullRequest = {
   url: string;
   authorLogin: string;
   mergedAt: string;
+  repository: RepositoryKey;
 };
 
 export type { ExternalMergedPullRequest };
@@ -54,6 +56,7 @@ type ExternalClosedPullRequest = {
   mergedAt: string | null;
   status: ExternalClosedPullRequestStatus;
   displayDate: string;
+  repository: RepositoryKey;
 };
 
 export type { ExternalClosedPullRequest, ExternalClosedPullRequestStatus };
@@ -311,8 +314,14 @@ const CLOSED_PULL_REQUEST_ITEM_SCHEMA = z.object({
 const CLOSED_PULL_REQUESTS_RESPONSE_SCHEMA = z.array(CLOSED_PULL_REQUEST_ITEM_SCHEMA);
 
 const ORG = 'Kilo-Org';
-const REPO_OWNER = 'Kilo-Org';
-const REPO_NAME = 'kilocode';
+
+// Repository configurations
+export const REPOSITORIES = {
+  kilocode: { owner: 'Kilo-Org', name: 'kilocode' },
+  cloud: { owner: 'Kilo-Org', name: 'cloud' },
+} as const;
+
+export type RepositoryKey = keyof typeof REPOSITORIES;
 
 const countsCacheByIncludeDrafts = new Map<boolean, CacheEntry<OpenPullRequestCounts>>();
 const countsInFlightByIncludeDrafts = new Map<boolean, Promise<OpenPullRequestCounts>>();
@@ -363,13 +372,15 @@ async function githubRequest(url: string, init?: RequestInit): Promise<Response>
 }
 
 async function listOpenPullRequestAuthors(options: {
+  repository: RepositoryKey;
   includeDrafts: boolean;
 }): Promise<GithubUserLite[]> {
   const perPage = 100;
   const authors: GithubUserLite[] = [];
+  const repo = REPOSITORIES[options.repository];
 
   for (let page = 1; ; page += 1) {
-    const url = new URL(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls`);
+    const url = new URL(`https://api.github.com/repos/${repo.owner}/${repo.name}/pulls`);
     url.searchParams.set('state', 'open');
     url.searchParams.set('per_page', String(perPage));
     url.searchParams.set('page', String(page));
@@ -404,13 +415,15 @@ export function parseGithubListPullRequestsSummaryResponse(
 }
 
 async function listOpenPullRequests(options: {
+  repository: RepositoryKey;
   includeDrafts: boolean;
 }): Promise<OpenPullRequestApiSummary[]> {
   const perPage = 100;
   const prs: OpenPullRequestApiSummary[] = [];
+  const repo = REPOSITORIES[options.repository];
 
   for (let page = 1; ; page += 1) {
-    const url = new URL(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls`);
+    const url = new URL(`https://api.github.com/repos/${repo.owner}/${repo.name}/pulls`);
     url.searchParams.set('state', 'open');
     url.searchParams.set('per_page', String(perPage));
     url.searchParams.set('page', String(page));
@@ -501,12 +514,14 @@ async function anyOrgMemberInLogins(org: string, logins: readonly string[]): Pro
 }
 
 async function listIssueCommentAuthorLoginsForPullRequest(options: {
+  repository: RepositoryKey;
   prNumber: number;
   page: number;
   perPage: number;
 }): Promise<string[]> {
+  const repo = REPOSITORIES[options.repository];
   const url = new URL(
-    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${options.prNumber}/comments`
+    `https://api.github.com/repos/${repo.owner}/${repo.name}/issues/${options.prNumber}/comments`
   );
   url.searchParams.set('per_page', String(options.perPage));
   url.searchParams.set('page', String(options.page));
@@ -529,12 +544,14 @@ async function listIssueCommentAuthorLoginsForPullRequest(options: {
 }
 
 async function listReviewCommentAuthorLoginsForPullRequest(options: {
+  repository: RepositoryKey;
   prNumber: number;
   page: number;
   perPage: number;
 }): Promise<string[]> {
+  const repo = REPOSITORIES[options.repository];
   const url = new URL(
-    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${options.prNumber}/comments`
+    `https://api.github.com/repos/${repo.owner}/${repo.name}/pulls/${options.prNumber}/comments`
   );
   url.searchParams.set('per_page', String(options.perPage));
   url.searchParams.set('page', String(options.page));
@@ -557,12 +574,14 @@ async function listReviewCommentAuthorLoginsForPullRequest(options: {
 }
 
 async function listPullRequestReviewApproverLoginsForPullRequest(options: {
+  repository: RepositoryKey;
   prNumber: number;
   page: number;
   perPage: number;
 }): Promise<{ reviews: Array<{ state: string; userLogin: string }>; totalReviews: number }> {
+  const repo = REPOSITORIES[options.repository];
   const url = new URL(
-    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${options.prNumber}/reviews`
+    `https://api.github.com/repos/${repo.owner}/${repo.name}/pulls/${options.prNumber}/reviews`
   );
   url.searchParams.set('per_page', String(options.perPage));
   url.searchParams.set('page', String(options.page));
@@ -597,6 +616,7 @@ async function listPullRequestReviewApproverLoginsForPullRequest(options: {
 
 async function hasOrgMemberReviewedPullRequest(options: {
   org: string;
+  repository: RepositoryKey;
   prNumber: number;
   maxPullRequestReviewPages: number;
 }): Promise<boolean> {
@@ -606,6 +626,7 @@ async function hasOrgMemberReviewedPullRequest(options: {
 
   for (let page = 1; page <= options.maxPullRequestReviewPages; page += 1) {
     const { reviews, totalReviews } = await listPullRequestReviewApproverLoginsForPullRequest({
+      repository: options.repository,
       prNumber: options.prNumber,
       page,
       perPage,
@@ -628,6 +649,7 @@ async function hasOrgMemberReviewedPullRequest(options: {
 
 async function getPullRequestReviewStatus(options: {
   org: string;
+  repository: RepositoryKey;
   prNumber: number;
   maxPullRequestReviewPages: number;
 }): Promise<PullRequestReviewStatus> {
@@ -637,6 +659,7 @@ async function getPullRequestReviewStatus(options: {
 
   for (let page = 1; page <= options.maxPullRequestReviewPages; page += 1) {
     const { reviews, totalReviews } = await listPullRequestReviewApproverLoginsForPullRequest({
+      repository: options.repository,
       prNumber: options.prNumber,
       page,
       perPage,
@@ -678,6 +701,7 @@ async function getPullRequestReviewStatus(options: {
 
 async function hasOrgMemberCommentedOnPullRequest(options: {
   org: string;
+  repository: RepositoryKey;
   prNumber: number;
   ttlMs: number;
   maxIssueCommentPages: number;
@@ -696,6 +720,7 @@ async function hasOrgMemberCommentedOnPullRequest(options: {
 
   for (let page = 1; page <= options.maxIssueCommentPages; page += 1) {
     const logins = await listIssueCommentAuthorLoginsForPullRequest({
+      repository: options.repository,
       prNumber: options.prNumber,
       page,
       perPage,
@@ -703,6 +728,7 @@ async function hasOrgMemberCommentedOnPullRequest(options: {
     if (await anyOrgMemberInLogins(options.org, logins)) {
       const reviewStatus = await getPullRequestReviewStatus({
         org: options.org,
+        repository: options.repository,
         prNumber: options.prNumber,
         maxPullRequestReviewPages: options.maxPullRequestReviewPages,
       });
@@ -715,12 +741,14 @@ async function hasOrgMemberCommentedOnPullRequest(options: {
 
   const reviewStatus = await getPullRequestReviewStatus({
     org: options.org,
+    repository: options.repository,
     prNumber: options.prNumber,
     maxPullRequestReviewPages: options.maxPullRequestReviewPages,
   });
 
   const teamReviewed = await hasOrgMemberReviewedPullRequest({
     org: options.org,
+    repository: options.repository,
     prNumber: options.prNumber,
     maxPullRequestReviewPages: options.maxPullRequestReviewPages,
   });
@@ -733,6 +761,7 @@ async function hasOrgMemberCommentedOnPullRequest(options: {
 
   for (let page = 1; page <= options.maxReviewCommentPages; page += 1) {
     const logins = await listReviewCommentAuthorLoginsForPullRequest({
+      repository: options.repository,
       prNumber: options.prNumber,
       page,
       perPage,
@@ -748,6 +777,52 @@ async function hasOrgMemberCommentedOnPullRequest(options: {
   const value: PullRequestTeamInteraction = { teamCommented: false, reviewStatus };
   teamCommentedCache.set(options.prNumber, { value, expiresAtMs: now + options.ttlMs });
   return value;
+}
+
+async function getRepoOpenPullRequestCounts(
+  repository: RepositoryKey,
+  options?: {
+    ttlMs?: number;
+    includeDrafts?: boolean;
+  }
+): Promise<OpenPullRequestCounts> {
+  const includeDrafts = options?.includeDrafts ?? false;
+
+  const authorsByPr = await listOpenPullRequestAuthors({ repository, includeDrafts });
+
+  const uniqueNonBotAuthorsByLowerLogin = new Map<string, string>();
+  for (const author of authorsByPr) {
+    if (isBotGithubUser(author)) continue;
+    const lower = author.login.toLowerCase();
+    if (!uniqueNonBotAuthorsByLowerLogin.has(lower)) {
+      uniqueNonBotAuthorsByLowerLogin.set(lower, author.login);
+    }
+  }
+
+  const isMemberByLogin = new Map<string, boolean>();
+  for (const [lowerLogin, originalLogin] of uniqueNonBotAuthorsByLowerLogin.entries()) {
+    isMemberByLogin.set(lowerLogin, await isOrgMember(ORG, originalLogin));
+  }
+
+  let teamOpenPullRequests = 0;
+  let externalOpenPullRequests = 0;
+
+  for (const author of authorsByPr) {
+    if (isBotGithubUser(author)) {
+      teamOpenPullRequests += 1;
+      continue;
+    }
+    const isMember = isMemberByLogin.get(author.login.toLowerCase()) ?? false;
+    if (isMember) teamOpenPullRequests += 1;
+    else externalOpenPullRequests += 1;
+  }
+
+  return {
+    totalOpenPullRequests: authorsByPr.length,
+    teamOpenPullRequests,
+    externalOpenPullRequests,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 export async function getKilocodeRepoOpenPullRequestCounts(options?: {
@@ -771,56 +846,175 @@ export async function getKilocodeRepoOpenPullRequestCounts(options?: {
     return inFlight;
   }
 
-  const promise = (async () => {
-    const authorsByPr = await listOpenPullRequestAuthors({ includeDrafts });
-
-    const uniqueNonBotAuthorsByLowerLogin = new Map<string, string>();
-    for (const author of authorsByPr) {
-      if (isBotGithubUser(author)) continue;
-      const lower = author.login.toLowerCase();
-      if (!uniqueNonBotAuthorsByLowerLogin.has(lower)) {
-        uniqueNonBotAuthorsByLowerLogin.set(lower, author.login);
-      }
-    }
-
-    const isMemberByLogin = new Map<string, boolean>();
-    for (const [lowerLogin, originalLogin] of uniqueNonBotAuthorsByLowerLogin.entries()) {
-      isMemberByLogin.set(lowerLogin, await isOrgMember(ORG, originalLogin));
-    }
-
-    let teamOpenPullRequests = 0;
-    let externalOpenPullRequests = 0;
-
-    for (const author of authorsByPr) {
-      if (isBotGithubUser(author)) {
-        teamOpenPullRequests += 1;
-        continue;
-      }
-      const isMember = isMemberByLogin.get(author.login.toLowerCase()) ?? false;
-      if (isMember) teamOpenPullRequests += 1;
-      else externalOpenPullRequests += 1;
-    }
-
-    const value: OpenPullRequestCounts = {
-      totalOpenPullRequests: authorsByPr.length,
-      teamOpenPullRequests,
-      externalOpenPullRequests,
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (shouldUseCache) {
-      countsCacheByIncludeDrafts.set(includeDrafts, { value, expiresAtMs: Date.now() + ttlMs });
-    }
-    return value;
-  })();
+  const promise = getRepoOpenPullRequestCounts('kilocode', { ttlMs, includeDrafts });
 
   countsInFlightByIncludeDrafts.set(includeDrafts, promise);
 
   try {
-    return await promise;
+    const result = await promise;
+    if (shouldUseCache) {
+      countsCacheByIncludeDrafts.set(includeDrafts, {
+        value: result,
+        expiresAtMs: Date.now() + ttlMs,
+      });
+    }
+    return result;
   } finally {
     countsInFlightByIncludeDrafts.delete(includeDrafts);
   }
+}
+
+export async function getCombinedReposOpenPullRequestCounts(options?: {
+  ttlMs?: number;
+  includeDrafts?: boolean;
+}): Promise<OpenPullRequestCounts> {
+  const [kilocode, cloud] = await Promise.all([
+    getRepoOpenPullRequestCounts('kilocode', options),
+    getRepoOpenPullRequestCounts('cloud', options),
+  ]);
+
+  return {
+    totalOpenPullRequests: kilocode.totalOpenPullRequests + cloud.totalOpenPullRequests,
+    teamOpenPullRequests: kilocode.teamOpenPullRequests + cloud.teamOpenPullRequests,
+    externalOpenPullRequests: kilocode.externalOpenPullRequests + cloud.externalOpenPullRequests,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+async function getRepoOpenPullRequestsSummary(
+  repository: RepositoryKey,
+  options?: {
+    ttlMs?: number;
+    includeDrafts?: boolean;
+    commentConcurrency?: number;
+    maxIssueCommentPages?: number;
+    maxReviewCommentPages?: number;
+    maxPullRequestReviewPages?: number;
+  }
+): Promise<OpenPullRequestsSummary> {
+  const ttlMs = options?.ttlMs ?? 2 * 60_000;
+  const includeDrafts = options?.includeDrafts ?? false;
+
+  const prs = await listOpenPullRequests({ repository, includeDrafts });
+  const prsWithoutDrafts = includeDrafts ? prs : prs.filter(pr => !pr.draft);
+
+  const prsWithAuthors = prsWithoutDrafts.flatMap(pr => {
+    const user = pr.user;
+    if (!user) return [];
+    return [{ pr, author: toGithubUserLite(user) }];
+  });
+
+  const uniqueAuthorsByLowerLogin = new Map<string, string>();
+  for (const { author } of prsWithAuthors) {
+    if (isBotGithubUser(author)) continue;
+    const lower = author.login.toLowerCase();
+    if (!uniqueAuthorsByLowerLogin.has(lower)) {
+      uniqueAuthorsByLowerLogin.set(lower, author.login);
+    }
+  }
+
+  const authorMembershipChecks = await mapWithConcurrencyLimit(
+    [...uniqueAuthorsByLowerLogin.entries()],
+    5,
+    async ([lowerLogin, originalLogin]) => {
+      const isMember = await isOrgMember(ORG, originalLogin);
+      return { lowerLogin, isMember };
+    }
+  );
+
+  const isMemberByLowerLogin = new Map<string, boolean>();
+  for (const { lowerLogin, isMember } of authorMembershipChecks) {
+    isMemberByLowerLogin.set(lowerLogin, isMember);
+  }
+
+  let teamOpenPullRequests = 0;
+  let externalOpenPullRequests = 0;
+
+  const external: Array<{ pr: OpenPullRequestApiSummary; authorLogin: string }> = [];
+  for (const { pr, author } of prsWithAuthors) {
+    if (isBotGithubUser(author)) {
+      teamOpenPullRequests += 1;
+      continue;
+    }
+    const isMember = isMemberByLowerLogin.get(author.login.toLowerCase()) ?? false;
+    if (isMember) {
+      teamOpenPullRequests += 1;
+    } else {
+      externalOpenPullRequests += 1;
+      external.push({ pr, authorLogin: author.login });
+    }
+  }
+
+  const commentConcurrency = options?.commentConcurrency ?? 4;
+  const maxIssueCommentPages = options?.maxIssueCommentPages ?? 2;
+  const maxReviewCommentPages = options?.maxReviewCommentPages ?? 1;
+  const maxPullRequestReviewPages = options?.maxPullRequestReviewPages ?? 1;
+
+  const nowDate = new Date();
+  const externalListBase: ExternalOpenPullRequest[] = external.map(({ pr, authorLogin }) => {
+    const createdAt = pr.created_at;
+    const createdAtDate = new Date(createdAt);
+    const ageDays = Number.isNaN(createdAtDate.getTime()) ? 0 : daysBetween(createdAtDate, nowDate);
+
+    const commentCount = pr.comments + pr.review_comments;
+
+    return {
+      number: pr.number,
+      title: pr.title,
+      url: pr.html_url,
+      authorLogin,
+      createdAt,
+      ageDays,
+      commentCount,
+      teamCommented: false,
+      reviewStatus: 'no_reviews',
+      repository,
+    };
+  });
+
+  const teamInteractionResults = await mapWithConcurrencyLimit<
+    ExternalOpenPullRequest,
+    PullRequestTeamInteraction
+  >(externalListBase, commentConcurrency, async pr => {
+    return hasOrgMemberCommentedOnPullRequest({
+      org: ORG,
+      repository,
+      prNumber: pr.number,
+      ttlMs,
+      maxIssueCommentPages,
+      maxReviewCommentPages,
+      maxPullRequestReviewPages,
+    });
+  });
+
+  const externalOpenPullRequestsList: ExternalOpenPullRequest[] = externalListBase.map(
+    (pr, idx) => {
+      const interaction = teamInteractionResults[idx];
+      if (!interaction) {
+        const fallback: ExternalOpenPullRequest = {
+          ...pr,
+          teamCommented: false,
+          reviewStatus: 'no_reviews',
+        };
+        return fallback;
+      }
+
+      const merged: ExternalOpenPullRequest = {
+        ...pr,
+        teamCommented: interaction.teamCommented,
+        reviewStatus: interaction.reviewStatus,
+      };
+      return merged;
+    }
+  );
+
+  return {
+    totalOpenPullRequests: prsWithAuthors.length,
+    teamOpenPullRequests,
+    externalOpenPullRequests,
+    externalOpenPullRequestsList,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 export async function getKilocodeRepoOpenPullRequestsSummary(options?: {
@@ -848,141 +1042,47 @@ export async function getKilocodeRepoOpenPullRequestsSummary(options?: {
     return inFlight;
   }
 
-  const promise = (async () => {
-    const prs = await listOpenPullRequests({ includeDrafts });
-    const prsWithoutDrafts = includeDrafts ? prs : prs.filter(pr => !pr.draft);
-
-    const prsWithAuthors = prsWithoutDrafts.flatMap(pr => {
-      const user = pr.user;
-      if (!user) return [];
-      return [{ pr, author: toGithubUserLite(user) }];
-    });
-
-    const uniqueAuthorsByLowerLogin = new Map<string, string>();
-    for (const { author } of prsWithAuthors) {
-      if (isBotGithubUser(author)) continue;
-      const lower = author.login.toLowerCase();
-      if (!uniqueAuthorsByLowerLogin.has(lower)) {
-        uniqueAuthorsByLowerLogin.set(lower, author.login);
-      }
-    }
-
-    const authorMembershipChecks = await mapWithConcurrencyLimit(
-      [...uniqueAuthorsByLowerLogin.entries()],
-      5,
-      async ([lowerLogin, originalLogin]) => {
-        const isMember = await isOrgMember(ORG, originalLogin);
-        return { lowerLogin, isMember };
-      }
-    );
-
-    const isMemberByLowerLogin = new Map<string, boolean>();
-    for (const { lowerLogin, isMember } of authorMembershipChecks) {
-      isMemberByLowerLogin.set(lowerLogin, isMember);
-    }
-
-    let teamOpenPullRequests = 0;
-    let externalOpenPullRequests = 0;
-
-    const external: Array<{ pr: OpenPullRequestApiSummary; authorLogin: string }> = [];
-    for (const { pr, author } of prsWithAuthors) {
-      if (isBotGithubUser(author)) {
-        teamOpenPullRequests += 1;
-        continue;
-      }
-      const isMember = isMemberByLowerLogin.get(author.login.toLowerCase()) ?? false;
-      if (isMember) {
-        teamOpenPullRequests += 1;
-      } else {
-        externalOpenPullRequests += 1;
-        external.push({ pr, authorLogin: author.login });
-      }
-    }
-
-    const commentConcurrency = options?.commentConcurrency ?? 4;
-    const maxIssueCommentPages = options?.maxIssueCommentPages ?? 2;
-    const maxReviewCommentPages = options?.maxReviewCommentPages ?? 1;
-    const maxPullRequestReviewPages = options?.maxPullRequestReviewPages ?? 1;
-
-    const nowDate = new Date();
-    const externalListBase: ExternalOpenPullRequest[] = external.map(({ pr, authorLogin }) => {
-      const createdAt = pr.created_at;
-      const createdAtDate = new Date(createdAt);
-      const ageDays = Number.isNaN(createdAtDate.getTime())
-        ? 0
-        : daysBetween(createdAtDate, nowDate);
-
-      const commentCount = pr.comments + pr.review_comments;
-
-      return {
-        number: pr.number,
-        title: pr.title,
-        url: pr.html_url,
-        authorLogin,
-        createdAt,
-        ageDays,
-        commentCount,
-        teamCommented: false,
-        reviewStatus: 'no_reviews',
-      };
-    });
-
-    const teamInteractionResults = await mapWithConcurrencyLimit<
-      ExternalOpenPullRequest,
-      PullRequestTeamInteraction
-    >(externalListBase, commentConcurrency, async pr => {
-      return hasOrgMemberCommentedOnPullRequest({
-        org: ORG,
-        prNumber: pr.number,
-        ttlMs,
-        maxIssueCommentPages,
-        maxReviewCommentPages,
-        maxPullRequestReviewPages,
-      });
-    });
-
-    const externalOpenPullRequestsList: ExternalOpenPullRequest[] = externalListBase.map(
-      (pr, idx) => {
-        const interaction = teamInteractionResults[idx];
-        if (!interaction) {
-          const fallback: ExternalOpenPullRequest = {
-            ...pr,
-            teamCommented: false,
-            reviewStatus: 'no_reviews',
-          };
-          return fallback;
-        }
-
-        const merged: ExternalOpenPullRequest = {
-          ...pr,
-          teamCommented: interaction.teamCommented,
-          reviewStatus: interaction.reviewStatus,
-        };
-        return merged;
-      }
-    );
-
-    const value: OpenPullRequestsSummary = {
-      totalOpenPullRequests: prsWithAuthors.length,
-      teamOpenPullRequests,
-      externalOpenPullRequests,
-      externalOpenPullRequestsList,
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (shouldUseCache) {
-      summaryCacheByIncludeDrafts.set(includeDrafts, { value, expiresAtMs: Date.now() + ttlMs });
-    }
-    return value;
-  })();
+  const promise = getRepoOpenPullRequestsSummary('kilocode', options);
 
   summaryInFlightByIncludeDrafts.set(includeDrafts, promise);
 
   try {
-    return await promise;
+    const result = await promise;
+    if (shouldUseCache) {
+      summaryCacheByIncludeDrafts.set(includeDrafts, {
+        value: result,
+        expiresAtMs: Date.now() + ttlMs,
+      });
+    }
+    return result;
   } finally {
     summaryInFlightByIncludeDrafts.delete(includeDrafts);
   }
+}
+
+export async function getCombinedReposOpenPullRequestsSummary(options?: {
+  ttlMs?: number;
+  includeDrafts?: boolean;
+  commentConcurrency?: number;
+  maxIssueCommentPages?: number;
+  maxReviewCommentPages?: number;
+  maxPullRequestReviewPages?: number;
+}): Promise<OpenPullRequestsSummary> {
+  const [kilocode, cloud] = await Promise.all([
+    getRepoOpenPullRequestsSummary('kilocode', options),
+    getRepoOpenPullRequestsSummary('cloud', options),
+  ]);
+
+  return {
+    totalOpenPullRequests: kilocode.totalOpenPullRequests + cloud.totalOpenPullRequests,
+    teamOpenPullRequests: kilocode.teamOpenPullRequests + cloud.teamOpenPullRequests,
+    externalOpenPullRequests: kilocode.externalOpenPullRequests + cloud.externalOpenPullRequests,
+    externalOpenPullRequestsList: [
+      ...kilocode.externalOpenPullRequestsList,
+      ...cloud.externalOpenPullRequestsList,
+    ],
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 const mergedPrsCache = new Map<number, CacheEntry<ExternalMergedPullRequest[]>>();
@@ -992,14 +1092,16 @@ const closedPrsCache = new Map<number, CacheEntry<ExternalClosedPullRequestsWith
 const closedPrsInFlight = new Map<number, Promise<ExternalClosedPullRequestsWithWeekStats>>();
 
 async function listMergedPullRequests(options: {
+  repository: RepositoryKey;
   maxResults: number;
 }): Promise<z.infer<typeof CLOSED_PULL_REQUEST_ITEM_SCHEMA>[]> {
   const perPage = 100;
   const prs: z.infer<typeof CLOSED_PULL_REQUEST_ITEM_SCHEMA>[] = [];
   const maxPages = Math.ceil(options.maxResults / perPage);
+  const repo = REPOSITORIES[options.repository];
 
   for (let page = 1; page <= maxPages; page += 1) {
-    const url = new URL(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls`);
+    const url = new URL(`https://api.github.com/repos/${repo.owner}/${repo.name}/pulls`);
     url.searchParams.set('state', 'closed');
     url.searchParams.set('sort', 'updated');
     url.searchParams.set('direction', 'desc');
@@ -1056,7 +1158,7 @@ export async function getKilocodeRepoRecentlyMergedExternalPRs(options?: {
   }
 
   const promise = (async () => {
-    const prs = await listMergedPullRequests({ maxResults });
+    const prs = await listMergedPullRequests({ repository: 'kilocode', maxResults });
 
     const prsWithAuthors = prs.flatMap(pr => {
       const user = pr.user;
@@ -1099,6 +1201,7 @@ export async function getKilocodeRepoRecentlyMergedExternalPRs(options?: {
           url: pr.html_url,
           authorLogin: author.login,
           mergedAt,
+          repository: 'kilocode', // This will be updated when we refactor to accept repository parameter
         });
       }
     }
@@ -1126,16 +1229,18 @@ export async function getKilocodeRepoRecentlyMergedExternalPRs(options?: {
 }
 
 async function listRecentlyClosedPullRequests(options: {
+  repository: RepositoryKey;
   maxResults: number;
 }): Promise<z.infer<typeof CLOSED_PULL_REQUEST_ITEM_SCHEMA>[]> {
   const perPage = 100;
   const prs: z.infer<typeof CLOSED_PULL_REQUEST_ITEM_SCHEMA>[] = [];
+  const repo = REPOSITORIES[options.repository];
 
   // We may need more than maxResults items to find `maxResults` external PRs.
   const maxPages = Math.ceil((options.maxResults * 4) / perPage);
 
   for (let page = 1; page <= maxPages; page += 1) {
-    const url = new URL(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls`);
+    const url = new URL(`https://api.github.com/repos/${repo.owner}/${repo.name}/pulls`);
     url.searchParams.set('state', 'closed');
     url.searchParams.set('sort', 'updated');
     url.searchParams.set('direction', 'desc');
@@ -1186,7 +1291,7 @@ export async function getKilocodeRepoRecentlyClosedExternalPRs(options?: {
   }
 
   const promise = (async () => {
-    const prs = await listRecentlyClosedPullRequests({ maxResults });
+    const prs = await listRecentlyClosedPullRequests({ repository: 'kilocode', maxResults });
 
     const prsWithAuthors = prs.flatMap(pr => {
       const user = pr.user;
@@ -1238,6 +1343,7 @@ export async function getKilocodeRepoRecentlyClosedExternalPRs(options?: {
         mergedAt,
         status,
         displayDate,
+        repository: 'kilocode', // This function still needs to be updated to accept repository parameter
       });
     }
 

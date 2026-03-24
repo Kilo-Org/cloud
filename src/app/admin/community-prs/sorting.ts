@@ -8,6 +8,7 @@ export type ExternalOpenPullRequestRow = {
   commentCount: number;
   teamCommented: boolean;
   reviewStatus: string;
+  repository: string;
 };
 
 export type ExternalPrSortKey = 'ageDays' | 'teamCommented' | 'reviewStatus';
@@ -25,6 +26,7 @@ export type ExternalMergedPullRequestRow = {
   url: string;
   authorLogin: string;
   mergedAt: string;
+  repository: string;
 };
 
 export type ExternalClosedPullRequestStatus = 'merged' | 'closed';
@@ -38,6 +40,7 @@ export type ExternalClosedPullRequestRow = {
   mergedAt: string | null;
   status: ExternalClosedPullRequestStatus;
   displayDate: string;
+  repository: string;
 };
 
 export type MergedPrSortKey = 'mergedAt' | 'authorLogin';

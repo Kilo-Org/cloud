@@ -65,6 +65,8 @@ import {
   getKilocodeRepoOpenPullRequestsSummary,
   getKilocodeRepoRecentlyClosedExternalPRs,
   getKilocodeRepoRecentlyMergedExternalPRs,
+  getCombinedReposOpenPullRequestCounts,
+  getCombinedReposOpenPullRequestsSummary,
 } from '@/lib/github/open-pull-request-counts';
 
 const SyncResponseSchema = z.object({
@@ -181,10 +183,23 @@ export const adminRouter = createTRPCRouter({
       return getKilocodeRepoOpenPullRequestCounts({ ttlMs: 2 * 60_000 });
     }),
 
+    getCombinedOpenPullRequestCounts: adminProcedure.query(async () => {
+      return getCombinedReposOpenPullRequestCounts({ ttlMs: 2 * 60_000 });
+    }),
+
     getKilocodeOpenPullRequestsSummary: adminProcedure
       .input(z.object({ includeDrafts: z.boolean().optional() }).optional())
       .query(async ({ input }) => {
         return getKilocodeRepoOpenPullRequestsSummary({
+          ttlMs: 2 * 60_000,
+          includeDrafts: input?.includeDrafts ?? false,
+        });
+      }),
+
+    getCombinedOpenPullRequestsSummary: adminProcedure
+      .input(z.object({ includeDrafts: z.boolean().optional() }).optional())
+      .query(async ({ input }) => {
+        return getCombinedReposOpenPullRequestsSummary({
           ttlMs: 2 * 60_000,
           includeDrafts: input?.includeDrafts ?? false,
         });

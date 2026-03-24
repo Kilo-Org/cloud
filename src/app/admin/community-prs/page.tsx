@@ -54,9 +54,9 @@ export default function GithubPrCountsAdminPage() {
   }, []);
 
   const { data, error, isFetching, isLoading, refetch } = useQuery({
-    queryKey: ['admin', 'github', 'kilocode', 'open-prs-summary', { includeDrafts }],
+    queryKey: ['admin', 'github', 'combined', 'open-prs-summary', { includeDrafts }],
     queryFn: async () =>
-      trpcClient.admin.github.getKilocodeOpenPullRequestsSummary.query({ includeDrafts }),
+      trpcClient.admin.github.getCombinedOpenPullRequestsSummary.query({ includeDrafts }),
     staleTime: 60_000,
     refetchInterval: 60_000,
   });
@@ -207,8 +207,9 @@ export default function GithubPrCountsAdminPage() {
                 <div className="flex flex-col gap-1">
                   <h3 className="text-lg font-semibold">Community open PRs</h3>
                   <p className="text-muted-foreground text-sm">
-                    Sorted by urgency by default (oldest first). “Team commented” checks both issue
-                    comments and review comments by Kilo team members.
+                    Shows PRs from both kilocode and cloud repositories. Sorted by urgency by
+                    default (oldest first). "Team commented" checks both issue comments and review
+                    comments by Kilo team members.
                   </p>
                 </div>
 
@@ -257,6 +258,7 @@ export default function GithubPrCountsAdminPage() {
                       <thead>
                         <tr className="text-muted-foreground border-b">
                           <th className="px-2 py-2 text-left font-medium">PR</th>
+                          <th className="px-2 py-2 text-left font-medium">Repository</th>
                           <th className="px-2 py-2 text-left font-medium">Author</th>
                           <th className="px-2 py-2 text-left font-medium">Age</th>
                           <th className="px-2 py-2 text-left font-medium">Review status</th>
@@ -282,6 +284,11 @@ export default function GithubPrCountsAdminPage() {
                                 >
                                   #{pr.number} <span className="text-foreground">{pr.title}</span>
                                 </a>
+                              </td>
+                              <td className="px-2 py-3 align-top">
+                                <Badge variant="outline" className="text-xs">
+                                  {pr.repository}
+                                </Badge>
                               </td>
                               <td className="px-2 py-3 align-top">
                                 <span className="font-medium">{pr.authorLogin}</span>

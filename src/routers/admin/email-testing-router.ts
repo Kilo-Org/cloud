@@ -1,8 +1,8 @@
 import { TRPCError } from '@trpc/server';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { NEXTAUTH_URL } from '@/lib/config.server';
-import { sendViaMailgun } from '@/lib/email-mailgun';
 import {
+  send,
   subjects,
   creditsVars,
   renderTemplate,
@@ -132,16 +132,16 @@ export const emailTestingRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       const vars = fixtureTemplateVars(input.template);
-      const subject = subjects[input.template];
-      const html = renderTemplate(input.template, {
-        ...vars,
-        year: String(new Date().getFullYear()),
+      const result = await send({
+        to: input.recipient,
+        templateName: input.template,
+        templateVars: vars,
       });
-      const result = await sendViaMailgun({ to: input.recipient, subject, html });
-      if (!result) {
+      if (!result.sent) {
         throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'MAILGUN_API_KEY/MAILGUN_DOMAIN is not configured — email was not sent',
+          code: 'BAD_REQUEST',
+          message:
+            'Email blocked by NeverBounce verification. This address is invalid or disposable.',
         });
       }
       return { recipient: input.recipient };

@@ -554,6 +554,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (!store.get(isLoadingAtom)) return;
         // Fallback: clear loading state when events start flowing even if
         // no root session.created was replayed (e.g. CLI snapshot failure).
+        // Reset all per-session atoms first, same as the onSessionCreated
+        // path, so stale UI state from the previous session doesn't leak.
+        clearAllAtoms();
         store.set(sessionConfigAtom, {
           sessionId: data.cloudAgentSessionId ?? kiloSessionId,
           repository: data.repository ?? '',

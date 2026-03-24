@@ -9,6 +9,7 @@ import {
   runOnboardOrDoctor,
   updateToolsMdKiloCliSection,
   updateToolsMd1PasswordSection,
+  updateHeartbeatMdWorkspaceSync,
   buildGatewayArgs,
   bootstrap,
 } from './bootstrap';
@@ -679,6 +680,56 @@ describe('updateToolsMd1PasswordSection', () => {
     const env: Record<string, string | undefined> = {};
 
     updateToolsMd1PasswordSection(env, harness.deps);
+
+    expect(harness.writeCalls).toHaveLength(0);
+  });
+});
+
+// ---- updateHeartbeatMdWorkspaceSync ----
+
+describe('updateHeartbeatMdWorkspaceSync', () => {
+  it('creates heartbeat.md with workspace-sync section when file does not exist', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+    const env: Record<string, string | undefined> = {};
+
+    updateHeartbeatMdWorkspaceSync(env, harness.deps);
+
+    expect(harness.mkdirCalls).toContain('/root/.openclaw/workspace');
+    expect(harness.writeCalls).toHaveLength(1);
+    expect(harness.writeCalls[0]!.path).toBe('/root/.openclaw/workspace/heartbeat.md');
+    expect(harness.writeCalls[0]!.data).toContain('# Workspace Heartbeat');
+    expect(harness.writeCalls[0]!.data).toContain('<!-- BEGIN:workspace-sync -->');
+    expect(harness.writeCalls[0]!.data).toContain('use the **workspace-sync** skill');
+    expect(harness.writeCalls[0]!.data).toContain('<!-- END:workspace-sync -->');
+  });
+
+  it('adds workspace-sync section to existing heartbeat.md', () => {
+    const harness = fakeDeps();
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      '# Workspace Heartbeat\n\nExisting content\n'
+    );
+
+    const env: Record<string, string | undefined> = {};
+
+    updateHeartbeatMdWorkspaceSync(env, harness.deps);
+
+    expect(harness.writeCalls).toHaveLength(1);
+    expect(harness.writeCalls[0]!.data).toContain('Existing content');
+    expect(harness.writeCalls[0]!.data).toContain('<!-- BEGIN:workspace-sync -->');
+    expect(harness.writeCalls[0]!.data).toContain('use the **workspace-sync** skill');
+  });
+
+  it('skips adding when workspace-sync section already present', () => {
+    const harness = fakeDeps();
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      '# Workspace Heartbeat\n<!-- BEGIN:workspace-sync -->\nexisting\n<!-- END:workspace-sync -->'
+    );
+
+    const env: Record<string, string | undefined> = {};
+
+    updateHeartbeatMdWorkspaceSync(env, harness.deps);
 
     expect(harness.writeCalls).toHaveLength(0);
   });

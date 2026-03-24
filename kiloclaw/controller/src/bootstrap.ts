@@ -23,6 +23,8 @@ const WORKSPACE_DIR = '/root/clawd';
 const COMPILE_CACHE_DIR = '/var/tmp/openclaw-compile-cache';
 const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
 const TOOLS_MD_DEST = '/root/.openclaw/workspace/TOOLS.md';
+const HEARTBEAT_MD_SOURCE = '/usr/local/share/kiloclaw/heartbeat.md';
+const HEARTBEAT_MD_DEST = '/root/.openclaw/workspace/heartbeat.md';
 
 const ENC_PREFIX = 'KILOCLAW_ENC_';
 const VALUE_PREFIX = 'enc:v1:';
@@ -366,6 +368,12 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
       deps.mkdirSync(path.dirname(TOOLS_MD_DEST), { recursive: true });
       deps.copyFileSync(TOOLS_MD_SOURCE, TOOLS_MD_DEST);
     }
+
+    // Seed heartbeat.md on first provision
+    if (deps.existsSync(HEARTBEAT_MD_SOURCE)) {
+      deps.mkdirSync(path.dirname(HEARTBEAT_MD_DEST), { recursive: true });
+      deps.copyFileSync(HEARTBEAT_MD_SOURCE, HEARTBEAT_MD_DEST);
+    }
   } else {
     console.log('Using existing config, running doctor...');
     deps.execFileSync('openclaw', ['doctor', '--fix', '--non-interactive'], {
@@ -539,7 +547,45 @@ export function updateToolsMd1PasswordSection(env: EnvLike, deps: BootstrapDeps)
   }
 }
 
-// ---- Step 10: Gateway args ----
+// ---- Step 10: heartbeat.md workspace-sync skill ----
+
+const WORKSPACE_SYNC_MARKER_BEGIN = '<!-- BEGIN:workspace-sync -->';
+const WORKSPACE_SYNC_MARKER_END = '<!-- END:workspace-sync -->';
+
+const WORKSPACE_SYNC_SECTION = `
+${WORKSPACE_SYNC_MARKER_BEGIN}
+- Sync workspace to GitHub → use the **workspace-sync** skill
+${WORKSPACE_SYNC_MARKER_END}`;
+
+/**
+ * Update heartbeat.md with workspace-sync skill information.
+ * 
+ * Creates heartbeat.md if it doesn't exist and adds the workspace-sync skill entry.
+ * If the file exists, ensures the workspace-sync section is present.
+ * Idempotent: skips if the marker is already present.
+ */
+export function updateHeartbeatMdWorkspaceSync(_env: EnvLike, deps: BootstrapDeps): void {
+  // Ensure the workspace directory exists
+  const workspaceDir = path.dirname(HEARTBEAT_MD_DEST);
+  deps.mkdirSync(workspaceDir, { recursive: true });
+
+  let content = '';
+  if (deps.existsSync(HEARTBEAT_MD_DEST)) {
+    content = deps.readFileSync(HEARTBEAT_MD_DEST, 'utf8');
+  } else {
+    // Create initial heartbeat.md content
+    content = '# Workspace Heartbeat\n\nAvailable workspace operations:\n';
+  }
+
+  if (!content.includes(WORKSPACE_SYNC_MARKER_BEGIN)) {
+    deps.writeFileSync(HEARTBEAT_MD_DEST, content + WORKSPACE_SYNC_SECTION);
+    console.log('heartbeat.md: added workspace-sync skill section');
+  } else {
+    console.log('heartbeat.md: workspace-sync skill section already present');
+  }
+}
+
+// ---- Step 11: Gateway args ----
 
 /**
  * Build the gateway CLI arguments array.
@@ -596,6 +642,9 @@ export async function bootstrap(
   updateToolsMdKiloCliSection(env, deps);
   updateToolsMdGoogleSection(env, deps);
   updateToolsMd1PasswordSection(env, deps);
+
+  // Update heartbeat.md with workspace-sync skill
+  updateHeartbeatMdWorkspaceSync(env, deps);
 
   // Write mcporter config for MCP servers (AgentCard, etc.)
   writeMcporterConfig(env);

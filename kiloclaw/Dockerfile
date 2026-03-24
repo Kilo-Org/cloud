@@ -118,9 +118,10 @@ COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list
 # Copy custom skills
 COPY skills/ /root/clawd/skills/
 
-# Stage TOOLS.md outside /root so it survives the Fly Volume mount.
-# The controller's bootstrap copies it to /root/.openclaw/workspace/TOOLS.md on first boot.
+# Stage TOOLS.md and heartbeat.md outside /root so they survive the Fly Volume mount.
+# The controller's bootstrap copies them to /root/.openclaw/workspace/ on first boot.
 COPY container/TOOLS.md /usr/local/share/kiloclaw/TOOLS.md
+COPY container/heartbeat.md /usr/local/share/kiloclaw/heartbeat.md
 
 # Expose the gateway port
 EXPOSE 18789

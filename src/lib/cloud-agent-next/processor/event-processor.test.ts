@@ -4,7 +4,7 @@
  * These tests verify the EventProcessor's ability to:
  * - Process cloud agent events and emit callbacks for streaming messages
  * - Handle message.updated events with pending parts queue
- * - Handle message.part.updated events with delta streaming
+ * - Handle message.part.updated events
  * - Track child sessions (sessions with parentID) via callbacks
  * - Manage session status and streaming state via callbacks
  * - Fire onMessageCompleted when messages finish
@@ -345,21 +345,10 @@ describe('createEventProcessor', () => {
       );
     });
 
-    it('should handle delta streaming for text parts', () => {
-      let capturedMessage: ProcessedMessage | undefined;
+    it('should handle part replacement for text parts', () => {
       const callbacks: EventProcessorCallbacks = {
-        onMessageUpdated: jest.fn((_, __, message) => {
-          capturedMessage = message;
-        }),
-        onPartUpdated: jest.fn((_, __, ___, part) => {
-          // Update captured message with the part for verification
-          if (capturedMessage) {
-            const partIndex = capturedMessage.parts.findIndex(p => p.id === part.id);
-            if (partIndex >= 0) {
-              capturedMessage.parts[partIndex] = part;
-            }
-          }
-        }),
+        onMessageUpdated: jest.fn(),
+        onPartUpdated: jest.fn(),
       };
       const processor = createEventProcessor({ callbacks });
 
@@ -368,7 +357,7 @@ describe('createEventProcessor', () => {
         createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
       );
 
-      // Initial part with delta
+      // First part update with text content
       processor.processEvent(
         createKilocodeEvent('message.part.updated', {
           part: {
@@ -376,13 +365,12 @@ describe('createEventProcessor', () => {
             sessionID: 'session-123',
             messageID: 'msg-1',
             type: 'text',
-            text: '',
+            text: 'Hello',
           },
-          delta: 'Hello',
         })
       );
 
-      // First delta should set text to 'Hello'
+      // First update should set text to 'Hello'
       expect(callbacks.onPartUpdated).toHaveBeenCalledWith(
         'session-123',
         'msg-1',
@@ -391,7 +379,7 @@ describe('createEventProcessor', () => {
         null
       );
 
-      // Streaming delta
+      // Second part update replaces with full text
       processor.processEvent(
         createKilocodeEvent('message.part.updated', {
           part: {
@@ -399,13 +387,12 @@ describe('createEventProcessor', () => {
             sessionID: 'session-123',
             messageID: 'msg-1',
             type: 'text',
-            text: '',
+            text: 'Hello World',
           },
-          delta: ' World',
         })
       );
 
-      // Second delta should accumulate to 'Hello World'
+      // Second update should replace to 'Hello World'
       expect(callbacks.onPartUpdated).toHaveBeenLastCalledWith(
         'session-123',
         'msg-1',
@@ -484,9 +471,8 @@ describe('createEventProcessor', () => {
             sessionID: 'session-123',
             messageID: 'msg-1',
             type: 'text',
-            text: '',
+            text: 'Hello',
           },
-          delta: 'Hello',
         })
       );
       processor.processEvent(
@@ -497,6 +483,7 @@ describe('createEventProcessor', () => {
 
       expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
 
+      // Late part update after completion — full replacement
       processor.processEvent(
         createKilocodeEvent('message.part.updated', {
           part: {
@@ -504,9 +491,8 @@ describe('createEventProcessor', () => {
             sessionID: 'session-123',
             messageID: 'msg-1',
             type: 'text',
-            text: '',
+            text: 'Hello world',
           },
-          delta: ' world',
         })
       );
 

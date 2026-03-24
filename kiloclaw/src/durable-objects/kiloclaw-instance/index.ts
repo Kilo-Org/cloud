@@ -771,7 +771,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     const { envVars, minSecretsVersion } = await buildUserEnvVars(this.env, this.ctx, this.s);
     const guest = guestFromSize(this.s.machineSize);
-    const imageTag = opts?.imageTag ?? resolveImageTag(this.s, this.env);
+
+    // If an explicit imageTag was passed (e.g. from admin machineCreate with a
+    // version pin), persist it so subsequent restarts keep the same image.
+    if (opts?.imageTag && opts.imageTag !== this.s.trackedImageTag) {
+      this.s.trackedImageTag = opts.imageTag;
+      await this.persist({ trackedImageTag: opts.imageTag });
+    }
+
+    const imageTag = resolveImageTag(this.s, this.env);
     console.log(
       '[DO] startGateway: deploying with imageTag:',
       imageTag,

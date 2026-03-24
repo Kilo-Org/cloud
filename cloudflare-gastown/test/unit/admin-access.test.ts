@@ -28,9 +28,7 @@ describe('adminAuditMiddleware', () => {
       return next();
     });
     app.use('/api/towns/:townId/*', adminAuditMiddleware);
-    app.get('/api/towns/:townId/config', c =>
-      c.json({ ok: true, townId: c.req.param('townId') })
-    );
+    app.get('/api/towns/:townId/config', c => c.json({ ok: true, townId: c.req.param('townId') }));
     return app;
   }
 

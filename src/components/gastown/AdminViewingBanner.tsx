@@ -19,12 +19,27 @@ export function AdminViewingBanner({ townId }: { townId: string }) {
   return (
     <Alert variant="warning" className="mb-4 border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
       <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-      <AlertTitle className="text-amber-800 dark:text-amber-200">
-        Viewing as admin
-      </AlertTitle>
+      <AlertTitle className="text-amber-800 dark:text-amber-200">Viewing as admin</AlertTitle>
       <AlertDescription className="text-amber-700 dark:text-amber-300">
-        This town belongs to user <code className="rounded bg-amber-100 px-1 py-0.5 text-xs dark:bg-amber-900/40">{data.ownerUserId}</code>.
-        Changes to settings and destructive actions are restricted.
+        This town belongs to{' '}
+        {data.ownerOrgId ? (
+          <>
+            org{' '}
+            <code className="rounded bg-amber-100 px-1 py-0.5 text-xs dark:bg-amber-900/40">
+              {data.ownerOrgId}
+            </code>
+          </>
+        ) : data.ownerUserId ? (
+          <>
+            user{' '}
+            <code className="rounded bg-amber-100 px-1 py-0.5 text-xs dark:bg-amber-900/40">
+              {data.ownerUserId}
+            </code>
+          </>
+        ) : (
+          'another user'
+        )}
+        . Changes to settings and destructive actions are restricted.
       </AlertDescription>
     </Alert>
   );

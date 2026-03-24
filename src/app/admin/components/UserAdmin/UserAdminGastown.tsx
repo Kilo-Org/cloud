@@ -122,9 +122,7 @@ function TownRow({ town }: { town: { id: string; name: string; created_at: strin
             </Link>
           </Button>
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/admin/gastown/towns/${town.id}`}>
-              Inspect
-            </Link>
+            <Link href={`/admin/gastown/towns/${town.id}`}>Inspect</Link>
           </Button>
           <Button
             variant="outline"

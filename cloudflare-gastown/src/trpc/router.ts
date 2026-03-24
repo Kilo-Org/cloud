@@ -162,7 +162,8 @@ async function resolveTownOwnership(
   try {
     config = await townStub.getTownConfig();
   } catch {
-    if (isAdmin) return { type: 'admin' };
+    // Town config failed to load — the town is deleted or invalid.
+    // Don't return admin bypass here; the town genuinely doesn't exist.
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
   }
 
@@ -257,9 +258,12 @@ async function verifyTownOwnership(env: Env, ctx: TRPCContext, townId: string) {
 /**
  * Verify that a user has access to a rig — either through their personal DO
  * or through an org that owns the rig's town (checked via JWT claims).
- * Admins can access any rig by resolving the owner from TownDO config.
+ *
+ * For admins viewing another user's town, pass `townIdHint` so the function
+ * can resolve the real owner from TownDO config and look up the rig in
+ * their DO.
  */
-async function verifyRigOwnership(env: Env, ctx: TRPCContext, rigId: string) {
+async function verifyRigOwnership(env: Env, ctx: TRPCContext, rigId: string, townIdHint?: string) {
   const { userId, isAdmin, orgMemberships: memberships } = ctx;
 
   // Fast path: personal rig lookup
@@ -277,18 +281,26 @@ async function verifyRigOwnership(env: Env, ctx: TRPCContext, rigId: string) {
     if (orgRig) return orgRig;
   }
 
-  // Admin bypass: try to find the rig by scanning all org stubs is impractical.
-  // Instead, for admin access we rely on the townId being passed alongside
-  // the rigId in procedures that need it. For procedures that only pass rigId,
-  // admins can use the admin-specific endpoints instead.
-  if (isAdmin) {
-    // This is a fallback — admin procedures that need rig access should
-    // prefer using town-scoped admin endpoints. Throw NOT_FOUND if we
-    // genuinely can't locate the rig.
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Rig not found (admin: use town-scoped admin endpoints for cross-user rig access)',
-    });
+  // Admin bypass: resolve the real owner from TownDO config so we can
+  // look up the rig in their DO.
+  if (isAdmin && townIdHint) {
+    const townStub = getTownDOStub(env, townIdHint);
+    let config;
+    try {
+      config = await townStub.getTownConfig();
+    } catch {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
+    }
+
+    if (config.owner_type === 'org' && config.organization_id) {
+      const orgStub = getGastownOrgStub(env, config.organization_id);
+      const orgRig = await orgStub.getRigAsync(rigId);
+      if (orgRig) return orgRig;
+    } else if (config.owner_user_id) {
+      const ownerStub = getGastownUserStub(env, config.owner_user_id);
+      const ownerRig = await ownerStub.getRigAsync(rigId);
+      if (ownerRig) return ownerRig;
+    }
   }
 
   throw new TRPCError({ code: 'NOT_FOUND', message: 'Rig not found' });
@@ -360,10 +372,11 @@ export const gastownRouter = router({
       z.object({
         isAdminViewing: z.boolean(),
         ownerUserId: z.string().nullable(),
+        ownerOrgId: z.string().nullable(),
       })
     )
     .query(async ({ ctx, input }) => {
-      if (!ctx.isAdmin) return { isAdminViewing: false, ownerUserId: null };
+      if (!ctx.isAdmin) return { isAdminViewing: false, ownerUserId: null, ownerOrgId: null };
       const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
       if (ownership.type === 'admin') {
         // Admin is viewing a town they don't own — resolve the real owner
@@ -372,9 +385,10 @@ export const gastownRouter = router({
         return {
           isAdminViewing: true,
           ownerUserId: config.owner_user_id ?? null,
+          ownerOrgId: config.organization_id ?? null,
         };
       }
-      return { isAdminViewing: false, ownerUserId: null };
+      return { isAdminViewing: false, ownerUserId: null, ownerOrgId: null };
     }),
 
   deleteTown: gastownProcedure
@@ -519,10 +533,10 @@ export const gastownRouter = router({
     }),
 
   getRig: gastownProcedure
-    .input(z.object({ rigId: z.string().uuid() }))
+    .input(z.object({ rigId: z.string().uuid(), townId: z.string().uuid().optional() }))
     .output(RpcRigDetailOutput)
     .query(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       // Sequential to avoid "excessively deep" type inference with Rpc.Promisified DO stubs.
       const agentList = await townStub.listAgents({ rig_id: rig.id });
@@ -562,20 +576,27 @@ export const gastownRouter = router({
     .input(
       z.object({
         rigId: z.string().uuid(),
+        townId: z.string().uuid().optional(),
         status: z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']).optional(),
       })
     )
     .output(z.array(RpcBeadOutput))
     .query(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       return townStub.listBeads({ rig_id: rig.id, status: input.status });
     }),
 
   deleteBead: gastownProcedure
-    .input(z.object({ rigId: z.string().uuid(), beadId: z.string().uuid() }))
+    .input(
+      z.object({
+        rigId: z.string().uuid(),
+        beadId: z.string().uuid(),
+        townId: z.string().uuid().optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       await townStub.deleteBead(input.beadId);
     }),
@@ -586,6 +607,7 @@ export const gastownRouter = router({
         .object({
           rigId: z.string().uuid(),
           beadId: z.string().uuid(),
+          townId: z.string().uuid().optional(),
           title: z.string().min(1).optional(),
           body: z.string().nullable().optional(),
           status: z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']).optional(),
@@ -610,7 +632,7 @@ export const gastownRouter = router({
     )
     .output(RpcBeadOutput)
     .mutation(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
 
       // Verify the bead belongs to this rig
@@ -622,25 +644,31 @@ export const gastownRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Bead does not belong to this rig' });
       }
 
-      const { rigId: _rigId, beadId, ...fields } = input;
+      const { rigId: _rigId, beadId, townId: _townId, ...fields } = input;
       return townStub.updateBead(beadId, fields, ctx.userId);
     }),
 
   // ── Agents ──────────────────────────────────────────────────────────
 
   listAgents: gastownProcedure
-    .input(z.object({ rigId: z.string().uuid() }))
+    .input(z.object({ rigId: z.string().uuid(), townId: z.string().uuid().optional() }))
     .output(z.array(RpcAgentOutput))
     .query(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       return townStub.listAgents({ rig_id: rig.id });
     }),
 
   deleteAgent: gastownProcedure
-    .input(z.object({ rigId: z.string().uuid(), agentId: z.string().uuid() }))
+    .input(
+      z.object({
+        rigId: z.string().uuid(),
+        agentId: z.string().uuid(),
+        townId: z.string().uuid().optional(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       await townStub.deleteAgent(input.agentId);
     }),
@@ -959,7 +987,13 @@ export const gastownRouter = router({
   refreshContainerToken: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      await verifyTownOwnership(ctx.env, ctx, input.townId);
+      const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot refresh container tokens for towns they do not own',
+        });
+      }
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.forceRefreshContainerToken();
     }),
@@ -970,6 +1004,7 @@ export const gastownRouter = router({
     .input(
       z.object({
         rigId: z.string().uuid(),
+        townId: z.string().uuid().optional(),
         beadId: z.string().uuid().optional(),
         since: z.string().optional(),
         limit: z.number().int().positive().max(500).default(100),
@@ -977,7 +1012,7 @@ export const gastownRouter = router({
     )
     .output(z.array(RpcBeadEventOutput))
     .query(async ({ ctx, input }) => {
-      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId);
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       return townStub.listBeadEvents({
         beadId: input.beadId,

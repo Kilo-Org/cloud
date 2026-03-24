@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useUser } from '@/hooks/useUser';
@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import {
   Plus,
   Trash2,
@@ -30,7 +32,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
-type Props = { townId: string; readOnly?: boolean };
+type Props = { townId: string; readOnly?: boolean; organizationId?: string };
 
 type EnvVarEntry = { key: string; value: string; isNew?: boolean };
 
@@ -96,10 +98,21 @@ function useScrollSpy(sectionIds: readonly string[]) {
   return { activeId, scrollTo };
 }
 
-export function TownSettingsPageClient({ townId, readOnly = false }: Props) {
+export function TownSettingsPageClient({ townId, readOnly = false, organizationId }: Props) {
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
   const { data: currentUser } = useUser();
+
+  const {
+    data: modelsData,
+    isLoading: isLoadingModels,
+    error: modelsError,
+  } = useModelSelectorList(organizationId);
+
+  const modelOptions = useMemo<ModelOption[]>(
+    () => modelsData?.data.map(model => ({ id: model.id, name: model.name })) ?? [],
+    [modelsData]
+  );
 
   const townQuery = useQuery(trpc.gastown.getTown.queryOptions({ townId }));
   const configQuery = useQuery(trpc.gastown.getTownConfig.queryOptions({ townId }));
@@ -469,12 +482,24 @@ export function TownSettingsPageClient({ townId, readOnly = false }: Props) {
               >
                 <div className="space-y-4">
                   <FieldGroup label="Default Model">
-                    <Input
-                      value={defaultModel}
-                      onChange={e => setDefaultModel(e.target.value)}
-                      placeholder="anthropic/claude-sonnet-4.6"
-                      className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
-                    />
+                    {modelsError ? (
+                      <Input
+                        value={defaultModel}
+                        onChange={e => setDefaultModel(e.target.value)}
+                        placeholder="e.g. anthropic/claude-sonnet-4.6"
+                        className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
+                      />
+                    ) : (
+                      <ModelCombobox
+                        label=""
+                        models={modelOptions}
+                        value={defaultModel}
+                        onValueChange={setDefaultModel}
+                        isLoading={isLoadingModels}
+                        placeholder="Select a model"
+                        className="border-white/[0.08] bg-white/[0.03] text-sm text-white/85"
+                      />
+                    )}
                   </FieldGroup>
 
                   <FieldGroup

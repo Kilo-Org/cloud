@@ -6,12 +6,18 @@ export default async function OrgTownSettingsPage({
 }: {
   params: Promise<{ id: string; townId: string }>;
 }) {
-  const { townId } = await params;
+  const { id: organizationId, townId } = await params;
   return (
     <OrganizationByPageLayout
       params={params}
       fullBleed
-      render={({ role }) => <TownSettingsPageClient townId={townId} readOnly={role !== 'owner'} />}
+      render={({ role }) => (
+        <TownSettingsPageClient
+          townId={townId}
+          readOnly={role !== 'owner'}
+          organizationId={organizationId}
+        />
+      )}
     />
   );
 }

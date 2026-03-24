@@ -6,34 +6,8 @@ import { NEXTAUTH_URL } from '@/lib/config.server';
 import { sendViaMailgun } from '@/lib/email-mailgun';
 import { verifyEmail } from '@/lib/email-neverbounce';
 
-export const templates = {
-  orgSubscription: '10',
-  orgRenewed: '11',
-  orgCancelled: '12',
-  orgSSOUserJoined: '13',
-  orgInvitation: '6',
-  magicLink: '14',
-  balanceAlert: '16',
-  autoTopUpFailed: '17',
-  ossInviteNewUser: '18',
-  ossInviteExistingUser: '19',
-  ossExistingOrgProvisioned: '20',
-  deployFailed: '21',
-  clawTrialEndingSoon: '22',
-  clawTrialExpiresTomorrow: '23',
-  clawSuspendedTrial: '24',
-  clawSuspendedSubscription: '25',
-  clawSuspendedPayment: '26',
-  clawDestructionWarning: '27',
-  clawInstanceDestroyed: '28',
-  clawEarlybirdEndingSoon: '29',
-  clawEarlybirdExpiresTomorrow: '30',
-} as const;
-
-export type TemplateName = keyof typeof templates;
-
-// Subject lines for each template — used by Mailgun (PR 2) and the admin testing page
-export const subjects: Record<TemplateName, string> = {
+// Subject lines for each template — used by Mailgun and the admin testing page
+export const subjects = {
   orgSubscription: 'Welcome to Kilo for Teams!',
   orgRenewed: 'Kilo: Your Teams Subscription Renewal',
   orgCancelled: 'Kilo: Your Teams Subscription is Cancelled',
@@ -55,7 +29,9 @@ export const subjects: Record<TemplateName, string> = {
   clawInstanceDestroyed: 'Your KiloClaw Instance Has Been Deleted',
   clawEarlybirdEndingSoon: 'Your KiloClaw Earlybird Access Ends Soon',
   clawEarlybirdExpiresTomorrow: 'Your KiloClaw Earlybird Access Expires Tomorrow',
-};
+} as const;
+
+export type TemplateName = keyof typeof subjects;
 
 function escapeHtml(str: string): string {
   return str
@@ -96,9 +72,6 @@ export function buildCreditsSection(monthlyCreditsUsd: number): RawHtml {
 export function creditsVars(monthlyCreditsUsd: number): TemplateVars {
   return {
     credits_section: buildCreditsSection(monthlyCreditsUsd),
-    ...(monthlyCreditsUsd > 0
-      ? { has_credits: 'true', monthly_credits_usd: String(monthlyCreditsUsd) }
-      : {}),
   };
 }
 
@@ -109,10 +82,12 @@ type SendParams = {
   subjectOverride?: string;
 };
 
-export async function send(params: SendParams) {
+type SendResult = { sent: true } | { sent: false; reason: 'neverbounce_rejected' };
+
+export async function send(params: SendParams): Promise<SendResult> {
   const isSafeToSend = await verifyEmail(params.to);
   if (!isSafeToSend) {
-    return;
+    return { sent: false, reason: 'neverbounce_rejected' };
   }
 
   const subject = params.subjectOverride ?? subjects[params.templateName];
@@ -120,7 +95,8 @@ export async function send(params: SendParams) {
     ...params.templateVars,
     year: String(new Date().getFullYear()),
   });
-  return sendViaMailgun({ to: params.to, subject, html });
+  await sendViaMailgun({ to: params.to, subject, html });
+  return { sent: true };
 }
 
 type OrganizationInviteEmailData = {

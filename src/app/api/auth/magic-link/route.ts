@@ -56,7 +56,17 @@ export async function POST(request: NextRequest) {
   }
 
   const magicLink = await createMagicLinkToken(email);
-  await sendMagicLinkEmail(magicLink, callbackUrl);
+  const result = await sendMagicLinkEmail(magicLink, callbackUrl);
+
+  if (!result.sent) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Unable to deliver email to this address. Please use a different email.',
+      },
+      { status: 400 }
+    );
+  }
 
   return NextResponse.json({
     success: true,

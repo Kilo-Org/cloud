@@ -27,13 +27,23 @@ export async function verifyEmail(email: string): Promise<boolean> {
     url.searchParams.set('key', NEVERBOUNCE_API_KEY);
     url.searchParams.set('email', email);
 
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
     if (!response.ok) {
       console.warn(`[neverbounce] API returned ${response.status} for ${email}, allowing send`);
       return true;
     }
 
     const data: NeverBounceResponse = await response.json();
+
+    if (data.status !== 'success') {
+      console.warn(`[neverbounce] API returned status=${data.status} for ${email}, allowing send`);
+      captureMessage(`NeverBounce API returned non-success status: ${data.status}`, {
+        level: 'warning',
+        tags: { source: 'neverbounce' },
+        extra: { email, status: data.status },
+      });
+      return true;
+    }
 
     if (BLOCKED_RESULTS.has(data.result)) {
       captureMessage(`Blocked email send to ${data.result} address`, {
@@ -47,9 +57,13 @@ export async function verifyEmail(email: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.warn(
-      `[neverbounce] Check failed for ${email}: ${error instanceof Error ? error.message : String(error)}, allowing send`
-    );
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn(`[neverbounce] Check failed for ${email}: ${errorMessage}, allowing send`);
+    captureMessage('NeverBounce verification check failed', {
+      level: 'warning',
+      tags: { source: 'neverbounce' },
+      extra: { email, error: errorMessage },
+    });
     return true;
   }
 }

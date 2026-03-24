@@ -75,6 +75,12 @@ export const SendMessageRequest = z.object({
 });
 export type SendMessageRequest = z.infer<typeof SendMessageRequest>;
 
+export const UpdateAgentModelRequest = z.object({
+  model: z.string().min(1),
+  smallModel: z.string().optional(),
+});
+export type UpdateAgentModelRequest = z.infer<typeof UpdateAgentModelRequest>;
+
 // ── Agent lifecycle ─────────────────────────────────────────────────────
 
 export const AgentStatus = z.enum(['starting', 'running', 'stopping', 'exited', 'failed']);

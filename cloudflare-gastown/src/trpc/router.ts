@@ -848,16 +848,19 @@ export const gastownRouter = router({
         console.warn('[gastown-trpc] updateTownConfig: syncConfigToContainer failed:', err);
       }
 
-      // If the model changed, restart the mayor so it picks up the new model.
-      // The mayor's conversation history is preserved in AgentDO events.
+      // If the model changed, hot-update the running mayor session so it
+      // picks up the new model without losing conversation context.
       const modelChanged =
         result.default_model !== existingConfig.default_model ||
         result.small_model !== existingConfig.small_model;
       if (modelChanged) {
         try {
-          await townStub.restartMayor();
+          await townStub.updateMayorModel(
+            result.default_model ?? 'anthropic/claude-sonnet-4.6',
+            result.small_model ?? undefined
+          );
         } catch (err) {
-          console.warn('[gastown-trpc] updateTownConfig: restartMayor failed:', err);
+          console.warn('[gastown-trpc] updateTownConfig: updateMayorModel failed:', err);
         }
       }
 

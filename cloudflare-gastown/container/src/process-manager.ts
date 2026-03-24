@@ -10,6 +10,7 @@ import { createKilo, type KiloClient } from '@kilocode/sdk';
 import { z } from 'zod';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted } from './completion-reporter';
+import { buildKiloConfigContent, kiloModel } from './agent-runner';
 import { log } from './logger';
 
 const MANAGER_LOG = '[process-manager]';
@@ -727,6 +728,104 @@ export async function sendMessage(agentId: string, prompt: string): Promise<void
 
   agent.messageCount++;
   agent.lastActivityAt = new Date().toISOString();
+}
+
+/**
+ * Update the model for a running agent by restarting its SDK server with
+ * new KILO_CONFIG_CONTENT. The kilo serve child process reads the model
+ * from KILO_CONFIG_CONTENT at startup (highest config precedence after
+ * enterprise managed config), so the only reliable way to change it is
+ * to restart the server process.
+ *
+ * The agent's session is re-created on the new server. The session history
+ * is persisted on disk by kilo serve, so it survives the restart.
+ *
+ * @param model OpenRouter-style model ID (e.g. "anthropic/claude-sonnet-4.6")
+ * @param smallModel Optional small model in the same format
+ */
+export async function updateAgentModel(
+  agentId: string,
+  model: string,
+  smallModel?: string
+): Promise<void> {
+  const agent = agents.get(agentId);
+  if (!agent) throw new Error(`Agent ${agentId} not found`);
+  if (agent.status !== 'running' && agent.status !== 'starting') {
+    throw new Error(`Agent ${agentId} is not running (status: ${agent.status})`);
+  }
+
+  const oldInstance = sdkInstances.get(agent.workdir);
+  if (!oldInstance) throw new Error(`No SDK instance for agent ${agentId}`);
+
+  const oldSessionId = agent.sessionId;
+
+  console.log(
+    `${MANAGER_LOG} updateAgentModel: restarting SDK server for agent ${agentId} with model=${model}`
+  );
+
+  // 1. Abort the event subscription so it doesn't interfere with shutdown
+  const controller = eventAbortControllers.get(agentId);
+  if (controller) controller.abort();
+
+  // 2. Close the old SDK server (kills the kilo serve child process)
+  oldInstance.server.close();
+  sdkInstances.delete(agent.workdir);
+
+  // 3. Rebuild KILO_CONFIG_CONTENT with the new model and update process.env
+  //    so the next createKilo() spawns kilo serve with fresh config.
+  const kilocodeToken = process.env.KILOCODE_TOKEN;
+  if (kilocodeToken) {
+    const configJson = buildKiloConfigContent(
+      kilocodeToken,
+      model,
+      smallModel ?? 'anthropic/claude-haiku-4.5',
+      process.env.GASTOWN_ORGANIZATION_ID
+    );
+    process.env.KILO_CONFIG_CONTENT = configJson;
+    process.env.OPENCODE_CONFIG_CONTENT = configJson;
+  }
+
+  // 4. Update the agent's model field for per-message overrides
+  agent.model = model;
+
+  // 5. Create a new SDK server (spawns a fresh kilo serve with updated env)
+  const { client, port } = await ensureSDKServer(agent.workdir, {});
+  agent.serverPort = port;
+
+  // 6. Create a new session on the fresh server
+  const sessionResult = await client.session.create({ body: {} });
+  const rawSession: unknown = sessionResult.data ?? sessionResult;
+  const parsed = SessionResponse.safeParse(rawSession);
+  if (!parsed.success) {
+    throw new Error('SDK session.create response missing required "id" field');
+  }
+  agent.sessionId = parsed.data.id;
+
+  // Track session count
+  const newInstance = sdkInstances.get(agent.workdir);
+  if (newInstance) {
+    newInstance.sessionCount++;
+  }
+
+  // 7. Re-subscribe to events on the new session
+  void subscribeToEvents(client, agent, {
+    agentId: agent.agentId,
+    role: agent.role,
+    name: agent.name,
+    model,
+    prompt: '',
+    rigId: agent.rigId,
+    townId: agent.townId,
+    identity: '',
+    gitUrl: '',
+    branch: '',
+    defaultBranch: '',
+  });
+
+  console.log(
+    `${MANAGER_LOG} updateAgentModel: SDK server restarted for agent ${agentId}, ` +
+    `old session=${oldSessionId} new session=${agent.sessionId} model=${model}`
+  );
 }
 
 export function getAgentStatus(agentId: string): ManagedAgent | null {

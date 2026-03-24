@@ -16,7 +16,7 @@ function resolveEnv(request: StartAgentRequest, key: string): string | undefined
 }
 
 /** Prepend the kilo provider prefix to an OpenRouter-style model ID. */
-function kiloModel(openrouterModel: string): string {
+export function kiloModel(openrouterModel: string): string {
   const trimmed = openrouterModel.trim();
   if (!trimmed) return 'kilo/kilo-auto/frontier';
   return trimmed.startsWith('kilo/') ? trimmed : `kilo/${trimmed}`;
@@ -35,7 +35,7 @@ const HEADLESS_PERMISSIONS = {
  * the Kilo LLM gateway. Both `model` and `smallModel` are OpenRouter-style
  * IDs (e.g. "anthropic/claude-sonnet-4.6") resolved from the town config.
  */
-function buildKiloConfigContent(
+export function buildKiloConfigContent(
   kilocodeToken: string,
   model: string,
   smallModel: string,

@@ -1982,11 +1982,11 @@ export class TownDO extends DurableObject<Env> {
   }
 
   /**
-   * Restart the mayor session so it picks up new config (e.g. a model change).
-   * Stops the running mayor process and re-dispatches with fresh town config.
-   * The mayor's conversation history is preserved in AgentDO events.
+   * Hot-update the mayor's model without restarting the session.
+   * Patches the running SDK server config and per-message model override
+   * so both the mayor and its sub-agents use the new model immediately.
    */
-  async restartMayor(): Promise<void> {
+  async updateMayorModel(model: string, smallModel?: string): Promise<void> {
     const townId = this.townId;
     const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0];
     if (!mayor) return;
@@ -1995,13 +1995,21 @@ export class TownDO extends DurableObject<Env> {
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
 
     if (isAlive) {
-      console.log(`${TOWN_LOG} restartMayor: stopping mayor ${mayor.id}`);
-      await dispatch.stopAgentInContainer(this.env, townId, mayor.id);
-      agents.updateAgentStatus(this.sql, mayor.id, 'idle');
+      const updated = await dispatch.updateAgentModelInContainer(
+        this.env,
+        townId,
+        mayor.id,
+        model,
+        smallModel
+      );
+      if (updated) {
+        console.log(`${TOWN_LOG} updateMayorModel: hot-updated mayor ${mayor.id} to model=${model}`);
+      } else {
+        console.warn(`${TOWN_LOG} updateMayorModel: failed to hot-update mayor ${mayor.id}`);
+      }
     }
-
-    // Re-dispatch with current config (which now has the updated model)
-    await this.ensureMayor();
+    // If the mayor is not alive, the next dispatch will pick up the new
+    // model from the updated town config automatically.
   }
 
   async getMayorStatus(): Promise<{

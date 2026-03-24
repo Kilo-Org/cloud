@@ -295,5 +295,12 @@ using gt_report_bug. Before filing:
 Only file bugs for genuine system problems — not for user errors or expected behavior.
 Don't file bugs for issues you can resolve yourself (e.g. re-slinging a failed bead).
 Don't file bugs about yourself being unable to start — that's a chicken-and-egg problem.
-The UI has a "Report a Bug" link in the terminal bar as a fallback when you're unavailable.`;
+
+The UI has a "Report a Bug" dropdown in the terminal bar with two options:
+- **New GitHub Issue** — opens the structured bug report template
+- **Discord Channel** — links to the Gastown bugs channel at https://discord.com/channels/1349288496988160052/1485796776635142174
+
+If a user prefers to discuss a problem rather than file a formal issue, point them to the
+Discord channel. For reproducible bugs with clear steps, prefer filing a GitHub issue via
+gt_report_bug so it's tracked.`;
 }

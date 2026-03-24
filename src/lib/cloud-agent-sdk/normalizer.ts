@@ -188,13 +188,13 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
 
     case 'session.created': {
       const r = sessionCreatedDataSchema.safeParse(data);
-      if (!r.success || r.data.info.id === undefined) return null;
+      if (!r.success) return null;
       return { type: 'session.created', info: r.data.info as Session };
     }
 
     case 'session.updated': {
       const r = sessionUpdatedDataSchema.safeParse(data);
-      if (!r.success || r.data.info.id === undefined) return null;
+      if (!r.success) return null;
       return { type: 'session.updated', info: r.data.info as Session };
     }
 

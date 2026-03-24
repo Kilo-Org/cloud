@@ -202,13 +202,14 @@ export class KiloClawInternalClient {
 
   async updateMachineSize(
     userId: string,
-    machineSize: MachineSize | null
-  ): Promise<{ machineSize: MachineSize | null }> {
+    machineSize: MachineSize | null,
+    applyNow?: boolean
+  ): Promise<{ machineSize: MachineSize | null; applied: boolean }> {
     return this.request(
       '/api/platform/machine-size',
       {
         method: 'PATCH',
-        body: JSON.stringify({ userId, machineSize }),
+        body: JSON.stringify({ userId, machineSize, applyNow }),
       },
       { userId }
     );

@@ -1053,8 +1053,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
   const { mutateAsync: updateMachineSize, isPending: isUpdatingMachineSize } = useMutation(
     trpc.admin.kiloclawInstances.updateMachineSize.mutationOptions({
-      onSuccess: () => {
-        toast.success('Machine size updated. Takes effect on next restart.');
+      onSuccess: (result) => {
+        if (result?.applied) {
+          toast.success('Machine size updated and applied immediately.');
+        } else {
+          toast.success('Machine size updated. Takes effect on next restart.');
+        }
         invalidateMachineQueries();
         setEditingMachineSize(false);
       },
@@ -1565,7 +1569,6 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                           </Select>
                         </div>
                       </div>
-                      <p className="text-muted-foreground text-xs">Takes effect on next restart.</p>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -1578,13 +1581,31 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                                 memory_mb: Number(machineSizeMemory),
                                 cpu_kind: machineSizeCpuKind,
                               },
+                              applyNow: true,
                             })
                           }
                         >
                           {isUpdatingMachineSize && (
                             <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                           )}
-                          Save
+                          Save & Apply Now
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isUpdatingMachineSize}
+                          onClick={() =>
+                            void updateMachineSize({
+                              userId: data.user_id,
+                              machineSize: {
+                                cpus: Number(machineSizeCpus),
+                                memory_mb: Number(machineSizeMemory),
+                                cpu_kind: machineSizeCpuKind,
+                              },
+                            })
+                          }
+                        >
+                          Save for Restart
                         </Button>
                         <Button
                           size="sm"

@@ -522,13 +522,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             cpu_kind: z.enum(['shared', 'performance']).optional(),
           })
           .nullable(),
+        applyNow: z.boolean().optional(),
       })
     )
     .mutation(async ({ input }) => {
       const fallbackMessage = 'Failed to update machine size';
       try {
         const client = new KiloClawInternalClient();
-        return await client.updateMachineSize(input.userId, input.machineSize);
+        return await client.updateMachineSize(input.userId, input.machineSize, input.applyNow);
       } catch (err) {
         console.error('Failed to update machine size for user:', input.userId, err);
         throwKiloclawAdminError(err, fallbackMessage);

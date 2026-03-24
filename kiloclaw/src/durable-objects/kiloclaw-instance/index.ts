@@ -18,7 +18,7 @@ import type {
   MachineSize,
 } from '../../schemas/instance-config';
 import { DEFAULT_INSTANCE_FEATURES } from '../../schemas/instance-config';
-import type { FlyVolume, FlyVolumeSnapshot } from '../../fly/types';
+import type { FlyMachineConfig, FlyVolume, FlyVolumeSnapshot } from '../../fly/types';
 import * as fly from '../../fly/client';
 import { sandboxIdFromUserId } from '../../auth/sandbox-id';
 import { resolveLatestVersion, resolveVersionByTag } from '../../lib/image-version';
@@ -344,8 +344,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   async updateMachineSize(
     userId: string,
-    machineSize: MachineSize | null
-  ): Promise<{ machineSize: MachineSize | null }> {
+    machineSize: MachineSize | null,
+    applyNow?: boolean
+  ): Promise<{ machineSize: MachineSize | null; applied: boolean }> {
     await this.loadState();
 
     if (this.s.status === null) {
@@ -358,7 +359,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.machineSize = machineSize;
     await this.persist({ machineSize });
 
-    return { machineSize: this.s.machineSize };
+    let applied = false;
+    if (applyNow && this.s.flyMachineId) {
+      const flyConfig = getFlyConfig(this.env, this.s);
+
+      // Fetch the current machine config from Fly and only patch the guest
+      // field. This preserves the running image (version pin), env vars,
+      // mounts, and all other config exactly as-is.
+      const machine = await fly.getMachine(flyConfig, this.s.flyMachineId);
+      const updatedConfig: FlyMachineConfig = {
+        ...machine.config,
+        guest: guestFromSize(this.s.machineSize),
+      };
+
+      await fly.updateMachine(flyConfig, this.s.flyMachineId, updatedConfig);
+      await fly.waitForState(
+        flyConfig,
+        this.s.flyMachineId,
+        'started',
+        STARTUP_TIMEOUT_SECONDS
+      );
+      console.log('[DO] Machine size applied immediately:', this.s.flyMachineId);
+      applied = true;
+    }
+
+    return { machineSize: this.s.machineSize, applied };
   }
 
   async updateExecPreset(patch: {

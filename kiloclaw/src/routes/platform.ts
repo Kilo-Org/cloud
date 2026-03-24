@@ -295,18 +295,19 @@ platform.patch('/exec-preset', async c => {
 const MachineSizePatchSchema = z.object({
   userId: z.string().min(1),
   machineSize: MachineSizeSchema.nullable(),
+  applyNow: z.boolean().optional(),
 });
 
 platform.patch('/machine-size', async c => {
   const result = await parseBody(c, MachineSizePatchSchema);
   if ('error' in result) return result.error;
 
-  const { userId, machineSize } = result.data;
+  const { userId, machineSize, applyNow } = result.data;
 
   try {
     const updated = await withDORetry(
       instanceStubFactory(c.env, userId),
-      stub => stub.updateMachineSize(userId, machineSize),
+      stub => stub.updateMachineSize(userId, machineSize, applyNow),
       'updateMachineSize'
     );
     return c.json(updated, 200);

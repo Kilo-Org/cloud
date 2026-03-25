@@ -211,6 +211,49 @@ app.patch('/agents/:agentId/model', async c => {
     return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
   }
 
+  // Sync config-derived env vars from X-Town-Config into process.env so
+  // the SDK server restart picks up fresh tokens and git identity.
+  // The middleware already parsed the header into lastKnownTownConfig.
+  const cfg = getCurrentTownConfig();
+  if (cfg) {
+    const CONFIG_ENV_MAP: Array<[string, string]> = [
+      ['github_cli_pat', 'GITHUB_CLI_PAT'],
+      ['git_author_name', 'GASTOWN_GIT_AUTHOR_NAME'],
+      ['git_author_email', 'GASTOWN_GIT_AUTHOR_EMAIL'],
+    ];
+    for (const [cfgKey, envKey] of CONFIG_ENV_MAP) {
+      const val = cfg[cfgKey];
+      if (typeof val === 'string' && val) {
+        process.env[envKey] = val;
+      } else {
+        delete process.env[envKey];
+      }
+    }
+    // git_auth tokens
+    const gitAuth = cfg.git_auth;
+    if (typeof gitAuth === 'object' && gitAuth !== null) {
+      const auth = gitAuth as Record<string, unknown>;
+      for (const [authKey, envKey] of [
+        ['github_token', 'GIT_TOKEN'],
+        ['gitlab_token', 'GITLAB_TOKEN'],
+        ['gitlab_instance_url', 'GITLAB_INSTANCE_URL'],
+      ] as const) {
+        const val = auth[authKey];
+        if (typeof val === 'string' && val) {
+          process.env[envKey] = val;
+        } else {
+          delete process.env[envKey];
+        }
+      }
+    }
+    // disable_ai_coauthor
+    if (cfg.disable_ai_coauthor) {
+      process.env.GASTOWN_DISABLE_AI_COAUTHOR = '1';
+    } else {
+      delete process.env.GASTOWN_DISABLE_AI_COAUTHOR;
+    }
+  }
+
   await updateAgentModel(
     agentId,
     parsed.data.model,

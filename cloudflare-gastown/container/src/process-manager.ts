@@ -825,9 +825,23 @@ export async function updateAgentModel(
   sdkInstances.delete(agent.workdir);
   agent.model = model;
 
+  // Build the env vars the gastown plugin needs to identify itself and
+  // connect back to the worker. During initial dispatch these come from
+  // buildAgentEnv; here we reconstruct them from the ManagedAgent record.
+  const pluginEnv: Record<string, string> = {
+    GASTOWN_AGENT_ID: agent.agentId,
+    GASTOWN_RIG_ID: agent.rigId,
+    GASTOWN_TOWN_ID: agent.townId,
+    GASTOWN_AGENT_ROLE: agent.role,
+    KILOCODE_FEATURE: 'gastown',
+  };
+  if (agent.gastownApiUrl) pluginEnv.GASTOWN_API_URL = agent.gastownApiUrl;
+  if (agent.gastownContainerToken) pluginEnv.GASTOWN_CONTAINER_TOKEN = agent.gastownContainerToken;
+  if (agent.gastownSessionToken) pluginEnv.GASTOWN_SESSION_TOKEN = agent.gastownSessionToken;
+
   try {
     // 4. Create a new SDK server (spawns a fresh kilo serve with updated env)
-    const { client, port } = await ensureSDKServer(agent.workdir, {});
+    const { client, port } = await ensureSDKServer(agent.workdir, pluginEnv);
     agent.serverPort = port;
 
     // 5. Create a new session and send the startup prompt.

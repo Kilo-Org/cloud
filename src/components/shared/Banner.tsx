@@ -35,7 +35,7 @@ const colorMap: Record<BannerColor, { border: string; bg: string; text: string; 
   };
 
 type BannerBaseProps = {
-  icon: React.ComponentType<{ className?: string }>;
+  icon?: React.ComponentType<{ className?: string }>;
   /** Override default icon classes. */
   iconClassName?: string;
   title: string;
@@ -44,7 +44,7 @@ type BannerBaseProps = {
   description: React.ReactNode;
   /** Override default description classes. */
   descriptionClassName?: string;
-  color: BannerColor;
+  color?: BannerColor;
   /** Override default container classes. */
   className?: string;
   /** Optional ARIA role for the outer container. */
@@ -89,23 +89,25 @@ export function Banner({
   className,
   role,
 }: BannerProps) {
-  const colors = colorMap[color];
+  const colors = color ? colorMap[color] : undefined;
 
   return (
     <div
       role={role}
       className={cn(
         'flex w-full flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:gap-4',
-        colors.border,
-        colors.bg,
-        colors.text,
+        colors?.border,
+        colors?.bg,
+        colors?.text,
         className
       )}
     >
       <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
-        <div className="mt-0.5 flex shrink-0 items-center sm:mt-0">
-          <Icon className={cn('h-5 w-5 sm:h-6 sm:w-6', iconClassName)} />
-        </div>
+        {Icon && (
+          <div className="mt-0.5 flex shrink-0 items-center sm:mt-0">
+            <Icon className={cn('h-5 w-5 sm:h-6 sm:w-6', iconClassName)} />
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <p className={cn('text-sm font-semibold sm:font-bold', titleClassName)}>{title}</p>
           <p className={cn('text-muted-foreground mt-0.5 text-sm sm:mt-0', descriptionClassName)}>
@@ -117,7 +119,7 @@ export function Banner({
         (buttonLabel && buttonHref && (
           <Button
             asChild
-            className={cn('w-full shrink-0 sm:w-auto', colors.button, buttonClassName)}
+            className={cn('w-full shrink-0 sm:w-auto', colors?.button, buttonClassName)}
           >
             <Link href={buttonHref}>
               {buttonLabel}

@@ -29,7 +29,15 @@ import {
   Container,
   User,
   Key,
+  X,
 } from 'lucide-react';
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from '@/components/ui/accordion';
+import { Slider } from '@/components/ui/slider';
 import { motion } from 'motion/react';
 import { AdminViewingBanner } from '@/components/gastown/AdminViewingBanner';
 
@@ -126,6 +134,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
 
   // Track the server-side model so we can detect changes on save
   const savedModelRef = useRef<string>('');
+  const savedMayorModelRef = useRef<string>('');
 
   const updateConfig = useMutation(
     trpc.gastown.updateTownConfig.mutationOptions({
@@ -134,10 +143,15 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
           queryKey: trpc.gastown.getTownConfig.queryKey({ townId }),
         });
 
-        const modelChanged = defaultModel !== savedModelRef.current;
-        savedModelRef.current = defaultModel;
+        const defaultModelChanged = defaultModel !== savedModelRef.current;
+        const effectiveMayor = mayorModel || defaultModel;
+        const previousEffectiveMayor = savedMayorModelRef.current || savedModelRef.current;
+        const mayorEffectiveChanged = effectiveMayor !== previousEffectiveMayor;
 
-        if (modelChanged) {
+        savedModelRef.current = defaultModel;
+        savedMayorModelRef.current = mayorModel;
+
+        if (defaultModelChanged || mayorEffectiveChanged) {
           toast.success('Configuration saved — reloading for model change…');
           // Reload after a brief delay so the server-side model update
           // (SDK server restart + new session) has time to complete.
@@ -163,6 +177,9 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
   const [gitlabToken, setGitlabToken] = useState('');
   const [gitlabInstanceUrl, setGitlabInstanceUrl] = useState('');
   const [defaultModel, setDefaultModel] = useState('');
+  const [mayorModel, setMayorModel] = useState('');
+  const [refineryModel, setRefineryModel] = useState('');
+  const [polecatModel, setPolecatModel] = useState('');
   const [maxPolecats, setMaxPolecats] = useState<number | undefined>(undefined);
   const [refineryGates, setRefineryGates] = useState<string[]>([]);
   const [autoMerge, setAutoMerge] = useState(true);
@@ -184,6 +201,10 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
     setGitlabInstanceUrl(cfg.git_auth?.gitlab_instance_url ?? '');
     setDefaultModel(cfg.default_model ?? '');
     savedModelRef.current = cfg.default_model ?? '';
+    setMayorModel(cfg.role_models?.mayor ?? '');
+    setRefineryModel(cfg.role_models?.refinery ?? '');
+    setPolecatModel(cfg.role_models?.polecat ?? '');
+    savedMayorModelRef.current = cfg.role_models?.mayor ?? '';
     setMaxPolecats(cfg.max_polecats_per_rig);
     setRefineryGates(cfg.refinery?.gates ?? []);
     setAutoMerge(cfg.refinery?.auto_merge ?? true);
@@ -218,6 +239,11 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
           ...(gitlabInstanceUrl ? { gitlab_instance_url: gitlabInstanceUrl } : {}),
         },
         ...(defaultModel ? { default_model: defaultModel } : {}),
+        role_models: {
+          mayor: mayorModel || undefined,
+          refinery: refineryModel || undefined,
+          polecat: polecatModel || undefined,
+        },
         ...(maxPolecats ? { max_polecats_per_rig: maxPolecats } : {}),
         ...(githubCliPat && !githubCliPat.startsWith('****')
           ? { github_cli_pat: githubCliPat }
@@ -523,21 +549,73 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                     )}
                   </FieldGroup>
 
+                  <Accordion type="single" collapsible className="border-none">
+                    <AccordionItem value="role-overrides" className="border-none">
+                      <AccordionTrigger className="py-0 text-xs text-white/40 hover:text-white/60 hover:no-underline">
+                        Override by role (optional)
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-4 pt-2">
+                        {(
+                          [
+                            ['Mayor', mayorModel, setMayorModel],
+                            ['Refinery', refineryModel, setRefineryModel],
+                            ['Polecat', polecatModel, setPolecatModel],
+                          ] as const
+                        ).map(([roleLabel, roleValue, setRoleValue]) => (
+                          <FieldGroup key={roleLabel} label={roleLabel}>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1">
+                                {modelsError ? (
+                                  <Input
+                                    value={roleValue}
+                                    onChange={e => setRoleValue(e.target.value)}
+                                    placeholder="Use default"
+                                    className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
+                                  />
+                                ) : (
+                                  <ModelCombobox
+                                    label=""
+                                    models={modelOptions}
+                                    value={roleValue}
+                                    onValueChange={setRoleValue}
+                                    isLoading={isLoadingModels}
+                                    placeholder="Use default"
+                                    className="border-white/[0.08] bg-white/[0.03] text-sm text-white/85"
+                                  />
+                                )}
+                              </div>
+                              {roleValue && (
+                                <button
+                                  onClick={() => setRoleValue('')}
+                                  className="rounded p-1 text-white/25 transition-colors hover:bg-white/[0.06] hover:text-white/50"
+                                  title="Reset to default"
+                                >
+                                  <X className="size-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </FieldGroup>
+                        ))}
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+
                   <FieldGroup
                     label="Max Polecats per Rig"
                     hint="Upper bound on concurrent worker agents per rig."
                   >
-                    <Input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={maxPolecats ?? ''}
-                      onChange={e =>
-                        setMaxPolecats(e.target.value ? parseInt(e.target.value, 10) : undefined)
-                      }
-                      placeholder="5"
-                      className="w-28 border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
-                    />
+                    <div className="flex items-center gap-3">
+                      <Slider
+                        min={1}
+                        max={50}
+                        value={[maxPolecats ?? 5]}
+                        onValueChange={([v]) => setMaxPolecats(v)}
+                        className="w-full"
+                      />
+                      <span className="w-8 shrink-0 text-right font-mono text-sm text-white/70">
+                        {maxPolecats ?? 5}
+                      </span>
+                    </div>
                   </FieldGroup>
                 </div>
               </SettingsSection>

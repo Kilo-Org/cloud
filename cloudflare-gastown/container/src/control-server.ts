@@ -315,6 +315,11 @@ app.post('/repos/setup', async c => {
         platformIntegrationId: req.platformIntegrationId,
       });
 
+      const hasGitToken = !!(envVars.GIT_TOKEN || envVars.GITHUB_TOKEN || envVars.GITLAB_TOKEN);
+      console.log(
+        `[control-server] /repos/setup: cloning rigId=${req.rigId} hasGitToken=${hasGitToken} hasPlatformIntegration=${!!req.platformIntegrationId}`
+      );
+
       const browseDir = await setupRigBrowseWorktree({
         rigId: req.rigId,
         gitUrl: req.gitUrl,
@@ -323,16 +328,17 @@ app.post('/repos/setup', async c => {
       });
       console.log(`[control-server] /repos/setup: done rigId=${req.rigId} browse=${browseDir}`);
     } catch (err) {
-      // Log as a warning, not an error — this is a best-effort background
-      // operation. The mayor and agents can still function without the
-      // browse worktree; it will be retried on the next agent dispatch.
       const message = err instanceof Error ? err.message : String(err);
-      console.warn(
-        `[control-server] /repos/setup: FAILED for rigId=${req.rigId}: ${message.split('\n')[0]}`
+      const stack = err instanceof Error ? err.stack : undefined;
+      console.error(
+        `[control-server] /repos/setup: FAILED rigId=${req.rigId} gitUrl=${req.gitUrl}: ${message}`,
+        stack ? `\n${stack}` : ''
       );
     }
   };
-  doSetup().catch(() => {});
+  doSetup().catch(err => {
+    console.error(`[control-server] /repos/setup: unhandled error rigId=${req.rigId}:`, err);
+  });
 
   return c.json({ status: 'accepted', message: 'Repo setup started' }, 202);
 });

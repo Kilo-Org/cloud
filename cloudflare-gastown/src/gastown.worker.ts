@@ -120,6 +120,8 @@ import { townAuthMiddleware } from './middleware/town-auth.middleware';
 import { orgAuthMiddleware } from './middleware/org-auth.middleware';
 import { adminAuditMiddleware } from './middleware/admin-audit.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
+import { logger } from './util/log.util';
+import { useWorkersLogger } from 'workers-tagged-logger/hono';
 import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
 import {
   handleGetMoleculeCurrentStep,
@@ -146,20 +148,30 @@ export type GastownEnv = {
 
 const app = new Hono<GastownEnv>();
 
-const WORKER_LOG = '[gastown-worker]';
-
 // ── Timing ──────────────────────────────────────────────────────────────
 // Capture high-resolution start timestamp before any other middleware.
 app.use('*', timingMiddleware);
+
+// ── Structured logging context ──────────────────────────────────────────
+// Establishes AsyncLocalStorage context so all downstream logs are tagged.
+app.use('*', useWorkersLogger('gastown-worker'));
 
 // ── Request logging ─────────────────────────────────────────────────────
 app.use('*', async (c, next) => {
   const method = c.req.method;
   const path = c.req.path;
-  console.log(`${WORKER_LOG} --> ${method} ${path}`);
+  logger.info(`--> ${method} ${path}`);
   await next();
   const elapsed = Math.round(performance.now() - (c.get('requestStartTime') ?? 0));
-  console.log(`${WORKER_LOG} <-- ${method} ${path} ${c.res.status} (${elapsed}ms)`);
+  // After auth middleware has run, context vars are available.
+  logger.setTags({
+    townId: c.req.param('townId') || undefined,
+    rigId: c.req.param('rigId') || undefined,
+    agentId: c.req.param('agentId') || undefined,
+    userId: c.get('kiloUserId') || c.get('agentJWT')?.userId || undefined,
+    orgId: c.get('orgId') || undefined,
+  });
+  logger.info(`<-- ${method} ${path} ${c.res.status}`, { durationMs: elapsed });
 });
 
 // ── CORS ────────────────────────────────────────────────────────────────

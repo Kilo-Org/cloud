@@ -1124,6 +1124,9 @@ importers:
       pg:
         specifier: ^8.16.3
         version: 8.20.0
+      workers-tagged-logger:
+        specifier: 'catalog:'
+        version: 1.0.0
       zod:
         specifier: 'catalog:'
         version: 4.3.6
@@ -21625,7 +21628,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.15
       tinyrainbow: 2.0.0
-      vitest: 3.2.4(@types/debug@4.1.12)(@types/node@25.5.0)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+      vitest: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.15)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
 
   '@vitest/utils@3.2.4':
     dependencies:

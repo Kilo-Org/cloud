@@ -831,17 +831,38 @@ export async function updateAgentModel(
   // gets the same git identity, auth tokens, and plugin vars. Exclude
   // KILO_CONFIG_CONTENT / OPENCODE_CONFIG_CONTENT — those were already
   // rebuilt above with the new model and set on process.env.
-  // For GASTOWN_CONTAINER_TOKEN, prefer the live process.env value since
-  // /refresh-token rotates it after initial dispatch.
+  //
+  // For env vars that syncConfigToContainer can update at runtime, prefer
+  // the live process.env value over the stale startupEnv snapshot.
+  const LIVE_ENV_KEYS = new Set([
+    'GASTOWN_CONTAINER_TOKEN',
+    'GIT_TOKEN',
+    'GITLAB_TOKEN',
+    'GITLAB_INSTANCE_URL',
+    'GITHUB_CLI_PAT',
+    'GASTOWN_GIT_AUTHOR_NAME',
+    'GASTOWN_GIT_AUTHOR_EMAIL',
+    'GASTOWN_DISABLE_AI_COAUTHOR',
+  ]);
   const hotSwapEnv: Record<string, string> = {};
   for (const [key, value] of Object.entries(agent.startupEnv)) {
     if (key === 'KILO_CONFIG_CONTENT' || key === 'OPENCODE_CONFIG_CONTENT') continue;
-    if (key === 'GASTOWN_CONTAINER_TOKEN') {
-      const live = process.env.GASTOWN_CONTAINER_TOKEN;
+    if (LIVE_ENV_KEYS.has(key)) {
+      const live = process.env[key];
       if (live) hotSwapEnv[key] = live;
       continue;
     }
     hotSwapEnv[key] = value;
+  }
+
+  // Re-derive GH_TOKEN from live values using the same priority chain
+  // as buildAgentEnv: GITHUB_CLI_PAT > GIT_TOKEN > GITHUB_TOKEN.
+  // syncConfigToContainer updates these on process.env, but buildAgentEnv
+  // only ran once at initial dispatch.
+  const liveGhCliPat = process.env.GITHUB_CLI_PAT;
+  const liveGhToken = liveGhCliPat ?? process.env.GIT_TOKEN ?? process.env.GITHUB_TOKEN;
+  if (liveGhToken) {
+    hotSwapEnv.GH_TOKEN = liveGhToken;
   }
 
   try {

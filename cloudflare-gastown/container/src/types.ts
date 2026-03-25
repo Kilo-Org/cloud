@@ -78,6 +78,8 @@ export type SendMessageRequest = z.infer<typeof SendMessageRequest>;
 export const UpdateAgentModelRequest = z.object({
   model: z.string().min(1),
   smallModel: z.string().optional(),
+  /** Pre-formatted conversation history to inject into the new session prompt. */
+  conversationHistory: z.string().optional(),
 });
 export type UpdateAgentModelRequest = z.infer<typeof UpdateAgentModelRequest>;
 

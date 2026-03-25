@@ -2016,12 +2016,17 @@ export class TownDO extends DurableObject<Env> {
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
 
     if (isAlive) {
+      // Reconstruct conversation history so the new session retains context
+      // (same mechanism used for container restarts — see PR #1494).
+      const conversationHistory = await this.reconstructConversation(mayor.id);
+
       const updated = await dispatch.updateAgentModelInContainer(
         this.env,
         townId,
         mayor.id,
         model,
-        smallModel
+        smallModel,
+        conversationHistory || undefined
       );
       if (updated) {
         console.log(

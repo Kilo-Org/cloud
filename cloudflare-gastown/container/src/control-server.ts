@@ -211,7 +211,12 @@ app.patch('/agents/:agentId/model', async c => {
     return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
   }
 
-  await updateAgentModel(agentId, parsed.data.model, parsed.data.smallModel);
+  await updateAgentModel(
+    agentId,
+    parsed.data.model,
+    parsed.data.smallModel,
+    parsed.data.conversationHistory
+  );
   return c.json({ updated: true });
 });
 

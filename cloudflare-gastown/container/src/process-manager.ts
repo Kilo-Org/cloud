@@ -782,7 +782,8 @@ const MAYOR_STARTUP_PROMPT = 'Mayor ready. Waiting for instructions.';
 export async function updateAgentModel(
   agentId: string,
   model: string,
-  smallModel?: string
+  smallModel?: string,
+  conversationHistory?: string
 ): Promise<void> {
   const agent = agents.get(agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);
@@ -864,12 +865,17 @@ export async function updateAgentModel(
       newInstance.sessionCount++;
     }
 
-    // Send the startup prompt so the mayor is ready for instructions.
+    // Send the startup prompt, including conversation history if available
+    // so the mayor retains context across model changes (same mechanism
+    // used for container restarts — see PR #1494).
+    const prompt = conversationHistory
+      ? `${conversationHistory}\n\n${MAYOR_STARTUP_PROMPT}`
+      : MAYOR_STARTUP_PROMPT;
     const modelParam = { providerID: 'kilo', modelID: model };
     await client.session.prompt({
       path: { id: agent.sessionId },
       body: {
-        parts: [{ type: 'text', text: MAYOR_STARTUP_PROMPT }],
+        parts: [{ type: 'text', text: prompt }],
         model: modelParam,
       },
     });
@@ -886,7 +892,7 @@ export async function updateAgentModel(
       role: agent.role,
       name: agent.name,
       model,
-      prompt: MAYOR_STARTUP_PROMPT,
+      prompt,
       rigId: agent.rigId,
       townId: agent.townId,
       identity: '',

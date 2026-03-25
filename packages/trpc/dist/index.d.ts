@@ -3396,6 +3396,18 @@ type ReassociateVolumeResponse = {
     newVolumeId: string;
     newRegion: string;
 };
+/** Response from GET /api/platform/regions */
+type RegionsResponse = {
+    regions: string[];
+    source: 'kv' | 'env' | 'default';
+    raw: string;
+};
+/** Response from PUT /api/platform/regions */
+type UpdateRegionsResponse = {
+    ok: true;
+    regions: string[];
+    raw: string;
+};
 
 /** Keep in sync with: kiloclaw/controller/src/routes/files.ts, kiloclaw/src/.../gateway.ts (Zod) */
 interface FileNode {
@@ -9946,6 +9958,15 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                 };
                 meta: object;
             }>;
+            forceRetryRecovery: _trpc_server.TRPCMutationProcedure<{
+                input: {
+                    userId: string;
+                };
+                output: {
+                    ok: true;
+                };
+                meta: object;
+            }>;
             machineStop: _trpc_server.TRPCMutationProcedure<{
                 input: {
                     userId: string;
@@ -10187,6 +10208,39 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     email: string;
                     name: string;
                 }[];
+                meta: object;
+            }>;
+        }>>;
+        kiloclawRegions: _trpc_server.TRPCBuiltRouter<{
+            ctx: TRPCContext;
+            meta: object;
+            errorShape: {
+                data: {
+                    zodError: {
+                        formErrors: string[];
+                        fieldErrors: {};
+                    } | null;
+                    upstreamCode: string | undefined;
+                    code: _trpc_server.TRPC_ERROR_CODE_KEY;
+                    httpStatus: number;
+                    path?: string;
+                    stack?: string;
+                };
+                message: string;
+                code: _trpc_server.TRPC_ERROR_CODE_NUMBER;
+            };
+            transformer: false;
+        }, _trpc_server.TRPCDecorateCreateRouterOptions<{
+            getRegions: _trpc_server.TRPCQueryProcedure<{
+                input: void;
+                output: RegionsResponse;
+                meta: object;
+            }>;
+            updateRegions: _trpc_server.TRPCMutationProcedure<{
+                input: {
+                    regions: string[];
+                };
+                output: UpdateRegionsResponse;
                 meta: object;
             }>;
         }>>;
@@ -10880,6 +10934,11 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     owner_user_id?: string | undefined;
                     kilocode_token?: string | undefined;
                     default_model?: string | null | undefined;
+                    role_models?: {
+                        mayor?: string | null | undefined;
+                        refinery?: string | null | undefined;
+                        polecat?: string | null | undefined;
+                    } | null | undefined;
                     small_model?: string | null | undefined;
                     max_polecats_per_rig?: number | undefined;
                     refinery?: {
@@ -11016,6 +11075,11 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                         owner_user_id?: string | undefined;
                         kilocode_token?: string | undefined;
                         default_model?: string | null | undefined;
+                        role_models?: {
+                            mayor?: string | null | undefined;
+                            refinery?: string | null | undefined;
+                            polecat?: string | null | undefined;
+                        } | null | undefined;
                         small_model?: string | null | undefined;
                         max_polecats_per_rig?: number | undefined;
                         merge_strategy?: "direct" | "pr" | undefined;
@@ -11044,6 +11108,11 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     owner_user_id?: string | undefined;
                     kilocode_token?: string | undefined;
                     default_model?: string | null | undefined;
+                    role_models?: {
+                        mayor?: string | null | undefined;
+                        refinery?: string | null | undefined;
+                        polecat?: string | null | undefined;
+                    } | null | undefined;
                     small_model?: string | null | undefined;
                     max_polecats_per_rig?: number | undefined;
                     refinery?: {

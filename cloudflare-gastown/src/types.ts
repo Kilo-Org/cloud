@@ -233,7 +233,7 @@ export const TownConfigSchema = z.object({
   small_model: z.string().optional(),
 
   /** Maximum concurrent polecats per rig */
-  max_polecats_per_rig: z.number().int().min(1).max(20).optional(),
+  max_polecats_per_rig: z.number().int().min(1).max(50).optional(),
 
   /**
    * Town-level merge strategy. Rigs inherit this when they don't set their own.
@@ -309,7 +309,7 @@ export const TownConfigUpdateSchema = z.object({
   kilocode_token: z.string().optional(),
   default_model: z.string().optional(),
   small_model: z.string().optional(),
-  max_polecats_per_rig: z.number().int().min(1).max(20).optional(),
+  max_polecats_per_rig: z.number().int().min(1).max(50).optional(),
   merge_strategy: MergeStrategy.optional(),
   refinery: z
     .object({

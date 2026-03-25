@@ -156,8 +156,9 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
   }, [size]);
 
   const exitFullscreen = useCallback(() => {
+    setSize(previousSizeRef.current);
     setIsFullscreen(false);
-  }, []);
+  }, [setSize]);
 
   const toggleFullscreen = useCallback(() => {
     if (isFullscreen) {

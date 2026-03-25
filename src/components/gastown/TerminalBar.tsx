@@ -146,13 +146,59 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
   const effectiveActiveId = activeTabId ?? 'mayor';
   const activeTab = allTabs.find(t => t.id === effectiveActiveId) ?? allTabs[0];
 
+  // ── Fullscreen state ────────────────────────────────────────────────
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const previousSizeRef = useRef<number>(size);
+
+  const enterFullscreen = useCallback(() => {
+    previousSizeRef.current = size;
+    setIsFullscreen(true);
+  }, [size]);
+
+  const exitFullscreen = useCallback(() => {
+    setIsFullscreen(false);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (isFullscreen) {
+      exitFullscreen();
+    } else {
+      enterFullscreen();
+    }
+  }, [isFullscreen, enterFullscreen, exitFullscreen]);
+
+  // Escape key exits fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        exitFullscreen();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen, exitFullscreen]);
+
   // ── Resize drag logic ──────────────────────────────────────────────
   const isDragging = useRef(false);
   const startPos = useRef(0);
   const startSize = useRef(0);
+  const lastClickTime = useRef(0);
 
   const onResizePointerDown = useCallback(
     (e: React.PointerEvent) => {
+      // Prevent drag on double-click (detected by < 300ms between clicks)
+      const now = Date.now();
+      if (now - lastClickTime.current < 300) {
+        return;
+      }
+      lastClickTime.current = now;
+
+      if (isFullscreen) {
+        exitFullscreen();
+        return;
+      }
+
       e.preventDefault();
       isDragging.current = true;
       startSize.current = size;
@@ -184,14 +230,37 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
       document.addEventListener('pointermove', onPointerMove);
       document.addEventListener('pointerup', onPointerUp);
     },
-    [size, position, horizontal, setSize]
+    [size, position, horizontal, setSize, isFullscreen, exitFullscreen]
   );
+
+  // Double-click handler for resize bar
+  const onResizeDoubleClick = useCallback(() => {
+    if (!collapsed) {
+      toggleFullscreen();
+    }
+  }, [collapsed, toggleFullscreen]);
 
   // ── Compute container styles ───────────────────────────────────────
   const totalSize = collapsed ? COLLAPSED_SIZE : COLLAPSED_SIZE + size;
 
   const containerStyle = (() => {
-    const base: React.CSSProperties = { zIndex: 50 };
+    const base: React.CSSProperties = {
+      zIndex: 50,
+      transition: 'left 0.3s ease-in-out, right 0.3s ease-in-out, top 0.3s ease-in-out, bottom 0.3s ease-in-out, width 0.3s ease-in-out, height 0.3s ease-in-out',
+    };
+
+    if (isFullscreen) {
+      const fullscreenStyles: React.CSSProperties = {
+        ...base,
+        left: sidebarLeft,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: 'auto',
+        height: 'auto',
+      };
+      return fullscreenStyles;
+    }
 
     if (position === 'bottom') {
       return {
@@ -277,7 +346,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
         {position === 'bottom' && (
           <>
             {!collapsed && (
-              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown} onDoubleClick={onResizeDoubleClick}>
                 <div className={resizeHandleIndicator} />
               </div>
             )}
@@ -326,7 +395,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               closeTab={closeTab}
             />
             {!collapsed && (
-              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown} onDoubleClick={onResizeDoubleClick}>
                 <div className={resizeHandleIndicator} />
               </div>
             )}
@@ -335,7 +404,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
         {position === 'right' && (
           <>
             {!collapsed && (
-              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown} onDoubleClick={onResizeDoubleClick}>
                 <div className={resizeHandleIndicator} />
               </div>
             )}
@@ -384,7 +453,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               alarmWs={alarmWs}
             />
             {!collapsed && (
-              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown} onDoubleClick={onResizeDoubleClick}>
                 <div className={resizeHandleIndicator} />
               </div>
             )}

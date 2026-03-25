@@ -16,7 +16,7 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
-import { auto_deleted_at, db, sql } from '@/lib/drizzle';
+import { auto_deleted_at, db, readDb, sql } from '@/lib/drizzle';
 import { and, eq, isNull, gt } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@/lib/constants';
 import { randomUUID } from 'crypto';
@@ -54,7 +54,7 @@ export async function findOrganizationByStripeCustomerId(
 export async function getUserOrganizationsWithSeats(
   userId: User['id']
 ): Promise<UserOrganizationWithSeats[]> {
-  const results = await db
+  const results = await readDb
     .select({
       organization: organizations,
       membership: organization_memberships,

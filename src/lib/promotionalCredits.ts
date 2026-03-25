@@ -1,4 +1,4 @@
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, readDb, type DrizzleTransaction } from '@/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
 import { getCustomerInfo } from './customerInfo';
 import type { User, Organization } from '@kilocode/db/schema';
@@ -282,7 +282,7 @@ export async function grantCreditForCategoryConfig(
  * Check if a user has received a promotional credit category
  */
 export async function hasReceivedPromotion(userId: string, promoId: string): Promise<boolean> {
-  const result = await db
+  const result = await readDb
     .select({ id: credit_transactions.id })
     .from(credit_transactions)
     .where(

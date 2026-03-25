@@ -76,7 +76,7 @@ export async function getCreditTransactionsForOrganization(organizationId: Organ
 }
 
 export async function hasUserEverPaid(kiloUserId: string): Promise<boolean> {
-  const result = await db.query.credit_transactions.findFirst({
+  const result = await readDb.query.credit_transactions.findFirst({
     where: and(
       eq(credit_transactions.kilo_user_id, kiloUserId),
       eq(credit_transactions.is_free, false),
@@ -90,7 +90,7 @@ export async function hasUserEverPaid(kiloUserId: string): Promise<boolean> {
 export async function hasOrganizationEverPaid(
   organizationId: Organization['id']
 ): Promise<boolean> {
-  const result = await db.query.credit_transactions.findFirst({
+  const result = await readDb.query.credit_transactions.findFirst({
     where: and(
       eq(credit_transactions.organization_id, organizationId),
       eq(credit_transactions.is_free, false)

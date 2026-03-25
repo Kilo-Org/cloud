@@ -502,9 +502,14 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
         })
       );
 
-      const failures = rigSetupResults
-        .map((r, i) => (r.status === 'rejected' ? { rigId: request.rigs![i].rigId, error: r.reason } : null))
-        .filter((f): f is { rigId: string; error: unknown } => f !== null);
+      const failures: Array<{ rigId: string; error: unknown }> = [];
+      for (let i = 0; i < rigSetupResults.length; i++) {
+        const r = rigSetupResults[i];
+        if (r.status === 'rejected') {
+          const reason: unknown = r.reason;
+          failures.push({ rigId: request.rigs[i].rigId, error: reason });
+        }
+      }
 
       if (failures.length > 0) {
         for (const f of failures) {
@@ -517,7 +522,7 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
         }
         console.error(
           `[runAgent] mayor rig setup: ${failures.length}/${request.rigs.length} rigs failed. ` +
-          `Mayor will start but may not be able to browse these codebases.`
+            `Mayor will start but may not be able to browse these codebases.`
         );
       }
     }

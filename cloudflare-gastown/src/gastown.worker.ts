@@ -121,7 +121,7 @@ import { orgAuthMiddleware } from './middleware/org-auth.middleware';
 import { adminAuditMiddleware } from './middleware/admin-audit.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
 import { logger } from './util/log.util';
-import { useWorkersLogger } from 'workers-tagged-logger/hono';
+import { useWorkersLogger } from 'workers-tagged-logger';
 import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
 import {
   handleGetMoleculeCurrentStep,

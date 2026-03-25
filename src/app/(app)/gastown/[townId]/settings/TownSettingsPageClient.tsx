@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useUser } from '@/hooks/useUser';
@@ -27,12 +27,26 @@ import {
   Container,
   User,
   Key,
+  Github,
+  ChevronDown,
+  Copy,
+  Check,
+  Loader2,
+  X,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
 type Props = { townId: string; readOnly?: boolean };
 
 type EnvVarEntry = { key: string; value: string; isNew?: boolean };
+
+type DeviceFlowState = {
+  userCode: string;
+  verificationUri: string;
+  deviceCode: string;
+  interval: number;
+  expiresIn: number;
+};
 
 // Section definitions for the scrollspy nav
 const SECTIONS = [
@@ -103,6 +117,7 @@ export function TownSettingsPageClient({ townId, readOnly = false }: Props) {
 
   const townQuery = useQuery(trpc.gastown.getTown.queryOptions({ townId }));
   const configQuery = useQuery(trpc.gastown.getTownConfig.queryOptions({ townId }));
+  const githubOAuthStatus = useQuery(trpc.gastown.githubOAuthStatus.queryOptions({ townId }));
 
   const effectiveReadOnly = readOnly && currentUser?.id !== configQuery.data?.created_by_user_id;
 
@@ -125,6 +140,38 @@ export function TownSettingsPageClient({ townId, readOnly = false }: Props) {
     })
   );
 
+  const githubOAuthDeviceCode = useMutation(
+    trpc.gastown.githubOAuthDeviceCode.mutationOptions({
+      onSuccess: data => {
+        setDeviceFlowState({
+          userCode: data.userCode,
+          verificationUri: data.verificationUri,
+          deviceCode: data.deviceCode,
+          interval: data.interval,
+          expiresIn: data.expiresIn,
+        });
+      },
+      onError: err => toast.error(`Failed to start GitHub connection: ${err.message}`),
+    })
+  );
+
+  const githubOAuthPollMutation = useMutation(trpc.gastown.githubOAuthPoll.mutationOptions({}));
+
+  const githubOAuthDisconnect = useMutation(
+    trpc.gastown.githubOAuthDisconnect.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gastown.githubOAuthStatus.queryKey({ townId }),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gastown.getTownConfig.queryKey({ townId }),
+        });
+        toast.success('GitHub account disconnected');
+      },
+      onError: err => toast.error(`Disconnect failed: ${err.message}`),
+    })
+  );
+
   // Local state for form fields
   const [envVars, setEnvVars] = useState<EnvVarEntry[]>([]);
   const [githubToken, setGithubToken] = useState('');
@@ -142,6 +189,9 @@ export function TownSettingsPageClient({ townId, readOnly = false }: Props) {
   const [disableAiCoauthor, setDisableAiCoauthor] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [showTokens, setShowTokens] = useState(false);
+  const [deviceFlowState, setDeviceFlowState] = useState<DeviceFlowState | null>(null);
+  const [showManualPat, setShowManualPat] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   // Sync config into local state when loaded
   if (configQuery.data && !initialized) {
@@ -166,6 +216,70 @@ export function TownSettingsPageClient({ townId, readOnly = false }: Props) {
   const { activeId: activeSection, scrollTo: scrollToSection } = useScrollSpy(
     SECTIONS.map(s => s.id)
   );
+
+  // GitHub OAuth Device Flow polling
+  const cancelDeviceFlow = useCallback(() => {
+    setDeviceFlowState(null);
+    setCodeCopied(false);
+  }, []);
+
+  // Use a ref for the poll mutate function to avoid re-triggering the effect
+  const pollMutateRef = useRef(githubOAuthPollMutation.mutate);
+  pollMutateRef.current = githubOAuthPollMutation.mutate;
+
+  useEffect(() => {
+    if (!deviceFlowState) return;
+
+    const intervalMs = (deviceFlowState.interval || 5) * 1000;
+    const expiresAt = Date.now() + deviceFlowState.expiresIn * 1000;
+
+    const timer = setInterval(() => {
+      if (Date.now() > expiresAt) {
+        clearInterval(timer);
+        toast.error('Authorization timed out. Please try again.');
+        setDeviceFlowState(null);
+        setCodeCopied(false);
+        return;
+      }
+
+      pollMutateRef.current(
+        { townId, deviceCode: deviceFlowState.deviceCode },
+        {
+          onSuccess: result => {
+            if (result.status === 'complete') {
+              clearInterval(timer);
+              setDeviceFlowState(null);
+              setCodeCopied(false);
+              toast.success(`Connected as @${result.username}`);
+              void queryClient.invalidateQueries({
+                queryKey: trpc.gastown.githubOAuthStatus.queryKey({ townId }),
+              });
+              void queryClient.invalidateQueries({
+                queryKey: trpc.gastown.getTownConfig.queryKey({ townId }),
+              });
+            }
+          },
+          onError: err => {
+            clearInterval(timer);
+            toast.error(`Authorization failed: ${err.message}`);
+            setDeviceFlowState(null);
+            setCodeCopied(false);
+          },
+        }
+      );
+    }, intervalMs);
+
+    return () => clearInterval(timer);
+  }, [deviceFlowState, townId, queryClient, trpc]);
+
+  function copyUserCode() {
+    if (!deviceFlowState) return;
+    void navigator.clipboard.writeText(deviceFlowState.userCode).then(() => {
+      setCodeCopied(true);
+      toast.success('Code copied to clipboard');
+      setTimeout(() => setCodeCopied(false), 2000);
+    });
+  }
 
   function handleSave() {
     const envVarObj: Record<string, string> = {};
@@ -337,24 +451,132 @@ export function TownSettingsPageClient({ townId, readOnly = false }: Props) {
               <SettingsSection
                 id="github-cli"
                 title="GitHub CLI"
-                description="Personal Access Token used exclusively for gh CLI operations (PRs, issues, reviews). Git clone and push still use the integration token above."
+                description="Authenticate gh CLI operations (PRs, issues, reviews). Git clone and push still use the integration token above."
                 icon={Key}
                 index={1}
               >
-                <div className="space-y-4">
-                  <FieldGroup
-                    label="GitHub Personal Access Token"
-                    hint="When set, PRs and issues created by agents will appear under your GitHub identity. Requires repo scope (or fine-grained: contents, pull_requests, issues)."
-                  >
-                    <Input
-                      type={showTokens ? 'text' : 'password'}
-                      value={githubCliPat}
-                      onChange={e => setGithubCliPat(e.target.value)}
-                      placeholder="ghp_xxxxxxxxxxxx or github_pat_xxxxxxxxxxxx"
-                      className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
-                    />
-                  </FieldGroup>
-                </div>
+                {/* Connected state */}
+                {githubOAuthStatus.data?.connected ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between rounded-lg border border-[color:oklch(95%_0.15_108_/_0.15)] bg-[color:oklch(95%_0.15_108_/_0.04)] px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={`https://github.com/${githubOAuthStatus.data.username}.png?size=64`}
+                          alt={githubOAuthStatus.data.username}
+                          className="size-10 rounded-full ring-1 ring-white/10"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-white/85">
+                            @{githubOAuthStatus.data.username}
+                          </p>
+                          {githubOAuthStatus.data.connectedAt && (
+                            <p className="text-[11px] text-white/35">
+                              Connected{' '}
+                              {new Date(githubOAuthStatus.data.connectedAt).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => githubOAuthDisconnect.mutate({ townId })}
+                        disabled={githubOAuthDisconnect.isPending}
+                        variant="secondary"
+                        size="sm"
+                        className="gap-1.5 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                      >
+                        <X className="size-3" />
+                        {githubOAuthDisconnect.isPending ? 'Disconnecting...' : 'Disconnect'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : deviceFlowState ? (
+                  /* Connecting state — device flow in progress */
+                  <div className="space-y-4">
+                    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-white/[0.15] bg-white/[0.02] px-4 py-6">
+                      <p className="text-xs text-white/40">
+                        Enter this code at GitHub to connect your account
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <code className="rounded-lg border border-white/[0.1] bg-white/[0.05] px-5 py-3 font-mono text-2xl font-bold tracking-[0.2em] text-white/90">
+                          {deviceFlowState.userCode}
+                        </code>
+                        <button
+                          onClick={copyUserCode}
+                          className="rounded-md p-2 text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white/70"
+                          title="Copy code"
+                        >
+                          {codeCopied ? (
+                            <Check className="size-4 text-[color:oklch(95%_0.15_108)]" />
+                          ) : (
+                            <Copy className="size-4" />
+                          )}
+                        </button>
+                      </div>
+                      <a
+                        href={deviceFlowState.verificationUri}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-[color:oklch(95%_0.15_108_/_0.8)] underline decoration-white/20 underline-offset-2 transition-colors hover:text-[color:oklch(95%_0.15_108)]"
+                      >
+                        Enter this code at github.com/login/device
+                      </a>
+                      <div className="flex items-center gap-2 pt-1 text-xs text-white/35">
+                        <Loader2 className="size-3 animate-spin" />
+                        Waiting for authorization...
+                      </div>
+                    </div>
+                    <div className="flex justify-center">
+                      <button
+                        onClick={cancelDeviceFlow}
+                        className="rounded-md px-3 py-1.5 text-xs text-white/40 transition-colors hover:bg-white/[0.04] hover:text-white/60"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Disconnected state — show Connect button and collapsible manual PAT */
+                  <div className="space-y-4">
+                    <Button
+                      onClick={() => githubOAuthDeviceCode.mutate({ townId })}
+                      disabled={githubOAuthDeviceCode.isPending}
+                      variant="primary"
+                      size="sm"
+                      className="gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] px-4 py-2.5 text-sm text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+                    >
+                      <Github className="size-4" />
+                      {githubOAuthDeviceCode.isPending ? 'Connecting...' : 'Connect GitHub'}
+                    </Button>
+
+                    <div className="border-t border-white/[0.06] pt-3">
+                      <button
+                        onClick={() => setShowManualPat(prev => !prev)}
+                        className="flex items-center gap-1.5 text-xs text-white/35 transition-colors hover:text-white/55"
+                      >
+                        <ChevronDown
+                          className={`size-3 transition-transform ${showManualPat ? '' : '-rotate-90'}`}
+                        />
+                        Or enter a token manually
+                      </button>
+                      {showManualPat && (
+                        <div className="mt-3">
+                          <FieldGroup
+                            label="GitHub Personal Access Token"
+                            hint="When set, PRs and issues created by agents will appear under your GitHub identity. Requires repo scope (or fine-grained: contents, pull_requests, issues)."
+                          >
+                            <Input
+                              type={showTokens ? 'text' : 'password'}
+                              value={githubCliPat}
+                              onChange={e => setGithubCliPat(e.target.value)}
+                              placeholder="ghp_xxxxxxxxxxxx or github_pat_xxxxxxxxxxxx"
+                              className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
+                            />
+                          </FieldGroup>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </SettingsSection>
 
               {/* ── Commit Identity ─────────────────────────────────── */}

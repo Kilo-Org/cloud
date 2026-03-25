@@ -454,6 +454,8 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           | undefined;
         staged_convoys_default: boolean;
         github_cli_pat?: string | undefined;
+        github_cli_oauth_username?: string | undefined;
+        github_cli_oauth_connected_at?: string | undefined;
         git_author_name?: string | undefined;
         git_author_email?: string | undefined;
         disable_ai_coauthor: boolean;
@@ -495,6 +497,8 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
             | undefined;
           staged_convoys_default?: boolean | undefined;
           github_cli_pat?: string | undefined;
+          github_cli_oauth_username?: string | undefined;
+          github_cli_oauth_connected_at?: string | undefined;
           git_author_name?: string | undefined;
           git_author_email?: string | undefined;
           disable_ai_coauthor?: boolean | undefined;
@@ -537,6 +541,43 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         townId: string;
       };
       output: void;
+      meta: object;
+    }>;
+    githubOAuthDeviceCode: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        townId: string;
+      };
+      output: {
+        userCode: string;
+        verificationUri: string;
+        deviceCode: string;
+        expiresIn: number;
+        interval: number;
+      };
+      meta: object;
+    }>;
+    githubOAuthPoll: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        townId: string;
+        deviceCode: string;
+      };
+      output: { status: 'pending' } | { status: 'complete'; username: string; avatarUrl: string };
+      meta: object;
+    }>;
+    githubOAuthDisconnect: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        townId: string;
+      };
+      output: void;
+      meta: object;
+    }>;
+    githubOAuthStatus: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        townId: string;
+      };
+      output:
+        | { connected: true; username: string; connectedAt: string | undefined }
+        | { connected: false };
       meta: object;
     }>;
     getBeadEvents: import('@trpc/server').TRPCQueryProcedure<{
@@ -1660,6 +1701,8 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               | undefined;
             staged_convoys_default: boolean;
             github_cli_pat?: string | undefined;
+            github_cli_oauth_username?: string | undefined;
+            github_cli_oauth_connected_at?: string | undefined;
             git_author_name?: string | undefined;
             git_author_email?: string | undefined;
             disable_ai_coauthor: boolean;
@@ -1701,6 +1744,8 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                 | undefined;
               staged_convoys_default?: boolean | undefined;
               github_cli_pat?: string | undefined;
+              github_cli_oauth_username?: string | undefined;
+              github_cli_oauth_connected_at?: string | undefined;
               git_author_name?: string | undefined;
               git_author_email?: string | undefined;
               disable_ai_coauthor?: boolean | undefined;
@@ -1743,6 +1788,45 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             townId: string;
           };
           output: void;
+          meta: object;
+        }>;
+        githubOAuthDeviceCode: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            townId: string;
+          };
+          output: {
+            userCode: string;
+            verificationUri: string;
+            deviceCode: string;
+            expiresIn: number;
+            interval: number;
+          };
+          meta: object;
+        }>;
+        githubOAuthPoll: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            townId: string;
+            deviceCode: string;
+          };
+          output:
+            | { status: 'pending' }
+            | { status: 'complete'; username: string; avatarUrl: string };
+          meta: object;
+        }>;
+        githubOAuthDisconnect: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            townId: string;
+          };
+          output: void;
+          meta: object;
+        }>;
+        githubOAuthStatus: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            townId: string;
+          };
+          output:
+            | { connected: true; username: string; connectedAt: string | undefined }
+            | { connected: false };
           meta: object;
         }>;
         getBeadEvents: import('@trpc/server').TRPCQueryProcedure<{

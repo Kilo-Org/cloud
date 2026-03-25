@@ -132,9 +132,12 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
   const effectiveReadOnly =
     isAdminViewing || (readOnly && currentUser?.id !== configQuery.data?.created_by_user_id);
 
-  // Track the server-side model so we can detect changes on save
+  // Track server-side values so we can detect changes that require a reload
   const savedModelRef = useRef<string>('');
   const savedMayorModelRef = useRef<string>('');
+  const savedGithubCliPatRef = useRef<string>('');
+  const savedGithubTokenRef = useRef<string>('');
+  const savedGitlabTokenRef = useRef<string>('');
 
   const updateConfig = useMutation(
     trpc.gastown.updateTownConfig.mutationOptions({
@@ -148,13 +151,28 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
         const previousEffectiveMayor = savedMayorModelRef.current || savedModelRef.current;
         const mayorEffectiveChanged = effectiveMayor !== previousEffectiveMayor;
 
+        // Detect auth config changes that trigger an SDK server restart.
+        // Compare against the non-masked form: if the current value starts
+        // with "****" it wasn't changed by the user, so skip the comparison.
+        const ghCliPatChanged =
+          !githubCliPat.startsWith('****') && githubCliPat !== savedGithubCliPatRef.current;
+        const ghTokenChanged =
+          !githubToken.startsWith('****') && githubToken !== savedGithubTokenRef.current;
+        const glTokenChanged =
+          !gitlabToken.startsWith('****') && gitlabToken !== savedGitlabTokenRef.current;
+        const authChanged = ghCliPatChanged || ghTokenChanged || glTokenChanged;
+
         savedModelRef.current = defaultModel;
         savedMayorModelRef.current = mayorModel;
+        if (!githubCliPat.startsWith('****')) savedGithubCliPatRef.current = githubCliPat;
+        if (!githubToken.startsWith('****')) savedGithubTokenRef.current = githubToken;
+        if (!gitlabToken.startsWith('****')) savedGitlabTokenRef.current = gitlabToken;
 
-        if (defaultModelChanged || mayorEffectiveChanged) {
-          toast.success('Configuration saved — reloading for model change…');
-          // Reload after a brief delay so the server-side model update
-          // (SDK server restart + new session) has time to complete.
+        if (defaultModelChanged || mayorEffectiveChanged || authChanged) {
+          const reason = authChanged ? 'credential change' : 'model change';
+          toast.success(`Configuration saved — reloading for ${reason}…`);
+          // Reload after a brief delay so the server-side SDK server
+          // restart has time to complete.
           setTimeout(() => window.location.reload(), 2000);
         } else {
           toast.success('Configuration saved');
@@ -211,6 +229,9 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
     setMergeStrategy(cfg.merge_strategy === 'pr' ? 'pr' : 'direct');
     setStagedConvoysDefault(cfg.staged_convoys_default ?? false);
     setGithubCliPat(cfg.github_cli_pat ?? '');
+    savedGithubCliPatRef.current = cfg.github_cli_pat ?? '';
+    savedGithubTokenRef.current = cfg.git_auth?.github_token ?? '';
+    savedGitlabTokenRef.current = cfg.git_auth?.gitlab_token ?? '';
     setGitAuthorName(cfg.git_author_name ?? '');
     setGitAuthorEmail(cfg.git_author_email ?? '');
     setDisableAiCoauthor(cfg.disable_ai_coauthor ?? false);

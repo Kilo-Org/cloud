@@ -28,6 +28,7 @@ import {
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
 } from '@/lib/autoTopUpConstants';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
+import { getBalanceForUser } from '@/lib/user.balance';
 
 const ViewTypeSchema = z.union([z.literal('personal'), z.literal('all'), z.uuid()]);
 
@@ -150,6 +151,13 @@ export const userRouter = createTRPCRouter({
         ...getCreditBlocks(transactions, now, ctx.user, ctx.user.id),
         autoTopUpEnabled: ctx.user.auto_top_up_enabled,
       };
+    }),
+
+  getBalance: baseProcedure
+    .output(z.object({ balance: z.number(), isDepleted: z.boolean() }))
+    .query(async ({ ctx }) => {
+      const { balance } = await getBalanceForUser(ctx.user);
+      return { balance, isDepleted: balance <= 0 };
     }),
 
   getAutocompleteMetrics: baseProcedure

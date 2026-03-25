@@ -1389,7 +1389,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               <User className="text-muted-foreground h-4 w-4 shrink-0" />
               <DetailField label="User">
                 <Link
-                  href={`/admin/users/${data.user_id}`}
+                  href={`/admin/users/${encodeURIComponent(data.user_id)}`}
                   className="text-blue-600 hover:underline"
                 >
                   {data.user_email ?? data.user_id}

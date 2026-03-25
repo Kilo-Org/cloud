@@ -17,6 +17,13 @@ export function execPresetToConfig(preset: ExecPreset): { security: string; ask:
   }
 }
 
+/** Reverse-map stored exec config values back to a preset, or null if unrecognised. */
+export function configToExecPreset(security: string | null, ask: string | null): ExecPreset | null {
+  if (security === 'full' && ask === 'off') return 'never-ask';
+  if (security === 'allowlist' && ask === 'on-miss') return 'always-ask';
+  return null;
+}
+
 /**
  * Build the openclaw.json config patch that enables a channel with its token(s).
  * The shape must match what the controller writes in config-writer.ts.

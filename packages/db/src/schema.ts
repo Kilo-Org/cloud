@@ -3308,6 +3308,7 @@ export const kiloclaw_instances = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     sandbox_id: text().notNull(),
+    name: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),
   },

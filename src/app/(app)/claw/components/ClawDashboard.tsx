@@ -21,6 +21,7 @@ import { InstanceTab } from './InstanceTab';
 import { OpenClawButton } from './OpenClawButton';
 import { SettingsTab } from './SettingsTab';
 import { ChangelogTab } from './ChangelogTab';
+import { ChannelPairingStep } from './ChannelPairingStep';
 import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { PermissionStep } from './PermissionStep';
 import { ProvisioningStep } from './ProvisioningStep';
@@ -66,10 +67,12 @@ export function ClawDashboard({
   const configServiceNudgeVisible = !instanceStatus || instanceYoung;
 
   const [onboardingStep, setOnboardingStep] = useState<
-    'permissions' | 'channels' | 'provisioning' | 'done'
+    'permissions' | 'channels' | 'provisioning' | 'pairing' | 'done'
   >('permissions');
   const [selectedPreset, setSelectedPreset] = useState<ExecPreset | null>(null);
   const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+  const hasPairingStep = selectedChannelId === 'telegram' || selectedChannelId === 'discord';
 
   const [dirtySecrets, setDirtySecrets] = useState<Set<string>>(new Set());
 
@@ -188,11 +191,13 @@ export function ClawDashboard({
         ) : isNewSetup && onboardingStep === 'channels' ? (
           <ChannelSelectionStepView
             instanceRunning={isRunning && gatewayStatus?.state === 'running'}
-            onSelect={(_channelId, tokens) => {
+            onSelect={(channelId, tokens) => {
+              setSelectedChannelId(channelId);
               setChannelTokens(tokens);
               setOnboardingStep('provisioning');
             }}
             onSkip={() => {
+              setSelectedChannelId(null);
               setChannelTokens(null);
               setOnboardingStep('provisioning');
             }}
@@ -203,7 +208,17 @@ export function ClawDashboard({
             channelTokens={channelTokens}
             instanceRunning={isRunning && gatewayStatus?.state === 'running'}
             mutations={mutations}
+            totalSteps={hasPairingStep ? 5 : 4}
+            onComplete={() => setOnboardingStep(hasPairingStep ? 'pairing' : 'done')}
+          />
+        ) : isNewSetup &&
+          onboardingStep === 'pairing' &&
+          (selectedChannelId === 'telegram' || selectedChannelId === 'discord') ? (
+          <ChannelPairingStep
+            channelId={selectedChannelId}
+            mutations={mutations}
             onComplete={() => setOnboardingStep('done')}
+            onSkip={() => setOnboardingStep('done')}
           />
         ) : isNewSetup ? (
           <Card className="mt-6 overflow-hidden">

@@ -27,7 +27,6 @@ import { ImageVariantSchema } from '../../schemas/image-version';
 import {
   STARTUP_TIMEOUT_SECONDS,
   DEFAULT_VOLUME_SIZE_GB,
-  DEFAULT_FLY_REGION,
   LIVE_CHECK_THROTTLE_MS,
   OPENCLAW_BUILTIN_DEFAULT_MODEL,
 } from '../../config';
@@ -38,7 +37,7 @@ import {
   ALL_SECRET_FIELD_KEYS,
   type SecretFieldKey,
 } from '@kilocode/kiloclaw-secret-catalog';
-import { parseRegions } from '../regions';
+import { parseRegions, prepareRegions, resolveRegions } from '../regions';
 import { buildMachineConfig, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
 import type { GatewayProcessStatus } from '../gateway-controller-types';
 
@@ -66,7 +65,14 @@ import { writeEvent } from '../../utils/analytics';
 import type { KiloClawEventData, KiloClawEventName } from '../../utils/analytics';
 
 // Re-export extracted helpers so existing consumers don't break.
-export { parseRegions, shuffleRegions, deprioritizeRegion } from '../regions';
+export {
+  parseRegions,
+  shuffleRegions,
+  deprioritizeRegion,
+  isMetaRegion,
+  prepareRegions,
+  resolveRegions,
+} from '../regions';
 export { selectRecoveryCandidate } from '../machine-recovery';
 export { METADATA_KEY_USER_ID } from '../machine-config';
 
@@ -209,7 +215,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // Create Fly Volume on first provision.
     if (isNew && !this.s.flyVolumeId) {
       const flyConfig = getFlyConfig(this.env, this.s);
-      const regions = parseRegions(config.region ?? this.env.FLY_REGION ?? DEFAULT_FLY_REGION);
+      const regions = config.region
+        ? prepareRegions(parseRegions(config.region))
+        : await resolveRegions(this.env.KV_CLAW_CACHE, this.env.FLY_REGION);
       const guest = guestFromSize(config.machineSize ?? null);
       const volume = await fly.createVolumeWithFallback(
         flyConfig,
@@ -1209,6 +1217,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     trackedImageDigest: string | null;
     googleConnected: boolean;
     gmailNotificationsEnabled: boolean;
+    execSecurity: string | null;
+    execAsk: string | null;
   }> {
     await this.loadState();
 
@@ -1245,6 +1255,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       trackedImageDigest: this.s.trackedImageDigest,
       googleConnected: this.s.googleCredentials !== null,
       gmailNotificationsEnabled: this.s.gmailNotificationsEnabled,
+      execSecurity: this.s.execSecurity,
+      execAsk: this.s.execAsk,
     };
   }
 
@@ -1453,6 +1465,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   } | null> {
     await this.loadState();
     return gateway.getControllerVersion(this.s, this.env);
+  }
+
+  async getGatewayReady(): Promise<Record<string, unknown> | null> {
+    await this.loadState();
+    return gateway.getGatewayReady(this.s, this.env);
   }
 
   async patchConfigOnMachine(patch: Record<string, unknown>): Promise<void> {

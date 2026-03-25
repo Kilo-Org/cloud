@@ -271,7 +271,7 @@ export function DeploymentsTable() {
                   <TableCell>
                     {deployment.owned_by_user_id ? (
                       <Link
-                        href={`/admin/users/${deployment.owned_by_user_id}`}
+                        href={`/admin/users/${encodeURIComponent(deployment.owned_by_user_id)}`}
                         className="text-blue-600 hover:underline"
                         onClick={e => e.stopPropagation()}
                       >

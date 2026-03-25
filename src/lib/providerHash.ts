@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { PROVIDERS, type Provider } from '@/lib/providers';
+import { type Provider } from '@/lib/providers/types';
+import PROVIDERS from '@/lib/providers/provider-definitions';
 import { getEnvVariable } from '@/lib/dotenvx';
 import type { GatewayRequest } from '@/lib/providers/openrouter/types';
 

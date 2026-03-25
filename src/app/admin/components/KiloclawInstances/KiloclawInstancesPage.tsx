@@ -522,7 +522,7 @@ export function KiloclawInstancesPage() {
                 >
                   <TableCell>
                     <Link
-                      href={`/admin/users/${instance.user_id}`}
+                      href={`/admin/users/${encodeURIComponent(instance.user_id)}`}
                       className="text-blue-600 hover:underline"
                       onClick={e => e.stopPropagation()}
                     >

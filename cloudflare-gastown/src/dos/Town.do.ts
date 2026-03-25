@@ -1062,6 +1062,24 @@ export class TownDO extends DurableObject<Env> {
     return agentDO.getEvents(afterId, limit);
   }
 
+  /**
+   * Reconstruct a conversation transcript from an agent's persisted
+   * streaming events. Delegates to the AgentDO so the TownDO doesn't
+   * bear the cost of fetching and reducing thousands of events.
+   */
+  async reconstructConversation(agentId: string): Promise<string> {
+    try {
+      const agentDO = getAgentDOStub(this.env, agentId);
+      return await agentDO.reconstructConversation();
+    } catch (err) {
+      console.error(
+        `${TOWN_LOG} reconstructConversation: failed for agent=${agentId}:`,
+        err instanceof Error ? err.message : err
+      );
+      return '';
+    }
+  }
+
   // ── Prime & Checkpoint ────────────────────────────────────────────
 
   async prime(agentId: string): Promise<PrimeContext> {
@@ -1878,9 +1896,10 @@ export class TownDO extends DurableObject<Env> {
         role: 'mayor',
         identity: mayor.identity,
         beadId: '',
-        beadTitle: message,
+        beadTitle: combinedMessage,
         beadBody: '',
-        checkpoint: null,
+        checkpoint: agents.readCheckpoint(this.sql, mayor.id),
+        conversationHistory: await this.reconstructConversation(mayor.id),
         gitUrl: rigConfig?.gitUrl ?? '',
         defaultBranch: rigConfig?.defaultBranch ?? 'main',
         kilocodeToken,
@@ -1966,7 +1985,8 @@ export class TownDO extends DurableObject<Env> {
       beadId: '',
       beadTitle: 'Mayor ready. Waiting for instructions.',
       beadBody: '',
-      checkpoint: null,
+      checkpoint: agents.readCheckpoint(this.sql, mayor.id),
+      conversationHistory: await this.reconstructConversation(mayor.id),
       gitUrl: rigConfig?.gitUrl ?? '',
       defaultBranch: rigConfig?.defaultBranch ?? 'main',
       kilocodeToken,

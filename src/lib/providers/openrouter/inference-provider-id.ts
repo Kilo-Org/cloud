@@ -29,6 +29,7 @@ export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'anthropic',
   'bedrock',
   'google', // Google AI Studio
+  'inception',
   'openai',
   'minimax',
   'mistral',
@@ -53,6 +54,7 @@ export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.anthropic]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.bedrock]: 'anthropic/claude-haiku-4.5',
+  [VercelUserByokInferenceProviderIdSchema.enum.inception]: 'inception/mercury-2',
   [VercelUserByokInferenceProviderIdSchema.enum.google]: 'google/gemini-2.5-flash-lite',
   [VercelUserByokInferenceProviderIdSchema.enum.minimax]: 'minimax/minimax-m2.5',
   [VercelUserByokInferenceProviderIdSchema.enum.mistral]: 'mistral/devstral-2',

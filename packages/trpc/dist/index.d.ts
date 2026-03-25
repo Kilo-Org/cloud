@@ -8,6 +8,15 @@ import { SecretFieldKey } from '@kilocode/kiloclaw-secret-catalog';
 import * as _workos_inc_node from '@workos-inc/node';
 import * as stripe from 'stripe';
 
+type ChangelogCategory = 'feature' | 'bugfix';
+type ChangelogDeployHint = 'redeploy_suggested' | 'redeploy_required' | 'upgrade_required' | null;
+type ChangelogEntry = {
+    date: string;
+    description: string;
+    category: ChangelogCategory;
+    deployHint: ChangelogDeployHint;
+};
+
 declare enum KiloPassTier {
     Tier19 = "tier_19",
     Tier49 = "tier_49",
@@ -3291,6 +3300,8 @@ type PlatformStatusResponse = {
     trackedImageDigest: string | null;
     googleConnected: boolean;
     gmailNotificationsEnabled: boolean;
+    execSecurity: string | null;
+    execAsk: string | null;
 };
 /** Response from GET /api/platform/debug-status (internal/admin only). */
 type PlatformDebugStatusResponse = PlatformStatusResponse & {
@@ -3359,6 +3370,8 @@ type ConfigRestoreResponse = {
     ok: boolean;
     signaled: boolean;
 };
+/** Response from GET /api/platform/gateway/ready (opaque — shape depends on OpenClaw version) */
+type GatewayReadyResponse = Record<string, unknown>;
 /** Response from GET /api/platform/controller-version. Null fields = old controller. */
 type ControllerVersionResponse = {
     version: string | null;
@@ -3395,6 +3408,18 @@ type ReassociateVolumeResponse = {
     previousVolumeId: string | null;
     newVolumeId: string;
     newRegion: string;
+};
+/** Response from GET /api/platform/regions */
+type RegionsResponse = {
+    regions: string[];
+    source: 'kv' | 'env' | 'default';
+    raw: string;
+};
+/** Response from PUT /api/platform/regions */
+type UpdateRegionsResponse = {
+    ok: true;
+    regions: string[];
+    raw: string;
 };
 
 /** Keep in sync with: kiloclaw/controller/src/routes/files.ts, kiloclaw/src/.../gateway.ts (Zod) */
@@ -7610,6 +7635,14 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
             };
             meta: object;
         }>;
+        getBalance: _trpc_server.TRPCQueryProcedure<{
+            input: void;
+            output: {
+                balance: number;
+                isDepleted: boolean;
+            };
+            meta: object;
+        }>;
         getAutocompleteMetrics: _trpc_server.TRPCQueryProcedure<{
             input: {
                 viewType?: string | undefined;
@@ -10212,6 +10245,39 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     email: string;
                     name: string;
                 }[];
+                meta: object;
+            }>;
+        }>>;
+        kiloclawRegions: _trpc_server.TRPCBuiltRouter<{
+            ctx: TRPCContext;
+            meta: object;
+            errorShape: {
+                data: {
+                    zodError: {
+                        formErrors: string[];
+                        fieldErrors: {};
+                    } | null;
+                    upstreamCode: string | undefined;
+                    code: _trpc_server.TRPC_ERROR_CODE_KEY;
+                    httpStatus: number;
+                    path?: string;
+                    stack?: string;
+                };
+                message: string;
+                code: _trpc_server.TRPC_ERROR_CODE_NUMBER;
+            };
+            transformer: false;
+        }, _trpc_server.TRPCDecorateCreateRouterOptions<{
+            getRegions: _trpc_server.TRPCQueryProcedure<{
+                input: void;
+                output: RegionsResponse;
+                meta: object;
+            }>;
+            updateRegions: _trpc_server.TRPCMutationProcedure<{
+                input: {
+                    regions: string[];
+                };
+                output: UpdateRegionsResponse;
                 meta: object;
             }>;
         }>>;
@@ -15372,6 +15438,11 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
         };
         transformer: false;
     }, _trpc_server.TRPCDecorateCreateRouterOptions<{
+        getChangelog: _trpc_server.TRPCQueryProcedure<{
+            input: void;
+            output: ChangelogEntry[];
+            meta: object;
+        }>;
         serviceDegraded: _trpc_server.TRPCQueryProcedure<{
             input: void;
             output: boolean;
@@ -15385,6 +15456,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
         getStatus: _trpc_server.TRPCQueryProcedure<{
             input: void;
             output: {
+                name: string | null;
                 workerUrl: string;
                 userId: string | null;
                 sandboxId: string | null;
@@ -15406,7 +15478,16 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                 trackedImageDigest: string | null;
                 googleConnected: boolean;
                 gmailNotificationsEnabled: boolean;
+                execSecurity: string | null;
+                execAsk: string | null;
             };
+            meta: object;
+        }>;
+        renameInstance: _trpc_server.TRPCMutationProcedure<{
+            input: {
+                name: string | null;
+            };
+            output: void;
             meta: object;
         }>;
         start: _trpc_server.TRPCMutationProcedure<{
@@ -15517,6 +15598,46 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
             output: UserConfigResponse;
             meta: object;
         }>;
+        getChannelCatalog: _trpc_server.TRPCQueryProcedure<{
+            input: void;
+            output: {
+                id: string;
+                label: string;
+                configured: boolean;
+                fields: {
+                    key: string;
+                    label: string;
+                    placeholder: string;
+                    placeholderConfigured: string;
+                    validationPattern: string | undefined;
+                    validationMessage: string | undefined;
+                }[];
+                helpText: string | undefined;
+                helpUrl: string | undefined;
+                allFieldsRequired: boolean;
+            }[];
+            meta: object;
+        }>;
+        getSecretCatalog: _trpc_server.TRPCQueryProcedure<{
+            input: void;
+            output: {
+                id: string;
+                label: string;
+                configured: boolean;
+                fields: {
+                    key: string;
+                    label: string;
+                    placeholder: string;
+                    placeholderConfigured: string;
+                    validationPattern: string | undefined;
+                    validationMessage: string | undefined;
+                }[];
+                helpText: string | undefined;
+                helpUrl: string | undefined;
+                allFieldsRequired: boolean;
+            }[];
+            meta: object;
+        }>;
         restartMachine: _trpc_server.TRPCMutationProcedure<{
             input: {
                 imageTag?: string | undefined;
@@ -15556,6 +15677,11 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
         gatewayStatus: _trpc_server.TRPCQueryProcedure<{
             input: void;
             output: GatewayProcessStatusResponse;
+            meta: object;
+        }>;
+        gatewayReady: _trpc_server.TRPCQueryProcedure<{
+            input: void;
+            output: GatewayReadyResponse;
             meta: object;
         }>;
         controllerVersion: _trpc_server.TRPCQueryProcedure<{

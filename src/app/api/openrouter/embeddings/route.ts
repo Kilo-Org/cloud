@@ -3,7 +3,7 @@ import { type NextRequest } from 'next/server';
 import { generateProviderSpecificHash } from '@/lib/providerHash';
 import type { MicrodollarUsageContext } from '@/lib/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import { getEmbeddingProvider, type Provider } from '@/lib/providers';
+import { getEmbeddingProvider } from '@/lib/providers';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
@@ -33,6 +33,7 @@ import { normalizeModelId } from '@/lib/model-utils';
 import { buildUpstreamBody, type EmbeddingProxyRequest } from '@/lib/embeddings/embedding-request';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/providers/vercel';
+import type { Provider } from '@/lib/providers/types';
 
 export const maxDuration = 300;
 

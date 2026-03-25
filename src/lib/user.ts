@@ -55,7 +55,7 @@ import {
   kiloclaw_email_log,
   kiloclaw_admin_audit_logs,
 } from '@kilocode/db/schema';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, inArray, isNotNull, sql } from 'drizzle-orm';
 import { allow_fake_login } from './constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { hosted_domain_specials } from '@/lib/auth/constants';
@@ -154,6 +154,21 @@ export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
     );
     existingUser.hosted_domain = args.hosted_domain;
   }
+
+  // Sync display_name from OAuth on every sign-in
+  if (args.display_name) {
+    await db
+      .update(user_auth_provider)
+      .set({ display_name: args.display_name })
+      .where(
+        and(
+          eq(user_auth_provider.kilo_user_id, existingUser.id),
+          eq(user_auth_provider.provider, args.provider),
+          eq(user_auth_provider.provider_account_id, args.provider_account_id)
+        )
+      );
+  }
+
   timer.log(`findFirst user with id ${existingUser.id}`);
   return existingUser;
 }
@@ -692,6 +707,19 @@ export async function getUserAuthProviders(kiloUserId: string): Promise<UserAuth
     .from(user_auth_provider)
     .where(eq(user_auth_provider.kilo_user_id, kiloUserId))
     .orderBy(user_auth_provider.created_at);
+}
+
+export async function getOAuthDisplayNames(userId: string): Promise<Map<AuthProviderId, string>> {
+  const rows = await db
+    .select({
+      provider: user_auth_provider.provider,
+      display_name: user_auth_provider.display_name,
+    })
+    .from(user_auth_provider)
+    .where(
+      and(eq(user_auth_provider.kilo_user_id, userId), isNotNull(user_auth_provider.display_name))
+    );
+  return new Map(rows.map(r => [r.provider, r.display_name ?? '']));
 }
 
 export async function findUserIdByAuthProvider(

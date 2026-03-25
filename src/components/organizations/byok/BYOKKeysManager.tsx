@@ -49,6 +49,7 @@ const BYOK_PROVIDERS = [
   { id: VercelUserByokInferenceProviderIdSchema.enum.anthropic, name: 'Anthropic' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.bedrock, name: 'AWS Bedrock' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.openai, name: 'OpenAI' },
+  { id: VercelUserByokInferenceProviderIdSchema.enum.inception, name: 'Inception' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.google, name: 'Google AI Studio' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.minimax, name: 'MiniMax' },
   { id: AutocompleteUserByokProviderIdSchema.enum.codestral, name: 'Mistral AI: Codestral' },

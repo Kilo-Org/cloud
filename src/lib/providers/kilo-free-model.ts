@@ -1,5 +1,5 @@
 import type { OpenRouterInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
-import type { ProviderId } from '@/lib/providers/provider-id';
+import type { ProviderId } from '@/lib/providers/types';
 
 export type KiloFreeModelFlag = 'reasoning' | 'prompt_cache' | 'vision';
 

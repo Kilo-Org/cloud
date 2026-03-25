@@ -1188,7 +1188,7 @@ function SponsorshipsTable() {
                       {sponsorship.email ? (
                         sponsorship.kiloUserId ? (
                           <Link
-                            href={`/admin/users/${sponsorship.kiloUserId}`}
+                            href={`/admin/users/${encodeURIComponent(sponsorship.kiloUserId)}`}
                             className="text-blue-400 hover:underline"
                           >
                             {sponsorship.email}

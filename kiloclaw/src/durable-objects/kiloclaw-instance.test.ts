@@ -1620,7 +1620,15 @@ describe('gateway process control via controller', () => {
 // ============================================================================
 
 import { selectRecoveryCandidate } from './machine-recovery';
-import { parseRegions, deprioritizeRegion, shuffleRegions } from './regions';
+import {
+  parseRegions,
+  deprioritizeRegion,
+  shuffleRegions,
+  isMetaRegion,
+  prepareRegions,
+  resolveRegions,
+  FLY_REGIONS_KV_KEY,
+} from './regions';
 import type { FlyMachine } from '../fly/types';
 
 function fakeMachine(overrides: Partial<FlyMachine>): FlyMachine {
@@ -2393,16 +2401,28 @@ describe('parseRegions', () => {
 });
 
 describe('deprioritizeRegion', () => {
-  it('moves failed region to end', () => {
-    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'dfw')).toEqual(['yyz', 'cdg', 'dfw']);
+  it('removes failed region entirely with 3+ distinct regions', () => {
+    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'dfw')).toEqual(['yyz', 'cdg']);
   });
 
-  it('moves middle region to end', () => {
-    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'yyz')).toEqual(['dfw', 'cdg', 'yyz']);
+  it('removes middle region entirely with 3+ distinct regions', () => {
+    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'yyz')).toEqual(['dfw', 'cdg']);
   });
 
-  it('returns list unchanged when failed region is already last', () => {
-    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'cdg')).toEqual(['dfw', 'yyz', 'cdg']);
+  it('removes last region entirely with 3+ distinct regions', () => {
+    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'cdg')).toEqual(['dfw', 'yyz']);
+  });
+
+  it('removes all duplicates of failed region with 3+ distinct', () => {
+    expect(deprioritizeRegion(['dfw', 'dfw', 'yyz', 'cdg'], 'dfw')).toEqual(['yyz', 'cdg']);
+  });
+
+  it('moves failed region to end with only 2 distinct regions', () => {
+    expect(deprioritizeRegion(['dfw', 'yyz'], 'dfw')).toEqual(['yyz', 'dfw']);
+  });
+
+  it('moves failed region to end with 2 distinct including duplicates', () => {
+    expect(deprioritizeRegion(['dfw', 'dfw', 'yyz'], 'dfw')).toEqual(['yyz', 'dfw']);
   });
 
   it('returns list unchanged when failed region is not in list', () => {
@@ -2411,10 +2431,6 @@ describe('deprioritizeRegion', () => {
 
   it('returns list unchanged when failedRegion is null', () => {
     expect(deprioritizeRegion(['dfw', 'yyz'], null)).toEqual(['dfw', 'yyz']);
-  });
-
-  it('handles single-element list', () => {
-    expect(deprioritizeRegion(['dfw'], 'dfw')).toEqual(['dfw']);
   });
 });
 
@@ -2447,6 +2463,132 @@ describe('shuffleRegions', () => {
     }
     // With 6 elements (720 permutations), 50 shuffles should produce at least 2 distinct orderings
     expect(orderings.size).toBeGreaterThan(1);
+  });
+});
+
+// ============================================================================
+// isMetaRegion + prepareRegions + resolveRegions
+// ============================================================================
+
+describe('isMetaRegion', () => {
+  it('returns true for eu', () => {
+    expect(isMetaRegion('eu')).toBe(true);
+  });
+
+  it('returns true for us', () => {
+    expect(isMetaRegion('us')).toBe(true);
+  });
+
+  it('is case-insensitive', () => {
+    expect(isMetaRegion('EU')).toBe(true);
+    expect(isMetaRegion('Us')).toBe(true);
+  });
+
+  it('returns false for specific regions', () => {
+    expect(isMetaRegion('dfw')).toBe(false);
+    expect(isMetaRegion('iad')).toBe(false);
+    expect(isMetaRegion('cdg')).toBe(false);
+    expect(isMetaRegion('lhr')).toBe(false);
+  });
+});
+
+describe('prepareRegions', () => {
+  it('does not shuffle when all regions are meta', () => {
+    const result = prepareRegions(['eu', 'us']);
+    expect(result).toEqual(['eu', 'us']);
+  });
+
+  it('does not shuffle a single meta region', () => {
+    expect(prepareRegions(['eu'])).toEqual(['eu']);
+  });
+
+  it('shuffles when all regions are specific', () => {
+    const input = ['dfw', 'ord', 'lax', 'iad', 'cdg', 'arn'];
+    const orderings = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      orderings.add(prepareRegions([...input]).join(','));
+    }
+    expect(orderings.size).toBeGreaterThan(1);
+  });
+
+  it('shuffles when mix of meta and specific regions', () => {
+    const input = ['dfw', 'eu', 'ord', 'us'];
+    const orderings = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      orderings.add(prepareRegions([...input]).join(','));
+    }
+    expect(orderings.size).toBeGreaterThan(1);
+  });
+
+  it('preserves all elements including duplicates', () => {
+    const result = prepareRegions(['dfw', 'dfw', 'ord']);
+    expect(result.sort()).toEqual(['dfw', 'dfw', 'ord'].sort());
+  });
+
+  it('does not mutate the input array', () => {
+    const input = ['dfw', 'ord', 'lax'];
+    const copy = [...input];
+    prepareRegions(input);
+    expect(input).toEqual(copy);
+  });
+});
+
+describe('resolveRegions', () => {
+  function createMockKV(value: string | null = null) {
+    const getMock = vi.fn().mockResolvedValue(value);
+    const kv = { get: getMock, put: vi.fn(), delete: vi.fn() } as unknown as KVNamespace;
+    return { kv, getMock };
+  }
+
+  it('reads from KV when value is present', async () => {
+    const { kv, getMock } = createMockKV('dfw,ord,lax');
+    const result = await resolveRegions(kv, 'eu,us');
+    // Specific regions → shuffled, but all elements preserved
+    expect(result.sort()).toEqual(['dfw', 'lax', 'ord']);
+    expect(getMock).toHaveBeenCalledWith(FLY_REGIONS_KV_KEY);
+  });
+
+  it('falls back to env FLY_REGION when KV is empty', async () => {
+    const { kv } = createMockKV(null);
+    const result = await resolveRegions(kv, 'eu,us');
+    // Meta regions → not shuffled
+    expect(result).toEqual(['eu', 'us']);
+  });
+
+  it('falls back to DEFAULT_FLY_REGION when both KV and env are missing', async () => {
+    const { kv } = createMockKV(null);
+    const result = await resolveRegions(kv, undefined);
+    // DEFAULT_FLY_REGION is 'eu,us' → meta → not shuffled
+    expect(result).toEqual(['eu', 'us']);
+  });
+
+  it('applies shuffle to specific regions from KV', async () => {
+    const { kv } = createMockKV('arn,cdg,iad,ams,fra,lhr');
+    const orderings = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      const result = await resolveRegions(kv, undefined);
+      orderings.add(result.join(','));
+    }
+    expect(orderings.size).toBeGreaterThan(1);
+  });
+
+  it('does not shuffle meta regions from KV', async () => {
+    const { kv } = createMockKV('us,eu');
+    const result = await resolveRegions(kv, undefined);
+    expect(result).toEqual(['us', 'eu']);
+  });
+
+  it('preserves duplicates for shuffle biasing', async () => {
+    const { kv } = createMockKV('dfw,dfw,ord');
+    const result = await resolveRegions(kv, undefined);
+    expect(result.sort()).toEqual(['dfw', 'dfw', 'ord']);
+  });
+
+  it('falls back to env when KV read throws', async () => {
+    const getMock = vi.fn().mockRejectedValue(new Error('KV unavailable'));
+    const kv = { get: getMock, put: vi.fn(), delete: vi.fn() } as unknown as KVNamespace;
+    const result = await resolveRegions(kv, 'eu,us');
+    expect(result).toEqual(['eu', 'us']);
   });
 });
 

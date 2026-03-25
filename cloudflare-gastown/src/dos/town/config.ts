@@ -91,8 +91,8 @@ export async function updateTownConfig(
  * Priority: rig override → role-specific → town default → hardcoded default.
  */
 export function resolveModel(townConfig: TownConfig, _rigId: string, role: string): string {
-  const roleModel = townConfig.role_models?.[role as keyof NonNullable<TownConfig['role_models']>];
-  return roleModel ?? townConfig.default_model ?? 'anthropic/claude-sonnet-4.6';
+  const roleModels: Record<string, string | undefined> | undefined = townConfig.role_models;
+  return roleModels?.[role] ?? townConfig.default_model ?? 'anthropic/claude-sonnet-4.6';
 }
 
 /**

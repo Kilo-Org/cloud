@@ -164,31 +164,27 @@ export function reconstructConversation(rawEvents: unknown[]): ConversationTurn[
 }
 
 /**
- * Sanitize turn content so it cannot break the `<prior-conversation>`
- * wrapper. Escapes closing tags that would prematurely end the block.
- */
-function sanitizeTurnContent(text: string): string {
-  return text.replaceAll('</prior-conversation>', '&lt;/prior-conversation&gt;');
-}
-
-/**
  * Format a conversation transcript into a string suitable for injection
  * into an agent's initial prompt context.
+ *
+ * Uses JSON serialization inside the XML wrapper so that arbitrary
+ * content in turns (including newlines, speaker labels like "User:",
+ * or literal closing tags) cannot break the format. The `</` sequence
+ * is escaped to `<\/` to prevent the JSON payload from containing a
+ * literal closing tag that would prematurely end the wrapper block.
  */
 export function formatTranscriptForPrompt(turns: ConversationTurn[]): string {
   if (turns.length === 0) return '';
 
-  const lines = turns.map(t => {
-    const label = t.role === 'user' ? 'User' : 'Assistant';
-    return `${label}: ${sanitizeTurnContent(t.content)}`;
-  });
+  // Escape </ inside JSON to prevent closing-tag injection
+  const safeJson = JSON.stringify(turns).replaceAll('</', '<\\/');
 
   return [
     '<prior-conversation>',
     'The following is your conversation history from a previous session.',
     'Continue naturally from where you left off.',
     '',
-    ...lines,
+    safeJson,
     '</prior-conversation>',
   ].join('\n');
 }

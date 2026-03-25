@@ -25,7 +25,6 @@ import * as reviewQueue from './town/review-queue';
 import * as config from './town/config';
 import * as rigs from './town/rigs';
 import * as dispatch from './town/container-dispatch';
-import * as conversation from './town/conversation';
 import * as patrol from './town/patrol';
 import * as scheduling from './town/scheduling';
 import * as events from './town/events';
@@ -1065,14 +1064,13 @@ export class TownDO extends DurableObject<Env> {
 
   /**
    * Reconstruct a conversation transcript from an agent's persisted
-   * streaming events. Returns a formatted string for prompt injection,
-   * or an empty string if no conversation history exists.
+   * streaming events. Delegates to the AgentDO so the TownDO doesn't
+   * bear the cost of fetching and reducing thousands of events.
    */
   async reconstructConversation(agentId: string): Promise<string> {
     try {
-      const rawEvents = await this.getAgentEvents(agentId, 0, 10_000);
-      const turns = conversation.reconstructConversation(rawEvents);
-      return conversation.formatTranscriptForPrompt(turns);
+      const agentDO = getAgentDOStub(this.env, agentId);
+      return await agentDO.reconstructConversation();
     } catch (err) {
       console.error(
         `${TOWN_LOG} reconstructConversation: failed for agent=${agentId}:`,

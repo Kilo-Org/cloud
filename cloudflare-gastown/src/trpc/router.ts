@@ -859,6 +859,190 @@ export const gastownRouter = router({
       await townStub.forceRefreshContainerToken();
     }),
 
+  // ── GitHub OAuth Device Flow ────────────────────────────────────────
+
+  githubOAuthDeviceCode: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+
+      const clientId = ctx.env.GITHUB_OAUTH_CLIENT_ID;
+      if (!clientId) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'GitHub OAuth is not configured (missing GITHUB_OAUTH_CLIENT_ID)',
+        });
+      }
+
+      const response = await fetch('https://github.com/login/device/code', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          scope: 'repo read:user user:email',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `GitHub device code request failed: ${response.status}`,
+        });
+      }
+
+      const DeviceCodeResponse = z.object({
+        device_code: z.string(),
+        user_code: z.string(),
+        verification_uri: z.string(),
+        expires_in: z.number(),
+        interval: z.number(),
+      });
+      const raw: unknown = await response.json();
+      const data = DeviceCodeResponse.parse(raw);
+
+      return {
+        userCode: data.user_code,
+        verificationUri: data.verification_uri,
+        deviceCode: data.device_code,
+        expiresIn: data.expires_in,
+        interval: data.interval,
+      };
+    }),
+
+  githubOAuthPoll: gastownProcedure
+    .input(z.object({ townId: z.string().uuid(), deviceCode: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+
+      const clientId = ctx.env.GITHUB_OAUTH_CLIENT_ID;
+      if (!clientId) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'GitHub OAuth is not configured (missing GITHUB_OAUTH_CLIENT_ID)',
+        });
+      }
+
+      const response = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          device_code: input.deviceCode,
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `GitHub token exchange failed: ${response.status}`,
+        });
+      }
+
+      const TokenResponse = z.object({
+        access_token: z.string().optional(),
+        token_type: z.string().optional(),
+        scope: z.string().optional(),
+        error: z.string().optional(),
+        error_description: z.string().optional(),
+      });
+      const raw: unknown = await response.json();
+      const data = TokenResponse.parse(raw);
+
+      if (data.error === 'authorization_pending' || data.error === 'slow_down') {
+        return { status: 'pending' as const };
+      }
+
+      if (data.error) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: data.error_description ?? data.error,
+        });
+      }
+
+      if (!data.access_token) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'GitHub returned no access token',
+        });
+      }
+
+      // Fetch the authenticated GitHub user
+      const userResponse = await fetch('https://api.github.com/user', {
+        headers: {
+          Authorization: `Bearer ${data.access_token}`,
+          Accept: 'application/json',
+          'User-Agent': 'Kilo-Gastown',
+        },
+      });
+
+      if (!userResponse.ok) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `GitHub user lookup failed: ${userResponse.status}`,
+        });
+      }
+
+      const GitHubUser = z.object({
+        login: z.string(),
+        avatar_url: z.string(),
+      });
+      const userRaw: unknown = await userResponse.json();
+      const user = GitHubUser.parse(userRaw);
+
+      // Store the token and OAuth metadata
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      await townStub.updateTownConfig({
+        github_cli_pat: data.access_token,
+        github_cli_oauth_username: user.login,
+        github_cli_oauth_connected_at: new Date().toISOString(),
+      });
+
+      return {
+        status: 'complete' as const,
+        username: user.login,
+        avatarUrl: user.avatar_url,
+      };
+    }),
+
+  githubOAuthDisconnect: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      await townStub.updateTownConfig({
+        github_cli_pat: '',
+        github_cli_oauth_username: '',
+        github_cli_oauth_connected_at: '',
+      });
+    }),
+
+  githubOAuthStatus: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx.userId, input.townId, ctx.orgMemberships);
+
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      const config = await townStub.getTownConfig();
+
+      if (config.github_cli_oauth_username && config.github_cli_pat) {
+        return {
+          connected: true as const,
+          username: config.github_cli_oauth_username,
+          connectedAt: config.github_cli_oauth_connected_at,
+        };
+      }
+
+      return { connected: false as const };
+    }),
+
   // ── Events ──────────────────────────────────────────────────────────
 
   getBeadEvents: gastownProcedure

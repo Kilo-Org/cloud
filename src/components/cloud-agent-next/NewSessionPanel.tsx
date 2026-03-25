@@ -54,7 +54,11 @@ import {
 import { Button as UIButton } from '@/components/ui/button';
 import { LinkButton } from '@/components/Button';
 import { cn } from '@/lib/utils';
-import { extractRepoFromGitUrl } from '@/components/cloud-agent-next/utils/git-utils';
+import {
+  extractRepoFromGitUrl,
+  findAllGitPlatformUrls,
+  detectGitPlatform,
+} from '@/components/cloud-agent-next/utils/git-utils';
 import type { AgentMode } from './types';
 
 type Repository = {
@@ -345,6 +349,30 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     },
     [unifiedRepositories]
   );
+
+  // ---------------------------------------------------------------------------
+  // Auto-select repo from pasted GitHub/GitLab URLs
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (selectedRepo) return;
+
+    for (const url of findAllGitPlatformUrls(prompt)) {
+      const repoName = extractRepoFromGitUrl(url);
+      if (!repoName) continue;
+
+      const match = unifiedRepositories.find(
+        r => r.fullName.toLowerCase() === repoName.toLowerCase()
+      );
+      if (!match) continue;
+
+      setSelectedRepo(match.fullName);
+      const platform = detectGitPlatform(url);
+      if (platform) {
+        setSelectedPlatform(platform);
+      }
+      break;
+    }
+  }, [prompt, selectedRepo, unifiedRepositories]);
 
   const repoError = githubRepoError || gitlabRepoError;
 

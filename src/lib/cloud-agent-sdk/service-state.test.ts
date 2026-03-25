@@ -615,6 +615,45 @@ describe('createServiceState', () => {
       expect(state.getPermission()).toBeNull();
     });
 
+    it('fires onQuestionResolved when clearing stale question on reconnect', () => {
+      const onQuestionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onQuestionResolved }));
+      // Set a question
+      state.process({ type: 'question.asked', requestId: 'req-stale' });
+      onQuestionResolved.mockClear();
+      // Reconnect — question was answered while disconnected
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+      expect(onQuestionResolved).toHaveBeenCalledWith('req-stale');
+    });
+
+    it('fires onPermissionResolved when clearing stale permission on reconnect', () => {
+      const onPermissionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onPermissionResolved }));
+      // Set a permission
+      state.process({
+        type: 'permission.asked',
+        requestId: 'perm-stale',
+        permission: 'file-edit',
+        patterns: ['**/*'],
+        metadata: {},
+        always: [],
+      });
+      onPermissionResolved.mockClear();
+      // Reconnect — permission was resolved while disconnected
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+      expect(onPermissionResolved).toHaveBeenCalledWith('perm-stale');
+    });
+
+    it('does not fire resolve callbacks when no question/permission was pending', () => {
+      const onQuestionResolved = jest.fn();
+      const onPermissionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onQuestionResolved, onPermissionResolved }));
+      // Connect with no prior question/permission
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+      expect(onQuestionResolved).not.toHaveBeenCalled();
+      expect(onPermissionResolved).not.toHaveBeenCalled();
+    });
+
     it('clears terminated flag', () => {
       const onError = jest.fn();
       const state = createServiceState(makeConfig({ onError }));

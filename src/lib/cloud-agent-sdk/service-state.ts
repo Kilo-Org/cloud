@@ -264,8 +264,21 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     // Clear question/permission — if still pending on the server the wrapper
     // replays them as separate question.asked / permission.asked events
     // immediately after the snapshot, so they'll be re-set.
-    question = null;
-    permission = null;
+    // Fire resolve callbacks first so consumers (e.g. dock atoms) also clear.
+    if (question) {
+      const { requestId } = question;
+      question = null;
+      config.onQuestionResolved?.(requestId);
+    } else {
+      question = null;
+    }
+    if (permission) {
+      const { requestId } = permission;
+      permission = null;
+      config.onPermissionResolved?.(requestId);
+    } else {
+      permission = null;
+    }
 
     // Clear terminated on connected
     terminated = false;

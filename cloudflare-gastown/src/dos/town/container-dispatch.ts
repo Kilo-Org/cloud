@@ -190,8 +190,13 @@ export function buildPrompt(params: {
   beadTitle: string;
   beadBody: string;
   checkpoint: unknown;
+  conversationHistory?: string;
 }): string {
-  const parts: string[] = [params.beadTitle];
+  const parts: string[] = [];
+  if (params.conversationHistory) {
+    parts.push(params.conversationHistory);
+  }
+  parts.push(params.beadTitle);
   if (params.beadBody) parts.push(params.beadBody);
   if (params.checkpoint) {
     parts.push(
@@ -292,6 +297,8 @@ export async function startAgentInContainer(
     beadTitle: string;
     beadBody: string;
     checkpoint: unknown;
+    /** Reconstructed conversation transcript for prompt injection on re-dispatch. */
+    conversationHistory?: string;
     gitUrl: string;
     defaultBranch: string;
     kilocodeToken?: string;
@@ -401,6 +408,7 @@ export async function startAgentInContainer(
           beadTitle: params.beadTitle,
           beadBody: params.beadBody,
           checkpoint: params.checkpoint,
+          conversationHistory: params.conversationHistory,
         }),
         model: resolveModel(params.townConfig, params.rigId, params.role),
         smallModel: resolveSmallModel(params.townConfig),

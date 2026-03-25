@@ -229,6 +229,16 @@ export const TownConfigSchema = z.object({
   /** Default LLM model for new agent sessions */
   default_model: z.string().optional(),
 
+  /** Per-role model overrides. When set, the specified role uses this model
+   *  instead of default_model. */
+  role_models: z
+    .object({
+      mayor: z.string().optional(),
+      refinery: z.string().optional(),
+      polecat: z.string().optional(),
+    })
+    .optional(),
+
   /** Lightweight model for title generation, explore subagent, etc. */
   small_model: z.string().optional(),
 
@@ -308,6 +318,13 @@ export const TownConfigUpdateSchema = z.object({
   organization_id: z.string().optional(),
   kilocode_token: z.string().optional(),
   default_model: z.string().optional(),
+  role_models: z
+    .object({
+      mayor: z.string().optional(),
+      refinery: z.string().optional(),
+      polecat: z.string().optional(),
+    })
+    .optional(),
   small_model: z.string().optional(),
   max_polecats_per_rig: z.number().int().min(1).max(20).optional(),
   merge_strategy: MergeStrategy.optional(),

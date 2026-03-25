@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -44,8 +43,16 @@ type BannerBaseProps = {
   title: string;
   description: React.ReactNode;
   color: BannerColor;
+  /** Override default container classes. */
+  className?: string;
   /** Optional ARIA role for the outer container. */
   role?: string;
+  /** Icon after button label. Component type (auto-sized h-4 w-4) or ReactNode. */
+  buttonIcon?: React.ComponentType<{ className?: string }> | React.ReactNode;
+  /** Override default button icon classes (only when buttonIcon is a component type). */
+  buttonIconClassName?: string;
+  /** Override default button classes. */
+  buttonClassName?: string;
 };
 
 type BannerProps = BannerBaseProps &
@@ -55,7 +62,11 @@ type BannerProps = BannerBaseProps &
         buttonLabel?: never;
         buttonHref?: never;
       }
-    | { action?: never; buttonLabel: string; buttonHref: string }
+    | {
+        action?: never;
+        buttonLabel: string;
+        buttonHref: string;
+      }
     | { action?: never; buttonLabel?: never; buttonHref?: never }
   );
 
@@ -67,7 +78,11 @@ export function Banner({
   action,
   buttonLabel,
   buttonHref,
+  buttonIcon,
+  buttonIconClassName,
+  buttonClassName,
   color,
+  className,
   role,
 }: BannerProps) {
   const colors = colorMap[color];
@@ -78,6 +93,14 @@ export function Banner({
         })
       : (icon as React.ReactNode);
 
+  const buttonIconNode = buttonIcon
+    ? typeof buttonIcon === 'function'
+      ? React.createElement(buttonIcon as React.ComponentType<{ className?: string }>, {
+          className: cn('h-4 w-4', buttonIconClassName),
+        })
+      : buttonIcon
+    : null;
+
   return (
     <div
       role={role}
@@ -85,7 +108,8 @@ export function Banner({
         'flex w-full flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:gap-4',
         colors.border,
         colors.bg,
-        colors.text
+        colors.text,
+        className
       )}
     >
       <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
@@ -97,10 +121,13 @@ export function Banner({
       </div>
       {action ??
         (buttonLabel && buttonHref && (
-          <Button asChild className={cn('w-full shrink-0 sm:w-auto', colors.button)}>
+          <Button
+            asChild
+            className={cn('w-full shrink-0 sm:w-auto', colors.button, buttonClassName)}
+          >
             <Link href={buttonHref}>
               {buttonLabel}
-              <ArrowRight className="h-4 w-4" />
+              {buttonIconNode}
             </Link>
           </Button>
         ))}

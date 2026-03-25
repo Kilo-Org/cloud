@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowRight, Loader2, AlertTriangle } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { Banner } from '@/components/shared/Banner';
@@ -34,6 +34,7 @@ export function ProfileKiloClawBanner() {
         description="Manage your instance, configure integrations, and monitor your Claw."
         buttonLabel="Go to KiloClaw"
         buttonHref="/claw"
+        buttonIcon={ArrowRight}
       />
     );
   }
@@ -47,6 +48,7 @@ export function ProfileKiloClawBanner() {
         description="Your access has lapsed. Visit the dashboard to resolve billing and restore your instance."
         buttonLabel="Resolve"
         buttonHref="/claw"
+        buttonIcon={ArrowRight}
       />
     );
   }

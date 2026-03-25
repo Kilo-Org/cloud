@@ -164,7 +164,7 @@ app.use('*', async (c, next) => {
   const path = c.req.path;
   // Tag with route params immediately so all downstream logs (auth,
   // handlers, DO calls) inherit them. Auth-derived tags (userId, orgId)
-  // are added after next() since auth middleware hasn't run yet.
+  // are set by kiloAuthMiddleware and orgAuthMiddleware when they run.
   logger.setTags({
     townId: c.req.param('townId') || undefined,
     rigId: c.req.param('rigId') || undefined,
@@ -172,11 +172,6 @@ app.use('*', async (c, next) => {
   });
   logger.info(`--> ${method} ${path}`);
   await next();
-  // Auth context is now available — tag for the response log line.
-  logger.setTags({
-    userId: c.get('kiloUserId') || c.get('agentJWT')?.userId || undefined,
-    orgId: c.get('orgId') || undefined,
-  });
   const elapsed = Math.round(performance.now() - (c.get('requestStartTime') ?? 0));
   logger.info(`<-- ${method} ${path} ${c.res.status}`, { durationMs: elapsed });
 });

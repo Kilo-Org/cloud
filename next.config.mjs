@@ -40,6 +40,10 @@ const nextConfig = {
               source: '/api/marketplace/:path*',
               destination: 'https://global-api.kilo.ai/api/marketplace/:path*',
             },
+            {
+              source: '/api/notifications',
+              destination: 'https://global-api.kilo.ai/api/notifications',
+            },
           ]
         : [];
 

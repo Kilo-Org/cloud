@@ -33,11 +33,14 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import styles from './TerminalBar.module.css';
 
 type TerminalBarProps = {
   townId: string;
   /** Override base path for org-scoped routes (e.g. /organizations/[id]/gastown/[townId]) */
   basePath?: string;
+  /** Whether the terminal is in fullscreen mode */
+  fullscreen?: boolean;
 };
 
 /**
@@ -45,7 +48,7 @@ type TerminalBarProps = {
  * Agent terminal tabs are opened/closed via TerminalBarContext.
  * Can be positioned at bottom/top/right/left with drag-to-resize.
  */
-export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarProps) {
+export function TerminalBar({ townId, basePath: basePathOverride, fullscreen }: TerminalBarProps) {
   const townBasePath = basePathOverride ?? `/gastown/${townId}`;
   const { state: sidebarState, isMobile } = useSidebar();
   const {
@@ -270,8 +273,8 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
 
   return (
     <div
-      className={`fixed ${borderClass} border-white/[0.08] bg-[#0a0a0a] transition-[left] duration-200 ease-linear`}
-      style={containerStyle}
+      className={`fixed ${borderClass} border-white/[0.08] bg-[#0a0a0a] transition-[left] duration-200 ease-linear ${fullscreen ? `${styles.fullscreen} ${styles.fullscreenTransition}` : ''}`}
+      style={fullscreen ? {} : containerStyle}
     >
       <div className={`flex h-full w-full ${horizontal ? 'flex-col' : 'flex-row'}`}>
         {position === 'bottom' && (
@@ -300,6 +303,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               size={size}
               townId={townId}
               alarmWs={alarmWs}
+              fullscreen={fullscreen}
             />
           </>
         )}
@@ -312,6 +316,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               size={size}
               townId={townId}
               alarmWs={alarmWs}
+              fullscreen={fullscreen}
             />
             <TabBar
               allTabs={allTabs}
@@ -358,6 +363,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               size={size}
               townId={townId}
               alarmWs={alarmWs}
+              fullscreen={fullscreen}
             />
           </>
         )}
@@ -382,6 +388,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               size={size}
               townId={townId}
               alarmWs={alarmWs}
+              fullscreen={fullscreen}
             />
             {!collapsed && (
               <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
@@ -758,6 +765,7 @@ function TerminalContent({
   size,
   townId,
   alarmWs,
+  fullscreen,
 }: {
   activeTab: TabDef;
   collapsed: boolean;
@@ -765,6 +773,7 @@ function TerminalContent({
   size: number;
   townId: string;
   alarmWs: AlarmWsResult;
+  fullscreen?: boolean;
 }) {
   if (collapsed) return null;
 
@@ -776,8 +785,8 @@ function TerminalContent({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.15 }}
-        style={horizontal ? { height: size } : { width: size }}
-        className={`overflow-hidden ${horizontal ? '' : 'h-full'}`}
+        style={fullscreen ? {} : (horizontal ? { height: size } : { width: size })}
+        className={`overflow-hidden ${horizontal ? '' : 'h-full'} ${fullscreen ? 'h-full' : ''}`}
       >
         {activeTab.kind === 'mayor' ? (
           <MayorTerminalPane townId={townId} collapsed={collapsed} />

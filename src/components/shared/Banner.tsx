@@ -1,5 +1,10 @@
+'use client';
+
+import React from 'react';
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 type BannerColor = 'emerald' | 'amber' | 'blue' | 'red';
 
@@ -33,19 +38,28 @@ const colorMap: Record<
   },
 };
 
-type BannerProps = {
-  /** Component type (auto-sized) or ReactNode (full control). */
+type BannerBaseProps = {
+  /**
+   * Component type (auto-sized with default className) or ReactNode (full control).
+   * Accepts any component type — plain functions, React.memo(), React.forwardRef(),
+   * React.lazy(), etc. — as well as already-rendered ReactNode elements.
+   */
   icon: React.ComponentType<{ className?: string }> | React.ReactNode;
   /** Override default icon classes (only when icon is a component type). */
   iconClassName?: string;
   title: string;
   description: React.ReactNode;
-  /** Custom action element, overrides buttonLabel/buttonHref. */
-  action?: React.ReactNode;
-  buttonLabel?: string;
-  buttonHref?: string;
   color: BannerColor;
+  /** Optional ARIA role for the outer container. */
+  role?: string;
 };
+
+type BannerProps = BannerBaseProps &
+  (
+    | { /** Custom action element. */ action: React.ReactNode; buttonLabel?: never; buttonHref?: never }
+    | { action?: never; buttonLabel: string; buttonHref: string }
+    | { action?: never; buttonLabel?: never; buttonHref?: never }
+  );
 
 export function Banner({
   icon,
@@ -56,15 +70,19 @@ export function Banner({
   buttonLabel,
   buttonHref,
   color,
+  role,
 }: BannerProps) {
   const colors = colorMap[color];
-  const IconComponent = typeof icon === 'function' ? icon : null;
-  const iconNode = IconComponent
-    ? <IconComponent className={cn('h-5 w-5 sm:h-6 sm:w-6', iconClassName)} />
-    : icon;
+  const iconNode = React.isValidElement(icon)
+    ? icon
+    : React.createElement(
+        icon as React.ComponentType<{ className?: string }>,
+        { className: cn('h-5 w-5 sm:h-6 sm:w-6', iconClassName) },
+      );
 
   return (
     <div
+      role={role}
       className={cn(
         'flex w-full flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:gap-4',
         colors.border,
@@ -83,15 +101,12 @@ export function Banner({
       </div>
       {action ??
         (buttonLabel && buttonHref && (
-          <Link
-            href={buttonHref}
-            className={cn(
-              'inline-flex w-full shrink-0 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors sm:w-auto',
-              colors.button
-            )}
-          >
-            {buttonLabel}
-          </Link>
+          <Button asChild className={cn('w-full shrink-0 sm:w-auto', colors.button)}>
+            <Link href={buttonHref}>
+              {buttonLabel}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
         ))}
     </div>
   );

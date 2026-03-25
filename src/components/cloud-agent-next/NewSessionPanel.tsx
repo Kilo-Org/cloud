@@ -10,6 +10,7 @@ import {
   FolderGit2,
   Loader2,
   Lock,
+  RefreshCw,
   Send,
   Settings,
   Unlock,
@@ -18,6 +19,7 @@ import {
 import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
 
 import { useProfile, useProfiles, useCombinedProfiles } from '@/hooks/useCloudAgentProfiles';
+import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import {
@@ -36,6 +38,7 @@ import {
 } from '@/components/shared/RepositoryCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { ModeCombobox, NEXT_MODE_OPTIONS } from '@/components/shared/ModeCombobox';
+import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { AdvancedConfig } from '@/components/shared/AdvancedConfig';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -101,7 +104,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const allModels = modelsData?.data || [];
 
   const modelOptions = useMemo<ModelOption[]>(
-    () => allModels.map(model => ({ id: model.id, name: model.name })),
+    () =>
+      allModels.map(model => ({
+        id: model.id,
+        name: model.name,
+        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
+      })),
     [allModels]
   );
 
@@ -113,6 +121,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const [selectedPlatform, setSelectedPlatform] = useState<RepositoryPlatform>('github');
   const [mode, setMode] = useState<AgentMode>('code');
   const [model, setModel] = useState<string>('');
+  const [variant, setVariant] = useState<string | undefined>(undefined);
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
 
@@ -132,6 +141,8 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   useEffect(() => {
     resetSessionForm();
   }, [resetSessionForm]);
+
+  const availableVariants = modelOptions.find(m => m.id === model)?.variants ?? [];
 
   // ---------------------------------------------------------------------------
   // Model auto-selection
@@ -154,6 +165,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       if (newModel && newModel !== model) {
         setModel(newModel);
         setIsModelUserSelected(false);
+        // Default variant to first available variant (typically "none") for the new model
+        const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
+        setVariant(newVariants[0]);
       }
     }
   }, [defaultsData?.defaultModel, modelOptions, model, isModelUserSelected]);
@@ -334,6 +348,77 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
   const repoError = githubRepoError || gitlabRepoError;
 
+  const { refresh: refreshGitHubRepositories, isRefreshing: isRefreshingGitHubRepos } =
+    useRefreshRepositories({
+      silent: true,
+      getRefreshQueryOptions: useCallback(
+        () =>
+          organizationId
+            ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
+                organizationId,
+                forceRefresh: true,
+              })
+            : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
+                forceRefresh: true,
+              }),
+        [organizationId, trpc]
+      ),
+      getCacheQueryKey: useCallback(
+        () =>
+          organizationId
+            ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryKey({
+                organizationId,
+                forceRefresh: false,
+              })
+            : trpc.cloudAgentNext.listGitHubRepositories.queryKey({
+                forceRefresh: false,
+              }),
+        [organizationId, trpc]
+      ),
+    });
+
+  const { refresh: refreshGitLabRepositories, isRefreshing: isRefreshingGitLabRepos } =
+    useRefreshRepositories({
+      silent: true,
+      getRefreshQueryOptions: useCallback(
+        () =>
+          organizationId
+            ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
+                organizationId,
+                forceRefresh: true,
+              })
+            : trpc.cloudAgentNext.listGitLabRepositories.queryOptions({
+                forceRefresh: true,
+              }),
+        [organizationId, trpc]
+      ),
+      getCacheQueryKey: useCallback(
+        () =>
+          organizationId
+            ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryKey({
+                organizationId,
+                forceRefresh: false,
+              })
+            : trpc.cloudAgentNext.listGitLabRepositories.queryKey({
+                forceRefresh: false,
+              }),
+        [organizationId, trpc]
+      ),
+    });
+
+  const refreshRepositories = useCallback(async () => {
+    try {
+      await Promise.all([refreshGitHubRepositories(), refreshGitLabRepositories()]);
+      toast.success('Repositories refreshed');
+    } catch (error) {
+      toast.error('Failed to refresh repositories', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }, [refreshGitHubRepositories, refreshGitLabRepositories]);
+
+  const isRefreshingRepos = isRefreshingGitHubRepos || isRefreshingGitLabRepos;
+
   // ---------------------------------------------------------------------------
   // Integration missing check
   // ---------------------------------------------------------------------------
@@ -365,13 +450,13 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         prompt: prompt.trim(),
         mode,
         model,
+        variant,
         envVars: Object.keys(manualEnvVars).length > 0 ? manualEnvVars : undefined,
         setupCommands: manualSetupCommands.length > 0 ? manualSetupCommands : undefined,
         profileName: selectedProfile?.name,
         autoCommit: true,
         autoInitiate: true,
       };
-
       let result: { kiloSessionId: string; cloudAgentSessionId: string };
 
       if (organizationId) {
@@ -433,6 +518,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     selectedProfile,
     trpc.unifiedSessions.list,
     trpcClient,
+    variant,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -558,123 +644,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             disabled={isPreparing}
           />
           <div className="flex items-center gap-2 px-3 py-1.5">
-            {/* Repo pill */}
-            <Popover open={repoPopoverOpen} onOpenChange={setRepoPopoverOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    'hover:bg-accent inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm',
-                    !selectedRepo && 'text-muted-foreground'
-                  )}
-                  disabled={isPreparing}
-                >
-                  <FolderGit2 className="h-3.5 w-3.5" />
-                  <span className="max-w-[12rem] truncate">{selectedRepo || 'Repository...'}</span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 p-0" align="start">
-                {isLoadingRepos ? (
-                  <div className="text-muted-foreground p-4 text-center text-sm">
-                    Loading repositories...
-                  </div>
-                ) : repoError ? (
-                  <div className="p-4 text-center text-sm text-red-400">
-                    Failed to load repositories
-                  </div>
-                ) : unifiedRepositories.length === 0 ? (
-                  <div className="text-muted-foreground p-4 text-center text-sm">
-                    No repositories found
-                  </div>
-                ) : (
-                  <Command>
-                    <CommandInput placeholder="Search repositories..." />
-                    <CommandEmpty>No repositories match your search</CommandEmpty>
-                    <CommandList className="max-h-64 overflow-auto">
-                      {recentRepos.length > 0 && (
-                        <CommandGroup heading="Recently used">
-                          {recentRepos.map(repo => (
-                            <RepoCommandItem
-                              key={`recent-${repo.id}`}
-                              repo={repo}
-                              isSelected={repo.fullName === selectedRepo}
-                              onSelect={handleRepoPillSelect}
-                            />
-                          ))}
-                        </CommandGroup>
-                      )}
-                      {hasMultiplePlatforms ? (
-                        <>
-                          {githubRepos.length > 0 && (
-                            <CommandGroup heading="GitHub">
-                              {githubRepos.map(repo => (
-                                <RepoCommandItem
-                                  key={repo.id}
-                                  repo={repo}
-                                  isSelected={repo.fullName === selectedRepo}
-                                  onSelect={handleRepoPillSelect}
-                                />
-                              ))}
-                            </CommandGroup>
-                          )}
-                          {gitlabRepos.length > 0 && (
-                            <CommandGroup heading="GitLab">
-                              {gitlabRepos.map(repo => (
-                                <RepoCommandItem
-                                  key={repo.id}
-                                  repo={repo}
-                                  isSelected={repo.fullName === selectedRepo}
-                                  onSelect={handleRepoPillSelect}
-                                />
-                              ))}
-                            </CommandGroup>
-                          )}
-                          {otherRepos.length > 0 && (
-                            <CommandGroup heading="Other">
-                              {otherRepos.map(repo => (
-                                <RepoCommandItem
-                                  key={repo.id}
-                                  repo={repo}
-                                  isSelected={repo.fullName === selectedRepo}
-                                  onSelect={handleRepoPillSelect}
-                                />
-                              ))}
-                            </CommandGroup>
-                          )}
-                        </>
-                      ) : (
-                        <CommandGroup>
-                          {filteredUnifiedRepos.map(repo => (
-                            <RepoCommandItem
-                              key={repo.id}
-                              repo={repo}
-                              isSelected={repo.fullName === selectedRepo}
-                              onSelect={handleRepoPillSelect}
-                            />
-                          ))}
-                        </CommandGroup>
-                      )}
-                    </CommandList>
-                  </Command>
-                )}
-              </PopoverContent>
-            </Popover>
-
-            <div className="flex-1" />
-
-            {/* Model + Mode + submit */}
-            {isPreparing && <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />}
-            <ModelCombobox
-              models={modelOptions}
-              value={model}
-              onValueChange={newModel => {
-                setModel(newModel);
-                setIsModelUserSelected(true);
-              }}
-              isLoading={!modelsData}
-              variant="compact"
-              disabled={isPreparing}
-            />
+            {/* Mode → Model → Variant */}
             <ModeCombobox<AgentMode>
               value={mode}
               onValueChange={setMode}
@@ -682,6 +652,34 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               variant="compact"
               disabled={isPreparing}
             />
+            <ModelCombobox
+              models={modelOptions}
+              value={model}
+              onValueChange={newModel => {
+                setModel(newModel);
+                setIsModelUserSelected(true);
+                // Reset variant to first available (typically "none") if current is invalid for new model
+                const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
+                if (!variant || !newVariants.includes(variant)) {
+                  setVariant(newVariants[0]);
+                }
+              }}
+              isLoading={!modelsData}
+              variant="compact"
+              disabled={isPreparing}
+            />
+            {availableVariants.length > 0 && (
+              <VariantCombobox
+                variants={availableVariants}
+                value={variant}
+                onValueChange={setVariant}
+                disabled={isPreparing}
+              />
+            )}
+
+            <div className="flex-1" />
+
+            {isPreparing && <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />}
             <UIButton
               type="button"
               variant="primary"
@@ -695,8 +693,124 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
           </div>
         </div>
 
-        {/* Advanced settings (outside prompt, bottom-right) */}
-        <div className="flex justify-end">
+        {/* Repo + Settings row (outside prompt box) */}
+        <div className="flex items-center justify-between">
+          {/* Repo — bottom left */}
+          <Popover open={repoPopoverOpen} onOpenChange={setRepoPopoverOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  'text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm',
+                  selectedRepo && 'text-foreground'
+                )}
+                disabled={isPreparing}
+              >
+                <FolderGit2 className="h-3.5 w-3.5" />
+                <span className="max-w-[16rem] truncate">{selectedRepo || 'Repository'}</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="start">
+              {isLoadingRepos ? (
+                <div className="text-muted-foreground p-4 text-center text-sm">
+                  Loading repositories...
+                </div>
+              ) : repoError ? (
+                <div className="p-4 text-center text-sm text-red-400">
+                  Failed to load repositories
+                </div>
+              ) : unifiedRepositories.length === 0 ? (
+                <div className="text-muted-foreground p-4 text-center text-sm">
+                  No repositories found
+                </div>
+              ) : (
+                <Command>
+                  <div className="flex items-center border-b pr-2 [&_[cmdk-input-wrapper]]:flex-1 [&_[cmdk-input-wrapper]]:border-b-0">
+                    <CommandInput placeholder="Search repositories..." />
+                    <button
+                      type="button"
+                      onClick={() => void refreshRepositories()}
+                      disabled={isRefreshingRepos}
+                      className="text-muted-foreground hover:text-foreground shrink-0 rounded-sm p-1 disabled:opacity-50"
+                      title="Refresh repositories"
+                    >
+                      <RefreshCw
+                        className={cn('h-3.5 w-3.5', isRefreshingRepos && 'animate-spin')}
+                      />
+                    </button>
+                  </div>
+                  <CommandEmpty>No repositories match your search</CommandEmpty>
+                  <CommandList className="max-h-64 overflow-auto">
+                    {recentRepos.length > 0 && (
+                      <CommandGroup heading="Recently used">
+                        {recentRepos.map(repo => (
+                          <RepoCommandItem
+                            key={`recent-${repo.id}`}
+                            repo={repo}
+                            isSelected={repo.fullName === selectedRepo}
+                            onSelect={handleRepoPillSelect}
+                          />
+                        ))}
+                      </CommandGroup>
+                    )}
+                    {hasMultiplePlatforms ? (
+                      <>
+                        {githubRepos.length > 0 && (
+                          <CommandGroup heading="GitHub">
+                            {githubRepos.map(repo => (
+                              <RepoCommandItem
+                                key={repo.id}
+                                repo={repo}
+                                isSelected={repo.fullName === selectedRepo}
+                                onSelect={handleRepoPillSelect}
+                              />
+                            ))}
+                          </CommandGroup>
+                        )}
+                        {gitlabRepos.length > 0 && (
+                          <CommandGroup heading="GitLab">
+                            {gitlabRepos.map(repo => (
+                              <RepoCommandItem
+                                key={repo.id}
+                                repo={repo}
+                                isSelected={repo.fullName === selectedRepo}
+                                onSelect={handleRepoPillSelect}
+                              />
+                            ))}
+                          </CommandGroup>
+                        )}
+                        {otherRepos.length > 0 && (
+                          <CommandGroup heading="Other">
+                            {otherRepos.map(repo => (
+                              <RepoCommandItem
+                                key={repo.id}
+                                repo={repo}
+                                isSelected={repo.fullName === selectedRepo}
+                                onSelect={handleRepoPillSelect}
+                              />
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </>
+                    ) : (
+                      <CommandGroup>
+                        {filteredUnifiedRepos.map(repo => (
+                          <RepoCommandItem
+                            key={repo.id}
+                            repo={repo}
+                            isSelected={repo.fullName === selectedRepo}
+                            onSelect={handleRepoPillSelect}
+                          />
+                        ))}
+                      </CommandGroup>
+                    )}
+                  </CommandList>
+                </Command>
+              )}
+            </PopoverContent>
+          </Popover>
+
+          {/* Settings — bottom right */}
           <Popover>
             <PopoverTrigger asChild>
               <button

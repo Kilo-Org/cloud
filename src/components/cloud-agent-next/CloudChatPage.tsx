@@ -159,6 +159,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
         prompt,
         mode: sessionConfig?.mode ?? 'code',
         model: sessionConfig?.model ?? '',
+        variant: sessionConfig?.variant ?? undefined,
       });
     },
     [manager, sessionConfig]
@@ -197,7 +198,21 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   const handleModelChange = useCallback(
     (model: string) => {
-      if (sessionConfig) setSessionConfig({ ...sessionConfig, model });
+      if (!sessionConfig) return;
+      // Reset variant to first available (typically "none") when switching models if current is invalid
+      const newModelVariants = modelOptions.find(m => m.id === model)?.variants ?? [];
+      const validVariant =
+        sessionConfig.variant && newModelVariants.includes(sessionConfig.variant)
+          ? sessionConfig.variant
+          : newModelVariants[0];
+      setSessionConfig({ ...sessionConfig, model, variant: validVariant });
+    },
+    [sessionConfig, setSessionConfig, modelOptions]
+  );
+
+  const handleVariantChange = useCallback(
+    (variant: string) => {
+      if (sessionConfig) setSessionConfig({ ...sessionConfig, variant });
     },
     [sessionConfig, setSessionConfig]
   );
@@ -215,6 +230,9 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   // -- Derived state --------------------------------------------------------
   const showChatInterface = Boolean(sessionConfig) || Boolean(sessionIdFromParams);
+  const currentModelOption = modelOptions.find(m => m.id === sessionConfig?.model);
+  const modelDisplayName = currentModelOption?.name;
+  const availableVariants = currentModelOption?.variants ?? [];
 
   const placeholder = isLoading
     ? 'Loading session…'
@@ -249,6 +267,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                 organizationId={organizationId}
                 repository={sessionConfig?.repository ?? ''}
                 model={sessionConfig?.model}
+                modelDisplayName={modelDisplayName}
                 totalCost={totalCost}
                 soundEnabled={soundEnabled}
                 onToggleSound={handleToggleSound}
@@ -318,6 +337,9 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                   isLoadingModels={isLoadingModels}
                   onModeChange={handleModeChange}
                   onModelChange={handleModelChange}
+                  variant={sessionConfig?.variant ?? undefined}
+                  onVariantChange={handleVariantChange}
+                  availableVariants={availableVariants}
                   showToolbar={Boolean(sessionIdFromParams)}
                   initialValue={failedPrompt ?? undefined}
                 />

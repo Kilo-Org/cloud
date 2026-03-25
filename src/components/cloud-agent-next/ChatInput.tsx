@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { BrowseCommandsDialog } from './BrowseCommandsDialog';
 import { ModeCombobox, NEXT_MODE_OPTIONS } from '@/components/shared/ModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import type { AgentMode } from './types';
 
 type ChatInputProps = {
@@ -32,6 +33,12 @@ type ChatInputProps = {
   onModeChange?: (mode: AgentMode) => void;
   /** Callback when model changes */
   onModelChange?: (model: string) => void;
+  /** Current variant for the toolbar */
+  variant?: string;
+  /** Callback when variant changes */
+  onVariantChange?: (variant: string) => void;
+  /** Available variant keys for the current model */
+  availableVariants?: string[];
   /** Whether to show the toolbar (hide when no active session) */
   showToolbar?: boolean;
   /** Pre-populate the textarea (e.g. to restore text after a failed send) */
@@ -51,6 +58,9 @@ export function ChatInput({
   isLoadingModels = false,
   onModeChange,
   onModelChange,
+  variant,
+  onVariantChange,
+  availableVariants = [],
   showToolbar = false,
   initialValue,
 }: ChatInputProps) {
@@ -288,6 +298,14 @@ export function ChatInput({
                 isLoading={isLoadingModels}
                 disabled={disabled || isStreaming}
               />
+              {availableVariants.length > 0 && onVariantChange && (
+                <VariantCombobox
+                  variants={availableVariants}
+                  value={variant}
+                  onValueChange={onVariantChange}
+                  disabled={disabled || isStreaming}
+                />
+              )}
             </>
           )}
           {slashCommands.length > 0 && <BrowseCommandsDialog />}

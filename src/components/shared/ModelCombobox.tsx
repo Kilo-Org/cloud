@@ -17,11 +17,14 @@ import { ChevronsUpDown, Check, Image } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { preferredModels } from '@/lib/models';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatShortModelDisplayName } from '@/lib/format-model-name';
 
 export type ModelOption = {
   id: string; // e.g., "anthropic/claude-sonnet-4.5"
   name: string; // e.g., "Claude Sonnet 4.5"
   supportsVision?: boolean;
+  /** Ordered list of variant key names (e.g., ["none","low","medium","high","max"]) */
+  variants?: string[];
 };
 
 export type ModelComboboxProps = {
@@ -189,7 +192,9 @@ export function ModelCombobox({
             className={cn('h-9 justify-between gap-1.5', className)}
             ref={triggerRef}
           >
-            <span className="truncate">{selectedModel ? selectedModel.name : placeholder}</span>
+            <span className="truncate">
+              {selectedModel ? formatShortModelDisplayName(selectedModel.name) : placeholder}
+            </span>
             <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>

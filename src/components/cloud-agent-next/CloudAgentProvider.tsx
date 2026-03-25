@@ -105,6 +105,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
         const prompt = payload.prompt as string;
         const mode = payload.mode as 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
         const model = payload.model as string;
+        const variant = payload.variant as string | undefined;
         if (organizationId) {
           return trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
             {
@@ -112,6 +113,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
               prompt,
               mode,
               model,
+              variant,
               autoCommit: true,
               organizationId,
             },
@@ -119,7 +121,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           );
         }
         return trpcClient.cloudAgentNext.sendMessage.mutate(
-          { cloudAgentSessionId: castSessionId, prompt, mode, model, autoCommit: true },
+          { cloudAgentSessionId: castSessionId, prompt, mode, model, variant, autoCommit: true },
           { context: { skipBatch: true } }
         );
       },
@@ -236,6 +238,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           gitBranch: rs?.upstreamBranch ?? sessionResult.git_branch,
           mode: rs?.mode ?? null,
           model: rs?.model ?? null,
+          variant: rs?.variant ?? null,
           repository: rs?.githubRepo ?? null,
           isInitiated: Boolean(rs?.initiatedAt),
           needsLegacyPrepare: Boolean(sessionResult.cloud_agent_session_id && !rs),

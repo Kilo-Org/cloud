@@ -37,6 +37,7 @@ type SessionConfig = {
   repository: string;
   mode: string;
   model: string;
+  variant?: string | null;
 };
 type StandaloneQuestion = { requestId: string; questions: QuestionInfo[] };
 type StandalonePermission = {
@@ -56,6 +57,7 @@ type FetchedSessionData = {
   gitBranch: string | null;
   mode: string | null;
   model: string | null;
+  variant: string | null;
   repository: string | null;
   isInitiated: boolean;
   needsLegacyPrepare: boolean;
@@ -66,6 +68,7 @@ type PrepareInput = {
   prompt: string;
   mode: string;
   model: string;
+  variant?: string;
   githubRepo?: string;
   gitlabProject?: string;
   envVars?: Record<string, string>;
@@ -140,7 +143,7 @@ type SessionManagerAtoms = {
 
 type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
-  send(payload: { prompt: string; mode: string; model: string }): Promise<void>;
+  send(payload: { prompt: string; mode: string; model: string; variant?: string }): Promise<void>;
   interrupt(): Promise<void>;
   answerQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
@@ -489,6 +492,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             repository: data.repository ?? '',
             mode: data.mode ?? '',
             model: data.model ?? '',
+            variant: data.variant ?? null,
           });
           store.set(sessionIdAtom, data.cloudAgentSessionId);
           store.set(sessionStorageAtom, jotaiStorage);
@@ -538,12 +542,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           const currentConfig = store.get(sessionConfigAtom);
           if (
             currentConfig &&
-            (currentConfig.model !== event.info.modelID || currentConfig.mode !== event.info.mode)
+            (currentConfig.model !== event.info.modelID ||
+              currentConfig.mode !== event.info.mode ||
+              currentConfig.variant !== (event.info.variant ?? null))
           ) {
             store.set(sessionConfigAtom, {
               ...currentConfig,
               model: event.info.modelID,
               mode: event.info.mode,
+              variant: event.info.variant ?? null,
             });
           }
         }
@@ -577,7 +584,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     session.connect();
   }
 
-  async function send(payload: { prompt: string; mode: string; model: string }): Promise<void> {
+  async function send(payload: {
+    prompt: string;
+    mode: string;
+    model: string;
+    variant?: string;
+  }): Promise<void> {
     store.set(errorAtom, null);
     setIndicator(null);
     const id = `optimistic-${crypto.randomUUID()}`;
@@ -600,6 +612,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         prompt: payload.prompt,
         mode: payload.mode,
         model: payload.model,
+        variant: payload.variant,
       });
     } catch (err) {
       store.set(optimisticMessageAtom, null);

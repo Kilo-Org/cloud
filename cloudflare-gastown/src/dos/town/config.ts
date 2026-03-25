@@ -55,11 +55,20 @@ export async function updateTownConfig(
     }
   }
 
+  // github_cli_pat: same mask-preservation as git_auth tokens
+  const resolvedGithubCliPat =
+    update.github_cli_pat !== undefined
+      ? MASKED_RE.test(update.github_cli_pat)
+        ? current.github_cli_pat
+        : update.github_cli_pat
+      : current.github_cli_pat;
+
   const merged: TownConfig = {
     ...current,
     ...update,
     env_vars: resolvedEnvVars,
     git_auth: resolvedGitAuth,
+    github_cli_pat: resolvedGithubCliPat,
     refinery:
       update.refinery !== undefined
         ? {

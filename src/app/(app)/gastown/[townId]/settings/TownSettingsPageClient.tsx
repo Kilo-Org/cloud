@@ -234,22 +234,23 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
       config: {
         env_vars: envVarObj,
         git_auth: {
-          ...(githubToken && !githubToken.startsWith('****') ? { github_token: githubToken } : {}),
-          ...(gitlabToken && !gitlabToken.startsWith('****') ? { gitlab_token: gitlabToken } : {}),
-          ...(gitlabInstanceUrl ? { gitlab_instance_url: gitlabInstanceUrl } : {}),
+          // Omit masked values to preserve the real secret server-side.
+          // Send empty string to clear, real value to update.
+          ...(githubToken.startsWith('****') ? {} : { github_token: githubToken }),
+          ...(gitlabToken.startsWith('****') ? {} : { gitlab_token: gitlabToken }),
+          gitlab_instance_url: gitlabInstanceUrl,
         },
-        ...(defaultModel ? { default_model: defaultModel } : {}),
+        default_model: defaultModel,
         role_models: {
           mayor: mayorModel || undefined,
           refinery: refineryModel || undefined,
           polecat: polecatModel || undefined,
         },
         ...(maxPolecats ? { max_polecats_per_rig: maxPolecats } : {}),
-        ...(githubCliPat && !githubCliPat.startsWith('****')
-          ? { github_cli_pat: githubCliPat }
-          : {}),
-        ...(gitAuthorName ? { git_author_name: gitAuthorName } : { git_author_name: '' }),
-        ...(gitAuthorEmail ? { git_author_email: gitAuthorEmail } : { git_author_email: '' }),
+        // Omit masked values to preserve the real secret; send empty string to clear.
+        ...(githubCliPat.startsWith('****') ? {} : { github_cli_pat: githubCliPat }),
+        git_author_name: gitAuthorName,
+        git_author_email: gitAuthorEmail,
         disable_ai_coauthor: disableAiCoauthor,
         merge_strategy: mergeStrategy,
         staged_convoys_default: stagedConvoysDefault,

@@ -17,6 +17,7 @@ import type { JwtOrgMembership } from '../middleware/auth.middleware';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
 import { TownConfigSchema, TownConfigUpdateSchema } from '../types';
+import { resolveModel } from '../dos/town/config';
 import type { UserRigRecord } from '../db/tables/user-rigs.table';
 import {
   RpcTownOutput,
@@ -981,17 +982,16 @@ export const gastownRouter = router({
         console.warn('[gastown-trpc] updateTownConfig: syncConfigToContainer failed:', err);
       }
 
-      // If the model changed, hot-update the running mayor session so it
-      // picks up the new model without losing conversation context.
-      const modelChanged =
-        result.default_model !== existingConfig.default_model ||
-        result.small_model !== existingConfig.small_model;
-      if (modelChanged) {
+      // If the mayor's effective model changed (via default_model, role_models.mayor,
+      // or small_model), hot-update the running mayor session so it picks up the
+      // new model without losing conversation context.
+      const oldMayorModel = resolveModel(existingConfig, '', 'mayor');
+      const newMayorModel = resolveModel(result, '', 'mayor');
+      const mayorModelChanged =
+        newMayorModel !== oldMayorModel || result.small_model !== existingConfig.small_model;
+      if (mayorModelChanged) {
         try {
-          await townStub.updateMayorModel(
-            result.default_model ?? 'anthropic/claude-sonnet-4.6',
-            result.small_model ?? undefined
-          );
+          await townStub.updateMayorModel(newMayorModel, result.small_model ?? undefined);
         } catch (err) {
           console.warn('[gastown-trpc] updateTownConfig: updateMayorModel failed:', err);
         }

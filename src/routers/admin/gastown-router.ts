@@ -122,6 +122,14 @@ const TownConfigRecord = z.object({
   owner_user_id: z.string().optional(),
   kilocode_token: z.string().optional(),
   default_model: z.string().nullable().optional(),
+  role_models: z
+    .object({
+      mayor: z.string().nullable().optional(),
+      refinery: z.string().nullable().optional(),
+      polecat: z.string().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
   small_model: z.string().nullable().optional(),
   max_polecats_per_rig: z.number().optional(),
   merge_strategy: z.enum(['direct', 'pr']),

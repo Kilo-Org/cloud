@@ -5,9 +5,10 @@
  * Processes ServiceEvents from the normalizer and provides a reactive snapshot
  * of the current service state via subscribe().
  */
-import type { Session, QuestionInfo } from '@/types/opencode.gen';
+import type { QuestionInfo } from '@/types/opencode.gen';
 import type { ServiceEvent } from './normalizer';
 import type {
+  SessionInfo,
   SessionActivity,
   AgentStatus,
   QuestionState,
@@ -32,8 +33,8 @@ type ServiceStateConfig = {
   ) => void;
   onPermissionResolved?: (requestId: string) => void;
   onBranchChanged?: (branch: string) => void;
-  onSessionCreated?: (info: Session) => void;
-  onSessionUpdated?: (info: Session) => void;
+  onSessionCreated?: (info: SessionInfo) => void;
+  onSessionUpdated?: (info: SessionInfo) => void;
   /** Fired when async preparation completes (preparing step === 'ready'). */
   onPreparationReady?: () => void;
   /** Fired when async preparation fails (preparing step === 'failed'). */
@@ -47,7 +48,7 @@ type ServiceState = {
   getCloudStatus(): CloudStatus | null;
   getQuestion(): QuestionState | null;
   getPermission(): PermissionState | null;
-  getSessionInfo(): Session | null;
+  getSessionInfo(): SessionInfo | null;
   snapshot(): ServiceStateSnapshot;
   /** Set activity directly (for transport lifecycle events like connecting/disconnected). */
   setActivity(activity: SessionActivity): void;
@@ -66,7 +67,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   let activity: SessionActivity = INITIAL_ACTIVITY;
   let status: AgentStatus = IDLE_STATUS;
   let cloudStatus: CloudStatus | null = null;
-  let sessionInfo: Session | null = null;
+  let sessionInfo: SessionInfo | null = null;
   let question: QuestionState | null = null;
   let permission: PermissionState | null = null;
 

@@ -3,8 +3,14 @@ import { createMemoryStorage } from './storage/memory';
 import { createChatProcessor } from './chat-processor';
 import { createServiceState } from './service-state';
 import type { CloudAgentEvent } from '@/lib/cloud-agent-next/event-types';
-import type { Session, UserMessage, TextPart } from '@/types/opencode.gen';
-import type { KiloSessionId, CloudAgentSessionId, SessionSnapshot, MessageInfo } from './types';
+import type { UserMessage, TextPart } from '@/types/opencode.gen';
+import type {
+  KiloSessionId,
+  CloudAgentSessionId,
+  SessionInfo,
+  SessionSnapshot,
+  MessageInfo,
+} from './types';
 
 /** Cast a plain string to KiloSessionId in tests. */
 function kiloId(id: string): KiloSessionId {
@@ -39,16 +45,8 @@ function createTestSession() {
 // Typed stub factories for SessionSnapshot tests
 // ---------------------------------------------------------------------------
 
-function stubSession(overrides: Partial<Session> & { id: string }): Session {
-  return {
-    slug: 'test',
-    projectID: 'proj-1',
-    directory: '/tmp',
-    title: 'Test session',
-    version: '1',
-    time: { created: 0, updated: 0 },
-    ...overrides,
-  };
+function stubSessionInfo(overrides: Partial<SessionInfo> & { id: string }): SessionInfo {
+  return { id: overrides.id, parentID: overrides.parentID };
 }
 
 function stubUserMessage(
@@ -74,17 +72,17 @@ function stubTextPart(
 }
 
 function makeSnapshot(
-  info: Partial<Session> & { id: string },
+  info: Partial<SessionInfo> & { id: string },
   messages: Array<{ info: MessageInfo; parts: TextPart[] }> = []
 ): SessionSnapshot {
-  return { info: stubSession(info), messages };
+  return { info: stubSessionInfo(info), messages };
 }
 
 export {
   createTestSession,
   kiloId,
   cloudAgentId,
-  stubSession,
+  stubSessionInfo,
   stubUserMessage,
   stubTextPart,
   makeSnapshot,

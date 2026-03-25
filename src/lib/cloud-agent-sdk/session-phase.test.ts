@@ -7,8 +7,7 @@
 import { createCloudAgentSession } from './session';
 import { createEventHelpers, sessionInfo } from './__fixtures__/helpers';
 import { kiloId, cloudAgentId, makeSnapshot } from './test-helpers';
-import type { SessionActivity, AgentStatus } from './types';
-import type { Session } from '@/types/opencode.gen';
+import type { SessionActivity, AgentStatus, SessionInfo } from './types';
 import type { CloudAgentEvent } from '@/lib/cloud-agent-next/event-types';
 
 // ---------------------------------------------------------------------------
@@ -378,7 +377,7 @@ describe('session state transitions', () => {
         getTicket: getTicketMock,
         fetchSnapshot: () => Promise.resolve(emptySnapshot),
       },
-      onSessionCreated: (info: Session) => sessions.push(info),
+      onSessionCreated: (info: SessionInfo) => sessions.push(info),
     });
 
     session.connect();

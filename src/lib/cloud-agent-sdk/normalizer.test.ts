@@ -409,9 +409,23 @@ describe('normalize', () => {
 
   describe('session.created', () => {
     it('normalizes valid session.created', () => {
-      const info = { id: 'ses-1', title: 'Test Session' };
-      const result = normalize(createRaw('session.created', { info }));
-      expect(result).toEqual({ type: 'session.created', info });
+      const result = normalize(
+        createRaw('session.created', { info: { id: 'ses-1', title: 'Test Session' } })
+      );
+      expect(result).toEqual({
+        type: 'session.created',
+        info: { id: 'ses-1', parentID: undefined },
+      });
+    });
+
+    it('extracts parentID from session.created', () => {
+      const result = normalize(
+        createRaw('session.created', { info: { id: 'child-1', parentID: 'ses-1' } })
+      );
+      expect(result).toEqual({
+        type: 'session.created',
+        info: { id: 'child-1', parentID: 'ses-1' },
+      });
     });
 
     it('returns null when info is missing', () => {
@@ -425,9 +439,13 @@ describe('normalize', () => {
 
   describe('session.updated', () => {
     it('normalizes valid session.updated', () => {
-      const info = { id: 'ses-1', title: 'Updated Session' };
-      const result = normalize(createRaw('session.updated', { info }));
-      expect(result).toEqual({ type: 'session.updated', info });
+      const result = normalize(
+        createRaw('session.updated', { info: { id: 'ses-1', title: 'Updated Session' } })
+      );
+      expect(result).toEqual({
+        type: 'session.updated',
+        info: { id: 'ses-1', parentID: undefined },
+      });
     });
 
     it('returns null when info is missing', () => {
@@ -1273,10 +1291,11 @@ describe('normalizeCliEvent', () => {
     });
 
     it('normalizes session.created without envelope', () => {
-      const info = { id: 'ses-1', title: 'CLI Session' };
-      expect(normalizeCliEvent('session.created', { info })).toEqual({
+      expect(
+        normalizeCliEvent('session.created', { info: { id: 'ses-1', title: 'CLI Session' } })
+      ).toEqual({
         type: 'session.created',
-        info,
+        info: { id: 'ses-1', parentID: undefined },
       });
     });
 

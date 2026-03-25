@@ -5,7 +5,7 @@
  * `resolveSession` determines the session type and routes to Cloud Agent,
  * CLI live, or CLI historical transport.
  */
-import type { QuestionInfo, Session } from '@/types/opencode.gen';
+import type { QuestionInfo } from '@/types/opencode.gen';
 import type { NormalizedEvent } from './normalizer';
 import { createChatProcessor } from './chat-processor';
 import { createServiceState } from './service-state';
@@ -16,7 +16,13 @@ import { createCliHistoricalTransport } from './cli-historical-transport';
 import type { TransportFactory, TransportSink, Transport } from './transport';
 import { createMemoryStorage } from './storage/memory';
 import type { SessionStorage } from './storage/types';
-import type { CloudAgentSessionId, KiloSessionId, ResolvedSession, SessionSnapshot } from './types';
+import type {
+  CloudAgentSessionId,
+  KiloSessionId,
+  ResolvedSession,
+  SessionInfo,
+  SessionSnapshot,
+} from './types';
 
 type CloudAgentSessionConfig = {
   kiloSessionId: KiloSessionId;
@@ -37,8 +43,8 @@ type CloudAgentSessionConfig = {
   ) => void;
   onPermissionResolved?: (requestId: string) => void;
   onBranchChanged?: (branch: string) => void;
-  onSessionCreated?: (info: Session) => void;
-  onSessionUpdated?: (info: Session) => void;
+  onSessionCreated?: (info: SessionInfo) => void;
+  onSessionUpdated?: (info: SessionInfo) => void;
   onEvent?: (event: NormalizedEvent) => void;
 };
 
@@ -302,7 +308,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     answer: payload => {
       if (transport?.sendCommand) {
         return transport.sendCommand('question_reply', {
-          requestId: payload.requestId,
+          requestID: payload.requestId,
           answers: payload.answers,
         });
       }
@@ -314,9 +320,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     },
     reject: payload => {
       if (transport?.sendCommand) {
-        return transport.sendCommand('permission_respond', {
-          requestId: payload.requestId,
-          accepted: false,
+        return transport.sendCommand('question_reject', {
+          requestID: payload.requestId,
         });
       }
       const reject = config.transport.reject;
@@ -328,8 +333,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     respondToPermission: payload => {
       if (transport?.sendCommand) {
         return transport.sendCommand('permission_respond', {
-          requestId: payload.requestId,
-          response: payload.response,
+          requestID: payload.requestId,
+          reply: payload.response,
         });
       }
       const respondToPermission = config.transport.respondToPermission;

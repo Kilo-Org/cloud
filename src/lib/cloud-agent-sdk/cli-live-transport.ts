@@ -102,15 +102,17 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
 
         const session = r.data.sessions.find(s => s.id === config.kiloSessionId);
         if (session) {
-          const connId = z.object({ connectionId: z.string() }).safeParse(session);
-          ownerConnectionId = connId.success ? connId.data.connectionId : ownerConnectionId;
+          ownerConnectionId = r.data.connectionId;
+          return;
         }
 
-        if (!session) {
-          if (!sessionStopped) {
-            sink.onServiceEvent({ type: 'stopped', reason: 'disconnected' });
-            sessionStopped = true;
-          }
+        // Session not in this heartbeat — only treat as stopped if this heartbeat
+        // is from the connection that owns the session (or we haven't learned the
+        // owner yet, in which case sessions.list is the authoritative source).
+        const isOwnerHeartbeat = !ownerConnectionId || r.data.connectionId === ownerConnectionId;
+        if (isOwnerHeartbeat && !sessionStopped) {
+          sink.onServiceEvent({ type: 'stopped', reason: 'disconnected' });
+          sessionStopped = true;
         }
       }
     }

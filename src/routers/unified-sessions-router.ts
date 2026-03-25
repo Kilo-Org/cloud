@@ -49,6 +49,7 @@ const SearchInputSchema = z.object({
     .optional(),
   organizationId: z.uuid().nullable().optional(),
   includeSubSessions: z.boolean().optional().default(false),
+  gitUrl: z.string().optional(),
 });
 
 /**
@@ -286,8 +287,15 @@ export const unifiedSessionsRouter = createTRPCRouter({
     }),
 
   search: baseProcedure.input(SearchInputSchema).query(async ({ ctx, input }) => {
-    const { search_string, limit, offset, createdOnPlatform, organizationId, includeSubSessions } =
-      input;
+    const {
+      search_string,
+      limit,
+      offset,
+      createdOnPlatform,
+      organizationId,
+      includeSubSessions,
+      gitUrl,
+    } = input;
 
     if (organizationId) {
       await ensureOrganizationAccess(ctx, organizationId);
@@ -298,6 +306,7 @@ export const unifiedSessionsRouter = createTRPCRouter({
       createdOnPlatform,
       organizationId,
       includeSubSessions,
+      gitUrl,
     };
 
     const v1Where = buildScopeFragments('cli_sessions', scopeOpts);

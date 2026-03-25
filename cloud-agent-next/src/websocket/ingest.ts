@@ -25,12 +25,7 @@ import {
   extractEntityId,
   type KiloSessionCaptureState,
 } from '../session/ingest-handlers/index.js';
-import type {
-  CompleteEventData,
-  KilocodeEventData,
-  CloudStatusData,
-  KiloSnapshotData,
-} from '../shared/protocol.js';
+import type { CompleteEventData, KilocodeEventData, CloudStatusData } from '../shared/protocol.js';
 
 // ---------------------------------------------------------------------------
 // Ingest Attachment
@@ -179,8 +174,6 @@ export type IngestDOContext = {
   ) => Promise<void>;
   /** Cancel the disconnect grace period when wrapper reconnects */
   cancelDisconnectGrace?: () => Promise<void>;
-  /** Called when wrapper sends a kilo_snapshot with session status and pending question */
-  onKiloSnapshot?: (data: KiloSnapshotData) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -353,13 +346,6 @@ export function createIngestHandler(
 
         const payload = JSON.stringify(ingestEvent.data ?? {});
         const eventType = ingestEvent.streamEventType;
-
-        // Handle kilo_snapshot: update DO's cached kilo state without persisting or broadcasting.
-        // The DO will broadcast a fresh `connected` event to all /stream clients.
-        if (eventType === 'kilo_snapshot') {
-          doContext.onKiloSnapshot?.(ingestEvent.data as KiloSnapshotData);
-          return;
-        }
 
         let eventId: number;
 

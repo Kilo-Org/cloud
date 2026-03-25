@@ -15,7 +15,7 @@ import { ListToolCard } from './ListToolCard';
 import { GenericToolCard } from './GenericToolCard';
 import { TodoReadToolCard } from './TodoReadToolCard';
 import { TodoWriteToolCard } from './TodoWriteToolCard';
-import { QuestionToolCard } from './QuestionToolCard';
+import { QuestionToolStatus } from './QuestionToolStatus';
 import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection';
 import type { RenderPartFn } from './ChildSessionSection';
 import { useState } from 'react';
@@ -236,9 +236,9 @@ function ToolPartRenderer({
     return <TodoWriteToolCard toolPart={part} />;
   }
 
-  // Special handling for question tool - compact display with tabs
+  // Question tool — read-only status in message stream (interactive UI is in the dock)
   if (part.tool === 'question') {
-    return <QuestionToolCard toolPart={part} />;
+    return <QuestionToolStatus toolPart={part} />;
   }
 
   return <GenericToolCard toolPart={part} />;

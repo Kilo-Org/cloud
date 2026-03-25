@@ -30,16 +30,31 @@ const mockSession = {
   storage: {},
 };
 
+const mockSessionCallbacks: {
+  onQuestionAsked?: (...args: unknown[]) => void;
+  onQuestionResolved?: (...args: unknown[]) => void;
+  onPermissionAsked?: (...args: unknown[]) => void;
+  onPermissionResolved?: (...args: unknown[]) => void;
+} = {};
+
 jest.mock('./session', () => ({
   createCloudAgentSession: jest.fn(
     (sessionConfig: {
       onSessionCreated?: (info: { id: string; parentID: string | null }) => void;
+      onQuestionAsked?: (...args: unknown[]) => void;
+      onQuestionResolved?: (...args: unknown[]) => void;
+      onPermissionAsked?: (...args: unknown[]) => void;
+      onPermissionResolved?: (...args: unknown[]) => void;
     }) => {
       // Capture the onSessionCreated callback and fire it when connect() is called,
       // simulating what the real session does after connecting and replaying the snapshot.
       mockSession.connect.mockImplementation(() => {
         sessionConfig.onSessionCreated?.({ id: 'mock-session', parentID: null });
       });
+      mockSessionCallbacks.onQuestionAsked = sessionConfig.onQuestionAsked;
+      mockSessionCallbacks.onQuestionResolved = sessionConfig.onQuestionResolved;
+      mockSessionCallbacks.onPermissionAsked = sessionConfig.onPermissionAsked;
+      mockSessionCallbacks.onPermissionResolved = sessionConfig.onPermissionResolved;
       return mockSession;
     }
   ),
@@ -107,6 +122,10 @@ describe('createSessionManager', () => {
     mockSession.canSend = true;
     mockSession.canInterrupt = true;
     mockSession.state.subscribe.mockImplementation(() => () => {});
+    mockSessionCallbacks.onQuestionAsked = undefined;
+    mockSessionCallbacks.onQuestionResolved = undefined;
+    mockSessionCallbacks.onPermissionAsked = undefined;
+    mockSessionCallbacks.onPermissionResolved = undefined;
   });
 
   // -------------------------------------------------------------------------
@@ -482,6 +501,128 @@ describe('createSessionManager', () => {
         })
       );
       expect(config.initiate).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // activeQuestion / activePermission
+  // -------------------------------------------------------------------------
+
+  describe('activeQuestion / activePermission', () => {
+    it('onQuestionAsked sets activeQuestion', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const questions = [
+        {
+          question: 'Pick a color',
+          header: 'Color',
+          options: [
+            { label: 'Red', description: '' },
+            { label: 'Blue', description: '' },
+          ],
+        },
+      ];
+      mockSessionCallbacks.onQuestionAsked?.('req-1', questions);
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).toEqual({
+        requestId: 'req-1',
+        questions,
+      });
+
+      const questions2 = [{ question: 'Pick a shape', header: 'Shape', options: [] }];
+      mockSessionCallbacks.onQuestionAsked?.('req-2', questions2);
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).toEqual({
+        requestId: 'req-2',
+        questions: questions2,
+      });
+    });
+
+    it('onQuestionResolved clears activeQuestion', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const questions = [{ question: 'Pick one', header: 'Q', options: [] }];
+      mockSessionCallbacks.onQuestionAsked?.('req-1', questions);
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).not.toBeNull();
+
+      mockSessionCallbacks.onQuestionResolved?.('req-1');
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
+    });
+
+    it('onPermissionAsked sets activePermission', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSessionCallbacks.onPermissionAsked?.('req-1', 'write', ['*.ts'], {}, []);
+      expect(atomValue(config.store, mgr.atoms.activePermission)).toEqual({
+        requestId: 'req-1',
+        permission: 'write',
+        patterns: ['*.ts'],
+        metadata: {},
+        always: [],
+      });
+
+      mockSessionCallbacks.onPermissionAsked?.('req-2', 'bash', ['**'], { command: 'rm' }, [
+        'write',
+      ]);
+      expect(atomValue(config.store, mgr.atoms.activePermission)).toEqual({
+        requestId: 'req-2',
+        permission: 'bash',
+        patterns: ['**'],
+        metadata: { command: 'rm' },
+        always: ['write'],
+      });
+    });
+
+    it('onPermissionResolved clears activePermission', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSessionCallbacks.onPermissionAsked?.('req-1', 'write', [], {}, []);
+      expect(atomValue(config.store, mgr.atoms.activePermission)).not.toBeNull();
+
+      mockSessionCallbacks.onPermissionResolved?.('req-1');
+      expect(atomValue(config.store, mgr.atoms.activePermission)).toBeNull();
+    });
+
+    it('destroy clears activeQuestion and activePermission', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSessionCallbacks.onQuestionAsked?.('req-q', [
+        { question: 'Q?', header: 'Q', options: [] },
+      ]);
+      mockSessionCallbacks.onPermissionAsked?.('req-p', 'write', [], {}, []);
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).not.toBeNull();
+      expect(atomValue(config.store, mgr.atoms.activePermission)).not.toBeNull();
+
+      mgr.destroy();
+
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.activePermission)).toBeNull();
+    });
+
+    it('switchSession clears activeQuestion and activePermission', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSessionCallbacks.onQuestionAsked?.('req-q', [
+        { question: 'Q?', header: 'Q', options: [] },
+      ]);
+      mockSessionCallbacks.onPermissionAsked?.('req-p', 'write', [], {}, []);
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).not.toBeNull();
+      expect(atomValue(config.store, mgr.atoms.activePermission)).not.toBeNull();
+
+      await mgr.switchSession(kiloId('ses-2'));
+
+      expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.activePermission)).toBeNull();
     });
   });
 

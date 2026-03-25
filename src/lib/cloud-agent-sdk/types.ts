@@ -83,13 +83,11 @@ export type CloudStatus =
 
 export type QuestionState = {
   requestId: string;
-  callId?: string;
   questions?: QuestionInfo[];
 };
 
 export type PermissionState = {
   requestId: string;
-  callId?: string;
   permission: string;
   patterns: string[];
   metadata: Record<string, unknown>;

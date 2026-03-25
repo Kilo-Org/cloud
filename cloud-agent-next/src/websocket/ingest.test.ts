@@ -268,6 +268,35 @@ describe('createIngestHandler', () => {
         );
       }
     );
+
+    it('kilo_snapshot is broadcast-only (no special handling)', async () => {
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+
+      await handler.handleIngestMessage(
+        ws,
+        JSON.stringify({
+          streamEventType: 'kilo_snapshot',
+          data: { sessionStatus: { type: 'busy' } },
+          timestamp: new Date().toISOString(),
+        })
+      );
+
+      // Should NOT call onKiloSnapshot (removed)
+      // Should be broadcast as a regular event with eventId 0
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 0, stream_event_type: 'kilo_snapshot' })
+      );
+    });
   });
 
   describe('hasActiveConnection', () => {

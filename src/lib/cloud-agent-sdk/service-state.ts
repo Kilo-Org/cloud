@@ -21,11 +21,10 @@ type ServiceStateConfig = {
   /** The root session ID we're tracking (to detect child sessions). */
   rootSessionId: string;
   onError?: (message: string) => void;
-  onQuestionAsked?: (requestId: string, callId?: string, questions?: QuestionInfo[]) => void;
+  onQuestionAsked?: (requestId: string, questions?: QuestionInfo[]) => void;
   onQuestionResolved?: (requestId: string) => void;
   onPermissionAsked?: (
     requestId: string,
-    callId?: string,
     permission?: string,
     patterns?: string[],
     metadata?: Record<string, unknown>,
@@ -114,6 +113,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
   function processStopped(event: Extract<ServiceEvent, { type: 'stopped' }>): void {
     activity = { type: 'idle' };
+    cloudStatus = null;
 
     switch (event.reason) {
       case 'complete':
@@ -168,10 +168,9 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processQuestionAsked(event: Extract<ServiceEvent, { type: 'question.asked' }>): void {
     question = {
       requestId: event.requestId,
-      callId: event.callId,
       questions: event.questions,
     };
-    config.onQuestionAsked?.(event.requestId, event.callId, event.questions);
+    config.onQuestionAsked?.(event.requestId, event.questions);
     notify();
   }
 
@@ -183,14 +182,13 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
   function processPermissionAsked(
     requestId: string,
-    callId: string | undefined,
     permissionType: string,
     patterns: string[],
     metadata: Record<string, unknown>,
     always: string[]
   ): void {
-    permission = { requestId, callId, permission: permissionType, patterns, metadata, always };
-    config.onPermissionAsked?.(requestId, callId, permissionType, patterns, metadata, always);
+    permission = { requestId, permission: permissionType, patterns, metadata, always };
+    config.onPermissionAsked?.(requestId, permissionType, patterns, metadata, always);
     notify();
   }
 
@@ -263,29 +261,11 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     // Set cloudStatus (undefined means not provided — leave as null)
     cloudStatus = event.cloudStatus ?? null;
 
-    // Sync question state: set if present, clear if absent (question was answered while disconnected)
-    if (event.question) {
-      question = {
-        requestId: event.question.requestId,
-        callId: event.question.callId,
-        questions: event.question.questions,
-      };
-      // Notify via callback so questionRequestIdsAtom gets populated (needed for answering questions)
-      config.onQuestionAsked?.(
-        event.question.requestId,
-        event.question.callId,
-        event.question.questions
-      );
-    } else {
-      question = null;
-    }
-
-    // Sync permission state: set if present, clear if absent
-    if (event.permission) {
-      permission = event.permission;
-    } else {
-      permission = null;
-    }
+    // Clear question/permission — if still pending on the server the wrapper
+    // replays them as separate question.asked / permission.asked events
+    // immediately after the snapshot, so they'll be re-set.
+    question = null;
+    permission = null;
 
     // Clear terminated on connected
     terminated = false;
@@ -322,7 +302,6 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       case 'permission.asked':
         processPermissionAsked(
           event.requestId,
-          event.callId,
           event.permission,
           event.patterns,
           event.metadata,

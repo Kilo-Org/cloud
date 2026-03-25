@@ -22,8 +22,6 @@ export type StreamEventType =
   | 'wrapper_resumed' // Wrapper reconnected after disconnect (may have lost events)
   | 'autocommit_started' // Auto-commit process began
   | 'autocommit_completed' // Auto-commit finished (success, skip, or failure)
-  // Wrapper -> DO (kilo server state snapshot on connect)
-  | 'kilo_snapshot' // Initial kilo server state sent by wrapper on ingest WS connect
   // DO -> /stream clients (connection status)
   | 'wrapper_disconnected' // Wrapper WebSocket closed unexpectedly
   | 'wrapper_reconnected' // Wrapper reconnected successfully
@@ -123,7 +121,7 @@ export type CloudStatusData = {
   };
 };
 
-/** Session status as reported by the Kilo server via kilo_snapshot. */
+/** Session status as reported by the Kilo server via session.status events. */
 export type SessionStatus =
   | { type: 'busy' }
   | { type: 'idle' }
@@ -133,22 +131,6 @@ export type SessionStatus =
 export type ConnectedEventData = {
   sessionStatus?: SessionStatus;
   cloudStatus?: { type: CloudStatusType; step?: string; message?: string };
-  question?: { requestId: string; callId?: string };
-  permission?: {
-    requestId: string;
-    callId?: string;
-    permission: string;
-    patterns: string[];
-    metadata: Record<string, unknown>;
-    always: string[];
-  };
-};
-
-/** Data included in 'kilo_snapshot' events (wrapper→DO only, not broadcast to /stream clients). */
-export type KiloSnapshotData = {
-  sessionStatus: SessionStatus;
-  question?: ConnectedEventData['question'];
-  permission?: ConnectedEventData['permission'];
 };
 
 /**

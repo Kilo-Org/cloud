@@ -41,7 +41,11 @@ type BannerBaseProps = {
   /** Override default icon classes (only when icon is a component type). */
   iconClassName?: string;
   title: string;
+  /** Override default title classes. */
+  titleClassName?: string;
   description: React.ReactNode;
+  /** Override default description classes. */
+  descriptionClassName?: string;
   color: BannerColor;
   /** Override default container classes. */
   className?: string;
@@ -74,7 +78,9 @@ export function Banner({
   icon,
   iconClassName,
   title,
+  titleClassName,
   description,
+  descriptionClassName,
   action,
   buttonLabel,
   buttonHref,
@@ -115,8 +121,10 @@ export function Banner({
       <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
         <div className="mt-0.5 flex shrink-0 items-center sm:mt-0">{iconNode}</div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold sm:font-bold">{title}</p>
-          <p className="text-muted-foreground mt-0.5 text-sm sm:mt-0">{description}</p>
+          <p className={cn('text-sm font-semibold sm:font-bold', titleClassName)}>{title}</p>
+          <p className={cn('text-muted-foreground mt-0.5 text-sm sm:mt-0', descriptionClassName)}>
+            {description}
+          </p>
         </div>
       </div>
       {action ??

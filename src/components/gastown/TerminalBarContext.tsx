@@ -64,12 +64,14 @@ type TerminalBarContextValue = {
   collapsed: boolean;
   position: TerminalPosition;
   size: number;
+  isFullscreen: boolean;
   openAgentTab: (agentId: string, agentName: string) => void;
   closeTab: (tabId: string) => void;
   setActiveTabId: (id: string) => void;
   setCollapsed: (collapsed: boolean) => void;
   setPosition: (position: TerminalPosition) => void;
   setSize: (size: number) => void;
+  setIsFullscreen: (full: boolean) => void;
 };
 
 const TerminalBarContext = createContext<TerminalBarContextValue | null>(null);
@@ -86,6 +88,7 @@ export function TerminalBarProvider({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [position, setPositionState] = useState<TerminalPosition>('bottom');
   const [size, setSizeState] = useState(DEFAULT_EXPANDED_SIZE);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
@@ -143,12 +146,14 @@ export function TerminalBarProvider({ children }: { children: ReactNode }) {
         collapsed,
         position,
         size,
+        isFullscreen,
         openAgentTab,
         closeTab,
         setActiveTabId,
         setCollapsed,
         setPosition,
         setSize,
+        setIsFullscreen,
       }}
     >
       {children}

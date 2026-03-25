@@ -59,6 +59,8 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
     setCollapsed,
     setPosition,
     setSize,
+    isFullscreen,
+    setIsFullscreen,
   } = useTerminalBar();
   const queryClient = useQueryClient();
   const drawerStack = useDrawerStack();
@@ -187,11 +189,30 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
     [size, position, horizontal, setSize]
   );
 
+  const onResizeDoubleClick = useCallback(() => {
+    setIsFullscreen(!isFullscreen);
+    if (!isFullscreen) {
+      setCollapsed(false);
+    }
+  }, [isFullscreen, setIsFullscreen, setCollapsed]);
+
   // ── Compute container styles ───────────────────────────────────────
   const totalSize = collapsed ? COLLAPSED_SIZE : COLLAPSED_SIZE + size;
 
-  const containerStyle = (() => {
+  const containerStyle = useMemo(() => {
     const base: React.CSSProperties = { zIndex: 50 };
+
+    if (isFullscreen) {
+      return {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 100,
+        transition: 'all 0.2s ease-in-out',
+      };
+    }
 
     if (position === 'bottom') {
       return {
@@ -200,6 +221,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
         right: 0,
         bottom: 0,
         height: totalSize,
+        transition: 'all 0.2s ease-in-out',
       };
     }
     if (position === 'top') {
@@ -209,6 +231,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
         right: 0,
         top: 0,
         height: totalSize,
+        transition: 'all 0.2s ease-in-out',
       };
     }
     if (position === 'right') {
@@ -218,6 +241,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
         top: 0,
         bottom: 0,
         width: totalSize,
+        transition: 'all 0.2s ease-in-out',
       };
     }
     // left
@@ -227,8 +251,9 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
       top: 0,
       bottom: 0,
       width: totalSize,
+      transition: 'all 0.2s ease-in-out',
     };
-  })();
+  }, [isFullscreen, position, sidebarLeft, totalSize]);
 
   // Border class depends on which edge faces content
   const borderClass = {
@@ -270,14 +295,14 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
 
   return (
     <div
-      className={`fixed ${borderClass} border-white/[0.08] bg-[#0a0a0a] transition-[left] duration-200 ease-linear`}
+      className={`fixed ${borderClass} border-white/[0.08] bg-[#0a0a0a] transition-[left] duration-200 ease-linear ${isFullscreen ? 'gastown-terminal-fullscreen' : ''}`}
       style={containerStyle}
     >
       <div className={`flex h-full w-full ${horizontal ? 'flex-col' : 'flex-row'}`}>
         {position === 'bottom' && (
           <>
             {!collapsed && (
-              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown} onDoubleClick={onResizeDoubleClick}>
                 <div className={resizeHandleIndicator} />
               </div>
             )}
@@ -326,7 +351,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               closeTab={closeTab}
             />
             {!collapsed && (
-              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown} onDoubleClick={onResizeDoubleClick}>
                 <div className={resizeHandleIndicator} />
               </div>
             )}
@@ -335,7 +360,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
         {position === 'right' && (
           <>
             {!collapsed && (
-              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown} onDoubleClick={onResizeDoubleClick}>
                 <div className={resizeHandleIndicator} />
               </div>
             )}
@@ -384,7 +409,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               alarmWs={alarmWs}
             />
             {!collapsed && (
-              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown} onDoubleClick={onResizeDoubleClick}>
                 <div className={resizeHandleIndicator} />
               </div>
             )}

@@ -858,11 +858,14 @@ export async function updateAgentModel(
   // Re-derive GH_TOKEN from live values using the same priority chain
   // as buildAgentEnv: GITHUB_CLI_PAT > GIT_TOKEN > GITHUB_TOKEN.
   // syncConfigToContainer updates these on process.env, but buildAgentEnv
-  // only ran once at initial dispatch.
+  // only ran once at initial dispatch. When all sources are cleared,
+  // remove GH_TOKEN so the SDK server doesn't retain stale credentials.
   const liveGhCliPat = process.env.GITHUB_CLI_PAT;
   const liveGhToken = liveGhCliPat ?? process.env.GIT_TOKEN ?? process.env.GITHUB_TOKEN;
   if (liveGhToken) {
     hotSwapEnv.GH_TOKEN = liveGhToken;
+  } else {
+    delete hotSwapEnv.GH_TOKEN;
   }
 
   try {

@@ -993,7 +993,8 @@ export const gastownRouter = router({
       const authConfigChanged =
         result.github_cli_pat !== existingConfig.github_cli_pat ||
         result.git_auth?.github_token !== existingConfig.git_auth?.github_token ||
-        result.git_auth?.gitlab_token !== existingConfig.git_auth?.gitlab_token;
+        result.git_auth?.gitlab_token !== existingConfig.git_auth?.gitlab_token ||
+        result.git_auth?.gitlab_instance_url !== existingConfig.git_auth?.gitlab_instance_url;
       if (mayorModelChanged || authConfigChanged) {
         try {
           await townStub.updateMayorModel(newMayorModel, result.small_model ?? undefined);

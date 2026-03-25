@@ -138,6 +138,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
   const savedGithubCliPatRef = useRef<string>('');
   const savedGithubTokenRef = useRef<string>('');
   const savedGitlabTokenRef = useRef<string>('');
+  const savedGitlabInstanceUrlRef = useRef<string>('');
 
   const updateConfig = useMutation(
     trpc.gastown.updateTownConfig.mutationOptions({
@@ -160,13 +161,16 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
           !githubToken.startsWith('****') && githubToken !== savedGithubTokenRef.current;
         const glTokenChanged =
           !gitlabToken.startsWith('****') && gitlabToken !== savedGitlabTokenRef.current;
-        const authChanged = ghCliPatChanged || ghTokenChanged || glTokenChanged;
+        const glInstanceUrlChanged = gitlabInstanceUrl !== savedGitlabInstanceUrlRef.current;
+        const authChanged =
+          ghCliPatChanged || ghTokenChanged || glTokenChanged || glInstanceUrlChanged;
 
         savedModelRef.current = defaultModel;
         savedMayorModelRef.current = mayorModel;
         if (!githubCliPat.startsWith('****')) savedGithubCliPatRef.current = githubCliPat;
         if (!githubToken.startsWith('****')) savedGithubTokenRef.current = githubToken;
         if (!gitlabToken.startsWith('****')) savedGitlabTokenRef.current = gitlabToken;
+        savedGitlabInstanceUrlRef.current = gitlabInstanceUrl;
 
         if (defaultModelChanged || mayorEffectiveChanged || authChanged) {
           const reason = authChanged ? 'credential change' : 'model change';
@@ -232,6 +236,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
     savedGithubCliPatRef.current = cfg.github_cli_pat ?? '';
     savedGithubTokenRef.current = cfg.git_auth?.github_token ?? '';
     savedGitlabTokenRef.current = cfg.git_auth?.gitlab_token ?? '';
+    savedGitlabInstanceUrlRef.current = cfg.git_auth?.gitlab_instance_url ?? '';
     setGitAuthorName(cfg.git_author_name ?? '');
     setGitAuthorEmail(cfg.git_author_email ?? '');
     setDisableAiCoauthor(cfg.disable_ai_coauthor ?? false);
@@ -261,7 +266,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
           ...(gitlabToken.startsWith('****') ? {} : { gitlab_token: gitlabToken }),
           gitlab_instance_url: gitlabInstanceUrl,
         },
-        default_model: defaultModel,
+        ...(defaultModel ? { default_model: defaultModel } : {}),
         role_models: {
           mayor: mayorModel || undefined,
           refinery: refineryModel || undefined,

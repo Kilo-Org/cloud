@@ -48,6 +48,7 @@ export function useRefreshRepositories({
           description: error instanceof Error ? error.message : 'Unknown error',
         });
       }
+      throw error;
     } finally {
       setIsRefreshing(false);
     }

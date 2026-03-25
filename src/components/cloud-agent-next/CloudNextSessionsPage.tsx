@@ -474,6 +474,7 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
     selectedProfile,
     trpc.unifiedSessions.list,
     trpcClient,
+    variant,
   ]);
 
   const isFormValid =

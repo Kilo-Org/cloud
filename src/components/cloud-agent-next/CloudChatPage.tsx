@@ -23,6 +23,7 @@ import { useOrganizationModels } from './hooks/useOrganizationModels';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { useCelebrationSound } from '@/hooks/useCelebrationSound';
 
+import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import type { AgentMode } from './types';
 import type { StoredMessage } from '@/lib/cloud-agent-sdk';
 
@@ -231,7 +232,9 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   // -- Derived state --------------------------------------------------------
   const showChatInterface = Boolean(sessionConfig) || Boolean(sessionIdFromParams);
   const currentModelOption = modelOptions.find(m => m.id === sessionConfig?.model);
-  const modelDisplayName = currentModelOption?.name;
+  const modelDisplayName = currentModelOption?.name
+    ? formatShortModelDisplayName(currentModelOption.name)
+    : undefined;
   const availableVariants = currentModelOption?.variants ?? [];
 
   const placeholder = isLoading

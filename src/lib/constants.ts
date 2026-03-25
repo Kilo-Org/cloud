@@ -42,6 +42,9 @@ export const CLOUD_AGENT_WS_URL = process.env.NEXT_PUBLIC_CLOUD_AGENT_WS_URL ?? 
 // Cloud Agent Next WebSocket URL (client-side, inlined at build time)
 // Separate URL for the new cloud-agent-next implementation
 export const CLOUD_AGENT_NEXT_WS_URL = process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL ?? '';
+// Session Ingest WebSocket URL (client-side, inlined at build time)
+// Used by the CLI live transport for real-time event streaming
+export const SESSION_INGEST_WS_URL = process.env.NEXT_PUBLIC_SESSION_INGEST_WS_URL ?? '';
 
 // Gastown worker URL (client-side, inlined at build time)
 // The browser talks directly to the gastown Cloudflare Worker for tRPC + WS.

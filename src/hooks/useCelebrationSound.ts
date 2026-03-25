@@ -15,7 +15,9 @@ export const SOUND_NOTIFICATIONS_KEY = 'kilo-sound-notifications-enabled';
  * Respects user preference stored in localStorage.
  */
 export function useCelebrationSound() {
-  const [soundEnabled, setSoundEnabled] = useLocalStorage(SOUND_NOTIFICATIONS_KEY, true);
+  const [soundEnabled, setSoundEnabled] = useLocalStorage(SOUND_NOTIFICATIONS_KEY, true, {
+    initializeWithValue: false,
+  });
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {

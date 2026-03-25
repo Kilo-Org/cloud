@@ -6,6 +6,16 @@ import { formatDistanceToNow } from 'date-fns';
 const ONE_MINUTE = 60_000;
 const ONE_HOUR = 60 * ONE_MINUTE;
 const ONE_DAY = 24 * ONE_HOUR;
+const ONE_WEEK = 7 * ONE_DAY;
+
+function formatCompact(ms: number): string {
+  const age = Date.now() - ms;
+  if (age < ONE_MINUTE) return 'now';
+  if (age < ONE_HOUR) return `${Math.floor(age / ONE_MINUTE)}m`;
+  if (age < ONE_DAY) return `${Math.floor(age / ONE_HOUR)}h`;
+  if (age < ONE_WEEK) return `${Math.floor(age / ONE_DAY)}d`;
+  return `${Math.floor(age / ONE_WEEK)}w`;
+}
 
 /**
  * Choose a refresh interval based on how old the timestamp is:
@@ -20,26 +30,30 @@ function refreshInterval(timestampMs: number): number {
   return ONE_HOUR;
 }
 
-function useTimeAgo(timestamp: number | string): string {
+function useTimeAgo(timestamp: number | string, compact?: boolean): string {
   const ms = typeof timestamp === 'string' ? new Date(timestamp).getTime() : timestamp;
 
-  const [text, setText] = useState(() => formatDistanceToNow(new Date(ms), { addSuffix: true }));
+  const format = compact
+    ? () => formatCompact(ms)
+    : () => formatDistanceToNow(new Date(ms), { addSuffix: true });
+
+  const [text, setText] = useState(format);
 
   useEffect(() => {
     // Recompute immediately in case the initial render was cached / stale
-    setText(formatDistanceToNow(new Date(ms), { addSuffix: true }));
+    setText(format());
 
     let timer: ReturnType<typeof setTimeout>;
 
     function tick() {
-      setText(formatDistanceToNow(new Date(ms), { addSuffix: true }));
+      setText(format());
       // Schedule next tick with an interval appropriate for the current age
       timer = setTimeout(tick, refreshInterval(ms));
     }
 
     timer = setTimeout(tick, refreshInterval(ms));
     return () => clearTimeout(timer);
-  }, [ms]);
+  }, [ms, compact]);
 
   return text;
 }
@@ -51,11 +65,13 @@ function useTimeAgo(timestamp: number | string): string {
 export function TimeAgo({
   timestamp,
   className,
+  compact,
 }: {
   timestamp: number | string;
   className?: string;
+  compact?: boolean;
 }) {
-  const text = useTimeAgo(timestamp);
+  const text = useTimeAgo(timestamp, compact);
   // Server and client compute formatDistanceToNow at different wall-clock
   // times, so a minor mismatch is expected and harmless.
   return (

@@ -40,7 +40,7 @@ function createTransportWithSinks(
 
 describe('CliHistoricalTransport', () => {
   it('replays snapshot in correct order', async () => {
-    const snapshot = makeSnapshot({ id: SES_ID, title: 'Test session' }, [
+    const snapshot = makeSnapshot({ id: SES_ID }, [
       {
         info: stubUserMessage({ id: 'msg-1', sessionID: SES_ID }),
         parts: [
@@ -92,7 +92,7 @@ describe('CliHistoricalTransport', () => {
   });
 
   it('fires session.created and stopped for empty snapshot', async () => {
-    const snapshot = makeSnapshot({ id: SES_ID, title: 'Test session' });
+    const snapshot = makeSnapshot({ id: SES_ID });
 
     const { transport, chatEvents, serviceEvents } = createTransportWithSinks(() =>
       Promise.resolve(snapshot)

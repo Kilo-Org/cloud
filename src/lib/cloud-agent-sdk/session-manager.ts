@@ -10,6 +10,7 @@ import type {
   KiloSessionId,
   ResolvedSession,
   SessionSnapshot,
+  SessionInfo,
   SessionActivity,
   AgentStatus,
   CloudStatus,
@@ -18,7 +19,7 @@ import type {
   MessageInfo,
   Part,
 } from './types';
-import type { Session, QuestionInfo } from '@/types/opencode.gen';
+import type { QuestionInfo } from '@/types/opencode.gen';
 import { splitByContiguousPrefix } from '@/lib/utils/splitByContiguousPrefix';
 
 // ---------------------------------------------------------------------------
@@ -110,13 +111,15 @@ type W<T> = WritableAtom<T, [T], void>;
 type SessionManagerAtoms = {
   isStreaming: W<boolean>;
   isLoading: W<boolean>;
+  /** Session structurally cannot accept input (no transport send/sendCommand). */
+  isReadOnly: W<boolean>;
   canSend: W<boolean>;
   canInterrupt: W<boolean>;
   statusIndicator: W<SessionStatusIndicator | null>;
   error: W<string | null>;
   question: W<QuestionState | null>;
   questionRequestIds: W<Map<string, string>>;
-  sessionInfo: W<Session | null>;
+  sessionInfo: W<SessionInfo | null>;
   sessionId: W<CloudAgentSessionId | null>;
   activity: W<SessionActivity>;
   agentStatus: W<AgentStatus>;
@@ -235,13 +238,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // Public writable atoms
   const isStreamingAtom = atom(false);
   const isLoadingAtom = atom(false);
+  const isReadOnlyAtom = atom(false);
   const canSendAtom = atom(false);
   const canInterruptAtom = atom(false);
   const statusIndicatorAtom = atom<SessionStatusIndicator | null>(null);
   const errorAtom = atom<string | null>(null);
   const questionAtom = atom<QuestionState | null>(null);
   const questionRequestIdsAtom = atom<Map<string, string>>(new Map());
-  const sessionInfoAtom = atom<Session | null>(null);
+  const sessionInfoAtom = atom<SessionInfo | null>(null);
   const sessionIdAtom = atom<CloudAgentSessionId | null>(null);
   const activityAtom = atom<SessionActivity>({ type: 'connecting' });
   const agentStatusAtom = atom<AgentStatus>({ type: 'idle' });
@@ -328,6 +332,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(sessionParentsAtom, new Map());
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
+    store.set(isReadOnlyAtom, false);
     store.set(canSendAtom, false);
     store.set(canInterruptAtom, false);
     store.set(statusIndicatorAtom, null);
@@ -373,6 +378,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
       // canSend factors in cloud status: preparing/finalizing blocks input
       const cloudReady = cs === null || cs.type === 'ready';
+      store.set(isReadOnlyAtom, !session.canSend);
       store.set(canSendAtom, session.canSend && cloudReady);
       store.set(canInterruptAtom, session.canInterrupt);
 
@@ -652,6 +658,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     atoms: {
       isStreaming: isStreamingAtom,
       isLoading: isLoadingAtom,
+      isReadOnly: isReadOnlyAtom,
       canSend: canSendAtom,
       canInterrupt: canInterruptAtom,
       statusIndicator: statusIndicatorAtom,

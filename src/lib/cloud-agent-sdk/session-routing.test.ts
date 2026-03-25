@@ -145,7 +145,7 @@ describe('session transport routing', () => {
 
   describe('resolveSession returning CLI historical session', () => {
     it('replays snapshot events', async () => {
-      const snapshot = makeSnapshot({ id: SES_ID, title: 'Test session' }, [
+      const snapshot = makeSnapshot({ id: SES_ID }, [
         {
           info: stubUserMessage({ id: 'msg-1', sessionID: SES_ID }),
           parts: [
@@ -180,9 +180,7 @@ describe('session transport routing', () => {
       await Promise.resolve();
 
       // Session info set from snapshot
-      expect(session.state.getSessionInfo()).toEqual(
-        expect.objectContaining({ id: 'ses-1', title: 'Test session' })
-      );
+      expect(session.state.getSessionInfo()).toEqual({ id: 'ses-1', parentID: undefined });
 
       // Messages in storage
       const messageIds = session.storage.getMessageIds();

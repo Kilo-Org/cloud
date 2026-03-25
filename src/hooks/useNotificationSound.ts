@@ -45,7 +45,9 @@ function playChime(audioCtx: AudioContext) {
  * Respects the same sound-notifications localStorage toggle as useCelebrationSound.
  */
 export function useNotificationSound() {
-  const [soundEnabled] = useLocalStorage(SOUND_NOTIFICATIONS_KEY, true);
+  const [soundEnabled] = useLocalStorage(SOUND_NOTIFICATIONS_KEY, true, {
+    initializeWithValue: false,
+  });
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   const playNotification = useCallback(() => {

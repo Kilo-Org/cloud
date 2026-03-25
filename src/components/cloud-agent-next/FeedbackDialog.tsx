@@ -15,28 +15,25 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  messagesListAtom,
-  isStreamingAtom,
-  currentSessionIdAtom,
-  sessionConfigAtom,
-  sessionOrganizationIdAtom,
-} from './store/atoms';
-import { currentDbSessionIdAtom } from './store/db-session-atoms';
+import { useManager } from './CloudAgentProvider';
 import type { StoredMessage } from './types';
 import { isTextPart } from './types';
 
-export function FeedbackDialog() {
+type FeedbackDialogProps = {
+  organizationId?: string;
+  kiloSessionId?: string;
+};
+
+export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const messages = useAtomValue(messagesListAtom);
-  const isStreaming = useAtomValue(isStreamingAtom);
-  const currentSessionId = useAtomValue(currentSessionIdAtom);
-  const currentDbSessionId = useAtomValue(currentDbSessionIdAtom);
-  const sessionConfig = useAtomValue(sessionConfigAtom);
-  const organizationId = useAtomValue(sessionOrganizationIdAtom);
+  const manager = useManager();
+  const messages = useAtomValue(manager.atoms.messagesList);
+  const isStreaming = useAtomValue(manager.atoms.isStreaming);
+  const currentSessionId = useAtomValue(manager.atoms.sessionId);
+  const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
 
   const trpc = useTRPC();
 
@@ -71,7 +68,7 @@ export function FeedbackDialog() {
 
     mutate({
       cloud_agent_session_id: currentSessionId ?? undefined,
-      kilo_session_id: currentDbSessionId ?? undefined,
+      kilo_session_id: kiloSessionId ?? undefined,
       organization_id: organizationId ?? undefined,
       feedback_text: feedbackText.trim(),
       model: sessionConfig?.model || undefined,
@@ -83,7 +80,7 @@ export function FeedbackDialog() {
   }, [
     feedbackText,
     currentSessionId,
-    currentDbSessionId,
+    kiloSessionId,
     organizationId,
     sessionConfig,
     isStreaming,

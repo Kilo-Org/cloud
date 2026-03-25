@@ -1,9 +1,10 @@
 // Auto-generated — do not edit. Rebuild with: pnpm --filter @kilocode/trpc run build
+import * as z from 'zod';
+import { z as z$1 } from 'zod';
 import * as drizzle_orm from 'drizzle-orm';
 import * as drizzle_orm_pg_core from 'drizzle-orm/pg-core';
 import * as _trpc_server from '@trpc/server';
 export { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
-import * as z from 'zod';
 import { SecretFieldKey } from '@kilocode/kiloclaw-secret-catalog';
 import * as _workos_inc_node from '@workos-inc/node';
 import * as stripe from 'stripe';
@@ -3098,6 +3099,20 @@ type BotRequestStep = {
     };
 };
 
+type TRPCContext = {
+    user: User;
+};
+
+declare const activeSessionSchema: z$1.ZodObject<{
+    id: z$1.ZodString;
+    status: z$1.ZodString;
+    title: z$1.ZodString;
+    connectionId: z$1.ZodString;
+    gitUrl: z$1.ZodOptional<z$1.ZodString>;
+    gitBranch: z$1.ZodOptional<z$1.ZodString>;
+}, z$1.core.$strip>;
+type ActiveSession = z$1.infer<typeof activeSessionSchema>;
+
 /**
  * Auto Triage - Zod Validation Schemas
  *
@@ -3120,10 +3135,6 @@ type SuccessResult<TOk = {}> = {
 type FailureResult<TErr = void> = {
     success: false;
     error: TErr;
-};
-
-type TRPCContext = {
-    user: User;
 };
 
 type SessionLogEntry = {
@@ -3291,6 +3302,8 @@ type PlatformStatusResponse = {
     trackedImageDigest: string | null;
     googleConnected: boolean;
     gmailNotificationsEnabled: boolean;
+    execSecurity: string | null;
+    execAsk: string | null;
 };
 /** Response from GET /api/platform/debug-status (internal/admin only). */
 type PlatformDebugStatusResponse = PlatformStatusResponse & {
@@ -6142,6 +6155,18 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     organizationId: string;
                     sessionId: string;
                     questionId: string;
+                };
+                output: {
+                    success: boolean;
+                };
+                meta: object;
+            }>;
+            answerPermission: _trpc_server.TRPCMutationProcedure<{
+                input: {
+                    organizationId: string;
+                    sessionId: string;
+                    permissionId: string;
+                    response: "always" | "once" | "reject";
                 };
                 output: {
                     success: boolean;
@@ -12062,6 +12087,16 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
             };
             meta: object;
         }>;
+        rename: _trpc_server.TRPCMutationProcedure<{
+            input: {
+                session_id: string;
+                title: string;
+            };
+            output: {
+                title: string | null;
+            };
+            meta: object;
+        }>;
         share: _trpc_server.TRPCMutationProcedure<{
             input: {
                 session_id: string;
@@ -13012,6 +13047,17 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
             input: {
                 sessionId: string;
                 questionId: string;
+            };
+            output: {
+                success: boolean;
+            };
+            meta: object;
+        }>;
+        answerPermission: _trpc_server.TRPCMutationProcedure<{
+            input: {
+                sessionId: string;
+                permissionId: string;
+                response: "always" | "once" | "reject";
             };
             output: {
                 success: boolean;
@@ -15438,6 +15484,8 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                 trackedImageDigest: string | null;
                 googleConnected: boolean;
                 gmailNotificationsEnabled: boolean;
+                execSecurity: string | null;
+                execAsk: string | null;
             };
             meta: object;
         }>;
@@ -15861,6 +15909,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                 orderBy?: "updated_at" | "created_at" | undefined;
                 organizationId?: string | null | undefined;
                 includeSubSessions?: boolean | undefined;
+                gitUrl?: string | undefined;
             };
             output: {
                 cliSessions: {
@@ -15883,6 +15932,19 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
             };
             meta: object;
         }>;
+        recentRepositories: _trpc_server.TRPCQueryProcedure<{
+            input: {
+                organizationId?: string | null | undefined;
+                recentDays?: number | undefined;
+            };
+            output: {
+                repositories: {
+                    gitUrl: string;
+                    lastUsedAt: string;
+                }[];
+            };
+            meta: object;
+        }>;
         search: _trpc_server.TRPCQueryProcedure<{
             input: {
                 search_string: string;
@@ -15891,6 +15953,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                 createdOnPlatform?: string | string[] | undefined;
                 organizationId?: string | null | undefined;
                 includeSubSessions?: boolean | undefined;
+                gitUrl?: string | undefined;
             };
             output: {
                 results: {
@@ -15912,6 +15975,41 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                 total: number;
                 limit: number;
                 offset: number;
+            };
+            meta: object;
+        }>;
+    }>>;
+    activeSessions: _trpc_server.TRPCBuiltRouter<{
+        ctx: TRPCContext;
+        meta: object;
+        errorShape: {
+            data: {
+                zodError: {
+                    formErrors: string[];
+                    fieldErrors: {};
+                } | null;
+                upstreamCode: string | undefined;
+                code: _trpc_server.TRPC_ERROR_CODE_KEY;
+                httpStatus: number;
+                path?: string;
+                stack?: string;
+            };
+            message: string;
+            code: _trpc_server.TRPC_ERROR_CODE_NUMBER;
+        };
+        transformer: false;
+    }, _trpc_server.TRPCDecorateCreateRouterOptions<{
+        getToken: _trpc_server.TRPCQueryProcedure<{
+            input: void;
+            output: {
+                token: string;
+            };
+            meta: object;
+        }>;
+        list: _trpc_server.TRPCQueryProcedure<{
+            input: void;
+            output: {
+                sessions: ActiveSession[];
             };
             meta: object;
         }>;

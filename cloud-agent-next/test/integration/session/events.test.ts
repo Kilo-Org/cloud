@@ -226,4 +226,111 @@ describe('Event Storage', () => {
     expect(result.fromId2).toHaveLength(3);
     expect(result.fromId2[0].id).toBeGreaterThan(result.ids[1]);
   });
+
+  it('should upsert: insert on first call, update payload on conflict', async () => {
+    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_5');
+    const stub = env.CLOUD_AGENT_SESSION.get(id);
+
+    const result = await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const events = createEventQueries(db, state.storage.sql);
+      const now = Date.now();
+
+      // First upsert — should create a new row
+      const id1 = events.upsert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'kilocode',
+        payload: JSON.stringify({
+          event: 'message.updated',
+          properties: { info: { id: 'msg_1', text: 'hello' } },
+        }),
+        timestamp: now,
+        entityId: 'message/msg_1',
+      });
+
+      // Second upsert with same entityId — should update existing row
+      const id2 = events.upsert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'kilocode',
+        payload: JSON.stringify({
+          event: 'message.updated',
+          properties: { info: { id: 'msg_1', text: 'hello world' } },
+        }),
+        timestamp: now + 1000,
+        entityId: 'message/msg_1',
+      });
+
+      // Should still be only 1 row
+      const allEvents = events.findByFilters({});
+
+      return { id1, id2, allEvents };
+    });
+
+    // Both upserts should return the same row ID (same entity_id)
+    expect(result.id1).toBe(result.id2);
+    // Only one row in the table
+    expect(result.allEvents).toHaveLength(1);
+    // Payload should be the latest version
+    expect(JSON.parse(result.allEvents[0].payload).properties.info.text).toBe('hello world');
+    // Timestamp should be updated
+    expect(result.allEvents[0].stream_event_type).toBe('kilocode');
+  });
+
+  it('should upsert: different entityIds create separate rows', async () => {
+    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_6');
+    const stub = env.CLOUD_AGENT_SESSION.get(id);
+
+    const result = await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const events = createEventQueries(db, state.storage.sql);
+      const now = Date.now();
+
+      // Upsert two different entities
+      const id1 = events.upsert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'kilocode',
+        payload: JSON.stringify({
+          event: 'message.updated',
+          properties: { info: { id: 'msg_1' } },
+        }),
+        timestamp: now,
+        entityId: 'message/msg_1',
+      });
+
+      const id2 = events.upsert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'kilocode',
+        payload: JSON.stringify({
+          event: 'message.updated',
+          properties: { info: { id: 'msg_2' } },
+        }),
+        timestamp: now,
+        entityId: 'message/msg_2',
+      });
+
+      // Also insert a regular event (no entity_id)
+      const id3 = events.insert({
+        executionId: 'exc_1',
+        sessionId: 'sess_1',
+        streamEventType: 'output',
+        payload: JSON.stringify({ text: 'some output' }),
+        timestamp: now,
+      });
+
+      const allEvents = events.findByFilters({});
+
+      return { id1, id2, id3, allEvents };
+    });
+
+    // Different entity IDs should create different rows
+    expect(result.id1).not.toBe(result.id2);
+    // Regular insert should create a third row
+    expect(result.allEvents).toHaveLength(3);
+    // entity_id should not appear in the projected results (StoredEvent type)
+    expect(result.allEvents[0]).not.toHaveProperty('entity_id');
+  });
 });

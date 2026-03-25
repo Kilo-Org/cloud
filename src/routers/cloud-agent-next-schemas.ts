@@ -209,6 +209,13 @@ export const baseRejectQuestionNextSchema = z.object({
   questionId: z.string().min(1),
 });
 
+// Schema for answering a permission request
+export const baseAnswerPermissionNextSchema = z.object({
+  sessionId: z.string(),
+  permissionId: z.string().min(1),
+  response: z.enum(['once', 'always', 'reject']),
+});
+
 // Output schema for V2 initiation/message procedures
 export const baseInitiateSessionNextOutputSchema = z.object({
   cloudAgentSessionId: z.string(),

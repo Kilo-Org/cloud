@@ -37,6 +37,7 @@ const ListSessionsInputSchema = z.object({
   orderBy: z.enum(['created_at', 'updated_at']).optional().default('created_at'),
   organizationId: z.uuid().nullable().optional(),
   includeSubSessions: z.boolean().optional().default(false),
+  gitUrl: z.string().optional(),
 });
 
 const SearchInputSchema = z.object({
@@ -48,6 +49,7 @@ const SearchInputSchema = z.object({
     .optional(),
   organizationId: z.uuid().nullable().optional(),
   includeSubSessions: z.boolean().optional().default(false),
+  gitUrl: z.string().optional(),
 });
 
 /**
@@ -61,6 +63,7 @@ function buildScopeFragments(
     createdOnPlatform?: string | string[];
     organizationId?: string | null;
     includeSubSessions?: boolean;
+    gitUrl?: string;
   }
 ): SQL[] {
   const table = tableName === 'cli_sessions' ? cliSessions : cli_sessions_v2;
@@ -101,6 +104,10 @@ function buildScopeFragments(
 
   if (!opts.includeSubSessions) {
     fragments.push(sql`${table.parent_session_id} IS NULL`);
+  }
+
+  if (opts.gitUrl) {
+    fragments.push(sql`${table.git_url} = ${opts.gitUrl}`);
   }
 
   return fragments;
@@ -150,7 +157,15 @@ function v2Columns(): SQL {
 
 export const unifiedSessionsRouter = createTRPCRouter({
   list: baseProcedure.input(ListSessionsInputSchema).query(async ({ ctx, input }) => {
-    const { cursor, limit, createdOnPlatform, orderBy, organizationId, includeSubSessions } = input;
+    const {
+      cursor,
+      limit,
+      createdOnPlatform,
+      orderBy,
+      organizationId,
+      includeSubSessions,
+      gitUrl,
+    } = input;
 
     if (organizationId) {
       await ensureOrganizationAccess(ctx, organizationId);
@@ -161,6 +176,7 @@ export const unifiedSessionsRouter = createTRPCRouter({
       createdOnPlatform,
       organizationId,
       includeSubSessions,
+      gitUrl,
     };
 
     const orderColumn = sql.raw(orderBy === 'updated_at' ? 'updated_at' : 'created_at');
@@ -211,9 +227,75 @@ export const unifiedSessionsRouter = createTRPCRouter({
     };
   }),
 
+  recentRepositories: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid().nullable().optional(),
+        recentDays: z.number().min(1).max(365).optional().default(5),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { organizationId, recentDays } = input;
+
+      if (organizationId) {
+        await ensureOrganizationAccess(ctx, organizationId);
+      }
+
+      const scopeOpts = {
+        userId: ctx.user.id,
+        organizationId,
+        includeSubSessions: false,
+      };
+
+      const v1Where = buildScopeFragments('cli_sessions', scopeOpts);
+      const v2Where = buildScopeFragments('cli_sessions_v2', scopeOpts);
+
+      v1Where.push(sql`${cliSessions.git_url} IS NOT NULL`);
+      v1Where.push(sql`${cliSessions.updated_at} >= NOW() - make_interval(days => ${recentDays})`);
+      v1Where.push(sql`${cliSessions.created_on_platform} != 'app-builder'`);
+
+      v2Where.push(sql`${cli_sessions_v2.git_url} IS NOT NULL`);
+      v2Where.push(
+        sql`${cli_sessions_v2.updated_at} >= NOW() - make_interval(days => ${recentDays})`
+      );
+      v2Where.push(sql`${cli_sessions_v2.created_on_platform} != 'app-builder'`);
+
+      const query = sql`
+        SELECT git_url, MAX(updated_at) AS last_used_at FROM (
+          SELECT ${cliSessions.git_url} AS git_url, ${cliSessions.updated_at} AS updated_at
+          FROM ${cliSessions}
+          WHERE ${joinWithAnd(v1Where)}
+
+          UNION ALL
+
+          SELECT ${cli_sessions_v2.git_url} AS git_url, ${cli_sessions_v2.updated_at} AS updated_at
+          FROM ${cli_sessions_v2}
+          WHERE ${joinWithAnd(v2Where)}
+        ) unified
+        GROUP BY git_url
+        ORDER BY last_used_at DESC
+        LIMIT 10`;
+
+      const { rows } = await db.execute<{ git_url: string; last_used_at: string }>(query);
+
+      return {
+        repositories: rows.map(r => ({
+          gitUrl: r.git_url,
+          lastUsedAt: r.last_used_at,
+        })),
+      };
+    }),
+
   search: baseProcedure.input(SearchInputSchema).query(async ({ ctx, input }) => {
-    const { search_string, limit, offset, createdOnPlatform, organizationId, includeSubSessions } =
-      input;
+    const {
+      search_string,
+      limit,
+      offset,
+      createdOnPlatform,
+      organizationId,
+      includeSubSessions,
+      gitUrl,
+    } = input;
 
     if (organizationId) {
       await ensureOrganizationAccess(ctx, organizationId);
@@ -224,6 +306,7 @@ export const unifiedSessionsRouter = createTRPCRouter({
       createdOnPlatform,
       organizationId,
       includeSubSessions,
+      gitUrl,
     };
 
     const v1Where = buildScopeFragments('cli_sessions', scopeOpts);

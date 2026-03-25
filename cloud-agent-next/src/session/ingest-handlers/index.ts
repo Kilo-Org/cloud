@@ -9,3 +9,4 @@ export {
   type ExecutionLifecycleContext,
   type ExecutionStatus,
 } from './execution-lifecycle.js';
+export { extractEntityId } from './entity-id.js';

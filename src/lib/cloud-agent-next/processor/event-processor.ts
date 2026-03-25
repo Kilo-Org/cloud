@@ -6,7 +6,7 @@
  * updates can still merge into the final message before the consumer renders it.
  *
  * Key behavior:
- * - Messages are stored internally for delta accumulation, pending parts, and late updates
+ * - Messages are stored internally for pending parts and late updates
  * - When a message completes, onMessageCompleted is called and the buffered message is retained
  *
  * Storage uses composite keys (sessionId:messageId) for unified handling of
@@ -79,7 +79,6 @@ function isKilocodePayload(data: unknown): data is KilocodePayload {
  */
 type PendingPartEntry = {
   part: Part;
-  delta?: string;
 };
 
 /**
@@ -114,7 +113,7 @@ export type EventProcessor = {
  *
  * The processor buffers in-flight (streaming) messages and handles:
  * - Message creation and updates via message.updated events
- * - Part updates with delta support for streaming text
+ * - Part updates (upsert by part id)
  * - Pending parts queue for parts that arrive before their message
  * - Session parent tracking (sessions with parentID are child sessions)
  * - Session status management (idle/busy/retry)
@@ -175,8 +174,8 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     if (!pending?.length) return;
 
     const parentSessionId = getParentSessionId(sessionId);
-    for (const { part, delta } of pending) {
-      applyPartToMessage(message, part, delta);
+    for (const { part } of pending) {
+      applyPartToMessage(message, part);
       callbacks.onPartUpdated?.(sessionId, messageId, part.id, part, parentSessionId);
     }
 
@@ -184,30 +183,15 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
   }
 
   /**
-   * Apply a part update to a message, handling delta for streaming text.
+   * Apply a part update to a message — upsert by part id.
    */
-  function applyPartToMessage(message: ProcessedMessage, part: Part, delta?: string): void {
+  function applyPartToMessage(message: ProcessedMessage, part: Part): void {
     const existingIndex = message.parts.findIndex(p => p.id === part.id);
 
     if (existingIndex >= 0) {
-      const existingPart = message.parts[existingIndex];
-      // Apply delta to text parts if provided
-      if (delta !== undefined && existingPart.type === 'text' && part.type === 'text') {
-        const updatedPart = {
-          ...part,
-          text: (existingPart.text ?? '') + delta,
-        };
-        message.parts[existingIndex] = updatedPart;
-      } else {
-        message.parts[existingIndex] = part;
-      }
+      message.parts[existingIndex] = part;
     } else {
-      // New part - if it has delta, that's the initial text
-      if (delta !== undefined && part.type === 'text') {
-        message.parts.push({ ...part, text: delta });
-      } else {
-        message.parts.push(part);
-      }
+      message.parts.push(part);
     }
   }
 
@@ -281,7 +265,6 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
    * Completed messages stay buffered so late part updates can still merge.
    */
   function handleMessagePartUpdated(data: EventMessagePartUpdated['properties']): void {
-    const { delta } = data;
     // Strip large content from file parts immediately to reduce memory
     const part = stripPartContentIfFile(data.part);
     const sessionId = part.sessionID;
@@ -294,13 +277,12 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
     if (!message) {
       // Queue for later - message hasn't arrived yet
       const queue = pendingParts.get(key) ?? [];
-      queue.push({ part, delta });
+      queue.push({ part });
       pendingParts.set(key, queue);
       return;
     }
 
-    applyPartToMessage(message, part, delta);
-    // Pass the updated part from the message (with delta accumulated), not the raw input
+    applyPartToMessage(message, part);
     const updatedPart = message.parts.find(p => p.id === part.id) ?? part;
     callbacks.onPartUpdated?.(sessionId, messageId, part.id, updatedPart, parentSessionId);
     checkAndHandleCompletion(sessionId, messageId, message);

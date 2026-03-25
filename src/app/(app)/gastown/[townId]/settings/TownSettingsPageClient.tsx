@@ -52,6 +52,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Button as UiButton } from '@/components/ui/button';
 
 type Props = { townId: string; readOnly?: boolean; organizationId?: string };
 
@@ -132,7 +133,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
         toast.success('Town deleted');
         router.push('/gastown');
       },
-      onError: (err) => toast.error(`Failed to delete town: ${err.message}`),
+      onError: err => toast.error(`Failed to delete town: ${err.message}`),
     })
   );
 
@@ -144,7 +145,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
           router.push(`/organizations/${organizationId}/gastown`);
         }
       },
-      onError: (err) => toast.error(`Failed to delete town: ${err.message}`),
+      onError: err => toast.error(`Failed to delete town: ${err.message}`),
     })
   );
 
@@ -155,7 +156,6 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
       deleteTown.mutate({ townId });
     }
   };
-
 
   const {
     data: modelsData,
@@ -842,20 +842,23 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                     <div>
                       <p className="text-sm text-red-400">Delete Town</p>
                       <p className="text-[11px] text-red-400/70">
-                        Permanently delete this town, all its agents, and all data. This action cannot be undone.
+                        Permanently delete this town, all its agents, and all data. This action
+                        cannot be undone.
                       </p>
                     </div>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button
-                          disabled={deleteTown.isPending || deleteOrgTown.isPending || effectiveReadOnly}
-                          variant="red"
+                        <UiButton
+                          disabled={
+                            deleteTown.isPending || deleteOrgTown.isPending || effectiveReadOnly
+                          }
+                          variant="destructive"
                           size="sm"
                           className="ml-4 shrink-0 gap-1.5"
                         >
                           <Trash2 className="size-3" />
                           Delete Town
-                        </Button>
+                        </UiButton>
                       </AlertDialogTrigger>
                       <AlertDialogContent className="border-red-500/20 bg-[oklch(0.15_0_0)] sm:max-w-md">
                         <AlertDialogHeader>
@@ -863,8 +866,8 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                             Delete this town?
                           </AlertDialogTitle>
                           <AlertDialogDescription className="text-white/70">
-                            This action cannot be undone. This will permanently delete the town
-                            and all of its associated data, including agents, rigs, and settings.
+                            This action cannot be undone. This will permanently delete the town and
+                            all of its associated data, including agents, rigs, and settings.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -875,7 +878,9 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                             onClick={handleDeleteTown}
                             className="bg-red-500/80 text-white hover:bg-red-500"
                           >
-                            {deleteTown.isPending || deleteOrgTown.isPending ? 'Deleting...' : 'Yes, delete town'}
+                            {deleteTown.isPending || deleteOrgTown.isPending
+                              ? 'Deleting...'
+                              : 'Yes, delete town'}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>

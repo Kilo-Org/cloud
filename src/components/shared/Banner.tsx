@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -36,9 +35,8 @@ const colorMap: Record<BannerColor, { border: string; bg: string; text: string; 
   };
 
 type BannerBaseProps = {
-  /** Function component (auto-sized) or ReactNode (full control). */
-  icon: React.ComponentType<{ className?: string }> | React.ReactNode;
-  /** Override default icon classes (only when icon is a component type). */
+  icon: React.ComponentType<{ className?: string }>;
+  /** Override default icon classes. */
   iconClassName?: string;
   title: string;
   /** Override default title classes. */
@@ -51,9 +49,9 @@ type BannerBaseProps = {
   className?: string;
   /** Optional ARIA role for the outer container. */
   role?: string;
-  /** Icon after button label. Component type (auto-sized h-4 w-4) or ReactNode. */
-  buttonIcon?: React.ComponentType<{ className?: string }> | React.ReactNode;
-  /** Override default button icon classes (only when buttonIcon is a component type). */
+  /** Icon after button label. */
+  buttonIcon?: React.ComponentType<{ className?: string }>;
+  /** Override default button icon classes. */
   buttonIconClassName?: string;
   /** Override default button classes. */
   buttonClassName?: string;
@@ -75,7 +73,7 @@ type BannerProps = BannerBaseProps &
   );
 
 export function Banner({
-  icon,
+  icon: Icon,
   iconClassName,
   title,
   titleClassName,
@@ -84,7 +82,7 @@ export function Banner({
   action,
   buttonLabel,
   buttonHref,
-  buttonIcon,
+  buttonIcon: ButtonIcon,
   buttonIconClassName,
   buttonClassName,
   color,
@@ -92,20 +90,6 @@ export function Banner({
   role,
 }: BannerProps) {
   const colors = colorMap[color];
-  const iconNode =
-    typeof icon === 'function'
-      ? React.createElement(icon as React.ComponentType<{ className?: string }>, {
-          className: cn('h-5 w-5 sm:h-6 sm:w-6', iconClassName),
-        })
-      : (icon as React.ReactNode);
-
-  const buttonIconNode = buttonIcon
-    ? typeof buttonIcon === 'function'
-      ? React.createElement(buttonIcon as React.ComponentType<{ className?: string }>, {
-          className: cn('h-4 w-4', buttonIconClassName),
-        })
-      : buttonIcon
-    : null;
 
   return (
     <div
@@ -119,7 +103,9 @@ export function Banner({
       )}
     >
       <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
-        <div className="mt-0.5 flex shrink-0 items-center sm:mt-0">{iconNode}</div>
+        <div className="mt-0.5 flex shrink-0 items-center sm:mt-0">
+          <Icon className={cn('h-5 w-5 sm:h-6 sm:w-6', iconClassName)} />
+        </div>
         <div className="min-w-0 flex-1">
           <p className={cn('text-sm font-semibold sm:font-bold', titleClassName)}>{title}</p>
           <p className={cn('text-muted-foreground mt-0.5 text-sm sm:mt-0', descriptionClassName)}>
@@ -135,7 +121,7 @@ export function Banner({
           >
             <Link href={buttonHref}>
               {buttonLabel}
-              {buttonIconNode}
+              {ButtonIcon && <ButtonIcon className={cn('h-4 w-4', buttonIconClassName)} />}
             </Link>
           </Button>
         ))}

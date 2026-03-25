@@ -830,9 +830,16 @@ export async function updateAgentModel(
   // gets the same git identity, auth tokens, and plugin vars. Exclude
   // KILO_CONFIG_CONTENT / OPENCODE_CONFIG_CONTENT — those were already
   // rebuilt above with the new model and set on process.env.
+  // For GASTOWN_CONTAINER_TOKEN, prefer the live process.env value since
+  // /refresh-token rotates it after initial dispatch.
   const hotSwapEnv: Record<string, string> = {};
   for (const [key, value] of Object.entries(agent.startupEnv)) {
     if (key === 'KILO_CONFIG_CONTENT' || key === 'OPENCODE_CONFIG_CONTENT') continue;
+    if (key === 'GASTOWN_CONTAINER_TOKEN') {
+      const live = process.env.GASTOWN_CONTAINER_TOKEN;
+      if (live) hotSwapEnv[key] = live;
+      continue;
+    }
     hotSwapEnv[key] = value;
   }
 

@@ -211,14 +211,6 @@ export const clearStandaloneQuestionAtom = atom(null, (get, set, resolvedRequest
   }
 });
 
-export type SessionStatusIndicator = {
-  type: 'error' | 'warning' | 'info' | 'progress';
-  message: string;
-  timestamp: number;
-};
-
-export const sessionStatusIndicatorAtom = atom<SessionStatusIndicator | null>(null);
-
 export const currentSessionIdAtom = atom<string | null>(null);
 export const sessionOrganizationIdAtom = atom<string | null>(null);
 export const sessionConfigAtom = atom<SessionConfig | null>(null);
@@ -240,7 +232,6 @@ export const clearMessagesAtom = atom(null, (get, set) => {
   set(errorAtom, null);
   set(isStreamingAtom, false);
   set(questionRequestIdsAtom, new Map());
-  set(sessionStatusIndicatorAtom, null);
   set(standaloneQuestionAtom, null);
   set(sessionParentsAtom, new Map());
 });

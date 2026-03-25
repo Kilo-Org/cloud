@@ -460,16 +460,29 @@ describe('createServiceState', () => {
       expect(onPreparationReady).toHaveBeenCalledTimes(1);
     });
 
-    it('step failed fires onPreparationFailed and onError, sets cloudStatus to error', () => {
+    it('step failed preserves preparing cloudStatus and passes stderr to callback', () => {
       const onPreparationFailed = jest.fn();
       const onError = jest.fn();
       const state = createServiceState(makeConfig({ onPreparationFailed, onError }));
 
-      state.process({ type: 'preparing', step: 'failed', message: 'Clone failed' });
+      state.process({
+        type: 'preparing',
+        step: 'failed',
+        message: 'Clone failed',
+        stderr: 'fatal: repository not found',
+      });
 
-      expect(state.getCloudStatus()).toEqual({ type: 'error', message: 'Clone failed' });
+      expect(state.getCloudStatus()).toEqual({
+        type: 'preparing',
+        step: 'failed',
+        message: 'Clone failed',
+        stderr: 'fatal: repository not found',
+      });
       expect(onError).toHaveBeenCalledWith('Clone failed');
-      expect(onPreparationFailed).toHaveBeenCalledWith('Clone failed');
+      expect(onPreparationFailed).toHaveBeenCalledWith(
+        'Clone failed',
+        'fatal: repository not found'
+      );
     });
   });
 

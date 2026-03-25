@@ -76,10 +76,10 @@ export type AgentStatus =
 
 /** Cloud infrastructure status — independent from agent activity. */
 export type CloudStatus =
-  | { type: 'preparing'; step?: string; message?: string }
+  | { type: 'preparing'; step?: string; message?: string; stderr?: string }
   | { type: 'ready' }
   | { type: 'finalizing'; step?: string; message?: string }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string; stderr?: string };
 
 export type QuestionState = {
   requestId: string;

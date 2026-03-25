@@ -823,6 +823,22 @@ describe('normalize', () => {
       });
     });
 
+    it('normalizes failed preparing event with stderr', () => {
+      const result = normalize(
+        createRaw('preparing', {
+          step: 'failed',
+          message: 'Setup command failed',
+          stderr: 'npm ERR! missing script: build',
+        })
+      );
+      expect(result).toEqual({
+        type: 'preparing',
+        step: 'failed',
+        message: 'Setup command failed',
+        stderr: 'npm ERR! missing script: build',
+      });
+    });
+
     it('returns null when step is missing', () => {
       expect(normalize(createRaw('preparing', { message: 'Cloning repository...' }))).toBeNull();
     });

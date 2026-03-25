@@ -107,6 +107,7 @@ export type PreparingStep =
 export type PreparingEventData = {
   step: PreparingStep;
   message: string;
+  stderr?: string;
 };
 
 /** Cloud infrastructure status types. */
@@ -118,6 +119,7 @@ export type CloudStatusData = {
     type: CloudStatusType;
     step?: string;
     message?: string;
+    stderr?: string;
   };
 };
 

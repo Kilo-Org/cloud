@@ -6,6 +6,7 @@ import {
   type FetchedSessionData,
 } from './session-manager';
 import { createCloudAgentSession } from './session';
+import type { CloudStatus } from './types';
 import { kiloId, cloudAgentId } from './test-helpers';
 
 // ---------------------------------------------------------------------------
@@ -24,10 +25,12 @@ const mockSession = {
   canSend: true,
   canInterrupt: true,
   state: {
-    subscribe: jest.fn(() => () => {}),
+    subscribe: jest.fn((_cb: () => void) => () => {}),
     getActivity: jest.fn(() => ({ type: 'idle' as const })),
     getStatus: jest.fn(() => ({ type: 'idle' as const })),
+    getCloudStatus: jest.fn((): CloudStatus | null => null),
     getQuestion: jest.fn(() => null),
+    getPermission: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
   },
   storage: {},
@@ -129,7 +132,13 @@ describe('createSessionManager', () => {
     mockSession.respondToPermission.mockClear();
     mockSession.canSend = true;
     mockSession.canInterrupt = true;
-    mockSession.state.subscribe.mockImplementation(() => () => {});
+    mockSession.state.subscribe.mockImplementation((_cb: () => void) => () => {});
+    mockSession.state.getActivity.mockImplementation(() => ({ type: 'idle' as const }));
+    mockSession.state.getStatus.mockImplementation(() => ({ type: 'idle' as const }));
+    mockSession.state.getQuestion.mockImplementation(() => null);
+    mockSession.state.getSessionInfo.mockImplementation(() => null);
+    mockSession.state.getPermission = jest.fn(() => null);
+    mockSession.state.getCloudStatus = jest.fn(() => null);
     mockSessionCallbacks.onQuestionAsked = undefined;
     mockSessionCallbacks.onQuestionResolved = undefined;
     mockSessionCallbacks.onPermissionAsked = undefined;
@@ -805,6 +814,40 @@ describe('createSessionManager', () => {
       expect(
         atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
       ).toBeNull();
+    });
+  });
+
+  describe('status indicator stderr propagation', () => {
+    it('shows stderr details for failed preparing cloud status', async () => {
+      const listeners: Array<() => void> = [];
+      let cloudStatus: CloudStatus | null = null;
+
+      mockSession.state.subscribe.mockImplementation((cb: () => void) => {
+        listeners.push(cb);
+        return () => {};
+      });
+      mockSession.state.getCloudStatus = jest.fn(() => cloudStatus);
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      cloudStatus = {
+        type: 'preparing',
+        step: 'failed',
+        message: 'Setup command failed',
+        stderr: 'npm ERR! missing script: build',
+      };
+      listeners.at(-1)?.();
+
+      expect(atomValue(config.store, mgr.atoms.statusIndicator)).toEqual(
+        expect.objectContaining({
+          type: 'error',
+          message: 'Setup command failed',
+          stderr: 'npm ERR! missing script: build',
+        })
+      );
     });
   });
 

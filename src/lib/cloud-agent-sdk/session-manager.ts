@@ -31,6 +31,7 @@ type StoredMessage = { info: MessageInfo; parts: Part[] };
 type SessionStatusIndicator = {
   type: 'error' | 'warning' | 'info' | 'progress';
   message: string;
+  stderr?: string;
   timestamp: number;
 };
 type SessionConfig = {
@@ -190,13 +191,21 @@ function isMessageStreaming(msg: StoredMessage): boolean {
 function indicatorForCloudStatus(cs: CloudStatus): SessionStatusIndicator | null {
   const now = Date.now();
   if (cs.type === 'preparing') {
+    if (cs.step === 'failed') {
+      return {
+        type: 'error',
+        message: cs.message ?? 'Setting up environment failed',
+        stderr: cs.stderr,
+        timestamp: now,
+      };
+    }
     return { type: 'progress', message: cs.message ?? 'Setting up environment…', timestamp: now };
   }
   if (cs.type === 'finalizing') {
     return { type: 'progress', message: cs.message ?? 'Wrapping up…', timestamp: now };
   }
   if (cs.type === 'error') {
-    return { type: 'error', message: cs.message, timestamp: now };
+    return { type: 'error', message: cs.message, stderr: cs.stderr, timestamp: now };
   }
   return null; // 'ready' — no indicator
 }

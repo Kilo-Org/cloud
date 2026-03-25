@@ -242,7 +242,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   const placeholder = isLoading
     ? 'Loading session…'
-    : cloudStatus?.type === 'preparing'
+    : cloudStatus?.type === 'preparing' && cloudStatus.step !== 'failed'
       ? 'Setting up environment…'
       : cloudStatus?.type === 'finalizing'
         ? 'Wrapping up…'

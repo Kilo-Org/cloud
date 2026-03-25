@@ -56,7 +56,7 @@ export const cloudStatusSchema = z.discriminatedUnion('type', [
     step: z.string().optional(),
     message: z.string().optional(),
   }),
-  z.object({ type: z.literal('error'), message: z.string() }),
+  z.object({ type: z.literal('error'), message: z.string(), stderr: z.string().optional() }),
 ]);
 export type CloudStatus = z.infer<typeof cloudStatusSchema>;
 
@@ -259,6 +259,7 @@ export type WrapperDisconnectedData = z.infer<typeof wrapperDisconnectedDataSche
 export const preparingDataSchema = z.object({
   step: z.string(),
   message: z.string(),
+  stderr: z.string().optional(),
 });
 export type PreparingData = z.infer<typeof preparingDataSchema>;
 

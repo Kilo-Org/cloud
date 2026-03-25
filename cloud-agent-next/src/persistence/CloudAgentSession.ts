@@ -51,7 +51,12 @@ import {
   type IngestDOContext,
 } from '../websocket/ingest.js';
 import type { StoredEvent } from '../websocket/types.js';
-import type { WrapperCommand, PreparingStep, CloudStatusData } from '../shared/protocol.js';
+import type {
+  WrapperCommand,
+  PreparingEventData,
+  PreparingStep,
+  CloudStatusData,
+} from '../shared/protocol.js';
 import { STALE_THRESHOLD_MS, SANDBOX_SLEEP_AFTER_SECONDS } from '../core/lease.js';
 import { ExecutionOrchestrator, type OrchestratorDeps } from '../execution/orchestrator.js';
 import type {
@@ -70,7 +75,7 @@ import { GitHubTokenService } from '../services/github-token-service.js';
 import { validateStreamTicket } from '../auth.js';
 import { getSandbox } from '@cloudflare/sandbox';
 import { stopWrapper } from '../kilo/wrapper-manager.js';
-import { SessionService } from '../session-service.js';
+import { SessionService, SetupCommandFailedError } from '../session-service.js';
 import { executePreparationSteps } from './async-preparation.js';
 
 // ---------------------------------------------------------------------------
@@ -945,23 +950,25 @@ export class CloudAgentSession extends DurableObject {
     const prepExecutionId: EventSourceId = `prep_${input.sessionId}`;
     const env = this.env as unknown as WorkerEnv;
 
-    const emitProgress = (step: PreparingStep, message: string) => {
+    const emitProgress = (event: PreparingEventData) => {
       const now = Date.now();
-      // Backward-compatible preparing event
       this.broadcastVolatileEvent({
         executionId: prepExecutionId,
         sessionId: input.sessionId,
         streamEventType: 'preparing',
-        payload: JSON.stringify({ step, message }),
+        payload: JSON.stringify(event),
         timestamp: now,
       });
-      // cloud.status event derived from preparation step
       const cloudStatus =
-        step === 'ready'
+        event.step === 'ready'
           ? { type: 'ready' as const }
-          : step === 'failed'
-            ? { type: 'error' as const, message }
-            : { type: 'preparing' as const, step, message };
+          : event.step === 'failed'
+            ? {
+                type: 'error' as const,
+                message: event.message,
+                ...(event.stderr ? { stderr: event.stderr } : {}),
+              }
+            : { type: 'preparing' as const, step: event.step, message: event.message };
       this.broadcastVolatileEvent({
         executionId: prepExecutionId,
         sessionId: input.sessionId,
@@ -969,6 +976,10 @@ export class CloudAgentSession extends DurableObject {
         payload: JSON.stringify({ cloudStatus }),
         timestamp: now,
       });
+    };
+
+    const emitPreparingStep = (step: PreparingStep, message: string) => {
+      emitProgress({ step, message });
     };
 
     let createdKiloSessionId: string | undefined = input.kiloSessionId;
@@ -992,7 +1003,7 @@ export class CloudAgentSession extends DurableObject {
 
     try {
       // Steps 1–9: workspace orchestration (token, disk, clone, branch, setup, wrapper)
-      const result = await executePreparationSteps(input, env, emitProgress);
+      const result = await executePreparationSteps(input, env, emitPreparingStep);
       if (!result) {
         // executePreparationSteps already emitted 'failed' — clean up DO metadata
         await this.ctx.storage.delete('metadata');
@@ -1040,7 +1051,7 @@ export class CloudAgentSession extends DurableObject {
       });
 
       if (!prepareResult.success) {
-        emitProgress('failed', prepareResult.error ?? 'Failed to prepare session');
+        emitPreparingStep('failed', prepareResult.error ?? 'Failed to prepare session');
         await this.ctx.storage.delete('metadata');
         await cleanupCliSession();
         return;
@@ -1073,13 +1084,13 @@ export class CloudAgentSession extends DurableObject {
             await this.ctx.storage.put('metadata', { ...rest, version: Date.now() });
           }
 
-          emitProgress('failed', `Auto-initiate failed: ${initiateResult.error}`);
+          emitPreparingStep('failed', `Auto-initiate failed: ${initiateResult.error}`);
           return;
         }
       }
 
       // 12. Emit ready — session is prepared (and initiated, if autoInitiate)
-      emitProgress('ready', 'Session ready');
+      emitPreparingStep('ready', 'Session ready');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger
@@ -1092,7 +1103,11 @@ export class CloudAgentSession extends DurableObject {
 
       await cleanupCliSession();
 
-      emitProgress('failed', message);
+      emitProgress({
+        step: 'failed',
+        message,
+        ...(error instanceof SetupCommandFailedError ? { stderr: error.stderr } : {}),
+      });
       await this.ctx.storage.delete('metadata');
     }
   }

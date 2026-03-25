@@ -37,7 +37,7 @@ type ServiceStateConfig = {
   /** Fired when async preparation completes (preparing step === 'ready'). */
   onPreparationReady?: () => void;
   /** Fired when async preparation fails (preparing step === 'failed'). */
-  onPreparationFailed?: (message: string) => void;
+  onPreparationFailed?: (message: string, stderr?: string) => void;
 };
 
 type ServiceState = {
@@ -203,11 +203,20 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       cloudStatus = { type: 'ready' };
       config.onPreparationReady?.();
     } else if (event.step === 'failed') {
-      cloudStatus = { type: 'error', message: event.message };
+      cloudStatus = {
+        type: 'preparing',
+        step: event.step,
+        message: event.message,
+        stderr: event.stderr,
+      };
       config.onError?.(event.message);
-      config.onPreparationFailed?.(event.message);
+      config.onPreparationFailed?.(event.message, event.stderr);
     } else {
-      cloudStatus = { type: 'preparing', step: event.step, message: event.message };
+      cloudStatus = {
+        type: 'preparing',
+        step: event.step,
+        message: event.message,
+      };
     }
     notify();
   }

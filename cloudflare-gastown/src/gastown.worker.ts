@@ -162,8 +162,12 @@ app.use('*', useWorkersLogger('gastown-worker') as unknown as MiddlewareHandler)
 // Extract IDs from the URL path directly — c.req.param() only works
 // after Hono has matched a route, which hasn't happened yet in a
 // wildcard middleware.
-const PATH_IDS =
-  /\/towns\/(?<townId>[^/]+)(?:\/rigs\/(?<rigId>[^/]+)(?:\/agents\/(?<agentId>[^/]+))?)?/;
+// Matches /orgs/:orgId, /towns/:townId, /rigs/:rigId, /agents/:agentId
+// in any combination that appears in our route patterns.
+const RE_ORG = /\/orgs\/(?<orgId>[^/]+)/;
+const RE_TOWN = /\/towns\/(?<townId>[^/]+)/;
+const RE_RIG = /\/rigs\/(?<rigId>[^/]+)/;
+const RE_AGENT = /\/agents\/(?<agentId>[^/]+)/;
 
 app.use('*', async (c, next) => {
   const method = c.req.method;
@@ -171,14 +175,12 @@ app.use('*', async (c, next) => {
   // Tag with route params immediately so all downstream logs (auth,
   // handlers, DO calls) inherit them. Auth-derived tags (userId, orgId)
   // are set by kiloAuthMiddleware and orgAuthMiddleware when they run.
-  const ids = PATH_IDS.exec(path)?.groups;
-  if (ids) {
-    logger.setTags({
-      townId: ids.townId,
-      rigId: ids.rigId,
-      agentId: ids.agentId,
-    });
-  }
+  logger.setTags({
+    orgId: RE_ORG.exec(path)?.groups?.orgId,
+    townId: RE_TOWN.exec(path)?.groups?.townId,
+    rigId: RE_RIG.exec(path)?.groups?.rigId,
+    agentId: RE_AGENT.exec(path)?.groups?.agentId,
+  });
   logger.info(`--> ${method} ${path}`);
   await next();
   const elapsed = Math.round(performance.now() - (c.get('requestStartTime') ?? 0));

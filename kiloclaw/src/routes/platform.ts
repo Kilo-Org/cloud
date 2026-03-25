@@ -158,6 +158,7 @@ const SAFE_ERROR_PREFIXES = [
   'Cannot enable Gmail ', // no Google account connected
   'New volume ID is ', // reassociate: same volume
   'Volume ', // reassociate: volume not found / bad state
+  'Cannot retry recovery', // force-retry-recovery guard messages
 ];
 
 function sanitizeError(err: unknown, operation: string): { message: string; status: number } {
@@ -620,6 +621,28 @@ platform.get('/gateway/status', async c => {
   }
 });
 
+// GET /api/platform/gateway/ready?userId=...
+// Non-fatal polling endpoint — always returns 200 so the frontend poll
+// doesn't generate a wall of errors during startup.
+platform.get('/gateway/ready', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  try {
+    const result = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.getGatewayReady(),
+      'getGatewayReady'
+    );
+    return c.json(result ?? { ready: false, error: 'controller too old' }, 200);
+  } catch (err) {
+    const { message } = sanitizeError(err, 'gateway ready');
+    return c.json({ ready: false, error: message }, 200);
+  }
+});
+
 // GET /api/platform/controller-version?userId=...
 platform.get('/controller-version', async c => {
   const userId = setValidatedQueryUserId(c);
@@ -911,19 +934,76 @@ platform.post('/doctor', async c => {
 });
 
 // POST /api/platform/start
+const StartRequestSchema = UserIdRequestSchema.extend({
+  skipCooldown: z.boolean().optional(),
+});
+
 platform.post('/start', async c => {
-  const result = await parseBody(c, UserIdRequestSchema);
+  const result = await parseBody(c, StartRequestSchema);
   if ('error' in result) return result.error;
+  const startedAt = performance.now();
 
   try {
-    await withDORetry(
+    const options = result.data.skipCooldown ? { skipCooldown: true } : undefined;
+    const { started } = await withDORetry(
       instanceStubFactory(c.env, result.data.userId),
-      stub => stub.start(result.data.userId),
+      stub => stub.start(result.data.userId, options),
       'start'
     );
+    if (started) {
+      writeEvent(c.env, {
+        event: 'instance.manual_start_succeeded',
+        delivery: 'http',
+        route: '/api/platform/start',
+        userId: result.data.userId,
+        durationMs: performance.now() - startedAt,
+      });
+    }
     return c.json({ ok: true });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'start');
+    writeEvent(c.env, {
+      event: 'instance.manual_start_failed',
+      delivery: 'http',
+      route: '/api/platform/start',
+      userId: result.data.userId,
+      error: message,
+      durationMs: performance.now() - startedAt,
+    });
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/force-retry-recovery
+platform.post('/force-retry-recovery', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+  const startedAt = performance.now();
+
+  try {
+    const { ok } = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.forceRetryRecovery(),
+      'forceRetryRecovery'
+    );
+    writeEvent(c.env, {
+      event: 'instance.force_retry_recovery_succeeded',
+      delivery: 'http',
+      route: '/api/platform/force-retry-recovery',
+      userId: result.data.userId,
+      durationMs: performance.now() - startedAt,
+    });
+    return c.json({ ok });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'forceRetryRecovery');
+    writeEvent(c.env, {
+      event: 'instance.force_retry_recovery_failed',
+      delivery: 'http',
+      route: '/api/platform/force-retry-recovery',
+      userId: result.data.userId,
+      error: message,
+      durationMs: performance.now() - startedAt,
+    });
     return jsonError(message, status);
   }
 });
@@ -1200,6 +1280,56 @@ platform.post('/publish-image-version', async c => {
     setLatest ? '(latest)' : '(backfill)'
   );
   return c.json({ ok: true, setLatest, ...parsed.data }, 201);
+});
+
+// ---------------------------------------------------------------------------
+// Region configuration
+// ---------------------------------------------------------------------------
+
+import { FLY_REGIONS_KV_KEY, parseRegions, ALL_VALID_REGIONS } from '../durable-objects/regions';
+import { DEFAULT_FLY_REGION } from '../config';
+
+const UpdateRegionsSchema = z.object({
+  regions: z
+    .array(z.enum(ALL_VALID_REGIONS))
+    .min(2, 'At least 2 regions required')
+    .refine(
+      regions => new Set(regions).size >= 2,
+      'Must include at least 2 distinct regions (duplicates bias the shuffle, but need 2+ unique for fallback)'
+    ),
+});
+
+// GET /api/platform/regions
+// Returns the current region configuration with its source.
+platform.get('/regions', async c => {
+  try {
+    const kvValue = await c.env.KV_CLAW_CACHE.get(FLY_REGIONS_KV_KEY);
+    const source = kvValue ? 'kv' : c.env.FLY_REGION ? 'env' : 'default';
+    const raw = kvValue ?? c.env.FLY_REGION ?? DEFAULT_FLY_REGION;
+    const regions = parseRegions(raw);
+    return c.json({ regions, source, raw });
+  } catch (err) {
+    console.error('[platform] Failed to read regions:', err);
+    return c.json({ error: 'Failed to read regions' }, 500);
+  }
+});
+
+// PUT /api/platform/regions
+// Updates the region configuration in KV.
+platform.put('/regions', async c => {
+  const result = await parseBody(c, UpdateRegionsSchema);
+  if ('error' in result) return result.error;
+
+  const raw = result.data.regions.join(',');
+  try {
+    await c.env.KV_CLAW_CACHE.put(FLY_REGIONS_KV_KEY, raw);
+  } catch (err) {
+    console.error('[platform] Failed to write regions to KV:', err);
+    return c.json({ error: 'Failed to write regions' }, 500);
+  }
+
+  console.log('[platform] Regions updated:', raw);
+  return c.json({ ok: true, regions: result.data.regions, raw });
 });
 
 export { platform };

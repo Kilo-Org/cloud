@@ -7,6 +7,7 @@ import { getCustomerInfo } from '@/lib/customerInfo';
 import { DevNukeAccountButton } from '@/components/dev/DevNukeAccountButton';
 import { DevConsumeCreditsButton } from '@/components/dev/DevConsumeCreditsButton';
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
+import { getOAuthDisplayNames } from '@/lib/user';
 import { getExtensionUrl } from '@/components/auth/getExtensionUrl';
 import { cookies } from 'next/headers';
 import CreditPurchaseOptions from '@/components/payment/CreditPurchaseOptions';
@@ -23,11 +24,15 @@ import { ProfileKiloPassSection } from '@/components/profile/ProfileKiloPassSect
 import { CreateKilocodeOrgButton } from '@/components/dev/CreateKilocodeOrgButton';
 import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import { UserProfileCard } from '@/components/profile/UserProfileCard';
+import { ProfileKiloClawBanner } from '@/components/profile/ProfileKiloClawBanner';
 
 export default async function ProfilePage({ searchParams }: AppPageProps) {
   const user = await getUserFromAuthOrRedirect('/users/sign_in');
   const params = await searchParams;
   const customerInfo = await getCustomerInfo(user, params);
+
+  const oauthDisplayNames = await getOAuthDisplayNames(user.id);
+  const githubOAuthDisplayName = oauthDisplayNames.get('github') ?? null;
 
   const isDevelopment = process.env.NODE_ENV === 'development';
   const isKiloPassUiEnabled =
@@ -42,6 +47,8 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
   return (
     // NOTE: When making changes to this structure, make sure to also update the structure in the loading.tsx file
     <PageLayout title="Profile">
+      <ProfileKiloClawBanner />
+
       <div className="flex w-full flex-col gap-4 lg:flex-row">
         <Card className="flex-1 rounded-xl shadow-sm">
           <CardContent className="p-6">
@@ -51,6 +58,7 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
               imageUrl={user.google_user_image_url}
               linkedinUrl={user.linkedin_url ?? null}
               githubUrl={user.github_url ?? null}
+              githubOAuthDisplayName={githubOAuthDisplayName}
             />
           </CardContent>
         </Card>

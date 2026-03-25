@@ -61,6 +61,9 @@ FLY_APP_NAME=kiloclaw-dev
 # (claw.kilosessions.ai), so that origin must be included for local dev.
 OPENCLAW_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8795,http://claw.kilosessions.ai
 
+# PostHog product telemetry (public project token, same as .env).
+NEXT_PUBLIC_POSTHOG_KEY=phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z
+
 # Encryption (for user secrets)
 # Get the dev version from 1Password (engineering vault). Quote the value.
 # AGENT_ENV_VARS_PRIVATE_KEY=...

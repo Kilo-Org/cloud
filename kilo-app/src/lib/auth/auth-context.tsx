@@ -1,0 +1,66 @@
+import * as SecureStore from 'expo-secure-store';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
+
+import { queryClient } from '@/lib/query-client';
+
+const TOKEN_KEY = 'auth-token';
+
+interface AuthContextValue {
+  token: string | undefined;
+  isLoading: boolean;
+  signIn: (token: string) => Promise<void>;
+  signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+export function AuthProvider({ children }: { readonly children: ReactNode }) {
+  const [token, setToken] = useState<string | undefined>();
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadToken = async () => {
+      try {
+        const stored = await SecureStore.getItemAsync(TOKEN_KEY);
+        setToken(stored ?? undefined);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    void loadToken();
+  }, []);
+
+  const signIn = useCallback(async (tokenValue: string) => {
+    await SecureStore.setItemAsync(TOKEN_KEY, tokenValue);
+    setToken(tokenValue);
+  }, []);
+
+  const signOut = useCallback(async () => {
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    queryClient.clear();
+    setToken(undefined);
+  }, []);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({ token, isLoading, signIn, signOut }),
+    [token, isLoading, signIn, signOut]
+  );
+
+  return <AuthContext value={value}>{children}</AuthContext>;
+}
+
+export function useAuth(): AuthContextValue {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}

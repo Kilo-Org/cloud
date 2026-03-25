@@ -6,7 +6,7 @@ import { TownListPageClient } from './TownListPageClient';
 export default async function GastownPage() {
   const user = await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/gastown');
 
-  if (!(await isGastownEnabled(user.id))) {
+  if (!(await isGastownEnabled(user.id, { isAdmin: user.is_admin }))) {
     return notFound();
   }
 

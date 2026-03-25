@@ -1,0 +1,20 @@
+{
+  "messageId": "gen_01KMFKV0SBFKVM87H8RCDDS0CK",
+  "hasError": false,
+  "model": "anthropic/claude-sonnet-4.6",
+  "responseContent": "Hi there! 👋 How are you doing? Is there something I can help you with today?",
+  "inference_provider": "bedrock",
+  "finish_reason": "end_turn",
+  "upstream_id": null,
+  "latency": null,
+  "moderation_latency": null,
+  "generation_time": null,
+  "streamed": true,
+  "cancelled": null,
+  "inputTokens": 9,
+  "outputTokens": 25,
+  "cacheHitTokens": 0,
+  "cacheWriteTokens": 0,
+  "cost_mUsd": 402,
+  "is_byok": null
+}

@@ -151,7 +151,7 @@ export default function OrganizationAppSidebar({
     ...(currentRole !== 'billing_manager'
       ? [
           {
-            title: 'Gastown',
+            title: 'Gas Town',
             icon: Bot,
             url: `/organizations/${organizationId}/gastown`,
           },

@@ -35,7 +35,7 @@
     "@kilocode/encryption": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@octokit/auth-app": "catalog:",
-    "@trpc/server": "^11.13.0",
+    "@trpc/server": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "jsonwebtoken": "catalog:",

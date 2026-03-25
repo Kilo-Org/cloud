@@ -81,7 +81,7 @@ export function OrgTownListPageClient({ organizationId, role }: OrgTownListPageC
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-semibold tracking-tight text-white/95">Gastown</h1>
+                <h1 className="text-3xl font-semibold tracking-tight text-white/95">Gas Town</h1>
                 <Badge variant="beta">beta</Badge>
               </div>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/60">

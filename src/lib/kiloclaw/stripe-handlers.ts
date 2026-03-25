@@ -9,6 +9,7 @@ import {
   kiloclaw_subscriptions,
   kiloclaw_instances,
   kiloclaw_email_log,
+  kilocode_users,
 } from '@kilocode/db/schema';
 import type { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
 import {
@@ -18,6 +19,9 @@ import {
 } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { sentryLogger } from '@/lib/utils.server';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import PostHogClient from '@/lib/posthog';
+import { after } from 'next/server';
+import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
 import { client as stripe } from '@/lib/stripe-client';
 
 const logInfo = sentryLogger('kiloclaw-stripe', 'info');
@@ -132,6 +136,16 @@ async function autoResumeIfSuspended(kiloUserId: string): Promise<void> {
         inArray(kiloclaw_email_log.email_type, resettableEmailTypes)
       )
     );
+  // Also clear per-instance ready emails (claw_instance_ready:{sandboxId})
+  // so a re-provision after reactivation triggers the notification again.
+  await db
+    .delete(kiloclaw_email_log)
+    .where(
+      and(
+        eq(kiloclaw_email_log.user_id, kiloUserId),
+        sql`${kiloclaw_email_log.email_type} LIKE 'claw_instance_ready:%'`
+      )
+    );
 
   await db
     .update(kiloclaw_subscriptions)
@@ -161,6 +175,28 @@ async function persistAutoIntroSchedule(scheduleId: string, userId: string): Pro
       scheduled_by: 'auto',
     })
     .where(eq(kiloclaw_subscriptions.user_id, userId));
+}
+
+/**
+ * Determine whether a schedule is auto-intro (already tagged) or a claimable
+ * orphan (untagged, single-phase — likely a half-created auto-intro where
+ * create succeeded but the update that sets metadata + phases never ran).
+ * If orphaned, tags it as auto-intro before returning. Returns true when the
+ * schedule should be treated as auto-intro, false otherwise.
+ */
+async function claimIfAutoIntro(schedule: Stripe.SubscriptionSchedule): Promise<boolean> {
+  if (schedule.metadata?.origin === 'auto-intro') return true;
+
+  // Only claim untagged schedules with a single phase (the from_subscription
+  // default). Schedules with 2+ phases were already configured by another code
+  // path (user plan switch, kilo-pass) and must not be claimed.
+  const isOrphan = !schedule.metadata?.origin && schedule.phases.length === 1;
+  if (!isOrphan) return false;
+
+  await stripe.subscriptionSchedules.update(schedule.id, {
+    metadata: { origin: 'auto-intro' },
+  });
+  return true;
 }
 
 /**
@@ -247,7 +283,7 @@ export async function ensureAutoIntroSchedule(
     if (!scheduleId) return;
     const schedule = await stripe.subscriptionSchedules.retrieve(scheduleId);
 
-    if (schedule.metadata?.origin === 'auto-intro') {
+    if (await claimIfAutoIntro(schedule)) {
       const valid = await validateOrRepairAutoIntroSchedule(schedule, stripeSubscriptionId, userId);
       if (!valid) {
         logError('Auto-intro schedule is unrecoverable, skipping', {
@@ -297,7 +333,6 @@ async function createAutoIntroSchedule(
   try {
     newSchedule = await stripe.subscriptionSchedules.create({
       from_subscription: stripeSubscriptionId,
-      metadata: { origin: 'auto-intro' },
     });
   } catch (error) {
     await handleAutoIntroCreateRace(error, stripeSubscriptionId, userId);
@@ -317,19 +352,31 @@ async function createAutoIntroSchedule(
     return;
   }
 
-  await stripe.subscriptionSchedules.update(newSchedule.id, {
-    phases: [
-      {
-        items: [{ price: phase1Price }],
-        start_date: currentPhase.start_date,
-        end_date: currentPhase.end_date,
-      },
-      {
-        items: [{ price: getStripePriceIdForClawPlan('standard') }],
-      },
-    ],
-    end_behavior: 'release',
-  });
+  try {
+    await stripe.subscriptionSchedules.update(newSchedule.id, {
+      metadata: { origin: 'auto-intro' },
+      phases: [
+        {
+          items: [{ price: phase1Price }],
+          start_date: currentPhase.start_date,
+          end_date: currentPhase.end_date,
+        },
+        {
+          items: [{ price: getStripePriceIdForClawPlan('standard') }],
+        },
+      ],
+      end_behavior: 'release',
+    });
+  } catch (error) {
+    // Release the half-created schedule so retry can start fresh — without
+    // metadata, recovery paths cannot identify it as auto-intro.
+    try {
+      await stripe.subscriptionSchedules.release(newSchedule.id);
+    } catch {
+      // best-effort cleanup
+    }
+    throw error;
+  }
 
   await persistAutoIntroSchedule(newSchedule.id, userId);
 }
@@ -362,7 +409,8 @@ async function handleAutoIntroCreateRace(
   });
 
   const existingSchedule = await stripe.subscriptionSchedules.retrieve(refetchedScheduleId);
-  if (existingSchedule.metadata?.origin === 'auto-intro') {
+
+  if (await claimIfAutoIntro(existingSchedule)) {
     const valid = await validateOrRepairAutoIntroSchedule(
       existingSchedule,
       stripeSubscriptionId,
@@ -728,5 +776,60 @@ export async function handleKiloClawScheduleEvent(params: {
     schedule_id: scheduleId,
     schedule_status: scheduleStatus,
     user_id: row.user_id,
+  });
+}
+
+/**
+ * Handle invoice.paid for KiloClaw subscriptions.
+ * Fires a claw_transaction PostHog event for revenue tracking.
+ */
+export function handleKiloClawInvoicePaid(params: {
+  eventId: string;
+  invoice: Stripe.Invoice;
+}): void {
+  const { eventId, invoice } = params;
+  const subDetails = invoice.parent?.subscription_details;
+  const kiloUserId = subDetails?.metadata?.kiloUserId ?? null;
+  const plan = subDetails?.metadata?.plan ?? null;
+  const stripeSubscriptionId =
+    typeof subDetails?.subscription === 'string' ? subDetails.subscription : null;
+
+  if (!kiloUserId) {
+    logWarning('KiloClaw invoice.paid missing kiloUserId in subscription metadata', {
+      stripe_event_id: eventId,
+      stripe_invoice_id: invoice.id,
+    });
+    return;
+  }
+
+  if (IS_IN_AUTOMATED_TEST) return;
+
+  after(async () => {
+    const [user] = await db
+      .select({ email: kilocode_users.google_user_email })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, kiloUserId))
+      .limit(1);
+
+    if (!user) {
+      logWarning('KiloClaw invoice.paid user not found', {
+        stripe_event_id: eventId,
+        kilo_user_id: kiloUserId,
+      });
+      return;
+    }
+
+    PostHogClient().capture({
+      distinctId: user.email,
+      event: 'claw_transaction',
+      properties: {
+        user_id: kiloUserId,
+        plan: plan ?? 'unknown',
+        amount_cents: invoice.amount_paid,
+        currency: invoice.currency,
+        stripe_invoice_id: invoice.id,
+        stripe_subscription_id: stripeSubscriptionId,
+      },
+    });
   });
 }

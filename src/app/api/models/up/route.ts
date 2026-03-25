@@ -4,8 +4,6 @@ import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { getMonitoredModels } from '@/lib/models';
 
-const monitoredModels = getMonitoredModels();
-
 // Simple hardcoded key for authentication
 const HEALTH_CHECK_KEY = 'kilo-models-health-check';
 
@@ -44,6 +42,8 @@ export async function GET(
   if (key !== HEALTH_CHECK_KEY) {
     return NextResponse.json({ healthy: false }, { status: 401 });
   }
+
+  const monitoredModels = await getMonitoredModels();
 
   try {
     const queryStartTime = Date.now();

@@ -213,6 +213,11 @@ export function generateBaseConfig(
   config.tools.exec.security = env.KILOCLAW_EXEC_SECURITY || 'allowlist';
   config.tools.exec.ask = env.KILOCLAW_EXEC_ASK || 'on-miss';
 
+  // Disable update checks on start. KiloClaw manages updates via Docker
+  // image deployments, not openclaw's built-in updater.
+  config.update = config.update ?? {};
+  config.update.checkOnStart = false;
+
   // Browser: headless Chromium for the browser tool in Docker.
   // OpenClaw auto-detects /usr/bin/chromium and adds --disable-dev-shm-usage on Linux.
   // noSandbox is required in containers (Chromium's setuid sandbox needs kernel namespacing).

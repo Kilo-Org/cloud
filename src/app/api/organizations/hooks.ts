@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { Organization } from '@kilocode/db/schema';
-import type { OrgTrialStatus } from '@/lib/organizations/organization-types';
+import type { OrgTrialStatus, TimePeriod } from '@/lib/organizations/organization-types';
 import {
   getDaysRemainingInTrial,
   getOrgTrialStatusFromDays,
@@ -92,9 +92,17 @@ export function useOrganizationUsageStats(organizationId: string) {
   return useQuery(trpc.organizations.usageStats.queryOptions({ organizationId }));
 }
 
-export function useOrganizationAutocompleteMetrics(organizationId: string) {
+export function useOrganizationAutocompleteMetrics(
+  organizationId: string,
+  period: TimePeriod = 'month'
+) {
   const trpc = useTRPC();
-  return useQuery(trpc.organizations.usageDetails.getAutocomplete.queryOptions({ organizationId }));
+  return useQuery(
+    trpc.organizations.usageDetails.getAutocomplete.queryOptions({
+      organizationId,
+      period,
+    })
+  );
 }
 
 export function useOrganizationInvoices(organizationId: string, timePeriod: string = 'year') {

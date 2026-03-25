@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
+import { ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +20,8 @@ import { Label } from '@/components/ui/label';
 import { useTRPC } from '@/lib/trpc/utils';
 import { formatDate } from '@/lib/admin-utils';
 import { toast } from 'sonner';
+
+const DEFAULT_TRIAL_DAYS = 7;
 
 function formatDateOrDash(date: string | null): string {
   return date ? formatDate(date) : '—';
@@ -70,8 +74,14 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
     if (!dialogOpen) return;
 
     const currentTrialEndAt = data?.subscription?.trial_ends_at;
-    setSelectedDate(currentTrialEndAt ? toLocalDateInputValue(currentTrialEndAt) : '');
-  }, [data?.subscription?.trial_ends_at, dialogOpen]);
+    if (currentTrialEndAt && data?.subscription?.status !== 'canceled') {
+      setSelectedDate(toLocalDateInputValue(currentTrialEndAt));
+    } else {
+      const defaultTrialEnd = new Date();
+      defaultTrialEnd.setDate(defaultTrialEnd.getDate() + DEFAULT_TRIAL_DAYS);
+      setSelectedDate(toLocalDateInputValue(defaultTrialEnd.toISOString()));
+    }
+  }, [data?.subscription?.trial_ends_at, data?.subscription?.status, dialogOpen]);
 
   const updateTrialEndAt = useMutation(
     trpc.admin.users.updateKiloClawTrialEndAt.mutationOptions({
@@ -131,8 +141,20 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
     return (
       <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle>KiloClaw</CardTitle>
-          <CardDescription>No KiloClaw subscription</CardDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>KiloClaw</CardTitle>
+              <CardDescription>n/a</CardDescription>
+            </div>
+            {data?.activeInstanceId && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/admin/kiloclaw/${data.activeInstanceId}`}>
+                  <ExternalLink className="mr-1 h-3 w-3" />
+                  View KiloClaw
+                </Link>
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {data?.earlybird ? (
@@ -165,7 +187,8 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
   }
 
   const { subscription } = data;
-  const canEditTrialEnd = subscription.status === 'trialing';
+  const canEditTrialEnd = subscription.status === 'trialing' || subscription.status === 'canceled';
+  const isTrialReset = subscription.status === 'canceled';
 
   return (
     <>
@@ -176,11 +199,21 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
               <CardTitle>KiloClaw</CardTitle>
               <CardDescription>KiloClaw subscription and trial status</CardDescription>
             </div>
-            {canEditTrialEnd && (
-              <Button variant="outline" size="sm" onClick={() => setDialogOpen(true)}>
-                Edit Trial End
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {data.activeInstanceId && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/admin/kiloclaw/${data.activeInstanceId}`}>
+                    <ExternalLink className="mr-1 h-3 w-3" />
+                    View KiloClaw
+                  </Link>
+                </Button>
+              )}
+              {canEditTrialEnd && (
+                <Button variant="outline" size="sm" onClick={() => setDialogOpen(true)}>
+                  {isTrialReset ? 'Reset Trial' : 'Edit Trial End'}
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -263,10 +296,13 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit KiloClaw Trial End Date</DialogTitle>
+            <DialogTitle>
+              {isTrialReset ? 'Reset KiloClaw Trial' : 'Edit KiloClaw Trial End Date'}
+            </DialogTitle>
             <DialogDescription>
-              Set the day this user&apos;s KiloClaw trial ends. The trial will end at the end of the
-              selected day.
+              {isTrialReset
+                ? 'Reset this canceled subscription to a new trial. This will restore access, clear suspension state, and attempt to restart the instance.'
+                : "Set the day this user's KiloClaw trial ends. The trial will end at the end of the selected day."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-4">

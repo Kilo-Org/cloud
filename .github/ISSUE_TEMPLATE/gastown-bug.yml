@@ -1,0 +1,47 @@
+name: 'Gastown Bug Report'
+description: 'Report a bug with Gastown by Kilo'
+labels: ['gastown', 'bug']
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the bug. What did you expect to happen vs. what actually happened?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Mayor / Chat
+        - Terminal UI
+        - Bead Board / Dashboard
+        - Convoys
+        - Merge Queue / Refinery
+        - Agent Dispatch / Scheduling
+        - Container / Git
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: town-id
+    attributes:
+      label: Town ID (if known)
+      description: Found in the URL or town settings
+    validations:
+      required: false
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this?
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots
+      description: Paste any error messages, activity log entries, or screenshots
+    validations:
+      required: false

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
 import { Check, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import {
@@ -20,6 +21,7 @@ import { InstanceTab } from './InstanceTab';
 import { OpenClawButton } from './OpenClawButton';
 import { SettingsTab } from './SettingsTab';
 import { ChangelogTab } from './ChangelogTab';
+import { ChannelPairingStep } from './ChannelPairingStep';
 import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { PermissionStep } from './PermissionStep';
 import { ProvisioningStep } from './ProvisioningStep';
@@ -65,23 +67,59 @@ export function ClawDashboard({
   const configServiceNudgeVisible = !instanceStatus || instanceYoung;
 
   const [onboardingStep, setOnboardingStep] = useState<
-    'permissions' | 'channels' | 'provisioning' | 'done'
+    'permissions' | 'channels' | 'provisioning' | 'pairing' | 'done'
   >('permissions');
   const [selectedPreset, setSelectedPreset] = useState<ExecPreset | null>(null);
   const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+  const hasPairingStep = selectedChannelId === 'telegram' || selectedChannelId === 'discord';
 
   const [dirtySecrets, setDirtySecrets] = useState<Set<string>>(new Set());
 
   const onSecretsChanged = useCallback((entryId: string) => {
     setDirtySecrets(prev => new Set([...prev, entryId]));
   }, []);
+  const [upgradeRequested, setUpgradeRequested] = useState(false);
+  const onRequestUpgrade = useCallback(() => setUpgradeRequested(true), []);
+  const onUpgradeHandled = useCallback(() => setUpgradeRequested(false), []);
+
   const onRedeploySuccess = useCallback(() => {
     setDirtySecrets(new Set());
   }, []);
 
+  const onRedeploy = useCallback(() => {
+    mutations.restartMachine.mutate(undefined, {
+      onSuccess: () => {
+        toast.success('Redeploying');
+        onRedeploySuccess();
+      },
+      onError: err => {
+        toast.error(err.message, { duration: 10000 });
+      },
+    });
+  }, [mutations.restartMachine, onRedeploySuccess]);
+
+  const onUpgrade = useCallback(() => {
+    mutations.restartMachine.mutate(
+      { imageTag: 'latest' },
+      {
+        onSuccess: () => {
+          toast.success('Upgrading to latest image');
+          onRedeploySuccess();
+        },
+        onError: err => {
+          toast.error(err.message, { duration: 10000 });
+        },
+      }
+    );
+  }, [mutations.restartMachine, onRedeploySuccess]);
+
   // Billing gating (welcome page for new users, loading spinner) is handled
   // by page.tsx before this component mounts. ClawDashboard always renders
   // the full dashboard with BillingWrapper handling lock dialogs and banners.
+
+  const tabTriggerClass =
+    'border-border text-muted-foreground hover:bg-muted hover:text-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground rounded-md border px-4 py-2 text-sm font-medium transition-colors data-[state=active]:shadow-none';
 
   return (
     <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
@@ -156,11 +194,13 @@ export function ClawDashboard({
         ) : isNewSetup && onboardingStep === 'channels' ? (
           <ChannelSelectionStepView
             instanceRunning={isRunning && gatewayStatus?.state === 'running'}
-            onSelect={(_channelId, tokens) => {
+            onSelect={(channelId, tokens) => {
+              setSelectedChannelId(channelId);
               setChannelTokens(tokens);
               setOnboardingStep('provisioning');
             }}
             onSkip={() => {
+              setSelectedChannelId(null);
               setChannelTokens(null);
               setOnboardingStep('provisioning');
             }}
@@ -171,7 +211,17 @@ export function ClawDashboard({
             channelTokens={channelTokens}
             instanceRunning={isRunning && gatewayStatus?.state === 'running'}
             mutations={mutations}
+            totalSteps={hasPairingStep ? 5 : 4}
+            onComplete={() => setOnboardingStep(hasPairingStep ? 'pairing' : 'done')}
+          />
+        ) : isNewSetup &&
+          onboardingStep === 'pairing' &&
+          (selectedChannelId === 'telegram' || selectedChannelId === 'discord') ? (
+          <ChannelPairingStep
+            channelId={selectedChannelId}
+            mutations={mutations}
             onComplete={() => setOnboardingStep('done')}
+            onSkip={() => setOnboardingStep('done')}
           />
         ) : isNewSetup ? (
           <Card className="mt-6 overflow-hidden">
@@ -236,27 +286,20 @@ export function ClawDashboard({
                 status={instanceStatus}
                 mutations={mutations}
                 onRedeploySuccess={onRedeploySuccess}
+                upgradeRequested={upgradeRequested}
+                onUpgradeHandled={onUpgradeHandled}
               />
             </CardContent>
             <Tabs defaultValue="instance">
               <div className="px-5">
-                <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-b bg-transparent p-0">
-                  <TabsTrigger
-                    value="instance"
-                    className="text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-                  >
+                <TabsList className="mt-4 h-auto w-full justify-start gap-2 rounded-none border-b bg-transparent p-0 pb-3">
+                  <TabsTrigger value="instance" className={tabTriggerClass}>
                     Gateway Process
                   </TabsTrigger>
-                  <TabsTrigger
-                    value="settings"
-                    className="text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-                  >
+                  <TabsTrigger value="settings" className={tabTriggerClass}>
                     Settings
                   </TabsTrigger>
-                  <TabsTrigger
-                    value="changelog"
-                    className="text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-                  >
+                  <TabsTrigger value="changelog" className={tabTriggerClass}>
                     What&apos;s New <Sparkles className="ml-1 inline h-3 w-3 text-amber-400" />
                   </TabsTrigger>
                 </TabsList>
@@ -276,6 +319,9 @@ export function ClawDashboard({
                     mutations={mutations}
                     onSecretsChanged={onSecretsChanged}
                     dirtySecrets={dirtySecrets}
+                    onRedeploy={onRedeploy}
+                    onUpgrade={onUpgrade}
+                    onRequestUpgrade={onRequestUpgrade}
                   />
                 </TabsContent>
                 <TabsContent value="changelog" className="mt-0">

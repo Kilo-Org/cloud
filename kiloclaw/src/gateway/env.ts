@@ -190,10 +190,12 @@ export async function buildEnvVars(
   if (env.DISCORD_DM_POLICY) plainEnv.DISCORD_DM_POLICY = env.DISCORD_DM_POLICY;
   if (env.OPENCLAW_ALLOWED_ORIGINS)
     plainEnv.OPENCLAW_ALLOWED_ORIGINS = env.OPENCLAW_ALLOWED_ORIGINS;
+  if (env.KILOCLAW_CHECKIN_URL) plainEnv.KILOCLAW_CHECKIN_URL = env.KILOCLAW_CHECKIN_URL;
   plainEnv.REQUIRE_PROXY_TOKEN = env.REQUIRE_PROXY_TOKEN ?? 'false';
 
   // Layer 5: Reserved system vars (cannot be overridden by any user config)
   sensitive.OPENCLAW_GATEWAY_TOKEN = await deriveGatewayToken(sandboxId, gatewayTokenSecret);
+  plainEnv.KILOCLAW_SANDBOX_ID = sandboxId;
   plainEnv.AUTO_APPROVE_DEVICES = 'true';
 
   // User-selected exec permissions preset (non-sensitive, survives restarts).

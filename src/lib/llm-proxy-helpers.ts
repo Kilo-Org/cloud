@@ -199,6 +199,11 @@ export function modelDoesNotExistResponse() {
   );
 }
 
+export function storeAndPreviousResponseIdIsNotSupported() {
+  const error = 'The store and previous_response_id fields are not supported.';
+  return NextResponse.json({ error, message: error }, { status: 400 });
+}
+
 export function getOutputHeaders(response: Response) {
   const outputHeaders = new Headers();
 
@@ -551,6 +556,12 @@ export function countAndStoreFimUsage(
           extra: { usageContext },
         });
         return;
+      }
+
+      usageStats.market_cost = usageStats.cost_mUsd;
+
+      if (usageContext.user_byok) {
+        usageStats.cost_mUsd = 0;
       }
 
       // Use the same logMicrodollarUsage as OpenRouter!

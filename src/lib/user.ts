@@ -55,7 +55,7 @@ import {
   kiloclaw_email_log,
   kiloclaw_admin_audit_logs,
 } from '@kilocode/db/schema';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, inArray, isNotNull, sql } from 'drizzle-orm';
 import { allow_fake_login } from './constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { hosted_domain_specials } from '@/lib/auth/constants';
@@ -64,6 +64,7 @@ import type { OptionalError, Result } from '@/lib/maybe-result';
 import { failureResult, successResult, trpcFailure } from '@/lib/maybe-result';
 import type { TRPCError } from '@trpc/server';
 import type { UUID } from 'node:crypto';
+import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 import { generateOpenRouterUpstreamSafetyIdentifier } from '@/lib/providerHash';
 
@@ -126,6 +127,7 @@ export type CreateOrUpdateUserArgs = {
   hosted_domain: string | null;
   provider: AuthProviderId;
   provider_account_id: string;
+  display_name?: string | null;
 };
 
 export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
@@ -152,6 +154,21 @@ export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
     );
     existingUser.hosted_domain = args.hosted_domain;
   }
+
+  // Sync display_name from OAuth on every sign-in
+  if (args.display_name) {
+    await db
+      .update(user_auth_provider)
+      .set({ display_name: args.display_name })
+      .where(
+        and(
+          eq(user_auth_provider.kilo_user_id, existingUser.id),
+          eq(user_auth_provider.provider, args.provider),
+          eq(user_auth_provider.provider_account_id, args.provider_account_id)
+        )
+      );
+  }
+
   timer.log(`findFirst user with id ${existingUser.id}`);
   return existingUser;
 }
@@ -310,6 +327,7 @@ export async function createOrUpdateUser(
       provider_account_id: args.provider_account_id,
       avatar_url: args.google_user_image_url,
       email: args.google_user_email,
+      display_name: args.display_name ?? null,
       hosted_domain: args.hosted_domain,
     });
 
@@ -344,6 +362,8 @@ export async function createOrUpdateUser(
   // Set up user identification via user ID
   posthogClient.alias({ distinctId: savedUser.google_user_email, alias: savedUser.id });
 
+  await tryVerifyDiscordGuildMembership(args.provider, args.provider_account_id, savedUser.id);
+
   return successResult({ user: savedUser, isNew: true });
 }
 
@@ -362,6 +382,7 @@ export async function linkAccountToExistingUser(
     provider_account_id: authProviderData.provider_account_id,
     email: authProviderData.google_user_email,
     avatar_url: authProviderData.google_user_image_url,
+    display_name: authProviderData.display_name ?? null,
     hosted_domain: authProviderData.hosted_domain,
   });
 
@@ -381,6 +402,12 @@ export async function linkAccountToExistingUser(
 
     return linkResult;
   }
+
+  await tryVerifyDiscordGuildMembership(
+    authProviderData.provider,
+    authProviderData.provider_account_id,
+    existingKiloUserId
+  );
 
   // Log the account linking event
   posthogClient.capture({
@@ -505,6 +532,7 @@ export async function softDeleteUser(userId: string) {
         hosted_domain: null,
         linkedin_url: null,
         github_url: null,
+        discord_server_membership_verified_at: null,
         api_token_pepper: null,
         default_model: null,
         blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
@@ -681,6 +709,19 @@ export async function getUserAuthProviders(kiloUserId: string): Promise<UserAuth
     .orderBy(user_auth_provider.created_at);
 }
 
+export async function getOAuthDisplayNames(userId: string): Promise<Map<AuthProviderId, string>> {
+  const rows = await db
+    .select({
+      provider: user_auth_provider.provider,
+      display_name: user_auth_provider.display_name,
+    })
+    .from(user_auth_provider)
+    .where(
+      and(eq(user_auth_provider.kilo_user_id, userId), isNotNull(user_auth_provider.display_name))
+    );
+  return new Map(rows.map(r => [r.provider, r.display_name ?? '']));
+}
+
 export async function findUserIdByAuthProvider(
   provider: AuthProviderId,
   providerAccountId: string
@@ -813,6 +854,28 @@ export async function linkAuthProviderToUser(
   return successResult();
 }
 
+async function tryVerifyDiscordGuildMembership(
+  provider: AuthProviderId,
+  providerAccountId: string,
+  kiloUserId: string
+) {
+  if (provider !== 'discord') return;
+  try {
+    const isMember = await checkDiscordGuildMembership(providerAccountId);
+    if (isMember) {
+      await db
+        .update(kilocode_users)
+        .set({ discord_server_membership_verified_at: new Date().toISOString() })
+        .where(eq(kilocode_users.id, kiloUserId));
+    }
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'discord_server_membership_verification' },
+      extra: { kiloUserId },
+    });
+  }
+}
+
 export async function unlinkAuthProviderFromUser(
   kiloUserId: string,
   provider: AuthProviderId
@@ -842,6 +905,14 @@ export async function unlinkAuthProviderFromUser(
         eq(user_auth_provider.provider, provider)
       )
     );
+
+  // Clear Discord guild membership verification when unlinking Discord
+  if (provider === 'discord') {
+    await db
+      .update(kilocode_users)
+      .set({ discord_server_membership_verified_at: null })
+      .where(eq(kilocode_users.id, kiloUserId));
+  }
 
   return successResult();
 }

@@ -186,6 +186,9 @@ export const PersistedStateSchema = z.object({
   // null = use defaults (security: 'allowlist', ask: 'on-miss').
   execSecurity: z.string().nullable().default(null),
   execAsk: z.string().nullable().default(null),
+  // Tracks whether the "instance ready" email has been sent for this provision lifecycle.
+  // Set to true on first low-load checkin; reset on DO wipe (destroy + re-provision).
+  instanceReadyEmailSent: z.boolean().default(false),
 });
 
 export type PersistedState = z.infer<typeof PersistedStateSchema>;

@@ -1,4 +1,4 @@
-import { PROVIDERS } from '@/lib/providers';
+import PROVIDERS from '@/lib/providers/provider-definitions';
 import { generateProviderSpecificHash } from './providerHash';
 
 describe('generateProviderSpecificHash', () => {

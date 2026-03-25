@@ -2,7 +2,19 @@ import 'server-only';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
-import { eq, and, desc, lt, or, ilike, sql, isNull, notInArray, type SQL } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  desc,
+  lt,
+  or,
+  ilike,
+  sql,
+  isNull,
+  notInArray,
+  inArray,
+  type SQL,
+} from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { cliSessions, sharedCliSessions } from '@kilocode/db/schema';
 import { CliSessionSharedState } from '@/types/cli-session-shared-state';
@@ -28,7 +40,13 @@ export const BLOB_TYPES = [
 ] as const satisfies readonly FileName[];
 
 /** Known platform values that have dedicated filters. "Extension" is everything else. */
-export const KNOWN_PLATFORMS = ['cloud-agent', 'cli', 'agent-manager', 'app-builder'] as const;
+export const KNOWN_PLATFORMS = [
+  'cloud-agent',
+  'cloud-agent-web',
+  'cli',
+  'agent-manager',
+  'app-builder',
+] as const;
 
 const PAGE_SIZE = 10;
 
@@ -109,7 +127,7 @@ const cloudAgentSessionIdField = z.string().min(1).max(255);
 const ListSessionsInputSchema = z.object({
   cursor: z.iso.datetime().optional(),
   limit: z.number().min(1).max(50).optional().default(PAGE_SIZE),
-  createdOnPlatform: z.string().optional(),
+  createdOnPlatform: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
   orderBy: z.enum(['created_at', 'updated_at']).optional().default('created_at'),
   organizationId: z.uuid().nullable().optional(),
 });
@@ -118,7 +136,7 @@ const SearchInputSchema = z.object({
   search_string: z.string().min(1),
   limit: z.number().min(1).max(50).optional().default(PAGE_SIZE),
   offset: z.number().min(0).optional().default(0),
-  createdOnPlatform: z.string().optional(),
+  createdOnPlatform: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
   organizationId: z.uuid().nullable().optional(),
 });
 
@@ -281,17 +299,23 @@ async function getForkableSession(
  * Used by both list and search procedures to ensure consistent filtering.
  */
 function buildScopeConditions(opts: {
-  createdOnPlatform?: string;
+  createdOnPlatform?: string | string[];
   organizationId?: string | null;
 }): SQL[] {
   const conditions: SQL[] = [];
 
   if (opts.createdOnPlatform) {
-    if (opts.createdOnPlatform === 'extension') {
+    const platforms = Array.isArray(opts.createdOnPlatform)
+      ? opts.createdOnPlatform
+      : [opts.createdOnPlatform];
+
+    if (platforms.length === 1 && platforms[0] === 'extension') {
       // "Extension" means everything NOT in the known platforms list
       conditions.push(notInArray(cliSessions.created_on_platform, [...KNOWN_PLATFORMS]));
+    } else if (platforms.length === 1) {
+      conditions.push(eq(cliSessions.created_on_platform, platforms[0]));
     } else {
-      conditions.push(eq(cliSessions.created_on_platform, opts.createdOnPlatform));
+      conditions.push(inArray(cliSessions.created_on_platform, platforms));
     }
   }
 

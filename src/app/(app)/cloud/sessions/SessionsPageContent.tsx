@@ -79,7 +79,12 @@ export function SessionsPageContent() {
       limit: 50,
       orderBy: 'updated_at',
       organizationId: organizationId ?? null,
-      createdOnPlatform: platformFilter === 'all' ? undefined : platformFilter,
+      createdOnPlatform:
+        platformFilter === 'all'
+          ? undefined
+          : platformFilter === 'cloud-agent'
+            ? ['cloud-agent', 'cloud-agent-web']
+            : platformFilter,
       includeSubSessions,
     })
   );
@@ -91,7 +96,12 @@ export function SessionsPageContent() {
       limit: 50,
       offset: 0,
       organizationId: organizationId ?? null,
-      createdOnPlatform: platformFilter === 'all' ? undefined : platformFilter,
+      createdOnPlatform:
+        platformFilter === 'all'
+          ? undefined
+          : platformFilter === 'cloud-agent'
+            ? ['cloud-agent', 'cloud-agent-web']
+            : platformFilter,
       includeSubSessions,
     }),
     enabled: isSearching,

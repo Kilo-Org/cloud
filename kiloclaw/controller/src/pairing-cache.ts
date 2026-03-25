@@ -189,7 +189,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function detectChannels(config: unknown): string[] {
+export function detectChannels(config: unknown): string[] {
   if (!isRecord(config)) return [];
   const ch = isRecord(config.channels) ? config.channels : {};
   const tg = isRecord(ch.telegram) ? ch.telegram : {};

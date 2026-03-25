@@ -1,7 +1,6 @@
 export type ProviderId =
   | 'openrouter'
   | 'alibaba'
-  | 'gigapotato'
   | 'corethink'
   | 'martian'
   | 'mistral'
@@ -9,3 +8,9 @@ export type ProviderId =
   | 'vercel'
   | 'custom'
   | 'dev-tools';
+
+export type Provider = {
+  id: ProviderId;
+  apiUrl: string;
+  apiKey: string;
+};

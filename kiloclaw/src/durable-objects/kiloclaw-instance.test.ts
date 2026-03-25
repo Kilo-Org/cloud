@@ -180,6 +180,7 @@ function createFakeAppStub() {
 
 function createFakeEnv() {
   const appStub = createFakeAppStub();
+  const writeDataPoint = vi.fn();
   return {
     FLY_API_TOKEN: 'test-token',
     FLY_APP_NAME: 'test-app',
@@ -198,7 +199,25 @@ function createFakeEnv() {
       put: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
     } as unknown,
+    KILOCLAW_AE: {
+      writeDataPoint,
+    } as unknown,
   };
+}
+
+function analyticsEvents(env: ReturnType<typeof createFakeEnv>): Record<string, unknown>[] {
+  const dataset = env.KILOCLAW_AE as { writeDataPoint: Mock };
+  return dataset.writeDataPoint.mock.calls.map(call => call[0] as Record<string, unknown>);
+}
+
+function analyticsEventsByName(
+  env: ReturnType<typeof createFakeEnv>,
+  eventName: string
+): Record<string, unknown>[] {
+  return analyticsEvents(env).filter(call => {
+    const blobs = call.blobs;
+    return Array.isArray(blobs) && blobs[0] === eventName;
+  });
 }
 
 function createInstance(
@@ -322,6 +341,20 @@ afterEach(() => {
 });
 
 describe('two-phase destroy', () => {
+  it('throws with status 404 when instance was never provisioned', async () => {
+    const { instance } = createInstance();
+
+    const err: Error & { status?: number } = await instance.destroy().then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      (e: Error & { status?: number }) => e
+    );
+
+    expect(err.message).toBe('Instance not provisioned');
+    expect(err.status).toBe(404);
+  });
+
   it('clears all state when both Fly deletes succeed', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage);
@@ -1246,6 +1279,22 @@ describe('alarm runs for all live statuses', () => {
   });
 });
 
+describe('start: not provisioned', () => {
+  it('throws with status 404 when instance was never provisioned', async () => {
+    const { instance } = createInstance();
+
+    const err: Error & { status?: number } = await instance.start('user-1').then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      (e: Error & { status?: number }) => e
+    );
+
+    expect(err.message).toBe('Instance not provisioned');
+    expect(err.status).toBe(404);
+  });
+});
+
 describe('startExistingMachine: transient vs 404 errors', () => {
   it('does NOT recreate machine on transient 500 error', async () => {
     const { instance, storage } = createInstance();
@@ -1571,7 +1620,15 @@ describe('gateway process control via controller', () => {
 // ============================================================================
 
 import { selectRecoveryCandidate } from './machine-recovery';
-import { parseRegions, deprioritizeRegion, shuffleRegions } from './regions';
+import {
+  parseRegions,
+  deprioritizeRegion,
+  shuffleRegions,
+  isMetaRegion,
+  prepareRegions,
+  resolveRegions,
+  FLY_REGIONS_KV_KEY,
+} from './regions';
 import type { FlyMachine } from '../fly/types';
 
 function fakeMachine(overrides: Partial<FlyMachine>): FlyMachine {
@@ -2344,16 +2401,28 @@ describe('parseRegions', () => {
 });
 
 describe('deprioritizeRegion', () => {
-  it('moves failed region to end', () => {
-    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'dfw')).toEqual(['yyz', 'cdg', 'dfw']);
+  it('removes failed region entirely with 3+ distinct regions', () => {
+    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'dfw')).toEqual(['yyz', 'cdg']);
   });
 
-  it('moves middle region to end', () => {
-    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'yyz')).toEqual(['dfw', 'cdg', 'yyz']);
+  it('removes middle region entirely with 3+ distinct regions', () => {
+    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'yyz')).toEqual(['dfw', 'cdg']);
   });
 
-  it('returns list unchanged when failed region is already last', () => {
-    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'cdg')).toEqual(['dfw', 'yyz', 'cdg']);
+  it('removes last region entirely with 3+ distinct regions', () => {
+    expect(deprioritizeRegion(['dfw', 'yyz', 'cdg'], 'cdg')).toEqual(['dfw', 'yyz']);
+  });
+
+  it('removes all duplicates of failed region with 3+ distinct', () => {
+    expect(deprioritizeRegion(['dfw', 'dfw', 'yyz', 'cdg'], 'dfw')).toEqual(['yyz', 'cdg']);
+  });
+
+  it('moves failed region to end with only 2 distinct regions', () => {
+    expect(deprioritizeRegion(['dfw', 'yyz'], 'dfw')).toEqual(['yyz', 'dfw']);
+  });
+
+  it('moves failed region to end with 2 distinct including duplicates', () => {
+    expect(deprioritizeRegion(['dfw', 'dfw', 'yyz'], 'dfw')).toEqual(['yyz', 'dfw']);
   });
 
   it('returns list unchanged when failed region is not in list', () => {
@@ -2362,10 +2431,6 @@ describe('deprioritizeRegion', () => {
 
   it('returns list unchanged when failedRegion is null', () => {
     expect(deprioritizeRegion(['dfw', 'yyz'], null)).toEqual(['dfw', 'yyz']);
-  });
-
-  it('handles single-element list', () => {
-    expect(deprioritizeRegion(['dfw'], 'dfw')).toEqual(['dfw']);
   });
 });
 
@@ -2398,6 +2463,132 @@ describe('shuffleRegions', () => {
     }
     // With 6 elements (720 permutations), 50 shuffles should produce at least 2 distinct orderings
     expect(orderings.size).toBeGreaterThan(1);
+  });
+});
+
+// ============================================================================
+// isMetaRegion + prepareRegions + resolveRegions
+// ============================================================================
+
+describe('isMetaRegion', () => {
+  it('returns true for eu', () => {
+    expect(isMetaRegion('eu')).toBe(true);
+  });
+
+  it('returns true for us', () => {
+    expect(isMetaRegion('us')).toBe(true);
+  });
+
+  it('is case-insensitive', () => {
+    expect(isMetaRegion('EU')).toBe(true);
+    expect(isMetaRegion('Us')).toBe(true);
+  });
+
+  it('returns false for specific regions', () => {
+    expect(isMetaRegion('dfw')).toBe(false);
+    expect(isMetaRegion('iad')).toBe(false);
+    expect(isMetaRegion('cdg')).toBe(false);
+    expect(isMetaRegion('lhr')).toBe(false);
+  });
+});
+
+describe('prepareRegions', () => {
+  it('does not shuffle when all regions are meta', () => {
+    const result = prepareRegions(['eu', 'us']);
+    expect(result).toEqual(['eu', 'us']);
+  });
+
+  it('does not shuffle a single meta region', () => {
+    expect(prepareRegions(['eu'])).toEqual(['eu']);
+  });
+
+  it('shuffles when all regions are specific', () => {
+    const input = ['dfw', 'ord', 'lax', 'iad', 'cdg', 'arn'];
+    const orderings = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      orderings.add(prepareRegions([...input]).join(','));
+    }
+    expect(orderings.size).toBeGreaterThan(1);
+  });
+
+  it('shuffles when mix of meta and specific regions', () => {
+    const input = ['dfw', 'eu', 'ord', 'us'];
+    const orderings = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      orderings.add(prepareRegions([...input]).join(','));
+    }
+    expect(orderings.size).toBeGreaterThan(1);
+  });
+
+  it('preserves all elements including duplicates', () => {
+    const result = prepareRegions(['dfw', 'dfw', 'ord']);
+    expect(result.sort()).toEqual(['dfw', 'dfw', 'ord'].sort());
+  });
+
+  it('does not mutate the input array', () => {
+    const input = ['dfw', 'ord', 'lax'];
+    const copy = [...input];
+    prepareRegions(input);
+    expect(input).toEqual(copy);
+  });
+});
+
+describe('resolveRegions', () => {
+  function createMockKV(value: string | null = null) {
+    const getMock = vi.fn().mockResolvedValue(value);
+    const kv = { get: getMock, put: vi.fn(), delete: vi.fn() } as unknown as KVNamespace;
+    return { kv, getMock };
+  }
+
+  it('reads from KV when value is present', async () => {
+    const { kv, getMock } = createMockKV('dfw,ord,lax');
+    const result = await resolveRegions(kv, 'eu,us');
+    // Specific regions → shuffled, but all elements preserved
+    expect(result.sort()).toEqual(['dfw', 'lax', 'ord']);
+    expect(getMock).toHaveBeenCalledWith(FLY_REGIONS_KV_KEY);
+  });
+
+  it('falls back to env FLY_REGION when KV is empty', async () => {
+    const { kv } = createMockKV(null);
+    const result = await resolveRegions(kv, 'eu,us');
+    // Meta regions → not shuffled
+    expect(result).toEqual(['eu', 'us']);
+  });
+
+  it('falls back to DEFAULT_FLY_REGION when both KV and env are missing', async () => {
+    const { kv } = createMockKV(null);
+    const result = await resolveRegions(kv, undefined);
+    // DEFAULT_FLY_REGION is 'eu,us' → meta → not shuffled
+    expect(result).toEqual(['eu', 'us']);
+  });
+
+  it('applies shuffle to specific regions from KV', async () => {
+    const { kv } = createMockKV('arn,cdg,iad,ams,fra,lhr');
+    const orderings = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      const result = await resolveRegions(kv, undefined);
+      orderings.add(result.join(','));
+    }
+    expect(orderings.size).toBeGreaterThan(1);
+  });
+
+  it('does not shuffle meta regions from KV', async () => {
+    const { kv } = createMockKV('us,eu');
+    const result = await resolveRegions(kv, undefined);
+    expect(result).toEqual(['us', 'eu']);
+  });
+
+  it('preserves duplicates for shuffle biasing', async () => {
+    const { kv } = createMockKV('dfw,dfw,ord');
+    const result = await resolveRegions(kv, undefined);
+    expect(result.sort()).toEqual(['dfw', 'dfw', 'ord']);
+  });
+
+  it('falls back to env when KV read throws', async () => {
+    const getMock = vi.fn().mockRejectedValue(new Error('KV unavailable'));
+    const kv = { get: getMock, put: vi.fn(), delete: vi.fn() } as unknown as KVNamespace;
+    const result = await resolveRegions(kv, 'eu,us');
+    expect(result).toEqual(['eu', 'us']);
   });
 });
 
@@ -2615,7 +2806,8 @@ describe('start: 412 insufficient resources recovery', () => {
   });
 
   it('fresh provision (never started): deletes volume and creates fresh with deprioritized regions', async () => {
-    const { instance, storage } = createInstance();
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
     await seedProvisioned(storage, { flyMachineId: null, lastStartedAt: null });
 
     // First createMachine fails with 412
@@ -2657,6 +2849,13 @@ describe('start: 412 insufficient resources recovery', () => {
     expect(storage._store.get('flyVolumeId')).toBe('vol-new');
     expect(storage._store.get('flyRegion')).toBe('cdg');
     expect(storage._store.get('status')).toBe('running');
+
+    const recoveryEvents = analyticsEventsByName(env, 'instance.start_capacity_recovery');
+    expect(recoveryEvents).toHaveLength(1);
+    expect(recoveryEvents[0].blobs).toEqual(
+      expect.arrayContaining(['instance.start_capacity_recovery', 'user-1', 'do'])
+    );
+    expect(recoveryEvents[0].blobs).toContain('fly_412_insufficient_resources');
   });
 
   it('existing instance (has user data): forks volume to preserve data', async () => {
@@ -2887,6 +3086,20 @@ describe('stop: error propagation', () => {
 
     expect(storage._store.get('status')).toBe('stopped');
     expect(storage._store.get('lastStoppedAt')).toBeDefined();
+  });
+
+  it('throws with status 404 when instance was never provisioned', async () => {
+    const { instance } = createInstance();
+
+    const err: Error & { status?: number } = await instance.stop().then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      (e: Error & { status?: number }) => e
+    );
+
+    expect(err.message).toBe('Instance not provisioned');
+    expect(err.status).toBe(404);
   });
 });
 
@@ -3835,7 +4048,8 @@ describe('provision: auto-start after fresh provision', () => {
 
 describe('startAsync: catch handler writes stopped state on pre-machine failure', () => {
   it('transitions to stopped immediately when start() throws before machine creation', async () => {
-    const { instance, storage, waitUntilPromises } = createInstance();
+    const env = createFakeEnv();
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
 
     (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
       id: 'vol-1',
@@ -3857,6 +4071,11 @@ describe('startAsync: catch handler writes stopped state on pre-machine failure'
     expect(storage._store.get('flyMachineId')).toBeFalsy();
     expect(storage._store.get('lastStartErrorMessage')).toBe('Fly API unavailable');
     expect(storage._store.get('lastStartErrorAt')).toBeGreaterThan(0);
+
+    const failedEvents = analyticsEventsByName(env, 'instance.provisioning_failed');
+    expect(failedEvents).toHaveLength(1);
+    expect(failedEvents[0].blobs).toContain('no_machine_created');
+    expect(failedEvents[0].blobs).toContain('Fly API unavailable');
   });
 
   it('does NOT overwrite state when start() fails after machine ID is persisted', async () => {
@@ -3880,6 +4099,124 @@ describe('startAsync: catch handler writes stopped state on pre-machine failure'
     expect(storage._store.get('status')).toBe('starting');
     // Error fields should NOT be populated for post-machine failures
     expect(storage._store.get('lastStartErrorMessage')).toBeFalsy();
+  });
+});
+
+describe('start failure analytics events', () => {
+  it('emits instance.provisioning_failed when reconcile times out with no machine', async () => {
+    vi.useFakeTimers();
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
+    await seedStarting(storage, {
+      flyMachineId: null,
+      startingAt: Date.now() - STARTING_TIMEOUT_MS - 1,
+      lastStartErrorMessage: 'timed out bootstrapping',
+    });
+
+    await instance.alarm();
+
+    const failedEvents = analyticsEventsByName(env, 'instance.provisioning_failed');
+    expect(failedEvents).toHaveLength(1);
+    expect(failedEvents[0].blobs).toContain('starting_timeout');
+    expect(failedEvents[0].blobs).toContain('timed out bootstrapping');
+  });
+
+  it('emits instance.provisioning_failed when Fly reports failed state during reconcile', async () => {
+    vi.useFakeTimers();
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
+    await seedStarting(storage, {
+      flyMachineId: 'machine-1',
+      startingAt: Date.now() - 1_000,
+    });
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'failed' });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+
+    await instance.alarm();
+
+    const failedEvents = analyticsEventsByName(env, 'instance.provisioning_failed');
+    expect(failedEvents).toHaveLength(1);
+    expect(failedEvents[0].blobs).toContain('fly_failed_state');
+    expect(failedEvents[0].blobs).toContain('fly machine entered failed state');
+  });
+
+  it('does not emit instance.provisioning_failed for a running machine that later fails', async () => {
+    vi.useFakeTimers();
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      flyMachineId: 'machine-1',
+    });
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'failed' });
+
+    await instance.alarm();
+
+    const failedEvents = analyticsEventsByName(env, 'instance.provisioning_failed');
+    expect(failedEvents).toHaveLength(0);
+  });
+});
+
+describe('manual and crash recovery analytics events', () => {
+  it('can record manual start success events through Analytics Engine payloads', () => {
+    const env = createFakeEnv();
+    const dataset = env.KILOCLAW_AE as { writeDataPoint: Mock };
+
+    dataset.writeDataPoint({
+      blobs: [
+        'instance.manual_start_succeeded',
+        'user-1',
+        'http',
+        '/api/platform/start',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+      ],
+      doubles: [12, 0],
+      indexes: ['instance.manual_start_succeeded'],
+    });
+
+    const successEvents = analyticsEventsByName(env, 'instance.manual_start_succeeded');
+    expect(successEvents).toHaveLength(1);
+    expect(successEvents[0].blobs).toEqual(
+      expect.arrayContaining(['instance.manual_start_succeeded', 'user-1', 'http'])
+    );
+  });
+
+  it('can record crash recovery failure events through Analytics Engine payloads', () => {
+    const env = createFakeEnv();
+    const dataset = env.KILOCLAW_AE as { writeDataPoint: Mock };
+
+    dataset.writeDataPoint({
+      blobs: [
+        'instance.crash_recovery_failed',
+        'user-1',
+        'http',
+        '',
+        'restart failed',
+        'acct-test',
+        'machine-1',
+        'sandbox-1',
+        'running',
+        '',
+        '',
+        '',
+        '',
+      ],
+      doubles: [34, 0],
+      indexes: ['instance.crash_recovery_failed'],
+    });
+
+    const failureEvents = analyticsEventsByName(env, 'instance.crash_recovery_failed');
+    expect(failureEvents).toHaveLength(1);
+    expect(failureEvents[0].blobs).toEqual(
+      expect.arrayContaining(['instance.crash_recovery_failed', 'user-1', 'http', 'restart failed'])
+    );
   });
 });
 
@@ -5423,5 +5760,61 @@ describe('updateExecPreset', () => {
 
     expect(result.execSecurity).toBe('full');
     expect(result.execAsk).toBe('off');
+  });
+});
+
+describe('tryMarkInstanceReady', () => {
+  it('returns shouldNotify: true on first call and persists the flag', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { instanceReadyEmailSent: false });
+
+    const result = await instance.tryMarkInstanceReady();
+
+    expect(result).toEqual({ shouldNotify: true, userId: 'user-1' });
+    expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
+  });
+
+  it('returns shouldNotify: false on subsequent calls', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { instanceReadyEmailSent: false });
+
+    await instance.tryMarkInstanceReady();
+    const result = await instance.tryMarkInstanceReady();
+
+    expect(result).toEqual({ shouldNotify: false, userId: 'user-1' });
+  });
+
+  it('returns shouldNotify: false when flag is already persisted', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { instanceReadyEmailSent: true });
+
+    const putSpy = vi.spyOn(storage, 'put');
+    const result = await instance.tryMarkInstanceReady();
+
+    expect(result).toEqual({ shouldNotify: false, userId: 'user-1' });
+    expect(putSpy).not.toHaveBeenCalled();
+  });
+
+  it('suppresses email for legacy instances without the field (migration)', async () => {
+    const { instance, storage } = createInstance();
+    // Seed a provisioned instance WITHOUT instanceReadyEmailSent in storage.
+    // The migration in loadState treats this as already-sent to prevent
+    // spurious emails to pre-existing instances after deploy.
+    await seedProvisioned(storage);
+
+    const result = await instance.tryMarkInstanceReady();
+
+    expect(result).toEqual({ shouldNotify: false, userId: 'user-1' });
+  });
+
+  it('allows email for newly provisioned instances with the field explicitly set', async () => {
+    const { instance, storage } = createInstance();
+    // New instances created after deploy will have the field explicitly in storage.
+    await seedProvisioned(storage, { instanceReadyEmailSent: false });
+
+    const result = await instance.tryMarkInstanceReady();
+
+    expect(result).toEqual({ shouldNotify: true, userId: 'user-1' });
+    expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 import { isFreeModel, kiloFreeModels, preferredModels } from '@/lib/models';
-import { PROVIDERS } from '@/lib/providers';
+import PROVIDERS from '@/lib/providers/provider-definitions';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
   OpenRouterModelsResponseSchema,

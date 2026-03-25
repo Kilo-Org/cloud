@@ -7,17 +7,32 @@ jest.mock('@/lib/fetchWithBackoff', () => ({
     fetch(input, init),
 }));
 
-import {
-  getKilocodeRepoOpenPullRequestsSummary,
-  getKilocodeRepoRecentlyClosedExternalPRs,
-  parseGithubListPullRequestsSummaryResponse,
-} from '@/lib/github/open-pull-request-counts';
+import { parseGithubListPullRequestsSummaryResponse } from '@/lib/github/open-pull-request-counts';
+
+beforeEach(() => {
+  // Reset the module registry so each test gets a fresh import with clean caches.
+  jest.resetModules();
+});
+
+async function importModule() {
+  return await import('@/lib/github/open-pull-request-counts');
+}
 
 function mockGithubJsonResponse(json: unknown): Response {
   return new Response(JSON.stringify(json), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+// Default org members response: empty org (all authors are external)
+function emptyOrgMembersResponse(): Response {
+  return mockGithubJsonResponse([]);
+}
+
+// Org members response with specified members
+function orgMembersResponse(logins: string[]): Response {
+  return mockGithubJsonResponse(logins.map(login => ({ login })));
 }
 
 describe('getKilocodeRepoOpenPullRequestsSummary bot author classification', () => {
@@ -63,9 +78,9 @@ describe('getKilocodeRepoOpenPullRequestsSummary bot author classification', () 
           return mockGithubJsonResponse(prListJson);
         }
 
-        // Org membership check for "some-user" should classify as external.
-        if (urlString.includes('/orgs/Kilo-Org/members/')) {
-          return new Response('', { status: 404 });
+        // Bulk org members endpoint
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return emptyOrgMembersResponse();
         }
 
         // Comment endpoints should be hit only for the external PR (number 2).
@@ -84,8 +99,10 @@ describe('getKilocodeRepoOpenPullRequestsSummary bot author classification', () 
         throw new Error(`Unexpected fetch: ${urlString}`);
       });
 
+    const { getKilocodeRepoOpenPullRequestsSummary } = await importModule();
     const summary = await getKilocodeRepoOpenPullRequestsSummary({
       ttlMs: 0,
+      repos: ['kilocode'],
       commentConcurrency: 1,
       maxIssueCommentPages: 1,
       maxReviewCommentPages: 1,
@@ -97,6 +114,7 @@ describe('getKilocodeRepoOpenPullRequestsSummary bot author classification', () 
 
     expect(summary.externalOpenPullRequestsList).toHaveLength(1);
     expect(summary.externalOpenPullRequestsList[0]?.authorLogin).toBe('some-user');
+    expect(summary.externalOpenPullRequestsList[0]?.repo).toBe('kilocode');
     expect(summary.externalOpenPullRequestsList.some(pr => pr.authorLogin === 'renovate')).toBe(
       false
     );
@@ -128,20 +146,26 @@ describe('getKilocodeRepoOpenPullRequestsSummary bot author classification', () 
           return mockGithubJsonResponse(prListJson);
         }
 
+        // Bulk org members endpoint
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return emptyOrgMembersResponse();
+        }
+
         if (
-          urlString.includes('/orgs/Kilo-Org/members/') ||
           urlString.includes('/issues/1/comments') ||
           urlString.includes('/pulls/1/comments') ||
           urlString.includes('/pulls/1/reviews')
         ) {
-          throw new Error('No membership/comment checks expected for bot-only PR list');
+          throw new Error('No comment checks expected for bot-only PR list');
         }
 
         throw new Error(`Unexpected fetch: ${urlString}`);
       });
 
+    const { getKilocodeRepoOpenPullRequestsSummary } = await importModule();
     const summary = await getKilocodeRepoOpenPullRequestsSummary({
       ttlMs: 0,
+      repos: ['kilocode'],
       commentConcurrency: 1,
       maxIssueCommentPages: 1,
       maxReviewCommentPages: 1,
@@ -205,28 +229,28 @@ describe('getKilocodeRepoRecentlyClosedExternalPRs', () => {
           return mockGithubJsonResponse(closedPrsJson);
         }
 
-        if (urlString.includes('/orgs/Kilo-Org/members/external-user')) {
-          return new Response('', { status: 404 });
-        }
-
-        if (urlString.includes('/orgs/Kilo-Org/members/external-user-2')) {
-          return new Response('', { status: 404 });
-        }
-
-        if (urlString.includes('/orgs/Kilo-Org/members/kilo-team-member')) {
-          return new Response(null, { status: 204 });
+        // Bulk org members endpoint — kilo-team-member is a member
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return orgMembersResponse(['kilo-team-member']);
         }
 
         return new Response('', { status: 404, statusText: `Unexpected fetch: ${urlString}` });
       });
 
-    const result = await getKilocodeRepoRecentlyClosedExternalPRs({ ttlMs: 0, maxResults: 50 });
+    const { getKilocodeRepoRecentlyClosedExternalPRs } = await importModule();
+    const result = await getKilocodeRepoRecentlyClosedExternalPRs({
+      ttlMs: 0,
+      maxResults: 50,
+      repos: ['kilocode'],
+    });
 
     expect(result.prs.map(pr => pr.number)).toEqual([2, 1]);
     expect(result.prs[0]?.status).toBe('closed');
     expect(result.prs[0]?.displayDate).toBe('2024-01-03T00:00:00.000Z');
+    expect(result.prs[0]?.repo).toBe('kilocode');
     expect(result.prs[1]?.status).toBe('merged');
     expect(result.prs[1]?.displayDate).toBe('2024-01-01T00:00:00.000Z');
+    expect(result.prs[1]?.repo).toBe('kilocode');
 
     expect(typeof result.thisWeekMergedCount).toBe('number');
     expect(typeof result.thisWeekClosedCount).toBe('number');
@@ -276,13 +300,12 @@ describe('getKilocodeRepoOpenPullRequestsSummary draft filtering', () => {
       .mockImplementation(async (input: RequestInfo | URL) => {
         const urlString = typeof input === 'string' ? input : input.toString();
 
-        // List pulls endpoint includes query params (e.g. /pulls?state=open...)
         if (urlString.includes('/repos/Kilo-Org/kilocode/pulls?')) {
           return mockGithubJsonResponse(prListJson);
         }
 
-        if (urlString.includes('/orgs/Kilo-Org/members/')) {
-          return new Response('', { status: 404 });
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return emptyOrgMembersResponse();
         }
 
         if (urlString.includes('/issues/') || urlString.includes('/pulls/')) {
@@ -292,8 +315,10 @@ describe('getKilocodeRepoOpenPullRequestsSummary draft filtering', () => {
         throw new Error(`Unexpected fetch: ${urlString}`);
       });
 
+    const { getKilocodeRepoOpenPullRequestsSummary } = await importModule();
     const summary = await getKilocodeRepoOpenPullRequestsSummary({
       ttlMs: 0,
+      repos: ['kilocode'],
       commentConcurrency: 1,
       maxIssueCommentPages: 1,
       maxReviewCommentPages: 1,
@@ -348,13 +373,12 @@ describe('getKilocodeRepoOpenPullRequestsSummary draft filtering', () => {
       .mockImplementation(async (input: RequestInfo | URL) => {
         const urlString = typeof input === 'string' ? input : input.toString();
 
-        // List pulls endpoint includes query params (e.g. /pulls?state=open...)
         if (urlString.includes('/repos/Kilo-Org/kilocode/pulls?')) {
           return mockGithubJsonResponse(prListJson);
         }
 
-        if (urlString.includes('/orgs/Kilo-Org/members/')) {
-          return new Response('', { status: 404 });
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return emptyOrgMembersResponse();
         }
 
         // Comment endpoints should be hit only for external PRs (1 and 2), not the bot PR.
@@ -378,9 +402,11 @@ describe('getKilocodeRepoOpenPullRequestsSummary draft filtering', () => {
         throw new Error(`Unexpected fetch: ${urlString}`);
       });
 
+    const { getKilocodeRepoOpenPullRequestsSummary } = await importModule();
     const summary = await getKilocodeRepoOpenPullRequestsSummary({
       ttlMs: 0,
       includeDrafts: true,
+      repos: ['kilocode'],
       commentConcurrency: 1,
       maxIssueCommentPages: 1,
       maxReviewCommentPages: 1,
@@ -423,33 +449,26 @@ describe('getKilocodeRepoOpenPullRequestsSummary team approval classification', 
           ]);
         }
 
-        // List pulls endpoint includes query params (e.g. /pulls?state=open...)
         if (urlString.includes('/repos/Kilo-Org/kilocode/pulls?')) {
           return mockGithubJsonResponse(prListJson);
         }
 
-        // PR author is external.
-        if (urlString.includes('/orgs/Kilo-Org/members/external-user')) {
-          return new Response('', { status: 404 });
+        // Bulk org members — kilo-team-member is in the org
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return orgMembersResponse(['kilo-team-member']);
         }
 
-        // Comments are empty.
         if (urlString.includes('/issues/10/comments') || urlString.includes('/pulls/10/comments')) {
           return mockGithubJsonResponse([]);
         }
 
-        // Approver is in the org.
-        if (urlString.includes('/orgs/Kilo-Org/members/kilo-team-member')) {
-          return new Response(null, { status: 204 });
-        }
-
-        // Returning a non-retriable status here helps avoid tests hanging due to
-        // fetchWithBackoff retrying thrown errors.
         return new Response('', { status: 404, statusText: `Unexpected fetch: ${urlString}` });
       });
 
+    const { getKilocodeRepoOpenPullRequestsSummary } = await importModule();
     const summary = await getKilocodeRepoOpenPullRequestsSummary({
       ttlMs: 0,
+      repos: ['kilocode'],
       commentConcurrency: 1,
       maxIssueCommentPages: 1,
       maxReviewCommentPages: 1,
@@ -492,8 +511,8 @@ describe('getKilocodeRepoOpenPullRequestsSummary team approval classification', 
           return mockGithubJsonResponse(prListJson);
         }
 
-        if (urlString.includes('/orgs/Kilo-Org/members/external-user')) {
-          return new Response('', { status: 404 });
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return orgMembersResponse(['kilo-team-member']);
         }
 
         if (urlString.includes('/issues/11/comments')) {
@@ -507,15 +526,13 @@ describe('getKilocodeRepoOpenPullRequestsSummary team approval classification', 
           );
         }
 
-        if (urlString.includes('/orgs/Kilo-Org/members/kilo-team-member')) {
-          return new Response(null, { status: 204 });
-        }
-
         return new Response('', { status: 404, statusText: `Unexpected fetch: ${urlString}` });
       });
 
+    const { getKilocodeRepoOpenPullRequestsSummary } = await importModule();
     const summary = await getKilocodeRepoOpenPullRequestsSummary({
       ttlMs: 0,
+      repos: ['kilocode'],
       commentConcurrency: 1,
       maxIssueCommentPages: 1,
       maxReviewCommentPages: 1,
@@ -558,8 +575,8 @@ describe('getKilocodeRepoOpenPullRequestsSummary team approval classification', 
           return mockGithubJsonResponse(prListJson);
         }
 
-        if (urlString.includes('/orgs/Kilo-Org/members/external-user')) {
-          return new Response('', { status: 404 });
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return orgMembersResponse(['kilo-team-member']);
         }
 
         if (urlString.includes('/issues/12/comments')) {
@@ -573,15 +590,13 @@ describe('getKilocodeRepoOpenPullRequestsSummary team approval classification', 
           );
         }
 
-        if (urlString.includes('/orgs/Kilo-Org/members/kilo-team-member')) {
-          return new Response(null, { status: 204 });
-        }
-
         return new Response('', { status: 404, statusText: `Unexpected fetch: ${urlString}` });
       });
 
+    const { getKilocodeRepoOpenPullRequestsSummary } = await importModule();
     const summary = await getKilocodeRepoOpenPullRequestsSummary({
       ttlMs: 0,
+      repos: ['kilocode'],
       commentConcurrency: 1,
       maxIssueCommentPages: 1,
       maxReviewCommentPages: 1,
@@ -622,8 +637,8 @@ describe('getKilocodeRepoOpenPullRequestsSummary team approval classification', 
           return mockGithubJsonResponse(prListJson);
         }
 
-        if (urlString.includes('/orgs/Kilo-Org/members/external-user')) {
-          return new Response('', { status: 404 });
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return orgMembersResponse(['kilo-team-member']);
         }
 
         if (urlString.includes('/issues/13/comments')) {
@@ -634,15 +649,13 @@ describe('getKilocodeRepoOpenPullRequestsSummary team approval classification', 
           return mockGithubJsonResponse([{ user: { login: 'kilo-team-member' } }]);
         }
 
-        if (urlString.includes('/orgs/Kilo-Org/members/kilo-team-member')) {
-          return new Response(null, { status: 204 });
-        }
-
         return new Response('', { status: 404, statusText: `Unexpected fetch: ${urlString}` });
       });
 
+    const { getKilocodeRepoOpenPullRequestsSummary } = await importModule();
     const summary = await getKilocodeRepoOpenPullRequestsSummary({
       ttlMs: 0,
+      repos: ['kilocode'],
       commentConcurrency: 1,
       maxIssueCommentPages: 1,
       maxReviewCommentPages: 1,
@@ -685,31 +698,26 @@ describe('getKilocodeRepoOpenPullRequestsSummary team approval classification', 
           return mockGithubJsonResponse(prListJson);
         }
 
-        // PR author is external.
-        if (urlString.includes('/orgs/Kilo-Org/members/external-user')) {
-          return new Response('', { status: 404 });
+        // No org members
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return emptyOrgMembersResponse();
         }
 
-        // Issue comments are empty.
         if (urlString.includes('/issues/14/comments')) {
           return mockGithubJsonResponse([]);
         }
 
-        // Inline review comment from an external user.
         if (urlString.includes('/pulls/14/comments')) {
           return mockGithubJsonResponse([{ user: { login: 'external-reviewer' } }]);
-        }
-
-        // Reviewer is NOT in the org.
-        if (urlString.includes('/orgs/Kilo-Org/members/external-reviewer')) {
-          return new Response('', { status: 404 });
         }
 
         return new Response('', { status: 404, statusText: `Unexpected fetch: ${urlString}` });
       });
 
+    const { getKilocodeRepoOpenPullRequestsSummary } = await importModule();
     const summary = await getKilocodeRepoOpenPullRequestsSummary({
       ttlMs: 0,
+      repos: ['kilocode'],
       commentConcurrency: 1,
       maxIssueCommentPages: 1,
       maxReviewCommentPages: 1,
@@ -756,13 +764,12 @@ describe('getKilocodeRepoOpenPullRequestsSummary team approval classification', 
           return mockGithubJsonResponse(prListJson);
         }
 
-        if (urlString.includes('/orgs/Kilo-Org/members/external-user')) {
-          return new Response('', { status: 404 });
+        // kilo-team-member is in the org
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return orgMembersResponse(['kilo-team-member']);
         }
 
         // PR #20: same reviewer submits multiple reviews; latest wins.
-        // Final state has CHANGES_REQUESTED by external-reviewer, so precedence should pick it.
-        // Also includes a team approval, which should not override changes requested.
         if (urlString.includes('/repos/Kilo-Org/kilocode/pulls/20/reviews')) {
           return mockGithubJsonResponse([
             { state: 'APPROVED', user: { login: 'external-reviewer' } },
@@ -786,19 +793,13 @@ describe('getKilocodeRepoOpenPullRequestsSummary team approval classification', 
           return mockGithubJsonResponse([]);
         }
 
-        // Membership checks.
-        if (urlString.includes('/orgs/Kilo-Org/members/kilo-team-member')) {
-          return new Response(null, { status: 204 });
-        }
-        if (urlString.includes('/orgs/Kilo-Org/members/external-reviewer')) {
-          return new Response('', { status: 404 });
-        }
-
         return new Response('', { status: 404, statusText: `Unexpected fetch: ${urlString}` });
       });
 
+    const { getKilocodeRepoOpenPullRequestsSummary } = await importModule();
     const summary = await getKilocodeRepoOpenPullRequestsSummary({
       ttlMs: 0,
+      repos: ['kilocode'],
       commentConcurrency: 1,
       maxIssueCommentPages: 1,
       maxReviewCommentPages: 1,
@@ -810,6 +811,281 @@ describe('getKilocodeRepoOpenPullRequestsSummary team approval classification', 
 
     expect(pr20?.reviewStatus).toBe('changes_requested');
     expect(pr21?.reviewStatus).toBe('no_reviews');
+
+    fetchMock.mockRestore();
+  });
+});
+
+describe('multi-repo aggregation', () => {
+  it('aggregates open PR counts and lists across repos with correct repo field', async () => {
+    const kilocodePrs = parseGithubListPullRequestsSummaryResponse([
+      {
+        number: 1,
+        title: 'kilocode pr',
+        html_url: 'https://github.com/Kilo-Org/kilocode/pull/1',
+        created_at: '2020-01-01T00:00:00.000Z',
+        draft: false,
+        comments: 0,
+        review_comments: 0,
+        user: { login: 'external-a', type: 'User' },
+      },
+    ]);
+
+    const cloudPrs = parseGithubListPullRequestsSummaryResponse([
+      {
+        number: 10,
+        title: 'cloud pr',
+        html_url: 'https://github.com/Kilo-Org/cloud/pull/10',
+        created_at: '2020-01-01T00:00:00.000Z',
+        draft: false,
+        comments: 0,
+        review_comments: 0,
+        user: { login: 'external-b', type: 'User' },
+      },
+      {
+        number: 11,
+        title: 'cloud team pr',
+        html_url: 'https://github.com/Kilo-Org/cloud/pull/11',
+        created_at: '2020-01-01T00:00:00.000Z',
+        draft: false,
+        comments: 0,
+        review_comments: 0,
+        user: { login: 'kilo-member', type: 'User' },
+      },
+    ]);
+
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        const urlString = typeof input === 'string' ? input : input.toString();
+
+        if (urlString.includes('/repos/Kilo-Org/kilocode/pulls?')) {
+          return mockGithubJsonResponse(kilocodePrs);
+        }
+        if (urlString.includes('/repos/Kilo-Org/cloud/pulls?')) {
+          return mockGithubJsonResponse(cloudPrs);
+        }
+
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return orgMembersResponse(['kilo-member']);
+        }
+
+        if (urlString.includes('/issues/') || urlString.includes('/pulls/')) {
+          return mockGithubJsonResponse([]);
+        }
+
+        throw new Error(`Unexpected fetch: ${urlString}`);
+      });
+
+    const { getKilocodeRepoOpenPullRequestsSummary } = await importModule();
+    const summary = await getKilocodeRepoOpenPullRequestsSummary({
+      ttlMs: 0,
+      repos: ['kilocode', 'cloud'],
+      commentConcurrency: 1,
+      maxIssueCommentPages: 1,
+      maxReviewCommentPages: 1,
+    });
+
+    expect(summary.totalOpenPullRequests).toBe(3);
+    expect(summary.teamOpenPullRequests).toBe(1);
+    expect(summary.externalOpenPullRequests).toBe(2);
+    expect(summary.externalOpenPullRequestsList).toHaveLength(2);
+
+    const pr1 = summary.externalOpenPullRequestsList.find(pr => pr.number === 1);
+    const pr10 = summary.externalOpenPullRequestsList.find(pr => pr.number === 10);
+    expect(pr1?.repo).toBe('kilocode');
+    expect(pr10?.repo).toBe('cloud');
+
+    fetchMock.mockRestore();
+  });
+
+  it('merges closed PRs across repos sorted by displayDate and trims to maxResults', async () => {
+    const kilocodeClosedPrs = [
+      {
+        number: 1,
+        title: 'oldest merged',
+        html_url: 'https://github.com/Kilo-Org/kilocode/pull/1',
+        closed_at: '2024-01-01T00:00:00.000Z',
+        merged_at: '2024-01-01T00:00:00.000Z',
+        user: { login: 'external-a', type: 'User' },
+      },
+      {
+        number: 2,
+        title: 'newest closed',
+        html_url: 'https://github.com/Kilo-Org/kilocode/pull/2',
+        closed_at: '2024-01-10T00:00:00.000Z',
+        merged_at: null,
+        user: { login: 'external-b', type: 'User' },
+      },
+    ];
+
+    const cloudClosedPrs = [
+      {
+        number: 20,
+        title: 'middle merged',
+        html_url: 'https://github.com/Kilo-Org/cloud/pull/20',
+        closed_at: '2024-01-06T00:00:00.000Z',
+        merged_at: '2024-01-05T00:00:00.000Z',
+        user: { login: 'external-c', type: 'User' },
+      },
+    ];
+
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        const urlString = typeof input === 'string' ? input : input.toString();
+
+        if (
+          urlString.includes('/repos/Kilo-Org/kilocode/pulls?') &&
+          urlString.includes('state=closed')
+        ) {
+          return mockGithubJsonResponse(kilocodeClosedPrs);
+        }
+        if (
+          urlString.includes('/repos/Kilo-Org/cloud/pulls?') &&
+          urlString.includes('state=closed')
+        ) {
+          return mockGithubJsonResponse(cloudClosedPrs);
+        }
+
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return emptyOrgMembersResponse();
+        }
+
+        return new Response('', { status: 404, statusText: `Unexpected fetch: ${urlString}` });
+      });
+
+    const { getKilocodeRepoRecentlyClosedExternalPRs } = await importModule();
+
+    // maxResults=2 should trim to 2 after cross-repo sort
+    const result = await getKilocodeRepoRecentlyClosedExternalPRs({
+      ttlMs: 0,
+      maxResults: 2,
+      repos: ['kilocode', 'cloud'],
+    });
+
+    expect(result.prs).toHaveLength(2);
+    // Sorted by displayDate desc: PR #2 (Jan 10), PR #20 (Jan 5 merged_at)
+    expect(result.prs[0]?.number).toBe(2);
+    expect(result.prs[0]?.repo).toBe('kilocode');
+    expect(result.prs[1]?.number).toBe(20);
+    expect(result.prs[1]?.repo).toBe('cloud');
+
+    fetchMock.mockRestore();
+  });
+
+  it('aggregates week stats across repos', async () => {
+    // Use a fixed "now" in the middle of a known week (Mon Jan 15 2024)
+    const now = new Date('2024-01-17T12:00:00.000Z');
+
+    const kilocodeClosedPrs = [
+      {
+        number: 1,
+        title: 'merged this week',
+        html_url: 'https://github.com/Kilo-Org/kilocode/pull/1',
+        closed_at: '2024-01-16T00:00:00.000Z',
+        merged_at: '2024-01-16T00:00:00.000Z',
+        user: { login: 'external-a', type: 'User' },
+      },
+    ];
+
+    const cloudClosedPrs = [
+      {
+        number: 20,
+        title: 'also merged this week',
+        html_url: 'https://github.com/Kilo-Org/cloud/pull/20',
+        closed_at: '2024-01-17T00:00:00.000Z',
+        merged_at: '2024-01-17T00:00:00.000Z',
+        user: { login: 'external-b', type: 'User' },
+      },
+      {
+        number: 21,
+        title: 'closed unmerged this week',
+        html_url: 'https://github.com/Kilo-Org/cloud/pull/21',
+        closed_at: '2024-01-15T00:00:00.000Z',
+        merged_at: null,
+        user: { login: 'external-c', type: 'User' },
+      },
+    ];
+
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        const urlString = typeof input === 'string' ? input : input.toString();
+
+        if (
+          urlString.includes('/repos/Kilo-Org/kilocode/pulls?') &&
+          urlString.includes('state=closed')
+        ) {
+          return mockGithubJsonResponse(kilocodeClosedPrs);
+        }
+        if (
+          urlString.includes('/repos/Kilo-Org/cloud/pulls?') &&
+          urlString.includes('state=closed')
+        ) {
+          return mockGithubJsonResponse(cloudClosedPrs);
+        }
+
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return emptyOrgMembersResponse();
+        }
+
+        return new Response('', { status: 404, statusText: `Unexpected fetch: ${urlString}` });
+      });
+
+    const { getKilocodeRepoRecentlyClosedExternalPRs } = await importModule();
+    const result = await getKilocodeRepoRecentlyClosedExternalPRs({
+      ttlMs: 0,
+      maxResults: 50,
+      repos: ['kilocode', 'cloud'],
+      now,
+      timeZone: 'UTC',
+    });
+
+    // 1 merged from kilocode + 1 merged from cloud = 2
+    expect(result.thisWeekMergedCount).toBe(2);
+    // 1 closed-unmerged from cloud
+    expect(result.thisWeekClosedCount).toBe(1);
+    expect(result.prs).toHaveLength(3);
+
+    fetchMock.mockRestore();
+  });
+
+  it('defaults to all repos when repos param is omitted', async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        const urlString = typeof input === 'string' ? input : input.toString();
+
+        if (urlString.includes('/pulls?')) {
+          return mockGithubJsonResponse([]);
+        }
+
+        if (urlString.includes('/orgs/Kilo-Org/members')) {
+          return emptyOrgMembersResponse();
+        }
+
+        return new Response('', { status: 404, statusText: `Unexpected fetch: ${urlString}` });
+      });
+
+    const { getKilocodeRepoOpenPullRequestsSummary } = await importModule();
+    await getKilocodeRepoOpenPullRequestsSummary({ ttlMs: 0 });
+
+    const pullsCalls = fetchMock.mock.calls.filter(([input]) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      return url.includes('/pulls?');
+    });
+
+    const repos = pullsCalls.map(([input]) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      const match = url.match(/repos\/Kilo-Org\/([^/]+)\/pulls/);
+      return match?.[1];
+    });
+
+    expect(repos).toContain('kilocode');
+    expect(repos).toContain('cloud');
+    expect(repos).toContain('kilo-marketplace');
+    expect(repos).toContain('kilocode-legacy');
 
     fetchMock.mockRestore();
   });

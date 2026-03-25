@@ -7,7 +7,6 @@ import { cors } from 'hono/cors';
 import { getTownContainerStub } from './dos/TownContainer.do';
 import { getTownDOStub } from './dos/Town.do';
 import { resError } from './util/res.util';
-import { dashboardHtml } from './ui/dashboard.ui';
 import {
   authMiddleware,
   agentOnlyMiddleware,
@@ -119,7 +118,11 @@ import {
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { townAuthMiddleware } from './middleware/town-auth.middleware';
 import { orgAuthMiddleware } from './middleware/org-auth.middleware';
+import { adminAuditMiddleware } from './middleware/admin-audit.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
+import { logger } from './util/log.util';
+import { useWorkersLogger } from 'workers-tagged-logger';
+import type { MiddlewareHandler } from 'hono';
 import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
 import {
   handleGetMoleculeCurrentStep,
@@ -146,20 +149,42 @@ export type GastownEnv = {
 
 const app = new Hono<GastownEnv>();
 
-const WORKER_LOG = '[gastown-worker]';
-
 // ── Timing ──────────────────────────────────────────────────────────────
 // Capture high-resolution start timestamp before any other middleware.
 app.use('*', timingMiddleware);
 
+// ── Structured logging context ──────────────────────────────────────────
+// Establishes AsyncLocalStorage context so all downstream logs are tagged.
+// Cast needed: workers-tagged-logger@1.0.0 was built against an older Hono.
+app.use('*', useWorkersLogger('gastown-worker') as unknown as MiddlewareHandler);
+
 // ── Request logging ─────────────────────────────────────────────────────
+// Extract IDs from the URL path directly — c.req.param() only works
+// after Hono has matched a route, which hasn't happened yet in a
+// wildcard middleware.
+// Matches /orgs/:orgId, /towns/:townId, /rigs/:rigId, /agents/:agentId
+// in any combination that appears in our route patterns.
+const RE_ORG = /\/orgs\/(?<orgId>[^/]+)/;
+const RE_TOWN = /\/towns\/(?<townId>[^/]+)/;
+const RE_RIG = /\/rigs\/(?<rigId>[^/]+)/;
+const RE_AGENT = /\/agents\/(?<agentId>[^/]+)/;
+
 app.use('*', async (c, next) => {
   const method = c.req.method;
   const path = c.req.path;
-  console.log(`${WORKER_LOG} --> ${method} ${path}`);
+  // Tag with route params immediately so all downstream logs (auth,
+  // handlers, DO calls) inherit them. Auth-derived tags (userId, orgId)
+  // are set by kiloAuthMiddleware and orgAuthMiddleware when they run.
+  logger.setTags({
+    orgId: RE_ORG.exec(path)?.groups?.orgId,
+    townId: RE_TOWN.exec(path)?.groups?.townId,
+    rigId: RE_RIG.exec(path)?.groups?.rigId,
+    agentId: RE_AGENT.exec(path)?.groups?.agentId,
+  });
+  logger.info(`--> ${method} ${path}`);
   await next();
   const elapsed = Math.round(performance.now() - (c.get('requestStartTime') ?? 0));
-  console.log(`${WORKER_LOG} <-- ${method} ${path} ${c.res.status} (${elapsed}ms)`);
+  logger.info(`<-- ${method} ${path} ${c.res.status}`, { durationMs: elapsed });
 });
 
 // ── CORS ────────────────────────────────────────────────────────────────
@@ -186,12 +211,9 @@ const corsMiddleware = cors({
 app.use('/api/*', corsMiddleware);
 app.use('/trpc/*', corsMiddleware);
 
-// ── Dashboard UI ────────────────────────────────────────────────────────
-
-app.get('/', c => c.html(dashboardHtml()));
-
 // ── Health ──────────────────────────────────────────────────────────────
 
+app.get('/', c => c.json({ service: 'gastown', status: 'ok' }));
 app.get('/health', c => c.json({ status: 'ok' }));
 
 // ── DEBUG: unauthenticated town introspection — REMOVE after debugging ──
@@ -204,6 +226,34 @@ app.get('/debug/towns/:townId/status', async c => {
   // eslint-disable-next-line @typescript-eslint/await-thenable
   const beadSummary = await town.debugBeadSummary();
   return c.json({ alarmStatus, agentMeta, beadSummary });
+});
+
+app.post('/debug/towns/:townId/reconcile-dry-run', async c => {
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const result = await town.debugDryRun();
+  return c.json(result);
+});
+
+app.post('/debug/towns/:townId/replay-events', async c => {
+  const townId = c.req.param('townId');
+  const body: { from?: string; to?: string } = await c.req.json();
+  if (!body.from || !body.to) {
+    return c.json({ error: 'Missing required fields: from, to (ISO timestamps)' }, 400);
+  }
+  const fromDate = new Date(body.from);
+  const toDate = new Date(body.to);
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return c.json({ error: 'Invalid date format. Use ISO 8601 timestamps.' }, 400);
+  }
+  if (fromDate > toDate) {
+    return c.json({ error: '"from" must be before or equal to "to"' }, 400);
+  }
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const result = await town.debugReplayEvents(body.from, body.to);
+  return c.json(result);
 });
 
 // ── Town ID + Auth ──────────────────────────────────────────────────────
@@ -436,10 +486,12 @@ app.post('/api/towns/:townId/rigs/:rigId/triage/resolve', c =>
 app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
   kiloAuthMiddleware(c, next)
 );
-// Town routes: kilo auth + town ownership check (supports both personal and org-owned towns).
+// Town routes: kilo auth + admin audit + town ownership check (supports both personal and org-owned towns).
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) =>
   kiloAuthMiddleware(c, async () => {
-    await townAuthMiddleware(c, next);
+    await adminAuditMiddleware(c, async () => {
+      await townAuthMiddleware(c, next);
+    });
   })
 );
 

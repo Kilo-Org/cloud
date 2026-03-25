@@ -34,7 +34,7 @@ export function useRefreshPairing() {
     // Fetch with refresh=true to bust KV cache, then write the result
     // into the normal (no-input) query so the component sees it immediately.
     const fresh = await queryClient.fetchQuery(
-      trpc.kiloclaw.listPairingRequests.queryOptions({ refresh: true })
+      trpc.kiloclaw.listPairingRequests.queryOptions({ refresh: true }, { staleTime: 0 })
     );
     queryClient.setQueryData(trpc.kiloclaw.listPairingRequests.queryKey(), fresh);
   };
@@ -67,6 +67,16 @@ export function useKiloClawGatewayStatus(enabled: boolean) {
     trpc.kiloclaw.gatewayStatus.queryOptions(undefined, {
       enabled,
       refetchInterval: enabled ? 30_000 : false,
+    })
+  );
+}
+
+export function useGatewayReady(enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.gatewayReady.queryOptions(undefined, {
+      enabled,
+      refetchInterval: enabled ? 5_000 : false,
     })
   );
 }
@@ -222,13 +232,18 @@ export function useKiloClawMutations() {
         },
       })
     ),
-    patchExecPreset: useMutation(trpc.kiloclaw.patchExecPreset.mutationOptions()),
+    patchExecPreset: useMutation(
+      trpc.kiloclaw.patchExecPreset.mutationOptions({ onSuccess: invalidateStatus })
+    ),
     patchOpenclawConfig: useMutation(trpc.kiloclaw.patchOpenclawConfig.mutationOptions()),
     disconnectGoogle: useMutation(
       trpc.kiloclaw.disconnectGoogle.mutationOptions({ onSuccess: invalidateStatus })
     ),
     setGmailNotifications: useMutation(
       trpc.kiloclaw.setGmailNotifications.mutationOptions({ onSuccess: invalidateStatus })
+    ),
+    rename: useMutation(
+      trpc.kiloclaw.renameInstance.mutationOptions({ onSuccess: invalidateStatus })
     ),
   };
 }

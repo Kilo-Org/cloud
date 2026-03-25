@@ -18,9 +18,6 @@ import type {
   GatewayRequest,
   VercelInferenceProviderConfig,
   VercelProviderConfig,
-  OpenRouterChatCompletionRequest,
-  GatewayResponsesRequest,
-  GatewayMessagesRequest,
 } from '@/lib/providers/openrouter/types';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
 import { isZaiModel } from '@/lib/providers/zai';
@@ -65,17 +62,17 @@ function isLikelyAvailableOnAllGateways(requestedModel: string) {
 
 export async function shouldRouteToVercel(
   requestedModel: string,
-  request: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest,
+  request: GatewayRequest,
   randomSeed: string
 ) {
-  if (request.provider?.data_collection === 'deny') {
+  if (request.body.provider?.data_collection === 'deny') {
     console.debug(
       `[shouldRouteToVercel] not routing to Vercel because data_collection=deny is not supported`
     );
     return false;
   }
 
-  if ((request.provider?.ignore?.length ?? 0) > 0) {
+  if ((request.body.provider?.ignore?.length ?? 0) > 0) {
     console.debug(
       `[shouldRouteToVercel] not routing to Vercel because provider.ignore is not supported`
     );

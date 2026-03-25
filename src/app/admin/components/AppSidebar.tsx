@@ -146,7 +146,7 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <Database />,
   },
   {
-    title: () => 'Gastown',
+    title: () => 'Gas Town',
     url: '/admin/gastown',
     icon: () => <Network />,
   },

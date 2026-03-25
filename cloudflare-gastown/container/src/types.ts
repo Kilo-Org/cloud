@@ -75,6 +75,14 @@ export const SendMessageRequest = z.object({
 });
 export type SendMessageRequest = z.infer<typeof SendMessageRequest>;
 
+export const UpdateAgentModelRequest = z.object({
+  model: z.string().min(1),
+  smallModel: z.string().optional(),
+  /** Pre-formatted conversation history to inject into the new session prompt. */
+  conversationHistory: z.string().optional(),
+});
+export type UpdateAgentModelRequest = z.infer<typeof UpdateAgentModelRequest>;
+
 // ── Agent lifecycle ─────────────────────────────────────────────────────
 
 export const AgentStatus = z.enum(['starting', 'running', 'stopping', 'exited', 'failed']);
@@ -123,6 +131,8 @@ export type ManagedAgent = {
   completionCallbackUrl: string | null;
   /** Model ID used for this agent's sessions (e.g. "anthropic/claude-sonnet-4.6") */
   model: string | null;
+  /** Full env dict from buildAgentEnv, stored so model hot-swap can replay it. */
+  startupEnv: Record<string, string>;
 };
 
 export type AgentStatusResponse = {

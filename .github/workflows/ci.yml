@@ -130,6 +130,33 @@ jobs:
             exit 1
           }
 
+  drizzle-check:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    steps:
+      - uses: useblacksmith/checkout@v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Drizzle check
+        run: pnpm drizzle check
+        env:
+          POSTGRES_URL: postgresql://unused:unused@localhost:5432/unused
+
   dependency-cycle-check:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     steps:

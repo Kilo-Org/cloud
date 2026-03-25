@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
       return model;
     });
 
-    const monitoredModels = getMonitoredModels();
+    const monitoredModels = await getMonitoredModels();
     const preferredModelData = allModels.filter(model => monitoredModels.includes(model.id));
 
     console.log(

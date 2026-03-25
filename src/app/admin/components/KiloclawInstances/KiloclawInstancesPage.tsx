@@ -48,7 +48,7 @@ import {
 
 type SortField = 'created_at' | 'destroyed_at';
 type SortOrder = 'asc' | 'desc';
-type StatusFilter = 'all' | 'active' | 'destroyed';
+type StatusFilter = 'all' | 'active' | 'suspended' | 'destroyed';
 
 function toSortedSearchParams(obj: Record<string, unknown>): URLSearchParams {
   const params = new URLSearchParams();
@@ -77,6 +77,7 @@ function formatLifespan(minutes: number | null): string {
 type OverviewData = {
   totalInstances: number;
   activeInstances: number;
+  suspendedInstances: number;
   destroyedInstances: number;
   uniqueUsers: number;
   last24hCreated: number;
@@ -87,7 +88,7 @@ type OverviewData = {
 
 function OverviewStatsCards({ data }: { data: OverviewData }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Total Instances</CardTitle>
@@ -109,6 +110,16 @@ function OverviewStatsCards({ data }: { data: OverviewData }) {
           <p className="text-muted-foreground text-xs">
             {data.destroyedInstances.toLocaleString()} destroyed
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Suspended Instances</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{data.suspendedInstances.toLocaleString()}</div>
+          <p className="text-muted-foreground text-xs">Suspended by billing lifecycle</p>
         </CardContent>
       </Card>
 
@@ -445,6 +456,7 @@ export function KiloclawInstancesPage() {
           <SelectContent>
             <SelectItem value="all">All Instances</SelectItem>
             <SelectItem value="active">Active Only</SelectItem>
+            <SelectItem value="suspended">Suspended Only</SelectItem>
             <SelectItem value="destroyed">Destroyed Only</SelectItem>
           </SelectContent>
         </Select>
@@ -510,7 +522,7 @@ export function KiloclawInstancesPage() {
                 >
                   <TableCell>
                     <Link
-                      href={`/admin/users/${instance.user_id}`}
+                      href={`/admin/users/${encodeURIComponent(instance.user_id)}`}
                       className="text-blue-600 hover:underline"
                       onClick={e => e.stopPropagation()}
                     >
@@ -527,12 +539,14 @@ export function KiloclawInstancesPage() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {instance.destroyed_at === null ? (
+                    {instance.destroyed_at !== null ? (
+                      <Badge variant="secondary">Destroyed</Badge>
+                    ) : instance.suspended_at !== null ? (
+                      <Badge className="bg-amber-600">Suspended</Badge>
+                    ) : (
                       <Badge variant="default" className="bg-green-600">
                         Active
                       </Badge>
-                    ) : (
-                      <Badge variant="secondary">Destroyed</Badge>
                     )}
                   </TableCell>
                   <TableCell

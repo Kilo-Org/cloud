@@ -44,6 +44,21 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       meta: object;
     }>;
+    /**
+     * Check whether the current user is an admin viewing a town they don't own.
+     * Used by the frontend to show an admin banner.
+     */
+    checkAdminAccess: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        townId: string;
+      };
+      output: {
+        isAdminViewing: boolean;
+        ownerUserId: string | null;
+        ownerOrgId: string | null;
+      };
+      meta: object;
+    }>;
     deleteTown: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         townId: string;
@@ -90,6 +105,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
     getRig: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         rigId: string;
+        townId?: string | undefined;
       };
       output: {
         id: string;
@@ -152,6 +168,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
     listBeads: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         rigId: string;
+        townId?: string | undefined;
         status?: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open' | undefined;
       };
       output: {
@@ -184,6 +201,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       input: {
         rigId: string;
         beadId: string;
+        townId?: string | undefined;
       };
       output: void;
       meta: object;
@@ -192,6 +210,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       input: {
         rigId: string;
         beadId: string;
+        townId?: string | undefined;
         title?: string | undefined;
         body?: string | null | undefined;
         status?: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open' | undefined;
@@ -230,6 +249,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
     listAgents: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         rigId: string;
+        townId?: string | undefined;
       };
       output: {
         id: string;
@@ -252,6 +272,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       input: {
         rigId: string;
         agentId: string;
+        townId?: string | undefined;
       };
       output: void;
       meta: object;
@@ -312,6 +333,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         message: string;
         model?: string | undefined;
         rigId?: string | undefined;
+        uiContext?: string | undefined;
       };
       output: {
         agentId: string;
@@ -432,9 +454,19 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           platform_integration_id?: string | undefined;
         };
         owner_user_id?: string | undefined;
+        owner_type: 'org' | 'user';
+        owner_id?: string | undefined;
         created_by_user_id?: string | undefined;
+        organization_id?: string | undefined;
         kilocode_token?: string | undefined;
         default_model?: string | undefined;
+        role_models?:
+          | {
+              mayor?: string | undefined;
+              refinery?: string | undefined;
+              polecat?: string | undefined;
+            }
+          | undefined;
         small_model?: string | undefined;
         max_polecats_per_rig?: number | undefined;
         merge_strategy: 'direct' | 'pr';
@@ -474,8 +506,19 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
               }
             | undefined;
           owner_user_id?: string | undefined;
+          owner_type?: 'org' | 'user' | undefined;
+          owner_id?: string | undefined;
+          created_by_user_id?: string | undefined;
+          organization_id?: string | undefined;
           kilocode_token?: string | undefined;
           default_model?: string | undefined;
+          role_models?:
+            | {
+                mayor?: string | undefined;
+                refinery?: string | undefined;
+                polecat?: string | undefined;
+              }
+            | undefined;
           small_model?: string | undefined;
           max_polecats_per_rig?: number | undefined;
           merge_strategy?: 'direct' | 'pr' | undefined;
@@ -509,8 +552,19 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           platform_integration_id?: string | undefined;
         };
         owner_user_id?: string | undefined;
+        owner_type: 'org' | 'user';
+        owner_id?: string | undefined;
+        created_by_user_id?: string | undefined;
+        organization_id?: string | undefined;
         kilocode_token?: string | undefined;
         default_model?: string | undefined;
+        role_models?:
+          | {
+              mayor?: string | undefined;
+              refinery?: string | undefined;
+              polecat?: string | undefined;
+            }
+          | undefined;
         small_model?: string | undefined;
         max_polecats_per_rig?: number | undefined;
         merge_strategy: 'direct' | 'pr';
@@ -529,6 +583,10 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
             }
           | undefined;
         staged_convoys_default: boolean;
+        github_cli_pat?: string | undefined;
+        git_author_name?: string | undefined;
+        git_author_email?: string | undefined;
+        disable_ai_coauthor: boolean;
       };
       meta: object;
     }>;
@@ -542,6 +600,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
     getBeadEvents: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         rigId: string;
+        townId?: string | undefined;
         beadId?: string | undefined;
         since?: string | undefined;
         limit?: number | undefined;
@@ -578,6 +637,187 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         rig_id?: string | undefined;
         rig_name?: string | undefined;
       }[];
+      meta: object;
+    }>;
+    getMergeQueueData: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        townId: string;
+        rigId?: string | undefined;
+        limit?: number | undefined;
+        since?: string | undefined;
+      };
+      output: {
+        needsAttention: {
+          openPRs: {
+            mrBead: {
+              bead_id: string;
+              status: string;
+              title: string;
+              body: string | null;
+              rig_id: string | null;
+              created_at: string;
+              updated_at: string;
+              metadata: Record<string, unknown>;
+            };
+            reviewMetadata: {
+              branch: string;
+              target_branch: string;
+              merge_commit: string | null;
+              pr_url: string | null;
+              retry_count: number;
+            };
+            sourceBead: {
+              bead_id: string;
+              title: string;
+              status: string;
+              body: string | null;
+            } | null;
+            convoy: {
+              convoy_id: string;
+              title: string;
+              total_beads: number;
+              closed_beads: number;
+              feature_branch: string | null;
+              merge_mode: string | null;
+            } | null;
+            agent: {
+              agent_id: string;
+              name: string;
+              role: string;
+            } | null;
+            rigName: string | null;
+            staleSince: string | null;
+            failureReason: string | null;
+          }[];
+          failedReviews: {
+            mrBead: {
+              bead_id: string;
+              status: string;
+              title: string;
+              body: string | null;
+              rig_id: string | null;
+              created_at: string;
+              updated_at: string;
+              metadata: Record<string, unknown>;
+            };
+            reviewMetadata: {
+              branch: string;
+              target_branch: string;
+              merge_commit: string | null;
+              pr_url: string | null;
+              retry_count: number;
+            };
+            sourceBead: {
+              bead_id: string;
+              title: string;
+              status: string;
+              body: string | null;
+            } | null;
+            convoy: {
+              convoy_id: string;
+              title: string;
+              total_beads: number;
+              closed_beads: number;
+              feature_branch: string | null;
+              merge_mode: string | null;
+            } | null;
+            agent: {
+              agent_id: string;
+              name: string;
+              role: string;
+            } | null;
+            rigName: string | null;
+            staleSince: string | null;
+            failureReason: string | null;
+          }[];
+          stalePRs: {
+            mrBead: {
+              bead_id: string;
+              status: string;
+              title: string;
+              body: string | null;
+              rig_id: string | null;
+              created_at: string;
+              updated_at: string;
+              metadata: Record<string, unknown>;
+            };
+            reviewMetadata: {
+              branch: string;
+              target_branch: string;
+              merge_commit: string | null;
+              pr_url: string | null;
+              retry_count: number;
+            };
+            sourceBead: {
+              bead_id: string;
+              title: string;
+              status: string;
+              body: string | null;
+            } | null;
+            convoy: {
+              convoy_id: string;
+              title: string;
+              total_beads: number;
+              closed_beads: number;
+              feature_branch: string | null;
+              merge_mode: string | null;
+            } | null;
+            agent: {
+              agent_id: string;
+              name: string;
+              role: string;
+            } | null;
+            rigName: string | null;
+            staleSince: string | null;
+            failureReason: string | null;
+          }[];
+        };
+        activityLog: {
+          event: {
+            bead_event_id: string;
+            bead_id: string;
+            agent_id: string | null;
+            event_type: string;
+            old_value: string | null;
+            new_value: string | null;
+            metadata: Record<string, unknown>;
+            created_at: string;
+          };
+          mrBead: {
+            bead_id: string;
+            title: string;
+            type: string;
+            status: string;
+            rig_id: string | null;
+            metadata: Record<string, unknown>;
+          } | null;
+          sourceBead: {
+            bead_id: string;
+            title: string;
+            status: string;
+          } | null;
+          convoy: {
+            convoy_id: string;
+            title: string;
+            total_beads: number;
+            closed_beads: number;
+            feature_branch: string | null;
+            merge_mode: string | null;
+          } | null;
+          agent: {
+            agent_id: string;
+            name: string;
+            role: string;
+          } | null;
+          rigName: string | null;
+          reviewMetadata: {
+            pr_url: string | null;
+            branch: string | null;
+            target_branch: string | null;
+            merge_commit: string | null;
+          } | null;
+        }[];
+      };
       meta: object;
     }>;
     listConvoys: import('@trpc/server').TRPCQueryProcedure<{
@@ -701,6 +941,81 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           depends_on_bead_id: string;
         }[];
       } | null;
+      meta: object;
+    }>;
+    listOrgTowns: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        organizationId: string;
+      };
+      output: {
+        id: string;
+        name: string;
+        owner_org_id: string;
+        created_by_user_id: string;
+        created_at: string;
+        updated_at: string;
+      }[];
+      meta: object;
+    }>;
+    createOrgTown: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        organizationId: string;
+        name: string;
+      };
+      output: {
+        id: string;
+        name: string;
+        owner_org_id: string;
+        created_by_user_id: string;
+        created_at: string;
+        updated_at: string;
+      };
+      meta: object;
+    }>;
+    deleteOrgTown: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        organizationId: string;
+        townId: string;
+      };
+      output: void;
+      meta: object;
+    }>;
+    listOrgRigs: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        organizationId: string;
+        townId: string;
+      };
+      output: {
+        id: string;
+        town_id: string;
+        name: string;
+        git_url: string;
+        default_branch: string;
+        platform_integration_id: string | null;
+        created_at: string;
+        updated_at: string;
+      }[];
+      meta: object;
+    }>;
+    createOrgRig: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        organizationId: string;
+        townId: string;
+        name: string;
+        gitUrl: string;
+        defaultBranch?: string | undefined;
+        platformIntegrationId?: string | undefined;
+      };
+      output: {
+        id: string;
+        town_id: string;
+        name: string;
+        git_url: string;
+        default_branch: string;
+        platform_integration_id: string | null;
+        created_at: string;
+        updated_at: string;
+      };
       meta: object;
     }>;
     adminListBeads: import('@trpc/server').TRPCQueryProcedure<{
@@ -932,79 +1247,11 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       } | null;
       meta: object;
     }>;
-    listOrgTowns: import('@trpc/server').TRPCQueryProcedure<{
+    debugAgentMetadata: import('@trpc/server').TRPCQueryProcedure<{
       input: {
-        organizationId: string;
-      };
-      output: {
-        id: string;
-        name: string;
-        owner_org_id: string;
-        created_by_user_id: string;
-        created_at: string;
-        updated_at: string;
-      }[];
-      meta: object;
-    }>;
-    createOrgTown: import('@trpc/server').TRPCMutationProcedure<{
-      input: {
-        organizationId: string;
-        name: string;
-      };
-      output: {
-        id: string;
-        name: string;
-        owner_org_id: string;
-        created_by_user_id: string;
-        created_at: string;
-        updated_at: string;
-      };
-      meta: object;
-    }>;
-    deleteOrgTown: import('@trpc/server').TRPCMutationProcedure<{
-      input: {
-        organizationId: string;
         townId: string;
       };
-      output: void;
-      meta: object;
-    }>;
-    listOrgRigs: import('@trpc/server').TRPCQueryProcedure<{
-      input: {
-        organizationId: string;
-        townId: string;
-      };
-      output: {
-        id: string;
-        town_id: string;
-        name: string;
-        git_url: string;
-        default_branch: string;
-        platform_integration_id: string | null;
-        created_at: string;
-        updated_at: string;
-      }[];
-      meta: object;
-    }>;
-    createOrgRig: import('@trpc/server').TRPCMutationProcedure<{
-      input: {
-        organizationId: string;
-        townId: string;
-        name: string;
-        gitUrl: string;
-        defaultBranch?: string | undefined;
-        platformIntegrationId?: string | undefined;
-      };
-      output: {
-        id: string;
-        town_id: string;
-        name: string;
-        git_url: string;
-        default_branch: string;
-        platform_integration_id: string | null;
-        created_at: string;
-        updated_at: string;
-      };
+      output: never;
       meta: object;
     }>;
   }>
@@ -1069,6 +1316,21 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
           };
           meta: object;
         }>;
+        /**
+         * Check whether the current user is an admin viewing a town they don't own.
+         * Used by the frontend to show an admin banner.
+         */
+        checkAdminAccess: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            townId: string;
+          };
+          output: {
+            isAdminViewing: boolean;
+            ownerUserId: string | null;
+            ownerOrgId: string | null;
+          };
+          meta: object;
+        }>;
         deleteTown: import('@trpc/server').TRPCMutationProcedure<{
           input: {
             townId: string;
@@ -1115,6 +1377,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
         getRig: import('@trpc/server').TRPCQueryProcedure<{
           input: {
             rigId: string;
+            townId?: string | undefined;
           };
           output: {
             id: string;
@@ -1177,6 +1440,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
         listBeads: import('@trpc/server').TRPCQueryProcedure<{
           input: {
             rigId: string;
+            townId?: string | undefined;
             status?: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open' | undefined;
           };
           output: {
@@ -1209,6 +1473,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
           input: {
             rigId: string;
             beadId: string;
+            townId?: string | undefined;
           };
           output: void;
           meta: object;
@@ -1217,6 +1482,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
           input: {
             rigId: string;
             beadId: string;
+            townId?: string | undefined;
             title?: string | undefined;
             body?: string | null | undefined;
             status?: 'closed' | 'failed' | 'in_progress' | 'in_review' | 'open' | undefined;
@@ -1255,6 +1521,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
         listAgents: import('@trpc/server').TRPCQueryProcedure<{
           input: {
             rigId: string;
+            townId?: string | undefined;
           };
           output: {
             id: string;
@@ -1277,6 +1544,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
           input: {
             rigId: string;
             agentId: string;
+            townId?: string | undefined;
           };
           output: void;
           meta: object;
@@ -1337,6 +1605,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             message: string;
             model?: string | undefined;
             rigId?: string | undefined;
+            uiContext?: string | undefined;
           };
           output: {
             agentId: string;
@@ -1457,9 +1726,19 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               platform_integration_id?: string | undefined;
             };
             owner_user_id?: string | undefined;
+            owner_type: 'org' | 'user';
+            owner_id?: string | undefined;
             created_by_user_id?: string | undefined;
+            organization_id?: string | undefined;
             kilocode_token?: string | undefined;
             default_model?: string | undefined;
+            role_models?:
+              | {
+                  mayor?: string | undefined;
+                  refinery?: string | undefined;
+                  polecat?: string | undefined;
+                }
+              | undefined;
             small_model?: string | undefined;
             max_polecats_per_rig?: number | undefined;
             merge_strategy: 'direct' | 'pr';
@@ -1499,8 +1778,19 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                   }
                 | undefined;
               owner_user_id?: string | undefined;
+              owner_type?: 'org' | 'user' | undefined;
+              owner_id?: string | undefined;
+              created_by_user_id?: string | undefined;
+              organization_id?: string | undefined;
               kilocode_token?: string | undefined;
               default_model?: string | undefined;
+              role_models?:
+                | {
+                    mayor?: string | undefined;
+                    refinery?: string | undefined;
+                    polecat?: string | undefined;
+                  }
+                | undefined;
               small_model?: string | undefined;
               max_polecats_per_rig?: number | undefined;
               merge_strategy?: 'direct' | 'pr' | undefined;
@@ -1534,8 +1824,19 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               platform_integration_id?: string | undefined;
             };
             owner_user_id?: string | undefined;
+            owner_type: 'org' | 'user';
+            owner_id?: string | undefined;
+            created_by_user_id?: string | undefined;
+            organization_id?: string | undefined;
             kilocode_token?: string | undefined;
             default_model?: string | undefined;
+            role_models?:
+              | {
+                  mayor?: string | undefined;
+                  refinery?: string | undefined;
+                  polecat?: string | undefined;
+                }
+              | undefined;
             small_model?: string | undefined;
             max_polecats_per_rig?: number | undefined;
             merge_strategy: 'direct' | 'pr';
@@ -1554,6 +1855,10 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                 }
               | undefined;
             staged_convoys_default: boolean;
+            github_cli_pat?: string | undefined;
+            git_author_name?: string | undefined;
+            git_author_email?: string | undefined;
+            disable_ai_coauthor: boolean;
           };
           meta: object;
         }>;
@@ -1567,6 +1872,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
         getBeadEvents: import('@trpc/server').TRPCQueryProcedure<{
           input: {
             rigId: string;
+            townId?: string | undefined;
             beadId?: string | undefined;
             since?: string | undefined;
             limit?: number | undefined;
@@ -1603,6 +1909,187 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             rig_id?: string | undefined;
             rig_name?: string | undefined;
           }[];
+          meta: object;
+        }>;
+        getMergeQueueData: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            townId: string;
+            rigId?: string | undefined;
+            limit?: number | undefined;
+            since?: string | undefined;
+          };
+          output: {
+            needsAttention: {
+              openPRs: {
+                mrBead: {
+                  bead_id: string;
+                  status: string;
+                  title: string;
+                  body: string | null;
+                  rig_id: string | null;
+                  created_at: string;
+                  updated_at: string;
+                  metadata: Record<string, unknown>;
+                };
+                reviewMetadata: {
+                  branch: string;
+                  target_branch: string;
+                  merge_commit: string | null;
+                  pr_url: string | null;
+                  retry_count: number;
+                };
+                sourceBead: {
+                  bead_id: string;
+                  title: string;
+                  status: string;
+                  body: string | null;
+                } | null;
+                convoy: {
+                  convoy_id: string;
+                  title: string;
+                  total_beads: number;
+                  closed_beads: number;
+                  feature_branch: string | null;
+                  merge_mode: string | null;
+                } | null;
+                agent: {
+                  agent_id: string;
+                  name: string;
+                  role: string;
+                } | null;
+                rigName: string | null;
+                staleSince: string | null;
+                failureReason: string | null;
+              }[];
+              failedReviews: {
+                mrBead: {
+                  bead_id: string;
+                  status: string;
+                  title: string;
+                  body: string | null;
+                  rig_id: string | null;
+                  created_at: string;
+                  updated_at: string;
+                  metadata: Record<string, unknown>;
+                };
+                reviewMetadata: {
+                  branch: string;
+                  target_branch: string;
+                  merge_commit: string | null;
+                  pr_url: string | null;
+                  retry_count: number;
+                };
+                sourceBead: {
+                  bead_id: string;
+                  title: string;
+                  status: string;
+                  body: string | null;
+                } | null;
+                convoy: {
+                  convoy_id: string;
+                  title: string;
+                  total_beads: number;
+                  closed_beads: number;
+                  feature_branch: string | null;
+                  merge_mode: string | null;
+                } | null;
+                agent: {
+                  agent_id: string;
+                  name: string;
+                  role: string;
+                } | null;
+                rigName: string | null;
+                staleSince: string | null;
+                failureReason: string | null;
+              }[];
+              stalePRs: {
+                mrBead: {
+                  bead_id: string;
+                  status: string;
+                  title: string;
+                  body: string | null;
+                  rig_id: string | null;
+                  created_at: string;
+                  updated_at: string;
+                  metadata: Record<string, unknown>;
+                };
+                reviewMetadata: {
+                  branch: string;
+                  target_branch: string;
+                  merge_commit: string | null;
+                  pr_url: string | null;
+                  retry_count: number;
+                };
+                sourceBead: {
+                  bead_id: string;
+                  title: string;
+                  status: string;
+                  body: string | null;
+                } | null;
+                convoy: {
+                  convoy_id: string;
+                  title: string;
+                  total_beads: number;
+                  closed_beads: number;
+                  feature_branch: string | null;
+                  merge_mode: string | null;
+                } | null;
+                agent: {
+                  agent_id: string;
+                  name: string;
+                  role: string;
+                } | null;
+                rigName: string | null;
+                staleSince: string | null;
+                failureReason: string | null;
+              }[];
+            };
+            activityLog: {
+              event: {
+                bead_event_id: string;
+                bead_id: string;
+                agent_id: string | null;
+                event_type: string;
+                old_value: string | null;
+                new_value: string | null;
+                metadata: Record<string, unknown>;
+                created_at: string;
+              };
+              mrBead: {
+                bead_id: string;
+                title: string;
+                type: string;
+                status: string;
+                rig_id: string | null;
+                metadata: Record<string, unknown>;
+              } | null;
+              sourceBead: {
+                bead_id: string;
+                title: string;
+                status: string;
+              } | null;
+              convoy: {
+                convoy_id: string;
+                title: string;
+                total_beads: number;
+                closed_beads: number;
+                feature_branch: string | null;
+                merge_mode: string | null;
+              } | null;
+              agent: {
+                agent_id: string;
+                name: string;
+                role: string;
+              } | null;
+              rigName: string | null;
+              reviewMetadata: {
+                pr_url: string | null;
+                branch: string | null;
+                target_branch: string | null;
+                merge_commit: string | null;
+              } | null;
+            }[];
+          };
           meta: object;
         }>;
         listConvoys: import('@trpc/server').TRPCQueryProcedure<{
@@ -1726,6 +2213,81 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               depends_on_bead_id: string;
             }[];
           } | null;
+          meta: object;
+        }>;
+        listOrgTowns: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            organizationId: string;
+          };
+          output: {
+            id: string;
+            name: string;
+            owner_org_id: string;
+            created_by_user_id: string;
+            created_at: string;
+            updated_at: string;
+          }[];
+          meta: object;
+        }>;
+        createOrgTown: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            organizationId: string;
+            name: string;
+          };
+          output: {
+            id: string;
+            name: string;
+            owner_org_id: string;
+            created_by_user_id: string;
+            created_at: string;
+            updated_at: string;
+          };
+          meta: object;
+        }>;
+        deleteOrgTown: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            organizationId: string;
+            townId: string;
+          };
+          output: void;
+          meta: object;
+        }>;
+        listOrgRigs: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            organizationId: string;
+            townId: string;
+          };
+          output: {
+            id: string;
+            town_id: string;
+            name: string;
+            git_url: string;
+            default_branch: string;
+            platform_integration_id: string | null;
+            created_at: string;
+            updated_at: string;
+          }[];
+          meta: object;
+        }>;
+        createOrgRig: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            organizationId: string;
+            townId: string;
+            name: string;
+            gitUrl: string;
+            defaultBranch?: string | undefined;
+            platformIntegrationId?: string | undefined;
+          };
+          output: {
+            id: string;
+            town_id: string;
+            name: string;
+            git_url: string;
+            default_branch: string;
+            platform_integration_id: string | null;
+            created_at: string;
+            updated_at: string;
+          };
           meta: object;
         }>;
         adminListBeads: import('@trpc/server').TRPCQueryProcedure<{
@@ -1957,79 +2519,11 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
           } | null;
           meta: object;
         }>;
-        listOrgTowns: import('@trpc/server').TRPCQueryProcedure<{
+        debugAgentMetadata: import('@trpc/server').TRPCQueryProcedure<{
           input: {
-            organizationId: string;
-          };
-          output: {
-            id: string;
-            name: string;
-            owner_org_id: string;
-            created_by_user_id: string;
-            created_at: string;
-            updated_at: string;
-          }[];
-          meta: object;
-        }>;
-        createOrgTown: import('@trpc/server').TRPCMutationProcedure<{
-          input: {
-            organizationId: string;
-            name: string;
-          };
-          output: {
-            id: string;
-            name: string;
-            owner_org_id: string;
-            created_by_user_id: string;
-            created_at: string;
-            updated_at: string;
-          };
-          meta: object;
-        }>;
-        deleteOrgTown: import('@trpc/server').TRPCMutationProcedure<{
-          input: {
-            organizationId: string;
             townId: string;
           };
-          output: void;
-          meta: object;
-        }>;
-        listOrgRigs: import('@trpc/server').TRPCQueryProcedure<{
-          input: {
-            organizationId: string;
-            townId: string;
-          };
-          output: {
-            id: string;
-            town_id: string;
-            name: string;
-            git_url: string;
-            default_branch: string;
-            platform_integration_id: string | null;
-            created_at: string;
-            updated_at: string;
-          }[];
-          meta: object;
-        }>;
-        createOrgRig: import('@trpc/server').TRPCMutationProcedure<{
-          input: {
-            organizationId: string;
-            townId: string;
-            name: string;
-            gitUrl: string;
-            defaultBranch?: string | undefined;
-            platformIntegrationId?: string | undefined;
-          };
-          output: {
-            id: string;
-            town_id: string;
-            name: string;
-            git_url: string;
-            default_branch: string;
-            platform_integration_id: string | null;
-            created_at: string;
-            updated_at: string;
-          };
+          output: never;
           meta: object;
         }>;
       }>

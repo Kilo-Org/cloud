@@ -3,6 +3,7 @@ import { verifyKiloToken, extractBearerToken } from '@kilocode/worker-utils';
 import { resError } from '../util/res.util';
 import type { GastownEnv } from '../gastown.worker';
 import { resolveSecret } from '../util/secret.util';
+import { logger } from '../util/log.util';
 
 /**
  * Auth middleware that validates Kilo user JWTs (signed with NEXTAUTH_SECRET).
@@ -35,6 +36,7 @@ export const kiloAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
     c.set('kiloApiTokenPepper', payload.apiTokenPepper ?? null);
     c.set('kiloGastownAccess', payload.gastownAccess === true);
     c.set('kiloOrgMemberships', payload.orgMemberships ?? []);
+    logger.setTags({ userId: payload.kiloUserId });
   } catch (err) {
     console.warn(
       '[kilo-auth] token verification failed:',

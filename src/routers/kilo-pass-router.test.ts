@@ -77,8 +77,8 @@ type KiloPassCaller = {
       isBonusUnlocked: boolean;
       refillAt: string | null;
     } | null;
+    isEligibleForFirstMonthPromo: boolean;
   }>;
-  getFirstMonthPromoEligibility: () => Promise<{ eligible: boolean }>;
   getAverageMonthlyUsageLast3Months: () => Promise<{ averageMonthlyUsageUsd: number }>;
   getCheckoutReturnState: () => Promise<{
     subscription: {
@@ -268,7 +268,7 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getState();
 
-      expect(result).toEqual({ subscription: null });
+      expect(result).toEqual({ subscription: null, isEligibleForFirstMonthPromo: true });
     });
 
     it('throws BAD_REQUEST when subscription exists but user has no stripe customer', async () => {
@@ -704,26 +704,34 @@ describe('kiloPassRouter', () => {
     });
   });
 
-  describe('getFirstMonthPromoEligibility', () => {
-    it('returns eligible=true when user has never had any kilo_pass_subscriptions row', async () => {
+  describe('isEligibleForFirstMonthPromo in getState', () => {
+    it('returns isEligibleForFirstMonthPromo=true when user has no subscriptions', async () => {
       const user = await insertTestUser({
-        google_user_email: 'kilo-pass-first-month-eligibility-true@example.com',
+        google_user_email: 'kilo-pass-promo-eligible-no-sub@example.com',
       });
 
       const caller = await createCallerForUser(user.id);
-      const result = await caller.kiloPass.getFirstMonthPromoEligibility();
+      const result = await caller.kiloPass.getState();
 
-      expect(result).toEqual({ eligible: true });
+      expect(result.isEligibleForFirstMonthPromo).toBe(true);
+      expect(result.subscription).toBeNull();
     });
 
-    it('returns eligible=false when user has any prior Kilo Pass subscription (monthly or yearly)', async () => {
+    it('returns isEligibleForFirstMonthPromo=false when user has a canceled subscription', async () => {
+      const stripeMock = getStripeMock();
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_test_prior_yearly_canceled',
+        status: 'canceled',
+        items: { data: [] },
+      });
+
       const user = await insertTestUser({
-        google_user_email: 'kilo-pass-first-month-eligibility-false@example.com',
+        google_user_email: 'kilo-pass-promo-ineligible-canceled@example.com',
       });
 
       await insertSubscription({
         kiloUserId: user.id,
-        stripeSubscriptionId: 'sub_test_prior_yearly',
+        stripeSubscriptionId: 'sub_test_prior_yearly_canceled',
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Yearly,
         status: 'canceled',
@@ -731,9 +739,10 @@ describe('kiloPassRouter', () => {
       });
 
       const caller = await createCallerForUser(user.id);
-      const result = await caller.kiloPass.getFirstMonthPromoEligibility();
+      const result = await caller.kiloPass.getState();
 
-      expect(result).toEqual({ eligible: false });
+      expect(result.isEligibleForFirstMonthPromo).toBe(false);
+      expect(result.subscription).not.toBeNull();
     });
   });
 

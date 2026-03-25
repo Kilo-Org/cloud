@@ -423,7 +423,7 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
       void queryClient.invalidateQueries({
         queryKey: trpc.unifiedSessions.list.queryKey({
           limit: 3,
-          createdOnPlatform: 'cloud-agent',
+          createdOnPlatform: ['cloud-agent', 'cloud-agent-web'],
           orderBy: 'updated_at',
           organizationId: organizationId ?? null,
         }),

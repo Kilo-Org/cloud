@@ -646,7 +646,7 @@ describe('New Session Creation Logic', () => {
       title,
       git_url: repository ? `https://github.com/${repository}` : null,
       cloud_agent_session_id: cloudAgentSessionId,
-      created_on_platform: 'cloud-agent',
+      created_on_platform: 'cloud-agent-web',
       created_at: now,
       updated_at: now,
     };

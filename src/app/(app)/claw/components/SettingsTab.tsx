@@ -55,8 +55,98 @@ import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PairingSection } from './PairingSection';
 import { VersionPinCard } from './VersionPinCard';
 import { WorkspaceFileEditor } from './WorkspaceFileEditor';
+import { PermissionPresetCards } from './PermissionPresetCards';
+import { type ExecPreset, configToExecPreset, execPresetToConfig } from './claw.types';
 
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
+
+// ---------------------------------------------------------------------------
+// 1Password setup guide dialog
+// ---------------------------------------------------------------------------
+
+function OnePasswordSetupGuide() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Info className="h-3.5 w-3.5" />
+          Setup Guide
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>1Password Setup</DialogTitle>
+          <DialogDescription>
+            Give your agent access to look up credentials and manage vault items.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 text-sm">
+          <div className="rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+            <p className="text-amber-400 text-xs font-medium">
+              Warning: this gives your agent read/write access to the vault(s) you grant. Create a
+              dedicated vault with only the credentials your agent needs.
+            </p>
+          </div>
+
+          <div>
+            <p className="mb-2 font-medium">1. Create a Service Account</p>
+            <p className="text-muted-foreground text-xs">
+              Go to{' '}
+              <a
+                href="https://developer.1password.com/docs/service-accounts/get-started/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                developer.1password.com
+              </a>{' '}
+              and create a new service account.
+            </p>
+          </div>
+
+          <div>
+            <p className="mb-2 font-medium">2. Scope to a dedicated vault</p>
+            <p className="text-muted-foreground text-xs">
+              Grant the service account access to a dedicated &quot;Agent&quot; vault — not your
+              primary vault. Only store credentials your agent needs in this vault.
+            </p>
+          </div>
+
+          <div>
+            <p className="mb-2 font-medium">3. Copy the token</p>
+            <p className="text-muted-foreground text-xs">
+              Copy the service account token (starts with{' '}
+              <code className="bg-muted rounded px-1">ops_</code>) and paste it into the field
+              above.
+            </p>
+          </div>
+
+          <div>
+            <p className="mb-2 font-medium">4. Save and upgrade</p>
+            <p className="text-muted-foreground text-xs">
+              After saving, use <strong>Upgrade to latest</strong> (not just Redeploy) to activate
+              the integration. Your agent can then use the{' '}
+              <code className="bg-muted rounded px-1">op</code> CLI to look up credentials, e.g.{' '}
+              <code className="bg-muted rounded px-1">op item get &quot;My Login&quot;</code>.
+            </p>
+          </div>
+
+          <p className="text-muted-foreground border-t pt-3 text-xs">
+            Learn more at{' '}
+            <a
+              href="https://developer.1password.com/docs/service-accounts/get-started/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              1Password Service Accounts docs
+            </a>
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // AgentCard setup guide dialog
@@ -149,10 +239,12 @@ function GoogleAccountCard({
   connected,
   gmailNotificationsEnabled,
   mutations,
+  onRedeploy,
 }: {
   connected: boolean;
   gmailNotificationsEnabled: boolean;
   mutations: ClawMutations;
+  onRedeploy?: () => void;
 }) {
   const trpc = useTRPC();
   const { data: setupData } = useQuery(
@@ -327,7 +419,12 @@ function GoogleAccountCard({
         onConfirm={() => {
           mutations.disconnectGoogle.mutate(undefined, {
             onSuccess: () => {
-              toast.success('Google account disconnected. Redeploy to apply.');
+              toast.success('Google account disconnected. Redeploy to apply.', {
+                duration: 8000,
+                ...(onRedeploy && {
+                  action: { label: 'Redeploy', onClick: onRedeploy },
+                }),
+              });
               setConfirmDisconnect(false);
             },
             onError: err => toast.error(`Failed to disconnect: ${err.message}`),
@@ -335,6 +432,86 @@ function GoogleAccountCard({
         }}
       />
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Default Permissions section
+// ---------------------------------------------------------------------------
+
+function PermissionPresetSection({
+  isRunning,
+  status,
+  mutations,
+  onRedeploy,
+}: {
+  isRunning: boolean;
+  status: KiloClawDashboardStatus;
+  mutations: ClawMutations;
+  onRedeploy?: () => void;
+}) {
+  const currentPreset = configToExecPreset(status.execSecurity, status.execAsk);
+  const [selected, setSelected] = useState<ExecPreset | null>(currentPreset);
+  const saving = mutations.patchExecPreset.isPending || mutations.patchOpenclawConfig.isPending;
+  const dirty = selected !== null && selected !== currentPreset;
+
+  function handleSave() {
+    if (!selected) return;
+    const { security, ask } = execPresetToConfig(selected);
+
+    // Persist to durable storage (survives redeploys)
+    mutations.patchExecPreset.mutate(
+      { security, ask },
+      {
+        onError: (err: { message: string }) => toast.error(`Failed to save: ${err.message}`),
+      }
+    );
+
+    // Apply to the live openclaw.json if the instance is running
+    if (isRunning) {
+      mutations.patchOpenclawConfig.mutate(
+        { patch: { tools: { exec: { security, ask } } } },
+        {
+          onSuccess: () => {
+            toast.success('Default permissions saved. Redeploy to ensure the change persists.', {
+              duration: 8000,
+              ...(onRedeploy && {
+                action: { label: 'Redeploy', onClick: onRedeploy },
+              }),
+            });
+          },
+          onError: (err: { message: string }) =>
+            toast.error(`Saved to storage but failed to apply live: ${err.message}`),
+        }
+      );
+    } else {
+      toast.success(
+        'Default permissions saved. Start your instance and redeploy for the change to take effect.'
+      );
+    }
+  }
+
+  return (
+    <div>
+      <h2 className="text-foreground mb-3 text-base font-semibold">Default Permissions</h2>
+      <div className="rounded-lg border p-5">
+        <p className="text-muted-foreground mb-1 text-sm">
+          Choose how your bot handles actions by default. This sets the{' '}
+          <strong className="text-foreground">default permission level</strong> for all tool
+          executions.
+        </p>
+        <p className="mb-4 text-xs text-amber-400">
+          You must redeploy your instance for this change to take effect.
+        </p>
+        <PermissionPresetCards selected={selected} onSelect={setSelected} />
+        <div className="mt-4 flex justify-end">
+          <Button size="sm" disabled={!dirty || saving} onClick={handleSave}>
+            <Save className="h-4 w-4" />
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -347,11 +524,19 @@ export function SettingsTab({
   mutations,
   onSecretsChanged,
   dirtySecrets,
+  onRedeploy,
+  onUpgrade,
+  onRequestUpgrade,
 }: {
   status: KiloClawDashboardStatus;
   mutations: ClawMutations;
   onSecretsChanged?: (entryId: string) => void;
   dirtySecrets: Set<string>;
+  onRedeploy?: () => void;
+  /** Callback that triggers an image upgrade (pull latest) instead of a plain restart. */
+  onUpgrade?: () => void;
+  /** Callback that requests an upgrade via the InstanceControls dialog. */
+  onRequestUpgrade?: () => void;
 }) {
   const posthog = usePostHog();
   const { data: config } = useKiloClawConfig();
@@ -459,14 +644,27 @@ export function SettingsTab({
     !!latestAvailableVersion &&
     latestAvailableVersion !== trackedVersion &&
     calverAtLeast(latestAvailableVersion, trackedVersion);
-  const updateAvailable =
-    catalogNewerThanImage &&
-    (!isModified ||
-      (!!runningVersion &&
-        calverAtLeast(latestAvailableVersion, runningVersion) &&
-        latestAvailableVersion !== runningVersion));
   const isPinned = !!myPin;
   const hasVersionInfo = isRunning && trackedVersion && trackedVersion !== ':latest';
+  // Only compare image tags when variants match — latestVersion is always
+  // for the "default" variant, so skip for non-default instances to avoid
+  // false "Update available" badges that would switch their variant.
+  const variantsMatch =
+    !status.imageVariant ||
+    status.imageVariant === 'default' ||
+    status.imageVariant === latestVersion?.variant;
+  const imageTagDiffers =
+    hasVersionInfo &&
+    variantsMatch &&
+    !!status.trackedImageTag &&
+    !!latestVersion?.imageTag &&
+    status.trackedImageTag !== latestVersion.imageTag;
+  const updateAvailable = catalogNewerThanImage
+    ? !isModified ||
+      (!!runningVersion &&
+        calverAtLeast(latestAvailableVersion, runningVersion) &&
+        latestAvailableVersion !== runningVersion)
+    : imageTagDiffers;
 
   return (
     <div className="flex flex-col gap-6">
@@ -519,17 +717,20 @@ export function SettingsTab({
                   {updateAvailable && (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Badge
-                          variant="outline"
-                          className="border-orange-500/30 bg-orange-500/15 text-orange-400"
-                        >
-                          Update available
-                        </Badge>
+                        <button type="button" onClick={onRequestUpgrade} className="cursor-pointer">
+                          <Badge
+                            variant="outline"
+                            className="border-orange-500/30 bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
+                          >
+                            Update available
+                          </Badge>
+                        </button>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>
-                          A newer OpenClaw version ({latestAvailableVersion}) is available —
-                          redeploy to upgrade
+                          {catalogNewerThanImage
+                            ? `A newer OpenClaw version (${latestAvailableVersion}) is available — click to upgrade`
+                            : `A newer image (${latestVersion?.imageTag ?? 'unknown'}) is available — click to upgrade`}
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -564,7 +765,10 @@ export function SettingsTab({
         {/* Expandable version pinning */}
         {manageVersionOpen && (
           <div className="mt-4 border-t pt-4">
-            <VersionPinCard />
+            <VersionPinCard
+              trackedImageTag={status.trackedImageTag}
+              latestImageTag={variantsMatch ? (latestVersion?.imageTag ?? null) : null}
+            />
           </div>
         )}
       </div>
@@ -605,6 +809,14 @@ export function SettingsTab({
         </div>
       </div>
 
+      {/* ── Default Permissions ── */}
+      <PermissionPresetSection
+        isRunning={isRunning}
+        status={status}
+        mutations={mutations}
+        onRedeploy={onRedeploy}
+      />
+
       {/* ── Messaging Channels ── */}
       <div>
         <h2 className="text-foreground mb-3 text-base font-semibold">Messaging Channels</h2>
@@ -617,10 +829,32 @@ export function SettingsTab({
               mutations={mutations}
               onSecretsChanged={onSecretsChanged}
               isDirty={dirtySecrets.has(entry.id)}
+              onRedeploy={onRedeploy}
             />
           ))}
         </div>
       </div>
+
+      {/* ── Search ── */}
+      {toolEntries.some(e => e.id === 'brave-search') && (
+        <div>
+          <h2 className="text-foreground mb-3 text-base font-semibold">Search</h2>
+          <div className="space-y-3">
+            {toolEntries
+              .filter(e => e.id === 'brave-search')
+              .map(entry => (
+                <SecretEntrySection
+                  key={entry.id}
+                  entry={entry}
+                  configured={configuredSecrets[entry.id] ?? false}
+                  mutations={mutations}
+                  onSecretsChanged={onSecretsChanged}
+                  isDirty={dirtySecrets.has(entry.id)}
+                />
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Developer Tools ── */}
       {toolEntries.some(e => e.id === 'github') && (
@@ -637,6 +871,7 @@ export function SettingsTab({
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
+                  onRedeploy={onRedeploy}
                   actionRowExtra={
                     <span className="text-muted-foreground flex items-center gap-1 text-xs">
                       <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
@@ -682,7 +917,31 @@ export function SettingsTab({
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
+                  onRedeploy={onUpgrade ?? onRedeploy}
+                  redeployLabel="Upgrade"
                   actionRowExtra={<AgentCardSetupGuide />}
+                />
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Password Managers ── */}
+      {toolEntries.some(e => e.id === 'onepassword') && (
+        <div>
+          <h2 className="text-foreground mb-3 text-base font-semibold">Password Managers</h2>
+          <div className="space-y-3">
+            {toolEntries
+              .filter(e => e.id === 'onepassword')
+              .map(entry => (
+                <SecretEntrySection
+                  key={entry.id}
+                  entry={entry}
+                  configured={configuredSecrets[entry.id] ?? false}
+                  mutations={mutations}
+                  onSecretsChanged={onSecretsChanged}
+                  isDirty={dirtySecrets.has(entry.id)}
+                  actionRowExtra={<OnePasswordSetupGuide />}
                 />
               ))}
           </div>
@@ -697,6 +956,7 @@ export function SettingsTab({
             connected={status.googleConnected}
             gmailNotificationsEnabled={status.gmailNotificationsEnabled}
             mutations={mutations}
+            onRedeploy={onRedeploy}
           />
         </div>
       </div>

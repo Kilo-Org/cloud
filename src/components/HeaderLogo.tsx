@@ -61,7 +61,7 @@ export default function HeaderLogo({ className, href }: HeaderLogoProps) {
           </motion.div>
         </AnimatePresence>
       </motion.div>
-      <span className="text-3xl font-bold whitespace-nowrap">Kilo Code</span>
+      <span className="text-3xl font-bold whitespace-nowrap">Kilo</span>
     </>
   );
 
@@ -85,7 +85,7 @@ export default function HeaderLogo({ className, href }: HeaderLogoProps) {
             'focus:text-brand-primary focus:ring-brand-primary focus:ring-3',
             className
           )}
-          aria-label="Kilo Code Homepage"
+          aria-label="Kilo Homepage"
         >
           {logoContent}
         </Link>

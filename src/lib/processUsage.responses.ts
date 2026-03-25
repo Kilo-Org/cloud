@@ -2,9 +2,8 @@ import type { OpenAI } from 'openai';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
-import { toMicrodollars } from './utils';
 import { sentryRootSpan } from './getRootSpan';
-import type { ProviderId } from '@/lib/providers/provider-id';
+import type { ProviderId } from '@/lib/providers/types';
 import type {
   JustTheCostsUsageStats,
   MicrodollarUsageStats,
@@ -13,7 +12,11 @@ import type {
   VercelProviderMetaData,
 } from '@/lib/processUsage.types';
 import type { GatewayResponsesRequest } from '@/lib/providers/openrouter/types';
-import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/processUsage.constants';
+import {
+  computeOpenRouterCostFields,
+  computeVercelCostMicrodollars,
+  drainSseStream,
+} from '@/lib/processUsage.shared';
 
 // OpenRouter adds cost fields to the standard Responses API usage object.
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
@@ -51,39 +54,18 @@ export function processResponsesApiUsage(
 
   // OpenRouter path: cost fields are present directly in usage
   if (usage?.cost != null || usage?.is_byok != null) {
-    const is_byok = usage.is_byok ?? null;
-    const openrouterCost_USD = usage.cost ?? 0;
-    const upstream_inference_cost_USD = usage.cost_details?.upstream_inference_cost ?? 0;
-    const cost_mUsd = toMicrodollars(is_byok ? upstream_inference_cost_USD : openrouterCost_USD);
-    const inferredUpstream_USD = openrouterCost_USD * OPENROUTER_BYOK_COST_MULTIPLIER;
-    const microdollar_error = (inferredUpstream_USD - upstream_inference_cost_USD) * 1000000;
-    if (
-      (is_byok == null && (openrouterCost_USD || upstream_inference_cost_USD)) ||
-      (is_byok && usage.cost !== 0 && 1.1 < Math.abs(microdollar_error))
-    ) {
-      const { responseContent: _ignore, ...corePropsCopy } = coreProps;
-      captureMessage("SUSPICIOUS: openrouters cost accounting doesn't make sense", {
-        level: 'error',
-        tags: { source: 'responses_sse_processing' },
-        extra: {
-          ...corePropsCopy,
-          cost_mUsd,
-          is_byok,
-          openrouterCost_USD,
-          upstream_inference_cost_USD,
-          inferredUpstream_USD,
-          microdollar_error,
-        },
-      });
-    }
+    const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
+      usage,
+      coreProps,
+      'responses_sse_processing'
+    );
     return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens: 0, cost_mUsd, is_byok };
   }
 
   // Vercel path: cost is in provider_metadata.gateway
   const vercelGateway = providerMetadata?.gateway;
   if (vercelGateway?.marketCost != null || vercelGateway?.cost != null) {
-    const marketCost_USD = parseFloat(vercelGateway.marketCost ?? vercelGateway.cost ?? '0');
-    const cost_mUsd = toMicrodollars(isNaN(marketCost_USD) ? 0 : marketCost_USD);
+    const cost_mUsd = computeVercelCostMicrodollars(vercelGateway);
     return {
       inputTokens,
       outputTokens,
@@ -145,9 +127,6 @@ export async function parseResponsesMicrodollarUsageFromStream(
   let inference_provider: string | null = null;
   let finish_reason: string | null = null;
 
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-
   const sseStreamParser = createParser({
     onEvent(event: EventSourceMessage) {
       if (!firstTokenReceived) {
@@ -208,25 +187,11 @@ export async function parseResponsesMicrodollarUsageFromStream(
     },
   });
 
-  let wasAborted = false;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-      sseStreamParser.feed(decoder.decode(value, { stream: true }));
-    }
-  } catch (error) {
-    if (error instanceof Error && error.name === 'ResponseAborted') {
-      wasAborted = true;
-    } else {
-      throw error;
-    }
-  } finally {
-    reader.releaseLock();
-    streamProcessingSpan.end();
-  }
+  const wasAborted = await drainSseStream(
+    stream,
+    chunk => sseStreamParser.feed(chunk),
+    streamProcessingSpan
+  );
 
   if (!reportedError && !usage) {
     captureMessage('SUSPICIOUS: No usage in Responses API stream', {

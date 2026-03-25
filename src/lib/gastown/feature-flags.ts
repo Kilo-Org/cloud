@@ -11,9 +11,15 @@ const GASTOWN_ACCESS_FLAG = 'gastown-access';
  * (allowlists, percentage rollout, and kill-switch are managed in the
  * PostHog dashboard).
  *
+ * Kilo admins always have access regardless of the feature flag.
+ *
  * See #901 for details.
  */
-export async function isGastownEnabled(userId: string): Promise<boolean> {
+export async function isGastownEnabled(
+  userId: string,
+  opts?: { isAdmin?: boolean }
+): Promise<boolean> {
+  if (opts?.isAdmin) return true;
   if (process.env.NODE_ENV !== 'production') {
     return true;
   }

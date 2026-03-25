@@ -10,9 +10,8 @@ import * as z from 'zod';
 import { subDays } from 'date-fns';
 import { hasReceivedPromotion } from '@/lib/promotionalCredits';
 
-import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
-import { db } from '@/lib/drizzle';
 import { fromMicrodollars } from '@/lib/utils';
+import { KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto-model';
 
 /** Pre-fetched data shared across notification generators to avoid duplicate DB queries. */
 type NotificationContext = {
@@ -40,14 +39,6 @@ export type KiloNotification = {
 const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
-  // Disabled: GLM-5 free period has long ended; no need to keep notifying users.
-  // {
-  //   id: 'feb-25-glm5-free-ended',
-  //   title: 'GLM-5 Free Period Ended',
-  //   message:
-  //     'The free period for GLM-5 has ended. Try another free model like MiniMax M2.5 or Trinity Large Preview!',
-  //   showIn: ['extension', 'cli'],
-  // },
   {
     id: 'kilo-cli-jan-5',
     title: 'Kilo CLI',
@@ -119,8 +110,10 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateAutoTopUpNotification,
     generateAutoTopUpOrgsNotification,
     generateByokProvidersNotification,
+    generateMiniMaxNoLongerFreeNotification,
     generateFirstDayWelcomeNotification,
     generateKiloPassNotification,
+    generateLiteLLMSecurityNotification,
   ];
 
   const resolvedConditionalNotifications = (
@@ -237,6 +230,46 @@ async function generateTeamsTrialNotification(
   ];
 }
 
+async function generateMiniMaxNoLongerFreeNotification(
+  user: User,
+  _ctx: NotificationContext
+): Promise<KiloNotification[]> {
+  try {
+    const users = await cachedPosthogQuery(
+      z.array(z.tuple([z.string()]).transform(([userId]) => userId))
+    )(
+      'minimax-no-longer-free-users',
+      'select kilo_user_id from notification_mar_23_minimax_no_longer_free limit 5e5'
+    );
+
+    if (!users.includes(user.id)) {
+      console.debug(
+        '[generateMiniMaxNoLongerFreeNotification] user has not used MiniMax M2.5 free'
+      );
+      return [];
+    }
+
+    console.debug('[generateMiniMaxNoLongerFreeNotification] user has used MiniMax M2.5 free');
+    return [
+      {
+        id: 'minimax-no-longer-free-mar-23',
+        title: 'MiniMax M2.5 Free ending soon',
+        message:
+          'The MiniMax M2.5 free promotion ends soon. Please switch to Kilo Auto Free or another free model.',
+        action: {
+          actionText: 'Learn more',
+          actionURL: 'https://kilo.ai/docs/contributing/architecture/auto-model-tiers',
+        },
+        suggestModelId: KILO_AUTO_FREE_MODEL.id,
+        showIn: ['cli', 'extension'],
+      },
+    ];
+  } catch (e) {
+    console.error('[generateMiniMaxNoLongerFreeNotification]', e);
+    return [];
+  }
+}
+
 async function generateByokProvidersNotification(
   user: User,
   _ctx: NotificationContext
@@ -248,26 +281,7 @@ async function generateByokProvidersNotification(
       )
     )(
       'byok-provider-usage-users',
-      `
-        select u.id, ev.properties.apiProvider
-        from events ev
-        join postgres.kilocode_users u on u.google_user_email = ev.distinct_id
-        where ev.event = 'LLM Completion'
-          and ev.properties.apiProvider in (
-            'anthropic'
-            , 'gemini'
-            , 'openai-native'
-            , 'minimax'
-            , 'mistral'
-            , 'xai'
-            , 'zai'
-          )
-          and ev.timestamp >= now() - interval 14 day
-        group by u.id, ev.properties.apiProvider
-        having count(ev.distinct_id) >= 10
-        order by max(ev.timestamp) desc
-        limit 1e5
-      `
+      'select id, apiProvider from notification_byok_providers_jan_19 limit 5e5'
     );
 
     const provider = byokProviderUsers.find(p => p.userId === user.id)?.provider;
@@ -278,6 +292,7 @@ async function generateByokProvidersNotification(
 
     const names = {
       anthropic: 'Claude API Key',
+      bedrock: 'Amazon Bedrock',
       gemini: 'Google AI API Key',
       'openai-native': 'OpenAI API Key',
       minimax: 'MiniMax Coding Plan',
@@ -342,16 +357,40 @@ async function generateFirstDayWelcomeNotification(
   ];
 }
 
+async function generateLiteLLMSecurityNotification(
+  user: User,
+  _ctx: NotificationContext
+): Promise<KiloNotification[]> {
+  try {
+    const litellmUsers = await cachedPosthogQuery(
+      z.array(z.tuple([z.string()]).transform(([userId]) => userId))
+    )('litellm-security-incident-users', 'select id from notification_litellm_mar_24 limit 5e5');
+
+    if (!litellmUsers.includes(user.id)) {
+      console.debug('[generateLiteLLMSecurityNotification] user is not using LiteLLM provider');
+      return [];
+    }
+
+    console.debug('[generateLiteLLMSecurityNotification] user is using LiteLLM provider');
+    return [
+      {
+        id: 'litellm-security-mar-24',
+        title: 'LiteLLM Security Advisory',
+        message:
+          'Following a recent security incident with LiteLLM, we recommend reviewing your configuration and rotating credentials; if helpful, our gateway offers a more secure, managed alternative.',
+        showIn: ['extension'],
+      },
+    ];
+  } catch (e) {
+    console.error('[generateLiteLLMSecurityNotification]', e);
+    return [];
+  }
+}
+
 async function generateKiloPassNotification(
   user: User,
   ctx: NotificationContext
 ): Promise<KiloNotification[]> {
-  // Exclude users who already have a Kilo Pass
-  const kiloPassState = await getKiloPassStateForUser(db, user.id);
-  if (kiloPassState) {
-    return [];
-  }
-
   // Check if user belongs to an organization with balance > $5
   const hasHighBalanceOrg = ctx.userOrganizations.some(org => fromMicrodollars(org.balance) > 5);
   if (hasHighBalanceOrg) {

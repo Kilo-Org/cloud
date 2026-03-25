@@ -442,7 +442,104 @@ export function updateToolsMdGoogleSection(env: EnvLike, deps: BootstrapDeps): v
   }
 }
 
-// ---- Step 8: Gateway args ----
+// ---- Step 8: TOOLS.md Kilo CLI section ----
+
+const KILO_CLI_MARKER_BEGIN = '<!-- BEGIN:kilo-cli -->';
+const KILO_CLI_MARKER_END = '<!-- END:kilo-cli -->';
+
+const KILO_CLI_TOOLS_SECTION = `
+${KILO_CLI_MARKER_BEGIN}
+## Kilo CLI
+
+The Kilo CLI (\`kilo\`) is an agentic coding assistant for the terminal, pre-configured with your KiloCode account.
+
+- Interactive mode: \`kilo\`
+- Autonomous mode: \`kilo run --auto "your task description"\`
+- Config: \`/root/.config/kilo/opencode.json\` (customizable, persists across restarts)
+- Shares your KiloCode API key and model access with OpenClaw
+${KILO_CLI_MARKER_END}`;
+
+/**
+ * Ensure the Kilo CLI section is present in TOOLS.md.
+ *
+ * The kilo binary is always in the image, so this runs unconditionally
+ * (not gated on a feature flag). Idempotent: skips if the marker is
+ * already present.
+ */
+export function updateToolsMdKiloCliSection(_env: EnvLike, deps: BootstrapDeps): void {
+  if (!deps.existsSync(TOOLS_MD_DEST)) return;
+
+  const content = deps.readFileSync(TOOLS_MD_DEST, 'utf8');
+
+  if (!content.includes(KILO_CLI_MARKER_BEGIN)) {
+    deps.writeFileSync(TOOLS_MD_DEST, content + KILO_CLI_TOOLS_SECTION);
+    console.log('TOOLS.md: added Kilo CLI section');
+  } else {
+    console.log('TOOLS.md: Kilo CLI section already present');
+  }
+}
+
+// ---- Step 9: TOOLS.md 1Password section ----
+
+const OP_MARKER_BEGIN = '<!-- BEGIN:1password -->';
+const OP_MARKER_END = '<!-- END:1password -->';
+
+const OP_TOOLS_SECTION = `
+${OP_MARKER_BEGIN}
+## 1Password
+
+The \`op\` CLI is configured with a 1Password service account. Use it to look up credentials, generate passwords, and manage vault items.
+
+- List vaults: \`op vault list\`
+- Search items: \`op item list --vault <vault-name>\`
+- Get a credential: \`op item get "<item-name>" --vault <vault-name>\`
+- Get specific field: \`op item get "<item-name>" --fields password --vault <vault-name>\`
+- Generate password: \`op item create --category login --title "New Login" --generate-password\`
+- Run \`op --help\` for all available commands.
+
+**Security note:** Only access credentials the user has explicitly requested. Do not list or expose vault contents unnecessarily.
+${OP_MARKER_END}`;
+
+/**
+ * Manage the 1Password section in TOOLS.md.
+ *
+ * When OP_SERVICE_ACCOUNT_TOKEN is present, append a bounded section so the
+ * agent knows the op CLI is available. When absent, remove any stale section.
+ * Idempotent: skips if the marker is already present.
+ */
+export function updateToolsMd1PasswordSection(env: EnvLike, deps: BootstrapDeps): void {
+  if (!deps.existsSync(TOOLS_MD_DEST)) return;
+
+  const content = deps.readFileSync(TOOLS_MD_DEST, 'utf8');
+
+  if (env.OP_SERVICE_ACCOUNT_TOKEN) {
+    // 1Password configured — add section if not already present
+    if (!content.includes(OP_MARKER_BEGIN)) {
+      deps.writeFileSync(TOOLS_MD_DEST, content + OP_TOOLS_SECTION);
+      console.log('TOOLS.md: added 1Password section');
+    } else {
+      console.log('TOOLS.md: 1Password section already present');
+    }
+  } else {
+    // 1Password not configured — remove stale section if present
+    if (content.includes(OP_MARKER_BEGIN)) {
+      const beginIdx = content.indexOf(OP_MARKER_BEGIN);
+      const endIdx = content.indexOf(OP_MARKER_END);
+      if (beginIdx !== -1 && endIdx !== -1) {
+        const before = content.slice(0, beginIdx).replace(/\n+$/, '\n');
+        const after = content.slice(endIdx + OP_MARKER_END.length).replace(/^\n+/, '');
+        deps.writeFileSync(TOOLS_MD_DEST, before + after);
+        console.log('TOOLS.md: removed stale 1Password section');
+      } else {
+        console.warn(
+          'TOOLS.md: 1Password BEGIN marker found but END marker missing, skipping removal'
+        );
+      }
+    }
+  }
+}
+
+// ---- Step 10: Gateway args ----
 
 /**
  * Build the gateway CLI arguments array.
@@ -496,7 +593,9 @@ export async function bootstrap(
   runOnboardOrDoctor(env, deps);
   await yieldToEventLoop();
 
+  updateToolsMdKiloCliSection(env, deps);
   updateToolsMdGoogleSection(env, deps);
+  updateToolsMd1PasswordSection(env, deps);
 
   // Write mcporter config for MCP servers (AgentCard, etc.)
   writeMcporterConfig(env);

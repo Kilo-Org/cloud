@@ -387,6 +387,7 @@ describe('organizations usage details trpc router', () => {
 
       const result = await caller.organizations.usageDetails.getAutocomplete({
         organizationId: testOrganization.id,
+        period: 'month',
       });
 
       expect(result.cost).toBe(1500); // 1000 + 500
@@ -412,11 +413,61 @@ describe('organizations usage details trpc router', () => {
 
       const result = await caller.organizations.usageDetails.getAutocomplete({
         organizationId: testOrganization.id,
+        period: 'month',
       });
 
       expect(result.cost).toBe(0);
       expect(result.requests).toBe(0);
       expect(result.tokens).toBe(0);
+    });
+
+    it('should exclude autocomplete usage outside the selected period', async () => {
+      const now = await getDateFromDb();
+      const twoMonthsAgo = await getDateFromDb('60 days');
+
+      // Insert recent autocomplete usage (within the past week)
+      await insertUsageWithOverrides({
+        kilo_user_id: memberUser.id,
+        organization_id: testOrganization.id,
+        cost: 1000,
+        input_tokens: 300,
+        output_tokens: 200,
+        created_at: now,
+        model: 'codestral-2508',
+      });
+
+      // Insert old autocomplete usage (outside the past week)
+      await insertUsageWithOverrides({
+        kilo_user_id: memberUser.id,
+        organization_id: testOrganization.id,
+        cost: 5000,
+        input_tokens: 1000,
+        output_tokens: 800,
+        created_at: twoMonthsAgo,
+        model: 'codestral-2508',
+      });
+
+      const caller = await createCallerForUser(memberUser.id);
+
+      // Query with 'week' period — should only include recent usage
+      const weekResult = await caller.organizations.usageDetails.getAutocomplete({
+        organizationId: testOrganization.id,
+        period: 'week',
+      });
+
+      expect(weekResult.cost).toBe(1000);
+      expect(weekResult.requests).toBe(1);
+      expect(weekResult.tokens).toBe(500); // 300 + 200
+
+      // Query with 'all' period — should include everything
+      const allResult = await caller.organizations.usageDetails.getAutocomplete({
+        organizationId: testOrganization.id,
+        period: 'all',
+      });
+
+      expect(allResult.cost).toBe(6000); // 1000 + 5000
+      expect(allResult.requests).toBe(2);
+      expect(allResult.tokens).toBe(2300); // (300 + 200) + (1000 + 800)
     });
 
     it('should throw UNAUTHORIZED error for non-member users', async () => {

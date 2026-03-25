@@ -22,7 +22,7 @@ type Props = {
 
 export function MetricSelector({ metrics, selectedMetric, onSelectedMetricChange }: Props) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
       {metrics.map(metric => {
         const isSelected = metric.key === selectedMetric;
         const IconComponent = metric.icon;
@@ -44,16 +44,16 @@ export function MetricSelector({ metrics, selectedMetric, onSelectedMetricChange
                 isSelected ? 'opacity-100' : 'opacity-80'
               )}
             />
-            <CardHeader className="relative z-[1] flex flex-row items-center space-y-0 px-4 pt-4 pb-2">
+            <CardHeader className="relative z-[1] flex flex-row items-center space-y-0 px-3 pt-2 pb-0.5">
               {IconComponent && <IconComponent className="mr-2 h-4 w-4" />}
               <CardTitle className="text-sm font-medium whitespace-nowrap">
                 {metric.title}
               </CardTitle>
             </CardHeader>
-            <CardContent className="relative z-[1] px-4">
+            <CardContent className="relative z-[1] px-3 pb-2">
               <div
                 className={cn(
-                  'text-2xl font-bold transition-colors duration-200',
+                  'text-xl font-bold transition-colors duration-200',
                   isSelected ? 'text-blue-300' : ''
                 )}
               >

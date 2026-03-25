@@ -37,6 +37,7 @@ import {
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
   forbiddenFreeModelResponse,
+  storeAndPreviousResponseIdIsNotSupported,
 } from '@/lib/llm-proxy-helpers';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
@@ -74,7 +75,6 @@ import type { MicrodollarUsageContext, PromptInfo } from '@/lib/processUsage.typ
 import { extractResponsesPromptInfo } from '@/lib/processUsage.responses';
 import { extractMessagesPromptInfo } from '@/lib/processUsage.messages';
 import { getMaxTokens, hasMiddleOutTransform } from '@/lib/providers/openrouter/request-helpers';
-import { isKiloAffiliatedUser } from '@/lib/isKiloAffiliatedUser';
 
 export const maxDuration = 800;
 
@@ -89,6 +89,8 @@ function validatePath(
   | { path: '/chat/completions' | '/responses' | '/messages' }
   | { errorResponse: ReturnType<typeof invalidPathResponse> } {
   const pathSuffix =
+    stripRequiredPrefix(url.pathname, '/api/gateway/v1') ??
+    stripRequiredPrefix(url.pathname, '/api/openrouter/v1') ??
     stripRequiredPrefix(url.pathname, '/api/gateway') ??
     stripRequiredPrefix(url.pathname, '/api/openrouter');
 
@@ -139,7 +141,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestBodyParsed = { kind: 'messages', body };
     } else {
       const body: GatewayResponsesRequest = JSON.parse(requestBodyText);
-      body.store = false;
       requestBodyParsed = { kind: 'responses', body };
     }
   } catch (e) {
@@ -166,11 +167,24 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     request.headers.get(FEATURE_HEADER) || (isLegacyOpenRouterPath ? '' : 'direct-gateway')
   );
 
+  const authPromise = getUserFromAuth({ adminOnly: false });
+  const balanceAndSettingsPromise = authPromise.then(res =>
+    res.user
+      ? getBalanceAndOrgSettings(res.organizationId, res.user)
+      : { balance: 0, settings: undefined, plan: undefined }
+  );
+
   const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
   let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
-    applyResolvedAutoModel(requestedModelLowerCased, requestBodyParsed, modeHeader, feature);
+    await applyResolvedAutoModel(
+      requestedModelLowerCased,
+      requestBodyParsed,
+      modeHeader,
+      feature,
+      balanceAndSettingsPromise.then(res => res.balance)
+    );
   }
 
   const originalModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
@@ -209,7 +223,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     organizationId: authOrganizationId,
     botId: authBotId,
     tokenSource: authTokenSource,
-  } = await getUserFromAuth({ adminOnly: false });
+  } = await authPromise;
   authSpan.end();
 
   let user: typeof maybeUser | AnonymousUserContext;
@@ -265,17 +279,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   if (
-    ['messages', 'responses'].includes(requestBodyParsed.kind) &&
-    !isKiloAffiliatedUser(maybeUser, organizationId ?? null)
+    requestBodyParsed.kind === 'responses' &&
+    (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
   ) {
-    return NextResponse.json(
-      {
-        error: {
-          message: `The ${requestBodyParsed.kind} API is experimental and not yet available to all users.`,
-        },
-      },
-      { status: 403 }
-    );
+    return storeAndPreviousResponseIdIsNotSupported();
   }
 
   // Log to free_model_usage for rate limiting (at request start, before processing)
@@ -292,7 +299,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
   const { provider, userByok, customLlm } = await getProvider(
     originalModelIdLowerCased,
-    requestBodyParsed.body,
+    requestBodyParsed,
     user,
     organizationId,
     taskId
@@ -368,7 +375,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const bypassAccessCheckForCustomLlm =
     !!customLlm && !!organizationId && customLlm.organization_ids.includes(organizationId);
   if (!isAnonymousContext(user) && !bypassAccessCheckForCustomLlm) {
-    const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
+    const { balance, settings, plan } = await balanceAndSettingsPromise;
 
     if (
       balance <= 0 &&

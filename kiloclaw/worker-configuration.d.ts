@@ -14,7 +14,7 @@ declare namespace Cloudflare {
 		FLY_REGISTRY_APP: "kiloclaw-machines";
 		FLY_ORG_SLUG: "kilo-679";
 		FLY_IMAGE_TAG: "latest";
-		FLY_REGION: "dfw,ewr,lax,sjc,eu";
+		FLY_REGION: "eu,us";
 		OPENCLAW_ALLOWED_ORIGINS: "https://claw.kilosessions.ai,https://kilo.ai,https://www.kilo.ai";
 		REQUIRE_PROXY_TOKEN: "true";
 		PROACTIVE_REFRESH_THRESHOLD_HOURS: "72";

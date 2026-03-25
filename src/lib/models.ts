@@ -16,13 +16,13 @@ import {
 } from '@/lib/providers/anthropic';
 import { corethink_free_model } from '@/lib/providers/corethink';
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
-import { minimax_m21_free_model, minimax_m25_free_model } from '@/lib/providers/minimax';
-import { kimi_k25_free_model } from '@/lib/providers/moonshotai';
+import { MINIMAX_CURRENT_MODEL_ID, minimax_m25_free_model } from '@/lib/providers/minimax';
+import { KIMI_CURRENT_MODEL_ID } from '@/lib/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/providers/morph';
+import { gpt_oss_20b_free_model } from '@/lib/providers/openai';
 import { qwen35_plus_free_model } from '@/lib/providers/qwen';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 import { mimo_v2_omni_free_model, mimo_v2_pro_free_model } from '@/lib/providers/xiaomi';
-import { zai_glm5_free_model } from '@/lib/providers/zai';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
@@ -37,20 +37,22 @@ export const preferredModels = [
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   'openai/gpt-5.4',
   'google/gemini-3.1-pro-preview',
-  'minimax/minimax-m2.7',
-  'moonshotai/kimi-k2.5',
+  MINIMAX_CURRENT_MODEL_ID,
+  KIMI_CURRENT_MODEL_ID,
   'z-ai/glm-5',
   'x-ai/grok-code-fast-1',
 ].filter(m => m !== null);
 
-export function getMonitoredModels() {
-  return [
-    ...new Set(
-      preferredModels.map(model =>
-        isKiloAutoModel(model) ? resolveAutoModel(model, null).model : model
-      )
-    ),
-  ];
+export async function getMonitoredModels() {
+  const set = new Set<string>();
+  for (const model of preferredModels) {
+    if (isKiloAutoModel(model)) {
+      set.add((await resolveAutoModel(model, null, Promise.resolve(0))).model);
+    } else {
+      set.add(model);
+    }
+  }
+  return [...set];
 }
 
 export function isFreeModel(model: string): boolean {
@@ -77,15 +79,13 @@ export const kiloFreeModels = [
   // Instead, set status to 'disabled' first
   // and only remove when very few users are requesting it.
   corethink_free_model,
-  kimi_k25_free_model,
+  gpt_oss_20b_free_model,
   minimax_m25_free_model,
-  minimax_m21_free_model,
   mimo_v2_pro_free_model,
   mimo_v2_omni_free_model,
   morph_warp_grep_free_model,
   grok_code_fast_1_optimized_free_model,
   qwen35_plus_free_model,
-  zai_glm5_free_model,
 ] as KiloFreeModel[];
 
 export function isKiloStealthModel(model: string): boolean {

@@ -14,6 +14,10 @@
 - Keep titles under 72 characters.
 - Do not end the title with a period.
 
+## GitHub User Assignment
+
+When assigning PRs or issues (e.g., user says "assign to me"), resolve the GitHub username with `gh api user --jq '.login'`. Never guess usernames.
+
 ## Draft PRs
 
 When creating a pull request, create it as **ready for review** by default. Only create it as a draft (`gh pr create --draft`) if the user explicitly requests a draft PR. Look for phrases like "draft", "WIP", or "not ready for review" in the user's prompt.

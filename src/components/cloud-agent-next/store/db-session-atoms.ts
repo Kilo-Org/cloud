@@ -600,7 +600,7 @@ export const createNewSessionInIndexedDbAtom = atom(
       title,
       git_url: null,
       cloud_agent_session_id: cloudAgentSessionId,
-      created_on_platform: 'cloud-agent',
+      created_on_platform: 'cloud-agent-web',
       created_at: nowDate,
       updated_at: nowDate,
       last_mode: mode ?? null,

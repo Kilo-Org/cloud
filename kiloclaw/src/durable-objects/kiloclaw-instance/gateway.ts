@@ -7,6 +7,7 @@ import {
   GatewayCommandResponseSchema,
   ConfigRestoreResponseSchema,
   ControllerVersionResponseSchema,
+  GatewayReadyResponseSchema,
   EnvPatchResponseSchema,
   OpenclawConfigResponseSchema,
   GatewayControllerError,
@@ -234,6 +235,32 @@ export async function getControllerVersion(
   } catch (error) {
     if (isErrorUnknownRoute(error)) {
       return null;
+    }
+    throw error;
+  }
+}
+
+export async function getGatewayReady(
+  state: InstanceMutableState,
+  env: KiloClawEnv
+): Promise<Record<string, unknown> | null> {
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/gateway/ready',
+      'GET',
+      GatewayReadyResponseSchema
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) {
+      return null;
+    }
+    // During startup the gateway process may not be running yet, producing
+    // a 503 from the controller. Return a descriptive object instead of
+    // throwing so the frontend poll doesn't see a wall of 500s.
+    if (error instanceof GatewayControllerError) {
+      return { ready: false, error: error.message, status: error.status };
     }
     throw error;
   }

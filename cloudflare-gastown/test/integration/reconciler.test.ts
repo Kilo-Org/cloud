@@ -126,6 +126,77 @@ describe('Reconciler', () => {
     });
   });
 
+  // ── #1358: Heartbeat restores working status ────────────────────────
+
+  describe('#1358: dispatch timeout race recovery', () => {
+    it('should restore idle agent to working on heartbeat', async () => {
+      const agent = await town.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `heartbeat-restore-${townName}`,
+        rig_id: 'rig-1',
+      });
+      const bead = await town.createBead({
+        type: 'issue',
+        title: 'Heartbeat test',
+        rig_id: 'rig-1',
+      });
+
+      // Simulate dispatch timeout race: agent is hooked + idle
+      // (dispatchAgent set it to working, then timeout set it back to idle)
+      await town.hookBead(agent.id, bead.bead_id);
+      await town.updateAgentStatus(agent.id, 'idle');
+
+      const before = await town.getAgentAsync(agent.id);
+      expect(before?.status).toBe('idle');
+
+      // Agent sends a heartbeat (proving it's alive in the container)
+      await town.touchAgentHeartbeat(agent.id);
+
+      // Status should be restored to working
+      const after = await town.getAgentAsync(agent.id);
+      expect(after?.status).toBe('working');
+    });
+
+    it('should not change status of a working agent on heartbeat', async () => {
+      const agent = await town.registerAgent({
+        role: 'polecat',
+        name: 'P2',
+        identity: `heartbeat-noop-${townName}`,
+        rig_id: 'rig-1',
+      });
+      const bead = await town.createBead({
+        type: 'issue',
+        title: 'Heartbeat noop test',
+        rig_id: 'rig-1',
+      });
+
+      await town.hookBead(agent.id, bead.bead_id);
+      await town.updateAgentStatus(agent.id, 'working');
+
+      await town.touchAgentHeartbeat(agent.id);
+
+      const after = await town.getAgentAsync(agent.id);
+      expect(after?.status).toBe('working');
+    });
+
+    it('should not change status of an exited agent on heartbeat', async () => {
+      const agent = await town.registerAgent({
+        role: 'polecat',
+        name: 'P3',
+        identity: `heartbeat-exited-${townName}`,
+        rig_id: 'rig-1',
+      });
+
+      await town.updateAgentStatus(agent.id, 'exited');
+
+      await town.touchAgentHeartbeat(agent.id);
+
+      const after = await town.getAgentAsync(agent.id);
+      expect(after?.status).toBe('exited');
+    });
+  });
+
   // ── Event-driven agentDone ──────────────────────────────────────────
 
   describe('event-driven agentDone', () => {

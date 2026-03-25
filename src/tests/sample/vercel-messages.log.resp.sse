@@ -1,0 +1,39 @@
+event: message_start
+data: {"type":"message_start","message":{"id":"gen_01KMFKV0SBFKVM87H8RCDDS0CK","type":"message","role":"assistant","content":[],"model":"anthropic/claude-sonnet-4.6","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" there"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"! "}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"👋 How are"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" you doing?"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" Is"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" there something I can help you with today"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"?"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":9,"output_tokens":25,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0}},"provider_metadata":{"anthropic":{"usage":{"input_tokens":9,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":25},"cacheCreationInputTokens":0,"stopSequence":null,"iterations":null,"container":null,"contextManagement":null},"gateway":{"routing":{"originalModelId":"anthropic/claude-sonnet-4.6","resolvedProvider":"bedrock","resolvedProviderApiModelId":"global.anthropic.claude-sonnet-4-6","internalResolvedModelId":"bedrock:global.anthropic.claude-sonnet-4-6","fallbacksAvailable":["anthropic","vertexAnthropic"],"internalReasoning":"Custom provider order specified: bedrock → anthropic → vertexAnthropic. Selected bedrock for claude-sonnet-4.6. 2 fallback(s) available: anthropic, vertexAnthropic","planningReasoning":"BYOK credentials available for: bedrock, anthropic, vertexAnthropic. System credentials planned for: bedrock, anthropic, vertexAnthropic. Total execution order: bedrock(BYOK) → anthropic(BYOK) → vertexAnthropic(BYOK) → bedrock(system) → anthropic(system) → vertexAnthropic(system)","canonicalSlug":"anthropic/claude-sonnet-4.6","finalProvider":"bedrock","attempts":[{"provider":"bedrock","internalModelId":"bedrock:global.anthropic.claude-sonnet-4-6","providerApiModelId":"global.anthropic.claude-sonnet-4-6","credentialType":"byok","success":true,"startTime":410532.007093,"endTime":413743.858498,"providerRequestId":"305d0d3d-1a2c-47fe-a99f-96f30082adbd","statusCode":200,"providerResponseId":"msg_bdrk_01UJYNExfyCQVLXEBgP736G3"}],"modelAttemptCount":1,"modelAttempts":[{"modelId":"bedrock:global.anthropic.claude-sonnet-4-6","canonicalSlug":"anthropic/claude-sonnet-4.6","success":true,"providerAttemptCount":1,"providerAttempts":[{"provider":"bedrock","internalModelId":"bedrock:global.anthropic.claude-sonnet-4-6","providerApiModelId":"global.anthropic.claude-sonnet-4-6","credentialType":"byok","success":true,"startTime":410532.007093,"endTime":413743.858498,"providerRequestId":"305d0d3d-1a2c-47fe-a99f-96f30082adbd","statusCode":200,"providerResponseId":"msg_bdrk_01UJYNExfyCQVLXEBgP736G3"}]}],"totalProviderAttemptCount":1},"cost":"0","marketCost":"0.000402","generationId":"gen_01KMFKV0SBFKVM87H8RCDDS0CK","billableWebSearchCalls":0}}}
+
+event: message_stop
+data: {"type":"message_stop"}
+

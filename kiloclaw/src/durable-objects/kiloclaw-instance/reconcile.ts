@@ -26,6 +26,23 @@ import type { ReconcileContext } from './log';
 import { ensureVolume, staleProvisionAgeMs } from './fly-machines';
 import { mintFreshApiKey } from './config';
 import * as gateway from './gateway';
+import { writeEvent, eventContextFromState } from '../../utils/analytics';
+
+function emitStartFailedEvent(
+  env: { KILOCLAW_AE?: AnalyticsEngineDataset },
+  state: InstanceMutableState,
+  label: string,
+  error?: string
+): void {
+  writeEvent(env, {
+    event: 'instance.provisioning_failed',
+    delivery: 'do',
+    status: 'stopped',
+    label,
+    error,
+    ...eventContextFromState(state),
+  });
+}
 
 /**
  * Check actual Fly state against DO state and fix drift.
@@ -281,6 +298,12 @@ async function reconcileStarting(
           healthCheckFailCount: 0,
         })
       );
+      emitStartFailedEvent(
+        env,
+        state,
+        'starting_timeout',
+        state.lastStartErrorMessage ?? undefined
+      );
       return;
     }
     // start() hasn't persisted a machine ID yet — still in progress, wait.
@@ -324,6 +347,12 @@ async function reconcileStarting(
           healthCheckFailCount: 0,
         })
       );
+      emitStartFailedEvent(
+        env,
+        state,
+        'starting_timeout_with_machine',
+        state.lastStartErrorMessage ?? undefined
+      );
     }
   } catch (err) {
     if (fly.isFlyNotFound(err)) {
@@ -347,6 +376,7 @@ async function reconcileStarting(
           healthCheckFailCount: 0,
         })
       );
+      emitStartFailedEvent(env, state, 'starting_machine_gone', 'machine gone during start');
     } else if (isTimedOut) {
       // Transient Fly API error but we've exceeded the starting timeout.
       // Fall back to 'stopped' so the user can retry instead of staying
@@ -369,6 +399,12 @@ async function reconcileStarting(
           lastStoppedAt: state.lastStoppedAt,
           healthCheckFailCount: 0,
         })
+      );
+      emitStartFailedEvent(
+        env,
+        state,
+        'starting_timeout_transient_error',
+        err instanceof Error ? err.message : String(err)
       );
     } else {
       // Transient Fly API error — leave in 'starting', alarm will retry.
@@ -605,11 +641,13 @@ export async function attemptMetadataRecovery(
   flyConfig: FlyClientConfig,
   ctx: DurableObjectState,
   state: InstanceMutableState,
-  rctx: ReconcileContext
+  rctx: ReconcileContext,
+  skipCooldown?: boolean
 ): Promise<boolean> {
   if (!state.userId) return false;
 
   if (
+    !skipCooldown &&
     state.lastMetadataRecoveryAt &&
     Date.now() - state.lastMetadataRecoveryAt < METADATA_RECOVERY_COOLDOWN_MS
   ) {
@@ -742,6 +780,7 @@ export async function syncStatusWithFly(
   // failed is definitively terminal — transition immediately without waiting for
   // SELF_HEAL_THRESHOLD consecutive checks like we do for stopped/created.
   if (flyState === 'failed' && state.status !== 'stopped') {
+    const wasStarting = state.status === 'starting';
     rctx.log('sync_status_failed', {
       old_state: state.status,
       new_state: 'stopped',
@@ -759,6 +798,9 @@ export async function syncStatusWithFly(
         healthCheckFailCount: 0,
       })
     );
+    if (wasStarting) {
+      emitStartFailedEvent(rctx.env, state, 'fly_failed_state', 'fly machine entered failed state');
+    }
     return;
   }
 

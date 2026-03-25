@@ -28,6 +28,9 @@ import {
   PanelTop,
   PanelLeft,
   PanelRight,
+  Bug,
+  Github,
+  MessageCircle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -425,19 +428,28 @@ function TabBar({
   closeTab: (tabId: string) => void;
 }) {
   const [showPositionPicker, setShowPositionPicker] = useState(false);
+  const [showBugMenu, setShowBugMenu] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const bugMenuRef = useRef<HTMLDivElement>(null);
 
   // Close picker on outside click
   useEffect(() => {
-    if (!showPositionPicker) return;
+    if (!showPositionPicker && !showBugMenu) return;
     const handler = (e: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+      if (
+        showPositionPicker &&
+        pickerRef.current &&
+        !pickerRef.current.contains(e.target as Node)
+      ) {
         setShowPositionPicker(false);
+      }
+      if (showBugMenu && bugMenuRef.current && !bugMenuRef.current.contains(e.target as Node)) {
+        setShowBugMenu(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [showPositionPicker]);
+  }, [showPositionPicker, showBugMenu]);
 
   const borderClass = horizontal ? 'border-b border-white/[0.06]' : 'border-r border-white/[0.06]';
 
@@ -521,6 +533,26 @@ function TabBar({
           })}
         </AnimatePresence>
       </div>
+
+      {/* Bug report dropdown */}
+      {horizontal && (
+        <div ref={bugMenuRef} className="relative shrink-0">
+          <button
+            onClick={() => setShowBugMenu(p => !p)}
+            className="mr-2 flex items-center gap-1 rounded px-2 py-1 text-[10px] text-white/30 transition-colors hover:bg-white/[0.04] hover:text-white/50"
+          >
+            <Bug className="size-3" />
+            <span className="hidden sm:inline">Report a Bug</span>
+          </button>
+          {showBugMenu && (
+            <BugReportMenu
+              position={position}
+              triggerRef={bugMenuRef}
+              onClose={() => setShowBugMenu(false)}
+            />
+          )}
+        </div>
+      )}
 
       {/* Position picker */}
       <div ref={pickerRef}>
@@ -628,6 +660,89 @@ function PositionPicker({
             <Icon className="size-3.5" />
             {label}
           </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Bug Report Menu ──────────────────────────────────────────────────────
+
+const BUG_REPORT_OPTIONS = [
+  {
+    label: 'New GitHub Issue',
+    href: 'https://github.com/Kilo-Org/cloud/issues/new?template=gastown-bug.yml&labels=gastown,bug',
+    Icon: Github,
+  },
+  {
+    label: 'Discord Channel',
+    href: 'https://discord.com/channels/1349288496988160052/1485796776635142174',
+    Icon: MessageCircle,
+  },
+];
+
+function BugReportMenu({
+  position,
+  triggerRef,
+  onClose,
+}: {
+  position: TerminalPosition;
+  triggerRef: React.RefObject<HTMLDivElement | null>;
+  onClose: () => void;
+}) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<React.CSSProperties>({ opacity: 0 });
+
+  useEffect(() => {
+    const trigger = triggerRef.current;
+    const popover = popoverRef.current;
+    if (!trigger || !popover) return;
+    const tr = trigger.getBoundingClientRect();
+    const pr = popover.getBoundingClientRect();
+    const gap = 4;
+
+    let top: number;
+    let left: number;
+
+    if (position === 'bottom') {
+      top = tr.top - pr.height - gap;
+      left = tr.left;
+    } else if (position === 'top') {
+      top = tr.bottom + gap;
+      left = tr.left;
+    } else if (position === 'left') {
+      top = tr.top;
+      left = tr.right + gap;
+    } else {
+      top = tr.top;
+      left = tr.left - pr.width - gap;
+    }
+
+    top = Math.max(4, Math.min(top, window.innerHeight - pr.height - 4));
+    left = Math.max(4, Math.min(left, window.innerWidth - pr.width - 4));
+
+    setStyle({ top, left, opacity: 1 });
+  }, [position, triggerRef]);
+
+  return (
+    <div
+      ref={popoverRef}
+      className="fixed z-[60] w-max rounded-lg border border-white/[0.15] bg-[#1e1e1e] p-1.5 shadow-2xl backdrop-blur-sm"
+      style={style}
+    >
+      <div className="flex flex-col gap-0.5">
+        {BUG_REPORT_OPTIONS.map(({ label, href, Icon }) => (
+          <a
+            key={label}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onClose}
+            className="flex items-center gap-2 rounded-md px-3 py-2 text-[11px] text-white/50 whitespace-nowrap transition-colors hover:bg-white/[0.07] hover:text-white/70"
+          >
+            <Icon className="size-3.5" />
+            {label}
+          </a>
         ))}
       </div>
     </div>

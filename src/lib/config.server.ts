@@ -8,17 +8,9 @@ import 'server-only';
 
 export const IS_IN_AUTOMATED_TEST = !!getEnvVariable('IS_IN_AUTOMATED_TEST');
 export const NEXTAUTH_URL = APP_URL;
-export const CUSTOMERIO_EMAIL_API_KEY = getEnvVariable('CUSTOMERIO_EMAIL_API_KEY');
 export const MAILGUN_API_KEY = getEnvVariable('MAILGUN_API_KEY');
 export const MAILGUN_DOMAIN = getEnvVariable('MAILGUN_DOMAIN');
-// Which email backend to use: 'customerio' (default) or 'mailgun'
-const emailProviderRaw = getEnvVariable('EMAIL_PROVIDER') || 'customerio';
-if (emailProviderRaw !== 'customerio' && emailProviderRaw !== 'mailgun') {
-  throw new Error(
-    `Invalid EMAIL_PROVIDER: '${emailProviderRaw}'. Must be 'customerio' or 'mailgun'`
-  );
-}
-export const EMAIL_PROVIDER = emailProviderRaw;
+export const NEVERBOUNCE_API_KEY = getEnvVariable('NEVERBOUNCE_API_KEY');
 export const WORKOS_API_KEY = getEnvVariable('WORKOS_API_KEY');
 export const WORKOS_CLIENT_ID = getEnvVariable('WORKOS_CLIENT_ID');
 export const GOOGLE_CLIENT_ID = getEnvVariable('GOOGLE_CLIENT_ID');
@@ -110,11 +102,17 @@ export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
 export const SLACK_CLIENT_SECRET = getEnvVariable('SLACK_CLIENT_SECRET');
 export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
 
-// Discord
+// Discord (bot integration — existing)
 export const DISCORD_CLIENT_ID = getEnvVariable('DISCORD_CLIENT_ID');
 export const DISCORD_CLIENT_SECRET = getEnvVariable('DISCORD_CLIENT_SECRET');
 export const DISCORD_BOT_TOKEN = getEnvVariable('DISCORD_BOT_TOKEN');
 export const DISCORD_PUBLIC_KEY = getEnvVariable('DISCORD_PUBLIC_KEY');
+
+// Discord (OAuth user-linking app — separate application for auth + guild membership)
+export const DISCORD_OAUTH_CLIENT_ID = getEnvVariable('DISCORD_OAUTH_CLIENT_ID');
+export const DISCORD_OAUTH_CLIENT_SECRET = getEnvVariable('DISCORD_OAUTH_CLIENT_SECRET');
+export const DISCORD_OAUTH_BOT_TOKEN = getEnvVariable('DISCORD_OAUTH_BOT_TOKEN');
+export const DISCORD_SERVER_ID = getEnvVariable('DISCORD_SERVER_ID');
 
 // Posts user feedback into a fixed Slack channel in the Kilo workspace.
 // Expected to be a Slack Incoming Webhook URL.

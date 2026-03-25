@@ -4,7 +4,7 @@
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./src/index");
-		durableNamespaces: "SessionIngestDO" | "SessionAccessCacheDO";
+		durableNamespaces: "SessionIngestDO" | "SessionAccessCacheDO" | "UserConnectionDO";
 	}
 	interface Env {
 		USER_EXISTS_CACHE: KVNamespace;
@@ -15,6 +15,7 @@ declare namespace Cloudflare {
 		INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
 		SESSION_INGEST_DO: DurableObjectNamespace<import("./src/index").SessionIngestDO>;
 		SESSION_ACCESS_CACHE_DO: DurableObjectNamespace<import("./src/index").SessionAccessCacheDO>;
+		USER_CONNECTION_DO: DurableObjectNamespace<import("./src/index").UserConnectionDO>;
 		O11Y: Fetcher /* o11y */;
 	}
 }

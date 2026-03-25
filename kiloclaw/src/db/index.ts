@@ -17,6 +17,16 @@ export async function findPepperByUserId(db: WorkerDb, userId: string) {
   return row;
 }
 
+export async function findEmailByUserId(db: WorkerDb, userId: string): Promise<string | null> {
+  const row = await db
+    .select({ email: kilocode_users.google_user_email })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, userId))
+    .limit(1)
+    .then(rows => rows[0] ?? null);
+  return row?.email ?? null;
+}
+
 export async function validateAndRedeemAccessCode(db: WorkerDb, code: string, userId: string) {
   return await db.transaction(async tx => {
     const rows = await tx

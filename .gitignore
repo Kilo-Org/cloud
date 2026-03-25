@@ -100,3 +100,6 @@ supabase/.temp
 .dev-logs/
 
 .kilo/plans
+
+# @kilocode/trpc intermediate tsc output (bundled index.d.ts is committed)
+packages/trpc/dist/tsc/

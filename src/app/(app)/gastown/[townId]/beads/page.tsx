@@ -8,6 +8,6 @@ export default async function BeadsPage({ params }: { params: Promise<{ townId: 
   const user = await getUserFromAuthOrRedirect(
     `/users/sign_in?callbackPath=/gastown/${townId}/beads`
   );
-  if (!(await isGastownEnabled(user.id))) return notFound();
+  if (!(await isGastownEnabled(user.id, { isAdmin: user.is_admin }))) return notFound();
   return <BeadsPageClient townId={townId} />;
 }

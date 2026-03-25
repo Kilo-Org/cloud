@@ -18,6 +18,16 @@ import {
   type ClosedPrSortKey,
 } from '@/app/admin/community-prs/sorting';
 
+const ALL_REPOS = ['kilocode', 'cloud', 'kilo-marketplace', 'kilocode-legacy'] as const;
+type RepoFilterId = (typeof ALL_REPOS)[number];
+
+const REPO_LABELS: Record<RepoFilterId, string> = {
+  kilocode: 'kilocode',
+  cloud: 'cloud',
+  'kilo-marketplace': 'marketplace',
+  'kilocode-legacy': 'legacy',
+};
+
 const breadcrumbs = (
   <BreadcrumbItem>
     <BreadcrumbPage>Community PRs</BreadcrumbPage>
@@ -28,6 +38,33 @@ export default function GithubPrCountsAdminPage() {
   const trpcClient = useRawTRPCClient();
 
   const [includeDrafts, setIncludeDrafts] = useState(false);
+
+  const [selectedRepos, setSelectedRepos] = useState<ReadonlySet<RepoFilterId>>(new Set(ALL_REPOS));
+
+  const toggleRepo = useCallback((repo: RepoFilterId) => {
+    setSelectedRepos(prev => {
+      // If all are currently selected, clicking one repo selects only that repo
+      if (prev.size === ALL_REPOS.length) {
+        return new Set([repo]);
+      }
+      const next = new Set(prev);
+      if (next.has(repo)) {
+        next.delete(repo);
+      } else {
+        next.add(repo);
+      }
+      // If nothing selected, revert to all
+      if (next.size === 0) return new Set(ALL_REPOS);
+      return next;
+    });
+  }, []);
+
+  const selectAllRepos = useCallback(() => {
+    setSelectedRepos(new Set(ALL_REPOS));
+  }, []);
+
+  const allSelected = selectedRepos.size === ALL_REPOS.length;
+  const reposArray = useMemo(() => [...selectedRepos].sort(), [selectedRepos]);
 
   const [externalSort, setExternalSort] = useState<ExternalPrSort>({
     key: 'ageDays',
@@ -54,11 +91,19 @@ export default function GithubPrCountsAdminPage() {
   }, []);
 
   const { data, error, isFetching, isLoading, refetch } = useQuery({
-    queryKey: ['admin', 'github', 'kilocode', 'open-prs-summary', { includeDrafts }],
+    queryKey: [
+      'admin',
+      'github',
+      'community-prs',
+      'open-summary',
+      { includeDrafts, repos: reposArray },
+    ],
     queryFn: async () =>
-      trpcClient.admin.github.getKilocodeOpenPullRequestsSummary.query({ includeDrafts }),
+      trpcClient.admin.github.getKilocodeOpenPullRequestsSummary.query({
+        includeDrafts,
+        repos: reposArray,
+      }),
     staleTime: 60_000,
-    refetchInterval: 60_000,
   });
 
   const {
@@ -67,10 +112,12 @@ export default function GithubPrCountsAdminPage() {
     isLoading: closedIsLoading,
     refetch: closedRefetch,
   } = useQuery({
-    queryKey: ['admin', 'github', 'kilocode', 'closed-external-prs'],
-    queryFn: async () => trpcClient.admin.github.getKilocodeRecentlyClosedExternalPRs.query(),
+    queryKey: ['admin', 'github', 'community-prs', 'closed', { repos: reposArray }],
+    queryFn: async () =>
+      trpcClient.admin.github.getKilocodeRecentlyClosedExternalPRs.query({
+        repos: reposArray,
+      }),
     staleTime: 60_000,
-    refetchInterval: 60_000,
   });
 
   const handleRefresh = useCallback(() => {
@@ -112,10 +159,13 @@ export default function GithubPrCountsAdminPage() {
     };
   }, []);
 
-  const externalPrHref = useCallback((pr: { number: number; url?: string | null }) => {
-    if (pr.url) return pr.url;
-    return `https://github.com/Kilo-Org/kilocode/pull/${pr.number}`;
-  }, []);
+  const externalPrHref = useCallback(
+    (pr: { number: number; repo: string; url?: string | null }) => {
+      if (pr.url) return pr.url;
+      return `https://github.com/Kilo-Org/${pr.repo}/pull/${pr.number}`;
+    },
+    []
+  );
 
   const reviewStatusLabel = useCallback((reviewStatus: string) => {
     if (reviewStatus === 'changes_requested') return 'Changes requested';
@@ -136,10 +186,34 @@ export default function GithubPrCountsAdminPage() {
     >
       <div className="flex w-full flex-col gap-y-6">
         <div>
-          <h2 className="text-2xl font-bold">kilocode repo – open PRs</h2>
+          <h2 className="text-2xl font-bold">Community PRs</h2>
           <p className="text-muted-foreground mt-1">
-            Counts are split by whether the PR author is a member of the GitHub org “Kilo-Org”.
+            Counts are split by whether the PR author is a member of the GitHub org
+            &quot;Kilo-Org&quot;.
           </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground text-sm font-medium">Repos:</span>
+          <Button
+            type="button"
+            variant={allSelected ? 'default' : 'outline'}
+            size="sm"
+            onClick={selectAllRepos}
+          >
+            All
+          </Button>
+          {ALL_REPOS.map(repo => (
+            <Button
+              key={repo}
+              type="button"
+              variant={selectedRepos.has(repo) ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => toggleRepo(repo)}
+            >
+              {REPO_LABELS[repo]}
+            </Button>
+          ))}
         </div>
 
         {isLoading ? (
@@ -207,8 +281,8 @@ export default function GithubPrCountsAdminPage() {
                 <div className="flex flex-col gap-1">
                   <h3 className="text-lg font-semibold">Community open PRs</h3>
                   <p className="text-muted-foreground text-sm">
-                    Sorted by urgency by default (oldest first). “Team commented” checks both issue
-                    comments and review comments by Kilo team members.
+                    Sorted by urgency by default (oldest first). &quot;Team commented&quot; checks
+                    both issue comments and review comments by Kilo team members.
                   </p>
                 </div>
 
@@ -228,6 +302,14 @@ export default function GithubPrCountsAdminPage() {
                     onClick={() => toggleSort('ageDays')}
                   >
                     Age {externalSort.key === 'ageDays' ? `(${externalSort.direction})` : ''}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={externalSort.key === 'repo' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => toggleSort('repo')}
+                  >
+                    Repo {externalSort.key === 'repo' ? `(${externalSort.direction})` : ''}
                   </Button>
                   <Button
                     type="button"
@@ -257,6 +339,7 @@ export default function GithubPrCountsAdminPage() {
                       <thead>
                         <tr className="text-muted-foreground border-b">
                           <th className="px-2 py-2 text-left font-medium">PR</th>
+                          <th className="px-2 py-2 text-left font-medium">Repo</th>
                           <th className="px-2 py-2 text-left font-medium">Author</th>
                           <th className="px-2 py-2 text-left font-medium">Age</th>
                           <th className="px-2 py-2 text-left font-medium">Review status</th>
@@ -270,7 +353,7 @@ export default function GithubPrCountsAdminPage() {
                           const prHref = externalPrHref(pr);
                           return (
                             <tr
-                              key={pr.number}
+                              key={`${pr.repo}:${pr.number}`}
                               className={`border-b border-l-4 ${urgency.rowBorder} hover:bg-muted/30`}
                             >
                               <td className="px-2 py-3 align-top">
@@ -282,6 +365,11 @@ export default function GithubPrCountsAdminPage() {
                                 >
                                   #{pr.number} <span className="text-foreground">{pr.title}</span>
                                 </a>
+                              </td>
+                              <td className="px-2 py-3 align-top">
+                                <span className="text-muted-foreground text-xs">
+                                  {REPO_LABELS[pr.repo as RepoFilterId] ?? pr.repo}
+                                </span>
                               </td>
                               <td className="px-2 py-3 align-top">
                                 <span className="font-medium">{pr.authorLogin}</span>
@@ -348,6 +436,14 @@ export default function GithubPrCountsAdminPage() {
                   </Button>
                   <Button
                     type="button"
+                    variant={closedSort.key === 'repo' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => toggleClosedSort('repo')}
+                  >
+                    Repo {closedSort.key === 'repo' ? `(${closedSort.direction})` : ''}
+                  </Button>
+                  <Button
+                    type="button"
                     variant={closedSort.key === 'status' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => toggleClosedSort('status')}
@@ -374,6 +470,7 @@ export default function GithubPrCountsAdminPage() {
                       <thead>
                         <tr className="text-muted-foreground border-b">
                           <th className="px-2 py-2 text-left font-medium">PR</th>
+                          <th className="px-2 py-2 text-left font-medium">Repo</th>
                           <th className="px-2 py-2 text-left font-medium">Author</th>
                           <th className="px-2 py-2 text-left font-medium">Date</th>
                           <th className="px-2 py-2 text-left font-medium">Status</th>
@@ -388,7 +485,10 @@ export default function GithubPrCountsAdminPage() {
                               : 'border-red-600/40 bg-red-600/10 text-red-200';
 
                           return (
-                            <tr key={pr.number} className="hover:bg-muted/30 border-b">
+                            <tr
+                              key={`${pr.repo}:${pr.number}`}
+                              className="hover:bg-muted/30 border-b"
+                            >
                               <td className="px-2 py-3 align-top">
                                 <a
                                   href={pr.url}
@@ -398,6 +498,11 @@ export default function GithubPrCountsAdminPage() {
                                 >
                                   #{pr.number} <span className="text-foreground">{pr.title}</span>
                                 </a>
+                              </td>
+                              <td className="px-2 py-3 align-top">
+                                <span className="text-muted-foreground text-xs">
+                                  {REPO_LABELS[pr.repo as RepoFilterId] ?? pr.repo}
+                                </span>
                               </td>
                               <td className="px-2 py-3 align-top">
                                 <span className="font-medium">{pr.authorLogin}</span>

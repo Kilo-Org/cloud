@@ -206,6 +206,7 @@ export const kilocode_users = pgTable(
     completed_welcome_form: boolean().default(false).notNull(),
     linkedin_url: text(),
     github_url: text(),
+    discord_server_membership_verified_at: timestamp({ withTimezone: true, mode: 'string' }),
     openrouter_upstream_safety_identifier: text(),
     customer_source: text(),
   },
@@ -519,6 +520,7 @@ export const user_auth_provider = pgTable(
     email: text().notNull(),
     avatar_url: text().notNull(),
 
+    display_name: text(),
     hosted_domain: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
@@ -2332,6 +2334,7 @@ export const AppBuilderSessionReason = {
   Initial: 'initial', // First session created with project
   GitHubMigration: 'github_migration', // New session after migrating to GitHub
   Upgrade: 'upgrade', // New session after worker version upgrade (v1→v2)
+  ModelVisionChange: 'model_vision_change', // New session after switching between vision and text-only models
 } satisfies Record<string, string>;
 
 export const app_builder_project_sessions = pgTable(
@@ -3306,6 +3309,7 @@ export const kiloclaw_instances = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     sandbox_id: text().notNull(),
+    name: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),
   },

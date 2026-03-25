@@ -13,7 +13,7 @@ export default async function RigDetailPage({
     `/users/sign_in?callbackPath=/gastown/${townId}/rigs/${rigId}`
   );
 
-  if (!(await isGastownEnabled(user.id))) {
+  if (!(await isGastownEnabled(user.id, { isAdmin: user.is_admin }))) {
     return notFound();
   }
 

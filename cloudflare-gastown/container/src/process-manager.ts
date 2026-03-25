@@ -10,6 +10,7 @@ import { createKilo, type KiloClient } from '@kilocode/sdk';
 import { z } from 'zod';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted } from './completion-reporter';
+import { buildKiloConfigContent, kiloModel } from './agent-runner';
 import { log } from './logger';
 
 const MANAGER_LOG = '[process-manager]';
@@ -577,6 +578,7 @@ export async function startAgent(
     gastownSessionToken: request.envVars?.GASTOWN_SESSION_TOKEN ?? null,
     completionCallbackUrl: request.envVars?.GASTOWN_COMPLETION_CALLBACK_URL ?? null,
     model: request.model ?? null,
+    startupEnv: env,
   };
   agents.set(request.agentId, agent);
 
@@ -727,6 +729,221 @@ export async function sendMessage(agentId: string, prompt: string): Promise<void
 
   agent.messageCount++;
   agent.lastActivityAt = new Date().toISOString();
+}
+
+/**
+ * Update the model for a running agent by restarting its SDK server with
+ * new KILO_CONFIG_CONTENT. The kilo serve child process reads the model
+ * from KILO_CONFIG_CONTENT at startup (highest config precedence after
+ * enterprise managed config), so the only reliable way to change it is
+ * to restart the server process.
+ *
+ * The agent's session is re-created on the new server. The session history
+ * is persisted on disk by kilo serve, so it survives the restart.
+ *
+ * @param model OpenRouter-style model ID (e.g. "anthropic/claude-sonnet-4.6")
+ * @param smallModel Optional small model in the same format
+ */
+/**
+ * Extract the organizationId from the current KILO_CONFIG_CONTENT env var.
+ * The org ID is embedded as `provider.kilo.options.kilocodeOrganizationId`
+ * by `buildKiloConfigContent` at agent startup.
+ */
+function extractOrganizationId(): string | undefined {
+  const raw = process.env.KILO_CONFIG_CONTENT;
+  if (!raw) return undefined;
+  try {
+    const config = JSON.parse(raw) as Record<string, unknown>;
+    const provider = config.provider as Record<string, unknown> | undefined;
+    const kilo = provider?.kilo as Record<string, unknown> | undefined;
+    const options = kilo?.options as Record<string, unknown> | undefined;
+    const orgId = options?.kilocodeOrganizationId;
+    return typeof orgId === 'string' ? orgId : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const MAYOR_STARTUP_PROMPT = 'Mayor ready. Waiting for instructions.';
+
+/**
+ * Update the model for a running agent by restarting its SDK server with
+ * new KILO_CONFIG_CONTENT. The kilo serve child process reads the model
+ * from KILO_CONFIG_CONTENT at startup (highest config precedence after
+ * enterprise managed config), so the only reliable way to change it is
+ * to restart the server process.
+ *
+ * The agent's session is re-created on the new server and given the
+ * startup prompt so the mayor is ready for instructions.
+ *
+ * @param model OpenRouter-style model ID (e.g. "anthropic/claude-sonnet-4.6")
+ * @param smallModel Optional small model in the same format
+ */
+export async function updateAgentModel(
+  agentId: string,
+  model: string,
+  smallModel?: string,
+  conversationHistory?: string
+): Promise<void> {
+  const agent = agents.get(agentId);
+  if (!agent) throw new Error(`Agent ${agentId} not found`);
+  if (agent.status !== 'running' && agent.status !== 'starting') {
+    throw new Error(`Agent ${agentId} is not running (status: ${agent.status})`);
+  }
+
+  const oldInstance = sdkInstances.get(agent.workdir);
+  if (!oldInstance) throw new Error(`No SDK instance for agent ${agentId}`);
+
+  const oldSessionId = agent.sessionId;
+  const oldPort = agent.serverPort;
+  const oldModel = agent.model;
+  const prevConfigContent = process.env.KILO_CONFIG_CONTENT;
+  const prevOpenCodeContent = process.env.OPENCODE_CONFIG_CONTENT;
+
+  console.log(
+    `${MANAGER_LOG} updateAgentModel: restarting SDK server for agent ${agentId} with model=${model}`
+  );
+
+  // 1. Preserve organizationId from the current config before we replace it
+  const organizationId = extractOrganizationId();
+
+  // 2. Rebuild KILO_CONFIG_CONTENT with the new model and update process.env
+  //    so the next createKilo() spawns kilo serve with fresh config.
+  const kilocodeToken = process.env.KILOCODE_TOKEN;
+  if (kilocodeToken) {
+    const configJson = buildKiloConfigContent(
+      kilocodeToken,
+      model,
+      smallModel ?? 'anthropic/claude-haiku-4.5',
+      organizationId
+    );
+    process.env.KILO_CONFIG_CONTENT = configJson;
+    process.env.OPENCODE_CONFIG_CONTENT = configJson;
+  }
+
+  // 3. Remove the old instance from the map so ensureSDKServer creates a
+  //    new one — but DON'T close the old server yet. If the new server
+  //    fails to start we can restore the old one.
+  sdkInstances.delete(agent.workdir);
+  agent.model = model;
+
+  // Replay the full env from the initial dispatch so the new SDK server
+  // gets the same git identity, auth tokens, and plugin vars. Exclude
+  // KILO_CONFIG_CONTENT / OPENCODE_CONFIG_CONTENT — those were already
+  // rebuilt above with the new model and set on process.env.
+  //
+  // For env vars that syncConfigToContainer can update at runtime, prefer
+  // the live process.env value over the stale startupEnv snapshot.
+  const LIVE_ENV_KEYS = new Set([
+    'GASTOWN_CONTAINER_TOKEN',
+    'GIT_TOKEN',
+    'GITLAB_TOKEN',
+    'GITLAB_INSTANCE_URL',
+    'GITHUB_CLI_PAT',
+    'GASTOWN_GIT_AUTHOR_NAME',
+    'GASTOWN_GIT_AUTHOR_EMAIL',
+    'GASTOWN_DISABLE_AI_COAUTHOR',
+  ]);
+  const hotSwapEnv: Record<string, string> = {};
+  for (const [key, value] of Object.entries(agent.startupEnv)) {
+    if (key === 'KILO_CONFIG_CONTENT' || key === 'OPENCODE_CONFIG_CONTENT') continue;
+    if (LIVE_ENV_KEYS.has(key)) {
+      const live = process.env[key];
+      if (live) hotSwapEnv[key] = live;
+      continue;
+    }
+    hotSwapEnv[key] = value;
+  }
+
+  // Re-derive GH_TOKEN from live values using the same priority chain
+  // as buildAgentEnv: GITHUB_CLI_PAT > GIT_TOKEN > GITHUB_TOKEN.
+  // syncConfigToContainer updates these on process.env, but buildAgentEnv
+  // only ran once at initial dispatch. When all sources are cleared,
+  // remove GH_TOKEN so the SDK server doesn't retain stale credentials.
+  const liveGhCliPat = process.env.GITHUB_CLI_PAT;
+  const liveGhToken = liveGhCliPat ?? process.env.GIT_TOKEN ?? process.env.GITHUB_TOKEN;
+  if (liveGhToken) {
+    hotSwapEnv.GH_TOKEN = liveGhToken;
+  } else {
+    delete hotSwapEnv.GH_TOKEN;
+  }
+
+  try {
+    // 4. Create a new SDK server (spawns a fresh kilo serve with updated env)
+    const { client, port } = await ensureSDKServer(agent.workdir, hotSwapEnv);
+    agent.serverPort = port;
+
+    // 5. Create a new session and send the startup prompt.
+    //    The system prompt lives in AGENTS.md (on disk), so kilo serve picks
+    //    it up automatically for every session.
+    const sessionResult = await client.session.create({ body: {} });
+    const rawSession: unknown = sessionResult.data ?? sessionResult;
+    const parsed = SessionResponse.safeParse(rawSession);
+    if (!parsed.success) {
+      throw new Error('SDK session.create response missing required "id" field');
+    }
+    agent.sessionId = parsed.data.id;
+
+    const newInstance = sdkInstances.get(agent.workdir);
+    if (newInstance) {
+      newInstance.sessionCount++;
+    }
+
+    // Send the startup prompt, including conversation history if available
+    // so the mayor retains context across model changes (same mechanism
+    // used for container restarts — see PR #1494).
+    const prompt = conversationHistory
+      ? `${conversationHistory}\n\n${MAYOR_STARTUP_PROMPT}`
+      : MAYOR_STARTUP_PROMPT;
+    const modelParam = { providerID: 'kilo', modelID: model };
+    await client.session.prompt({
+      path: { id: agent.sessionId },
+      body: {
+        parts: [{ type: 'text', text: prompt }],
+        model: modelParam,
+      },
+    });
+    agent.messageCount = 1;
+
+    // 6. New server is healthy — now tear down the old one.
+    const oldController = eventAbortControllers.get(agentId);
+    if (oldController) oldController.abort();
+    oldInstance.server.close();
+
+    // 7. Re-subscribe to events on the new session
+    void subscribeToEvents(client, agent, {
+      agentId: agent.agentId,
+      role: agent.role,
+      name: agent.name,
+      model,
+      prompt,
+      rigId: agent.rigId,
+      townId: agent.townId,
+      identity: '',
+      gitUrl: '',
+      branch: '',
+      defaultBranch: '',
+    });
+
+    console.log(
+      `${MANAGER_LOG} updateAgentModel: SDK server restarted for agent ${agentId}, ` +
+        `old session=${oldSessionId} new session=${agent.sessionId} model=${model}`
+    );
+  } catch (err) {
+    // Restore the old server so the mayor keeps running on the previous model
+    console.warn(
+      `${MANAGER_LOG} updateAgentModel: failed for ${agentId}, restoring old server:`,
+      err
+    );
+    sdkInstances.set(agent.workdir, oldInstance);
+    agent.model = oldModel;
+    agent.sessionId = oldSessionId;
+    agent.serverPort = oldPort;
+    if (prevConfigContent !== undefined) process.env.KILO_CONFIG_CONTENT = prevConfigContent;
+    if (prevOpenCodeContent !== undefined)
+      process.env.OPENCODE_CONFIG_CONTENT = prevOpenCodeContent;
+    throw err;
+  }
 }
 
 export function getAgentStatus(agentId: string): ManagedAgent | null {

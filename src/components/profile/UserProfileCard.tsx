@@ -12,6 +12,7 @@ type UserProfileCardProps = {
   imageUrl: string | null;
   linkedinUrl: string | null;
   githubUrl: string | null;
+  githubOAuthDisplayName: string | null;
 };
 
 export function UserProfileCard({
@@ -20,8 +21,13 @@ export function UserProfileCard({
   imageUrl,
   linkedinUrl,
   githubUrl,
+  githubOAuthDisplayName,
 }: UserProfileCardProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+
+  const effectiveGithubUrl = githubOAuthDisplayName
+    ? `https://github.com/${githubOAuthDisplayName}`
+    : githubUrl;
 
   return (
     <>
@@ -47,7 +53,7 @@ export function UserProfileCard({
               />
               <ProfileLink
                 icon={<Github className="mr-1.5 h-3.5 w-3.5" />}
-                url={githubUrl}
+                url={effectiveGithubUrl}
                 label="GitHub"
               />
             </div>
@@ -67,6 +73,7 @@ export function UserProfileCard({
         onOpenChange={setEditDialogOpen}
         linkedinUrl={linkedinUrl}
         githubUrl={githubUrl}
+        githubLinkedViaOAuth={!!githubOAuthDisplayName}
       />
     </>
   );

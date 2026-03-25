@@ -49,7 +49,11 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     user_id: string;
   };
 }>(async (c, next) => {
-  const token = extractBearerToken(c.req.header('Authorization'));
+  let token = extractBearerToken(c.req.header('Authorization'));
+  if (!token && c.req.header('Upgrade') === 'websocket') {
+    token = c.req.query('token') ?? null;
+  }
+
   if (!token) {
     return c.json({ success: false, error: 'Missing or malformed Authorization header' }, 401);
   }

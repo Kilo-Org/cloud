@@ -1,3 +1,4 @@
 *.mp4 filter=lfs diff=lfs merge=lfs -text
 *.webm filter=lfs diff=lfs merge=lfs -text
 packages/db/src/migrations/meta/** linguist-generated=true
+packages/trpc/dist/index.d.ts linguist-generated=true

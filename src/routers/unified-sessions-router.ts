@@ -31,7 +31,9 @@ const createdOnPlatformField = z.string().min(1).max(100);
 const ListSessionsInputSchema = z.object({
   cursor: z.iso.datetime().optional(),
   limit: z.number().min(1).max(50).optional().default(PAGE_SIZE),
-  createdOnPlatform: createdOnPlatformField.optional(),
+  createdOnPlatform: z
+    .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
+    .optional(),
   orderBy: z.enum(['created_at', 'updated_at']).optional().default('created_at'),
   organizationId: z.uuid().nullable().optional(),
   includeSubSessions: z.boolean().optional().default(false),
@@ -41,7 +43,9 @@ const SearchInputSchema = z.object({
   search_string: z.string().min(1),
   limit: z.number().min(1).max(50).optional().default(PAGE_SIZE),
   offset: z.number().min(0).optional().default(0),
-  createdOnPlatform: createdOnPlatformField.optional(),
+  createdOnPlatform: z
+    .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
+    .optional(),
   organizationId: z.uuid().nullable().optional(),
   includeSubSessions: z.boolean().optional().default(false),
 });
@@ -54,7 +58,7 @@ function buildScopeFragments(
   tableName: 'cli_sessions' | 'cli_sessions_v2',
   opts: {
     userId: string;
-    createdOnPlatform?: string;
+    createdOnPlatform?: string | string[];
     organizationId?: string | null;
     includeSubSessions?: boolean;
   }
@@ -64,15 +68,26 @@ function buildScopeFragments(
   const fragments: SQL[] = [sql`${table.kilo_user_id} = ${opts.userId}`];
 
   if (opts.createdOnPlatform) {
-    if (opts.createdOnPlatform === 'extension') {
+    const platforms = Array.isArray(opts.createdOnPlatform)
+      ? opts.createdOnPlatform
+      : [opts.createdOnPlatform];
+
+    if (platforms.length === 1 && platforms[0] === 'extension') {
       fragments.push(
         sql`${table.created_on_platform} NOT IN (${sql.join(
           KNOWN_PLATFORMS.map(p => sql`${p}`),
           sql`, `
         )})`
       );
+    } else if (platforms.length === 1) {
+      fragments.push(sql`${table.created_on_platform} = ${platforms[0]}`);
     } else {
-      fragments.push(sql`${table.created_on_platform} = ${opts.createdOnPlatform}`);
+      fragments.push(
+        sql`${table.created_on_platform} IN (${sql.join(
+          platforms.map(p => sql`${p}`),
+          sql`, `
+        )})`
+      );
     }
   }
 

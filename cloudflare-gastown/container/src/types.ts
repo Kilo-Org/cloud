@@ -129,6 +129,8 @@ export type ManagedAgent = {
   completionCallbackUrl: string | null;
   /** Model ID used for this agent's sessions (e.g. "anthropic/claude-sonnet-4.6") */
   model: string | null;
+  /** Full env dict from buildAgentEnv, stored so model hot-swap can replay it. */
+  startupEnv: Record<string, string>;
 };
 
 export type AgentStatusResponse = {

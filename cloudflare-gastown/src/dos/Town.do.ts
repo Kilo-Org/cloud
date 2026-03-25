@@ -676,6 +676,12 @@ export class TownDO extends DurableObject<Env> {
   // ── Rig Config (KV, per-rig — configuration needed for container dispatch) ──
 
   async configureRig(rigConfig: RigConfig): Promise<void> {
+    return withLogTags({ source: 'Town.do', tags: { townId: this.townId } }, () =>
+      this._configureRig(rigConfig)
+    );
+  }
+
+  private async _configureRig(rigConfig: RigConfig): Promise<void> {
     logger.setTags({ rigId: rigConfig.rigId, userId: rigConfig.userId });
     logger.info('configureRig: start', { hasKilocodeToken: !!rigConfig.kilocodeToken });
     await this.ctx.storage.put(`rig:${rigConfig.rigId}:config`, rigConfig);
@@ -1846,6 +1852,19 @@ export class TownDO extends DurableObject<Env> {
     agentId: string;
     sessionStatus: 'idle' | 'active' | 'starting';
   }> {
+    return withLogTags({ source: 'Town.do', tags: { townId: this.townId } }, () =>
+      this._sendMayorMessage(message, _model, uiContext)
+    );
+  }
+
+  private async _sendMayorMessage(
+    message: string,
+    _model?: string,
+    uiContext?: string
+  ): Promise<{
+    agentId: string;
+    sessionStatus: 'idle' | 'active' | 'starting';
+  }> {
     const townId = this.townId;
 
     let mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
@@ -1938,6 +1957,15 @@ export class TownDO extends DurableObject<Env> {
    * without requiring the user to send a message first.
    */
   async ensureMayor(): Promise<{
+    agentId: string;
+    sessionStatus: 'idle' | 'active' | 'starting';
+  }> {
+    return withLogTags({ source: 'Town.do', tags: { townId: this.townId } }, () =>
+      this._ensureMayor()
+    );
+  }
+
+  private async _ensureMayor(): Promise<{
     agentId: string;
     sessionStatus: 'idle' | 'active' | 'starting';
   }> {

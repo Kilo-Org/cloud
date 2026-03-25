@@ -262,7 +262,7 @@ cmd_ae_reconciler() {
   #   double8=pendingEventCount, blob10=actionsByType JSON
   query_ae "
     SELECT
-      timestamp,
+      intDiv(toUInt32(timestamp), 300) * 300 AS bucket,
       SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_wall_ms,
       SUM(_sample_interval * double2) AS total_events_drained,
       SUM(_sample_interval * double3) AS total_actions,
@@ -272,8 +272,8 @@ cmd_ae_reconciler() {
     WHERE blob1 = 'reconciler_tick'
       AND blob6 = '${town_id}'
       AND timestamp > NOW() - INTERVAL '${hours}' HOUR
-    GROUP BY intDiv(toUInt32(timestamp), 300) * 300
-    ORDER BY timestamp DESC
+    GROUP BY bucket
+    ORDER BY bucket DESC
     LIMIT 20
     FORMAT JSONCompact
   " | python3 -c "
@@ -294,9 +294,13 @@ print('-' * 60)
 cols = [c.get('name','') for c in data.get('meta', [])]
 for row in rows:
     d = dict(zip(cols, row))
-    ts = d.get('timestamp','')
-    if isinstance(ts, str) and len(ts) > 19:
-        ts = ts[11:19]
+    bucket = d.get('bucket','')
+    # bucket is a unix timestamp (seconds); convert to HH:MM:SS
+    try:
+        from datetime import datetime, timezone
+        ts = datetime.fromtimestamp(int(bucket), tz=timezone.utc).strftime('%H:%M:%S')
+    except (ValueError, TypeError, OSError):
+        ts = str(bucket)
     print(f'{str(ts):>10s}  {float(d.get(\"avg_wall_ms\",0)):6.1f}  {float(d.get(\"total_events_drained\",0)):7.0f}  {float(d.get(\"total_actions\",0)):8.0f}  {float(d.get(\"total_violations\",0)):7.0f}  {float(d.get(\"max_pending\",0)):8.0f}')
 " 2>/dev/null
 }

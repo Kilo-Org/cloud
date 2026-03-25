@@ -122,6 +122,7 @@ import { adminAuditMiddleware } from './middleware/admin-audit.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
 import { logger } from './util/log.util';
 import { useWorkersLogger } from 'workers-tagged-logger';
+import type { MiddlewareHandler } from 'hono';
 import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
 import {
   handleGetMoleculeCurrentStep,
@@ -154,23 +155,29 @@ app.use('*', timingMiddleware);
 
 // ── Structured logging context ──────────────────────────────────────────
 // Establishes AsyncLocalStorage context so all downstream logs are tagged.
-app.use('*', useWorkersLogger('gastown-worker'));
+// Cast needed: workers-tagged-logger@1.0.0 was built against an older Hono.
+app.use('*', useWorkersLogger('gastown-worker') as unknown as MiddlewareHandler);
 
 // ── Request logging ─────────────────────────────────────────────────────
 app.use('*', async (c, next) => {
   const method = c.req.method;
   const path = c.req.path;
-  logger.info(`--> ${method} ${path}`);
-  await next();
-  const elapsed = Math.round(performance.now() - (c.get('requestStartTime') ?? 0));
-  // After auth middleware has run, context vars are available.
+  // Tag with route params immediately so all downstream logs (auth,
+  // handlers, DO calls) inherit them. Auth-derived tags (userId, orgId)
+  // are added after next() since auth middleware hasn't run yet.
   logger.setTags({
     townId: c.req.param('townId') || undefined,
     rigId: c.req.param('rigId') || undefined,
     agentId: c.req.param('agentId') || undefined,
+  });
+  logger.info(`--> ${method} ${path}`);
+  await next();
+  // Auth context is now available — tag for the response log line.
+  logger.setTags({
     userId: c.get('kiloUserId') || c.get('agentJWT')?.userId || undefined,
     orgId: c.get('orgId') || undefined,
   });
+  const elapsed = Math.round(performance.now() - (c.get('requestStartTime') ?? 0));
   logger.info(`<-- ${method} ${path} ${c.res.status}`, { durationMs: elapsed });
 });
 

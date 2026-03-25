@@ -33,11 +33,14 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import styles from './TerminalBar.module.css';
 
 type TerminalBarProps = {
   townId: string;
   /** Override base path for org-scoped routes (e.g. /organizations/[id]/gastown/[townId]) */
   basePath?: string;
+  /** Whether the terminal is in fullscreen mode */
+  fullscreen?: boolean;
 };
 
 /**
@@ -45,7 +48,7 @@ type TerminalBarProps = {
  * Agent terminal tabs are opened/closed via TerminalBarContext.
  * Can be positioned at bottom/top/right/left with drag-to-resize.
  */
-export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarProps) {
+export function TerminalBar({ townId, basePath: basePathOverride, fullscreen: propFullscreen }: TerminalBarProps) {
   const townBasePath = basePathOverride ?? `/gastown/${townId}`;
   const { state: sidebarState, isMobile } = useSidebar();
   const {
@@ -146,13 +149,61 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
   const effectiveActiveId = activeTabId ?? 'mayor';
   const activeTab = allTabs.find(t => t.id === effectiveActiveId) ?? allTabs[0];
 
+  // ── Fullscreen state ────────────────────────────────────────────────
+  const [localFullscreen, setLocalFullscreen] = useState(false);
+  const isFullscreen = propFullscreen || localFullscreen;
+  const previousSizeRef = useRef<number>(size);
+
+  const enterFullscreen = useCallback(() => {
+    previousSizeRef.current = size;
+    setLocalFullscreen(true);
+  }, [size]);
+
+  const exitFullscreen = useCallback(() => {
+    setSize(previousSizeRef.current);
+    setLocalFullscreen(false);
+  }, [setSize]);
+
+  const toggleFullscreen = useCallback(() => {
+    if (isFullscreen) {
+      exitFullscreen();
+    } else {
+      enterFullscreen();
+    }
+  }, [isFullscreen, enterFullscreen, exitFullscreen]);
+
+  // Escape key exits fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        exitFullscreen();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen, exitFullscreen]);
+
   // ── Resize drag logic ──────────────────────────────────────────────
   const isDragging = useRef(false);
   const startPos = useRef(0);
   const startSize = useRef(0);
+  const lastClickTime = useRef(0);
 
   const onResizePointerDown = useCallback(
     (e: React.PointerEvent) => {
+      // Prevent drag on double-click (detected by < 300ms between clicks)
+      const now = Date.now();
+      if (now - lastClickTime.current < 300) {
+        return;
+      }
+      lastClickTime.current = now;
+
+      if (isFullscreen) {
+        exitFullscreen();
+        return;
+      }
+
       e.preventDefault();
       isDragging.current = true;
       startSize.current = size;
@@ -184,8 +235,15 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
       document.addEventListener('pointermove', onPointerMove);
       document.addEventListener('pointerup', onPointerUp);
     },
-    [size, position, horizontal, setSize]
+    [size, position, horizontal, setSize, isFullscreen, exitFullscreen]
   );
+
+  // Double-click handler for resize bar
+  const onResizeDoubleClick = useCallback(() => {
+    if (!collapsed) {
+      toggleFullscreen();
+    }
+  }, [collapsed, toggleFullscreen]);
 
   // ── Compute container styles ───────────────────────────────────────
   const totalSize = collapsed ? COLLAPSED_SIZE : COLLAPSED_SIZE + size;
@@ -270,14 +328,14 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
 
   return (
     <div
-      className={`fixed ${borderClass} border-white/[0.08] bg-[#0a0a0a] transition-[left] duration-200 ease-linear`}
-      style={containerStyle}
+      className={`fixed ${borderClass} border-white/[0.08] bg-[#0a0a0a] transition-[left] duration-200 ease-linear ${isFullscreen ? `${styles.fullscreen} ${styles.fullscreenTransition}` : ''}`}
+      style={isFullscreen ? {} : containerStyle}
     >
       <div className={`flex h-full w-full ${horizontal ? 'flex-col' : 'flex-row'}`}>
         {position === 'bottom' && (
           <>
             {!collapsed && (
-              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown} onDoubleClick={onResizeDoubleClick}>
                 <div className={resizeHandleIndicator} />
               </div>
             )}
@@ -300,6 +358,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               size={size}
               townId={townId}
               alarmWs={alarmWs}
+              fullscreen={isFullscreen}
             />
           </>
         )}
@@ -312,6 +371,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               size={size}
               townId={townId}
               alarmWs={alarmWs}
+              fullscreen={isFullscreen}
             />
             <TabBar
               allTabs={allTabs}
@@ -326,7 +386,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               closeTab={closeTab}
             />
             {!collapsed && (
-              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown} onDoubleClick={onResizeDoubleClick}>
                 <div className={resizeHandleIndicator} />
               </div>
             )}
@@ -335,7 +395,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
         {position === 'right' && (
           <>
             {!collapsed && (
-              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown} onDoubleClick={onResizeDoubleClick}>
                 <div className={resizeHandleIndicator} />
               </div>
             )}
@@ -358,6 +418,7 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               size={size}
               townId={townId}
               alarmWs={alarmWs}
+              fullscreen={isFullscreen}
             />
           </>
         )}
@@ -382,9 +443,10 @@ export function TerminalBar({ townId, basePath: basePathOverride }: TerminalBarP
               size={size}
               townId={townId}
               alarmWs={alarmWs}
+              fullscreen={isFullscreen}
             />
             {!collapsed && (
-              <div className={resizeHandleClass} onPointerDown={onResizePointerDown}>
+              <div className={resizeHandleClass} onPointerDown={onResizePointerDown} onDoubleClick={onResizeDoubleClick}>
                 <div className={resizeHandleIndicator} />
               </div>
             )}
@@ -758,6 +820,7 @@ function TerminalContent({
   size,
   townId,
   alarmWs,
+  fullscreen,
 }: {
   activeTab: TabDef;
   collapsed: boolean;
@@ -765,6 +828,7 @@ function TerminalContent({
   size: number;
   townId: string;
   alarmWs: AlarmWsResult;
+  fullscreen?: boolean;
 }) {
   if (collapsed) return null;
 
@@ -776,8 +840,8 @@ function TerminalContent({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.15 }}
-        style={horizontal ? { height: size } : { width: size }}
-        className={`overflow-hidden ${horizontal ? '' : 'h-full'}`}
+        style={fullscreen ? {} : (horizontal ? { height: size } : { width: size })}
+        className={`overflow-hidden ${horizontal ? '' : 'h-full'} ${fullscreen ? 'h-full' : ''}`}
       >
         {activeTab.kind === 'mayor' ? (
           <MayorTerminalPane townId={townId} collapsed={collapsed} />

@@ -63,12 +63,18 @@ export async function updateTownConfig(
         : update.github_cli_pat
       : current.github_cli_pat;
 
+  // Normalize empty-string model fields to undefined so resolveModel()'s
+  // nullish-coalescing fallback works correctly when the user clears them.
+  const resolvedDefaultModel =
+    update.default_model !== undefined ? update.default_model || undefined : current.default_model;
+
   const merged: TownConfig = {
     ...current,
     ...update,
     env_vars: resolvedEnvVars,
     git_auth: resolvedGitAuth,
     github_cli_pat: resolvedGithubCliPat,
+    default_model: resolvedDefaultModel,
     refinery:
       update.refinery !== undefined
         ? {

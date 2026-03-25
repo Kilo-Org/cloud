@@ -266,7 +266,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
           ...(gitlabToken.startsWith('****') ? {} : { gitlab_token: gitlabToken }),
           gitlab_instance_url: gitlabInstanceUrl,
         },
-        ...(defaultModel ? { default_model: defaultModel } : {}),
+        default_model: defaultModel,
         role_models: {
           mayor: mayorModel || undefined,
           refinery: refineryModel || undefined,

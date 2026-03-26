@@ -65,9 +65,6 @@ export function OnboardingStepRepo() {
     enabled: mode === 'picker',
   });
 
-  // Check GitHub installation status
-  const githubInstallQuery = useQuery(mainTrpc.githubApps.getInstallation.queryOptions(undefined));
-
   const unifiedRepositories = useMemo<RepositoryOption[]>(() => {
     const github = (githubReposQuery.data?.repositories ?? []).map(repo => ({
       id: repo.id,
@@ -85,17 +82,18 @@ export function OnboardingStepRepo() {
   }, [githubReposQuery.data, gitlabReposQuery.data]);
 
   const isLoadingRepos = githubReposQuery.isLoading || gitlabReposQuery.isLoading;
-  const hasGithubInstalled = githubInstallQuery.data?.installed === true;
-  const hasGitlabInstalled = (gitlabReposQuery.data?.repositories?.length ?? 0) > 0;
-  const hasAnyIntegration = hasGithubInstalled || hasGitlabInstalled;
+  // Derive integration availability from repo results (works for both personal and org scope)
+  const hasAnyIntegration =
+    (githubReposQuery.data?.repositories?.length ?? 0) > 0 ||
+    (gitlabReposQuery.data?.repositories?.length ?? 0) > 0;
 
   const githubAppName = process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'KiloConnect';
 
   const handleInstallGithub = useCallback(() => {
-    const installState = `user_${user?.id}`;
+    const installState = orgId ? `org_${orgId}` : `user_${user?.id}`;
     const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${installState}`;
     window.location.href = installUrl;
-  }, [user?.id, githubAppName]);
+  }, [orgId, user?.id, githubAppName]);
 
   const handleRepoSelect = useCallback(
     (fullName: string) => {
@@ -187,8 +185,8 @@ export function OnboardingStepRepo() {
               </div>
             )}
 
-            {/* Install GitHub App button when not installed */}
-            {!isLoadingRepos && !hasGithubInstalled && !githubInstallQuery.isLoading && (
+            {/* Install GitHub App button when no GitHub repos found */}
+            {!isLoadingRepos && (githubReposQuery.data?.repositories?.length ?? 0) === 0 && (
               <Button
                 type="button"
                 variant="outline"

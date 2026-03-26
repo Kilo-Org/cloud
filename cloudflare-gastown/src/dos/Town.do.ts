@@ -4065,7 +4065,10 @@ export class TownDO extends DurableObject<Env> {
       'User-Agent': 'Gastown-Refinery/1.0',
     };
 
-    // Check for unresolved review threads via GraphQL
+    // Check for unresolved review threads via GraphQL.
+    // Fetches the first 100 threads; if there are more (hasNextPage),
+    // conservatively treat the PR as having unresolved comments to avoid
+    // auto-merging with un-checked reviewer feedback.
     let hasUnresolvedComments = false;
     try {
       const graphqlRes = await fetch('https://api.github.com/graphql', {
@@ -4076,6 +4079,7 @@ export class TownDO extends DurableObject<Env> {
             repository(owner: $owner, name: $repo) {
               pullRequest(number: $number) {
                 reviewThreads(first: 100) {
+                  pageInfo { hasNextPage }
                   nodes { isResolved }
                 }
               }
@@ -4089,13 +4093,19 @@ export class TownDO extends DurableObject<Env> {
           data?: {
             repository?: {
               pullRequest?: {
-                reviewThreads?: { nodes?: Array<{ isResolved: boolean }> };
+                reviewThreads?: {
+                  pageInfo?: { hasNextPage?: boolean };
+                  nodes?: Array<{ isResolved: boolean }>;
+                };
               };
             };
           };
         };
-        const threads = gql.data?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
-        hasUnresolvedComments = threads.some(t => !t.isResolved);
+        const reviewThreads = gql.data?.repository?.pullRequest?.reviewThreads;
+        const threads = reviewThreads?.nodes ?? [];
+        const hasMorePages = reviewThreads?.pageInfo?.hasNextPage === true;
+        hasUnresolvedComments =
+          threads.some(t => !t.isResolved) || hasMorePages;
       }
     } catch (err) {
       console.warn(`${TOWN_LOG} checkPRFeedback: GraphQL failed for ${prUrl}`, err);

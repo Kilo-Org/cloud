@@ -20,6 +20,8 @@ import * as beadOps from './beads';
 import * as agentOps from './agents';
 import * as reviewQueue from './review-queue';
 import * as patrol from './patrol';
+import { getRig } from './rigs';
+import { parseGitUrl } from '../../util/platform-pr.util';
 
 // ── Bead mutations ──────────────────────────────────────────────────
 
@@ -718,6 +720,37 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     }
 
     case 'merge_pr': {
+      // Validate the PR URL matches the rig's repository before merging.
+      // Prevents merging an unrelated repo if a buggy refinery stores a wrong URL.
+      const mrBead = beadOps.getBead(sql, action.bead_id);
+      if (mrBead?.rig_id) {
+        const rig = getRig(sql, mrBead.rig_id);
+        if (rig?.git_url) {
+          const rigCoords = parseGitUrl(rig.git_url);
+          const prMeta = parsePrUrl(action.pr_url);
+          if (rigCoords && prMeta) {
+            const rigRepo = `${rigCoords.owner}/${rigCoords.repo}`;
+            if (rigRepo !== prMeta.repo) {
+              console.warn(
+                `${LOG} merge_pr: PR repo "${prMeta.repo}" does not match rig repo "${rigRepo}" — refusing to merge`
+              );
+              // Clear the pending flag to avoid retry loops
+              query(
+                sql,
+                /* sql */ `
+                  UPDATE ${beads}
+                  SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.auto_merge_pending'),
+                      ${beads.columns.updated_at} = ?
+                  WHERE ${beads.bead_id} = ?
+                `,
+                [now(), action.bead_id]
+              );
+              return null;
+            }
+          }
+        }
+      }
+
       return async () => {
         try {
           const merged = await ctx.mergePR(action.pr_url);
@@ -726,9 +759,55 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               bead_id: action.bead_id,
               payload: { pr_url: action.pr_url, pr_state: 'merged' },
             });
+          } else {
+            // Merge failed (405/409: branch protection, merge conflict, stale head, etc.)
+            // Clear auto_merge_pending so we resume normal polling on the next tick.
+            // Also reset the auto_merge_ready_since timer so it re-evaluates freshness.
+            query(
+              sql,
+              /* sql */ `
+                UPDATE ${beads}
+                SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.auto_merge_pending'),
+                    ${beads.columns.updated_at} = ?
+                WHERE ${beads.bead_id} = ?
+              `,
+              [now(), action.bead_id]
+            );
+            query(
+              sql,
+              /* sql */ `
+                UPDATE ${review_metadata}
+                SET ${review_metadata.columns.auto_merge_ready_since} = NULL
+                WHERE ${review_metadata.bead_id} = ?
+              `,
+              [action.bead_id]
+            );
+            console.warn(
+              `${LOG} merge_pr: merge failed, cleared auto_merge_pending for bead=${action.bead_id}`
+            );
           }
         } catch (err) {
           console.warn(`${LOG} merge_pr failed: bead=${action.bead_id} url=${action.pr_url}`, err);
+          // Clear pending flag on unexpected errors too
+          query(
+            sql,
+            /* sql */ `
+              UPDATE ${beads}
+              SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.auto_merge_pending'),
+                  ${beads.columns.updated_at} = ?
+              WHERE ${beads.bead_id} = ?
+            `,
+            [now(), action.bead_id]
+          );
+          query(
+            sql,
+            /* sql */ `
+              UPDATE ${review_metadata}
+              SET ${review_metadata.columns.auto_merge_ready_since} = NULL
+              WHERE ${review_metadata.bead_id} = ?
+            `,
+            [action.bead_id]
+          );
         }
       };
     }

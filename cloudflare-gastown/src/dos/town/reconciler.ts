@@ -1037,16 +1037,16 @@ export function reconcileReviewQueue(sql: SqlStorage, opts?: { draining?: boolea
   for (const mr of mrBeads) {
     // Rule 1: PR-strategy MR beads in_progress need polling
     if (mr.status === 'in_progress' && mr.pr_url) {
-      // Check if auto-merge is pending for this MR
+      // Always poll for status changes (merged/closed by human, etc.)
+      actions.push({
+        type: 'poll_pr',
+        bead_id: mr.bead_id,
+        pr_url: mr.pr_url,
+      });
+      // If auto-merge is pending, also attempt the merge
       if (mr.metadata?.auto_merge_pending) {
         actions.push({
           type: 'merge_pr',
-          bead_id: mr.bead_id,
-          pr_url: mr.pr_url,
-        });
-      } else {
-        actions.push({
-          type: 'poll_pr',
           bead_id: mr.bead_id,
           pr_url: mr.pr_url,
         });

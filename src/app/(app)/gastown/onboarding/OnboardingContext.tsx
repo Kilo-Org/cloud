@@ -34,6 +34,7 @@ type OnboardingContextValue = {
   setModelPreset: (preset: ModelPreset) => void;
   setCustomModels: (models: CustomModels) => void;
   setFirstTask: (task: string) => void;
+  goNext: () => void;
 };
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
@@ -46,7 +47,15 @@ const defaultState: OnboardingState = {
   firstTask: '',
 };
 
-export function OnboardingProvider({ children }: { children: ReactNode }) {
+const noop = () => {};
+
+export function OnboardingProvider({
+  children,
+  goNext = noop,
+}: {
+  children: ReactNode;
+  goNext?: () => void;
+}) {
   const [state, setState] = useState<OnboardingState>(defaultState);
 
   const setTownName = useCallback(
@@ -72,7 +81,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   return (
     <OnboardingContext
-      value={{ state, setTownName, setRepo, setModelPreset, setCustomModels, setFirstTask }}
+      value={{ state, setTownName, setRepo, setModelPreset, setCustomModels, setFirstTask, goNext }}
     >
       {children}
     </OnboardingContext>

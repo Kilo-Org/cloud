@@ -111,67 +111,65 @@ function WizardContent() {
   const isLastStep = currentIndex === STEPS.length - 1;
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center px-4 py-8">
-      {/* Header */}
-      <div className="mb-2 text-center">
-        <h1 className="text-2xl font-bold text-white/95">Set up your town</h1>
-        <p className="mt-1 text-sm text-white/40">
-          Get from zero to an agent working on your code in under 2 minutes.
-        </p>
-      </div>
+    <OnboardingProvider goNext={goNext}>
+      <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center px-4 py-8">
+        {/* Header */}
+        <div className="mb-2 text-center">
+          <h1 className="text-2xl font-bold text-white/95">Set up your town</h1>
+          <p className="mt-1 text-sm text-white/40">
+            Get from zero to an agent working on your code in under 2 minutes.
+          </p>
+        </div>
 
-      {/* Step indicator */}
-      <div className="mb-8 mt-6">
-        <StepIndicator currentIndex={currentIndex} />
-      </div>
+        {/* Step indicator */}
+        <div className="mb-8 mt-6">
+          <StepIndicator currentIndex={currentIndex} />
+        </div>
 
-      {/* Step content */}
-      <div className="w-full max-w-xl flex-1">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentStepKey}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }}
+        {/* Step content */}
+        <div className="w-full max-w-xl flex-1">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStepKey}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {currentStepKey === 'name' && <OnboardingStepName />}
+              {currentStepKey === 'repo' && <OnboardingStepRepo />}
+              {currentStepKey === 'model' && <OnboardingStepModel />}
+              {currentStepKey === 'task' && <OnboardingStepTask />}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Navigation buttons */}
+        <div className="mt-8 flex w-full max-w-xl items-center justify-between">
+          <Button
+            variant="ghost"
+            onClick={goBack}
+            disabled={isFirstStep}
+            className="gap-1.5 text-white/60 hover:text-white/90 disabled:opacity-0"
           >
-            {currentStepKey === 'name' && <OnboardingStepName />}
-            {currentStepKey === 'repo' && <OnboardingStepRepo />}
-            {currentStepKey === 'model' && <OnboardingStepModel />}
-            {currentStepKey === 'task' && <OnboardingStepTask />}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+            <ChevronLeft className="size-4" />
+            Back
+          </Button>
 
-      {/* Navigation buttons */}
-      <div className="mt-8 flex w-full max-w-xl items-center justify-between">
-        <Button
-          variant="ghost"
-          onClick={goBack}
-          disabled={isFirstStep}
-          className="gap-1.5 text-white/60 hover:text-white/90 disabled:opacity-0"
-        >
-          <ChevronLeft className="size-4" />
-          Back
-        </Button>
-
-        <Button
-          onClick={goNext}
-          disabled={isLastStep}
-          className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)] disabled:opacity-50"
-        >
-          Next
-          <ChevronRight className="size-4" />
-        </Button>
+          <Button
+            onClick={goNext}
+            disabled={isLastStep}
+            className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)] disabled:opacity-50"
+          >
+            Next
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
       </div>
-    </div>
+    </OnboardingProvider>
   );
 }
 
 export function OnboardingWizardClient() {
-  return (
-    <OnboardingProvider>
-      <WizardContent />
-    </OnboardingProvider>
-  );
+  return <WizardContent />;
 }

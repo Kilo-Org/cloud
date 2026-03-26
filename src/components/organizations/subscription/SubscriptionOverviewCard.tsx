@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import {
   useStopOrganizationSubscriptionCancellation,
   useOrganizationSubscriptionLink,
+  useCancelBillingCycleChange,
 } from '@/app/api/organizations/hooks';
 import { SubscriptionStatusBadge } from './SubscriptionStatusBadge';
 import type {
@@ -80,8 +81,55 @@ export function SubscriptionOverviewCard({
 
   const stopCancellation = useStopOrganizationSubscriptionCancellation();
   const subscriptionLink = useOrganizationSubscriptionLink();
+  const cancelBillingCycleChange = useCancelBillingCycleChange();
   const isKiloAdmin = useIsKiloAdmin();
   const [resubscribeError, setResubscribeError] = useState<string | null>(null);
+
+  // Detect pending cycle change from expanded schedule
+  const pendingCycleChange = (() => {
+    const schedule = subscription.schedule;
+    if (!schedule || typeof schedule === 'string') return null;
+    if (schedule.status !== 'active' && schedule.status !== 'not_started') return null;
+
+    const phase2 = schedule.phases?.[1];
+    if (!phase2) return null;
+
+    const phase2PriceItem = phase2.items?.[0];
+    if (!phase2PriceItem) return null;
+
+    const phase2Price =
+      typeof phase2PriceItem.price === 'string' ? phase2PriceItem.price : phase2PriceItem.price?.id;
+    const currentPrice = subscription.items.data[0]?.price?.id;
+
+    if (phase2Price === currentPrice) return null;
+
+    const phase2PriceObj = typeof phase2PriceItem.price === 'object' ? phase2PriceItem.price : null;
+    const phase2Interval =
+      phase2PriceObj && 'recurring' in phase2PriceObj
+        ? (phase2PriceObj.recurring?.interval ?? null)
+        : null;
+
+    const targetCycleName = phase2Interval === 'year' ? 'Annual' : 'Monthly';
+    const effectiveDate = formatDate(phase2.start_date);
+
+    const currentInterval = subscription.items.data[0]?.price?.recurring?.interval;
+    const isUpgradeToAnnual = currentInterval === 'month' && phase2Interval === 'year';
+
+    const description = isUpgradeToAnnual
+      ? 'No charges or proration until the switch takes effect.'
+      : 'No refunds or immediate changes.';
+
+    return { targetCycleName, effectiveDate, description };
+  })();
+
+  const handleCancelBillingCycleChange = async () => {
+    try {
+      const result = await cancelBillingCycleChange.mutateAsync({ organizationId });
+      toast.success(result.message);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to cancel billing cycle change');
+    }
+  };
 
   const handleStopCancellation = async () => {
     try {
@@ -224,6 +272,36 @@ export function SubscriptionOverviewCard({
               </div>
             )}
           </div>
+
+          {/* Pending billing cycle change banner */}
+          {pendingCycleChange && (
+            <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-amber-400/20 bg-amber-400/[0.08] p-3">
+              <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+              <div>
+                <p className="text-sm text-amber-300">
+                  <span className="font-semibold">
+                    Switching to {pendingCycleChange.targetCycleName} billing on{' '}
+                    {pendingCycleChange.effectiveDate}.
+                  </span>{' '}
+                  {pendingCycleChange.description}
+                </p>
+                {(userRole === 'owner' || userRole === 'billing_manager') && (
+                  <div className="mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-amber-400/30 text-amber-400 hover:bg-amber-400/10"
+                      onClick={handleCancelBillingCycleChange}
+                      disabled={cancelBillingCycleChange.isPending}
+                    >
+                      {cancelBillingCycleChange.isPending ? 'Cancelling...' : 'Cancel Change'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2">
             {ended && subscription.ended_at ? (
               <div>

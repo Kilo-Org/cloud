@@ -56,10 +56,12 @@ import {
 } from '@/lib/kiloclaw/stripe-handlers';
 import { invoiceLooksLikeKiloClawByPriceId } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
 import {
-  STRIPE_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID,
-  STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID,
+  STRIPE_TEAMS_MONTHLY_PRICE_ID,
+  STRIPE_TEAMS_ANNUAL_PRICE_ID,
+  STRIPE_ENTERPRISE_MONTHLY_PRICE_ID,
+  STRIPE_ENTERPRISE_ANNUAL_PRICE_ID,
 } from '@/lib/config.server';
-import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organization-types';
 import { successResult } from '@/lib/maybe-result';
 import { getRewardfulReferral } from '@/lib/rewardful';
 
@@ -1092,6 +1094,7 @@ type GetStripeCheckoutUrlProps = {
   organizationId: string;
   cancelUrl: string;
   plan: OrganizationPlan;
+  billingCycle: BillingCycle;
 };
 
 const assertNever = (x: never): never => {
@@ -1099,12 +1102,19 @@ const assertNever = (x: never): never => {
   throw new Error('Unexpected object: ' + (x as any));
 };
 
-function getProductCodeForPlan(plan: OrganizationPlan): string {
+export function getPriceIdForPlanAndCycle(
+  plan: OrganizationPlan,
+  billingCycle: BillingCycle
+): string {
   switch (plan) {
     case 'teams':
-      return STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID;
+      return billingCycle === 'monthly'
+        ? STRIPE_TEAMS_MONTHLY_PRICE_ID
+        : STRIPE_TEAMS_ANNUAL_PRICE_ID;
     case 'enterprise':
-      return STRIPE_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID;
+      return billingCycle === 'monthly'
+        ? STRIPE_ENTERPRISE_MONTHLY_PRICE_ID
+        : STRIPE_ENTERPRISE_ANNUAL_PRICE_ID;
     default:
       return assertNever(plan);
   }
@@ -1113,7 +1123,8 @@ function getProductCodeForPlan(plan: OrganizationPlan): string {
 export async function getStripeSeatsCheckoutUrl(
   props: GetStripeCheckoutUrlProps
 ): Promise<string | null> {
-  const { kiloUserId, stripeCustomerId, quantity, organizationId, cancelUrl, plan } = props;
+  const { kiloUserId, stripeCustomerId, quantity, organizationId, cancelUrl, plan, billingCycle } =
+    props;
 
   const subscriptionMetadata: SubscriptionMetadata = {
     type: 'stripe-checkout-seats',
@@ -1124,16 +1135,11 @@ export async function getStripeSeatsCheckoutUrl(
   };
 
   try {
-    const productId = getProductCodeForPlan(plan);
-    const product = await client.products.retrieve(productId);
-
-    if (typeof product?.default_price !== 'string') {
-      throw new Error(`Product ${productId} has no default price set`);
-    }
+    const priceId = getPriceIdForPlanAndCycle(plan, billingCycle);
 
     const line_items = [
       {
-        price: product.default_price,
+        price: priceId,
         quantity,
       },
     ];
@@ -1185,7 +1191,9 @@ export async function getStripeSeatsCheckoutUrl(
 }
 
 export async function retrieveSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
-  const subscription: Stripe.Subscription = await client.subscriptions.retrieve(subscriptionId);
+  const subscription: Stripe.Subscription = await client.subscriptions.retrieve(subscriptionId, {
+    expand: ['schedule'],
+  });
   return subscription;
 }
 

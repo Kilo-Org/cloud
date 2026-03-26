@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { PlanCard } from './subscription/PlanCard';
 import { Button } from '@/components/Button';
-import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import type { BillingCycle, OrganizationPlan } from '@/lib/organizations/organization-types';
 import {
-  TEAM_SEAT_PRICE_MONTHLY_USD,
-  ENTERPRISE_SEAT_PRICE_MONTHLY_USD,
+  TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
+  TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD,
+  ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
+  ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD,
 } from '@/lib/organizations/constants';
 import {
   useOrganizationSubscriptionLink,
@@ -53,7 +55,17 @@ export function UpgradeTrialDialog({
   container,
 }: UpgradeTrialDialogProps) {
   const [selectedPlan, setSelectedPlan] = useState<OrganizationPlan>(currentPlan);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
   const [isPurchasing, setIsPurchasing] = useState(false);
+
+  const teamPrice =
+    billingCycle === 'monthly'
+      ? TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD
+      : TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD;
+  const enterprisePrice =
+    billingCycle === 'monthly'
+      ? ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD
+      : ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD;
 
   const { data: orgData } = useOrganizationWithMembers(organizationId);
   const subscriptionLink = useOrganizationSubscriptionLink();
@@ -70,6 +82,7 @@ export function UpgradeTrialDialog({
     hog?.capture('trial_upgrade_purchase_clicked', {
       organizationId,
       selectedPlan,
+      billingCycle,
       seatCount: orgData.members.length,
     });
 
@@ -79,6 +92,7 @@ export function UpgradeTrialDialog({
         seats: orgData.members.length,
         cancelUrl: window.location.href,
         plan: selectedPlan,
+        billingCycle,
       });
 
       if (result.url) {
@@ -106,11 +120,47 @@ export function UpgradeTrialDialog({
             </p>
           </div>
 
+          {/* Billing Cycle Toggle */}
+          <div className="flex items-center justify-center gap-3">
+            <div className="inline-flex rounded-lg bg-muted p-1">
+              <button
+                type="button"
+                onClick={() => setBillingCycle('monthly')}
+                className={`rounded-md px-5 py-1.5 text-sm font-medium transition-all ${
+                  billingCycle === 'monthly'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                type="button"
+                onClick={() => setBillingCycle('annual')}
+                className={`rounded-md px-5 py-1.5 text-sm font-medium transition-all ${
+                  billingCycle === 'annual'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Annual
+              </button>
+            </div>
+            <span
+              className={`rounded-full border border-green-400/30 bg-green-400/10 px-2.5 py-0.5 text-xs font-semibold text-green-400 transition-opacity ${
+                billingCycle === 'annual' ? 'opacity-100' : 'opacity-30'
+              }`}
+            >
+              Save 17%
+            </span>
+          </div>
+
           {/* Plan Cards */}
           <div className="flex justify-center gap-4">
             <PlanCard
               plan="teams"
-              pricePerMonth={TEAM_SEAT_PRICE_MONTHLY_USD}
+              pricePerMonth={teamPrice}
+              billingCycle={billingCycle}
               features={TEAMS_FEATURES}
               isSelected={selectedPlan === 'teams'}
               currentPlan={currentPlan}
@@ -119,7 +169,8 @@ export function UpgradeTrialDialog({
 
             <PlanCard
               plan="enterprise"
-              pricePerMonth={ENTERPRISE_SEAT_PRICE_MONTHLY_USD}
+              pricePerMonth={enterprisePrice}
+              billingCycle={billingCycle}
               features={ENTERPRISE_FEATURES}
               isSelected={selectedPlan === 'enterprise'}
               currentPlan={currentPlan}

@@ -17,7 +17,11 @@ import { after } from 'next/server';
 import { sendOrgCancelledEmail, sendOrgRenewedEmail, sendOrgSubscriptionEmail } from '@/lib/email';
 import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';
-import { OrganizationPlanSchema } from '@/lib/organizations/organization-types';
+import {
+  OrganizationPlanSchema,
+  billingCycleFromStripeInterval,
+  billingCycleToDb,
+} from '@/lib/organizations/organization-types';
 
 const sentryError = sentryLogger('organization_seats', 'error');
 
@@ -130,6 +134,13 @@ async function handleSubscriptionEventInternal(
   const startDate = new Date(firstLineItem.current_period_start * 1000);
   const endDate = new Date(firstLineItem.current_period_end * 1000);
 
+  // Extract billing cycle from the Stripe subscription's recurring interval
+  const stripeInterval = firstLineItem.price?.recurring?.interval;
+  const billingCycleDb =
+    stripeInterval === 'month' || stripeInterval === 'year'
+      ? billingCycleToDb(billingCycleFromStripeInterval(stripeInterval))
+      : 'monthly'; // Default for subscriptions without a recognizable interval
+
   // ensure user is owner of org...we have an on-conflict do nothing here so this is idempontent-ish
   await addUserToOrganization(meta.organizationId, meta.kiloUserId, 'owner');
 
@@ -154,6 +165,7 @@ async function handleSubscriptionEventInternal(
         // set undefined to autogen a key in the database if one is not supplied
         idempotency_key: idempotencyKey || undefined,
         subscription_status: isSubscriptionEnded ? 'ended' : 'active',
+        billing_cycle: billingCycleDb,
       })
       .onConflictDoNothing({ target: [organization_seats_purchases.idempotency_key] });
 

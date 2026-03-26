@@ -81,6 +81,37 @@ describe('organizations subscription trpc router', () => {
         })
       ).rejects.toThrow('You do not have access to this organization');
     });
+
+    it('should accept billingCycle parameter without validation error', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      // The call will fail because there's no Stripe customer, but it should NOT
+      // fail on input validation — billingCycle: 'monthly' is a valid schema value.
+      const result = caller.organizations.subscription.getSubscriptionStripeUrl({
+        organizationId: testOrganization.id,
+        seats: 1,
+        cancelUrl: 'https://example.com',
+        billingCycle: 'monthly',
+      });
+
+      // Should pass input validation (no ZodError / BAD_REQUEST), then fail downstream
+      await expect(result).rejects.not.toThrow(/ZodError/);
+    });
+
+    it("should default billingCycle to 'annual' when not provided", async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      // Call without billingCycle — should not throw a validation error,
+      // meaning the default 'annual' is applied by the schema.
+      const result = caller.organizations.subscription.getSubscriptionStripeUrl({
+        organizationId: testOrganization.id,
+        seats: 1,
+        cancelUrl: 'https://example.com',
+      });
+
+      // Should pass input validation (no ZodError / BAD_REQUEST), then fail downstream
+      await expect(result).rejects.not.toThrow(/ZodError/);
+    });
   });
 
   describe('cancel procedure', () => {

@@ -1256,6 +1256,133 @@ describe('Organization seat count tracking', () => {
   });
 });
 
+describe('billing cycle tracking', () => {
+  let testUser: User;
+  let testOrganization: Organization;
+
+  beforeEach(async () => {
+    testUser = await insertTestUser();
+    testOrganization = await createOrganization('Test Organization', testUser.id);
+  });
+
+  test("sets billing_cycle to 'monthly' when price.recurring.interval is 'month'", async () => {
+    const subscription = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: testUser.id,
+        organizationId: testOrganization.id,
+        seats: '5',
+      },
+      items: {
+        object: 'list',
+        data: [
+          {
+            ...createMockSubscription().items.data[0],
+            price: {
+              ...createMockSubscription().items.data[0].price,
+              recurring: {
+                interval: 'month',
+                interval_count: 1,
+                trial_period_days: null,
+                usage_type: 'licensed',
+                meter: null,
+              },
+            },
+          },
+        ],
+        has_more: false,
+        url: '/v1/subscription_items',
+      },
+    });
+
+    await handleSubscriptionEvent(subscription, 'test-billing-cycle-monthly');
+
+    const purchases = await db
+      .select()
+      .from(organization_seats_purchases)
+      .where(eq(organization_seats_purchases.idempotency_key, 'test-billing-cycle-monthly'));
+
+    expect(purchases).toHaveLength(1);
+    expect(purchases[0].billing_cycle).toBe('monthly');
+  });
+
+  test("sets billing_cycle to 'yearly' when price.recurring.interval is 'year'", async () => {
+    const subscription = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: testUser.id,
+        organizationId: testOrganization.id,
+        seats: '5',
+      },
+      items: {
+        object: 'list',
+        data: [
+          {
+            ...createMockSubscription().items.data[0],
+            price: {
+              ...createMockSubscription().items.data[0].price,
+              recurring: {
+                interval: 'year',
+                interval_count: 1,
+                trial_period_days: null,
+                usage_type: 'licensed',
+                meter: null,
+              },
+            },
+          },
+        ],
+        has_more: false,
+        url: '/v1/subscription_items',
+      },
+    });
+
+    await handleSubscriptionEvent(subscription, 'test-billing-cycle-yearly');
+
+    const purchases = await db
+      .select()
+      .from(organization_seats_purchases)
+      .where(eq(organization_seats_purchases.idempotency_key, 'test-billing-cycle-yearly'));
+
+    expect(purchases).toHaveLength(1);
+    expect(purchases[0].billing_cycle).toBe('yearly');
+  });
+
+  test("defaults billing_cycle to 'monthly' when price.recurring is null", async () => {
+    const subscription = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: testUser.id,
+        organizationId: testOrganization.id,
+        seats: '5',
+      },
+      items: {
+        object: 'list',
+        data: [
+          {
+            ...createMockSubscription().items.data[0],
+            price: {
+              ...createMockSubscription().items.data[0].price,
+              recurring: null,
+            },
+          },
+        ],
+        has_more: false,
+        url: '/v1/subscription_items',
+      },
+    });
+
+    await handleSubscriptionEvent(subscription, 'test-billing-cycle-null-recurring');
+
+    const purchases = await db
+      .select()
+      .from(organization_seats_purchases)
+      .where(eq(organization_seats_purchases.idempotency_key, 'test-billing-cycle-null-recurring'));
+
+    expect(purchases).toHaveLength(1);
+    expect(purchases[0].billing_cycle).toBe('monthly');
+  });
+});
+
 describe('Organization plan type updates from subscription', () => {
   let testUser: User;
   let testOrganization: Organization;

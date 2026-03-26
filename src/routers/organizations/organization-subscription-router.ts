@@ -5,6 +5,7 @@ import {
   getSubscriptionsForStripeCustomerId,
   getStripeSeatsCheckoutUrl,
   handleCancelSubscription,
+  getPriceIdForPlanAndCycle,
 } from '@/lib/stripe';
 import {
   getMostRecentSeatPurchase,
@@ -21,6 +22,7 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import type Stripe from 'stripe';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
+import { BillingCycleSchema } from '@/lib/organizations/organization-types';
 import { successResult } from '@/lib/maybe-result';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { client } from '@/lib/stripe-client';
@@ -29,6 +31,7 @@ const SubscriptionRequestSchema = OrganizationIdInputSchema.extend({
   seats: z.number().int().min(1).max(100),
   cancelUrl: z.url(),
   plan: z.enum(['teams', 'enterprise']).optional(),
+  billingCycle: BillingCycleSchema.optional().default('annual'),
 });
 
 const UpdateSeatCountInputSchema = OrganizationIdInputSchema.extend({
@@ -53,6 +56,15 @@ const UpdateSeatCountResponseSchema = z.object({
   message: z.string().optional(),
   requiresAction: z.boolean().optional(),
   paymentIntentClientSecret: z.string().optional(),
+});
+
+const ChangeBillingCycleInputSchema = OrganizationIdInputSchema.extend({
+  targetCycle: BillingCycleSchema,
+});
+
+const BillingCycleChangeResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
 });
 
 export const organizationsSubscriptionRouter = createTRPCRouter({
@@ -145,6 +157,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         organizationId,
         cancelUrl: input.cancelUrl,
         plan: plan ?? org.plan,
+        billingCycle: input.billingCycle,
       });
       return { url: result };
     }),
@@ -263,5 +276,150 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       });
 
       return { url: session.url };
+    }),
+
+  changeBillingCycle: organizationOwnerProcedure
+    .input(ChangeBillingCycleInputSchema)
+    .output(BillingCycleChangeResponseSchema)
+    .mutation(async ({ input }) => {
+      const { organizationId, targetCycle } = input;
+
+      await requireActiveSubscriptionOrTrial(organizationId);
+
+      const latestPurchase = await getMostRecentSeatPurchase(organizationId);
+      if (!latestPurchase) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'No subscription found for this organization',
+        });
+      }
+
+      const subscription = await retrieveSubscription(latestPurchase.subscription_stripe_id);
+
+      const firstItem = subscription.items.data[0];
+      if (!firstItem) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Subscription has no items',
+        });
+      }
+
+      const currentInterval = firstItem.price.recurring?.interval;
+      const currentCycle = currentInterval === 'year' ? 'annual' : 'monthly';
+
+      if (currentCycle === targetCycle) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Subscription is already on ${targetCycle} billing`,
+        });
+      }
+
+      // Check if there's an active schedule (pending cycle change)
+      const scheduleRef = subscription.schedule;
+      if (scheduleRef) {
+        const schedule =
+          typeof scheduleRef === 'string'
+            ? await client.subscriptionSchedules.retrieve(scheduleRef)
+            : scheduleRef;
+        if (schedule.status === 'active' || schedule.status === 'not_started') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message:
+              'A billing cycle change is already scheduled. Cancel the existing change before scheduling a new one.',
+          });
+        }
+      }
+
+      const org = await getOrganizationById(organizationId);
+      if (!org) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
+
+      const currentPriceId = firstItem.price.id;
+      const currentQuantity = firstItem.quantity ?? 1;
+      const newPriceId = getPriceIdForPlanAndCycle(org.plan, targetCycle);
+
+      const schedule = await client.subscriptionSchedules.create({
+        from_subscription: subscription.id,
+      });
+
+      const firstPhase = schedule.phases[0];
+      if (!firstPhase) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Schedule has no phases',
+        });
+      }
+
+      await client.subscriptionSchedules.update(schedule.id, {
+        end_behavior: 'release',
+        phases: [
+          {
+            items: [{ price: currentPriceId, quantity: currentQuantity }],
+            start_date: firstPhase.start_date,
+            end_date: firstPhase.end_date,
+            proration_behavior: 'none',
+          },
+          {
+            items: [{ price: newPriceId, quantity: currentQuantity }],
+            proration_behavior: 'none',
+            billing_cycle_anchor: 'phase_start',
+            duration: {
+              interval: targetCycle === 'annual' ? 'year' : 'month',
+              interval_count: 1,
+            },
+          },
+        ],
+      });
+
+      return successResult({
+        message: `Billing cycle will change to ${targetCycle} at the end of the current period.`,
+      });
+    }),
+
+  cancelBillingCycleChange: organizationOwnerProcedure
+    .input(OrganizationIdInputSchema)
+    .output(BillingCycleChangeResponseSchema)
+    .mutation(async ({ input }) => {
+      const { organizationId } = input;
+
+      const latestPurchase = await getMostRecentSeatPurchase(organizationId);
+      if (!latestPurchase) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'No subscription found for this organization',
+        });
+      }
+
+      const subscription = await retrieveSubscription(latestPurchase.subscription_stripe_id);
+
+      const cancelScheduleRef = subscription.schedule;
+      if (!cancelScheduleRef) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No pending billing cycle change to cancel',
+        });
+      }
+
+      const resolvedSchedule =
+        typeof cancelScheduleRef === 'string'
+          ? await client.subscriptionSchedules.retrieve(cancelScheduleRef)
+          : cancelScheduleRef;
+
+      if (resolvedSchedule.status !== 'active' && resolvedSchedule.status !== 'not_started') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No pending billing cycle change to cancel',
+        });
+      }
+
+      await client.subscriptionSchedules.release(resolvedSchedule.id);
+
+      return successResult({
+        message: 'Scheduled billing cycle change has been canceled.',
+      });
     }),
 });

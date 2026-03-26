@@ -25,6 +25,23 @@ import {
   VersionedSettingsSchema,
 } from '@kilocode/db/schema-types';
 
+// API-facing billing cycle values: 'monthly' | 'annual'
+// The DB stores 'yearly' instead of 'annual'; use the mapping functions at boundaries.
+export const BillingCycleSchema = z.enum(['monthly', 'annual']);
+export type BillingCycle = z.infer<typeof BillingCycleSchema>;
+
+export function billingCycleToDb(cycle: BillingCycle): 'monthly' | 'yearly' {
+  return cycle === 'annual' ? 'yearly' : 'monthly';
+}
+
+export function billingCycleFromDb(dbCycle: 'monthly' | 'yearly'): BillingCycle {
+  return dbCycle === 'yearly' ? 'annual' : 'monthly';
+}
+
+export function billingCycleFromStripeInterval(interval: 'month' | 'year'): BillingCycle {
+  return interval === 'year' ? 'annual' : 'monthly';
+}
+
 export const OrganizationNameSchema = z
   .string()
   .trim()

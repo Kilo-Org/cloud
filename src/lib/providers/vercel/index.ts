@@ -1,6 +1,5 @@
 import type { BYOKResult } from '@/lib/providers/types';
 import { kiloFreeModels } from '@/lib/models';
-import { isAnthropicModel } from '@/lib/providers/anthropic';
 import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
 import { isGeminiModel } from '@/lib/providers/google';
 import { isMinimaxModel } from '@/lib/providers/minimax';
@@ -92,7 +91,6 @@ export async function shouldRouteToVercel(
 
   if (
     !requestedModel.startsWith('arcee-ai/') &&
-    !isAnthropicModel(requestedModel) &&
     !isGeminiModel(requestedModel) &&
     !isMinimaxModel(requestedModel) &&
     !isMoonshotModel(requestedModel) &&

@@ -6,6 +6,7 @@ import type { ModelOption } from '@/app/admin/alerting/types';
 import { OpenRouterModelsResponseSchema } from '@/lib/organizations/organization-types';
 import { normalizeModelId } from '@/lib/model-utils';
 import { z } from 'zod';
+import { getApiToken } from '@/lib/api-token';
 
 type AddModelSearchResult = {
   models: ModelOption[];
@@ -24,7 +25,10 @@ export function useAddModelSearch(search: string): AddModelSearchResult {
   const modelsQuery = useQuery({
     queryKey: ['openrouter-models'],
     queryFn: async () => {
-      const response = await fetch('/api/openrouter/models');
+      const token = await getApiToken();
+      const response = await fetch('/api/openrouter/models', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       const data: unknown = await response.json();
       if (!response.ok) {
         throw new Error('Failed to fetch models');

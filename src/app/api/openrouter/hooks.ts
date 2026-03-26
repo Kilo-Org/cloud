@@ -13,6 +13,7 @@ import {
   type OpenRouterModel,
 } from '@/lib/providers/openrouter/openrouter-types';
 import * as z from 'zod';
+import { getApiToken } from '@/lib/api-token';
 
 interface OpenRouterProvider {
   name: string;
@@ -76,7 +77,10 @@ export function useOpenRouterModels() {
   return useQuery<OpenRouterModelsResponse>({
     queryKey: ['openrouter-models'],
     queryFn: async (): Promise<OpenRouterModelsResponse> => {
-      const response = await fetch('/api/openrouter/models');
+      const token = await getApiToken();
+      const response = await fetch('/api/openrouter/models', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!response.ok) {
         throw new Error(`Failed to fetch models: ${response.status} ${response.statusText}`);
       }
@@ -104,9 +108,13 @@ export function useModelSelectorList(organizationId: string | undefined) {
   const query = useQuery({
     queryKey: ['openrouter-models', organizationId],
     queryFn: async (): Promise<OpenRouterModelsResponse> => {
-      const response = await fetch(
-        organizationId ? `/api/organizations/${organizationId}/models` : '/api/openrouter/models'
-      );
+      const token = await getApiToken();
+      const url = organizationId
+        ? `/api/organizations/${organizationId}/models`
+        : '/api/openrouter/models';
+      const response = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
       }
@@ -129,7 +137,10 @@ export function useOpenRouterModelsAndProviders() {
   const query = useQuery({
     queryKey: ['openrouter-models-and-providers'],
     queryFn: async (): Promise<Pick<OpenRouterData, 'providers'>> => {
-      const response = await fetch('/api/openrouter/models-by-provider');
+      const token = await getApiToken();
+      const response = await fetch('/api/openrouter/models-by-provider', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
       }

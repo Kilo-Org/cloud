@@ -50,6 +50,11 @@ type OnboardingContextValue = {
   backgroundTownId: string | null;
   /** Whether background provisioning is in progress. */
   isProvisioning: boolean;
+  /**
+   * Waits for any in-flight background provisioning to complete and returns
+   * the town ID, or null if provisioning failed / was never started.
+   */
+  waitForProvisionedTown: () => Promise<string | null>;
 };
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
@@ -83,6 +88,8 @@ export function OnboardingProvider({
   const [backgroundTown, setBackgroundTown] = useState<BackgroundTown | null>(null);
   const [isProvisioning, setIsProvisioning] = useState(false);
   const provisioningRef = useRef(false);
+  /** Resolves with the town ID on success, or null on failure. */
+  const provisioningPromiseRef = useRef<Promise<string | null> | null>(null);
 
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
@@ -124,24 +131,65 @@ export function OnboardingProvider({
       // Must have a town name to provision
       if (!currentState.townName.trim()) return currentState;
 
-      // Already provisioning or provisioned with matching params
+      // Already provisioning — don't start another
       if (provisioningRef.current) return currentState;
+
+      const configChanged =
+        backgroundTown &&
+        (backgroundTown.modelPreset !== currentState.modelPreset ||
+          JSON.stringify(backgroundTown.customModels) !==
+            JSON.stringify(currentState.customModels));
+
+      // Town already exists and config hasn't changed — nothing to do
       if (
         backgroundTown &&
         backgroundTown.townName === currentState.townName.trim() &&
-        backgroundTown.modelPreset === currentState.modelPreset
+        !configChanged
       ) {
         return currentState;
       }
 
+      // Town already exists but model config changed — re-apply config only
+      if (backgroundTown && configChanged) {
+        const { modelPreset, customModels } = currentState;
+        const townId = backgroundTown.townId;
+        provisioningRef.current = true;
+        setIsProvisioning(true);
+
+        provisioningPromiseRef.current = (async () => {
+          try {
+            const config = presetToConfig(modelPreset, customModels);
+            await updateConfig.mutateAsync({ townId, config });
+            setBackgroundTown({
+              townId,
+              townName: backgroundTown.townName,
+              modelPreset,
+              customModels,
+            });
+            return townId;
+          } catch (configErr) {
+            const message =
+              configErr instanceof Error ? configErr.message : 'Failed to configure models';
+            toast.error(`Model config failed: ${message}. You can update it in settings.`);
+            return townId; // Town still exists, just config update failed
+          } finally {
+            setIsProvisioning(false);
+            provisioningRef.current = false;
+          }
+        })();
+
+        return currentState;
+      }
+
+      // No background town yet — create one from scratch
       provisioningRef.current = true;
       setIsProvisioning(true);
 
       const townNameTrimmed = currentState.townName.trim();
       const { modelPreset, customModels } = currentState;
 
-      // Fire-and-forget the async provisioning chain
-      void (async () => {
+      // Store a promise so the task step can await in-flight provisioning
+      provisioningPromiseRef.current = (async () => {
         try {
           // 1. Create the town
           const town = currentState.orgId
@@ -171,10 +219,12 @@ export function OnboardingProvider({
           }
 
           setBackgroundTown({ townId, townName: townNameTrimmed, modelPreset, customModels });
+          return townId;
         } catch (err) {
           // Town creation failed — user will create it via the task step fallback
           const message = err instanceof Error ? err.message : 'Background provisioning failed';
           toast.error(message);
+          return null;
         } finally {
           setIsProvisioning(false);
           provisioningRef.current = false;
@@ -184,6 +234,15 @@ export function OnboardingProvider({
       return currentState;
     });
   }, [backgroundTown, createTown, createOrgTown, updateConfig, ensureMayor]);
+
+  const waitForProvisionedTown = useCallback(async (): Promise<string | null> => {
+    // If a town already exists, return it immediately
+    if (backgroundTown) return backgroundTown.townId;
+    // If provisioning is in-flight, await its result
+    if (provisioningPromiseRef.current) return provisioningPromiseRef.current;
+    // Never started
+    return null;
+  }, [backgroundTown]);
 
   const setTownName = useCallback(
     (townName: string, setByUser?: boolean) =>
@@ -224,6 +283,7 @@ export function OnboardingProvider({
         provisionTownInBackground,
         backgroundTownId: backgroundTown?.townId ?? null,
         isProvisioning,
+        waitForProvisionedTown,
       }}
     >
       {children}

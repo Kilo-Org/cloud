@@ -13,7 +13,8 @@ import { presetToConfig, FIRST_TASK_STORAGE_PREFIX, PHASE_LABELS } from './onboa
 import type { CreationPhase } from './onboarding.domain';
 
 export function OnboardingStepTask() {
-  const { state, setFirstTask, backgroundTownId, isProvisioning } = useOnboarding();
+  const { state, setFirstTask, backgroundTownId, isProvisioning, waitForProvisionedTown } =
+    useOnboarding();
   const router = useRouter();
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
@@ -61,9 +62,16 @@ export function OnboardingStepTask() {
     })
   );
 
-  /** Resolve the town ID — either from background provisioning or by creating now. */
+  /**
+   * Resolve the town ID — prefer the already-provisioned town, then await any
+   * in-flight provisioning, and only create a new town as a last resort.
+   */
   async function resolveTownId(): Promise<string> {
     if (backgroundTownId) return backgroundTownId;
+
+    // Wait for in-flight background provisioning before creating a duplicate
+    const provisionedId = await waitForProvisionedTown();
+    if (provisionedId) return provisionedId;
 
     const town = state.orgId
       ? await createOrgTown.mutateAsync({

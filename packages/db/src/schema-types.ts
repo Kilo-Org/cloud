@@ -151,6 +151,7 @@ export type KiloClawSubscriptionStatus =
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.reassociate',
+  'kiloclaw.snapshot.restore',
   'kiloclaw.subscription.update_trial_end',
   'kiloclaw.subscription.reset_trial',
   'kiloclaw.machine.start',

@@ -94,7 +94,7 @@
       "id": "kilo-auto/free",
       "name": "Kilo Auto Free",
       "created": 0,
-      "description": "Free with limited capability. No credits required. Uses MiniMax M2.5.",
+      "description": "Free with limited capability. No credits required. Uses MiMo-V2-Pro.",
       "architecture": {
         "input_modalities": [
           "text"
@@ -106,7 +106,7 @@
       },
       "top_provider": {
         "is_moderated": false,
-        "context_length": 204800,
+        "context_length": 1048576,
         "max_completion_tokens": 131072
       },
       "pricing": {
@@ -117,7 +117,7 @@
         "web_search": "0",
         "internal_reasoning": "0"
       },
-      "context_length": 204800,
+      "context_length": 1048576,
       "supported_parameters": [
         "max_tokens",
         "temperature",

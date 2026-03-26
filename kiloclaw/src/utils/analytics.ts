@@ -43,6 +43,12 @@ export type KiloClawEventName =
   | 'instance.stopped'
   | 'instance.restarting'
   | 'instance.destroy_started'
+  // Snapshot restore events (emitted from DO and queue worker)
+  | 'instance.restore_enqueued'
+  | 'instance.restore_started'
+  | 'instance.restore_completed'
+  | 'instance.restore_retry_scheduled'
+  | 'instance.restore_failed'
   // Reconcile events (emitted via ReconcileContext.log as `reconcile.{action}`)
   // All reconcileLog actions are automatically prefixed — see log.ts.
   | 'reconcile.sync_status'
@@ -59,7 +65,7 @@ export type KiloClawEventName =
   // HTTP-derived (open string) and additional reconcile.* events
   | (string & {});
 
-export type KiloClawDelivery = 'http' | 'do' | 'reconcile';
+export type KiloClawDelivery = 'http' | 'do' | 'reconcile' | 'queue';
 
 export type KiloClawEventData = {
   event: KiloClawEventName;

@@ -29,6 +29,7 @@ import type {
   GmailNotificationsResponse,
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
+  RestoreVolumeSnapshotResponse,
   RegionsResponse,
   UpdateRegionsResponse,
 } from './types';
@@ -491,6 +492,20 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         body: JSON.stringify({ userId, newVolumeId, reason }),
+      },
+      { userId }
+    );
+  }
+
+  async restoreVolumeFromSnapshot(
+    userId: string,
+    snapshotId: string
+  ): Promise<RestoreVolumeSnapshotResponse> {
+    return this.request(
+      '/api/platform/restore-volume-snapshot',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, snapshotId }),
       },
       { userId }
     );

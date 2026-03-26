@@ -9,12 +9,7 @@
       "distribution": "internal",
       "credentialsSource": "remote"
     },
-    "preview": {
-      "distribution": "internal",
-      "credentialsSource": "remote",
-      "channel": "preview"
-    },
-    "production": {
+"production": {
       "autoIncrement": true,
       "credentialsSource": "remote",
       "channel": "production"

@@ -354,11 +354,13 @@ function VolumeReassociationCard({
   userId,
   currentStatus,
   currentMachineId,
+  previousVolumeId,
   onStatusChange,
 }: {
   userId: string;
   currentStatus: string | null;
   currentMachineId: string | null;
+  previousVolumeId: string | null;
   onStatusChange: () => void;
 }) {
   const trpc = useTRPC();
@@ -635,6 +637,8 @@ function VolumeReassociationCard({
                         </thead>
                         <tbody>
                           {candidateData.volumes.map(vol => {
+                            const isPrevious =
+                              !vol.isCurrent && !!previousVolumeId && vol.id === previousVolumeId;
                             const attachedElsewhere =
                               !!vol.attached_machine_id &&
                               vol.attached_machine_id !== currentMachineId;
@@ -660,6 +664,11 @@ function VolumeReassociationCard({
                                   {vol.isCurrent && (
                                     <Badge className="ml-2 bg-green-600" variant="default">
                                       current
+                                    </Badge>
+                                  )}
+                                  {isPrevious && (
+                                    <Badge className="ml-2 bg-amber-600" variant="default">
+                                      previous
                                     </Badge>
                                   )}
                                   {attachedElsewhere && (
@@ -1006,10 +1015,14 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [doctorDialogOpen, setDoctorDialogOpen] = useState(false);
   const [restoreConfigDialogOpen, setRestoreConfigDialogOpen] = useState(false);
   const [awaitingRestartCompletion, setAwaitingRestartCompletion] = useState(false);
+  const [restoreSnapshotDialogOpen, setRestoreSnapshotDialogOpen] = useState(false);
+  const [restoreSnapshotId, setRestoreSnapshotId] = useState<string | null>(null);
+  const [restoreReason, setRestoreReason] = useState('');
+  const [awaitingRestoreCompletion, setAwaitingRestoreCompletion] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     ...trpc.admin.kiloclawInstances.get.queryOptions({ id: instanceId }),
-    refetchInterval: awaitingRestartCompletion ? 3000 : false,
+    refetchInterval: awaitingRestartCompletion || awaitingRestoreCompletion ? 3000 : false,
   });
 
   const { mutateAsync: destroyInstance, isPending: isDestroying } = useMutation(
@@ -1033,6 +1046,24 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     })
   );
 
+  const { mutateAsync: restoreSnapshot, isPending: isRestoring } = useMutation(
+    trpc.admin.kiloclawInstances.restoreVolumeSnapshot.mutationOptions({
+      onSuccess: () => {
+        toast.success('Snapshot restore enqueued');
+        setAwaitingRestoreCompletion(true);
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.get.queryKey(),
+        });
+        setRestoreSnapshotDialogOpen(false);
+        setRestoreSnapshotId(null);
+        setRestoreReason('');
+      },
+      onError: err => {
+        toast.error(`Failed to restore snapshot: ${err.message}`);
+      },
+    })
+  );
+
   const volumeId = data?.workerStatus?.flyVolumeId;
   const snapshotsEnabled = data !== undefined && data.destroyed_at === null && !!volumeId;
 
@@ -1047,7 +1078,19 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     enabled: snapshotsEnabled,
   });
 
-  const gatewayControlsEnabled = data?.destroyed_at === null && !!data?.workerStatus?.flyMachineId;
+  const { data: restoreAuditLogs } = useQuery({
+    ...trpc.admin.kiloclawInstances.adminAuditLogs.queryOptions({
+      userId: data?.user_id ?? '',
+      action: 'kiloclaw.snapshot.restore',
+      limit: 10,
+    }),
+    enabled: snapshotsEnabled,
+  });
+
+  const gatewayControlsEnabled =
+    data?.destroyed_at === null &&
+    !!data?.workerStatus?.flyMachineId &&
+    data?.workerStatus?.status !== 'restoring';
 
   const {
     data: gatewayStatus,
@@ -1101,6 +1144,32 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     }
   }, [data?.workerStatus?.status, data?.user_id, awaitingRestartCompletion, queryClient, trpc]);
 
+  // Stop polling when restore completes (status transitions from 'restoring' to something else).
+  // Track whether we've seen 'restoring' to avoid false positives when the mutation succeeds
+  // but the data hasn't refreshed to show 'restoring' yet.
+  const hasSeenRestoring = useRef(false);
+  useEffect(() => {
+    if (awaitingRestoreCompletion && data?.workerStatus?.status === 'restoring') {
+      hasSeenRestoring.current = true;
+    }
+    if (
+      awaitingRestoreCompletion &&
+      hasSeenRestoring.current &&
+      data?.workerStatus?.status !== 'restoring'
+    ) {
+      setAwaitingRestoreCompletion(false);
+      hasSeenRestoring.current = false;
+      if (data?.workerStatus?.status === 'running') {
+        toast.success('Snapshot restore completed — instance is running');
+      } else if (data?.workerStatus?.status === 'stopped') {
+        toast.success('Snapshot restore completed — instance is stopped');
+      }
+      void queryClient.invalidateQueries({
+        queryKey: trpc.admin.kiloclawInstances.volumeSnapshots.queryKey(),
+      });
+    }
+  }, [data?.workerStatus?.status, awaitingRestoreCompletion, queryClient, trpc]);
+
   const invalidateGatewayQueries = () => {
     if (!data?.user_id) return;
     void queryClient.invalidateQueries({
@@ -1109,7 +1178,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     void queryClient.invalidateQueries({ queryKey: trpc.admin.kiloclawInstances.get.queryKey() });
   };
 
-  const machineControlsEnabled = data?.destroyed_at === null;
+  const machineControlsEnabled =
+    data?.destroyed_at === null && data?.workerStatus?.status !== 'restoring';
   const hasMachine = !!data?.workerStatus?.flyMachineId;
   const canRetryRecovery =
     data?.destroyed_at === null &&
@@ -1322,6 +1392,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       variant="destructive"
                       size="sm"
                       onClick={() => setDestroyDialogOpen(true)}
+                      disabled={data.workerStatus?.status === 'restoring'}
                     >
                       <Trash2 className="mr-1 h-4 w-4" />
                       Destroy Instance
@@ -1593,6 +1664,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   )}
                 </DetailField>
 
+                <DetailField label="Instance Ready Email Sent">
+                  {data.workerStatus.instanceReadyEmailSent ? 'true' : 'false'}
+                </DetailField>
+
                 <DetailField label="Last Metadata Recovery Attempt">
                   {formatEpochTime(data.workerStatus.lastMetadataRecoveryAt)}
                 </DetailField>
@@ -1841,6 +1916,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             userId={data.user_id}
             currentStatus={data.workerStatus.status}
             currentMachineId={data.workerStatus.flyMachineId}
+            previousVolumeId={data.workerStatus.previousVolumeId ?? null}
             onStatusChange={invalidateMachineQueries}
           />
         )}
@@ -1873,6 +1949,15 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               </div>
             </CardHeader>
             <CardContent>
+              {data?.workerStatus?.status === 'restoring' && (
+                <Alert className="mb-4 border-purple-500/30 bg-purple-500/10">
+                  <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                  <AlertDescription className="text-purple-300">
+                    Restoring from snapshot... (started{' '}
+                    {formatRelativeTime(data.workerStatus.restoreStartedAt)})
+                  </AlertDescription>
+                </Alert>
+              )}
               {snapshotsLoading && (
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -1901,7 +1986,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                         <th className="pr-4 pb-2">Status</th>
                         <th className="pr-4 pb-2">Size</th>
                         <th className="pr-4 pb-2">Retention</th>
-                        <th className="pb-2">ID</th>
+                        <th className="pr-4 pb-2">ID</th>
+                        <th className="pb-2"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1928,14 +2014,85 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                           <td className="py-2 pr-4">
                             {snap.retention_days ? `${snap.retention_days}d` : '—'}
                           </td>
-                          <td className="py-2">
+                          <td className="py-2 pr-4">
                             <code className="text-xs">{snap.id}</code>
+                          </td>
+                          <td className="py-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={
+                                (snap.status !== 'created' && snap.status !== 'complete') ||
+                                data?.workerStatus?.status === 'restoring' ||
+                                data?.workerStatus?.status === 'destroying'
+                              }
+                              onClick={() => {
+                                setRestoreSnapshotId(snap.id);
+                                setRestoreReason('');
+                                setRestoreSnapshotDialogOpen(true);
+                              }}
+                            >
+                              <RotateCcw className="mr-1 h-3 w-3" />
+                              Restore
+                            </Button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+              )}
+              {restoreAuditLogs && restoreAuditLogs.length > 0 && (
+                <details className="mt-4">
+                  <summary className="text-muted-foreground cursor-pointer text-xs font-medium">
+                    Recent snapshot restores ({restoreAuditLogs.length})
+                  </summary>
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-muted-foreground border-b text-left">
+                          <th className="pr-4 pb-1">When</th>
+                          <th className="pr-4 pb-1">Admin</th>
+                          <th className="pr-4 pb-1">Snapshot</th>
+                          <th className="pr-4 pb-1">Previous Volume</th>
+                          <th className="pb-1">Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {restoreAuditLogs.map(log => {
+                          const meta = log.metadata ?? {};
+                          return (
+                            <tr key={log.id} className="border-b last:border-0">
+                              <td className="py-1.5 pr-4 whitespace-nowrap">
+                                <span title={formatAbsoluteTime(log.created_at)}>
+                                  {formatRelativeTime(log.created_at)}
+                                </span>
+                              </td>
+                              <td className="py-1.5 pr-4 whitespace-nowrap">
+                                {log.actor_email ?? '—'}
+                              </td>
+                              <td className="py-1.5 pr-4">
+                                <code>
+                                  {typeof meta.snapshotId === 'string' ? meta.snapshotId : '—'}
+                                </code>
+                              </td>
+                              <td className="py-1.5 pr-4">
+                                <code>
+                                  {typeof meta.previousVolumeId === 'string'
+                                    ? meta.previousVolumeId
+                                    : '—'}
+                                </code>
+                              </td>
+                              <td className="text-muted-foreground py-1.5">
+                                {typeof meta.reason === 'string' ? meta.reason : '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
               )}
             </CardContent>
           </Card>
@@ -1991,6 +2148,74 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 disabled={isDestroying}
               >
                 {isDestroying ? 'Destroying...' : 'Destroy Instance'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Snapshot Restore Confirmation Dialog */}
+        <Dialog
+          open={restoreSnapshotDialogOpen}
+          onOpenChange={isRestoring ? () => {} : setRestoreSnapshotDialogOpen}
+        >
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-500">
+                <RotateCcw className="h-5 w-5" />
+                Restore from Snapshot
+              </DialogTitle>
+              <DialogDescription className="pt-3">
+                This will create a new volume from snapshot{' '}
+                <code className="text-xs">{restoreSnapshotId}</code> and replace the current volume.
+                <span className="text-foreground mt-2 block font-medium">
+                  User: {data?.user_email ?? data?.user_id}
+                </span>
+                <span className="mt-2 block">
+                  The instance will be stopped during the restore. The current volume will be
+                  retained and can be reverted to via Volume Reassociation if needed.
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-2">
+              <label htmlFor="restore-reason" className="text-sm font-medium">
+                Reason for restore (min 10 chars)
+              </label>
+              <Textarea
+                id="restore-reason"
+                placeholder="e.g., User reported corrupted workspace files from 2 days ago..."
+                value={restoreReason}
+                onChange={e => setRestoreReason(e.target.value)}
+                maxLength={500}
+                className="mt-1"
+                rows={3}
+              />
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <DialogClose asChild>
+                <Button variant="secondary" disabled={isRestoring}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                variant="default"
+                disabled={isRestoring || restoreReason.length < 10 || !restoreSnapshotId}
+                onClick={() => {
+                  if (!data?.user_id || !restoreSnapshotId) return;
+                  void restoreSnapshot({
+                    userId: data.user_id,
+                    snapshotId: restoreSnapshotId,
+                    reason: restoreReason,
+                  });
+                }}
+              >
+                {isRestoring ? (
+                  <>
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    Restoring...
+                  </>
+                ) : (
+                  'Restore Snapshot'
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -185,6 +185,10 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
       const { shouldNotify } = await stub.tryMarkInstanceReady();
 
       if (shouldNotify && c.env.INTERNAL_API_SECRET) {
+        console.log('[controller] instance-ready: dispatching notification', {
+          userId,
+          sandboxId: data.sandboxId,
+        });
         const apiOrigin = nextApiOrigin(c.env.KILOCODE_API_BASE_URL);
         waitUntil(
           notifyInstanceReady(apiOrigin, c.env.INTERNAL_API_SECRET, userId, data.sandboxId).catch(
@@ -194,8 +198,9 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
           )
         );
       }
-    } catch {
+    } catch (err) {
       // Best-effort: never fail checkin on readiness notification errors
+      console.error('[controller] instance-ready: tryMarkInstanceReady failed:', err);
     }
   }
 

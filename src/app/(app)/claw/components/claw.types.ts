@@ -100,4 +100,8 @@ export const CLAW_STATUS_BADGE: Record<
     label: 'Destroying',
     className: 'border-amber-500/30 bg-amber-500/15 text-amber-400 animate-pulse',
   },
+  restoring: {
+    label: 'Restoring',
+    className: 'border-purple-500/30 bg-purple-500/15 text-purple-400 animate-pulse',
+  },
 };

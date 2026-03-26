@@ -65,6 +65,25 @@
     },
   ],
 
+  // Cloudflare Queue for async snapshot restore orchestration.
+  // Queues must be created before first deploy:
+  //   npx wrangler queues create kiloclaw-snapshot-restore
+  //   npx wrangler queues create kiloclaw-snapshot-restore-dlq
+  // Local dev (wrangler dev) simulates queues in-memory automatically.
+  "queues": {
+    "producers": [{ "queue": "kiloclaw-snapshot-restore", "binding": "SNAPSHOT_RESTORE_QUEUE" }],
+    "consumers": [
+      {
+        "queue": "kiloclaw-snapshot-restore",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 2,
+        "max_concurrency": 2,
+        "dead_letter_queue": "kiloclaw-snapshot-restore-dlq",
+      },
+    ],
+  },
+
   // Hyperdrive binding for Postgres (pepper validation, instance registry)
   "hyperdrive": [
     {

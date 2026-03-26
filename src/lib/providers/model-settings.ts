@@ -54,7 +54,8 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
     };
   }
   if (isOpenAiModel(model) || isGemini3Model(model)) {
-    const efforts = model.includes('codex')
+    const filterNone = model.includes('codex') || isGemini3Model(model);
+    const efforts = filterNone
       ? ReasoningEffortSchema.options.filter(e => e !== 'none')
       : ReasoningEffortSchema.options;
     return Object.fromEntries(

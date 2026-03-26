@@ -31,7 +31,7 @@ import * as scheduling from './town/scheduling';
 import * as events from './town/events';
 import * as reconciler from './town/reconciler';
 import { applyAction } from './town/actions';
-import type { Action, ApplyActionContext } from './town/actions';
+import type { Action, ApplyActionContext, PRFeedbackCheckResult } from './town/actions';
 import { buildRefinerySystemPrompt } from '../prompts/refinery-system.prompt';
 import { GitHubPRStatusSchema, GitLabMRStatusSchema } from '../util/platform-pr.util';
 
@@ -308,6 +308,17 @@ export class TownDO extends DurableObject<Env> {
       checkPRStatus: async prUrl => {
         const townConfig = await this.getTownConfig();
         return this.checkPRStatus(prUrl, townConfig);
+      },
+      checkPRFeedback: async prUrl => {
+        const townConfig = await this.getTownConfig();
+        return this.checkPRFeedback(prUrl, townConfig);
+      },
+      mergePR: async prUrl => {
+        const townConfig = await this.getTownConfig();
+        return this.mergePR(prUrl, townConfig);
+      },
+      getTownConfig: async () => {
+        return this.getTownConfig();
       },
       queueNudge: async (agentId, message, _tier) => {
         await this.queueNudge(agentId, message, {
@@ -4028,6 +4039,156 @@ export class TownDO extends DurableObject<Env> {
 
     console.warn(`${TOWN_LOG} checkPRStatus: unrecognized PR URL format: ${prUrl}`);
     return null;
+  }
+
+  /**
+   * Check a PR for unresolved review comments and failing CI checks.
+   * Used by the auto-resolve PR feedback feature.
+   */
+  private async checkPRFeedback(
+    prUrl: string,
+    townConfig: TownConfig
+  ): Promise<PRFeedbackCheckResult | null> {
+    const ghMatch = prUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    if (!ghMatch) {
+      // GitLab feedback detection not yet supported
+      return null;
+    }
+
+    const [, owner, repo, numberStr] = ghMatch;
+    const token = townConfig.git_auth.github_token;
+    if (!token) return null;
+
+    const headers = {
+      Authorization: `token ${token}`,
+      Accept: 'application/vnd.github.v3+json',
+      'User-Agent': 'Gastown-Refinery/1.0',
+    };
+
+    // Check for unresolved review threads via GraphQL
+    let hasUnresolvedComments = false;
+    try {
+      const graphqlRes = await fetch('https://api.github.com/graphql', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `query($owner: String!, $repo: String!, $number: Int!) {
+            repository(owner: $owner, name: $repo) {
+              pullRequest(number: $number) {
+                reviewThreads(first: 100) {
+                  nodes { isResolved }
+                }
+              }
+            }
+          }`,
+          variables: { owner, repo, number: parseInt(numberStr, 10) },
+        }),
+      });
+      if (graphqlRes.ok) {
+        const gql = (await graphqlRes.json()) as {
+          data?: {
+            repository?: {
+              pullRequest?: {
+                reviewThreads?: { nodes?: Array<{ isResolved: boolean }> };
+              };
+            };
+          };
+        };
+        const threads = gql.data?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
+        hasUnresolvedComments = threads.some(t => !t.isResolved);
+      }
+    } catch (err) {
+      console.warn(`${TOWN_LOG} checkPRFeedback: GraphQL failed for ${prUrl}`, err);
+    }
+
+    // Check CI status via check-runs API
+    let hasFailingChecks = false;
+    let allChecksPass = false;
+    try {
+      // Get the PR's head SHA
+      const prRes = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${numberStr}`,
+        { headers }
+      );
+      if (prRes.ok) {
+        const prData = (await prRes.json()) as { head?: { sha?: string } };
+        const sha = prData.head?.sha;
+        if (sha) {
+          const checksRes = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}/commits/${sha}/check-runs`,
+            { headers }
+          );
+          if (checksRes.ok) {
+            const checksData = (await checksRes.json()) as {
+              total_count?: number;
+              check_runs?: Array<{
+                status: string;
+                conclusion: string | null;
+              }>;
+            };
+            const runs = checksData.check_runs ?? [];
+            hasFailingChecks = runs.some(
+              r => r.status === 'completed' && r.conclusion !== 'success' && r.conclusion !== 'skipped'
+            );
+            // All checks pass = at least one check and all completed successfully
+            allChecksPass =
+              runs.length > 0 &&
+              runs.every(
+                r =>
+                  r.status === 'completed' &&
+                  (r.conclusion === 'success' || r.conclusion === 'skipped')
+              );
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`${TOWN_LOG} checkPRFeedback: check-runs failed for ${prUrl}`, err);
+    }
+
+    return { hasUnresolvedComments, hasFailingChecks, allChecksPass };
+  }
+
+  /**
+   * Merge a PR via GitHub API. Used by the auto-merge feature.
+   * Returns true if the merge succeeded.
+   */
+  private async mergePR(prUrl: string, townConfig: TownConfig): Promise<boolean> {
+    const ghMatch = prUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    if (!ghMatch) {
+      console.warn(`${TOWN_LOG} mergePR: unsupported PR URL format: ${prUrl}`);
+      return false;
+    }
+
+    const [, owner, repo, numberStr] = ghMatch;
+    const token = townConfig.git_auth.github_token;
+    if (!token) {
+      console.warn(`${TOWN_LOG} mergePR: no github_token configured`);
+      return false;
+    }
+
+    const response = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/pulls/${numberStr}/merge`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `token ${token}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'Gastown-Refinery/1.0',
+        },
+        body: JSON.stringify({ merge_method: 'merge' }),
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '(unreadable)');
+      console.warn(
+        `${TOWN_LOG} mergePR: GitHub API returned ${response.status} for ${prUrl}: ${text.slice(0, 500)}`
+      );
+      return false;
+    }
+
+    return true;
   }
 
   /**

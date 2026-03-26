@@ -102,6 +102,9 @@ supabase/.temp
 
 .kilo/plans
 
+# ESLint cache
+.eslintcache
+
 # @kilocode/trpc build output (rebuilt by: pnpm --filter @kilocode/trpc run build)
 packages/trpc/dist/
 .plan/

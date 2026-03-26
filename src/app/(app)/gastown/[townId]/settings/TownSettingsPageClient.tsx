@@ -267,6 +267,8 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
   const [maxPolecats, setMaxPolecats] = useState<number | undefined>(undefined);
   const [refineryGates, setRefineryGates] = useState<string[]>([]);
   const [autoMerge, setAutoMerge] = useState(true);
+  const [autoResolvePrFeedback, setAutoResolvePrFeedback] = useState(false);
+  const [autoMergeDelayMinutes, setAutoMergeDelayMinutes] = useState<number | null>(null);
   const [mergeStrategy, setMergeStrategy] = useState<'direct' | 'pr'>('direct');
   const [stagedConvoysDefault, setStagedConvoysDefault] = useState(false);
   const [githubCliPat, setGithubCliPat] = useState('');
@@ -292,6 +294,8 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
     setMaxPolecats(cfg.max_polecats_per_rig);
     setRefineryGates(cfg.refinery?.gates ?? []);
     setAutoMerge(cfg.refinery?.auto_merge ?? true);
+    setAutoResolvePrFeedback(cfg.refinery?.auto_resolve_pr_feedback ?? false);
+    setAutoMergeDelayMinutes(cfg.refinery?.auto_merge_delay_minutes ?? null);
     setMergeStrategy(cfg.merge_strategy === 'pr' ? 'pr' : 'direct');
     setStagedConvoysDefault(cfg.staged_convoys_default ?? false);
     setGithubCliPat(cfg.github_cli_pat ?? '');
@@ -346,6 +350,8 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
           gates: refineryGates.filter(g => g.trim()),
           auto_merge: autoMerge,
           require_clean_merge: true,
+          auto_resolve_pr_feedback: autoResolvePrFeedback,
+          auto_merge_delay_minutes: autoMergeDelayMinutes,
         },
       },
     });
@@ -811,6 +817,68 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                     </p>
                   </div>
                 </div>
+
+                <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                  <Switch
+                    checked={autoResolvePrFeedback}
+                    onCheckedChange={setAutoResolvePrFeedback}
+                  />
+                  <div>
+                    <Label className="text-sm text-white/70">Auto-resolve PR feedback</Label>
+                    <p className="text-[11px] text-white/30">
+                      When enabled, a polecat is automatically dispatched to address unresolved
+                      review comments and failing CI checks on open PRs.
+                    </p>
+                  </div>
+                </div>
+
+                {autoResolvePrFeedback && (
+                  <div className="mt-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                    <Label className="mb-1.5 block text-sm text-white/70">Auto-merge delay</Label>
+                    <p className="mb-3 text-[11px] text-white/30">
+                      After all CI checks pass and all review threads are resolved, automatically
+                      merge the PR after this delay. Leave empty to require manual merge.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex gap-1.5">
+                        {[
+                          { label: 'Off', value: null },
+                          { label: '0', value: 0 },
+                          { label: '15m', value: 15 },
+                          { label: '1h', value: 60 },
+                          { label: '4h', value: 240 },
+                        ].map(preset => (
+                          <button
+                            key={preset.label}
+                            onClick={() => setAutoMergeDelayMinutes(preset.value)}
+                            className={`rounded px-2 py-1 text-[11px] transition-colors ${
+                              autoMergeDelayMinutes === preset.value
+                                ? 'bg-white/[0.12] text-white/80'
+                                : 'bg-white/[0.04] text-white/40 hover:bg-white/[0.08] hover:text-white/60'
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                      {autoMergeDelayMinutes !== null && (
+                        <div className="flex items-center gap-1.5">
+                          <Input
+                            type="number"
+                            min={0}
+                            value={autoMergeDelayMinutes}
+                            onChange={e => {
+                              const v = parseInt(e.target.value, 10);
+                              setAutoMergeDelayMinutes(Number.isNaN(v) ? null : Math.max(0, v));
+                            }}
+                            className="w-20 border-white/[0.08] bg-white/[0.03] text-center font-mono text-xs text-white/85"
+                          />
+                          <span className="text-[11px] text-white/30">minutes</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </SettingsSection>
 
               {/* ── Container ──────────────────────────────────────── */}

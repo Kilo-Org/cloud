@@ -14,6 +14,7 @@ import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { convoy_metadata } from '../../db/tables/convoy-metadata.table';
 import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
 import { agent_nudges } from '../../db/tables/agent-nudges.table';
+import { review_metadata } from '../../db/tables/review-metadata.table';
 import { query } from '../../util/query.util';
 import * as beadOps from './beads';
 import * as agentOps from './agents';
@@ -164,6 +165,12 @@ const NotifyMayor = z.object({
   message: z.string(),
 });
 
+const MergePr = z.object({
+  type: z.literal('merge_pr'),
+  bead_id: z.string(),
+  pr_url: z.string(),
+});
+
 const EmitEvent = z.object({
   type: z.literal('emit_event'),
   event_name: z.string(),
@@ -195,6 +202,7 @@ export const Action = z.discriminatedUnion('type', [
   DispatchAgent,
   StopAgent,
   PollPr,
+  MergePr,
   SendNudge,
   CreateTriageRequest,
   NotifyMayor,
@@ -225,6 +233,7 @@ export type CloseConvoy = z.infer<typeof CloseConvoy>;
 export type DispatchAgent = z.infer<typeof DispatchAgent>;
 export type StopAgent = z.infer<typeof StopAgent>;
 export type PollPr = z.infer<typeof PollPr>;
+export type MergePr = z.infer<typeof MergePr>;
 export type SendNudge = z.infer<typeof SendNudge>;
 export type CreateTriageRequest = z.infer<typeof CreateTriageRequest>;
 export type NotifyMayor = z.infer<typeof NotifyMayor>;
@@ -235,6 +244,13 @@ export type EmitEvent = z.infer<typeof EmitEvent>;
 // The SQL handle is for synchronous mutations; the rest are for async
 // side effects (dispatch, stop, poll, nudge).
 
+/** Result of checking PR feedback (unresolved comments + failing CI checks). */
+export type PRFeedbackCheckResult = {
+  hasUnresolvedComments: boolean;
+  hasFailingChecks: boolean;
+  allChecksPass: boolean;
+};
+
 export type ApplyActionContext = {
   sql: SqlStorage;
   townId: string;
@@ -244,6 +260,10 @@ export type ApplyActionContext = {
   stopAgent: (agentId: string) => Promise<void>;
   /** Check a PR's status via GitHub/GitLab API. Returns 'open'|'merged'|'closed'|null. */
   checkPRStatus: (prUrl: string) => Promise<'open' | 'merged' | 'closed' | null>;
+  /** Check PR for unresolved review comments and failing CI checks. */
+  checkPRFeedback: (prUrl: string) => Promise<PRFeedbackCheckResult | null>;
+  /** Merge a PR via GitHub/GitLab API. */
+  mergePR: (prUrl: string) => Promise<boolean>;
   /** Queue a nudge message for an agent. */
   queueNudge: (agentId: string, message: string, tier: string) => Promise<void>;
   /** Insert a town_event for deferred processing (e.g. pr_status_changed). */
@@ -253,6 +273,8 @@ export type ApplyActionContext = {
   ) => void;
   /** Emit an analytics/WebSocket event. */
   emitEvent: (data: Record<string, unknown>) => void;
+  /** Get the current town config (read lazily). */
+  getTownConfig: () => Promise<{ refinery?: { auto_resolve_pr_feedback?: boolean; auto_merge_delay_minutes?: number | null } }>;
 };
 
 const LOG = '[actions]';
@@ -565,9 +587,148 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               bead_id: action.bead_id,
               payload: { pr_url: action.pr_url, pr_state: status },
             });
+            return;
+          }
+
+          // PR is open — check for feedback and auto-merge if configured
+          const townConfig = await ctx.getTownConfig();
+          const refineryConfig = townConfig.refinery;
+          if (!refineryConfig) return;
+
+          // Auto-resolve PR feedback: detect unresolved comments and failing CI
+          if (refineryConfig.auto_resolve_pr_feedback) {
+            const feedback = await ctx.checkPRFeedback(action.pr_url);
+            if (feedback && (feedback.hasUnresolvedComments || feedback.hasFailingChecks)) {
+              // Check for existing non-terminal feedback bead to prevent duplicates
+              const existingFeedback = hasExistingFeedbackBead(sql, action.bead_id);
+              if (!existingFeedback) {
+                // Parse PR URL for repo/number metadata
+                const prMeta = parsePrUrl(action.pr_url);
+                const rmRows = z
+                  .object({ branch: z.string() })
+                  .array()
+                  .parse([
+                    ...query(
+                      sql,
+                      /* sql */ `
+                        SELECT ${review_metadata.columns.branch}
+                        FROM ${review_metadata}
+                        WHERE ${review_metadata.bead_id} = ?
+                      `,
+                      [action.bead_id]
+                    ),
+                  ]);
+                const branch = rmRows[0]?.branch ?? '';
+
+                ctx.insertEvent('pr_feedback_detected', {
+                  bead_id: action.bead_id,
+                  payload: {
+                    mr_bead_id: action.bead_id,
+                    pr_url: action.pr_url,
+                    pr_number: prMeta?.prNumber ?? 0,
+                    repo: prMeta?.repo ?? '',
+                    branch,
+                    has_unresolved_comments: feedback.hasUnresolvedComments,
+                    has_failing_checks: feedback.hasFailingChecks,
+                  },
+                });
+              }
+
+              // Update last_feedback_check_at
+              query(
+                sql,
+                /* sql */ `
+                  UPDATE ${review_metadata}
+                  SET ${review_metadata.columns.last_feedback_check_at} = ?
+                  WHERE ${review_metadata.bead_id} = ?
+                `,
+                [now(), action.bead_id]
+              );
+            }
+          }
+
+          // Auto-merge timer: track grace period when everything is green
+          if (refineryConfig.auto_merge_delay_minutes !== null && refineryConfig.auto_merge_delay_minutes !== undefined) {
+            const feedback = await ctx.checkPRFeedback(action.pr_url);
+            if (!feedback) return;
+
+            const allGreen =
+              !feedback.hasUnresolvedComments && !feedback.hasFailingChecks && feedback.allChecksPass;
+
+            if (allGreen) {
+              // Check if timer is already running
+              const readySinceRows = z
+                .object({ auto_merge_ready_since: z.string().nullable() })
+                .array()
+                .parse([
+                  ...query(
+                    sql,
+                    /* sql */ `
+                      SELECT ${review_metadata.columns.auto_merge_ready_since}
+                      FROM ${review_metadata}
+                      WHERE ${review_metadata.bead_id} = ?
+                    `,
+                    [action.bead_id]
+                  ),
+                ]);
+
+              const readySince = readySinceRows[0]?.auto_merge_ready_since;
+
+              if (!readySince) {
+                // First tick where everything is green — start the timer
+                query(
+                  sql,
+                  /* sql */ `
+                    UPDATE ${review_metadata}
+                    SET ${review_metadata.columns.auto_merge_ready_since} = ?
+                    WHERE ${review_metadata.bead_id} = ?
+                  `,
+                  [now(), action.bead_id]
+                );
+              } else {
+                const elapsed = Date.now() - new Date(readySince).getTime();
+                if (elapsed >= refineryConfig.auto_merge_delay_minutes * 60_000) {
+                  // Grace period elapsed — emit merge event
+                  ctx.insertEvent('pr_auto_merge', {
+                    bead_id: action.bead_id,
+                    payload: {
+                      mr_bead_id: action.bead_id,
+                      pr_url: action.pr_url,
+                    },
+                  });
+                }
+              }
+            } else {
+              // Not all green — reset the timer
+              query(
+                sql,
+                /* sql */ `
+                  UPDATE ${review_metadata}
+                  SET ${review_metadata.columns.auto_merge_ready_since} = NULL
+                  WHERE ${review_metadata.bead_id} = ?
+                `,
+                [action.bead_id]
+              );
+            }
           }
         } catch (err) {
           console.warn(`${LOG} poll_pr failed: bead=${action.bead_id} url=${action.pr_url}`, err);
+        }
+      };
+    }
+
+    case 'merge_pr': {
+      return async () => {
+        try {
+          const merged = await ctx.mergePR(action.pr_url);
+          if (merged) {
+            ctx.insertEvent('pr_status_changed', {
+              bead_id: action.bead_id,
+              payload: { pr_url: action.pr_url, pr_state: 'merged' },
+            });
+          }
+        } catch (err) {
+          console.warn(`${LOG} merge_pr failed: bead=${action.bead_id} url=${action.pr_url}`, err);
         }
       };
     }
@@ -646,3 +807,43 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     }
   }
 }
+
+// ── Helpers ─────────────────────────────────────────────────────────
+
+/** Check if an MR bead already has a non-terminal feedback bead blocking it. */
+function hasExistingFeedbackBead(sql: SqlStorage, mrBeadId: string): boolean {
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT 1 FROM ${bead_dependencies} bd
+        INNER JOIN ${beads} fb ON fb.${beads.columns.bead_id} = bd.${bead_dependencies.columns.depends_on_bead_id}
+        WHERE bd.${bead_dependencies.columns.bead_id} = ?
+          AND bd.${bead_dependencies.columns.dependency_type} = 'blocks'
+          AND fb.${beads.columns.labels} LIKE '%gt:pr-feedback%'
+          AND fb.${beads.columns.status} NOT IN ('closed', 'failed')
+        LIMIT 1
+      `,
+      [mrBeadId]
+    ),
+  ];
+  return rows.length > 0;
+}
+
+/** Parse a GitHub/GitLab PR URL to extract repo and PR number. */
+function parsePrUrl(prUrl: string): { repo: string; prNumber: number } | null {
+  // GitHub: https://github.com/{owner}/{repo}/pull/{number}
+  const ghMatch = prUrl.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+  if (ghMatch) {
+    return { repo: ghMatch[1], prNumber: parseInt(ghMatch[2], 10) };
+  }
+  // GitLab: https://{host}/{path}/-/merge_requests/{iid}
+  const glMatch = prUrl.match(/^https:\/\/[^/]+\/(.+)\/-\/merge_requests\/(\d+)/);
+  if (glMatch) {
+    return { repo: glMatch[1], prNumber: parseInt(glMatch[2], 10) };
+  }
+  return null;
+}
+
+// Exported for testing
+export { hasExistingFeedbackBead as _hasExistingFeedbackBead, parsePrUrl as _parsePrUrl };

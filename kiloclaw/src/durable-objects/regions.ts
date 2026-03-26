@@ -170,9 +170,7 @@ export async function removeRegionFromKv(
     // Only one (or zero) named region would remain — revert to meta fallback.
     // Prefix with the last remaining named region as a breadcrumb (if any).
     const lastRegion = distinctRemaining[0];
-    const newRaw = lastRegion
-      ? `${lastRegion},${META_REGION_FALLBACK}`
-      : META_REGION_FALLBACK;
+    const newRaw = lastRegion ? `${lastRegion},${META_REGION_FALLBACK}` : META_REGION_FALLBACK;
     try {
       await kv.put(FLY_REGIONS_KV_KEY, newRaw);
     } catch {

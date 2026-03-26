@@ -54,7 +54,16 @@ interface ChatCompletionContentPartText {
   cache_control?: OpenRouterCacheControl;
 }
 
-type OpenRouterAudioFormat = 'wav' | 'mp3' | 'aiff' | 'aac' | 'ogg' | 'flac' | 'm4a' | 'pcm16' | 'pcm24';
+type OpenRouterAudioFormat =
+  | 'wav'
+  | 'mp3'
+  | 'aiff'
+  | 'aac'
+  | 'ogg'
+  | 'flac'
+  | 'm4a'
+  | 'pcm16'
+  | 'pcm24';
 
 interface ChatCompletionContentPartInputAudio {
   type: 'input_audio';

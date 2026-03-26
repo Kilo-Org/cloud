@@ -1848,11 +1848,9 @@ function buildFeedbackPrompt(
   lines.push('');
   lines.push('For each unresolved comment thread:');
   lines.push(
-    '- If it\'s a relevant code fix: make the change, push, reply explaining what you did, and resolve the thread'
+    "- If it's a relevant code fix: make the change, push, reply explaining what you did, and resolve the thread"
   );
-  lines.push(
-    '- If it\'s not relevant: reply explaining why, and resolve the thread'
-  );
+  lines.push("- If it's not relevant: reply explaining why, and resolve the thread");
   lines.push('');
   lines.push("It's important to resolve the full thread rather than just the base comment.");
   lines.push('');

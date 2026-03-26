@@ -40,9 +40,7 @@ describe('TownConfigSchema refinery extensions', () => {
   });
 
   it('rejects negative auto_merge_delay_minutes', () => {
-    expect(() =>
-      TownConfigSchema.parse({ refinery: { auto_merge_delay_minutes: -1 } })
-    ).toThrow();
+    expect(() => TownConfigSchema.parse({ refinery: { auto_merge_delay_minutes: -1 } })).toThrow();
   });
 
   it('preserves existing refinery fields alongside new ones', () => {
@@ -80,9 +78,7 @@ describe('parsePrUrl', () => {
   });
 
   it('parses GitLab MR URLs with subgroups', () => {
-    const result = parsePrUrl(
-      'https://gitlab.example.com/org/team/project/-/merge_requests/99'
-    );
+    const result = parsePrUrl('https://gitlab.example.com/org/team/project/-/merge_requests/99');
     expect(result).toEqual({ repo: 'org/team/project', prNumber: 99 });
   });
 
@@ -132,8 +128,10 @@ describe('ReviewMetadataRecord', () => {
 });
 
 describe('config deep merge for refinery extensions', () => {
-  it('preserves auto_resolve_pr_feedback when updating other refinery fields', async () => {
-    // Test the merge logic by simulating what updateTownConfig does
+  it('preserves auto_resolve_pr_feedback when updating other refinery fields', () => {
+    // Simulate the merge logic from config.ts updateTownConfig:
+    // When a partial update provides only gates, the new refinery fields
+    // should fall through to the current value.
     const current = TownConfigSchema.parse({
       refinery: {
         gates: ['npm test'],
@@ -142,17 +140,20 @@ describe('config deep merge for refinery extensions', () => {
       },
     });
 
-    // Simulate a partial update that only changes gates
-    const update = { gates: ['npm run test:all'] };
+    // Partial update only touches gates — other fields come from current
+    const updateGates: string[] | undefined = ['npm run test:all'];
+    const updateAutoResolve: boolean | undefined = undefined;
+    const updateDelayMinutes: number | null | undefined = undefined;
+
     const merged = {
-      gates: update.gates ?? current.refinery?.gates ?? [],
+      gates: updateGates ?? current.refinery?.gates ?? [],
       auto_merge: current.refinery?.auto_merge ?? true,
       require_clean_merge: current.refinery?.require_clean_merge ?? true,
       auto_resolve_pr_feedback:
-        undefined ?? current.refinery?.auto_resolve_pr_feedback ?? false,
+        updateAutoResolve ?? current.refinery?.auto_resolve_pr_feedback ?? false,
       auto_merge_delay_minutes:
-        undefined !== undefined
-          ? undefined
+        updateDelayMinutes !== undefined
+          ? updateDelayMinutes
           : (current.refinery?.auto_merge_delay_minutes ?? null),
     };
 

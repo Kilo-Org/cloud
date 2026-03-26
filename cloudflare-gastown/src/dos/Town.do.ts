@@ -4089,23 +4089,35 @@ export class TownDO extends DurableObject<Env> {
         }),
       });
       if (graphqlRes.ok) {
-        const gql = (await graphqlRes.json()) as {
-          data?: {
-            repository?: {
-              pullRequest?: {
-                reviewThreads?: {
-                  pageInfo?: { hasNextPage?: boolean };
-                  nodes?: Array<{ isResolved: boolean }>;
-                };
-              };
-            };
-          };
-        };
-        const reviewThreads = gql.data?.repository?.pullRequest?.reviewThreads;
+        const gqlRaw: unknown = await graphqlRes.json();
+        const gql = z
+          .object({
+            data: z
+              .object({
+                repository: z
+                  .object({
+                    pullRequest: z
+                      .object({
+                        reviewThreads: z
+                          .object({
+                            pageInfo: z.object({ hasNextPage: z.boolean() }).optional(),
+                            nodes: z.array(z.object({ isResolved: z.boolean() })),
+                          })
+                          .optional(),
+                      })
+                      .optional(),
+                  })
+                  .optional(),
+              })
+              .optional(),
+          })
+          .safeParse(gqlRaw);
+        const reviewThreads = gql.success
+          ? gql.data.data?.repository?.pullRequest?.reviewThreads
+          : undefined;
         const threads = reviewThreads?.nodes ?? [];
         const hasMorePages = reviewThreads?.pageInfo?.hasNextPage === true;
-        hasUnresolvedComments =
-          threads.some(t => !t.isResolved) || hasMorePages;
+        hasUnresolvedComments = threads.some(t => !t.isResolved) || hasMorePages;
       }
     } catch (err) {
       console.warn(`${TOWN_LOG} checkPRFeedback: GraphQL failed for ${prUrl}`, err);
@@ -4124,28 +4136,44 @@ export class TownDO extends DurableObject<Env> {
         { headers }
       );
       if (prRes.ok) {
-        const prData = (await prRes.json()) as { head?: { sha?: string } };
-        const sha = prData.head?.sha;
+        const prRaw: unknown = await prRes.json();
+        const prData = z
+          .object({ head: z.object({ sha: z.string() }).optional() })
+          .safeParse(prRaw);
+        const sha = prData.success ? prData.data.head?.sha : undefined;
         if (sha) {
           const checksRes = await fetch(
             `https://api.github.com/repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=100`,
             { headers }
           );
           if (checksRes.ok) {
-            const checksData = (await checksRes.json()) as {
-              total_count?: number;
-              check_runs?: Array<{
-                status: string;
-                conclusion: string | null;
-              }>;
-            };
-            const runs = checksData.check_runs ?? [];
-            const totalCount = checksData.total_count ?? runs.length;
+            const checksRaw: unknown = await checksRes.json();
+            const checksData = z
+              .object({
+                total_count: z.number().optional(),
+                check_runs: z
+                  .array(
+                    z.object({
+                      status: z.string(),
+                      conclusion: z.string().nullable(),
+                    })
+                  )
+                  .optional(),
+              })
+              .safeParse(checksRaw);
+            const runs = checksData.success ? (checksData.data.check_runs ?? []) : [];
+            const totalCount = checksData.success
+              ? (checksData.data.total_count ?? runs.length)
+              : runs.length;
             const hasMorePages = totalCount > runs.length;
 
-            hasFailingChecks = runs.some(
-              r => r.status === 'completed' && r.conclusion !== 'success' && r.conclusion !== 'skipped'
-            );
+            hasFailingChecks =
+              runs.some(
+                r =>
+                  r.status === 'completed' &&
+                  r.conclusion !== 'success' &&
+                  r.conclusion !== 'skipped'
+              ) || hasMorePages; // Conservatively assume unpaginated runs may be failing
             // All checks pass = at least one check, all returned runs completed
             // successfully, and no unpaginated runs exist
             allChecksPass =

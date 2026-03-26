@@ -276,7 +276,9 @@ export type ApplyActionContext = {
   /** Emit an analytics/WebSocket event. */
   emitEvent: (data: Record<string, unknown>) => void;
   /** Get the current town config (read lazily). */
-  getTownConfig: () => Promise<{ refinery?: { auto_resolve_pr_feedback?: boolean; auto_merge_delay_minutes?: number | null } }>;
+  getTownConfig: () => Promise<{
+    refinery?: { auto_resolve_pr_feedback?: boolean; auto_merge_delay_minutes?: number | null };
+  }>;
 };
 
 const LOG = '[actions]';
@@ -650,12 +652,17 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
           }
 
           // Auto-merge timer: track grace period when everything is green
-          if (refineryConfig.auto_merge_delay_minutes !== null && refineryConfig.auto_merge_delay_minutes !== undefined) {
+          if (
+            refineryConfig.auto_merge_delay_minutes !== null &&
+            refineryConfig.auto_merge_delay_minutes !== undefined
+          ) {
             const feedback = await ctx.checkPRFeedback(action.pr_url);
             if (!feedback) return;
 
             const allGreen =
-              !feedback.hasUnresolvedComments && !feedback.hasFailingChecks && feedback.allChecksPass;
+              !feedback.hasUnresolvedComments &&
+              !feedback.hasFailingChecks &&
+              feedback.allChecksPass;
 
             if (allGreen) {
               // Check if timer is already running
@@ -757,7 +764,12 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
           // stale state. If a reviewer posted new comments or CI regressed
           // since the last poll, abort and reset the timer.
           const freshFeedback = await ctx.checkPRFeedback(action.pr_url);
-          if (freshFeedback && (freshFeedback.hasUnresolvedComments || freshFeedback.hasFailingChecks || !freshFeedback.allChecksPass)) {
+          if (
+            freshFeedback &&
+            (freshFeedback.hasUnresolvedComments ||
+              freshFeedback.hasFailingChecks ||
+              !freshFeedback.allChecksPass)
+          ) {
             console.log(
               `${LOG} merge_pr: fresh feedback check found issues, aborting merge for bead=${action.bead_id}`
             );

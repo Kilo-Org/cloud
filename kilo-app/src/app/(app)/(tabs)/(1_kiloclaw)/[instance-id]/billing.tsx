@@ -69,18 +69,6 @@ function PlanDetails({
       </View>
     );
   }
-  if (billing.earlybird) {
-    const daysText = `${String(billing.earlybird.daysRemaining)} day${billing.earlybird.daysRemaining === 1 ? '' : 's'} left`;
-    return (
-      <View>
-        <DetailRow label="Plan" value="Earlybird" />
-        <View className="h-px bg-border" />
-        <DetailRow label="Remaining" value={daysText} />
-        <View className="h-px bg-border" />
-        <DetailRow label="Expires" value={formatBillingDate(billing.earlybird.expiresAt)} />
-      </View>
-    );
-  }
   return (
     <View className="py-2">
       <Text variant="muted" className="text-sm">

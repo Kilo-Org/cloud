@@ -9,8 +9,6 @@ type ClawBannerState =
   | 'trial_ending_soon'
   | 'trial_ending_very_soon'
   | 'trial_expires_today'
-  | 'earlybird_active'
-  | 'earlybird_ending_soon'
   | 'subscription_canceling'
   | 'subscription_past_due'
   | 'subscribed'
@@ -62,18 +60,6 @@ function deriveTrialBannerState(
   return 'trial_active';
 }
 
-function deriveEarlybirdBannerState(
-  earlybird: NonNullable<ClawBillingStatus['earlybird']>
-): ClawBannerState {
-  if (earlybird.daysRemaining <= 0) {
-    return 'none';
-  }
-  if (earlybird.daysRemaining <= 30) {
-    return 'earlybird_ending_soon';
-  }
-  return 'earlybird_active';
-}
-
 export function deriveBannerState(billing: ClawBillingStatus): ClawBannerState {
   if (billing.subscription) {
     const state = deriveSubscriptionBannerState(billing.subscription);
@@ -86,9 +72,6 @@ export function deriveBannerState(billing: ClawBillingStatus): ClawBannerState {
     if (state) {
       return state;
     }
-  }
-  if (billing.earlybird) {
-    return deriveEarlybirdBannerState(billing.earlybird);
   }
   return 'none';
 }

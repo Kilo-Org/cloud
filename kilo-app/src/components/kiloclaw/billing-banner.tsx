@@ -59,22 +59,6 @@ function getBannerConfig(
         bgClass: 'bg-red-100 dark:bg-red-950',
       };
     }
-    case 'earlybird_active': {
-      return {
-        icon: Info,
-        message: billing.earlybird
-          ? `Earlybird access until ${formatBillingDate(billing.earlybird.expiresAt)}`
-          : '',
-        bgClass: 'bg-secondary',
-      };
-    }
-    case 'earlybird_ending_soon': {
-      return {
-        icon: Clock,
-        message: `Earlybird ending: ${String(billing.earlybird?.daysRemaining ?? 0)} days left`,
-        bgClass: 'bg-secondary',
-      };
-    }
     case 'subscription_canceling': {
       return {
         icon: AlertTriangle,

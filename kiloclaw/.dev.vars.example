@@ -23,6 +23,10 @@ GATEWAY_TOKEN_SECRET=dev-gateway-secret-kiloclaw
 # Fly app naming prefix ("dev-") for per-user app creation.
 WORKER_ENV=development
 
+# Backend app origin for internal API calls (e.g. instance-ready email).
+# In dev, point this at your local Next.js server.
+BACKEND_API_URL=http://localhost:3000
+
 # Tunnel URL (set automatically by the dev-start script)
 # OpenClaw's native kilocode provider hardcodes https://api.kilo.ai/api/gateway/.
 # In dev, the script sets this to the Cloudflare tunnel URL pointing to your

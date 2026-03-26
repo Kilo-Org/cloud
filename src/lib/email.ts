@@ -115,7 +115,7 @@ type Props = {
   organizationId: string;
 };
 
-export async function sendOrgSubscriptionEmail(to: string, props: Props) {
+export async function sendOrgSubscriptionEmail(to: string, props: Props): Promise<SendResult> {
   const seats = `${props.seatCount} seat${props.seatCount === 1 ? '' : 's'}`;
   const organization_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}`;
   const invoices_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`;
@@ -126,7 +126,7 @@ export async function sendOrgSubscriptionEmail(to: string, props: Props) {
   });
 }
 
-export async function sendOrgRenewedEmail(to: string, props: Props) {
+export async function sendOrgRenewedEmail(to: string, props: Props): Promise<SendResult> {
   const seats = `${props.seatCount} seat${props.seatCount === 1 ? '' : 's'}`;
   const invoices_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`;
   return send({
@@ -136,7 +136,10 @@ export async function sendOrgRenewedEmail(to: string, props: Props) {
   });
 }
 
-export async function sendOrgCancelledEmail(to: string, props: Omit<Props, 'seatCount'>) {
+export async function sendOrgCancelledEmail(
+  to: string,
+  props: Omit<Props, 'seatCount'>
+): Promise<SendResult> {
   const invoices_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`;
   return send({
     to,
@@ -148,7 +151,7 @@ export async function sendOrgCancelledEmail(to: string, props: Omit<Props, 'seat
 export async function sendOrgSSOUserJoinedEmail(
   to: string,
   props: Omit<Props, 'seatCount'> & { new_user_email: string }
-) {
+): Promise<SendResult> {
   const organization_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}`;
   return send({
     to,
@@ -157,7 +160,9 @@ export async function sendOrgSSOUserJoinedEmail(
   });
 }
 
-export async function sendOrganizationInviteEmail(data: OrganizationInviteEmailData) {
+export async function sendOrganizationInviteEmail(
+  data: OrganizationInviteEmailData
+): Promise<SendResult> {
   return send({
     to: data.to,
     templateName: 'orgInvitation',
@@ -172,7 +177,7 @@ export async function sendOrganizationInviteEmail(data: OrganizationInviteEmailD
 export async function sendMagicLinkEmail(
   magicLink: MagicLinkTokenWithPlaintext,
   callbackUrl?: string
-) {
+): Promise<SendResult> {
   return send({
     to: magicLink.email,
     templateName: 'magicLink',
@@ -189,7 +194,7 @@ export async function sendMagicLinkEmail(
 export async function sendAutoTopUpFailedEmail(
   to: string,
   props: { reason: string; organizationId?: string }
-) {
+): Promise<SendResult> {
   const credits_url = props.organizationId
     ? `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`
     : `${NEXTAUTH_URL}/credits?show-auto-top-up`;
@@ -207,7 +212,9 @@ type SendDeploymentFailedEmailProps = {
   repository: string;
 };
 
-export async function sendDeploymentFailedEmail(props: SendDeploymentFailedEmailProps) {
+export async function sendDeploymentFailedEmail(
+  props: SendDeploymentFailedEmailProps
+): Promise<SendResult> {
   return send({
     to: props.to,
     templateName: 'deployFailed',
@@ -225,7 +232,7 @@ type SendBalanceAlertEmailProps = {
   to: string[];
 };
 
-export async function sendBalanceAlertEmail(props: SendBalanceAlertEmailProps) {
+export async function sendBalanceAlertEmail(props: SendBalanceAlertEmailProps): Promise<void> {
   const { organizationId, minimum_balance, to } = props;
 
   if (!to || to.length === 0) {
@@ -270,7 +277,7 @@ type OssInviteEmailData = {
   monthlyCreditsUsd: number;
 };
 
-export async function sendOssInviteNewUserEmail(data: OssInviteEmailData) {
+export async function sendOssInviteNewUserEmail(data: OssInviteEmailData): Promise<SendResult> {
   const integrations_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/integrations`;
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/code-reviews`;
   const tierConfig = ossTierConfig[data.tier];
@@ -292,7 +299,7 @@ export async function sendOssInviteNewUserEmail(data: OssInviteEmailData) {
 
 export async function sendOssInviteExistingUserEmail(
   data: Omit<OssInviteEmailData, 'acceptInviteUrl' | 'inviteCode'>
-) {
+): Promise<SendResult> {
   const organization_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}`;
   const integrations_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/integrations`;
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/code-reviews`;
@@ -321,7 +328,9 @@ type OssProvisionEmailData = {
   monthlyCreditsUsd: number;
 };
 
-export async function sendOssExistingOrgProvisionedEmail(data: OssProvisionEmailData) {
+export async function sendOssExistingOrgProvisionedEmail(
+  data: OssProvisionEmailData
+): Promise<void> {
   const organization_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}`;
   const integrations_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/integrations`;
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/code-reviews`;

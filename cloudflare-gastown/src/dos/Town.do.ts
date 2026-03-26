@@ -41,8 +41,7 @@ import {
   EscalationBeadRecord,
   ConvoyBeadRecord,
 } from '../db/tables/beads.table';
-import { agent_metadata, AgentMetadataRecord } from '../db/tables/agent-metadata.table';
-import { review_metadata } from '../db/tables/review-metadata.table';
+import { agent_metadata } from '../db/tables/agent-metadata.table';
 import { escalation_metadata } from '../db/tables/escalation-metadata.table';
 import { convoy_metadata } from '../db/tables/convoy-metadata.table';
 import { bead_dependencies } from '../db/tables/bead-dependencies.table';
@@ -278,8 +277,6 @@ export class TownDO extends DurableObject<Env> {
         let systemPromptOverride: string | undefined;
         if (agent.role === 'refinery' && bead.type === 'merge_request') {
           const reviewMeta = reviewQueue.getReviewMetadata(this.sql, beadId);
-          const sourceBeadId =
-            typeof bead.metadata?.source_bead_id === 'string' ? bead.metadata.source_bead_id : null;
           const townConfig = await this.getTownConfig();
           systemPromptOverride = buildRefinerySystemPrompt({
             identity: agent.identity,

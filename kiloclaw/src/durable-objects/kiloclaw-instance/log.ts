@@ -216,6 +216,8 @@ export function alarmIntervalForStatus(status: InstanceStatus): number {
       return ALARM_INTERVAL_RESTARTING_MS;
     case 'destroying':
       return ALARM_INTERVAL_DESTROYING_MS;
+    case 'restoring':
+      return ALARM_INTERVAL_STARTING_MS; // 1 min — frequent enough to detect stuck restores
     case 'provisioned':
     case 'stopped':
       return ALARM_INTERVAL_IDLE_MS;

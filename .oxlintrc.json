@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["oxc", "typescript", "unicorn", "nextjs"],
+  "plugins": ["oxc", "typescript", "unicorn", "nextjs", "import"],
+  "jsPlugins": [{ "name": "drizzle", "specifier": "./oxlint-plugin-drizzle.js" }],
   "options": {
     "typeAware": true
   },
@@ -116,7 +117,9 @@
     "@next/next/no-document-import-in-page": "error",
     "@next/next/no-duplicate-head": "error",
     "@next/next/no-head-import-in-document": "error",
-    "@next/next/no-script-component-in-head": "error"
+    "@next/next/no-script-component-in-head": "error",
+    "drizzle/enforce-delete-with-where": ["error", { "drizzleObjectName": ["db", "ctx.db"] }],
+    "drizzle/enforce-update-with-where": ["error", { "drizzleObjectName": ["db", "ctx.db"] }]
   },
   "overrides": [
     {
@@ -155,6 +158,47 @@
       "files": ["**/*.test.ts", "**/*.test.tsx"],
       "rules": {
         "@typescript-eslint/no-non-null-assertion": "off"
+      }
+    },
+    {
+      "files": [
+        "cloud-agent/**/*.ts",
+        "cloud-agent-next/**/*.ts",
+        "cloudflare-*/**/*.ts",
+        "kiloclaw/**/*.ts",
+        "packages/**/*.ts"
+      ],
+      "rules": {
+        "@typescript-eslint/no-empty-object-type": "error",
+        "@typescript-eslint/await-thenable": "error",
+        "@typescript-eslint/no-base-to-string": "error",
+        "@typescript-eslint/no-duplicate-type-constituents": "error",
+        "@typescript-eslint/no-for-in-array": "error",
+        "@typescript-eslint/no-implied-eval": "error",
+        "@typescript-eslint/no-redundant-type-constituents": "error",
+        "@typescript-eslint/no-unnecessary-type-assertion": "error",
+        "@typescript-eslint/no-unsafe-argument": "error",
+        "@typescript-eslint/no-unsafe-assignment": "error",
+        "@typescript-eslint/no-unsafe-call": "error",
+        "@typescript-eslint/no-unsafe-enum-comparison": "error",
+        "@typescript-eslint/no-unsafe-member-access": "error",
+        "@typescript-eslint/no-unsafe-return": "error",
+        "@typescript-eslint/no-unsafe-unary-minus": "error",
+        "@typescript-eslint/restrict-plus-operands": "error",
+        "@typescript-eslint/restrict-template-expressions": "error",
+        "@typescript-eslint/unbound-method": "error"
+      }
+    },
+    {
+      "files": [
+        "cloud-agent/src/session/queries/*.ts",
+        "cloud-agent-next/src/session/queries/*.ts",
+        "cloudflare-gastown/**/*.ts",
+        "cloudflare-webhook-agent-ingest/**/*.ts",
+        "kiloclaw/**/*.ts"
+      ],
+      "rules": {
+        "@typescript-eslint/restrict-template-expressions": "off"
       }
     }
   ]

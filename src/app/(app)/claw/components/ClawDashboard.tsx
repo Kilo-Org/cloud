@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Check, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
@@ -73,6 +73,19 @@ export function ClawDashboard({
   const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const hasPairingStep = selectedChannelId === 'telegram' || selectedChannelId === 'discord';
+
+  // Reset onboarding wizard to step 1 whenever we enter setup mode so that
+  // a destroy → re-provision cycle always starts fresh.
+  const prevIsNewSetup = useRef(isNewSetup);
+  useEffect(() => {
+    if (isNewSetup && !prevIsNewSetup.current) {
+      setOnboardingStep('permissions');
+      setSelectedPreset(null);
+      setChannelTokens(null);
+      setSelectedChannelId(null);
+    }
+    prevIsNewSetup.current = isNewSetup;
+  }, [isNewSetup]);
 
   const [dirtySecrets, setDirtySecrets] = useState<Set<string>>(new Set());
 
@@ -153,11 +166,11 @@ export function ClawDashboard({
       )}
 
       {configServiceNudgeVisible && !isNewSetup && (
-        <div className="border-brand-primary/30 bg-brand-primary/5 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="border-violet-500/30 bg-violet-500/10 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <Zap className="text-brand-primary mt-0.5 h-5 w-5 shrink-0" />
+            <Zap className="text-violet-400 mt-0.5 h-5 w-5 shrink-0" />
             <div>
-              <p className="text-brand-primary text-sm font-semibold">
+              <p className="text-violet-400 text-sm font-semibold">
                 Go from inbox chaos to an AI executive assistant — in one hour.
               </p>
               <p className="text-muted-foreground mt-0.5 text-sm">
@@ -170,7 +183,7 @@ export function ClawDashboard({
             href="https://kilo.ai/kiloclaw/config-service"
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-brand-primary text-primary-foreground hover:bg-brand-primary/90 inline-flex shrink-0 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors"
+            className="bg-violet-500 text-white hover:bg-violet-500/90 inline-flex shrink-0 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors"
           >
             Book your session
           </a>
@@ -182,6 +195,7 @@ export function ClawDashboard({
           <CreateInstanceCard
             mutations={mutations}
             onProvisionStart={() => onNewSetupChange(true)}
+            onProvisionFailed={() => onNewSetupChange(false)}
           />
         ) : isNewSetup && onboardingStep === 'permissions' ? (
           <PermissionStep

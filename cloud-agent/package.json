@@ -14,10 +14,7 @@
     "prestart": "pnpm run build:wrapper",
     "start": "wrangler dev",
     "types": "wrangler types",
-    "lint": "pnpm run lint:oxlint && pnpm run lint:eslint:fallback",
-    "lint:oxlint": "pnpm -w exec oxlint --config .oxlintrc.json cloud-agent/src cloud-agent/wrapper/src",
-    "lint:eslint:fallback": "eslint --config eslint.config.mjs --cache 'src/**/*.ts' 'wrapper/src/**/*.ts'",
-    "lint:fix": "eslint --config eslint.config.mjs --cache --fix 'src/**/*.ts' 'wrapper/src/**/*.ts'",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json cloud-agent/src cloud-agent/wrapper/src",
     "format": "oxfmt src",
     "format:check": "oxfmt --list-different src",
     "build:wrapper": "bun run --cwd wrapper build",
@@ -26,7 +23,7 @@
     "test:integration": "vitest run --config vitest.workers.config.ts",
     "test:integration:watch": "vitest --config vitest.workers.config.ts",
     "test:all": "vitest run && vitest run --config vitest.workers.config.ts",
-    "typecheck": "tsgo --noEmit --incremental false && pnpm -C wrapper run typecheck"
+    "typecheck": "tsgo --noEmit && pnpm -C wrapper run typecheck"
   },
   "dependencies": {
     "@cloudflare/sandbox": "0.6.7",
@@ -43,13 +40,11 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.21",
     "@cloudflare/workers-types": "catalog:",
-    "@kilocode/eslint-config": "workspace:*",
     "@types/jsonwebtoken": "catalog:",
     "@types/node": "^22.19.15",
     "@typescript/native-preview": "catalog:",
     "@vitest/ui": "^3.2.4",
     "drizzle-kit": "catalog:",
-    "eslint": "catalog:",
     "typescript": "catalog:",
     "vitest": "^3.2.4",
     "wrangler": "catalog:"

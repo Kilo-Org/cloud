@@ -1,5 +1,6 @@
 import type { KiloClawInstance } from './durable-objects/kiloclaw-instance';
 import type { KiloClawApp } from './durable-objects/kiloclaw-app';
+import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 
 /**
  * Environment bindings for the KiloClaw Worker
@@ -11,6 +12,10 @@ export type KiloClawEnv = {
   KILOCLAW_CONTROLLER_AE: AnalyticsEngineDataset;
   HYPERDRIVE?: Hyperdrive;
   KV_CLAW_CACHE: KVNamespace;
+  SNAPSHOT_RESTORE_QUEUE?: Queue<SnapshotRestoreMessage>;
+
+  // Backend app origin for internal API calls (e.g. instance-ready email)
+  BACKEND_API_URL?: string;
 
   // Auth secrets
   NEXTAUTH_SECRET?: string;

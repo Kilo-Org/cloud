@@ -44,6 +44,8 @@ import {
 } from '@kilocode/db/schema-types';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type OpenAI from 'openai';
+import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
+import PROVIDERS from '@/lib/providers/provider-definitions';
 
 function convertMessages(messages: OpenRouterChatCompletionsInput): ModelMessage[] {
   const toolNameByCallId = new Map<string, string>();
@@ -756,7 +758,7 @@ function applyLegacyExtensionHack(choice: ChatCompletionChunkChoice | undefined)
   }
 }
 
-export async function customLlmRequest(
+async function customLlmRequest(
   customLlm: CustomLlm,
   request: OpenRouterChatCompletionRequest,
   isLegacyExtension: boolean
@@ -863,4 +865,33 @@ export async function customLlmRequest(
       'Content-Type': 'text/event-stream',
     },
   });
+}
+
+export function grokCodeFastOptimizedRequest(
+  request: OpenRouterChatCompletionRequest,
+  isLegacyExtension: boolean
+) {
+  const model = grok_code_fast_1_optimized_free_model;
+  const provider = PROVIDERS.MARTIAN;
+  return customLlmRequest(
+    {
+      public_id: model.public_id,
+      internal_id: model.internal_id,
+      display_name: model.display_name,
+      context_length: model.context_length,
+      max_completion_tokens: model.max_completion_tokens,
+      provider: 'openai', // xai doesn't support preserved reasoning currently: https://github.com/vercel/ai/issues/10542
+      organization_ids: [],
+      base_url: provider.apiUrl,
+      api_key: provider.apiKey,
+      supports_image_input: model.flags.includes('vision'),
+      force_reasoning: true,
+      opencode_settings: null,
+      extra_body: null,
+      extra_headers: null,
+      interleaved_format: null,
+    },
+    request,
+    isLegacyExtension
+  );
 }

@@ -562,7 +562,6 @@ describe('maybePerformAutoTopUp with Kilo Pass', () => {
 
     await maybePerformAutoTopUp(user);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(client.invoices.create).not.toHaveBeenCalled();
   });
 
@@ -644,7 +643,6 @@ describe('maybePerformAutoTopUp with Kilo Pass', () => {
 
     await maybePerformAutoTopUp(user);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(client.invoices.create).toHaveBeenCalledTimes(1);
   });
 });
@@ -680,9 +678,7 @@ describe('invoice metadata includes traceId', () => {
 
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(client.invoices.create).toHaveBeenCalledTimes(1);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(client.invoices.create).toHaveBeenCalledWith(
       expect.objectContaining({
         metadata: expect.objectContaining({

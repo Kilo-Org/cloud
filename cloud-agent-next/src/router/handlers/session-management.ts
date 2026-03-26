@@ -407,6 +407,7 @@ export function createSessionManagementHandlers() {
             // mode is validated by zod (AgentModeSchema) at storage time
             mode: metadata.mode as AgentMode | undefined,
             model: metadata.model,
+            variant: metadata.variant,
             autoCommit: metadata.autoCommit,
             upstreamBranch: metadata.upstreamBranch,
 

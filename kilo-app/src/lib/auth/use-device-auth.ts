@@ -5,13 +5,13 @@ import { API_BASE_URL } from '@/lib/config';
 
 type DeviceAuthStatus = 'idle' | 'pending' | 'approved' | 'denied' | 'expired' | 'error';
 
-interface DeviceAuthState {
+type DeviceAuthState = {
   status: DeviceAuthStatus;
   code: string | undefined;
   token: string | undefined;
   error: string | undefined;
   verificationUrl: string | undefined;
-}
+};
 
 type DeviceAuthResult = DeviceAuthState & {
   start: () => Promise<void>;
@@ -94,7 +94,9 @@ export function useDeviceAuth(): DeviceAuthResult {
           }
           // 202 = still pending, continue polling
         } catch (error: unknown) {
-          if (error instanceof Error && error.name === 'AbortError') return;
+          if (error instanceof Error && error.name === 'AbortError') {
+            return;
+          }
           cleanup();
           setState(previous => ({
             status: 'error',

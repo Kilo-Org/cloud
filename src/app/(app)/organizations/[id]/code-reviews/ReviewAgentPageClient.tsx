@@ -7,6 +7,7 @@ import { CodeReviewJobsCard } from '@/components/code-reviews/CodeReviewJobsCard
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { SetPageTitle } from '@/components/SetPageTitle';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Rocket, ExternalLink, Settings2, ListChecks } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -83,12 +84,11 @@ export function ReviewAgentPageClient({
 
   return (
     <>
+      <SetPageTitle title="Code Reviewer">
+        <Badge variant="new">new</Badge>
+      </SetPageTitle>
       {/* Header */}
       <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-bold">Code Reviewer</h1>
-          <Badge variant="new">new</Badge>
-        </div>
         <p className="text-muted-foreground">
           Automate code reviews with AI-powered analysis for {organizationName}
         </p>

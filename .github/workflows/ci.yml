@@ -22,36 +22,52 @@ jobs:
   changes:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     outputs:
+      kilocode_backend: ${{ steps.filter.outputs.kilocode_backend }}
       cloud_agent: ${{ steps.filter.outputs.cloud_agent }}
       cloud_agent_next: ${{ steps.filter.outputs.cloud_agent_next }}
-      webhook_agent: ${{ steps.filter.outputs.webhook_agent }}
-      security_auto_analysis: ${{ steps.filter.outputs.security_auto_analysis }}
-      kiloclaw: ${{ steps.filter.outputs.kiloclaw }}
-      app_builder: ${{ steps.filter.outputs.app_builder }}
+      workspace_matrix: ${{ steps.workspaces.outputs.matrix }}
     steps:
       - uses: useblacksmith/checkout@v1
         with:
           fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       - name: Detect changes
         id: filter
         uses: dorny/paths-filter@v3
         with:
           filters: |
+            kilocode_backend:
+              - 'src/**'
+              - 'packages/db/**'
+              - 'packages/encryption/**'
+              - 'packages/trpc/**'
+              - 'packages/worker-utils/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'tsconfig.json'
+              - 'tsconfig.*.json'
+              - 'next.config.mjs'
+              - 'jest.config.ts'
+              - 'postcss.config.mjs'
+              - 'sentry.*'
             cloud_agent:
               - 'cloud-agent/**'
             cloud_agent_next:
               - 'cloud-agent-next/**'
-            webhook_agent:
-              - 'cloudflare-webhook-agent-ingest/**'
-            security_auto_analysis:
-              - 'cloudflare-security-auto-analysis/**'
-            kiloclaw:
-              - 'kiloclaw/**'
-            app_builder:
-              - 'cloudflare-app-builder/**'
+
+      - name: Detect changed workspaces with tests
+        id: workspaces
+        run: |
+          matrix=$(scripts/changed-workspaces.sh --exclude cloud-agent --exclude cloud-agent-next)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   typecheck:
+    needs: changes
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     steps:
       - uses: useblacksmith/checkout@v1
@@ -74,9 +90,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Typecheck
-        run: pnpm run typecheck
+        run: scripts/typecheck-all.sh
 
   lint:
+    needs: changes
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     steps:
       - uses: useblacksmith/checkout@v1
@@ -98,10 +115,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build trpc types
+        run: pnpm --filter @kilocode/trpc run build
+
       - name: Lint
-        run: pnpm run lint
+        run: scripts/lint-all.sh
 
   format-check:
+    needs: changes
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     steps:
       - uses: useblacksmith/checkout@v1
@@ -131,6 +152,7 @@ jobs:
           }
 
   drizzle-check:
+    needs: changes
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     steps:
       - uses: useblacksmith/checkout@v1
@@ -157,32 +179,9 @@ jobs:
         env:
           POSTGRES_URL: postgresql://unused:unused@localhost:5432/unused
 
-  dependency-cycle-check:
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    steps:
-      - uses: useblacksmith/checkout@v1
-        with:
-          lfs: true
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-          run_install: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Dependency cycle check
-        run: pnpm run dependency-cycle-check
-
   test:
+    needs: [changes, typecheck, lint, format-check, drizzle-check]
+    if: needs.changes.outputs.kilocode_backend == 'true'
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
 
     services:
@@ -225,10 +224,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Dependency cycle check
+        run: pnpm run dependency-cycle-check
+
       - name: Run tests
         run: pnpm run test
 
   build:
+    needs: [changes, typecheck, lint, format-check, drizzle-check]
+    if: needs.changes.outputs.kilocode_backend == 'true'
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     steps:
       - uses: useblacksmith/checkout@v1
@@ -274,7 +278,7 @@ jobs:
         run: pnpm run build
 
   cloud-agent:
-    needs: changes
+    needs: [changes, typecheck, lint, format-check, drizzle-check]
     if: needs.changes.outputs.cloud_agent == 'true'
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     steps:
@@ -306,17 +310,11 @@ jobs:
         working-directory: cloud-agent/wrapper
         run: bun run build.ts
 
-      - name: Typecheck (cloud-agent)
-        run: pnpm --filter cloud-agent typecheck
-
-      - name: Lint (cloud-agent)
-        run: pnpm --filter cloud-agent lint
-
       - name: Run cloud-agent tests
         run: pnpm --filter cloud-agent test:all
 
   cloud-agent-next:
-    needs: changes
+    needs: [changes, typecheck, lint, format-check, drizzle-check]
     if: needs.changes.outputs.cloud_agent_next == 'true'
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     steps:
@@ -349,159 +347,17 @@ jobs:
         working-directory: cloud-agent-next/wrapper
         run: bun run build.ts
 
-      - name: Typecheck (cloud-agent-next)
-        run: pnpm --filter cloud-agent-next typecheck
-
-      - name: Lint (cloud-agent-next)
-        run: pnpm --filter cloud-agent-next lint
-
       - name: Run cloud-agent-next tests
         run: pnpm --filter cloud-agent-next test:all
 
-  webhook-agent:
-    needs: changes
-    if: needs.changes.outputs.webhook_agent == 'true'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    steps:
-      - uses: useblacksmith/checkout@v1
-        with:
-          lfs: true
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-          run_install: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck (webhook-agent-ingest)
-        run: pnpm --filter cloudflare-webhook-agent-ingest typecheck
-
-      - name: Lint (webhook-agent-ingest)
-        run: pnpm --filter cloudflare-webhook-agent-ingest lint
-
-      - name: Run webhook-agent-ingest tests
-        run: pnpm --filter cloudflare-webhook-agent-ingest test
-
-  security-auto-analysis:
-    needs: changes
-    if: needs.changes.outputs.security_auto_analysis == 'true'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    steps:
-      - uses: useblacksmith/checkout@v1
-        with:
-          lfs: true
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-          run_install: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck (security-auto-analysis)
-        run: pnpm --filter cloudflare-security-auto-analysis typecheck
-
-      - name: Run security-auto-analysis tests
-        run: pnpm --filter cloudflare-security-auto-analysis test
-
-  kiloclaw:
-    needs: changes
-    if: needs.changes.outputs.kiloclaw == 'true'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    steps:
-      - uses: useblacksmith/checkout@v1
-        with:
-          lfs: true
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-          run_install: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck (kiloclaw)
-        run: pnpm --filter kiloclaw typecheck
-
-      - name: Lint (kiloclaw)
-        run: pnpm --filter kiloclaw lint
-
-      - name: Run kiloclaw tests
-        run: pnpm --filter kiloclaw test
-
-      - name: Typecheck (secret-catalog)
-        run: pnpm --filter @kilocode/kiloclaw-secret-catalog typecheck
-
-      - name: Run secret-catalog tests
-        run: pnpm --filter @kilocode/kiloclaw-secret-catalog test
-
-  app-builder:
-    needs: changes
-    if: needs.changes.outputs.app_builder == 'true'
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    steps:
-      - uses: useblacksmith/checkout@v1
-        with:
-          lfs: true
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-          run_install: false
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck (app-builder)
-        run: pnpm --filter app-builder typecheck
-
-      - name: Run app-builder tests
-        run: pnpm --filter app-builder test
-
-  cloudflare:
+  workspace-tests:
+    needs: [changes, typecheck, lint, format-check, drizzle-check]
+    if: ${{ needs.changes.outputs.workspace_matrix != '[]' }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: deploy-builder
-            filter: kilo-deploy-builder
-          - name: deploy-dispatcher
-            filter: deploy-dispatcher
-          - name: code-review
-            filter: kilo-code-review-worker
-    name: cloudflare-${{ matrix.name }}
+        workspace: ${{ fromJson(needs.changes.outputs.workspace_matrix) }}
+    name: test (${{ matrix.workspace.name }})
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     steps:
       - uses: useblacksmith/checkout@v1
@@ -523,5 +379,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm --filter ${{ matrix.filter }} typecheck
+      - name: Run tests
+        run: pnpm --filter ${{ matrix.workspace.name }} test

@@ -176,12 +176,15 @@
     @apply border-border outline-ring/50;
     color-scheme: dark;
   }
-  html {
-    scrollbar-gutter: stable;
-  }
   body {
     @apply bg-background text-foreground;
-    scrollbar-gutter: stable;
+  }
+
+  /* Desktop only: reserve space for scrollbar to prevent layout shift */
+  @media (min-width: 1024px) {
+    body {
+      scrollbar-gutter: stable;
+    }
   }
 
   /* Prevent Radix UI Dialog from removing scrollbar and causing layout shift */
@@ -211,5 +214,25 @@
 
   .animate-pulse-once {
     animation: pulse-glow 0.6s ease-out;
+  }
+
+  @keyframes pulse-opacity {
+    0%,
+    100% {
+      opacity: 0.4;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes pulse-opacity-dim {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    50% {
+      opacity: 0.2;
+    }
   }
 }

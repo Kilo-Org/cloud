@@ -2,8 +2,7 @@
 
 import type { KeyboardEvent } from 'react';
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Button } from '@/components/Button';
-import { Textarea } from '@/components/ui/textarea';
+import { Button as UIButton } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover';
 import { Command, CommandList, CommandItem, CommandEmpty } from '@/components/ui/command';
 import { Send, Square } from 'lucide-react';
@@ -12,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { BrowseCommandsDialog } from './BrowseCommandsDialog';
 import { ModeCombobox, NEXT_MODE_OPTIONS } from '@/components/shared/ModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import type { AgentMode } from './types';
 
 type ChatInputProps = {
@@ -33,6 +33,12 @@ type ChatInputProps = {
   onModeChange?: (mode: AgentMode) => void;
   /** Callback when model changes */
   onModelChange?: (model: string) => void;
+  /** Current variant for the toolbar */
+  variant?: string;
+  /** Callback when variant changes */
+  onVariantChange?: (variant: string) => void;
+  /** Available variant keys for the current model */
+  availableVariants?: string[];
   /** Whether to show the toolbar (hide when no active session) */
   showToolbar?: boolean;
   /** Pre-populate the textarea (e.g. to restore text after a failed send) */
@@ -52,6 +58,9 @@ export function ChatInput({
   isLoadingModels = false,
   onModeChange,
   onModelChange,
+  variant,
+  onVariantChange,
+  availableVariants = [],
   showToolbar = false,
   initialValue,
 }: ChatInputProps) {
@@ -204,39 +213,24 @@ export function ChatInput({
   const hasToolbar = showToolbar && onModeChange && onModelChange && modelOptions.length > 0;
 
   return (
-    <div className="bg-background w-full max-w-full overflow-x-hidden border-t p-3 md:p-4">
-      {/* Toolbar with mode and model selectors */}
-      {hasToolbar && (
-        <div className="mb-2 flex items-center gap-2">
-          <ModeCombobox
-            value={mode}
-            onValueChange={onModeChange}
-            options={NEXT_MODE_OPTIONS}
-            variant="compact"
-            disabled={disabled || isStreaming}
-          />
-          <ModelCombobox
-            models={modelOptions}
-            value={model}
-            onValueChange={onModelChange}
-            variant="compact"
-            isLoading={isLoadingModels}
-            disabled={disabled || isStreaming}
-            className="min-w-0 flex-1 md:w-auto md:flex-none"
-          />
-        </div>
-      )}
-      <div className="flex w-full max-w-full flex-col items-stretch gap-2 md:flex-row md:flex-wrap md:items-start md:gap-3">
+    <div className="px-[max(1rem,calc(50%_-_27rem))] py-3 md:py-4">
+      <div
+        className={cn(
+          'overflow-hidden bg-muted/30 focus-within:ring-ring rounded-lg border focus-within:ring-2',
+          disabled && !isStreaming && 'opacity-60'
+        )}
+      >
+        {/* Textarea with slash command autocomplete */}
         <Popover open={showAutocomplete} onOpenChange={handleOpenChange}>
           <PopoverAnchor asChild>
-            <Textarea
+            <textarea
               ref={textareaRef}
               value={value}
               onChange={e => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               disabled={disabled}
-              className="max-h-[200px] min-h-[56px] w-full min-w-0 resize-y md:min-h-[60px] md:flex-1"
+              className="max-h-[200px] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-sm focus:ring-0 focus:outline-none"
               rows={1}
               role="combobox"
               aria-expanded={showAutocomplete}
@@ -284,31 +278,62 @@ export function ChatInput({
             </Command>
           </PopoverContent>
         </Popover>
-        {isStreaming ? (
-          <Button
-            onClick={handleStop}
-            disabled={!onStop}
-            size="icon"
-            variant="danger"
-            className="h-11 min-h-[44px] w-full min-w-[44px] md:w-auto md:min-w-[44px] md:flex-none md:px-4"
-          >
-            <Square className="h-4 w-4" />
-          </Button>
-        ) : (
-          <Button
-            onClick={handleSend}
-            disabled={disabled || !value.trim()}
-            size="icon"
-            variant="primary"
-            className="h-11 min-h-[44px] w-full min-w-[44px] md:w-auto md:min-w-[44px] md:flex-none md:px-4"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-      <div className="mt-2 hidden items-center justify-between text-xs text-gray-400 sm:flex">
-        <p>Press Enter to send, Shift+Enter for new line</p>
-        {slashCommands && slashCommands.length > 0 && <BrowseCommandsDialog />}
+
+        {/* Toolbar below textarea */}
+        <div className="flex items-center gap-2 px-3 py-1.5">
+          {hasToolbar && (
+            <>
+              <ModeCombobox
+                value={mode}
+                onValueChange={onModeChange}
+                options={NEXT_MODE_OPTIONS}
+                variant="compact"
+                disabled={disabled || isStreaming}
+              />
+              <ModelCombobox
+                models={modelOptions}
+                value={model}
+                onValueChange={onModelChange}
+                variant="compact"
+                isLoading={isLoadingModels}
+                disabled={disabled || isStreaming}
+              />
+              {availableVariants.length > 0 && onVariantChange && (
+                <VariantCombobox
+                  variants={availableVariants}
+                  value={variant}
+                  onValueChange={onVariantChange}
+                  disabled={disabled || isStreaming}
+                />
+              )}
+            </>
+          )}
+          {slashCommands.length > 0 && <BrowseCommandsDialog />}
+          <div className="flex-1" />
+          {isStreaming ? (
+            <UIButton
+              type="button"
+              variant="destructive"
+              size="icon"
+              onClick={handleStop}
+              disabled={!onStop}
+              className="h-8 w-8 rounded-lg"
+            >
+              <Square className="h-4 w-4" />
+            </UIButton>
+          ) : (
+            <UIButton
+              type="button"
+              variant="primary"
+              size="icon"
+              onClick={handleSend}
+              disabled={disabled || !value.trim()}
+              className="h-8 w-8 rounded-lg"
+            >
+              <Send className="h-4 w-4" />
+            </UIButton>
+          )}
+        </div>
       </div>
     </div>
   );

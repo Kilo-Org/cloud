@@ -40,7 +40,6 @@ import {
 import { r2Client } from './client';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-// eslint-disable-next-line @typescript-eslint/unbound-method
 const mockSend = r2Client.send as jest.Mock;
 const mockGetSignedUrl = getSignedUrl as jest.Mock;
 

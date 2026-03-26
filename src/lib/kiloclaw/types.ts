@@ -115,11 +115,25 @@ export type MachineSize = {
   cpu_kind?: 'shared' | 'performance';
 };
 
+/** Response from POST /api/platform/restore-volume-snapshot */
+export type RestoreVolumeSnapshotResponse = {
+  acknowledged: boolean;
+  previousVolumeId: string;
+};
+
 /** Response from GET /api/platform/status and GET /api/kiloclaw/status */
 export type PlatformStatusResponse = {
   userId: string | null;
   sandboxId: string | null;
-  status: 'provisioned' | 'starting' | 'restarting' | 'running' | 'stopped' | 'destroying' | null;
+  status:
+    | 'provisioned'
+    | 'starting'
+    | 'restarting'
+    | 'running'
+    | 'stopped'
+    | 'destroying'
+    | 'restoring'
+    | null;
   provisionedAt: number | null;
   lastStartedAt: number | null;
   lastStoppedAt: number | null;
@@ -155,6 +169,10 @@ export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   lastDestroyErrorAt: number | null;
   lastRestartErrorMessage: string | null;
   lastRestartErrorAt: number | null;
+  previousVolumeId: string | null;
+  restoreStartedAt: string | null;
+  pendingRestoreVolumeId: string | null;
+  instanceReadyEmailSent: boolean;
 };
 
 /** A Fly volume snapshot. */

@@ -158,6 +158,8 @@ const SAFE_ERROR_PREFIXES = [
   'Cannot enable Gmail ', // no Google account connected
   'New volume ID is ', // reassociate: same volume
   'Volume ', // reassociate: volume not found / bad state
+  'Cannot restore: ', // snapshot restore: bad state
+  'Cannot destroy: ', // destroy while restoring
   'Cannot retry recovery', // force-retry-recovery guard messages
 ];
 
@@ -1176,6 +1178,30 @@ platform.post('/reassociate-volume', async c => {
     return c.json(response);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'reassociate-volume');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/restore-volume-snapshot
+// Enqueues a snapshot restore job. Returns immediately; restore runs async via CF Queue.
+const RestoreVolumeSnapshotSchema = z.object({
+  userId: z.string().min(1),
+  snapshotId: z.string().min(1),
+});
+
+platform.post('/restore-volume-snapshot', async c => {
+  const result = await parseBody(c, RestoreVolumeSnapshotSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.enqueueSnapshotRestore(result.data.snapshotId),
+      'enqueueSnapshotRestore'
+    );
+    return c.json(response);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'restore-volume-snapshot');
     return jsonError(message, status);
   }
 });

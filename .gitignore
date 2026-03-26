@@ -31,6 +31,9 @@ node_modules/
 # production
 /build
 
+# dev server port (written by scripts/dev.sh for multi-worktree support)
+.dev-port
+
 # debug
 npm-debug.log*
 yarn-debug.log*
@@ -54,15 +57,13 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# eslint cache
-.eslintcache
-
 # kdiff3
 *.orig
 dev-debug-request-logs/*
 
 # misc
 .DS_Store
+.eslintcache
 *.pem
 TMP_CI_commit_msg.txt
 *.csv
@@ -101,5 +102,5 @@ supabase/.temp
 
 .kilo/plans
 
-# @kilocode/trpc intermediate tsc output (bundled index.d.ts is committed)
-packages/trpc/dist/tsc/
+# @kilocode/trpc build output (rebuilt by: pnpm --filter @kilocode/trpc run build)
+packages/trpc/dist/

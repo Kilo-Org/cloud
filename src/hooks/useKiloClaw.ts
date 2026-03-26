@@ -108,10 +108,26 @@ export function useKiloClawMutations() {
     });
   };
 
+  // Wipe all instance-scoped caches so no stale data (e.g. gatewayReady
+  // from the old instance) bleeds into a subsequent re-provision flow.
+  // removeQueries drops the cached payload entirely; invalidateQueries
+  // only marks stale but leaves the old value readable synchronously.
+  const resetAllInstanceState = async () => {
+    await invalidateStatus();
+    await queryClient.invalidateQueries({
+      queryKey: trpc.kiloclaw.getBillingStatus.queryKey(),
+    });
+    queryClient.removeQueries({ queryKey: trpc.kiloclaw.gatewayReady.queryKey() });
+    queryClient.removeQueries({ queryKey: trpc.kiloclaw.gatewayStatus.queryKey() });
+    queryClient.removeQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
+  };
+
   return {
     start: useMutation(trpc.kiloclaw.start.mutationOptions({ onSuccess: invalidateStatus })),
     stop: useMutation(trpc.kiloclaw.stop.mutationOptions({ onSuccess: invalidateStatus })),
-    destroy: useMutation(trpc.kiloclaw.destroy.mutationOptions({ onSuccess: invalidateStatus })),
+    destroy: useMutation(
+      trpc.kiloclaw.destroy.mutationOptions({ onSuccess: resetAllInstanceState })
+    ),
     provision: useMutation(
       trpc.kiloclaw.provision.mutationOptions({ onSuccess: invalidateStatusAndBilling })
     ),

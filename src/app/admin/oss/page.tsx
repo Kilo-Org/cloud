@@ -712,6 +712,7 @@ type SortField =
   | 'hasCodeReviewsEnabled'
   | 'isOnboardingComplete'
   | 'hasCompletedCodeReview'
+  | 'hasKiloClawInstance'
   | 'lastCodeReviewDate'
   | 'tier'
   | 'monthlyCreditsUsd'
@@ -824,6 +825,9 @@ function SponsorshipsTable() {
         case 'hasCompletedCodeReview':
           comparison = Number(a.hasCompletedCodeReview) - Number(b.hasCompletedCodeReview);
           break;
+        case 'hasKiloClawInstance':
+          comparison = Number(a.hasKiloClawInstance) - Number(b.hasKiloClawInstance);
+          break;
         case 'lastCodeReviewDate':
           comparison =
             new Date(a.lastCodeReviewDate || 0).getTime() -
@@ -877,6 +881,7 @@ function SponsorshipsTable() {
       'Code Reviews Enabled',
       'Onboarding Complete',
       'Has Completed Code Review',
+      'Has KiloClaw Instance',
       'Last Code Review Date',
       'Tier',
       'Monthly Credits (USD)',
@@ -894,6 +899,7 @@ function SponsorshipsTable() {
       s.hasCodeReviewsEnabled ? 'Yes' : 'No',
       s.isOnboardingComplete ? 'Yes' : 'No',
       s.hasCompletedCodeReview ? 'Yes' : 'No',
+      s.hasKiloClawInstance ? 'Yes' : 'No',
       s.lastCodeReviewDate ? new Date(s.lastCodeReviewDate).toISOString() : '',
       getTierName(s.tier),
       s.monthlyCreditsUsd?.toFixed(2) || '0',
@@ -1132,6 +1138,15 @@ function SponsorshipsTable() {
                   </TableHead>
                   <TableHead
                     className="hover:bg-muted/50 cursor-pointer select-none"
+                    onClick={() => handleSort('hasKiloClawInstance')}
+                  >
+                    <div className="flex items-center">
+                      KiloClaw
+                      {getSortIcon('hasKiloClawInstance')}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="hover:bg-muted/50 cursor-pointer select-none"
                     onClick={() => handleSort('lastCodeReviewDate')}
                   >
                     <div className="flex items-center">
@@ -1230,6 +1245,13 @@ function SponsorshipsTable() {
                     </TableCell>
                     <TableCell>
                       {sponsorship.hasCompletedCodeReview ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-500" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {sponsorship.hasKiloClawInstance ? (
                         <CheckCircle2 className="h-5 w-5 text-green-500" />
                       ) : (
                         <XCircle className="h-5 w-5 text-red-500" />

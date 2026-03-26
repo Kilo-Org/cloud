@@ -119,6 +119,186 @@ describe('createIngestHandler', () => {
     // APIs unavailable in vitest Node. That path is covered by integration tests.
   });
 
+  describe('handleIngestMessage — persistence routing', () => {
+    function makeKilocodeMessage(eventName: string, properties?: Record<string, unknown>) {
+      return JSON.stringify({
+        streamEventType: 'kilocode',
+        data: { event: eventName, properties },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    function makeStreamMessage(streamEventType: string, data?: Record<string, unknown>) {
+      return JSON.stringify({
+        streamEventType,
+        data: data ?? {},
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // --- kilocode events: upsert path ---
+
+    it('message.updated is upserted by entity ID', async () => {
+      const eventQueries = createFakeEventQueries();
+      (eventQueries as unknown as Record<string, unknown>).upsert = vi.fn().mockReturnValue(42);
+      const broadcastFn = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        createFakeDOContext()
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+
+      await handler.handleIngestMessage(
+        ws,
+        makeKilocodeMessage('message.updated', { info: { id: 'msg_1' } })
+      );
+
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+      expect(
+        (eventQueries as unknown as Record<string, ReturnType<typeof vi.fn>>).upsert
+      ).toHaveBeenCalledWith(expect.objectContaining({ entityId: 'message/msg_1' }));
+      expect(broadcastFn).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }));
+    });
+
+    // --- kilocode events: plain insert path (PERSISTED_KILO_EVENT_NAMES) ---
+
+    it.each([
+      'message.part.removed',
+      'session.created',
+      'session.updated',
+      'session.status',
+      'session.error',
+      'session.idle',
+      'session.turn.close',
+    ])('kilocode %s is plain-inserted', async eventName => {
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        createFakeDOContext()
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+
+      await handler.handleIngestMessage(ws, makeKilocodeMessage(eventName));
+
+      expect(eventQueries.insert).toHaveBeenCalled();
+      expect(broadcastFn).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+    });
+
+    // --- kilocode events: broadcast-only (not in any allowlist) ---
+
+    it.each([
+      'question.asked',
+      'question.replied',
+      'question.rejected',
+      'session.diff',
+      'message.part.delta',
+      'permission.asked',
+      'session.completed',
+    ])('kilocode %s is broadcast-only', async eventName => {
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        createFakeDOContext()
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+
+      await handler.handleIngestMessage(ws, makeKilocodeMessage(eventName));
+
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
+      );
+    });
+
+    // --- non-kilocode: plain insert path (PERSISTED_STREAM_EVENT_TYPES) ---
+
+    it.each(['complete', 'interrupted', 'error', 'autocommit_started', 'autocommit_completed'])(
+      'stream event %s is plain-inserted',
+      async eventType => {
+        const eventQueries = createFakeEventQueries();
+        const broadcastFn = vi.fn();
+        const handler = createIngestHandler(
+          createFakeState(),
+          eventQueries,
+          SESSION_ID,
+          broadcastFn,
+          createFakeDOContext()
+        );
+        const ws = createFakeWebSocket(makeAttachment());
+
+        await handler.handleIngestMessage(ws, makeStreamMessage(eventType));
+
+        expect(eventQueries.insert).toHaveBeenCalled();
+        expect(broadcastFn).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+      }
+    );
+
+    // --- non-kilocode: broadcast-only (not in PERSISTED_STREAM_EVENT_TYPES) ---
+
+    it.each(['heartbeat', 'pong', 'output', 'status', 'started', 'wrapper_resumed'])(
+      'stream event %s is broadcast-only',
+      async eventType => {
+        const eventQueries = createFakeEventQueries();
+        const broadcastFn = vi.fn();
+        const handler = createIngestHandler(
+          createFakeState(),
+          eventQueries,
+          SESSION_ID,
+          broadcastFn,
+          createFakeDOContext()
+        );
+        const ws = createFakeWebSocket(makeAttachment());
+
+        await handler.handleIngestMessage(ws, makeStreamMessage(eventType));
+
+        expect(eventQueries.insert).not.toHaveBeenCalled();
+        expect(broadcastFn).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 0, stream_event_type: eventType })
+        );
+      }
+    );
+
+    it('kilo_snapshot is broadcast-only (no special handling)', async () => {
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+
+      await handler.handleIngestMessage(
+        ws,
+        JSON.stringify({
+          streamEventType: 'kilo_snapshot',
+          data: { sessionStatus: { type: 'busy' } },
+          timestamp: new Date().toISOString(),
+        })
+      );
+
+      // Should NOT call onKiloSnapshot (removed)
+      // Should be broadcast as a regular event with eventId 0
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 0, stream_event_type: 'kilo_snapshot' })
+      );
+    });
+  });
+
   describe('hasActiveConnection', () => {
     it('returns true when getWebSockets finds ingest sockets', () => {
       const state = createFakeState();

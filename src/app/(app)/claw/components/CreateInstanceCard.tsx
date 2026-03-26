@@ -24,9 +24,11 @@ type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 export function CreateInstanceCard({
   mutations,
   onProvisionStart,
+  onProvisionFailed,
 }: {
   mutations: ClawMutations;
   onProvisionStart?: () => void;
+  onProvisionFailed?: () => void;
 }) {
   // Evaluate the landing-page experiment flag so PostHog attaches
   // $feature/button-vs-card to events fired in this component.
@@ -115,11 +117,17 @@ export function CreateInstanceCard({
       auto_provision_after_payment: true,
     });
 
+    // Enter the onboarding wizard before the mutation fires so the UI
+    // shows the wizard immediately instead of racing with status polling.
+    onProvisionStart?.();
+
     mutations.provision.mutate(
       { kilocodeDefaultModel: `kilocode/${selectedModel}` },
       {
-        onSuccess: () => onProvisionStart?.(),
-        onError: err => toast.error(`Failed to create: ${err.message}`),
+        onError: err => {
+          onProvisionFailed?.();
+          toast.error(`Failed to create: ${err.message}`);
+        },
       }
     );
   }, [
@@ -131,6 +139,7 @@ export function CreateInstanceCard({
     mutations.provision,
     posthog,
     onProvisionStart,
+    onProvisionFailed,
   ]);
 
   function handleCreate() {
@@ -157,13 +166,16 @@ export function CreateInstanceCard({
     // doesn't depend on the useUser query still being resolved.
     const email = user?.google_user_email;
 
+    // Enter the onboarding wizard before the mutation fires so the UI
+    // shows the wizard immediately instead of racing with status polling.
+    onProvisionStart?.();
+
     mutations.provision.mutate(
       {
         kilocodeDefaultModel: `kilocode/${selectedModel}`,
       },
       {
         onSuccess: () => {
-          onProvisionStart?.();
           // Record a Rewardful lead when an affiliate-referred user starts a trial.
           // No-op if the visitor is not a referral or rw.js didn't load.
           if (email && typeof window.rewardful === 'function') {
@@ -171,6 +183,7 @@ export function CreateInstanceCard({
           }
         },
         onError: err => {
+          onProvisionFailed?.();
           toast.error(`Failed to create: ${err.message}`);
         },
       }

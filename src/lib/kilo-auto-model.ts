@@ -5,11 +5,8 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_NAME,
 } from '@/lib/providers/anthropic';
-import {
-  MINIMAX_CURRENT_MODEL_ID,
-  MINIMAX_CURRENT_MODEL_NAME,
-  minimax_m25_free_model,
-} from '@/lib/providers/minimax';
+import { MINIMAX_CURRENT_MODEL_ID, MINIMAX_CURRENT_MODEL_NAME } from '@/lib/providers/minimax';
+import { mimo_v2_pro_free_model } from '@/lib/providers/xiaomi';
 import { KIMI_CURRENT_MODEL_ID, KIMI_CURRENT_MODEL_NAME } from '@/lib/providers/moonshotai';
 import { gpt_oss_20b_free_model, GPT_5_NANO_ID, GPT_5_NANO_NAME } from '@/lib/providers/openai';
 import type {
@@ -138,9 +135,9 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
 export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Kilo Auto Free',
-  description: `Free with limited capability. No credits required. Uses ${stripDisplayName(minimax_m25_free_model.display_name)}.`,
-  context_length: minimax_m25_free_model.context_length,
-  max_completion_tokens: minimax_m25_free_model.max_completion_tokens,
+  description: `Free with limited capability. No credits required. Uses ${stripDisplayName(mimo_v2_pro_free_model.display_name)}.`,
+  context_length: mimo_v2_pro_free_model.context_length,
+  max_completion_tokens: mimo_v2_pro_free_model.max_completion_tokens,
   prompt_price: '0',
   completion_price: '0',
   supports_images: false,
@@ -210,7 +207,7 @@ export async function resolveAutoModel(
   const mappedModel =
     (Object.hasOwn(legacyMapping, model) ? legacyMapping[model] : null)?.id ?? model;
   if (mappedModel === KILO_AUTO_FREE_MODEL.id) {
-    return { model: minimax_m25_free_model.public_id };
+    return { model: mimo_v2_pro_free_model.public_id };
   }
   if (mappedModel === KILO_AUTO_SMALL_MODEL.id) {
     return {

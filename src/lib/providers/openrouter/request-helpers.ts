@@ -1,4 +1,9 @@
-import type { GatewayRequest } from '@/lib/providers/openrouter/types';
+import type {
+  GatewayRequest,
+  GatewayResponsesRequest,
+  OpenCodeSpecificProperties,
+  OpenRouterChatCompletionRequest,
+} from '@/lib/providers/openrouter/types';
 import type OpenAI from 'openai';
 
 export function getMaxTokens(request: GatewayRequest) {
@@ -105,4 +110,45 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       setCacheControlOnResponsesMessage(lastMessage);
     }
   }
+}
+
+export function fixResponsesRequest(request: GatewayResponsesRequest) {
+  if (!Array.isArray(request.input)) {
+    return;
+  }
+  for (const msg of request.input) {
+    const outputMsg = msg as Partial<OpenAI.Responses.ResponseOutputMessage>;
+    if (outputMsg.role !== 'assistant') {
+      continue;
+    }
+    if (!outputMsg.type) {
+      console.warn('[fixResponsesRequest] assistant message missing type, fixing');
+      outputMsg.type = 'message';
+    }
+    if (!outputMsg.status) {
+      console.warn('[fixResponsesRequest] assistant message missing status, fixing');
+      outputMsg.status = 'completed';
+    }
+  }
+}
+
+export function removeChatCompletionsReasoning(request: OpenRouterChatCompletionRequest) {
+  for (const message of request.messages) {
+    if ('reasoning' in message) {
+      delete message.reasoning;
+    }
+    if ('reasoning_content' in message) {
+      delete message.reasoning_content;
+    }
+    if ('reasoning_details' in message) {
+      delete message.reasoning_details;
+    }
+  }
+}
+
+export function scrubOpenCodeSpecificProperties(request: OpenRouterChatCompletionRequest) {
+  const body = request as OpenCodeSpecificProperties;
+  delete body.description;
+  delete body.usage;
+  delete body.reasoningEffort;
 }

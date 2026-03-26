@@ -1,24 +1,25 @@
 import * as SecureStore from 'expo-secure-store';
 import {
   createContext,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useState,
-  type ReactNode,
 } from 'react';
 
+import { CONTEXT_KEY } from '@/lib/context/context-context';
 import { queryClient } from '@/lib/query-client';
 
 const TOKEN_KEY = 'auth-token';
 
-interface AuthContextValue {
+type AuthContextValue = {
   token: string | undefined;
   isLoading: boolean;
   signIn: (token: string) => Promise<void>;
   signOut: () => Promise<void>;
-}
+};
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -45,6 +46,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await SecureStore.deleteItemAsync(CONTEXT_KEY);
     queryClient.clear();
     setToken(undefined);
   }, []);

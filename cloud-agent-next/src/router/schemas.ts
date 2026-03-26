@@ -372,6 +372,7 @@ export const GetSessionOutput = z.object({
   prompt: z.string().optional().describe('Task prompt'),
   mode: AgentModeSchema.optional().describe('Execution mode'),
   model: z.string().optional().describe('AI model'),
+  variant: z.string().optional().describe('Thinking effort variant'),
   autoCommit: z.boolean().optional().describe('Auto-commit setting'),
   upstreamBranch: z.string().optional().describe('Upstream branch name'),
 

@@ -10,13 +10,8 @@
 
 import { z } from 'zod';
 import { beads, BeadRecord as BeadRecordSchema } from '../../db/tables/beads.table';
-import { agent_metadata, AgentMetadataRecord } from '../../db/tables/agent-metadata.table';
-import { agent_nudges } from '../../db/tables/agent-nudges.table';
-import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
-import { convoy_metadata } from '../../db/tables/convoy-metadata.table';
 import { query } from '../../util/query.util';
-import { deleteAgent, getOrCreateAgent, hookBead, unhookBead } from './agents';
-import { createBead, updateBeadStatus } from './beads';
+import { createBead } from './beads';
 
 const LOG = '[patrol]';
 

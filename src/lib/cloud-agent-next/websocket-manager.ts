@@ -62,7 +62,7 @@ function calculateBackoffDelay(attempt: number): number {
 }
 
 // WebSocket close codes that indicate auth failures
-const AUTH_FAILURE_CLOSE_CODES = [1008, 4001, 1006] as const;
+const AUTH_FAILURE_CLOSE_CODES = [1008, 4001] as const;
 // Keywords in close reason that indicate auth failures
 const AUTH_FAILURE_KEYWORDS = ['unauthorized', '401', 'auth', 'ticket'] as const;
 
@@ -71,7 +71,6 @@ const AUTH_FAILURE_KEYWORDS = ['unauthorized', '401', 'auth', 'ticket'] as const
  * Auth failures can be signaled via:
  * - Close code 1008 (Policy Violation) - often used for auth failures
  * - Close code 4001 (custom) - explicit auth failure code
- * - Close code 1006 (Abnormal Closure) - can indicate HTTP error before upgrade
  * - Close reason containing auth-related keywords
  */
 function isAuthFailureClose(event: CloseEvent): boolean {

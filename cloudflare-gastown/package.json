@@ -18,9 +18,9 @@
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.workers.config.ts",
     "test:integration:watch": "vitest --config vitest.workers.config.ts",
-    "typecheck": "tsgo --noEmit --incremental false",
-    "build:types": "tsgo -p tsconfig.types.json || true",
-    "lint": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'"
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-gastown/src",
+    "build:types": "tsgo -p tsconfig.types.json || true"
   },
   "dependencies": {
     "@cloudflare/containers": "^0.1.0",
@@ -41,12 +41,10 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.8",
     "@cloudflare/workers-types": "catalog:",
-    "@kilocode/eslint-config": "workspace:*",
     "@sentry/cli": "^2.58.2",
     "@types/jsonwebtoken": "catalog:",
     "@types/node": "^22",
     "@typescript/native-preview": "7.0.0-dev.20251019.1",
-    "eslint": "catalog:",
     "typescript": "catalog:",
     "vitest": "^3.2.4",
     "wrangler": "catalog:"

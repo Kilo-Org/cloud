@@ -10,7 +10,7 @@ import { createKilo, type KiloClient } from '@kilocode/sdk';
 import { z } from 'zod';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted } from './completion-reporter';
-import { buildKiloConfigContent, kiloModel } from './agent-runner';
+import { buildKiloConfigContent } from './agent-runner';
 import { log } from './logger';
 
 const MANAGER_LOG = '[process-manager]';

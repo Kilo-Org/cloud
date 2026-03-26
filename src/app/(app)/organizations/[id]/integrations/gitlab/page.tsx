@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { GitLabIntegrationDetails } from '@/components/integrations/GitLabIntegrationDetails';
 import { Button } from '@/components/ui/button';
+import { SetPageTitle } from '@/components/SetPageTitle';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,12 +31,10 @@ export default async function GitLabIntegrationPage({
                 Back to Integrations
               </Button>
             </Link>
-            <div>
-              <h1 className="text-3xl font-bold">GitLab Integration</h1>
-              <p className="text-muted-foreground mt-2">
-                Manage GitLab OAuth integration for {organization.name}
-              </p>
-            </div>
+            <SetPageTitle title="GitLab Integration" />
+            <p className="text-muted-foreground">
+              Manage GitLab OAuth integration for {organization.name}
+            </p>
           </div>
 
           <Suspense

@@ -8,42 +8,31 @@ import type {
   GatewayRequest,
   GatewayMessagesRequest,
 } from '@/lib/providers/openrouter/types';
-import {
-  applyMistralModelSettings,
-  applyMistralProviderSettings,
-  isMistralModel,
-} from '@/lib/providers/mistral';
+import { applyMistralModelSettings, isMistralModel } from '@/lib/providers/mistral';
 import { applyXaiModelSettings, isXaiModel } from '@/lib/providers/xai';
-import { applyVercelSettings, shouldRouteToVercel } from '@/lib/providers/vercel';
+import { shouldRouteToVercel } from '@/lib/providers/vercel';
 import { kiloFreeModels } from '@/lib/models';
 import {
   applyAnthropicModelSettings,
   isAnthropicModel,
   isHaikuModel,
 } from '@/lib/providers/anthropic';
-import {
-  getBYOKforOrganization,
-  getBYOKforUser,
-  getModelUserByokProviders,
-  type BYOKResult,
-} from '@/lib/byok';
+import { getBYOKforOrganization, getBYOKforUser, getModelUserByokProviders } from '@/lib/byok';
 import type { CustomLlm } from '@kilocode/db/schema';
 import { custom_llm, type User } from '@kilocode/db/schema';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/providers/openrouter/inference-provider-id';
-import { applyCoreThinkProviderSettings } from '@/lib/providers/corethink';
 import { hasAttemptCompletionTool } from '@/lib/tool-calling';
 import { applyGoogleModelSettings, isGeminiModel } from '@/lib/providers/google';
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
-import { applyMoonshotProviderSettings, isMoonshotModel } from '@/lib/providers/moonshotai';
+import { applyMoonshotModelSettings, isMoonshotModel } from '@/lib/providers/moonshotai';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
 import { isOpenAiModel, isOpenAiOssModel } from '@/lib/providers/openai';
-import { applyAlibabaProviderSettings } from '@/lib/providers/qwen';
 import { isZaiModel } from '@/lib/providers/zai';
 import { isMinimaxModel } from '@/lib/providers/minimax';
 import { isXiaomiModel } from '@/lib/providers/xiaomi';
-import type { Provider } from '@/lib/providers/types';
+import type { BYOKResult, Provider } from '@/lib/providers/types';
 import PROVIDERS from '@/lib/providers/provider-definitions';
 
 async function checkBYOK(
@@ -86,6 +75,13 @@ export async function getProvider(
           id: 'custom',
           apiUrl: customLlm.base_url,
           apiKey: customLlm.api_key,
+          transformRequest(context) {
+            Object.assign(context.request.body, customLlm?.extra_body ?? {});
+            for (const [key, value] of Object.entries(customLlm.extra_headers ?? {})) {
+              context.extraHeaders[key] = value;
+            }
+            context.request.body.model = customLlm.internal_id;
+          },
         },
         userByok: null,
         customLlm,
@@ -99,30 +95,6 @@ export async function getProvider(
 
   const kiloFreeModel = kiloFreeModels.find(m => m.public_id === requestedModel);
   const freeModelProvider = Object.values(PROVIDERS).find(p => p.id === kiloFreeModel?.gateway);
-
-  if (kiloFreeModel && freeModelProvider?.id === 'martian') {
-    return {
-      provider: { ...freeModelProvider, id: 'custom' },
-      userByok: null,
-      customLlm: {
-        public_id: kiloFreeModel.public_id,
-        internal_id: kiloFreeModel.internal_id,
-        display_name: kiloFreeModel.display_name,
-        context_length: kiloFreeModel.context_length,
-        max_completion_tokens: kiloFreeModel.max_completion_tokens,
-        provider: 'openai', // xai doesn't support preserved reasoning currently: https://github.com/vercel/ai/issues/10542
-        organization_ids: [],
-        base_url: freeModelProvider.apiUrl,
-        api_key: freeModelProvider.apiKey,
-        supports_image_input: kiloFreeModel.flags.includes('vision'),
-        force_reasoning: true,
-        opencode_settings: null,
-        extra_body: null,
-        extra_headers: null,
-        interleaved_format: null,
-      },
-    };
-  }
 
   return {
     provider: freeModelProvider ?? PROVIDERS.OPENROUTER,
@@ -254,7 +226,7 @@ export function applyProviderSpecificLogic(
   applyPreferredProvider(requestedModel, requestToMutate.body);
 
   if (isXaiModel(requestedModel)) {
-    applyXaiModelSettings(requestedModel, requestToMutate, extraHeaders);
+    applyXaiModelSettings(requestToMutate, extraHeaders);
   }
 
   if (isGeminiModel(requestedModel)) {
@@ -262,26 +234,19 @@ export function applyProviderSpecificLogic(
   }
 
   if (isMoonshotModel(requestedModel)) {
-    applyMoonshotProviderSettings(requestToMutate);
+    applyMoonshotModelSettings(requestToMutate);
   }
 
-  if (provider.id === 'alibaba') {
-    applyAlibabaProviderSettings(requestToMutate);
-  }
-
-  if (provider.id === 'corethink') {
-    applyCoreThinkProviderSettings(requestToMutate);
-  }
-
-  if (provider.id === 'mistral') {
-    applyMistralProviderSettings(requestToMutate, extraHeaders);
-  } else if (isMistralModel(requestedModel)) {
+  if (isMistralModel(requestedModel)) {
     applyMistralModelSettings(requestToMutate);
   }
 
-  if (provider.id === 'vercel') {
-    applyVercelSettings(requestedModel, requestToMutate, userByok);
-  }
+  provider.transformRequest({
+    model: requestedModel,
+    request: requestToMutate,
+    extraHeaders,
+    userByok,
+  });
 }
 
 export async function openRouterRequest({

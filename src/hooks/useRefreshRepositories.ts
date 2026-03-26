@@ -16,6 +16,8 @@ type UseRefreshRepositoriesOptions = {
    * This is used to update the cache after refresh
    */
   getCacheQueryKey: () => QueryKey;
+  /** Suppress toasts — useful when combining multiple refreshes into one. */
+  silent?: boolean;
 };
 
 /**
@@ -29,6 +31,7 @@ type UseRefreshRepositoriesOptions = {
 export function useRefreshRepositories({
   getRefreshQueryOptions,
   getCacheQueryKey,
+  silent = false,
 }: UseRefreshRepositoriesOptions) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const queryClient = useQueryClient();
@@ -38,15 +41,18 @@ export function useRefreshRepositories({
     try {
       const freshData = await queryClient.fetchQuery(getRefreshQueryOptions());
       queryClient.setQueryData(getCacheQueryKey(), freshData);
-      toast.success('Repositories refreshed');
+      if (!silent) toast.success('Repositories refreshed');
     } catch (error) {
-      toast.error('Failed to refresh repositories', {
-        description: error instanceof Error ? error.message : 'Unknown error',
-      });
+      if (!silent) {
+        toast.error('Failed to refresh repositories', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+      if (silent) throw error;
     } finally {
       setIsRefreshing(false);
     }
-  }, [queryClient, getRefreshQueryOptions, getCacheQueryKey]);
+  }, [queryClient, getRefreshQueryOptions, getCacheQueryKey, silent]);
 
   return { refresh, isRefreshing };
 }

@@ -24,12 +24,7 @@ updates:
       - dependency-name: '@next/third-parties'
         # Stay on Next.js v15 for now
         versions: ['>=16.0.0']
-      - dependency-name: '@next/eslint-plugin-next'
-        # Stay on Next.js v15 for now
-        versions: ['>=16.0.0']
-      - dependency-name: 'eslint-config-next'
-        # Stay on Next.js v15 for now
-        versions: ['>=16.0.0']
+
     groups:
       npm-dependencies:
         # Group all npm dependencies together

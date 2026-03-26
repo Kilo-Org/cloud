@@ -13,7 +13,9 @@ export const trpcClient = createTRPCClient<RootRouter>({
       url: `${API_BASE_URL}/api/trpc`,
       async headers() {
         const token = await SecureStore.getItemAsync('auth-token');
-        if (!token) return {};
+        if (!token) {
+          return {};
+        }
         return { Authorization: `Bearer ${token}` };
       },
     }),

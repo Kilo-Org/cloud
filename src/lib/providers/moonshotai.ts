@@ -4,7 +4,7 @@ export function isMoonshotModel(model: string) {
   return model.startsWith('moonshotai/');
 }
 
-export function applyMoonshotProviderSettings(requestToMutate: GatewayRequest) {
+export function applyMoonshotModelSettings(requestToMutate: GatewayRequest) {
   // Moonshot models don't support the temperature parameter
   delete requestToMutate.body.temperature;
   // kimi-k2.5 only accepts top_p=0.95; any other value causes a 400 error

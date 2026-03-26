@@ -199,6 +199,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.s.status === 'destroying') {
       throw new Error('Cannot provision: instance is being destroyed');
     }
+    if (this.s.status === 'restoring') {
+      throw new Error('Cannot provision: instance is restoring from snapshot');
+    }
 
     const sandboxId = sandboxIdFromUserId(userId);
     const isNew = !this.s.status;
@@ -349,6 +352,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           pendingDestroyMachineId: null,
           pendingDestroyVolumeId: null,
           pendingPostgresMarkOnFinalize: false,
+          instanceReadyEmailSent: false,
         })
       : storageUpdate({
           ...configFields,
@@ -765,6 +769,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.s.status === 'destroying') {
       throw new Error('Cannot start: instance is being destroyed');
     }
+    if (this.s.status === 'restoring') {
+      throw new Error('Cannot start: instance is restoring from snapshot');
+    }
     // NOTE: status may be 'starting' here when called from startAsync() via
     // waitUntil. That is intentional — 'starting' is the expected in-flight
     // state and must not be treated as an error or early-return condition.
@@ -786,7 +793,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     // If the DO has identity but lost its machine ID, try to recover it
     // from Fly metadata before creating a duplicate machine.
-    if (!this.s.flyMachineId) {
+    // Skip recovery when the machine was intentionally destroyed for a volume swap
+    // (snapshot restore or reassociation). Both paths set previousVolumeId and clear
+    // flyMachineId in the same persist call, leaving status === 'stopped'. This triple
+    // condition is only true immediately after an intentional destroy — once start()
+    // creates a new machine, flyMachineId is no longer null and this won't match.
+    const machineIntentionallyDestroyed =
+      !this.s.flyMachineId && this.s.previousVolumeId !== null && this.s.status === 'stopped';
+    if (!this.s.flyMachineId && !machineIntentionallyDestroyed) {
       const recovered = await attemptMetadataRecovery(
         flyConfig,
         this.ctx,
@@ -1045,7 +1059,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.status === 'provisioned' ||
       this.s.status === 'starting' ||
       this.s.status === 'restarting' ||
-      this.s.status === 'destroying'
+      this.s.status === 'destroying' ||
+      this.s.status === 'restoring'
     ) {
       console.log('[DO] Instance not running (status:', this.s.status, '), no-op');
       return;
@@ -1086,6 +1101,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     if (!this.s.userId || !this.s.sandboxId) {
       throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
+    }
+    if (this.s.status === 'restoring') {
+      throw new Error('Cannot destroy: instance is restoring from snapshot');
     }
 
     const machineUptimeMs = this.s.lastStartedAt ? Date.now() - this.s.lastStartedAt : 0;
@@ -1232,6 +1250,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     lastStartErrorAt: number | null;
     lastRestartErrorMessage: string | null;
     lastRestartErrorAt: number | null;
+    previousVolumeId: string | null;
+    restoreStartedAt: string | null;
+    pendingRestoreVolumeId: string | null;
+    instanceReadyEmailSent: boolean;
   }> {
     await this.loadState();
     const alarmScheduledAt = await this.ctx.storage.getAlarm();
@@ -1273,6 +1295,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       lastStartErrorAt: this.s.lastStartErrorAt,
       lastRestartErrorMessage: this.s.lastRestartErrorMessage,
       lastRestartErrorAt: this.s.lastRestartErrorAt,
+      previousVolumeId: this.s.previousVolumeId,
+      restoreStartedAt: this.s.restoreStartedAt,
+      pendingRestoreVolumeId: this.s.pendingRestoreVolumeId,
+      instanceReadyEmailSent: this.s.instanceReadyEmailSent,
     };
   }
 
@@ -1349,6 +1375,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error('Instance is not provisioned');
     }
 
+    if (this.s.status === 'restoring') {
+      throw new Error('Cannot reassociate: instance is restoring from snapshot');
+    }
     if (this.s.status !== 'stopped') {
       throw new Error('Instance must be stopped before reassociating volume');
     }
@@ -1378,16 +1407,225 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         `reason="${reason}"`
     );
 
-    // Persist the new volume ID and region
+    // Destroy the existing machine so Fly releases the old volume's attached_machine_id.
+    // start() will create a fresh machine with the new volume mount.
+    if (this.s.flyMachineId) {
+      try {
+        await fly.destroyMachine(flyConfig, this.s.flyMachineId, true);
+        console.log(`[DO] Machine destroyed for reassociation: ${this.s.flyMachineId}`);
+      } catch (err) {
+        if (!fly.isFlyNotFound(err)) throw err;
+        console.log('[DO] Machine already gone during reassociation destroy');
+      }
+      this.s.flyMachineId = null;
+    }
+
+    // Persist the new volume ID, region, previousVolumeId, and cleared machine ID
     this.s.flyVolumeId = newVolumeId;
     this.s.flyRegion = volume.region;
-    await this.persist({ flyVolumeId: newVolumeId, flyRegion: volume.region });
+    this.s.previousVolumeId = previousVolumeId;
+    await this.persist({
+      flyVolumeId: newVolumeId,
+      flyRegion: volume.region,
+      flyMachineId: null,
+      previousVolumeId,
+    });
 
     return {
       previousVolumeId,
       newVolumeId,
       newRegion: volume.region,
     };
+  }
+
+  // ── Snapshot restore (admin) ───────────────────────────────────────
+
+  /**
+   * Enqueue a snapshot restore job. Sets status to 'restoring' immediately
+   * and sends a message to the CF Queue for async orchestration.
+   */
+  async enqueueSnapshotRestore(
+    snapshotId: string
+  ): Promise<{ acknowledged: boolean; previousVolumeId: string }> {
+    await this.loadState();
+
+    if (!this.s.userId || !this.s.flyVolumeId || !this.s.flyRegion || !this.s.sandboxId) {
+      throw new Error('Cannot restore: instance is not provisioned');
+    }
+    if (this.s.status === 'destroying') {
+      throw new Error('Cannot restore: instance is being destroyed');
+    }
+    if (this.s.status === 'restoring') {
+      throw new Error('Cannot restore: instance is already restoring');
+    }
+    if (this.s.status === 'starting' || this.s.status === 'restarting') {
+      throw new Error('Cannot restore: instance is busy (' + this.s.status + ')');
+    }
+
+    const previousVolumeId = this.s.flyVolumeId;
+    const previousStatus = this.s.status ?? 'stopped';
+
+    // Transition to restoring immediately — blocks all lifecycle methods.
+    // Set restoreStartedAt now so the alarm's stuck-restore detection has a timestamp
+    // to measure against even if the queue worker never picks up the message.
+    const now = new Date().toISOString();
+    this.s.status = 'restoring';
+    this.s.restoreStartedAt = now;
+    this.s.preRestoreStatus = previousStatus;
+    await this.persist({
+      status: 'restoring',
+      restoreStartedAt: now,
+      preRestoreStatus: previousStatus,
+    });
+    await this.scheduleAlarm();
+
+    // Enqueue the restore job for async processing.
+    // If the send fails, restore the previous status so the instance isn't stuck
+    // in 'restoring' while the machine may still be running.
+    if (!this.env.SNAPSHOT_RESTORE_QUEUE) {
+      this.s.status = previousStatus;
+      this.s.restoreStartedAt = null;
+      this.s.preRestoreStatus = null;
+      await this.persist({
+        status: previousStatus,
+        restoreStartedAt: null,
+        preRestoreStatus: null,
+      });
+      throw new Error('Cannot restore: SNAPSHOT_RESTORE_QUEUE binding not configured');
+    }
+    try {
+      await this.env.SNAPSHOT_RESTORE_QUEUE.send({
+        userId: this.s.userId,
+        snapshotId,
+        previousVolumeId,
+        region: this.s.flyRegion,
+      });
+    } catch (err) {
+      this.s.status = previousStatus;
+      this.s.restoreStartedAt = null;
+      this.s.preRestoreStatus = null;
+      await this.persist({
+        status: previousStatus,
+        restoreStartedAt: null,
+        preRestoreStatus: null,
+      });
+      throw err;
+    }
+
+    this.emitEvent({
+      event: 'instance.restore_enqueued',
+      status: 'restoring',
+      label: 'admin_snapshot_restore',
+    });
+
+    return { acknowledged: true, previousVolumeId };
+  }
+
+  /**
+   * Called by the queue worker to destroy the machine before starting with a new volume.
+   * Fly requires machine destruction to release the old volume's attached_machine_id.
+   * Clears flyMachineId so start() will create a fresh machine.
+   */
+  async destroyMachineForRestore(): Promise<void> {
+    await this.loadState();
+    if (this.s.status !== 'restoring') {
+      throw new Error('Cannot destroy machine: instance is not in restoring state');
+    }
+    if (this.s.flyMachineId) {
+      const flyConfig = getFlyConfig(this.env, this.s);
+      try {
+        await fly.destroyMachine(flyConfig, this.s.flyMachineId, true);
+        console.log(`[DO] Machine destroyed for restore: ${this.s.flyMachineId}`);
+      } catch (err) {
+        if (!fly.isFlyNotFound(err)) throw err;
+        console.log('[DO] Machine already gone during restore destroy');
+      }
+      this.s.flyMachineId = null;
+      // Machine is gone — update preRestoreStatus so failSnapshotRestore() doesn't
+      // restore to 'running' when the machine no longer exists.
+      this.s.preRestoreStatus = 'stopped';
+      await this.persist({ flyMachineId: null, preRestoreStatus: 'stopped' });
+    }
+  }
+
+  /**
+   * Called by the queue worker after creating a new volume, before swapping.
+   * Persists the volume ID so retries can reuse it instead of creating another.
+   */
+  async setPendingRestoreVolumeId(volumeId: string): Promise<void> {
+    await this.loadState();
+    if (this.s.status !== 'restoring') return;
+    this.s.pendingRestoreVolumeId = volumeId;
+    await this.persist({ pendingRestoreVolumeId: volumeId });
+  }
+
+  /**
+   * Called by the queue worker after the new volume is created and ready.
+   * Swaps the volume reference and stores the previous volume ID for admin revert.
+   */
+  async completeSnapshotRestore(newVolumeId: string, newRegion: string): Promise<void> {
+    await this.loadState();
+    if (this.s.status !== 'restoring') {
+      throw new Error('Cannot complete restore: instance is not in restoring state');
+    }
+
+    const previousVolumeId = this.s.flyVolumeId;
+    const durationMs = this.s.restoreStartedAt
+      ? Date.now() - new Date(this.s.restoreStartedAt).getTime()
+      : undefined;
+    this.s.previousVolumeId = previousVolumeId;
+    this.s.flyVolumeId = newVolumeId;
+    this.s.flyRegion = newRegion;
+    this.s.status = 'stopped';
+    this.s.restoreStartedAt = null;
+    this.s.preRestoreStatus = null;
+    this.s.pendingRestoreVolumeId = null;
+    await this.persist({
+      previousVolumeId,
+      flyVolumeId: newVolumeId,
+      flyRegion: newRegion,
+      status: 'stopped',
+      restoreStartedAt: null,
+      preRestoreStatus: null,
+      pendingRestoreVolumeId: null,
+    });
+
+    this.emitEvent({
+      event: 'instance.restore_completed',
+      status: 'stopped',
+      durationMs,
+    });
+  }
+
+  /**
+   * Called by the queue worker if the restore fails after all retries,
+   * or by the alarm if the restore is stuck for >30 min.
+   * Restores the pre-restore status so the instance reflects its actual state
+   * (e.g., still 'running' if the queue worker never stopped the machine).
+   */
+  async failSnapshotRestore(): Promise<void> {
+    await this.loadState();
+    if (this.s.status !== 'restoring') return;
+
+    const restoredStatus = this.s.preRestoreStatus ?? 'stopped';
+    if (this.s.pendingRestoreVolumeId) {
+      console.warn(
+        `[DO] Orphaned restore volume: ${this.s.pendingRestoreVolumeId} (manual cleanup may be needed)`
+      );
+    }
+    this.s.status = restoredStatus;
+    this.s.restoreStartedAt = null;
+    this.s.preRestoreStatus = null;
+    this.s.pendingRestoreVolumeId = null;
+    await this.persist({
+      status: restoredStatus,
+      restoreStartedAt: null,
+      preRestoreStatus: null,
+      pendingRestoreVolumeId: null,
+    });
+    await this.scheduleAlarm();
+
+    console.log(`[DO] Snapshot restore failed, status restored to ${restoredStatus}`);
   }
 
   // ── Gateway controller ─────────────────────────────────────────────
@@ -1486,7 +1724,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.status === 'provisioned' ||
       this.s.status === 'destroying' ||
       this.s.status === 'starting' ||
-      this.s.status === 'restarting'
+      this.s.status === 'restarting' ||
+      this.s.status === 'restoring'
     ) {
       return { success: false, error: 'Instance is busy' };
     }
@@ -1706,6 +1945,27 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.loadState();
 
     if (!this.s.userId || !this.s.status) return;
+
+    // Skip reconciliation during restore — the queue worker owns the lifecycle.
+    // Detect stuck restores: if restoreStartedAt is set and older than 30 min,
+    // the queue worker likely failed permanently. Reset to stopped.
+    if (this.s.status === 'restoring') {
+      if (this.s.restoreStartedAt) {
+        const elapsed = Date.now() - new Date(this.s.restoreStartedAt).getTime();
+        if (elapsed > 30 * 60 * 1000) {
+          this.emitEvent({
+            event: 'instance.restore_failed',
+            status: 'restoring',
+            label: 'alarm_timeout',
+            durationMs: elapsed,
+          });
+          await this.failSnapshotRestore();
+          return;
+        }
+      }
+      await this.scheduleAlarm();
+      return;
+    }
 
     try {
       const flyConfig = getFlyConfig(this.env, this.s);

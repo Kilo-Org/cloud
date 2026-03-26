@@ -8,18 +8,14 @@
     "start": "wrangler dev",
     "test": "vitest",
     "cf-typegen": "wrangler types",
-    "typecheck": "tsgo --noEmit --incremental false",
-    "lint": "pnpm run lint:oxlint && pnpm run lint:eslint:fallback",
-    "lint:oxlint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-o11y/src",
-    "lint:eslint:fallback": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'"
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-o11y/src"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.21",
-    "@kilocode/eslint-config": "workspace:*",
     "@types/node": "^25.5.0",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
-    "eslint": "catalog:",
     "typescript": "catalog:",
     "vitest": "~3.2.4",
     "wrangler": "catalog:"

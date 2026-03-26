@@ -2,10 +2,11 @@
 
 import { useState, useCallback } from 'react';
 
-import { ChevronDown, Loader2, XCircle, Check, Send, X, AlertCircle } from 'lucide-react';
+import { Loader2, Check, Send, X, AlertCircle, MessageCircleQuestion } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
 import { useQuestionContext } from './QuestionContext';
+import { ToolCardShell } from './ToolCardShell';
 import type { ToolPart } from './types';
 import type { QuestionInfo } from '@/types/opencode.gen';
 
@@ -28,19 +29,6 @@ type QuestionMetadata = {
   answers?: string[][];
   truncated?: boolean;
 };
-
-function getStatusIndicator(status: 'pending' | 'running' | 'completed' | 'error') {
-  switch (status) {
-    case 'error':
-      return <XCircle className="h-4 w-4 shrink-0 text-red-500" />;
-    case 'completed':
-      return <span className="text-muted-foreground shrink-0 text-xs">question</span>;
-    case 'pending':
-    case 'running':
-    default:
-      return <Loader2 className="h-4 w-4 shrink-0 animate-spin text-blue-500" />;
-  }
-}
 
 /** Read-only view of a completed question's answers */
 function CompletedQuestionContent({
@@ -275,7 +263,6 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
   const status = isStandalone ? props.status : props.toolPart.state.status;
   const isRunning = status === 'running';
 
-  const [isExpanded, setIsExpanded] = useState(isRunning);
   const [activeTab, setActiveTab] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<string[][]>(() => questions.map(() => []));
   const [customInputs, setCustomInputs] = useState<string[]>(() => questions.map(() => ''));
@@ -288,6 +275,8 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
     questionRequestIds,
     cloudAgentSessionId: sessionId,
     organizationId,
+    answerQuestion: ctxAnswerQuestion,
+    rejectQuestion: ctxRejectQuestion,
   } = useQuestionContext();
 
   const requestId = isStandalone
@@ -415,7 +404,7 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
   const hasAnyAnswer = questions.some((_, i) => getEffectiveAnswers(i).length > 0);
 
   const handleSubmit = useCallback(async () => {
-    if (!requestId || !sessionId || isSubmitting) return;
+    if (!requestId || isSubmitting) return;
 
     const answers: string[][] = questions.map((_, i) => getEffectiveAnswers(i));
 
@@ -423,16 +412,21 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
     setSubmitError(null);
 
     try {
-      if (organizationId) {
-        await trpcClient.organizations.cloudAgentNext.answerQuestion.mutate(
-          { sessionId, questionId: requestId, answers, organizationId },
-          { context: { skipBatch: true } }
-        );
+      if (ctxAnswerQuestion) {
+        await ctxAnswerQuestion(requestId, answers);
       } else {
-        await trpcClient.cloudAgentNext.answerQuestion.mutate(
-          { sessionId, questionId: requestId, answers },
-          { context: { skipBatch: true } }
-        );
+        if (!sessionId) return;
+        if (organizationId) {
+          await trpcClient.organizations.cloudAgentNext.answerQuestion.mutate(
+            { sessionId, questionId: requestId, answers, organizationId },
+            { context: { skipBatch: true } }
+          );
+        } else {
+          await trpcClient.cloudAgentNext.answerQuestion.mutate(
+            { sessionId, questionId: requestId, answers },
+            { context: { skipBatch: true } }
+          );
+        }
       }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to submit answer');
@@ -447,35 +441,41 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
     getEffectiveAnswers,
     isSubmitting,
     trpcClient,
+    ctxAnswerQuestion,
   ]);
 
   const handleDismiss = useCallback(async () => {
-    if (!requestId || !sessionId || isSubmitting) return;
+    if (!requestId || isSubmitting) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
 
     try {
-      if (organizationId) {
-        await trpcClient.organizations.cloudAgentNext.rejectQuestion.mutate(
-          { sessionId, questionId: requestId, organizationId },
-          { context: { skipBatch: true } }
-        );
+      if (ctxRejectQuestion) {
+        await ctxRejectQuestion(requestId);
       } else {
-        await trpcClient.cloudAgentNext.rejectQuestion.mutate(
-          { sessionId, questionId: requestId },
-          { context: { skipBatch: true } }
-        );
+        if (!sessionId) return;
+        if (organizationId) {
+          await trpcClient.organizations.cloudAgentNext.rejectQuestion.mutate(
+            { sessionId, questionId: requestId, organizationId },
+            { context: { skipBatch: true } }
+          );
+        } else {
+          await trpcClient.cloudAgentNext.rejectQuestion.mutate(
+            { sessionId, questionId: requestId },
+            { context: { skipBatch: true } }
+          );
+        }
       }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to dismiss question');
     } finally {
       setIsSubmitting(false);
     }
-  }, [requestId, sessionId, organizationId, isSubmitting, trpcClient]);
+  }, [requestId, sessionId, organizationId, isSubmitting, trpcClient, ctxRejectQuestion]);
 
-  // Running state: always expanded, interactive
-  if (isRunning) {
+  // Running state: always expanded, interactive (only if we have a requestId to submit answers)
+  if (isRunning && requestId) {
     return (
       <div className="border-primary/40 bg-muted/30 rounded-md border border-l-4">
         {/* Header */}
@@ -570,15 +570,15 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
           {submitError && <div className="mt-2 text-xs text-red-500">{submitError}</div>}
 
           {/* Action buttons — single question: always visible; multi-question: only on Confirm tab */}
-          {(questionCount === 1 || activeTab === questionCount) && (
+          {requestId && (questionCount === 1 || activeTab === questionCount) && (
             <div className="mt-3 flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={!hasAnyAnswer || isSubmitting || !requestId}
+                disabled={!hasAnyAnswer || isSubmitting}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-                  hasAnyAnswer && requestId && !isSubmitting
+                  hasAnyAnswer && !isSubmitting
                     ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                     : 'bg-muted text-muted-foreground cursor-not-allowed'
                 )}
@@ -593,17 +593,12 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
               <button
                 type="button"
                 onClick={handleDismiss}
-                disabled={isSubmitting || !requestId}
+                disabled={isSubmitting}
                 className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <X className="h-3 w-3" />
                 Dismiss
               </button>
-              {!requestId && (
-                <span className="text-muted-foreground text-[10px]">
-                  Waiting for question ID...
-                </span>
-              )}
             </div>
           )}
         </div>
@@ -611,64 +606,51 @@ export function QuestionToolCard(props: QuestionToolCardProps) {
     );
   }
 
-  // Non-running states: collapsible
+  // Non-running states: use shared shell
   return (
-    <div className="border-muted bg-muted/30 rounded-md border">
-      <button
-        type="button"
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
-      >
-        {getStatusIndicator(status)}
-        <span className="min-w-0 flex-1 truncate text-sm">{headerText}</span>
-        <ChevronDown
-          className={cn(
-            'text-muted-foreground h-4 w-4 shrink-0 transition-transform',
-            isExpanded && 'rotate-180'
-          )}
-        />
-      </button>
-
-      {isExpanded && (
-        <div className="border-muted border-t px-3 py-2">
-          {questionCount > 1 && (
-            <div className="mb-3 flex gap-1 overflow-x-auto pb-1">
-              {questions.map((q, idx) => (
-                <QuestionTab
-                  key={idx}
-                  question={q}
-                  answers={completedAnswers[idx]}
-                  isActive={activeTab === idx}
-                  onClick={() => setActiveTab(idx)}
-                  index={idx}
-                  total={questionCount}
-                />
-              ))}
-            </div>
-          )}
-
-          {questions[activeTab < questionCount ? activeTab : 0] && (
-            <CompletedQuestionContent
-              question={questions[activeTab < questionCount ? activeTab : 0]}
-              answers={completedAnswers[activeTab < questionCount ? activeTab : 0]}
-              showHeader={false}
+    <ToolCardShell
+      icon={MessageCircleQuestion}
+      title="Question"
+      subtitle={headerText}
+      status={status}
+    >
+      {/* Tabs for multiple questions */}
+      {questionCount > 1 && (
+        <div className="mb-3 flex gap-1 overflow-x-auto pb-1">
+          {questions.map((q, idx) => (
+            <QuestionTab
+              key={idx}
+              question={q}
+              answers={completedAnswers[idx]}
+              isActive={activeTab === idx}
+              onClick={() => setActiveTab(idx)}
+              index={idx}
+              total={questionCount}
             />
-          )}
-
-          {error && (
-            <div className="mt-2">
-              <div className="text-muted-foreground mb-1 text-xs">Error:</div>
-              <pre className="bg-background overflow-auto rounded-md p-2 text-xs text-red-500">
-                <code>{error}</code>
-              </pre>
-            </div>
-          )}
-
-          {status === 'pending' && (
-            <div className="text-muted-foreground mt-2 text-xs italic">Preparing question...</div>
-          )}
+          ))}
         </div>
       )}
-    </div>
+
+      {questions[activeTab < questionCount ? activeTab : 0] && (
+        <CompletedQuestionContent
+          question={questions[activeTab < questionCount ? activeTab : 0]}
+          answers={completedAnswers[activeTab < questionCount ? activeTab : 0]}
+          showHeader={false}
+        />
+      )}
+
+      {error && (
+        <div className="mt-2">
+          <div className="text-muted-foreground mb-1 text-xs">Error:</div>
+          <pre className="bg-background overflow-auto rounded-md p-2 text-xs text-red-500">
+            <code>{error}</code>
+          </pre>
+        </div>
+      )}
+
+      {status === 'pending' && (
+        <div className="text-muted-foreground mt-2 text-xs italic">Preparing question...</div>
+      )}
+    </ToolCardShell>
   );
 }

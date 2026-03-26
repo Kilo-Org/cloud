@@ -1,27 +1,33 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { GitBranch, ExternalLink, Loader2, Info, Menu, TrendingUpDown } from 'lucide-react';
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { GitBranch, ExternalLink, Menu, MoreHorizontal } from 'lucide-react';
 import { SessionInfoDialog } from './SessionInfoDialog';
 import { SessionActionsDialog } from './SessionActionsDialog';
 import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
 import { buildRepoBrowseUrl, detectGitPlatform } from './utils/git-utils';
+import { useSidebarToggle } from './CloudSidebarLayout';
+import { formatShortModelName } from '@/lib/format-model-name';
 
 type ChatHeaderProps = {
-  /** The cloud-agent session ID (e.g., agent_xxx format) */
   cloudAgentSessionId: string;
-  /** The Kilo session ID (UUID from cliSessions.session_id) */
   kiloSessionId?: string;
+  organizationId?: string;
   repository: string;
   branch?: string;
   gitUrl?: string | null;
   model?: string;
-  isStreaming?: boolean;
+  modelDisplayName?: string;
   totalCost?: number;
-  onMenuClick?: () => void;
   soundEnabled?: boolean;
   onToggleSound?: () => void;
   sessionTitle?: string;
@@ -33,19 +39,19 @@ export function ChatHeader({
   branch,
   gitUrl,
   model = 'Unknown',
-  isStreaming = false,
+  modelDisplayName,
   totalCost = 0,
-  onMenuClick,
   soundEnabled = true,
   onToggleSound,
   kiloSessionId,
+  organizationId,
   sessionTitle,
 }: ChatHeaderProps) {
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [showActionsDialog, setShowActionsDialog] = useState(false);
+  const { toggleMobileSidebar } = useSidebarToggle();
 
   const browseUrl = buildRepoBrowseUrl(gitUrl);
-  // Compare URL for GitHub only; GitLab MR links are not yet supported.
   const repoUrl =
     browseUrl && branch && detectGitPlatform(gitUrl) === 'github'
       ? `${browseUrl}/compare/${branch}?expand=1`
@@ -59,6 +65,7 @@ export function ChatHeader({
         sessionId={cloudAgentSessionId}
         kiloSessionId={kiloSessionId}
         model={model}
+        modelDisplayName={modelDisplayName}
         cost={totalCost * 1_000_000}
       />
       <SessionActionsDialog
@@ -68,102 +75,79 @@ export function ChatHeader({
         sessionTitle={sessionTitle}
         repository={repository}
       />
-      <div className="bg-background w-full max-w-full border-b px-3 py-2 md:px-4 md:py-3">
-        <div className="flex w-full max-w-full items-center justify-between gap-2 overflow-x-hidden md:gap-4">
-          <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
-            {/* Hamburger menu - only visible on mobile */}
-            {onMenuClick && (
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={onMenuClick}
-                className="h-11 min-h-11 w-11 min-w-11 lg:hidden"
-                title="Open menu"
-                aria-label="Open menu"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
+      <div className="bg-background w-full border-b px-3 py-2">
+        <div className="flex items-center gap-2 overflow-hidden">
+          {/* Mobile hamburger */}
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={toggleMobileSidebar}
+            className="h-8 w-8 shrink-0 lg:hidden"
+            aria-label="Open menu"
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+
+          {/* Left: repo, branch, model, cost */}
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
+            {repository && (
+              <>
+                <GitBranch className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+                <span className="truncate font-medium">{repository}</span>
+              </>
             )}
-
-            {/* Info button - only visible on mobile */}
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => setShowInfoDialog(true)}
-              className="h-11 min-h-11 w-11 min-w-11 lg:hidden"
-              title="Session information"
-              aria-label="Session information"
-            >
-              <Info className="h-5 w-5" />
-            </Button>
-
-            <div className="lg:hidden">
-              <FeedbackDialog />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h2 className="truncate text-base font-semibold text-gray-100 md:text-lg">
-                  <span className="lg:hidden">Session</span>
-                  <span className="hidden lg:inline">Cloud Agent Session</span>
-                </h2>
-                <Badge variant="new" className="hidden lg:inline-flex">
-                  new
-                </Badge>
-                {isStreaming && (
-                  <Badge variant="outline" className="hidden items-center gap-1 lg:flex">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Streaming
-                  </Badge>
-                )}
-                {model && model !== 'Unknown' && (
-                  <Badge variant="outline" className="hidden items-center gap-1 lg:flex">
-                    {model}
-                  </Badge>
-                )}
-                {totalCost > 0 && (
-                  <Badge variant="secondary" className="hidden items-center gap-1 lg:flex">
-                    ${totalCost.toFixed(4)}
-                  </Badge>
-                )}
-              </div>
-              {repository && (
-                <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-gray-400 md:text-sm">
-                  <GitBranch className="h-3 w-3 shrink-0" />
-                  <span className="truncate">
-                    {repository}
-                    {branch && <span className="text-gray-500"> : {branch}</span>}
-                  </span>
-                  {repoUrl && (
-                    <a
-                      href={repoUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="shrink-0 text-blue-400 transition-colors hover:text-blue-300"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  )}
-                </div>
-              )}
-            </div>
+            {branch && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground truncate">{branch}</span>
+              </>
+            )}
+            {model && model !== 'Unknown' && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground hidden shrink-0 sm:inline">
+                  {modelDisplayName ?? formatShortModelName(model)}
+                </span>
+              </>
+            )}
+            {totalCost > 0 && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground shrink-0">${totalCost.toFixed(4)}</span>
+              </>
+            )}
           </div>
-          <div className="hidden items-center gap-2 lg:flex">
-            <FeedbackDialog />
+
+          {/* Right: sound toggle + overflow menu */}
+          <div className="flex shrink-0 items-center gap-1">
             {onToggleSound && (
               <SoundToggleButton enabled={soundEnabled} onToggle={onToggleSound} size="sm" />
             )}
-            {/* Session Actions Button */}
-            <Button
-              variant="outline"
-              onClick={() => setShowActionsDialog(true)}
-              className="gap-2"
-              title="Share or fork this session"
-              aria-label="Share or fork this session"
-            >
-              <TrendingUpDown className="h-4 w-4" />
-              Share or Fork
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="More options">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setShowActionsDialog(true)}>
+                  Share or Fork
+                </DropdownMenuItem>
+                {repoUrl && (
+                  <DropdownMenuItem asChild>
+                    <a href={repoUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open in GitHub
+                    </a>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setShowInfoDialog(true)}>
+                  Session Info
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <FeedbackDialog organizationId={organizationId} kiloSessionId={kiloSessionId} />
           </div>
         </div>
       </div>

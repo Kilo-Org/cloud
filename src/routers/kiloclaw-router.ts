@@ -37,6 +37,7 @@ import {
   ensureActiveInstance,
   getActiveInstance,
   markActiveInstanceDestroyed,
+  markInstanceDestroyedById,
   renameInstance,
   restoreDestroyedInstance,
 } from '@/lib/kiloclaw/instance-registry';
@@ -222,7 +223,11 @@ async function provisionInstance(
   user: Parameters<typeof generateApiToken>[0],
   input: z.infer<typeof updateConfigSchema>
 ) {
-  await ensureActiveInstance(user.id);
+  // Remember which row existed before so we can detect whether
+  // ensureActiveInstance created a new one for this attempt.
+  const preExistingRow = await getActiveInstance(user.id);
+  const instanceRow = await ensureActiveInstance(user.id);
+  const rowIsNew = !preExistingRow || preExistingRow.id !== instanceRow.id;
 
   const encryptedSecrets = input.secrets
     ? Object.fromEntries(
@@ -245,15 +250,29 @@ async function provisionInstance(
   const pinnedImageTag = pin?.image_tag;
 
   const client = new KiloClawInternalClient();
-  return client.provision(user.id, {
-    envVars: input.envVars,
-    encryptedSecrets,
-    channels: buildWorkerChannels(input.channels),
-    kilocodeApiKey,
-    kilocodeApiKeyExpiresAt,
-    kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-    pinnedImageTag,
-  });
+  try {
+    return await client.provision(user.id, {
+      envVars: input.envVars,
+      encryptedSecrets,
+      channels: buildWorkerChannels(input.channels),
+      kilocodeApiKey,
+      kilocodeApiKeyExpiresAt,
+      kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+      pinnedImageTag,
+    });
+  } catch (error) {
+    // Only clean up the exact row this attempt created. Target by primary
+    // key so a concurrent request's row is never affected.
+    if (rowIsNew) {
+      await markInstanceDestroyedById(instanceRow.id).catch(cleanupErr => {
+        console.error(
+          '[kiloclaw] Failed to clean up instance row after provision error:',
+          cleanupErr
+        );
+      });
+    }
+    throw error;
+  }
 }
 
 async function patchConfig(

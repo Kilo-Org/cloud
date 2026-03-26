@@ -2,11 +2,12 @@
 
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { BackButton } from '@/components/BackButton';
+import { SetPageTitle } from '@/components/SetPageTitle';
 import type { ReactNode } from 'react';
 
 type OrganizationPageHeaderProps = {
   organizationId: string;
-  title: ReactNode;
+  title: string;
   showBackButton?: boolean;
   backButtonText?: string;
   backButtonHref?: string;
@@ -25,20 +26,16 @@ export function OrganizationPageHeader({
 
   const finalBackHref = backButtonHref || `/organizations/${organizationId}`;
   const organizationName = organization?.name || 'Organization';
-  const finalTitle =
-    typeof title === 'string' ? title.replace('<org name>', organizationName) : title;
+  const finalTitle = title.replace('<org name>', organizationName);
 
   return (
     <div className="flex w-full flex-col gap-y-4">
+      <SetPageTitle title={finalTitle}>{badge}</SetPageTitle>
       {showBackButton && (
         <div>
           <BackButton href={finalBackHref}>{backButtonText}</BackButton>
         </div>
       )}
-      <div className="flex items-center gap-3">
-        <h1 className="text-3xl font-bold">{finalTitle}</h1>
-        {badge}
-      </div>
     </div>
   );
 }

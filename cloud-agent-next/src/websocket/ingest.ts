@@ -14,7 +14,7 @@
  */
 
 import type { IngestEvent, StoredEvent } from './types.js';
-import type { ExecutionId, SessionId } from '../types/ids.js';
+import type { ExecutionId, EventId, SessionId } from '../types/ids.js';
 import type { EventQueries } from '../session/queries/index.js';
 import { createErrorMessage } from './stream.js';
 import { z } from 'zod';
@@ -22,9 +22,10 @@ import {
   handleKilocodeEvent,
   handleBranchCapture,
   handleExecutionComplete,
+  extractEntityId,
   type KiloSessionCaptureState,
 } from '../session/ingest-handlers/index.js';
-import type { CompleteEventData, KilocodeEventData } from '../shared/protocol.js';
+import type { CompleteEventData, KilocodeEventData, CloudStatusData } from '../shared/protocol.js';
 
 // ---------------------------------------------------------------------------
 // Ingest Attachment
@@ -56,6 +57,41 @@ const errorEventSchema = z.object({
   error: z.string().optional(),
   message: z.string().optional(),
 });
+
+// ---------------------------------------------------------------------------
+// Persistence Allowlists
+// ---------------------------------------------------------------------------
+
+/**
+ * Kilocode events with entity IDs are always persisted via upsert:
+ *   - message.updated   → entity_id: message/{id}
+ *   - message.part.updated → entity_id: part/{messageID}/{partId}
+ * See extractEntityId() for the mapping.
+ *
+ * The sets below cover events persisted via **plain insert**.
+ * Any event not covered by entity-ID upsert or these sets is broadcast-only:
+ * delivered to /stream clients in real time but not written to SQLite.
+ */
+
+/** Non-kilocode stream event types persisted to SQLite via plain insert. */
+const PERSISTED_STREAM_EVENT_TYPES: ReadonlySet<string> = new Set([
+  'complete',
+  'interrupted',
+  'error',
+  'autocommit_started',
+  'autocommit_completed',
+]);
+
+/** Kilocode event names persisted to SQLite via plain insert (no entity-ID dedup). */
+const PERSISTED_KILO_EVENT_NAMES: ReadonlySet<string> = new Set([
+  'message.part.removed',
+  'session.created',
+  'session.updated',
+  'session.status',
+  'session.error',
+  'session.idle',
+  'session.turn.close',
+]);
 
 const createExecutionLifecycleContext = (doContext: IngestDOContext) => ({
   updateExecutionStatus: (
@@ -308,22 +344,59 @@ export function createIngestHandler(
           ? new Date(ingestEvent.timestamp).getTime()
           : Date.now();
 
-        // Insert into SQLite and get the auto-generated ID
-        const eventId = eventQueries.insert({
-          executionId,
-          sessionId,
-          streamEventType: ingestEvent.streamEventType,
-          payload: JSON.stringify(ingestEvent.data ?? {}),
-          timestamp,
-        });
+        const payload = JSON.stringify(ingestEvent.data ?? {});
+        const eventType = ingestEvent.streamEventType;
+
+        let eventId: number;
+
+        // Route event: broadcast-only, upsert, or plain insert.
+        // Only events in the allowlists are written to SQLite;
+        // everything else is broadcast to /stream clients with eventId 0.
+        if (eventType === 'kilocode') {
+          const kiloEventName = (ingestEvent.data as Record<string, unknown> | undefined)?.event as
+            | string
+            | undefined;
+          const data = ingestEvent.data as Record<string, unknown>;
+          const entityId = extractEntityId(kiloEventName ?? '', data);
+          if (entityId) {
+            eventId = eventQueries.upsert({
+              executionId,
+              sessionId,
+              streamEventType: eventType,
+              payload,
+              timestamp,
+              entityId,
+            });
+          } else if (kiloEventName && PERSISTED_KILO_EVENT_NAMES.has(kiloEventName)) {
+            eventId = eventQueries.insert({
+              executionId,
+              sessionId,
+              streamEventType: eventType,
+              payload,
+              timestamp,
+            });
+          } else {
+            eventId = 0;
+          }
+        } else if (PERSISTED_STREAM_EVENT_TYPES.has(eventType)) {
+          eventId = eventQueries.insert({
+            executionId,
+            sessionId,
+            streamEventType: eventType,
+            payload,
+            timestamp,
+          });
+        } else {
+          eventId = 0;
+        }
 
         // Build stored event for broadcasting
         const storedEvent: StoredEvent = {
           id: eventId,
           execution_id: executionId,
           session_id: sessionId,
-          stream_event_type: ingestEvent.streamEventType,
-          payload: JSON.stringify(ingestEvent.data ?? {}),
+          stream_event_type: eventType,
+          payload,
           timestamp,
         };
 
@@ -343,7 +416,6 @@ export function createIngestHandler(
         // skipped — the stored timestamp may lag behind the true latest event
         // by up to the throttle window. This is fine because the only consumer
         // (checkHungExecution) uses a 2-minute timeout on a 2-minute alarm cycle.
-        const eventType: string = ingestEvent.streamEventType;
         if (eventType !== 'heartbeat') {
           if (now - attachment.lastEventAtUpdate >= HEARTBEAT_DEBOUNCE_MS) {
             attachment.lastEventAtUpdate = now;
@@ -373,11 +445,57 @@ export function createIngestHandler(
           }
         }
 
+        // Handle autocommit events — emit cloud.status for finalizing/ready.
+        // Compare via string variable because the local StreamEventType union
+        // does not include wrapper-only event names like autocommit_*.
+        const eventTypeStr: string = eventType;
+        if (eventTypeStr === 'autocommit_started') {
+          broadcastFn({
+            id: 0 as EventId,
+            execution_id: executionId,
+            session_id: sessionId,
+            stream_event_type: 'cloud.status',
+            payload: JSON.stringify({
+              cloudStatus: {
+                type: 'finalizing',
+                step: 'committing',
+                message: 'Committing changes...',
+              },
+            } satisfies CloudStatusData),
+            timestamp,
+          });
+        }
+        if (eventTypeStr === 'autocommit_completed') {
+          broadcastFn({
+            id: 0 as EventId,
+            execution_id: executionId,
+            session_id: sessionId,
+            stream_event_type: 'cloud.status',
+            payload: JSON.stringify({
+              cloudStatus: { type: 'ready' },
+            } satisfies CloudStatusData),
+            timestamp,
+          });
+        }
+
         // Handle complete events (branch capture + lifecycle)
         if (ingestEvent.streamEventType === 'complete') {
           if (await shouldIgnoreTerminalEvent(executionId, doContext)) {
             return;
           }
+
+          // Emit cloud.status = ready on successful completion
+          broadcastFn({
+            id: 0 as EventId,
+            execution_id: executionId,
+            session_id: sessionId,
+            stream_event_type: 'cloud.status',
+            payload: JSON.stringify({
+              cloudStatus: { type: 'ready' },
+            } satisfies CloudStatusData),
+            timestamp,
+          });
+
           const parsedComplete = completeEventSchema.safeParse(ingestEvent.data);
           if (!parsedComplete.success) {
             console.warn('Invalid complete event payload', parsedComplete.error);
@@ -427,11 +545,22 @@ export function createIngestHandler(
             if (await shouldIgnoreTerminalEvent(executionId, doContext)) {
               return;
             }
+            const fatalMessage = errorData.error ?? errorData.message ?? 'Fatal error';
+            broadcastFn({
+              id: 0 as EventId,
+              execution_id: executionId,
+              session_id: sessionId,
+              stream_event_type: 'cloud.status',
+              payload: JSON.stringify({
+                cloudStatus: { type: 'error', message: fatalMessage },
+              } satisfies CloudStatusData),
+              timestamp,
+            });
             await handleExecutionComplete(
               executionId,
               'failed',
               createExecutionLifecycleContext(doContext),
-              errorData.error ?? errorData.message ?? 'Fatal error'
+              fatalMessage
             );
           }
         }

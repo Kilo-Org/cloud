@@ -15,7 +15,9 @@ import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 
 import type { AppEnv, KiloClawEnv } from './types';
+import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform, controller } from './routes';
+import { handleSnapshotRestoreQueue } from './queue/snapshot-restore';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
@@ -231,6 +233,7 @@ async function resolveInstance(c: Context<AppEnv>): Promise<{
   const s = await stub.getStatus();
 
   if (s.status === 'destroying') return { machineId: null, flyAppName: null, status: 'destroying' };
+  if (s.status === 'restoring') return { machineId: null, flyAppName: null, status: 'restoring' };
 
   return { machineId: s.flyMachineId, flyAppName: s.flyAppName, status: s.status };
 }
@@ -248,6 +251,15 @@ app.all('*', async c => {
   if (status === 'destroying') {
     return c.json(
       { error: 'Instance is being destroyed', hint: 'This instance is being torn down.' },
+      409
+    );
+  }
+  if (status === 'restoring') {
+    return c.json(
+      {
+        error: 'Instance is restoring',
+        hint: 'This instance is being restored from a snapshot. Please wait.',
+      },
       409
     );
   }
@@ -491,5 +503,9 @@ export default {
     }
 
     return app.fetch(request, env, ctx);
+  },
+
+  async queue(batch: MessageBatch<SnapshotRestoreMessage>, env: KiloClawEnv): Promise<void> {
+    await handleSnapshotRestoreQueue(batch, env);
   },
 };

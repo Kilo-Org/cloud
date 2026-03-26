@@ -22,6 +22,7 @@ import type {
   VolumeSnapshot,
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
+  RestoreVolumeSnapshotResponse,
 } from '@/lib/kiloclaw/types';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { TRPCError } from '@trpc/server';
@@ -813,6 +814,47 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       } catch (err) {
         console.error('Failed to reassociate volume for user:', input.userId, err);
         throwKiloclawAdminError(err, 'Failed to reassociate volume');
+      }
+    }),
+
+  restoreVolumeSnapshot: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        snapshotId: z.string().min(1),
+        reason: z.string().min(10).max(500),
+      })
+    )
+    .mutation(async ({ input, ctx }): Promise<RestoreVolumeSnapshotResponse> => {
+      console.log(
+        `[admin-kiloclaw] Snapshot restore triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) for user ${input.userId}: snapshot=${input.snapshotId} reason="${input.reason}"`
+      );
+      try {
+        const client = new KiloClawInternalClient();
+        const result = await client.restoreVolumeFromSnapshot(input.userId, input.snapshotId);
+
+        try {
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.snapshot.restore',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `Snapshot restore enqueued: snapshot=${input.snapshotId}, previousVolume=${result.previousVolumeId}. Reason: ${input.reason}`,
+            metadata: {
+              snapshotId: input.snapshotId,
+              previousVolumeId: result.previousVolumeId,
+              reason: input.reason,
+            },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for snapshot restore:', auditErr);
+        }
+
+        return result;
+      } catch (err) {
+        console.error('Failed to restore snapshot for user:', input.userId, err);
+        throwKiloclawAdminError(err, 'Failed to restore from snapshot');
       }
     }),
 });

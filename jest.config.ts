@@ -1,6 +1,5 @@
 /** @jest-config-loader esbuild-register */
 
-/* eslint-disable n/no-process-env */
 import type { Config } from 'jest';
 
 const config: Config = {

@@ -40,26 +40,27 @@ const CheckinSchema = z.object({
 });
 
 /**
- * Derive the Next.js app origin for internal API calls.
+ * Return the backend app origin for internal API calls.
+ * Uses the dedicated BACKEND_API_URL env var set in wrangler.jsonc.
  */
-function nextApiOrigin(kilocodeApiBaseUrl: string | undefined): string {
-  if (!kilocodeApiBaseUrl) {
-    throw new Error('KILOCODE_API_BASE_URL not defined');
+function backendApiOrigin(backendApiUrl: string | undefined): string {
+  if (!backendApiUrl) {
+    throw new Error('BACKEND_API_URL is not configured');
   }
-  return new URL(kilocodeApiBaseUrl).origin;
+  return new URL(backendApiUrl).origin;
 }
 
 /**
- * Fire-and-forget HTTP POST to the Next.js internal API to trigger
+ * Fire-and-forget HTTP POST to the backend internal API to trigger
  * the "instance ready" transactional email.
  */
 async function notifyInstanceReady(
-  nextApiUrl: string,
+  backendOrigin: string,
   internalSecret: string,
   userId: string,
   sandboxId: string
 ): Promise<void> {
-  const res = await fetch(`${nextApiUrl}/api/internal/kiloclaw/instance-ready`, {
+  const res = await fetch(`${backendOrigin}/api/internal/kiloclaw/instance-ready`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -182,10 +183,16 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
   // one-time "instance ready" email to the user via the Next.js internal API.
   if (data.loadAvg5m <= INSTANCE_READY_LOAD_THRESHOLD) {
     try {
+      // Validate config before marking the DO flag so a misconfigured env var
+      // doesn't permanently prevent the email with no way to retry.
+      const apiOrigin = backendApiOrigin(c.env.BACKEND_API_URL);
       const { shouldNotify } = await stub.tryMarkInstanceReady();
 
       if (shouldNotify && c.env.INTERNAL_API_SECRET) {
-        const apiOrigin = nextApiOrigin(c.env.KILOCODE_API_BASE_URL);
+        console.log('[controller] instance-ready: dispatching notification', {
+          userId,
+          sandboxId: data.sandboxId,
+        });
         waitUntil(
           notifyInstanceReady(apiOrigin, c.env.INTERNAL_API_SECRET, userId, data.sandboxId).catch(
             err => {
@@ -194,8 +201,9 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
           )
         );
       }
-    } catch {
+    } catch (err) {
       // Best-effort: never fail checkin on readiness notification errors
+      console.error('[controller] instance-ready: tryMarkInstanceReady failed:', err);
     }
   }
 

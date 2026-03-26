@@ -16,6 +16,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'minimax',
   'mistral',
   'novita',
+  'seed',
   'streamlake',
   'stealth',
   'xiaomi',
@@ -64,7 +65,11 @@ export const UserByokTestModels = {
   [AutocompleteUserByokProviderIdSchema.enum.codestral]: 'mistral/codestral',
 } satisfies Record<UserByokProviderId, string>;
 
-export const VercelNonUserByokInferenceProviderIdSchema = z.enum(['alibaba', 'vertex']);
+export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
+  'alibaba',
+  'bytedance',
+  'vertex',
+]);
 
 export const VercelInferenceProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(
   VercelNonUserByokInferenceProviderIdSchema
@@ -81,6 +86,8 @@ const openRouterToVercelInferenceProviderMapping = {
     VercelUserByokInferenceProviderIdSchema.enum.google,
   [OpenRouterInferenceProviderIdSchema.enum['google-vertex']]:
     VercelNonUserByokInferenceProviderIdSchema.enum.vertex,
+  [OpenRouterInferenceProviderIdSchema.enum.seed]:
+    VercelNonUserByokInferenceProviderIdSchema.enum.bytedance,
   [OpenRouterInferenceProviderIdSchema.enum['z-ai']]:
     VercelUserByokInferenceProviderIdSchema.enum.zai,
 } as Record<string, VercelInferenceProviderId | undefined>;

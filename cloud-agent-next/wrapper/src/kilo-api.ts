@@ -48,6 +48,21 @@ export type WrapperKiloClient = {
   answerPermission: (permissionId: string, response: PermissionResponse) => Promise<boolean>;
   answerQuestion: (questionId: string, answers: string[][]) => Promise<boolean>;
   rejectQuestion: (questionId: string) => Promise<boolean>;
+  getSessionStatuses: () => Promise<Record<string, { type: string; [key: string]: unknown }>>;
+  getQuestions: () => Promise<
+    Array<{ id: string; sessionID: string; tool?: { messageID: string; callID: string } }>
+  >;
+  getPermissions: () => Promise<
+    Array<{
+      id: string;
+      sessionID: string;
+      permission: string;
+      patterns: string[];
+      metadata: Record<string, unknown>;
+      always: string[];
+      tool?: { messageID: string; callID: string };
+    }>
+  >;
   generateCommitMessage: (opts: { path: string }) => Promise<{ message: string }>;
 
   /** The underlying SDK client — used directly by connection.ts for event subscription */
@@ -149,6 +164,33 @@ export function createWrapperKiloClient(
     rejectQuestion: async questionId => {
       await v2Client.question.reject({ requestID: questionId });
       return true;
+    },
+
+    getSessionStatuses: async () => {
+      const result = await v2Client.session.status();
+      return (result.data ?? {}) as Record<string, { type: string; [key: string]: unknown }>;
+    },
+
+    getQuestions: async () => {
+      const result = await v2Client.question.list();
+      return (result.data ?? []) as Array<{
+        id: string;
+        sessionID: string;
+        tool?: { messageID: string; callID: string };
+      }>;
+    },
+
+    getPermissions: async () => {
+      const result = await v2Client.permission.list();
+      return (result.data ?? []) as Array<{
+        id: string;
+        sessionID: string;
+        permission: string;
+        patterns: string[];
+        metadata: Record<string, unknown>;
+        always: string[];
+        tool?: { messageID: string; callID: string };
+      }>;
     },
 
     generateCommitMessage: async opts => {

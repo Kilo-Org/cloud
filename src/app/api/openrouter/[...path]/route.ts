@@ -20,6 +20,7 @@ import {
   isDataCollectionRequiredOnKiloCodeOnly,
   isDeadFreeModel,
   isKiloFreeModel,
+  isKiloStealthModel,
 } from '@/lib/models';
 import {
   accountForMicrodollarUsage,
@@ -65,7 +66,7 @@ import {
   getToolsUsed,
 } from '@/lib/o11y/api-metrics.server';
 import { handleRequestLogging } from '@/lib/handleRequestLogging';
-import { customLlmRequest } from '@/lib/custom-llm/customLlmRequest';
+import { grokCodeFastOptimizedRequest } from '@/lib/custom-llm/customLlmRequest';
 import { normalizeModelId } from '@/lib/model-utils';
 import { isForbiddenFreeModel } from '@/lib/forbidden-free-models';
 import { isActiveReviewPromo } from '@/lib/code-reviews/core/constants';
@@ -74,7 +75,11 @@ import { fixOpenCodeDuplicateReasoning } from '@/lib/providers/fixOpenCodeDuplic
 import type { MicrodollarUsageContext, PromptInfo } from '@/lib/processUsage.types';
 import { extractResponsesPromptInfo } from '@/lib/processUsage.responses';
 import { extractMessagesPromptInfo } from '@/lib/processUsage.messages';
-import { getMaxTokens, hasMiddleOutTransform } from '@/lib/providers/openrouter/request-helpers';
+import {
+  fixResponsesRequest,
+  getMaxTokens,
+  hasMiddleOutTransform,
+} from '@/lib/providers/openrouter/request-helpers';
 
 export const maxDuration = 800;
 
@@ -432,6 +437,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
+  if (requestBodyParsed.kind === 'responses') {
+    fixResponsesRequest(requestBodyParsed.body);
+  }
+
   const toolsAvailable = getToolsAvailable(requestBodyParsed);
   const toolsUsed = getToolsUsed(requestBodyParsed);
 
@@ -445,14 +454,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
 
   let response: Response;
-  if (customLlm && requestBodyParsed.kind === 'chat_completions') {
-    response = await customLlmRequest(
-      customLlm,
+  if (requestBodyParsed.kind === 'chat_completions' && provider.id === 'martian') {
+    response = await grokCodeFastOptimizedRequest(
       requestBodyParsed.body,
       isRooCodeBasedClient(fraudHeaders)
     );
   } else {
-    Object.assign(requestBodyParsed.body, customLlm?.extra_body ?? {});
     response = await openRouterRequest({
       path,
       search: url.search,
@@ -530,10 +537,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       verdict: classifyResult.verdict,
       risk_score: classifyResult.risk_score,
       signals: classifyResult.signals,
-      identity_key: classifyResult.context.identity_key,
+      identity_key: classifyResult.context?.identity_key,
       kilo_user_id: user.id,
       requested_model: originalModelIdLowerCased,
-      rps: classifyResult.context.requests_per_second,
+      rps: classifyResult.context?.requests_per_second,
       request_id: classifyResult.request_id,
     });
     usageContext.abuse_request_id = classifyResult.request_id;
@@ -562,10 +569,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  if (
-    provider.id !== 'custom' &&
+  const isFreeModelRequiringCostRemoval =
+    (provider.id === 'openrouter' || provider.id === 'vercel') &&
     (isKiloFreeModel(originalModelIdLowerCased) ||
-      isActiveReviewPromo(botId, originalModelIdLowerCased))
+      isActiveReviewPromo(botId, originalModelIdLowerCased));
+  const isStealthModelRequiringNameRemoval = isKiloStealthModel(originalModelIdLowerCased);
+  const isProviderRequiringResponseFixes = provider.id === 'corethink';
+
+  if (
+    isFreeModelRequiringCostRemoval ||
+    isStealthModelRequiringNameRemoval ||
+    isProviderRequiringResponseFixes
   ) {
     if (requestBodyParsed.kind === 'chat_completions') {
       return rewriteFreeModelResponse_ChatCompletions(response, originalModelIdLowerCased);

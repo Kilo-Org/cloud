@@ -6,10 +6,8 @@
     "dev": "wrangler dev --env dev",
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types",
-    "typecheck": "tsgo --noEmit --incremental false",
-    "lint": "pnpm run lint:oxlint && pnpm run lint:eslint:fallback",
-    "lint:oxlint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-images-mcp/src",
-    "lint:eslint:fallback": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-images-mcp/src",
     "test": "vitest run"
   },
   "dependencies": {
@@ -22,11 +20,9 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
-    "@kilocode/eslint-config": "workspace:*",
     "@types/jsonwebtoken": "catalog:",
     "@types/node": "^22.19.15",
     "@typescript/native-preview": "catalog:",
-    "eslint": "catalog:",
     "typescript": "catalog:",
     "vitest": "^3.2.4",
     "wrangler": "catalog:"

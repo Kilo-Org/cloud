@@ -41,3 +41,8 @@ app-example
 # generated native folders
 /ios
 /android
+
+# superpowers brainstorming
+.superpowers/
+
+.env.local

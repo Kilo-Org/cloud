@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { LoadingCard } from '@/components/LoadingCard';
 import { ErrorCard } from '@/components/ErrorCard';
+import { SetPageTitle } from '@/components/SetPageTitle';
 import { Plus, Edit, Trash2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -267,10 +268,10 @@ export function CustomModesLayout({ organizationId }: CustomModesLayoutProps) {
   return (
     <LockableContainer>
       <div className="space-y-6">
+        <SetPageTitle title="Modes" />
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Modes</h1>
-            <p className="text-muted-foreground mt-2">
+            <p className="text-muted-foreground">
               Manage default and custom modes for your organization
             </p>
           </div>

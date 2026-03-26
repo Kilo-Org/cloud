@@ -4,7 +4,6 @@ import { getBalanceForUser } from '@/lib/user.balance';
 
 // Mock next/server's after function which requires request context
 jest.mock('next/server', () => {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return {
     ...jest.requireActual('next/server'),
     after: jest.fn(),

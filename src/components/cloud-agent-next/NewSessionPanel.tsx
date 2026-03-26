@@ -1,0 +1,902 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { toast } from 'sonner';
+import {
+  AlertCircle,
+  FolderGit2,
+  Loader2,
+  Lock,
+  RefreshCw,
+  Send,
+  Settings,
+  Unlock,
+  Check,
+} from 'lucide-react';
+import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
+
+import { useProfile, useProfiles, useCombinedProfiles } from '@/hooks/useCloudAgentProfiles';
+import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
+import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import {
+  manualEnvVarsAtom,
+  manualSetupCommandsAtom,
+  selectedProfileIdAtom,
+  hasAutoSelectedDefaultAtom,
+  profileConfigAtom,
+  effectiveEnvVarsAtom,
+  effectiveSetupCommandsAtom,
+  resetSessionFormAtom,
+} from '@/components/cloud-agent/store/session-form-atoms';
+import {
+  type RepositoryOption,
+  type RepositoryPlatform,
+} from '@/components/shared/RepositoryCombobox';
+import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { ModeCombobox, NEXT_MODE_OPTIONS } from '@/components/shared/ModeCombobox';
+import { VariantCombobox } from '@/components/shared/VariantCombobox';
+import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
+import { AdvancedConfig } from '@/components/shared/AdvancedConfig';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Separator } from '@/components/ui/separator';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Button as UIButton } from '@/components/ui/button';
+import { LinkButton } from '@/components/Button';
+import { cn } from '@/lib/utils';
+import {
+  extractRepoFromGitUrl,
+  findAllGitPlatformUrls,
+  detectGitPlatform,
+} from '@/components/cloud-agent-next/utils/git-utils';
+import type { AgentMode } from './types';
+
+type Repository = {
+  id: number;
+  name: string;
+  fullName: string;
+  private: boolean;
+};
+
+type NewSessionPanelProps = {
+  organizationId?: string;
+};
+
+export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
+  const router = useRouter();
+  const trpc = useTRPC();
+  const trpcClient = useRawTRPCClient();
+  const queryClient = useQueryClient();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // ---------------------------------------------------------------------------
+  // Eligibility
+  // ---------------------------------------------------------------------------
+  const personalEligibilityQuery = useQuery({
+    ...trpc.cloudAgent.checkEligibility.queryOptions(),
+    enabled: !organizationId,
+  });
+  const orgEligibilityQuery = useQuery({
+    ...trpc.organizations.cloudAgent.checkEligibility.queryOptions({
+      organizationId: organizationId || '',
+    }),
+    enabled: !!organizationId,
+  });
+  const eligibilityData = organizationId ? orgEligibilityQuery.data : personalEligibilityQuery.data;
+  const isEligibilityLoading = organizationId
+    ? orgEligibilityQuery.isPending
+    : personalEligibilityQuery.isPending;
+  const hasInsufficientBalance =
+    !isEligibilityLoading && eligibilityData && !eligibilityData.isEligible;
+
+  // ---------------------------------------------------------------------------
+  // Models
+  // ---------------------------------------------------------------------------
+  const { data: modelsData } = useModelSelectorList(organizationId);
+  const { data: defaultsData } = useOrganizationDefaults(organizationId);
+
+  const allModels = modelsData?.data || [];
+
+  const modelOptions = useMemo<ModelOption[]>(
+    () =>
+      allModels.map(model => ({
+        id: model.id,
+        name: model.name,
+        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
+      })),
+    [allModels]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Form state
+  // ---------------------------------------------------------------------------
+  const [prompt, setPrompt] = useState('');
+  const [selectedRepo, setSelectedRepo] = useState('');
+  const [selectedPlatform, setSelectedPlatform] = useState<RepositoryPlatform>('github');
+  const [mode, setMode] = useState<AgentMode>('code');
+  const [model, setModel] = useState<string>('');
+  const [variant, setVariant] = useState<string | undefined>(undefined);
+  const [isModelUserSelected, setIsModelUserSelected] = useState(false);
+  const [isPreparing, setIsPreparing] = useState(false);
+
+  // ---------------------------------------------------------------------------
+  // Session form atoms (profile / env / commands)
+  // ---------------------------------------------------------------------------
+  const [manualEnvVars, setManualEnvVars] = useAtom(manualEnvVarsAtom);
+  const [manualSetupCommands, setManualSetupCommands] = useAtom(manualSetupCommandsAtom);
+  const [selectedProfileId, setSelectedProfileId] = useAtom(selectedProfileIdAtom);
+  const [hasAutoSelectedDefault, setHasAutoSelectedDefault] = useAtom(hasAutoSelectedDefaultAtom);
+  const setProfileConfig = useSetAtom(profileConfigAtom);
+  const effectiveEnvVars = useAtomValue(effectiveEnvVarsAtom);
+  const effectiveSetupCommands = useAtomValue(effectiveSetupCommandsAtom);
+  const resetSessionForm = useSetAtom(resetSessionFormAtom);
+
+  // Clear any lingering manual overrides whenever the page loads
+  useEffect(() => {
+    resetSessionForm();
+  }, [resetSessionForm]);
+
+  const availableVariants = modelOptions.find(m => m.id === model)?.variants ?? [];
+
+  // ---------------------------------------------------------------------------
+  // Model auto-selection
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (modelOptions.length === 0) {
+      if (model) {
+        setModel('');
+        setIsModelUserSelected(false);
+      }
+      return;
+    }
+
+    const isCurrentModelAvailable = modelOptions.some(m => m.id === model);
+    if (!isCurrentModelAvailable || !model || !isModelUserSelected) {
+      const defaultModel = defaultsData?.defaultModel;
+      const isDefaultAllowed = defaultModel && modelOptions.some(m => m.id === defaultModel);
+      const newModel = isDefaultAllowed ? defaultModel : modelOptions[0]?.id;
+
+      if (newModel && newModel !== model) {
+        setModel(newModel);
+        setIsModelUserSelected(false);
+        // Default variant to first available variant (typically "none") for the new model
+        const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
+        setVariant(newVariants[0]);
+      }
+    }
+  }, [defaultsData?.defaultModel, modelOptions, model, isModelUserSelected]);
+
+  // ---------------------------------------------------------------------------
+  // Profiles
+  // ---------------------------------------------------------------------------
+  const { data: combinedProfilesData } = useCombinedProfiles({
+    organizationId: organizationId ?? '',
+    enabled: !!organizationId,
+  });
+  const { data: personalProfiles } = useProfiles({
+    organizationId: undefined,
+    enabled: !organizationId,
+  });
+
+  const allProfiles = organizationId
+    ? [
+        ...(combinedProfilesData?.orgProfiles ?? []),
+        ...(combinedProfilesData?.personalProfiles ?? []),
+      ]
+    : (personalProfiles ?? []);
+  const effectiveDefaultId = organizationId
+    ? combinedProfilesData?.effectiveDefaultId
+    : personalProfiles?.find(p => p.isDefault)?.id;
+
+  // Auto-select effective default profile on initial load
+  useEffect(() => {
+    if (!hasAutoSelectedDefault && !selectedProfileId && effectiveDefaultId) {
+      setSelectedProfileId(effectiveDefaultId);
+      setHasAutoSelectedDefault(true);
+    } else if (!hasAutoSelectedDefault && allProfiles.length > 0) {
+      setHasAutoSelectedDefault(true);
+    }
+  }, [
+    allProfiles.length,
+    effectiveDefaultId,
+    hasAutoSelectedDefault,
+    selectedProfileId,
+    setSelectedProfileId,
+    setHasAutoSelectedDefault,
+  ]);
+
+  // If a profile is deleted from the list, clear the selection
+  useEffect(() => {
+    if (!selectedProfileId || allProfiles.length === 0) {
+      return;
+    }
+    const stillPresent = allProfiles.some(p => p.id === selectedProfileId);
+    if (!stillPresent) {
+      setSelectedProfileId(null);
+      setProfileConfig(null);
+    }
+  }, [allProfiles, selectedProfileId, setProfileConfig, setSelectedProfileId]);
+
+  // Fetch selected profile data
+  const { data: selectedProfile } = useProfile(selectedProfileId || '', {
+    organizationId,
+    enabled: !!selectedProfileId,
+  });
+
+  // Update profile config atom when profile data is loaded
+  useEffect(() => {
+    if (selectedProfile) {
+      setProfileConfig({
+        vars: selectedProfile.vars.map(v => ({
+          key: v.key,
+          value: v.value,
+          isSecret: v.isSecret,
+        })),
+        commands: selectedProfile.commands
+          .sort((a, b) => a.sequence - b.sequence)
+          .map(c => c.command),
+      });
+    } else {
+      setProfileConfig(null);
+    }
+  }, [selectedProfile, setProfileConfig]);
+
+  const handleProfileSelect = useCallback(
+    (profileId: string | null) => {
+      setSelectedProfileId(profileId);
+    },
+    [setSelectedProfileId]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Repositories (GitHub + GitLab)
+  // ---------------------------------------------------------------------------
+  const {
+    data: githubRepoData,
+    isLoading: isLoadingGitHubRepos,
+    error: githubRepoError,
+  } = useQuery(
+    organizationId
+      ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
+          organizationId,
+          forceRefresh: false,
+        })
+      : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
+          forceRefresh: false,
+        })
+  );
+
+  const {
+    data: gitlabRepoData,
+    isLoading: isLoadingGitLabRepos,
+    error: gitlabRepoError,
+  } = useQuery(
+    organizationId
+      ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
+          organizationId,
+          forceRefresh: false,
+        })
+      : trpc.cloudAgentNext.listGitLabRepositories.queryOptions({
+          forceRefresh: false,
+        })
+  );
+
+  const { data: recentRepoData } = useQuery(
+    trpc.unifiedSessions.recentRepositories.queryOptions({
+      organizationId: organizationId ?? null,
+    })
+  );
+
+  const isLoadingRepos = isLoadingGitHubRepos && isLoadingGitLabRepos;
+
+  const githubRepositories = (githubRepoData?.repositories || []) as Repository[];
+  const gitlabRepositories = (gitlabRepoData?.repositories || []) as Repository[];
+
+  const unifiedRepositories = useMemo<RepositoryOption[]>(() => {
+    const github = githubRepositories.map(repo => ({
+      id: repo.id,
+      fullName: repo.fullName,
+      private: repo.private,
+      platform: 'github' as const,
+    }));
+    const gitlab = gitlabRepositories.map(repo => ({
+      id: repo.id,
+      fullName: repo.fullName,
+      private: repo.private,
+      platform: 'gitlab' as const,
+    }));
+    return [...github, ...gitlab];
+  }, [githubRepositories, gitlabRepositories]);
+
+  const recentRepos = useMemo<RepositoryOption[]>(() => {
+    const recentList = recentRepoData?.repositories;
+    if (!recentList?.length || unifiedRepositories.length === 0) return [];
+
+    const seen = new Set<string>();
+    const result: RepositoryOption[] = [];
+
+    for (const recent of recentList) {
+      const fullName = extractRepoFromGitUrl(recent.gitUrl);
+      if (!fullName || seen.has(fullName)) continue;
+      seen.add(fullName);
+
+      const match = unifiedRepositories.find(r => r.fullName === fullName);
+      if (match) result.push(match);
+    }
+
+    return result;
+  }, [recentRepoData?.repositories, unifiedRepositories]);
+
+  const hasMultiplePlatforms = githubRepositories.length > 0 && gitlabRepositories.length > 0;
+
+  const handleRepoSelect = useCallback(
+    (repoFullName: string) => {
+      setSelectedRepo(repoFullName);
+      const repo = unifiedRepositories.find(r => r.fullName === repoFullName);
+      if (repo?.platform) {
+        setSelectedPlatform(repo.platform);
+      }
+    },
+    [unifiedRepositories]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Auto-select repo from pasted GitHub/GitLab URLs
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (selectedRepo) return;
+
+    for (const url of findAllGitPlatformUrls(prompt)) {
+      const repoName = extractRepoFromGitUrl(url);
+      if (!repoName) continue;
+
+      const match = unifiedRepositories.find(
+        r => r.fullName.toLowerCase() === repoName.toLowerCase()
+      );
+      if (!match) continue;
+
+      setSelectedRepo(match.fullName);
+      const platform = detectGitPlatform(url);
+      if (platform) {
+        setSelectedPlatform(platform);
+      }
+      break;
+    }
+  }, [prompt, selectedRepo, unifiedRepositories]);
+
+  const repoError = githubRepoError || gitlabRepoError;
+
+  const { refresh: refreshGitHubRepositories, isRefreshing: isRefreshingGitHubRepos } =
+    useRefreshRepositories({
+      silent: true,
+      getRefreshQueryOptions: useCallback(
+        () =>
+          organizationId
+            ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
+                organizationId,
+                forceRefresh: true,
+              })
+            : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
+                forceRefresh: true,
+              }),
+        [organizationId, trpc]
+      ),
+      getCacheQueryKey: useCallback(
+        () =>
+          organizationId
+            ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryKey({
+                organizationId,
+                forceRefresh: false,
+              })
+            : trpc.cloudAgentNext.listGitHubRepositories.queryKey({
+                forceRefresh: false,
+              }),
+        [organizationId, trpc]
+      ),
+    });
+
+  const { refresh: refreshGitLabRepositories, isRefreshing: isRefreshingGitLabRepos } =
+    useRefreshRepositories({
+      silent: true,
+      getRefreshQueryOptions: useCallback(
+        () =>
+          organizationId
+            ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
+                organizationId,
+                forceRefresh: true,
+              })
+            : trpc.cloudAgentNext.listGitLabRepositories.queryOptions({
+                forceRefresh: true,
+              }),
+        [organizationId, trpc]
+      ),
+      getCacheQueryKey: useCallback(
+        () =>
+          organizationId
+            ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryKey({
+                organizationId,
+                forceRefresh: false,
+              })
+            : trpc.cloudAgentNext.listGitLabRepositories.queryKey({
+                forceRefresh: false,
+              }),
+        [organizationId, trpc]
+      ),
+    });
+
+  const refreshRepositories = useCallback(async () => {
+    try {
+      await Promise.all([refreshGitHubRepositories(), refreshGitLabRepositories()]);
+      toast.success('Repositories refreshed');
+    } catch (error) {
+      toast.error('Failed to refresh repositories', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }, [refreshGitHubRepositories, refreshGitLabRepositories]);
+
+  const isRefreshingRepos = isRefreshingGitHubRepos || isRefreshingGitLabRepos;
+
+  // ---------------------------------------------------------------------------
+  // Integration missing check
+  // ---------------------------------------------------------------------------
+  const githubIntegrationMissing =
+    !isLoadingGitHubRepos && githubRepoData?.integrationInstalled === false;
+  const gitlabIntegrationMissing =
+    !isLoadingGitLabRepos && gitlabRepoData?.integrationInstalled === false;
+  const isIntegrationMissing = githubIntegrationMissing && gitlabIntegrationMissing;
+
+  // ---------------------------------------------------------------------------
+  // Repo popover state (must be declared before early returns to satisfy Rules of Hooks)
+  // ---------------------------------------------------------------------------
+  const [repoPopoverOpen, setRepoPopoverOpen] = useState(false);
+
+  const recentFullNames = useMemo(() => new Set(recentRepos.map(r => r.fullName)), [recentRepos]);
+  const githubRepos = unifiedRepositories.filter(
+    r => r.platform === 'github' && !recentFullNames.has(r.fullName)
+  );
+  const gitlabRepos = unifiedRepositories.filter(
+    r => r.platform === 'gitlab' && !recentFullNames.has(r.fullName)
+  );
+  const otherRepos = unifiedRepositories.filter(
+    r => !r.platform && !recentFullNames.has(r.fullName)
+  );
+  const filteredUnifiedRepos = unifiedRepositories.filter(r => !recentFullNames.has(r.fullName));
+
+  const handleRepoPillSelect = useCallback(
+    (fullName: string) => {
+      handleRepoSelect(fullName);
+      setRepoPopoverOpen(false);
+    },
+    [handleRepoSelect]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Submit
+  // ---------------------------------------------------------------------------
+  const isFormValid =
+    prompt.trim().length > 0 &&
+    selectedRepo.length > 0 &&
+    model.length > 0 &&
+    !isPreparing &&
+    !hasInsufficientBalance;
+
+  const handleStartSession = useCallback(async () => {
+    if (!prompt.trim() || !selectedRepo) {
+      return;
+    }
+
+    setIsPreparing(true);
+
+    try {
+      const baseInput = {
+        prompt: prompt.trim(),
+        mode,
+        model,
+        variant,
+        envVars: Object.keys(manualEnvVars).length > 0 ? manualEnvVars : undefined,
+        setupCommands: manualSetupCommands.length > 0 ? manualSetupCommands : undefined,
+        profileName: selectedProfile?.name,
+        autoCommit: true,
+        autoInitiate: true,
+      };
+      let result: { kiloSessionId: string; cloudAgentSessionId: string };
+
+      if (organizationId) {
+        if (selectedPlatform === 'gitlab') {
+          result = await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
+            ...baseInput,
+            gitlabProject: selectedRepo,
+            organizationId,
+          });
+        } else {
+          result = await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
+            ...baseInput,
+            githubRepo: selectedRepo,
+            organizationId,
+          });
+        }
+      } else {
+        if (selectedPlatform === 'gitlab') {
+          result = await trpcClient.cloudAgentNext.prepareSession.mutate({
+            ...baseInput,
+            gitlabProject: selectedRepo,
+          });
+        } else {
+          result = await trpcClient.cloudAgentNext.prepareSession.mutate({
+            ...baseInput,
+            githubRepo: selectedRepo,
+          });
+        }
+      }
+
+      void queryClient.invalidateQueries({
+        queryKey: trpc.unifiedSessions.list.queryKey({
+          limit: 3,
+          createdOnPlatform: 'cloud-agent',
+          orderBy: 'updated_at',
+          organizationId: organizationId ?? null,
+        }),
+      });
+
+      const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
+      router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);
+    } catch (error) {
+      console.error('Failed to prepare session:', error);
+      toast.error('Failed to create session. Please try again.');
+    } finally {
+      setIsPreparing(false);
+    }
+  }, [
+    manualEnvVars,
+    manualSetupCommands,
+    model,
+    mode,
+    organizationId,
+    prompt,
+    queryClient,
+    router,
+    selectedPlatform,
+    selectedRepo,
+    selectedProfile,
+    trpc.unifiedSessions.list,
+    trpcClient,
+    variant,
+  ]);
+
+  // ---------------------------------------------------------------------------
+  // Textarea auto-resize
+  // ---------------------------------------------------------------------------
+  const resizeTextarea = useCallback(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = `${ta.scrollHeight}px`;
+  }, []);
+
+  const handlePromptChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setPrompt(e.target.value);
+      resizeTextarea();
+    },
+    [resizeTextarea]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        if (isFormValid) {
+          void handleStartSession();
+        }
+      }
+    },
+    [isFormValid, handleStartSession]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Integration missing view
+  // ---------------------------------------------------------------------------
+  if (isIntegrationMissing) {
+    const integrationsPath = organizationId
+      ? `/organizations/${organizationId}/integrations`
+      : '/integrations';
+    const integrationMessage =
+      githubRepoData?.errorMessage ||
+      gitlabRepoData?.errorMessage ||
+      'Connect a GitHub or GitLab integration to select a repository for the cloud agent.';
+
+    return (
+      <div className="flex h-full flex-col items-center justify-end p-4 pb-8">
+        <div className="w-full max-w-2xl rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-6">
+          <div className="mb-3 flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-amber-400" />
+            <h2 className="text-lg font-semibold">Connect GitHub or GitLab to start a session</h2>
+          </div>
+          <p className="text-muted-foreground mb-4 text-sm">{integrationMessage}</p>
+          <div className="flex flex-wrap gap-3">
+            <LinkButton href={integrationsPath} variant="primary" size="md">
+              Open integrations
+            </LinkButton>
+            <UIButton variant="outline" onClick={() => router.refresh()}>
+              Refresh
+            </UIButton>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+  return (
+    <div className="flex h-full flex-col items-center px-4">
+      <div className="flex-1" />
+      <div className="w-full max-w-2xl space-y-4">
+        {/* Insufficient balance banner */}
+        {hasInsufficientBalance && eligibilityData && (
+          <InsufficientBalanceBanner
+            balance={eligibilityData.balance}
+            organizationId={organizationId}
+            content={{ type: 'productName', productName: 'Cloud Agent' }}
+          />
+        )}
+
+        {/* Textarea + model toolbar container */}
+        <div
+          className={cn(
+            'overflow-hidden bg-muted/30 focus-within:ring-ring rounded-lg border focus-within:ring-2',
+            isPreparing && 'pointer-events-none opacity-60'
+          )}
+        >
+          <textarea
+            ref={textareaRef}
+            className="w-full resize-none border-0 bg-transparent p-4 pb-2 text-sm focus:ring-0 focus:outline-none"
+            placeholder="What would you like to do?"
+            rows={5}
+            value={prompt}
+            onChange={handlePromptChange}
+            onKeyDown={handleKeyDown}
+            disabled={isPreparing}
+          />
+          <div className="flex items-center gap-2 px-3 py-1.5">
+            {/* Mode → Model → Variant */}
+            <ModeCombobox<AgentMode>
+              value={mode}
+              onValueChange={setMode}
+              options={NEXT_MODE_OPTIONS}
+              variant="compact"
+              disabled={isPreparing}
+            />
+            <ModelCombobox
+              models={modelOptions}
+              value={model}
+              onValueChange={newModel => {
+                setModel(newModel);
+                setIsModelUserSelected(true);
+                // Reset variant to first available (typically "none") if current is invalid for new model
+                const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
+                if (!variant || !newVariants.includes(variant)) {
+                  setVariant(newVariants[0]);
+                }
+              }}
+              isLoading={!modelsData}
+              variant="compact"
+              disabled={isPreparing}
+            />
+            {availableVariants.length > 0 && (
+              <VariantCombobox
+                variants={availableVariants}
+                value={variant}
+                onValueChange={setVariant}
+                disabled={isPreparing}
+              />
+            )}
+
+            <div className="flex-1" />
+
+            {isPreparing && <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />}
+            <UIButton
+              type="button"
+              variant="primary"
+              size="icon"
+              onClick={() => void handleStartSession()}
+              disabled={!isFormValid || isPreparing}
+              className="h-8 w-8 rounded-lg"
+            >
+              <Send className="h-4 w-4" />
+            </UIButton>
+          </div>
+        </div>
+
+        {/* Repo + Settings row (outside prompt box) */}
+        <div className="flex items-center justify-between">
+          {/* Repo — bottom left */}
+          <Popover open={repoPopoverOpen} onOpenChange={setRepoPopoverOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  'text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm',
+                  selectedRepo && 'text-foreground'
+                )}
+                disabled={isPreparing}
+              >
+                <FolderGit2 className="h-3.5 w-3.5" />
+                <span className="max-w-[16rem] truncate">{selectedRepo || 'Repository'}</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="start">
+              {isLoadingRepos ? (
+                <div className="text-muted-foreground p-4 text-center text-sm">
+                  Loading repositories...
+                </div>
+              ) : repoError ? (
+                <div className="p-4 text-center text-sm text-red-400">
+                  Failed to load repositories
+                </div>
+              ) : unifiedRepositories.length === 0 ? (
+                <div className="text-muted-foreground p-4 text-center text-sm">
+                  No repositories found
+                </div>
+              ) : (
+                <Command>
+                  <div className="flex items-center border-b pr-2 [&_[cmdk-input-wrapper]]:flex-1 [&_[cmdk-input-wrapper]]:border-b-0">
+                    <CommandInput placeholder="Search repositories..." />
+                    <button
+                      type="button"
+                      onClick={() => void refreshRepositories()}
+                      disabled={isRefreshingRepos}
+                      className="text-muted-foreground hover:text-foreground shrink-0 rounded-sm p-1 disabled:opacity-50"
+                      title="Refresh repositories"
+                    >
+                      <RefreshCw
+                        className={cn('h-3.5 w-3.5', isRefreshingRepos && 'animate-spin')}
+                      />
+                    </button>
+                  </div>
+                  <CommandEmpty>No repositories match your search</CommandEmpty>
+                  <CommandList className="max-h-64 overflow-auto">
+                    {recentRepos.length > 0 && (
+                      <CommandGroup heading="Recently used">
+                        {recentRepos.map(repo => (
+                          <RepoCommandItem
+                            key={`recent-${repo.id}`}
+                            repo={repo}
+                            isSelected={repo.fullName === selectedRepo}
+                            onSelect={handleRepoPillSelect}
+                          />
+                        ))}
+                      </CommandGroup>
+                    )}
+                    {hasMultiplePlatforms ? (
+                      <>
+                        {githubRepos.length > 0 && (
+                          <CommandGroup heading="GitHub">
+                            {githubRepos.map(repo => (
+                              <RepoCommandItem
+                                key={repo.id}
+                                repo={repo}
+                                isSelected={repo.fullName === selectedRepo}
+                                onSelect={handleRepoPillSelect}
+                              />
+                            ))}
+                          </CommandGroup>
+                        )}
+                        {gitlabRepos.length > 0 && (
+                          <CommandGroup heading="GitLab">
+                            {gitlabRepos.map(repo => (
+                              <RepoCommandItem
+                                key={repo.id}
+                                repo={repo}
+                                isSelected={repo.fullName === selectedRepo}
+                                onSelect={handleRepoPillSelect}
+                              />
+                            ))}
+                          </CommandGroup>
+                        )}
+                        {otherRepos.length > 0 && (
+                          <CommandGroup heading="Other">
+                            {otherRepos.map(repo => (
+                              <RepoCommandItem
+                                key={repo.id}
+                                repo={repo}
+                                isSelected={repo.fullName === selectedRepo}
+                                onSelect={handleRepoPillSelect}
+                              />
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </>
+                    ) : (
+                      <CommandGroup>
+                        {filteredUnifiedRepos.map(repo => (
+                          <RepoCommandItem
+                            key={repo.id}
+                            repo={repo}
+                            isSelected={repo.fullName === selectedRepo}
+                            onSelect={handleRepoPillSelect}
+                          />
+                        ))}
+                      </CommandGroup>
+                    )}
+                  </CommandList>
+                </Command>
+              )}
+            </PopoverContent>
+          </Popover>
+
+          {/* Settings — bottom right */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
+              >
+                <Settings className="h-3.5 w-3.5" />
+                Settings
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[28rem] p-0" align="end" side="bottom" sideOffset={8}>
+              <div className="px-4 py-3">
+                <p className="text-sm font-medium">Advanced settings</p>
+              </div>
+              <Separator />
+              <div className="p-4">
+                <AdvancedConfig
+                  organizationId={organizationId}
+                  selectedProfileId={selectedProfileId}
+                  onProfileSelect={handleProfileSelect}
+                  manualEnvVars={manualEnvVars}
+                  manualSetupCommands={manualSetupCommands}
+                  effectiveEnvVars={effectiveEnvVars}
+                  effectiveSetupCommands={effectiveSetupCommands}
+                  onManualEnvVarsChange={setManualEnvVars}
+                  onManualSetupCommandsChange={setManualSetupCommands}
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+      <div className="flex-[1.5]" />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Internal sub-component for repo items in the Command list
+// ---------------------------------------------------------------------------
+
+function RepoCommandItem({
+  repo,
+  isSelected,
+  onSelect,
+}: {
+  repo: RepositoryOption;
+  isSelected: boolean;
+  onSelect: (fullName: string) => void;
+}) {
+  return (
+    <CommandItem value={repo.fullName} onSelect={onSelect} className="flex items-center gap-2">
+      {repo.private ? (
+        <Lock className="size-3.5 text-yellow-500" />
+      ) : (
+        <Unlock className="size-3.5 text-gray-500" />
+      )}
+      <span className="truncate">{repo.fullName}</span>
+      <Check className={cn('ml-auto h-4 w-4', isSelected ? 'opacity-100' : 'opacity-0')} />
+    </CommandItem>
+  );
+}

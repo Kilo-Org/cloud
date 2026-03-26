@@ -8,7 +8,7 @@
     "preview": "storybook preview",
     "chromatic": "chromatic --exit-zero-on-changes",
     "generate-screenshot-stories": "node scripts/generate-playwright-screenshot-stories.js",
-    "typecheck": "tsgo --noEmit --incremental false",
+    "typecheck": "tsgo --noEmit",
     "clean": "rimraf storybook-static .turbo stories/generated public/screenshots"
   },
   "dependencies": {

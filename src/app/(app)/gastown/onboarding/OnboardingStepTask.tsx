@@ -52,6 +52,18 @@ export function OnboardingStepTask() {
     })
   );
 
+  const createOrgTown = useMutation(
+    trpc.gastown.createOrgTown.mutationOptions({
+      onSuccess: () => {
+        if (state.orgId) {
+          void queryClient.invalidateQueries({
+            queryKey: trpc.gastown.listOrgTowns.queryKey({ organizationId: state.orgId }),
+          });
+        }
+      },
+    })
+  );
+
   const createRig = useMutation(trpc.gastown.createRig.mutationOptions({}));
 
   const updateConfig = useMutation(trpc.gastown.updateTownConfig.mutationOptions({}));
@@ -60,9 +72,14 @@ export function OnboardingStepTask() {
     if (!state.firstTask.trim() || !state.repo || !state.townName.trim()) return;
 
     try {
-      // Step 1: Create the town
+      // Step 1: Create the town (org-scoped or personal)
       setPhase('creating-town');
-      const town = await createTown.mutateAsync({ name: state.townName.trim() });
+      const town = state.orgId
+        ? await createOrgTown.mutateAsync({
+            organizationId: state.orgId,
+            name: state.townName.trim(),
+          })
+        : await createTown.mutateAsync({ name: state.townName.trim() });
       const townId = town.id;
 
       // Step 2: Create the rig (non-blocking — if it fails, user can add later)
@@ -101,9 +118,12 @@ export function OnboardingStepTask() {
         // localStorage may be unavailable; the message just won't be auto-sent
       }
 
-      // Step 5: Redirect to the new town
+      // Step 5: Redirect to the new town (org-scoped path when applicable)
       setPhase('redirecting');
-      router.push(`/gastown/${townId}`);
+      const townPath = state.orgId
+        ? `/organizations/${state.orgId}/gastown/${townId}`
+        : `/gastown/${townId}`;
+      router.push(townPath);
     } catch (townErr) {
       // Town creation is the critical path — if it fails, stay on the wizard
       setPhase('idle');

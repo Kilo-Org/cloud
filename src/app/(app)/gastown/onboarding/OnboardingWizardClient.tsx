@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -89,6 +90,8 @@ function StepIndicator({ currentIndex }: { currentIndex: number }) {
 }
 
 function WizardContent() {
+  const searchParams = useSearchParams();
+  const orgId = searchParams.get('orgId');
   const [currentStepKey, setCurrentStepKey] = useState<StepKey>('name');
 
   const currentIndex = STEPS.findIndex(s => s.key === currentStepKey);
@@ -111,7 +114,7 @@ function WizardContent() {
   const isLastStep = currentIndex === STEPS.length - 1;
 
   return (
-    <OnboardingProvider goNext={goNext}>
+    <OnboardingProvider goNext={goNext} orgId={orgId}>
       <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center px-4 py-8">
         {/* Header */}
         <div className="mb-2 text-center">

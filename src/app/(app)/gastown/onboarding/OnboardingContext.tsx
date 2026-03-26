@@ -26,6 +26,8 @@ type OnboardingState = {
   modelPreset: ModelPreset;
   customModels: CustomModels;
   firstTask: string;
+  /** When set, the wizard creates an org-scoped town via createOrgTown. */
+  orgId: string | null;
 };
 
 type OnboardingContextValue = {
@@ -47,6 +49,7 @@ const defaultState: OnboardingState = {
   modelPreset: 'balanced',
   customModels: {},
   firstTask: '',
+  orgId: null,
 };
 
 const noop = () => {};
@@ -54,11 +57,16 @@ const noop = () => {};
 export function OnboardingProvider({
   children,
   goNext = noop,
+  orgId = null,
 }: {
   children: ReactNode;
   goNext?: () => void;
+  orgId?: string | null;
 }) {
-  const [state, setState] = useState<OnboardingState>(defaultState);
+  const [state, setState] = useState<OnboardingState>(() => ({
+    ...defaultState,
+    orgId,
+  }));
 
   const setTownName = useCallback(
     (townName: string, setByUser?: boolean) =>

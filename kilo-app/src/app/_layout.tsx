@@ -12,7 +12,9 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { Toaster } from 'sonner-native';
 
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
+import { ForceUpgradeScreen } from '@/components/force-upgrade-screen';
 import { ContextProvider, useAppContext } from '@/lib/context/context-context';
+import { useForceUpgrade } from '@/lib/hooks/use-force-upgrade';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
@@ -56,13 +58,14 @@ function RootLayoutNav() {
   const { context, isLoading: contextLoading } = useAppContext();
   const segments = useSegments();
   const router = useRouter();
+  const { blocked, isChecking: upgradeChecking } = useForceUpgrade();
 
-  const isLoading = authLoading || contextLoading;
+  const isLoading = authLoading || contextLoading || upgradeChecking;
   const inAuthGroup = segments[0] === '(auth)';
   const inContextGroup = segments[0] === '(context)';
 
   useEffect(() => {
-    if (isLoading) {
+    if (isLoading || blocked) {
       return;
     }
 
@@ -83,7 +86,7 @@ function RootLayoutNav() {
     } else {
       void SplashScreen.hideAsync();
     }
-  }, [token, context, isLoading, inAuthGroup, inContextGroup, router]);
+  }, [token, context, isLoading, blocked, inAuthGroup, inContextGroup, router]);
 
   const needsRedirect =
     !isLoading &&
@@ -91,7 +94,15 @@ function RootLayoutNav() {
       (token != null && !context && !inContextGroup) ||
       (token != null && context != null && (inAuthGroup || inContextGroup)));
 
-  if (isLoading || needsRedirect) {
+  if (isLoading) {
+    return null;
+  }
+
+  if (blocked) {
+    return <ForceUpgradeScreen />;
+  }
+
+  if (needsRedirect) {
     return null;
   }
 

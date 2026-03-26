@@ -19,15 +19,17 @@ export function useForceUpgrade() {
 
   // Refetch when app comes to foreground
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (/inactive|background/.exec(appState.current) && nextAppState === 'active') {
         void queryClient.invalidateQueries({
           queryKey: trpc.appConfig.getMinVersion.queryKey(),
         });
       }
       appState.current = nextAppState;
     });
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+    };
   }, [queryClient, trpc]);
 
   const blocked = data != null && APP_BUILD < data.minBuild;

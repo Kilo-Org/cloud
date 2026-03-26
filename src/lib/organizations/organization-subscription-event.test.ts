@@ -1254,7 +1254,6 @@ describe('Organization seat count tracking', () => {
       .then(rows => rows[0]);
     expect(updatedOrg.seat_count).toBe(15);
   });
-
 });
 
 describe('Organization plan type updates from subscription', () => {

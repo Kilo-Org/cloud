@@ -1,0 +1,2275 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Monthly Billing — UI Prototype Scenes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+      /*
+       * This prototype mimics the existing app's Tailwind dark theme + shadcn
+       * component patterns. Classes are written longhand to avoid needing a
+       * Tailwind build step — but they follow the same color tokens and
+       * spacing conventions used in the real components.
+       */
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        /*
+         * Mapped from the app's globals.css oklch values:
+         *   --background: oklch(0.145 0 0)  ≈ #0f0f11
+         *   --card:       oklch(0.205 0 0)  ≈ #1a1a1e  (lighter than bg)
+         *   --muted:      oklch(0.269 0 0)  ≈ #262628
+         *   --muted-fg:   oklch(0.708 0 0)  ≈ #a3a3a3
+         *   --border:     oklch(1 0 0 / 10%) = rgba(255,255,255,0.1)
+         *   --radius:     0.625rem
+         */
+        --background: #0f0f11;
+        --foreground: #fafafa;
+        --card: #1a1a1e;
+        --card-foreground: #fafafa;
+        --muted: #262628;
+        --muted-foreground: #a3a3a3;
+        --border: rgba(255, 255, 255, 0.1);
+        --input: rgba(255, 255, 255, 0.15);
+        --ring: #3b82f6;
+        --radius: 0.625rem;
+      }
+
+      body {
+        font-family:
+          'Inter',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        background: var(--background);
+        color: var(--foreground);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* -- Scene wrapper ----------------------------- */
+      .page-title {
+        text-align: center;
+        padding: 24px 16px 8px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #71717a;
+      }
+      .scene {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 24px 16px 64px;
+      }
+      .scene + .scene {
+        border-top: 1px solid var(--border);
+      }
+      .scene-label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #71717a;
+        margin-bottom: 4px;
+      }
+      .scene-context {
+        font-size: 12px;
+        color: #71717a;
+        line-height: 1.5;
+        margin-bottom: 16px;
+        font-style: italic;
+      }
+
+      /* -- shadcn Card -------------------------------- */
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      }
+      .card-header {
+        padding: 24px 24px 0;
+      }
+      .card-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1.3;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .card-description {
+        font-size: 0.875rem;
+        color: var(--muted-foreground);
+        margin-top: 4px;
+      }
+      .card-content {
+        padding: 16px 24px 24px;
+      }
+
+      /* left border accent (SubscriptionOverviewCard) */
+      .card-border-green {
+        border-left: 4px solid #16a34a;
+      }
+      .card-border-red {
+        border-left: 4px solid #dc2626;
+      }
+
+      /* -- shadcn Dialog (simulated inline) ---------- */
+      .dialog-backdrop {
+        background: rgba(0, 0, 0, 0.7);
+        border-radius: var(--radius);
+        padding: 32px 24px;
+      }
+      .dialog {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+        max-width: 48rem; /* sm:max-w-3xl */
+        margin: 0 auto;
+      }
+      .dialog-sm {
+        max-width: 28rem;
+      } /* sm:max-w-md */
+      .dialog-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #fff;
+      }
+      .dialog-title-sm {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .dialog-description {
+        font-size: 0.875rem;
+        color: var(--muted-foreground);
+        margin-top: 8px;
+      }
+      .dialog-footer {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        margin-top: 20px;
+      }
+
+      /* -- Buttons (shadcn Button variants) ---------- */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-family: inherit;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition:
+          background 150ms,
+          opacity 150ms;
+        padding: 8px 16px;
+        border: none;
+        line-height: 1.4;
+        white-space: nowrap;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: #2563eb;
+        color: #fff;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: #1d4ed8;
+      }
+      .btn-outline {
+        background: transparent;
+        color: var(--foreground);
+        border: 1px solid var(--border);
+        padding: 7px 15px;
+      }
+      .btn-outline:hover:not(:disabled) {
+        background: var(--muted);
+      }
+      .btn-destructive {
+        background: #dc2626;
+        color: #fff;
+      }
+      .btn-destructive:hover:not(:disabled) {
+        background: #b91c1c;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--muted-foreground);
+        padding: 8px 12px;
+        border: none;
+      }
+      .btn-ghost:hover {
+        color: var(--foreground);
+      }
+      .btn-lg {
+        padding: 16px 24px;
+        font-size: 1.125rem;
+        font-weight: 600;
+      }
+      .btn-full {
+        width: 100%;
+      }
+      .btn-green-outline {
+        background: transparent;
+        color: #4ade80;
+        border: 1px solid #166534;
+        padding: 7px 15px;
+      }
+      .btn-green-outline:hover:not(:disabled) {
+        background: #052e16;
+        color: #86efac;
+      }
+      .btn-red-outline {
+        background: transparent;
+        color: #ef4444; /* text-destructive ≈ red-500 */
+        border: 1px solid #991b1b;
+        padding: 7px 15px; /* border-red-800 */
+      }
+      .btn-red-outline:hover:not(:disabled) {
+        background: #450a0a;
+        color: #f87171;
+      }
+      /* hover:bg-red-950, hover:text-red-400 */
+
+      /* -- Badge (shadcn Badge) ----------------------- */
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        padding: 2px 10px;
+        border-radius: 9999px;
+      }
+      .badge-green {
+        background: #16a34a;
+        color: #fff;
+      }
+      .badge-orange {
+        background: #ea580c;
+        color: #fff;
+      }
+      .badge-gray {
+        background: #52525b;
+        color: #fff;
+      }
+      .badge-outline {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--muted-foreground);
+      }
+      .badge-amber {
+        background: rgba(251, 191, 36, 0.15);
+        color: #fbbf24;
+        border: 1px solid rgba(251, 191, 36, 0.3);
+      }
+      /* SubscriptionStatusBadge: Badge variant="secondary-outline" + rounded-md */
+      .badge-status {
+        background: var(--muted);
+        color: var(--foreground);
+        border: 1px solid var(--border);
+        border-radius: 0.375rem; /* rounded-md */
+        padding: 2px 8px;
+      }
+      .badge-status svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      /* -- Plan cards (from PlanCard.tsx) ------------- */
+      .plan-cards {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .plan-card {
+        position: relative;
+        width: 336px; /* w-84 */
+        border: 2px solid #3f3f46;
+        border-radius: var(--radius); /* border-gray-700 (zinc-700) */
+        padding: 24px;
+        transition: all 200ms;
+        cursor: pointer;
+        background: #18181b; /* bg-gray-900 (zinc-900) */
+      }
+      .plan-card:hover {
+        border-color: #52525b;
+      } /* hover:border-gray-600 (zinc-600) */
+      .plan-card.selected {
+        border-color: #3b82f6;
+        background: rgba(59, 130, 246, 0.08);
+        opacity: 1;
+      }
+      .plan-card:not(.selected) {
+        opacity: 0.5;
+      }
+      .plan-card-badge {
+        position: absolute;
+        top: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+      .plan-card-name {
+        text-align: center;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 8px;
+      }
+      .plan-card-price-block {
+        text-align: center;
+        margin-bottom: 24px;
+      }
+      .plan-card-price {
+        font-size: 2.25rem;
+        font-weight: 700;
+        color: #fff;
+      }
+      .plan-card-price span {
+        font-size: 1.125rem;
+        font-weight: 400;
+        color: #a1a1aa;
+      }
+      .plan-card-billing-note {
+        font-size: 0.875rem;
+        color: #a1a1aa;
+        margin-top: 4px;
+      }
+      .plan-card-features {
+        list-style: none;
+        margin-bottom: 24px;
+      }
+      .plan-card-features li {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        font-size: 0.875rem;
+        color: #d4d4d8;
+        padding: 4px 0;
+      }
+      .plan-card-features li svg {
+        color: #22c55e;
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+      .plan-card-selected-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #60a5fa;
+      }
+
+      /* -- Billing cycle toggle (NEW for monthly) ---- */
+      .cycle-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      .cycle-pills {
+        display: inline-flex;
+        background: var(--muted);
+        border-radius: var(--radius);
+        padding: 4px;
+      }
+      .cycle-pill {
+        padding: 6px 20px;
+        border-radius: calc(var(--radius) - 2px);
+        font-size: 0.875rem;
+        font-weight: 500;
+        border: none;
+        background: transparent;
+        color: var(--muted-foreground);
+        cursor: pointer;
+        transition: all 150ms;
+      }
+      .cycle-pill:hover {
+        color: var(--foreground);
+      }
+      .cycle-pill.active {
+        background: #2563eb;
+        color: #fff;
+      }
+      .cycle-save-badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #4ade80;
+        background: rgba(74, 222, 128, 0.1);
+        border: 1px solid rgba(74, 222, 128, 0.3);
+        border-radius: 9999px;
+        padding: 2px 10px;
+        transition: opacity 150ms;
+      }
+
+      /* -- 4-col subscription stats grid -------------- */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 24px;
+      }
+      .stats-grid-2 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .stat-block {
+      }
+      .stat-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.875rem;
+        color: var(--muted-foreground);
+        margin-bottom: 8px;
+        white-space: nowrap;
+      }
+      .stat-label svg {
+        width: 16px;
+        height: 16px;
+      }
+      .stat-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--foreground);
+      }
+      .stat-sub {
+        font-size: 0.875rem;
+        color: var(--muted-foreground);
+        margin-top: 4px;
+      }
+
+      /*
+       * Alert banners (bottom of card)
+       * The real code uses LIGHT backgrounds (amber-50, blue-50, red-50)
+       * with DARK text — creating high-contrast areas within the dark UI.
+       */
+      .card-alert {
+        border-top: 1px solid var(--border);
+        padding: 16px 24px;
+        border-radius: 0 0 var(--radius) var(--radius);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .card-alert-amber {
+        background: #fffbeb;
+      } /* amber-50 */
+      .card-alert-blue {
+        background: #eff6ff;
+      } /* blue-50 */
+      .card-alert-red {
+        background: #fef2f2;
+      } /* red-50 */
+      .card-alert-inner {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .card-alert-title {
+        font-size: 0.875rem;
+        font-weight: 500;
+      }
+      .card-alert-text {
+        font-size: 0.875rem;
+      }
+      /* Dark text colors for light alert backgrounds */
+      .text-amber-600 {
+        color: #d97706;
+      }
+      .text-amber-700 {
+        color: #b45309;
+      }
+      .text-amber-800 {
+        color: #92400e;
+      }
+      .text-red-600 {
+        color: #dc2626;
+      }
+      .text-red-800 {
+        color: #991b1b;
+      }
+      .text-blue-600 {
+        color: #2563eb;
+      }
+      .text-blue-800 {
+        color: #1e40af;
+      }
+      .text-green-500 {
+        color: #22c55e;
+      }
+
+      /* -- Seat change modal (from SeatChangeModal) --- */
+      .field-group {
+        margin-bottom: 16px;
+      }
+      .field-label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--foreground);
+        margin-bottom: 4px;
+      }
+      .field-value {
+        font-size: 0.875rem;
+        color: var(--muted-foreground);
+      }
+      .seat-input-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 4px;
+      }
+      .seat-btn {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--foreground);
+        cursor: pointer;
+        font-size: 1rem;
+        transition: background 150ms;
+      }
+      .seat-btn:hover {
+        background: var(--muted);
+      }
+      .seat-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .seat-input {
+        flex: 1;
+        text-align: center;
+        padding: 8px;
+        font-size: 1rem;
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--foreground);
+        font-family: inherit;
+      }
+      .seat-input:focus {
+        outline: 2px solid var(--ring);
+        outline-offset: -1px;
+      }
+
+      /* -- Cost preview box (from SeatChangeModal: bg-muted/50) */
+      .cost-preview {
+        background: rgba(38, 38, 40, 0.5); /* --muted at 50% opacity */
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px;
+      }
+      .cost-preview-title {
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-bottom: 8px;
+      }
+      .cost-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.875rem;
+        padding: 2px 0;
+      }
+      .cost-row-bold {
+        font-weight: 500;
+      }
+
+      /*
+       * Info/warning boxes — match SeatChangeModal patterns:
+       *   Upgrade:   border-blue-200 bg-blue-50 text-blue-800
+       *   Downgrade: Alert variant="warning" (amber tones)
+       * These use LIGHT backgrounds with DARK text, same as alert bars.
+       */
+      .info-box {
+        padding: 8px 12px;
+        border-radius: var(--radius);
+        font-size: 0.75rem;
+        margin-top: 8px;
+        line-height: 1.5;
+      }
+      .info-box-blue {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1e40af;
+        /* bg-blue-50, border-blue-200, text-blue-800 */
+      }
+      .info-box-amber {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        color: #92400e;
+        /* bg-amber-50, border-amber-200, text-amber-800 */
+      }
+      .info-box-red {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+        /* bg-red-50, border-red-200, text-red-800 */
+      }
+      .info-box strong {
+        font-weight: 600;
+      }
+
+      /* -- Pending cycle change banner (NEW) ---------- */
+      .pending-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px;
+        border-radius: var(--radius);
+        background: rgba(251, 191, 36, 0.08);
+        border: 1px solid rgba(251, 191, 36, 0.2);
+        margin-bottom: 16px;
+      }
+      .pending-banner svg {
+        flex-shrink: 0;
+        color: #fbbf24;
+        margin-top: 2px;
+      }
+      .pending-banner-text {
+        font-size: 0.875rem;
+        color: #fcd34d;
+        line-height: 1.5;
+      }
+      .pending-banner-text strong {
+        font-weight: 600;
+      }
+      .pending-banner-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      /* -- Toast -------------------------------------- */
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--card);
+        border: 1px solid rgba(74, 222, 128, 0.3);
+        color: #86efac;
+        padding: 12px 20px;
+        border-radius: var(--radius);
+        font-size: 0.875rem;
+        font-weight: 500;
+        z-index: 2000;
+        display: none;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      }
+      .toast.show {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* -- Modal overlay ------------------------------ */
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .modal-overlay.open {
+        display: flex;
+      }
+
+      /* -- Cycle change comparison (before → after) ---- */
+      .cycle-comparison {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        margin-bottom: 12px;
+      }
+      .cycle-comparison-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+      }
+      .cycle-comparison-row + .cycle-comparison-row {
+        border-top: 1px solid var(--border);
+      }
+      .cycle-comparison-row.from {
+        background: transparent;
+      }
+      .cycle-comparison-row.to {
+        background: rgba(59, 130, 246, 0.06);
+      }
+      .cycle-comparison-label {
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        width: 40px;
+        flex-shrink: 0;
+      }
+      .cycle-comparison-label-muted {
+        color: var(--muted-foreground);
+      }
+      .cycle-comparison-label-blue {
+        color: #60a5fa;
+      }
+      .cycle-comparison-info {
+        flex: 1;
+      }
+      .cycle-comparison-name {
+        font-size: 0.875rem;
+        font-weight: 600;
+      }
+      .cycle-comparison-detail {
+        font-size: 0.75rem;
+        color: var(--muted-foreground);
+        margin-top: 2px;
+      }
+      .cycle-comparison-arrow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        color: var(--muted-foreground);
+      }
+      .cycle-comparison-savings {
+        color: #4ade80;
+        font-weight: 500;
+        font-size: 0.75rem;
+        margin-top: 2px;
+      }
+
+      /* -- Quick actions card (from SubscriptionQuickActions) */
+      .quick-actions-card .card-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      .quick-actions-card .btn {
+        width: 256px;
+        justify-content: center;
+      }
+
+      /* -- Credit options grid (from UpgradeTrialDialog) */
+      .credit-options {
+        border: 1px solid #3f3f46;
+        background: rgba(31, 41, 55, 0.5); /* border-gray-700 bg-gray-800/50 */
+        border-radius: var(--radius);
+        padding: 16px;
+      }
+      .credit-options-title {
+        text-align: center;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 12px;
+      }
+      .credit-options-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+      .credit-option {
+        border: 1px solid #4b5563;
+        background: rgba(17, 24, 39, 0.5);
+        border-radius: var(--radius);
+        padding: 12px;
+      }
+      .credit-option h4 {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #fff;
+      }
+      .credit-option p {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        margin-top: 4px;
+      }
+      .credit-option a {
+        color: #60a5fa;
+        text-decoration: none;
+      }
+      .credit-option a:hover {
+        text-decoration: underline;
+      }
+
+      /* -- Validation error (from SeatChangeModal) ---- */
+      .validation-error {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.875rem;
+        color: #dc2626;
+        margin-top: 4px;
+      }
+
+      /* -- Annotation note (cycle change info box) ---- */
+      .annotation {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px;
+        border-radius: var(--radius);
+        margin-top: 12px;
+      }
+      .annotation svg {
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+      .annotation-blue {
+        background: rgba(59, 130, 246, 0.08);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+      }
+      .annotation-amber {
+        background: rgba(251, 191, 36, 0.08);
+        border: 1px solid rgba(251, 191, 36, 0.2);
+      }
+      .annotation-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--foreground);
+      }
+      .annotation-text {
+        font-size: 0.75rem;
+        color: var(--muted-foreground);
+        margin-top: 2px;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <p class="page-title">Monthly Billing Option &mdash; UI Prototype Scenes</p>
+
+    <!-- ===============================================
+     SCENE 1: UpgradeTrialDialog — with billing cycle toggle
+     Matches the existing UpgradeTrialDialog.tsx layout:
+     header → plan cards → purchase button → credit options → support
+     NEW: billing cycle toggle between header and plan cards
+     =============================================== -->
+    <div class="scene" id="scene-1">
+      <p class="scene-label">Scene 1 &mdash; Upgrade Trial Dialog (Annual selected, default)</p>
+      <p class="scene-context">
+        The existing UpgradeTrialDialog with the new billing cycle toggle added between the header
+        and plan cards. Default selection is Annual. Plan cards show the annual-equivalent monthly
+        price ($15/$60) with "Billed annually" note — matching the current behavior. Per spec: users
+        choose plan tier and billing cycle when converting from trial.
+      </p>
+
+      <div class="dialog-backdrop">
+        <div class="dialog">
+          <div style="text-align: center; margin-bottom: 24px">
+            <div class="dialog-title">Upgrade Acme Corp</div>
+            <p class="dialog-description">Subscribe to continue using Enterprise features</p>
+          </div>
+
+          <!-- NEW: Billing cycle toggle -->
+          <div class="cycle-toggle" id="s1-cycle-toggle">
+            <div class="cycle-pills">
+              <button type="button" class="cycle-pill" data-cycle="monthly">Monthly</button>
+              <button type="button" class="cycle-pill active" data-cycle="annual">Annual</button>
+            </div>
+            <span class="cycle-save-badge" id="s1-save-badge">Save 17%</span>
+          </div>
+
+          <!-- Plan cards (matches PlanCard.tsx exactly) -->
+          <div class="plan-cards" id="s1-plan-cards">
+            <div class="plan-card" data-plan="teams" onclick="selectPlan(this, 'teams')">
+              <div class="plan-card-badge"><span class="badge badge-gray">DOWNGRADE</span></div>
+              <div class="plan-card-name">Teams</div>
+              <div class="plan-card-price-block">
+                <div class="plan-card-price" data-price>$15<span>/user/month</span></div>
+                <div class="plan-card-billing-note" data-note>Billed annually</div>
+              </div>
+              <ul class="plan-card-features">
+                <li>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >All the features from open source
+                </li>
+                <li>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >Centralized billing
+                </li>
+                <li>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >Team management dashboard
+                </li>
+                <li>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >Project-level usage analytics
+                </li>
+                <li>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >AI Adoption Score
+                </li>
+                <li>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >Shared Modes
+                </li>
+                <li>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >Role-based access permissions
+                </li>
+                <li>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >Control data collection policy
+                </li>
+              </ul>
+            </div>
+
+            <div
+              class="plan-card selected"
+              data-plan="enterprise"
+              onclick="selectPlan(this, 'enterprise')"
+            >
+              <div class="plan-card-badge">
+                <span class="badge badge-orange">CURRENT PLAN</span>
+              </div>
+              <div class="plan-card-name">Enterprise</div>
+              <div class="plan-card-price-block">
+                <div class="plan-card-price" data-price>$60<span>/user/month</span></div>
+                <div class="plan-card-billing-note" data-note>Billed annually</div>
+              </div>
+              <ul class="plan-card-features">
+                <li>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >All the features from teams
+                </li>
+                <li>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >Limit models and/or providers
+                </li>
+                <li>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >Audit logs
+                </li>
+                <li>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >SSO, OIDC, &amp; SCIM support
+                </li>
+                <li>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >SLA commitments
+                </li>
+                <li>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="20 6 9 17 4 12" /></svg
+                  >Dedicated support channels
+                </li>
+              </ul>
+              <div class="plan-card-selected-indicator">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Selected
+              </div>
+            </div>
+          </div>
+
+          <!-- Purchase button -->
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 12px;
+              margin-top: 24px;
+            "
+          >
+            <button
+              type="button"
+              class="btn btn-primary btn-lg btn-full"
+              style="max-width: 28rem"
+              id="s1-purchase-btn"
+            >
+              Purchase Enterprise Plan
+            </button>
+            <p style="font-size: 0.75rem; color: #9ca3af; text-align: center">
+              You'll be redirected to Stripe to complete your purchase
+            </p>
+          </div>
+
+          <!-- Credit options (unchanged from existing) -->
+          <div class="credit-options" style="margin-top: 24px">
+            <div class="credit-options-title">
+              Credits are not included with your subscription. Use what works best for your team no
+              matter what plan you choose.
+            </div>
+            <div class="credit-options-grid">
+              <div class="credit-option">
+                <h4>Kilo Pass</h4>
+                <p>Credit subscription with bonus credits. <a href="#">Learn more</a></p>
+              </div>
+              <div class="credit-option">
+                <h4>Pay-as-you-go</h4>
+                <p>
+                  Purchase credits as needed. Only pay for what you use. <a href="#">Learn more</a>
+                </p>
+              </div>
+              <div class="credit-option">
+                <h4>Bring Your Own Key</h4>
+                <p>
+                  Use API keys from your existing AI provider accounts. <a href="#">Learn more</a>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div style="text-align: center; margin-top: 16px">
+            <a href="#" style="font-size: 0.875rem; color: #9ca3af; text-decoration: none"
+              >Questions? Contact Support.</a
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scene 1b removed — Scene 1 already toggles between Monthly/Annual live -->
+
+    <!-- ===============================================
+     SCENE 2: SubscriptionOverviewCard — Active Monthly
+     Matches the existing 4-column stats grid layout
+     =============================================== -->
+    <div class="scene" id="scene-2">
+      <p class="scene-label">Scene 2 &mdash; Subscription Overview (Active Monthly Enterprise)</p>
+      <p class="scene-context">
+        The existing SubscriptionOverviewCard with an active monthly Enterprise subscription. Same
+        4-column stats grid (Next Payment, Seats Used, Billing Cycle, Days Until Renewal) with green
+        left border. The "Billing Cycle" column now shows "Monthly" where it previously always
+        showed "Yearly". The Quick Actions card adds "Switch to Annual".
+      </p>
+
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; align-items: start">
+        <!-- SubscriptionOverviewCard -->
+        <div class="card card-border-green" style="margin-bottom: 24px">
+          <div class="card-header">
+            <div class="card-title">
+              Current Subscription
+              <span class="badge badge-status">
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#16a34a"
+                  stroke-width="2"
+                >
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                Active
+              </span>
+            </div>
+          </div>
+          <div class="card-content">
+            <div class="stats-grid">
+              <div class="stat-block">
+                <div class="stat-label">
+                  <i data-lucide="calendar" style="width: 16px; height: 16px"></i> Next Payment
+                </div>
+                <div class="stat-value">$720.00</div>
+                <div class="stat-sub">April 26, 2026</div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-label">
+                  <i data-lucide="users" style="width: 16px; height: 16px"></i> Seats Used
+                </div>
+                <div class="stat-value">6/10</div>
+                <div class="stat-sub">4 seats available</div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-label">
+                  <i data-lucide="refresh-ccw" style="width: 16px; height: 16px"></i> Billing Cycle
+                </div>
+                <div class="stat-value">Monthly</div>
+                <div class="stat-sub">Collection: Automatic</div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-label">
+                  <i data-lucide="clock" style="width: 16px; height: 16px"></i> Days Until Renewal
+                </div>
+                <div class="stat-value">31</div>
+                <div class="stat-sub">Auto-renewal enabled</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SubscriptionQuickActions -->
+        <div class="card quick-actions-card">
+          <div class="card-header">
+            <div class="card-title" style="font-size: 1.125rem; margin: 8px">Quick Actions</div>
+          </div>
+          <div class="card-content">
+            <button
+              type="button"
+              class="btn btn-green-outline"
+              onclick="openModal('seat-change-modal')"
+            >
+              <i data-lucide="edit" style="width: 16px; height: 16px"></i>
+              Change Seats
+            </button>
+            <button type="button" class="btn btn-outline" onclick="openModal('cycle-change-modal')">
+              <i data-lucide="repeat" style="width: 16px; height: 16px"></i>
+              Switch to Annual
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline"
+              onclick="showToast('Redirecting to Stripe billing portal...')"
+            >
+              <i data-lucide="credit-card" style="width: 16px; height: 16px"></i>
+              Update Payment Method
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline"
+              style="width: 256px; justify-content: center"
+              onclick="showToast('Redirecting to Stripe billing portal...')"
+            >
+              <i data-lucide="download" style="width: 16px; height: 16px"></i>
+              View Payment History
+            </button>
+            <button
+              type="button"
+              class="btn btn-red-outline"
+              onclick="showToast('Subscription will be cancelled at end of billing period')"
+            >
+              <i data-lucide="alert-triangle" style="width: 16px; height: 16px"></i>
+              Cancel Subscription
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===============================================
+     SCENE 3: SubscriptionOverviewCard — Pending Cycle Change
+     Shows monthly→annual switch scheduled at renewal
+     =============================================== -->
+    <div class="scene" id="scene-3">
+      <p class="scene-label">Scene 3 &mdash; Subscription Overview (Pending Cycle Change)</p>
+      <p class="scene-context">
+        The subscription overview when a billing cycle change has been scheduled (monthly to
+        annual). A pending-change banner appears below the stats grid — same pattern as the existing
+        SeatCountChangeNotification but for billing cycle changes. Per spec: cycle changes take
+        effect at renewal, no proration.
+      </p>
+
+      <div class="card card-border-green">
+        <div class="card-header">
+          <div class="card-title">
+            Current Subscription
+            <span class="badge badge-status">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#16a34a"
+                stroke-width="2"
+              >
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              Active
+            </span>
+          </div>
+        </div>
+
+        <div class="card-content">
+          <div class="stats-grid" style="margin-bottom: 16px">
+            <div class="stat-block">
+              <div class="stat-label">
+                <i data-lucide="calendar" style="width: 16px; height: 16px"></i> Next Payment
+              </div>
+              <div class="stat-value">$720.00</div>
+              <div class="stat-sub">April 26, 2026</div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-label">
+                <i data-lucide="users" style="width: 16px; height: 16px"></i> Seats Used
+              </div>
+              <div class="stat-value">6/10</div>
+              <div class="stat-sub">4 seats available</div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-label">
+                <i data-lucide="refresh-ccw" style="width: 16px; height: 16px"></i> Billing Cycle
+              </div>
+              <div class="stat-value">Monthly</div>
+              <div class="stat-sub">Collection: Automatic</div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-label">
+                <i data-lucide="clock" style="width: 16px; height: 16px"></i> Days Until Renewal
+              </div>
+              <div class="stat-value">31</div>
+              <div class="stat-sub">Auto-renewal enabled</div>
+            </div>
+          </div>
+
+          <!-- Pending change banner -->
+          <div class="pending-banner">
+            <i data-lucide="clock" style="width: 16px; height: 16px"></i>
+            <div>
+              <div class="pending-banner-text">
+                <strong>Switching to Annual billing on April 26, 2026.</strong>
+                Your rate will change from $72/seat/month to $60/seat/month ($720/seat/year). No
+                charges or proration until the switch takes effect.
+              </div>
+              <div class="pending-banner-actions">
+                <button
+                  type="button"
+                  class="btn btn-outline"
+                  style="
+                    padding: 4px 12px;
+                    font-size: 0.8125rem;
+                    color: #fbbf24;
+                    border-color: rgba(251, 191, 36, 0.3);
+                  "
+                  onclick="showToast('Billing cycle change cancelled')"
+                >
+                  Cancel Change
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alert bar at bottom (matches existing amber alert pattern: bg-amber-50 + dark text) -->
+        <div class="card-alert card-alert-amber">
+          <div class="card-alert-inner">
+            <i data-lucide="info" style="width: 16px; height: 16px; color: #d97706"></i>
+            <div>
+              <p class="card-alert-title text-amber-800">Billing Cycle Change Scheduled</p>
+              <p class="card-alert-text text-amber-700">
+                After April 26 you'll be billed $7,200/year (10 seats &times; $720/seat/yr).
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===============================================
+     SCENE 4: Billing Cycle Change Confirmation Dialog
+     NEW dialog for switching monthly↔annual
+     =============================================== -->
+    <div class="scene" id="scene-4">
+      <p class="scene-label">Scene 4a &mdash; Switch to Annual Billing Confirmation</p>
+      <p class="scene-context">
+        Confirmation dialog when an owner/billing manager clicks "Switch to Annual". Uses the same
+        Dialog/DialogHeader/DialogFooter pattern as CancelSubscriptionModal. Shows current vs new
+        billing with savings. Per spec: takes effect at renewal, no proration.
+      </p>
+
+      <div class="dialog dialog-sm">
+        <div class="dialog-title-sm">
+          <i data-lucide="repeat" style="width: 20px; height: 20px; color: #60a5fa"></i>
+          Switch to Annual Billing
+        </div>
+        <div class="dialog-description" style="margin-bottom: 16px">
+          This change will take effect at your next renewal date.
+        </div>
+
+        <div class="cycle-comparison">
+          <div class="cycle-comparison-row from">
+            <div class="cycle-comparison-label cycle-comparison-label-muted">Now</div>
+            <div class="cycle-comparison-info">
+              <div class="cycle-comparison-name">Monthly Billing</div>
+              <div class="cycle-comparison-detail">
+                $72/seat/month &middot; 10 seats = $720/month
+              </div>
+            </div>
+          </div>
+          <div class="cycle-comparison-row to">
+            <div class="cycle-comparison-label cycle-comparison-label-blue">New</div>
+            <div class="cycle-comparison-info">
+              <div class="cycle-comparison-name">Annual Billing</div>
+              <div class="cycle-comparison-detail">
+                $60/seat/month &middot; 10 seats = $7,200/year
+              </div>
+              <div class="cycle-comparison-savings">Save $1,440/year (17%)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="annotation annotation-blue">
+          <i data-lucide="calendar" style="width: 16px; height: 16px; color: #60a5fa"></i>
+          <div>
+            <div class="annotation-title">Takes effect: April 26, 2026</div>
+            <div class="annotation-text">
+              Your current monthly billing continues until then. No proration or immediate charges.
+            </div>
+          </div>
+        </div>
+
+        <div class="dialog-footer">
+          <button type="button" class="btn btn-outline" onclick="showToast('Cancelled')">
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            onclick="showToast('Billing cycle change scheduled for April 26, 2026')"
+          >
+            Switch to Annual
+          </button>
+        </div>
+      </div>
+
+      <div style="height: 32px"></div>
+
+      <p class="scene-label">Scene 4b &mdash; Switch to Monthly Billing Confirmation</p>
+      <p class="scene-context">
+        Reverse direction: annual to monthly. Includes a cost-increase warning in the same amber
+        alert style used for seat downgrade warnings in SeatChangeModal.
+      </p>
+
+      <div class="dialog dialog-sm">
+        <div class="dialog-title-sm">
+          <i data-lucide="repeat" style="width: 20px; height: 20px; color: #60a5fa"></i>
+          Switch to Monthly Billing
+        </div>
+        <div class="dialog-description" style="margin-bottom: 16px">
+          This change will take effect at your next renewal date.
+        </div>
+
+        <div class="cycle-comparison">
+          <div class="cycle-comparison-row from">
+            <div class="cycle-comparison-label cycle-comparison-label-muted">Now</div>
+            <div class="cycle-comparison-info">
+              <div class="cycle-comparison-name">Annual Billing</div>
+              <div class="cycle-comparison-detail">
+                $60/seat/month &middot; 10 seats = $7,200/year
+              </div>
+            </div>
+          </div>
+          <div class="cycle-comparison-row to">
+            <div class="cycle-comparison-label cycle-comparison-label-blue">New</div>
+            <div class="cycle-comparison-info">
+              <div class="cycle-comparison-name">Monthly Billing</div>
+              <div class="cycle-comparison-detail">
+                $72/seat/month &middot; 10 seats = $720/month
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-box info-box-amber" style="margin-top: 12px; font-size: 0.8125rem">
+          <strong>Note:</strong> Switching to monthly billing will increase your cost by $1,440/year
+          ($720/mo &times; 12 = $8,640 vs $7,200 annually). The annual plan offers 12 months for the
+          price of 10.
+        </div>
+
+        <div class="annotation annotation-blue" style="margin-top: 8px">
+          <i data-lucide="calendar" style="width: 16px; height: 16px; color: #60a5fa"></i>
+          <div>
+            <div class="annotation-title">Takes effect: March 26, 2027</div>
+            <div class="annotation-text">
+              Your annual subscription continues until then. No refunds or immediate changes.
+            </div>
+          </div>
+        </div>
+
+        <div class="dialog-footer">
+          <button type="button" class="btn btn-outline" onclick="showToast('Cancelled')">
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            onclick="showToast('Billing cycle change scheduled for March 26, 2027')"
+          >
+            Switch to Monthly
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===============================================
+     SCENE 5: SeatChangeModal — Monthly context
+     Matches SeatChangeModal.tsx layout exactly
+     =============================================== -->
+    <div class="scene" id="scene-5">
+      <p class="scene-label">Scene 5 &mdash; Interactive Seat Change (Monthly Enterprise)</p>
+      <p class="scene-context">
+        Interactive SeatChangeModal for a monthly Enterprise subscription ($72/seat/mo). Use the
+        +/&minus; buttons to try increasing seats (prorated charge) or decreasing (end-of-cycle, no
+        proration). The validation error appears if you go below active usage (6 seats in use). Per
+        spec: increases are prorated immediately, decreases take effect at end of billing cycle,
+        both cycles.
+      </p>
+
+      <div class="dialog dialog-sm">
+        <div class="dialog-title-sm">
+          <i data-lucide="edit" style="width: 20px; height: 20px"></i>
+          Change Seat Count
+        </div>
+        <div class="dialog-description">
+          Adjust the number of seats for your organization subscription.
+        </div>
+
+        <div style="margin-top: 16px">
+          <div class="field-group">
+            <div class="field-label">Current Seats</div>
+            <div class="field-value">10 seats</div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">Active Usage</div>
+            <div class="field-value">6 of 10 seats in use</div>
+          </div>
+
+          <div class="field-group">
+            <div class="field-label">New Seat Count</div>
+            <div class="seat-input-row">
+              <button type="button" class="seat-btn" onclick="inlineAdjustSeats('s5', -1)">
+                <i data-lucide="minus" style="width: 16px; height: 16px"></i>
+              </button>
+              <input type="text" class="seat-input" id="s5-seat-input" value="10" readonly />
+              <button type="button" class="seat-btn" onclick="inlineAdjustSeats('s5', 1)">
+                <i data-lucide="plus" style="width: 16px; height: 16px"></i>
+              </button>
+            </div>
+            <div id="s5-validation"></div>
+          </div>
+          <div id="s5-cost-preview"></div>
+        </div>
+
+        <div class="dialog-footer">
+          <button type="button" class="btn btn-outline" onclick="resetInlineSeats('s5')">
+            Reset
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            id="s5-update-btn"
+            disabled
+            onclick="showToast('Seats updated successfully!')"
+          >
+            Update Seats
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===============================================
+     SCENE 6: SubscriptionOverviewCard — Active Annual (Teams)
+     Shows existing annual subscription (no changes needed)
+     =============================================== -->
+    <div class="scene" id="scene-6">
+      <p class="scene-label">Scene 6 &mdash; Subscription Overview (Active Annual Teams)</p>
+      <p class="scene-context">
+        An annual Teams subscription. The "Billing Cycle" column shows "Yearly" (matching
+        formatBillingInterval output). Quick Actions shows "Switch to Monthly" instead of "Switch to
+        Annual". The seat count is near capacity — Teams plan restricts invitations when seats are
+        full.
+      </p>
+
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; align-items: start">
+        <div class="card card-border-green">
+          <div class="card-header">
+            <div class="card-title">
+              Current Subscription
+              <span class="badge badge-status">
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#16a34a"
+                  stroke-width="2"
+                >
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                Active
+              </span>
+            </div>
+          </div>
+          <div class="card-content">
+            <div class="stats-grid">
+              <div class="stat-block">
+                <div class="stat-label">
+                  <i data-lucide="calendar" style="width: 16px; height: 16px"></i> Next Payment
+                </div>
+                <div class="stat-value">$1,440.00</div>
+                <div class="stat-sub">March 26, 2027</div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-label">
+                  <i data-lucide="users" style="width: 16px; height: 16px"></i> Seats Used
+                </div>
+                <div class="stat-value">7/8</div>
+                <div class="stat-sub">1 seat available</div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-label">
+                  <i data-lucide="refresh-ccw" style="width: 16px; height: 16px"></i> Billing Cycle
+                </div>
+                <div class="stat-value">Yearly</div>
+                <div class="stat-sub">Collection: Automatic</div>
+              </div>
+              <div class="stat-block">
+                <div class="stat-label">
+                  <i data-lucide="clock" style="width: 16px; height: 16px"></i> Days Until Renewal
+                </div>
+                <div class="stat-value">365</div>
+                <div class="stat-sub">Auto-renewal enabled</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card quick-actions-card">
+          <div class="card-header">
+            <div class="card-title" style="font-size: 1.125rem; margin: 8px">Quick Actions</div>
+          </div>
+          <div class="card-content">
+            <button
+              type="button"
+              class="btn btn-green-outline"
+              onclick="openModal('seat-change-annual-modal')"
+            >
+              <i data-lucide="edit" style="width: 16px; height: 16px"></i>
+              Change Seats
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline"
+              onclick="openModal('cycle-change-to-monthly-modal')"
+            >
+              <i data-lucide="repeat" style="width: 16px; height: 16px"></i>
+              Switch to Monthly
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline"
+              onclick="showToast('Redirecting to Stripe billing portal...')"
+            >
+              <i data-lucide="credit-card" style="width: 16px; height: 16px"></i>
+              Update Payment Method
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline"
+              style="width: 256px; justify-content: center"
+              onclick="showToast('Redirecting to Stripe billing portal...')"
+            >
+              <i data-lucide="download" style="width: 16px; height: 16px"></i>
+              View Payment History
+            </button>
+            <button
+              type="button"
+              class="btn btn-red-outline"
+              onclick="showToast('Subscription will be cancelled at end of billing period')"
+            >
+              <i data-lucide="alert-triangle" style="width: 16px; height: 16px"></i>
+              Cancel Subscription
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===============================================
+     MODALS (interactive, triggered from Scene 2)
+     =============================================== -->
+
+    <!-- Seat Change Modal (Monthly context, for Scene 2) -->
+    <div class="modal-overlay" id="seat-change-modal">
+      <div class="dialog dialog-sm">
+        <div class="dialog-title-sm">
+          <i data-lucide="edit" style="width: 20px; height: 20px"></i>
+          Change Seat Count
+        </div>
+        <div class="dialog-description">
+          Adjust the number of seats for your organization subscription.
+        </div>
+
+        <div style="margin-top: 16px">
+          <div class="field-group">
+            <div class="field-label">Current Seats</div>
+            <div class="field-value">10 seats</div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Active Usage</div>
+            <div class="field-value">6 of 10 seats in use</div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">New Seat Count</div>
+            <div class="seat-input-row">
+              <button type="button" class="seat-btn" onclick="modalAdjustSeats('monthly', -1)">
+                <i data-lucide="minus" style="width: 16px; height: 16px"></i>
+              </button>
+              <input type="text" class="seat-input" id="modal-seat-input" value="10" readonly />
+              <button type="button" class="seat-btn" onclick="modalAdjustSeats('monthly', 1)">
+                <i data-lucide="plus" style="width: 16px; height: 16px"></i>
+              </button>
+            </div>
+            <div id="modal-validation"></div>
+          </div>
+          <div id="modal-cost-preview"></div>
+        </div>
+
+        <div class="dialog-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('seat-change-modal')">
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            id="modal-update-btn"
+            disabled
+            onclick="
+              closeModal('seat-change-modal');
+              showToast('Seats updated successfully!');
+            "
+          >
+            Update Seats
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cycle Change Modal (Monthly→Annual, for Scene 2) -->
+    <div class="modal-overlay" id="cycle-change-modal">
+      <div class="dialog dialog-sm">
+        <div class="dialog-title-sm">
+          <i data-lucide="repeat" style="width: 20px; height: 20px; color: #60a5fa"></i>
+          Switch to Annual Billing
+        </div>
+        <div class="dialog-description" style="margin-bottom: 16px">
+          This change will take effect at your next renewal date.
+        </div>
+
+        <div class="cycle-comparison">
+          <div class="cycle-comparison-row from">
+            <div class="cycle-comparison-label cycle-comparison-label-muted">Now</div>
+            <div class="cycle-comparison-info">
+              <div class="cycle-comparison-name">Monthly Billing</div>
+              <div class="cycle-comparison-detail">
+                $72/seat/month &middot; 10 seats = $720/month
+              </div>
+            </div>
+          </div>
+          <div class="cycle-comparison-row to">
+            <div class="cycle-comparison-label cycle-comparison-label-blue">New</div>
+            <div class="cycle-comparison-info">
+              <div class="cycle-comparison-name">Annual Billing</div>
+              <div class="cycle-comparison-detail">
+                $60/seat/month &middot; 10 seats = $7,200/year
+              </div>
+              <div class="cycle-comparison-savings">Save $1,440/year (17%)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="annotation annotation-blue">
+          <i data-lucide="calendar" style="width: 16px; height: 16px; color: #60a5fa"></i>
+          <div>
+            <div class="annotation-title">Takes effect: April 26, 2026</div>
+            <div class="annotation-text">
+              Your current monthly billing continues until then. No proration or immediate charges.
+            </div>
+          </div>
+        </div>
+
+        <div class="dialog-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('cycle-change-modal')">
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            onclick="
+              closeModal('cycle-change-modal');
+              showToast('Billing cycle change scheduled for April 26');
+            "
+          >
+            Switch to Annual
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Seat Change Modal (Annual context, for Scene 6) -->
+    <div class="modal-overlay" id="seat-change-annual-modal">
+      <div class="dialog dialog-sm">
+        <div class="dialog-title-sm">
+          <i data-lucide="edit" style="width: 20px; height: 20px"></i>
+          Change Seat Count
+        </div>
+        <div class="dialog-description">
+          Adjust the number of seats for your organization subscription.
+        </div>
+
+        <div style="margin-top: 16px">
+          <div class="field-group">
+            <div class="field-label">Current Seats</div>
+            <div class="field-value">8 seats</div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Active Usage</div>
+            <div class="field-value">7 of 8 seats in use</div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">New Seat Count</div>
+            <div class="seat-input-row">
+              <button type="button" class="seat-btn" onclick="modalAdjustSeats('annual', -1)">
+                <i data-lucide="minus" style="width: 16px; height: 16px"></i>
+              </button>
+              <input
+                type="text"
+                class="seat-input"
+                id="modal-annual-seat-input"
+                value="8"
+                readonly
+              />
+              <button type="button" class="seat-btn" onclick="modalAdjustSeats('annual', 1)">
+                <i data-lucide="plus" style="width: 16px; height: 16px"></i>
+              </button>
+            </div>
+            <div id="modal-annual-validation"></div>
+          </div>
+          <div id="modal-annual-cost-preview"></div>
+        </div>
+
+        <div class="dialog-footer">
+          <button
+            type="button"
+            class="btn btn-outline"
+            onclick="closeModal('seat-change-annual-modal')"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            id="modal-annual-update-btn"
+            disabled
+            onclick="
+              closeModal('seat-change-annual-modal');
+              showToast('Seats updated successfully!');
+            "
+          >
+            Update Seats
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cycle Change to Monthly Modal (for Scene 6) -->
+    <div class="modal-overlay" id="cycle-change-to-monthly-modal">
+      <div class="dialog dialog-sm">
+        <div class="dialog-title-sm">
+          <i data-lucide="repeat" style="width: 20px; height: 20px; color: #60a5fa"></i>
+          Switch to Monthly Billing
+        </div>
+        <div class="dialog-description" style="margin-bottom: 16px">
+          This change will take effect at your next renewal date.
+        </div>
+
+        <div class="cycle-comparison">
+          <div class="cycle-comparison-row from">
+            <div class="cycle-comparison-label cycle-comparison-label-muted">Now</div>
+            <div class="cycle-comparison-info">
+              <div class="cycle-comparison-name">Annual Billing</div>
+              <div class="cycle-comparison-detail">
+                $15/seat/month &middot; 8 seats = $1,440/year
+              </div>
+            </div>
+          </div>
+          <div class="cycle-comparison-row to">
+            <div class="cycle-comparison-label cycle-comparison-label-blue">New</div>
+            <div class="cycle-comparison-info">
+              <div class="cycle-comparison-name">Monthly Billing</div>
+              <div class="cycle-comparison-detail">
+                $18/seat/month &middot; 8 seats = $144/month
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-box info-box-amber" style="margin-top: 12px; font-size: 0.8125rem">
+          <strong>Note:</strong> Switching to monthly billing will increase your cost by $288/year
+          ($144/mo &times; 12 = $1,728 vs $1,440 annually). The annual plan offers 12 months for the
+          price of 10.
+        </div>
+
+        <div class="annotation annotation-blue" style="margin-top: 8px">
+          <i data-lucide="calendar" style="width: 16px; height: 16px; color: #60a5fa"></i>
+          <div>
+            <div class="annotation-title">Takes effect: March 26, 2027</div>
+            <div class="annotation-text">
+              Your annual subscription continues until then. No refunds or immediate changes.
+            </div>
+          </div>
+        </div>
+
+        <div class="dialog-footer">
+          <button
+            type="button"
+            class="btn btn-outline"
+            onclick="closeModal('cycle-change-to-monthly-modal')"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            onclick="
+              closeModal('cycle-change-to-monthly-modal');
+              showToast('Billing cycle change scheduled for March 26, 2027');
+            "
+          >
+            Switch to Monthly
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+      lucide.createIcons();
+
+      // -- Helpers ------------------------------------
+      function openModal(id) {
+        document.getElementById(id).classList.add('open');
+      }
+      function closeModal(id) {
+        document.getElementById(id).classList.remove('open');
+      }
+      function showToast(msg) {
+        var t = document.getElementById('toast');
+        t.innerHTML =
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' +
+          msg;
+        t.classList.add('show');
+        setTimeout(function () {
+          t.classList.remove('show');
+        }, 3000);
+      }
+
+      // Close modals on overlay click
+      document.querySelectorAll('.modal-overlay').forEach(function (o) {
+        o.addEventListener('click', function (e) {
+          if (e.target === o) closeModal(o.id);
+        });
+      });
+
+      // -- Scene 1: Interactive cycle toggle ----------
+      var s1Cycle = 'annual';
+      var s1Plan = 'enterprise';
+      var pricing = {
+        teams: { monthly: 18, annualPerMonth: 15 },
+        enterprise: { monthly: 72, annualPerMonth: 60 },
+      };
+
+      document.querySelectorAll('#s1-cycle-toggle .cycle-pill').forEach(function (pill) {
+        pill.addEventListener('click', function () {
+          document.querySelectorAll('#s1-cycle-toggle .cycle-pill').forEach(function (p) {
+            p.classList.remove('active');
+          });
+          pill.classList.add('active');
+          s1Cycle = pill.dataset.cycle;
+          document.getElementById('s1-save-badge').style.opacity =
+            s1Cycle === 'annual' ? '1' : '0.3';
+          updateS1Cards();
+        });
+      });
+
+      function selectPlan(el, plan) {
+        s1Plan = plan;
+        document.querySelectorAll('#s1-plan-cards .plan-card').forEach(function (c) {
+          c.classList.remove('selected');
+          c.style.opacity = '0.5';
+          var indicator = c.querySelector('.plan-card-selected-indicator');
+          if (indicator) indicator.remove();
+        });
+        el.classList.add('selected');
+        el.style.opacity = '1';
+        var div = document.createElement('div');
+        div.className = 'plan-card-selected-indicator';
+        div.innerHTML =
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Selected';
+        el.appendChild(div);
+        updateS1Cards();
+      }
+
+      function updateS1Cards() {
+        document.querySelectorAll('#s1-plan-cards .plan-card').forEach(function (card) {
+          var plan = card.dataset.plan;
+          var p = pricing[plan];
+          var priceEl = card.querySelector('[data-price]');
+          var noteEl = card.querySelector('[data-note]');
+          if (s1Cycle === 'monthly') {
+            priceEl.innerHTML = '$' + p.monthly + '<span>/user/month</span>';
+            noteEl.textContent = 'Billed monthly';
+          } else {
+            priceEl.innerHTML = '$' + p.annualPerMonth + '<span>/user/month</span>';
+            noteEl.textContent = 'Billed annually';
+          }
+        });
+        var planName = s1Plan === 'teams' ? 'Teams' : 'Enterprise';
+        document.getElementById('s1-purchase-btn').textContent = 'Purchase ' + planName + ' Plan';
+      }
+
+      // -- Generic seat change logic for modals and inline scenes --
+
+      // Modal configs: { currentSeats, activeSeats, pricePerSeat, currentValue, costLabel }
+      var modalConfigs = {
+        monthly: {
+          currentSeats: 10,
+          activeSeats: 6,
+          pricePerSeat: 72,
+          value: 10,
+          costLabel: 'monthly cost',
+        },
+        annual: {
+          currentSeats: 8,
+          activeSeats: 7,
+          pricePerSeat: 180,
+          value: 8,
+          costLabel: 'annual cost',
+        },
+      };
+
+      function modalAdjustSeats(which, delta) {
+        var cfg = modalConfigs[which];
+        cfg.value = Math.max(1, cfg.value + delta);
+        var inputId = which === 'monthly' ? 'modal-seat-input' : 'modal-annual-seat-input';
+        document.getElementById(inputId).value = cfg.value;
+        updateSeatPreview(which);
+      }
+
+      function updateSeatPreview(which) {
+        var cfg = modalConfigs[which];
+        var prefix = which === 'monthly' ? 'modal' : 'modal-annual';
+        var previewEl = document.getElementById(prefix + '-cost-preview');
+        var validationEl = document.getElementById(prefix + '-validation');
+        var btn = document.getElementById(prefix + '-update-btn');
+        var inputEl = document.getElementById(prefix + '-seat-input');
+
+        // Validation: below active usage
+        if (cfg.value < cfg.activeSeats) {
+          if (validationEl)
+            validationEl.innerHTML =
+              '<div class="validation-error"><i data-lucide="alert-circle" style="width:16px;height:16px"></i><span>Seat count must be at least ' +
+              cfg.activeSeats +
+              ' (current active members and invites)</span></div>';
+          inputEl.style.borderColor = '#ef4444';
+          btn.disabled = true;
+          previewEl.innerHTML = '';
+          lucide.createIcons();
+          return;
+        }
+        if (validationEl) validationEl.innerHTML = '';
+        inputEl.style.borderColor = '';
+
+        if (cfg.value === cfg.currentSeats) {
+          previewEl.innerHTML =
+            '<div class="cost-preview"><div class="cost-preview-title">Cost Preview</div><div style="font-size:0.875rem;color:var(--muted-foreground);">No changes to seat count.</div></div>';
+          btn.disabled = true;
+          return;
+        }
+
+        btn.disabled = false;
+        var currentCost = cfg.currentSeats * cfg.pricePerSeat;
+        var newCost = cfg.value * cfg.pricePerSeat;
+
+        if (cfg.value > cfg.currentSeats) {
+          var added = cfg.value - cfg.currentSeats;
+          previewEl.innerHTML =
+            '<div class="cost-preview"><div class="cost-preview-title">Cost Preview</div>' +
+            '<div class="cost-row"><span>Current ' +
+            cfg.costLabel +
+            ':</span><span>$' +
+            currentCost.toLocaleString() +
+            '</span></div>' +
+            '<div class="cost-row cost-row-bold"><span>New ' +
+            cfg.costLabel +
+            ':</span><span>$' +
+            newCost.toLocaleString() +
+            '</span></div>' +
+            '<div class="info-box info-box-blue"><strong>Note:</strong> New seats will be granted, and you will be billed a prorated amount for the additional ' +
+            added +
+            ' seat' +
+            (added > 1 ? 's' : '') +
+            ' immediately.</div></div>';
+        } else {
+          previewEl.innerHTML =
+            '<div class="cost-preview"><div class="cost-preview-title">Cost Preview</div>' +
+            '<div class="cost-row"><span>Current ' +
+            cfg.costLabel +
+            ':</span><span>$' +
+            currentCost.toLocaleString() +
+            '</span></div>' +
+            '<div class="cost-row cost-row-bold"><span>New ' +
+            cfg.costLabel +
+            ':</span><span>$' +
+            newCost.toLocaleString() +
+            '</span></div>' +
+            '<div class="info-box info-box-amber"><strong>Note:</strong> Your current seat count will not be adjusted until the end of the current billing cycle. No proration will occur.</div></div>';
+        }
+      }
+
+      // -- Scene 5: Inline interactive seat change ----
+      var inlineConfigs = {
+        s5: {
+          currentSeats: 10,
+          activeSeats: 6,
+          pricePerSeat: 72,
+          value: 10,
+          costLabel: 'monthly cost',
+        },
+      };
+
+      function inlineAdjustSeats(id, delta) {
+        var cfg = inlineConfigs[id];
+        cfg.value = Math.max(1, cfg.value + delta);
+        document.getElementById(id + '-seat-input').value = cfg.value;
+        updateInlinePreview(id);
+      }
+
+      function resetInlineSeats(id) {
+        var cfg = inlineConfigs[id];
+        cfg.value = cfg.currentSeats;
+        document.getElementById(id + '-seat-input').value = cfg.value;
+        updateInlinePreview(id);
+      }
+
+      function updateInlinePreview(id) {
+        var cfg = inlineConfigs[id];
+        var previewEl = document.getElementById(id + '-cost-preview');
+        var validationEl = document.getElementById(id + '-validation');
+        var btn = document.getElementById(id + '-update-btn');
+        var inputEl = document.getElementById(id + '-seat-input');
+
+        // Validation: below active usage
+        if (cfg.value < cfg.activeSeats) {
+          if (validationEl)
+            validationEl.innerHTML =
+              '<div class="validation-error"><i data-lucide="alert-circle" style="width:16px;height:16px"></i><span>Seat count must be at least ' +
+              cfg.activeSeats +
+              ' (current active members and invites)</span></div>';
+          inputEl.style.borderColor = '#ef4444';
+          btn.disabled = true;
+          previewEl.innerHTML = '';
+          lucide.createIcons();
+          return;
+        }
+        if (validationEl) validationEl.innerHTML = '';
+        inputEl.style.borderColor = '';
+
+        if (cfg.value === cfg.currentSeats) {
+          previewEl.innerHTML =
+            '<div class="cost-preview"><div class="cost-preview-title">Cost Preview</div><div style="font-size:0.875rem;color:var(--muted-foreground);">No changes to seat count.</div></div>';
+          btn.disabled = true;
+          return;
+        }
+
+        btn.disabled = false;
+        var currentCost = cfg.currentSeats * cfg.pricePerSeat;
+        var newCost = cfg.value * cfg.pricePerSeat;
+
+        if (cfg.value > cfg.currentSeats) {
+          var added = cfg.value - cfg.currentSeats;
+          previewEl.innerHTML =
+            '<div class="cost-preview"><div class="cost-preview-title">Cost Preview</div>' +
+            '<div class="cost-row"><span>Current ' +
+            cfg.costLabel +
+            ':</span><span>$' +
+            currentCost.toLocaleString() +
+            '</span></div>' +
+            '<div class="cost-row cost-row-bold"><span>New ' +
+            cfg.costLabel +
+            ':</span><span>$' +
+            newCost.toLocaleString() +
+            '</span></div>' +
+            '<div class="info-box info-box-blue"><strong>Note:</strong> New seats will be granted, and you will be billed a prorated amount for the additional ' +
+            added +
+            ' seat' +
+            (added > 1 ? 's' : '') +
+            ' immediately.</div></div>';
+        } else {
+          previewEl.innerHTML =
+            '<div class="cost-preview"><div class="cost-preview-title">Cost Preview</div>' +
+            '<div class="cost-row"><span>Current ' +
+            cfg.costLabel +
+            ':</span><span>$' +
+            currentCost.toLocaleString() +
+            '</span></div>' +
+            '<div class="cost-row cost-row-bold"><span>New ' +
+            cfg.costLabel +
+            ':</span><span>$' +
+            newCost.toLocaleString() +
+            '</span></div>' +
+            '<div class="info-box info-box-amber"><strong>Note:</strong> Your current seat count will not be adjusted until the end of the current billing cycle. No proration will occur.</div></div>';
+        }
+      }
+
+      // Initialize all
+      updateS1Cards();
+      updateSeatPreview('monthly');
+      updateSeatPreview('annual');
+      updateInlinePreview('s5');
+      lucide.createIcons();
+    </script>
+  </body>
+</html>

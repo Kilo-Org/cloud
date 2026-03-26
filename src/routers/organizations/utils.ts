@@ -3,7 +3,7 @@ import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { baseProcedure } from '@/lib/trpc/init';
-import type { TRPCContext } from '@/lib/trpc/init';
+import type { AuthenticatedTRPCContext } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
 import * as z from 'zod';
@@ -13,7 +13,7 @@ export const OrganizationIdInputSchema = z.object({
 });
 
 export async function ensureOrganizationAccess(
-  ctx: TRPCContext,
+  ctx: AuthenticatedTRPCContext,
   organizationId: Organization['id'],
   roles?: OrganizationRole[]
 ): Promise<OrganizationRole> {
@@ -48,7 +48,7 @@ export async function ensureOrganizationAccess(
 }
 
 export async function ensureOrganizationAccessAndFetchOrg(
-  ctx: TRPCContext,
+  ctx: AuthenticatedTRPCContext,
   organizationId: Organization['id'],
   roles?: OrganizationRole[]
 ): Promise<Organization> {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Owner } from './core/types';
-import type { TRPCContext } from '@/lib/trpc/init';
+import type { AuthenticatedTRPCContext } from '@/lib/trpc/init';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 
@@ -17,12 +17,12 @@ export const optionalOrgInput = z
  * org membership before constructing the owner, or call
  * {@link ensureIntegrationAccess} explicitly before this function.
  */
-export function resolveOwner(ctx: TRPCContext, organizationId?: string): Owner {
+export function resolveOwner(ctx: AuthenticatedTRPCContext, organizationId?: string): Owner {
   return organizationId ? { type: 'org', id: organizationId } : { type: 'user', id: ctx.user.id };
 }
 
 export async function ensureIntegrationAccess(
-  ctx: TRPCContext,
+  ctx: AuthenticatedTRPCContext,
   organizationId?: string,
   roles?: OrganizationRole[]
 ) {
@@ -37,7 +37,7 @@ export async function ensureIntegrationAccess(
  * so callers cannot forget the access check.
  */
 export async function resolveAuthorizedOwner(
-  ctx: TRPCContext,
+  ctx: AuthenticatedTRPCContext,
   organizationId?: string,
   roles?: OrganizationRole[]
 ): Promise<Owner> {

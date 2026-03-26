@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { db } from '@/lib/drizzle';
 import { cloud_agent_webhook_triggers } from '@kilocode/db/schema';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import type { TRPCContext } from '@/lib/trpc/init';
+import type { AuthenticatedTRPCContext } from '@/lib/trpc/init';
 
 /**
  * Verify the caller has access to the given webhook trigger.
@@ -14,7 +14,7 @@ import type { TRPCContext } from '@/lib/trpc/init';
  * Throws NOT_FOUND if the trigger doesn't exist or the caller lacks access.
  */
 export async function verifyWebhookTriggerAccess(
-  ctx: TRPCContext,
+  ctx: AuthenticatedTRPCContext,
   triggerId: string,
   organizationId: string | undefined
 ) {

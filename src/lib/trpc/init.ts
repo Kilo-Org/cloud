@@ -6,24 +6,24 @@ import * as z from 'zod';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
 // Define the context type
 export type TRPCContext = {
-  user: User;
+  user: User | null;
 };
+
+/**
+ * Narrowed context type for use in handlers attached to `baseProcedure` or
+ * `adminProcedure` — the auth middleware guarantees `user` is non-null.
+ */
+export type AuthenticatedTRPCContext = TRPCContext & { user: User };
 
 /**
  * @see: https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (): Promise<TRPCContext> => {
   const { user } = await getUserFromAuth({ adminOnly: false });
-  if (!user) {
-    throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: 'User not authenticated - no user to set on context',
-    });
+  if (user) {
+    setTag('userId', user.id);
   }
-  setTag('userId', user.id);
-  return {
-    user,
-  };
+  return { user: user ?? null };
 };
 
 // Avoid exporting the entire t-object
@@ -74,10 +74,21 @@ const sentryMiddleware = t.middleware(
   })
 );
 
+const authMiddleware = t.middleware(async ({ ctx, next }) => {
+  if (!ctx.user) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'User not authenticated',
+    });
+  }
+  return next({ ctx: { user: ctx.user } });
+});
+
 // Base router and procedure helpers
 export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
-export const baseProcedure = t.procedure.use(sentryMiddleware);
+export const publicProcedure = t.procedure.use(sentryMiddleware);
+export const baseProcedure = t.procedure.use(sentryMiddleware).use(authMiddleware);
 
 // Admin-only procedure
 export const adminProcedure = baseProcedure.use(async ({ ctx, next }) => {

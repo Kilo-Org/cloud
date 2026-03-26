@@ -1,5 +1,5 @@
 import type { baseProcedure } from '@/lib/trpc/init';
-import type { TRPCContext } from '@/lib/trpc/init';
+import type { AuthenticatedTRPCContext } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import type { AutoTriageAgentConfig } from '@/lib/auto-triage/core/schemas';
@@ -18,11 +18,11 @@ import { successResult, failureResult } from '@/lib/maybe-result';
 import { tryDispatchPendingTickets } from '@/lib/auto-triage/dispatch/dispatch-pending-tickets';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 
-type OwnerResolver = (ctx: TRPCContext, input: unknown) => Owner | Promise<Owner>;
+type OwnerResolver = (ctx: AuthenticatedTRPCContext, input: unknown) => Owner | Promise<Owner>;
 
 type AuditLogParams = {
   owner: Owner;
-  ctx: TRPCContext;
+  ctx: AuthenticatedTRPCContext;
   message: string;
 };
 
@@ -127,7 +127,7 @@ export function createAutoTriageRouter({
     /**
      * Gets the GitHub App installation status
      */
-    getGitHubStatus: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
+    getGitHubStatus: async ({ ctx, input }: { ctx: AuthenticatedTRPCContext; input: unknown }) => {
       const owner = await ownerResolver(ctx, input);
       const integration = await integrationGetter(owner);
 
@@ -152,7 +152,13 @@ export function createAutoTriageRouter({
     /**
      * List GitHub repositories accessible by the integration
      */
-    listGitHubRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
+    listGitHubRepositories: async ({
+      ctx,
+      input,
+    }: {
+      ctx: AuthenticatedTRPCContext;
+      input: unknown;
+    }) => {
       const owner = await ownerResolver(ctx, input);
       return await repositoryFetcher(owner);
     },
@@ -160,7 +166,13 @@ export function createAutoTriageRouter({
     /**
      * Gets the auto-triage agent configuration
      */
-    getAutoTriageConfig: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
+    getAutoTriageConfig: async ({
+      ctx,
+      input,
+    }: {
+      ctx: AuthenticatedTRPCContext;
+      input: unknown;
+    }) => {
       const owner = await ownerResolver(ctx, input);
       const config = await agentConfigGetter(owner, 'auto_triage', 'github');
 
@@ -201,7 +213,7 @@ export function createAutoTriageRouter({
         ctx,
         input,
       }: {
-        ctx: TRPCContext;
+        ctx: AuthenticatedTRPCContext;
         input: z.infer<typeof SaveAutoTriageConfigInputSchema>;
       }) => {
         try {
@@ -270,7 +282,13 @@ export function createAutoTriageRouter({
       inputSchema: z.object({
         isEnabled: z.boolean(),
       }),
-      handler: async ({ ctx, input }: { ctx: TRPCContext; input: { isEnabled: boolean } }) => {
+      handler: async ({
+        ctx,
+        input,
+      }: {
+        ctx: AuthenticatedTRPCContext;
+        input: { isEnabled: boolean };
+      }) => {
         try {
           const owner = await ownerResolver(ctx, input);
 
@@ -338,7 +356,13 @@ export function createAutoTriageRouter({
       inputSchema: z.object({
         ticketId: z.string().uuid(),
       }),
-      handler: async ({ ctx, input }: { ctx: TRPCContext; input: { ticketId: string } }) => {
+      handler: async ({
+        ctx,
+        input,
+      }: {
+        ctx: AuthenticatedTRPCContext;
+        input: { ticketId: string };
+      }) => {
         try {
           // 1. Get ticket and verify ownership
           const ticket = await getTriageTicketById(input.ticketId);
@@ -403,7 +427,13 @@ export function createAutoTriageRouter({
       inputSchema: z.object({
         ticketId: z.string().uuid(),
       }),
-      handler: async ({ ctx, input }: { ctx: TRPCContext; input: { ticketId: string } }) => {
+      handler: async ({
+        ctx,
+        input,
+      }: {
+        ctx: AuthenticatedTRPCContext;
+        input: { ticketId: string };
+      }) => {
         try {
           // 1. Get ticket and verify ownership
           const ticket = await getTriageTicketById(input.ticketId);
@@ -489,7 +519,7 @@ export function createAutoTriageRouter({
         ctx,
         input,
       }: {
-        ctx: TRPCContext;
+        ctx: AuthenticatedTRPCContext;
         input: {
           limit: number;
           offset: number;

@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException, setTags } from '@sentry/nextjs';
 import * as z from 'zod';
-import { createTRPCContext } from '@/lib/trpc/init';
+import { createTRPCContext, type AuthenticatedTRPCContext } from '@/lib/trpc/init';
 import { sentryLogger } from '@/lib/utils.server';
 import { streamChunks, type ChunkMetadata } from '@/lib/managed-index-chunking';
 import { getIndexStorage } from '@/lib/code-indexing/storage';
@@ -62,7 +62,14 @@ export async function PUT(
 ): Promise<NextResponse<ErrorResponse | SuccessResponse>> {
   try {
     // Create tRPC context for authentication
-    const ctx = await createTRPCContext();
+    const baseCtx = await createTRPCContext();
+    if (!baseCtx.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized', message: 'User not authenticated' },
+        { status: 401 }
+      );
+    }
+    const ctx = baseCtx as AuthenticatedTRPCContext;
 
     // Parse multipart form data
     let formData: FormData | undefined;

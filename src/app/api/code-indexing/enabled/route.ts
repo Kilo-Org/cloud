@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { createTRPCContext } from '@/lib/trpc/init';
+import { createTRPCContext, type AuthenticatedTRPCContext } from '@/lib/trpc/init';
 import { ensureOrganizationAccessAndFetchOrg } from '@/routers/organizations/utils';
 import { getUserFromAuth } from '@/lib/user.server';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
@@ -40,7 +40,13 @@ export async function GET(
   try {
     // Create tRPC context for authentication
     const ctx = await createTRPCContext();
-    const org = await ensureOrganizationAccessAndFetchOrg(ctx, organizationId);
+    if (!ctx.user) {
+      return NextResponse.json({ enabled: false });
+    }
+    const org = await ensureOrganizationAccessAndFetchOrg(
+      ctx as AuthenticatedTRPCContext,
+      organizationId
+    );
 
     // Check if code indexing is enabled in organization settings
     const enabled = org.settings?.code_indexing_enabled === true;

@@ -1,4 +1,4 @@
-import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter, type AuthenticatedTRPCContext } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { code_indexing_search, code_indexing_manifest } from '@kilocode/db/schema';
@@ -123,7 +123,7 @@ const CodebaseIndexingProjectFilesResponseSchema = z.object({
 });
 
 type Input = { organizationId?: string | null | undefined };
-export async function getCodeIndexOrganizationId(ctx: TRPCContext, input: Input) {
+export async function getCodeIndexOrganizationId(ctx: AuthenticatedTRPCContext, input: Input) {
   if (input.organizationId) {
     const org = await ensureOrganizationAccessAndFetchOrg(ctx, input.organizationId);
     if (org.settings.code_indexing_enabled === false) {
@@ -144,7 +144,7 @@ export async function getCodeIndexOrganizationId(ctx: TRPCContext, input: Input)
  * the organization ID from either a UUID or email address.
  */
 async function resolveOrganizationIdWithOverride(
-  ctx: TRPCContext,
+  ctx: AuthenticatedTRPCContext,
   input: { organizationId?: string | null | undefined; overrideUser?: string }
 ): Promise<string> {
   if (input.overrideUser) {

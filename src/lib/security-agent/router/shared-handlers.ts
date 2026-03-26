@@ -1,4 +1,4 @@
-import type { TRPCContext } from '@/lib/trpc/init';
+import type { AuthenticatedTRPCContext } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import {
   type getIntegrationForOwner,
@@ -93,13 +93,17 @@ type Integration = Awaited<ReturnType<typeof getIntegrationForOwner>>;
  * This avoids `as` casts throughout the handlers and org router callbacks.
  */
 type SecurityAgentDeps<TExtra = {}> = {
-  resolveOwner: (ctx: TRPCContext, input: TExtra) => Owner;
-  resolveSecurityOwner: (ctx: TRPCContext, input: TExtra) => SecurityReviewOwner;
-  resolveResourceId: (ctx: TRPCContext, input: TExtra) => string;
-  verifyFindingOwnership: (finding: SecurityFinding, ctx: TRPCContext, input: TExtra) => boolean;
-  getIntegration: (ctx: TRPCContext, input: TExtra) => Promise<Integration>;
-  getGitHubToken: (ctx: TRPCContext, input: TExtra) => Promise<string | null>;
-  trackingExtras: (ctx: TRPCContext, input: TExtra) => Record<string, string>;
+  resolveOwner: (ctx: AuthenticatedTRPCContext, input: TExtra) => Owner;
+  resolveSecurityOwner: (ctx: AuthenticatedTRPCContext, input: TExtra) => SecurityReviewOwner;
+  resolveResourceId: (ctx: AuthenticatedTRPCContext, input: TExtra) => string;
+  verifyFindingOwnership: (
+    finding: SecurityFinding,
+    ctx: AuthenticatedTRPCContext,
+    input: TExtra
+  ) => boolean;
+  getIntegration: (ctx: AuthenticatedTRPCContext, input: TExtra) => Promise<Integration>;
+  getGitHubToken: (ctx: AuthenticatedTRPCContext, input: TExtra) => Promise<string | null>;
+  trackingExtras: (ctx: AuthenticatedTRPCContext, input: TExtra) => Record<string, string>;
 };
 
 // ---------------------------------------------------------------------------
@@ -119,7 +123,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     // -----------------------------------------------------------------------
     // 1. getPermissionStatus
     // -----------------------------------------------------------------------
-    getPermissionStatus: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
+    getPermissionStatus: async ({
+      ctx,
+      input,
+    }: {
+      ctx: AuthenticatedTRPCContext;
+      input: unknown;
+    }) => {
       const extra = toExtra(input);
       const integration = await deps.getIntegration(ctx, extra);
 
@@ -147,7 +157,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     // -----------------------------------------------------------------------
     // 2. getConfig
     // -----------------------------------------------------------------------
-    getConfig: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
+    getConfig: async ({ ctx, input }: { ctx: AuthenticatedTRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const owner = deps.resolveOwner(ctx, extra);
       const result = await getSecurityAgentConfigWithStatus(owner);
@@ -215,7 +225,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         ctx,
         input: rawInput,
       }: {
-        ctx: TRPCContext;
+        ctx: AuthenticatedTRPCContext;
         input: SaveSecurityConfigInput & TExtra;
       }) => {
         const input = rawInput;
@@ -377,7 +387,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         ctx,
         input: rawInput,
       }: {
-        ctx: TRPCContext;
+        ctx: AuthenticatedTRPCContext;
         input: SetEnabledInput & TExtra;
       }) => {
         const input = rawInput;
@@ -515,7 +525,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     // -----------------------------------------------------------------------
     // 5. getRepositories
     // -----------------------------------------------------------------------
-    getRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
+    getRepositories: async ({ ctx, input }: { ctx: AuthenticatedTRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const integration = await deps.getIntegration(ctx, extra);
 
@@ -552,7 +562,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         ctx,
         input: rawInput,
       }: {
-        ctx: TRPCContext;
+        ctx: AuthenticatedTRPCContext;
         input: ListFindingsInput & TExtra;
       }) => {
         const input = rawInput;
@@ -590,7 +600,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         ctx,
         input: rawInput,
       }: {
-        ctx: TRPCContext;
+        ctx: AuthenticatedTRPCContext;
         input: GetFindingInput & TExtra;
       }) => {
         const input = rawInput;
@@ -617,7 +627,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     // -----------------------------------------------------------------------
     // 8. getStats
     // -----------------------------------------------------------------------
-    getStats: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
+    getStats: async ({ ctx, input }: { ctx: AuthenticatedTRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
       return await getSecurityFindingsSummary({ owner: securityOwner });
@@ -632,7 +642,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         ctx,
         input: rawInput,
       }: {
-        ctx: TRPCContext;
+        ctx: AuthenticatedTRPCContext;
         input: Pick<ListFindingsInput, 'repoFullName'> & TExtra;
       }) => {
         const input = rawInput;
@@ -654,7 +664,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         ctx,
         input: rawInput,
       }: {
-        ctx: TRPCContext;
+        ctx: AuthenticatedTRPCContext;
         input: TriggerSyncInput & TExtra;
       }) => {
         const input = rawInput;
@@ -813,7 +823,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         ctx,
         input: rawInput,
       }: {
-        ctx: TRPCContext;
+        ctx: AuthenticatedTRPCContext;
         input: DismissFindingInput & TExtra;
       }) => {
         const input = rawInput;
@@ -923,7 +933,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         ctx,
         input: rawInput,
       }: {
-        ctx: TRPCContext;
+        ctx: AuthenticatedTRPCContext;
         input: StartAnalysisInput & TExtra;
       }) => {
         const input = rawInput;
@@ -1038,7 +1048,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         ctx,
         input: rawInput,
       }: {
-        ctx: TRPCContext;
+        ctx: AuthenticatedTRPCContext;
         input: GetAnalysisInput & TExtra;
       }) => {
         const input = rawInput;
@@ -1074,7 +1084,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     // -----------------------------------------------------------------------
     // 14. getOrphanedRepositories
     // -----------------------------------------------------------------------
-    getOrphanedRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
+    getOrphanedRepositories: async ({
+      ctx,
+      input,
+    }: {
+      ctx: AuthenticatedTRPCContext;
+      input: unknown;
+    }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
 
@@ -1110,7 +1126,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         ctx,
         input: rawInput,
       }: {
-        ctx: TRPCContext;
+        ctx: AuthenticatedTRPCContext;
         input: DeleteFindingsByRepoInput & TExtra;
       }) => {
         const input = rawInput;
@@ -1142,7 +1158,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     // -----------------------------------------------------------------------
     // 16. getAutoDismissEligible
     // -----------------------------------------------------------------------
-    getAutoDismissEligible: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
+    getAutoDismissEligible: async ({
+      ctx,
+      input,
+    }: {
+      ctx: AuthenticatedTRPCContext;
+      input: unknown;
+    }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
       const result = await countEligibleForAutoDismiss(securityOwner, ctx.user.id);
@@ -1156,7 +1178,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     // -----------------------------------------------------------------------
     // 17. autoDismissEligible
     // -----------------------------------------------------------------------
-    autoDismissEligible: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
+    autoDismissEligible: async ({
+      ctx,
+      input,
+    }: {
+      ctx: AuthenticatedTRPCContext;
+      input: unknown;
+    }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
       const result = await autoDismissEligibleFindings(securityOwner, ctx.user.id);
@@ -1193,7 +1221,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         ctx,
         input: rawInput,
       }: {
-        ctx: TRPCContext;
+        ctx: AuthenticatedTRPCContext;
         input: GetDashboardStatsInput & TExtra;
       }) => {
         const input = rawInput;

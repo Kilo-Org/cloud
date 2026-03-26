@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
@@ -19,6 +20,19 @@ export function TownListPageClient() {
 
   const queryClient = useQueryClient();
   const townsQuery = useQuery(trpc.gastown.listTowns.queryOptions());
+  const didAutoRedirect = useRef(false);
+
+  // Auto-redirect new users with no towns to the onboarding wizard (once per page load)
+  useEffect(() => {
+    if (
+      !didAutoRedirect.current &&
+      townsQuery.data &&
+      townsQuery.data.length === 0
+    ) {
+      didAutoRedirect.current = true;
+      router.replace('/gastown/onboarding');
+    }
+  }, [townsQuery.data, router]);
 
   const deleteTown = useMutation(
     trpc.gastown.deleteTown.mutationOptions({

@@ -282,11 +282,13 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
         const parts = [{ type: 'text' as const, text: payload.prompt }];
         const agent = payload.mode || undefined;
         const model = payload.model || undefined;
+        const variant = payload.variant || undefined;
         return transport.sendCommand('send_message', {
           sessionID: config.kiloSessionId,
           parts,
           ...(agent ? { agent } : {}),
           ...(model ? { model } : {}),
+          ...(variant ? { variant } : {}),
         });
       }
       const send = config.transport.send;

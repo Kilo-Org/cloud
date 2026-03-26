@@ -36,6 +36,7 @@ import {
 } from '@/components/shared/RepositoryCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { ModeCombobox, NEXT_MODE_OPTIONS } from '@/components/shared/ModeCombobox';
+import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { AdvancedConfig } from '@/components/shared/AdvancedConfig';
 import { cn } from '@/lib/utils';
@@ -85,7 +86,12 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
 
   // Format models for the combobox (ModelOption format: id, name)
   const modelOptions = useMemo<ModelOption[]>(
-    () => allModels.map(model => ({ id: model.id, name: model.name })),
+    () =>
+      allModels.map(model => ({
+        id: model.id,
+        name: model.name,
+        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
+      })),
     [allModels]
   );
 
@@ -95,8 +101,11 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
   const [selectedPlatform, setSelectedPlatform] = useState<RepositoryPlatform>('github');
   const [mode, setMode] = useState<AgentMode>('code');
   const [model, setModel] = useState<string>('');
+  const [variant, setVariant] = useState<string | undefined>(undefined);
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
+
+  const availableVariants = modelOptions.find(m => m.id === model)?.variants ?? [];
 
   // Session form atoms (profile/env/commands)
   const [manualEnvVars, setManualEnvVars] = useAtom(manualEnvVarsAtom);
@@ -136,6 +145,9 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
       if (newModel && newModel !== model) {
         setModel(newModel);
         setIsModelUserSelected(false); // Auto-selected, not user-selected
+        // Default variant to first available variant (typically "none") for the new model
+        const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
+        setVariant(newVariants[0]);
       }
     }
   }, [defaultsData?.defaultModel, modelOptions, model, isModelUserSelected]);
@@ -262,6 +274,7 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
   // Refresh repositories hook (refreshes both GitHub and GitLab)
   const { refresh: refreshGitHubRepositories, isRefreshing: isRefreshingGitHubRepos } =
     useRefreshRepositories({
+      silent: true,
       getRefreshQueryOptions: useCallback(
         () =>
           organizationId
@@ -290,6 +303,7 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
 
   const { refresh: refreshGitLabRepositories, isRefreshing: isRefreshingGitLabRepos } =
     useRefreshRepositories({
+      silent: true,
       getRefreshQueryOptions: useCallback(
         () =>
           organizationId
@@ -316,9 +330,16 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
       ),
     });
 
-  // Combined refresh function
+  // Combined refresh function — single toast for both platforms
   const refreshRepositories = useCallback(async () => {
-    await Promise.all([refreshGitHubRepositories(), refreshGitLabRepositories()]);
+    try {
+      await Promise.all([refreshGitHubRepositories(), refreshGitLabRepositories()]);
+      toast.success('Repositories refreshed');
+    } catch (error) {
+      toast.error('Failed to refresh repositories', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   }, [refreshGitHubRepositories, refreshGitLabRepositories]);
 
   const isRefreshingRepos = isRefreshingGitHubRepos || isRefreshingGitLabRepos;
@@ -380,6 +401,7 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
         prompt: prompt.trim(),
         mode,
         model,
+        variant,
         envVars: Object.keys(manualEnvVars).length > 0 ? manualEnvVars : undefined,
         setupCommands: manualSetupCommands.length > 0 ? manualSetupCommands : undefined,
         profileName: selectedProfile?.name,
@@ -452,6 +474,7 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
     selectedProfile,
     trpc.unifiedSessions.list,
     trpcClient,
+    variant,
   ]);
 
   const isFormValid =
@@ -538,10 +561,24 @@ export function CloudNextSessionsPage({ organizationId }: CloudNextSessionsPageP
             onModelChange={newModel => {
               setModel(newModel);
               setIsModelUserSelected(true);
+              // Reset variant to first available (typically "none") if current is invalid for new model
+              const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
+              if (!variant || !newVariants.includes(variant)) {
+                setVariant(newVariants[0]);
+              }
             }}
             modelOptions={modelOptions}
             isLoadingModels={!modelsData}
           />
+
+          {/* Variant selector — only shown for models with variant support */}
+          {availableVariants.length > 0 && (
+            <VariantCombobox
+              variants={availableVariants}
+              value={variant}
+              onValueChange={setVariant}
+            />
+          )}
 
           {/* Advanced Configuration */}
           <AdvancedConfig

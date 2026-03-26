@@ -49,6 +49,8 @@ export interface CreateSessionOptions {
 export interface PromptOptions {
   messageId?: string;
   model?: { providerID?: string; modelID: string };
+  /** Thinking/reasoning effort variant (e.g., "high", "max", "low") */
+  variant?: string;
   agent?: string;
   noReply?: boolean;
   /** Custom system prompt override */

@@ -5,6 +5,7 @@ import {
   type SessionManagerConfig,
   type FetchedSessionData,
 } from './session-manager';
+import { createCloudAgentSession } from './session';
 import { kiloId, cloudAgentId } from './test-helpers';
 
 // ---------------------------------------------------------------------------
@@ -58,6 +59,7 @@ const defaultFetchedSession = {
   gitBranch: 'main',
   mode: 'code',
   model: 'claude-3-5-sonnet',
+  variant: null,
   repository: 'test/repo',
   isInitiated: true,
   needsLegacyPrepare: false,
@@ -144,12 +146,14 @@ describe('createSessionManager', () => {
         repository: string;
         mode: string;
         model: string;
+        variant?: string | null;
       }>(config.store, mgr.atoms.sessionConfig);
       expect(sessionConfig).toEqual({
         sessionId: 'agent-1',
         repository: 'test/repo',
         mode: 'code',
         model: 'claude-3-5-sonnet',
+        variant: null,
       });
     });
 
@@ -238,6 +242,43 @@ describe('createSessionManager', () => {
         mgr.atoms.sessionConfig
       );
       expect(sessionConfig?.sessionId).toBe('ses-cli');
+    });
+
+    it('includes variant from fetched data in sessionConfig', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          variant: 'high',
+        }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sessionConfig = atomValue<{
+        sessionId: string;
+        repository: string;
+        mode: string;
+        model: string;
+        variant?: string | null;
+      }>(config.store, mgr.atoms.sessionConfig);
+      expect(sessionConfig?.variant).toBe('high');
+    });
+
+    it('defaults variant to null when fetched data has no variant', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sessionConfig = atomValue<{
+        sessionId: string;
+        repository: string;
+        mode: string;
+        model: string;
+        variant?: string | null;
+      }>(config.store, mgr.atoms.sessionConfig);
+      expect(sessionConfig?.variant).toBe(null);
     });
   });
 
@@ -367,6 +408,45 @@ describe('createSessionManager', () => {
       expect(onSendFailed).toHaveBeenCalledWith('My prompt');
     });
 
+    it('passes variant through to session.send', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({
+        prompt: 'Hello',
+        mode: 'code',
+        model: 'claude-3-5-sonnet',
+        variant: 'high',
+      });
+
+      expect(mockSession.send).toHaveBeenCalledWith({
+        prompt: 'Hello',
+        mode: 'code',
+        model: 'claude-3-5-sonnet',
+        variant: 'high',
+      });
+    });
+
+    it('omits variant when not provided (backward compat)', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
+
+      expect(mockSession.send).toHaveBeenCalledWith({
+        prompt: 'Hello',
+        mode: 'code',
+        model: 'claude-3-5-sonnet',
+        variant: undefined,
+      });
+    });
+
     it('without active session sets error indicator', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -384,6 +464,79 @@ describe('createSessionManager', () => {
           message: 'Connection failed. Please retry in a moment.',
         })
       );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // sessionConfig variant tracking
+  // -------------------------------------------------------------------------
+
+  describe('sessionConfig variant tracking', () => {
+    it('updates variant from assistant message events', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // The mock captures the session config — find the onEvent callback
+      const sessionConfig = mockedCreate.mock.calls[0][0];
+
+      // Simulate an assistant message with variant
+      sessionConfig.onEvent?.({
+        type: 'message.updated',
+        info: {
+          id: 'msg-1',
+          sessionID: 'ses-1',
+          role: 'assistant',
+          modelID: 'claude-3-5-sonnet',
+          providerID: 'test',
+          mode: 'code',
+          variant: 'high',
+          time: { created: 1 },
+          agent: 'test',
+          cost: 0,
+          parentID: '',
+          path: { cwd: '', root: '' },
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+      });
+
+      const sc = atomValue<{ variant?: string | null }>(config.store, mgr.atoms.sessionConfig);
+      expect(sc?.variant).toBe('high');
+    });
+
+    it('sets variant to null when assistant message has no variant', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sessionConfig = mockedCreate.mock.calls[0][0];
+
+      sessionConfig.onEvent?.({
+        type: 'message.updated',
+        info: {
+          id: 'msg-1',
+          sessionID: 'ses-1',
+          role: 'assistant',
+          modelID: 'claude-3-5-sonnet',
+          providerID: 'test',
+          mode: 'code',
+          time: { created: 1 },
+          agent: 'test',
+          cost: 0,
+          parentID: '',
+          path: { cwd: '', root: '' },
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+      });
+
+      const sc = atomValue<{ variant?: string | null }>(config.store, mgr.atoms.sessionConfig);
+      expect(sc?.variant).toBe(null);
     });
   });
 

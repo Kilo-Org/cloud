@@ -16,6 +16,7 @@ import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
 import { buildRepoBrowseUrl, detectGitPlatform } from './utils/git-utils';
 import { useSidebarToggle } from './CloudSidebarLayout';
+import { formatShortModelName } from '@/lib/format-model-name';
 
 type ChatHeaderProps = {
   cloudAgentSessionId: string;
@@ -25,6 +26,7 @@ type ChatHeaderProps = {
   branch?: string;
   gitUrl?: string | null;
   model?: string;
+  modelDisplayName?: string;
   totalCost?: number;
   soundEnabled?: boolean;
   onToggleSound?: () => void;
@@ -37,6 +39,7 @@ export function ChatHeader({
   branch,
   gitUrl,
   model = 'Unknown',
+  modelDisplayName,
   totalCost = 0,
   soundEnabled = true,
   onToggleSound,
@@ -62,6 +65,7 @@ export function ChatHeader({
         sessionId={cloudAgentSessionId}
         kiloSessionId={kiloSessionId}
         model={model}
+        modelDisplayName={modelDisplayName}
         cost={totalCost * 1_000_000}
       />
       <SessionActionsDialog
@@ -101,7 +105,9 @@ export function ChatHeader({
             {model && model !== 'Unknown' && (
               <>
                 <span className="text-muted-foreground">·</span>
-                <span className="text-muted-foreground hidden shrink-0 sm:inline">{model}</span>
+                <span className="text-muted-foreground hidden shrink-0 sm:inline">
+                  {modelDisplayName ?? formatShortModelName(model)}
+                </span>
               </>
             )}
             {totalCost > 0 && (

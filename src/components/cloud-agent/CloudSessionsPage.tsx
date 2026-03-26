@@ -83,7 +83,12 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
 
   // Format models for the combobox (ModelOption format: id, name)
   const modelOptions = useMemo<ModelOption[]>(
-    () => allModels.map(model => ({ id: model.id, name: model.name })),
+    () =>
+      allModels.map(model => ({
+        id: model.id,
+        name: model.name,
+        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
+      })),
     [allModels]
   );
 
@@ -278,6 +283,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
   // Refresh repositories hook (refreshes both GitHub and GitLab)
   const { refresh: refreshGitHubRepositories, isRefreshing: isRefreshingGitHubRepos } =
     useRefreshRepositories({
+      silent: true,
       getRefreshQueryOptions: useCallback(
         () =>
           organizationId
@@ -306,6 +312,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
 
   const { refresh: refreshGitLabRepositories, isRefreshing: isRefreshingGitLabRepos } =
     useRefreshRepositories({
+      silent: true,
       getRefreshQueryOptions: useCallback(
         () =>
           organizationId
@@ -332,9 +339,16 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
       ),
     });
 
-  // Combined refresh function
+  // Combined refresh function — single toast for both platforms
   const refreshRepositories = useCallback(async () => {
-    await Promise.all([refreshGitHubRepositories(), refreshGitLabRepositories()]);
+    try {
+      await Promise.all([refreshGitHubRepositories(), refreshGitLabRepositories()]);
+      toast.success('Repositories refreshed');
+    } catch (error) {
+      toast.error('Failed to refresh repositories', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   }, [refreshGitHubRepositories, refreshGitLabRepositories]);
 
   const isRefreshingRepos = isRefreshingGitHubRepos || isRefreshingGitLabRepos;

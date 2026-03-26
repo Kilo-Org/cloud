@@ -173,6 +173,7 @@ export const baseGetSessionNextOutputSchema = z.object({
   prompt: z.string().optional(),
   mode: agentModeNextSchema.optional(),
   model: z.string().optional(),
+  variant: z.string().optional(),
   autoCommit: z.boolean().optional(),
   upstreamBranch: z.string().optional(),
 

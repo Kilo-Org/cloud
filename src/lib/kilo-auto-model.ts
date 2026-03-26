@@ -5,7 +5,11 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_NAME,
 } from '@/lib/providers/anthropic';
-import { MINIMAX_CURRENT_MODEL_ID, MINIMAX_CURRENT_MODEL_NAME, minimax_m25_free_model } from '@/lib/providers/minimax';
+import {
+  MINIMAX_CURRENT_MODEL_ID,
+  MINIMAX_CURRENT_MODEL_NAME,
+  minimax_m25_free_model,
+} from '@/lib/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID, KIMI_CURRENT_MODEL_NAME } from '@/lib/providers/moonshotai';
 import { gpt_oss_20b_free_model, GPT_5_NANO_ID, GPT_5_NANO_NAME } from '@/lib/providers/openai';
 import type {

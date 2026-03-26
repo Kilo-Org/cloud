@@ -1231,6 +1231,8 @@ function TerminalStatusBadge({
 
 // ── Mayor Terminal Pane ──────────────────────────────────────────────────
 
+const FIRST_TASK_STORAGE_PREFIX = 'gastown_first_task_';
+
 function MayorTerminalPane({ townId, collapsed }: { townId: string; collapsed: boolean }) {
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
@@ -1264,11 +1266,27 @@ function MayorTerminalPane({ townId, collapsed }: { townId: string; collapsed: b
 
   const mayorAgentId = statusQuery.data?.session?.agentId ?? null;
 
+  // Check for a queued first task from the onboarding wizard
+  const [queuedMessage] = useState(() => {
+    const storageKey = `${FIRST_TASK_STORAGE_PREFIX}${townId}`;
+    try {
+      const msg = localStorage.getItem(storageKey);
+      if (msg) {
+        localStorage.removeItem(storageKey);
+        return msg;
+      }
+    } catch {
+      // localStorage unavailable
+    }
+    return null;
+  });
+
   const { terminalRef, connectionStatus, status, fitAddonRef } = useXtermPty({
     townId,
     agentId: mayorAgentId,
     retries: 10,
     retryDelay: 3_000,
+    initialMessage: queuedMessage,
   });
 
   const { state: sidebarState } = useSidebar();

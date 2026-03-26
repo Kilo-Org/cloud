@@ -15,6 +15,11 @@ type XtermPtyOptions = {
   retryDelay?: number;
   /** Called when status changes (e.g. "Connecting...", "Connected"). */
   onStatusChange?: (status: string) => void;
+  /**
+   * Message to send once the PTY WebSocket first connects.
+   * Sent exactly once (on first open), then cleared. Appends a newline.
+   */
+  initialMessage?: string | null;
 };
 
 type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected';
@@ -57,6 +62,7 @@ export function useXtermPty({
   retries = 1,
   retryDelay = 3_000,
   onStatusChange,
+  initialMessage,
 }: XtermPtyOptions): XtermPtyResult {
   const trpc = useGastownTRPC();
   const [connected, setConnected] = useState(false);
@@ -73,6 +79,9 @@ export function useXtermPty({
   const reconnectAttemptsRef = useRef(0);
   const intentionalCloseRef = useRef(false);
   const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialMessageSentRef = useRef(false);
+  const initialMessageRef = useRef(initialMessage);
+  initialMessageRef.current = initialMessage;
 
   const updateStatus = useCallback(
     (s: string) => {
@@ -122,6 +131,17 @@ export function useXtermPty({
         updateStatus('Connected');
         const dims = fitAddon.proposeDimensions();
         if (dims) doResize(dims.cols, dims.rows);
+
+        // Send queued initial message exactly once on first connection
+        if (!initialMessageSentRef.current && initialMessageRef.current) {
+          initialMessageSentRef.current = true;
+          // Small delay to let the PTY shell initialize before sending input
+          setTimeout(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(initialMessageRef.current + '\n');
+            }
+          }, 500);
+        }
       };
 
       ws.onmessage = (e: MessageEvent) => {

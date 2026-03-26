@@ -4,6 +4,7 @@ import {
   kiloclaw_instances,
   kiloclaw_subscriptions,
   kiloclaw_email_log,
+  kiloclaw_cli_runs,
   kilocode_users,
 } from '@kilocode/db/schema';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
@@ -493,6 +494,43 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       throwKiloclawAdminError(err, fallbackMessage);
     }
   }),
+
+  startKiloCliRun: adminProcedure
+    .input(z.object({ userId: z.string().min(1), prompt: z.string().min(1).max(10_000) }))
+    .mutation(async ({ input }) => {
+      const fallbackMessage = 'Failed to start kilo CLI run';
+      try {
+        const client = new KiloClawInternalClient();
+        return await client.startKiloCliRun(input.userId, input.prompt);
+      } catch (err) {
+        console.error('Failed to start kilo CLI run for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
+
+  getKiloCliRunStatus: adminProcedure.input(GatewayProcessSchema).query(async ({ input }) => {
+    const fallbackMessage = 'Failed to get kilo CLI run status';
+    try {
+      const client = new KiloClawInternalClient();
+      return await client.getKiloCliRunStatus(input.userId);
+    } catch (err) {
+      console.error('Failed to get kilo CLI run status for user:', input.userId, err);
+      throwKiloclawAdminError(err, fallbackMessage);
+    }
+  }),
+
+  listKiloCliRuns: adminProcedure
+    .input(z.object({ userId: z.string().min(1), limit: z.number().min(1).max(50).default(20) }))
+    .query(async ({ input }) => {
+      const runs = await db
+        .select()
+        .from(kiloclaw_cli_runs)
+        .where(eq(kiloclaw_cli_runs.user_id, input.userId))
+        .orderBy(desc(kiloclaw_cli_runs.started_at))
+        .limit(input.limit);
+
+      return { runs };
+    }),
 
   restoreConfig: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
     const fallbackMessage = 'Failed to restore config';

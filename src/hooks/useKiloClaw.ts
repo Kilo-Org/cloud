@@ -101,6 +101,26 @@ export function useControllerVersion(enabled: boolean) {
   );
 }
 
+export function useKiloCliRunStatus(enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.getKiloCliRunStatus.queryOptions(undefined, {
+      enabled,
+      refetchInterval: enabled ? 3_000 : false,
+    })
+  );
+}
+
+export function useKiloCliRunHistory(enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.listKiloCliRuns.queryOptions(undefined, {
+      enabled,
+      staleTime: 30_000,
+    })
+  );
+}
+
 export function useKiloClawMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -206,6 +226,12 @@ export function useKiloClawMutations() {
     ),
     runDoctor: useMutation(
       trpc.kiloclaw.runDoctor.mutationOptions({ onSuccess: invalidateStatus })
+    ),
+    startKiloCliRun: useMutation(
+      trpc.kiloclaw.startKiloCliRun.mutationOptions({ onSuccess: invalidateStatus })
+    ),
+    cancelKiloCliRun: useMutation(
+      trpc.kiloclaw.cancelKiloCliRun.mutationOptions({ onSuccess: invalidateStatus })
     ),
     restoreConfig: useMutation(
       trpc.kiloclaw.restoreConfig.mutationOptions({

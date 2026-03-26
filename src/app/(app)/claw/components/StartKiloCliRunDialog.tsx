@@ -1,0 +1,103 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Loader2, Terminal } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+
+export function StartKiloCliRunDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const router = useRouter();
+  const [prompt, setPrompt] = useState('');
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  const handleStart = () => {
+    if (!prompt.trim()) return;
+    setIsNavigating(true);
+    onOpenChange(false);
+    router.push(`/claw/kilo-run?prompt=${encodeURIComponent(prompt.trim())}`);
+  };
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setPrompt('');
+      setIsNavigating(false);
+    }
+    onOpenChange(nextOpen);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[550px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Terminal className="h-5 w-5" />
+            Run Kilo CLI Agent
+          </DialogTitle>
+          <DialogDescription>
+            Run the Kilo CLI agent on your instance with a task prompt. The agent will execute
+            autonomously and you can monitor its output in real time.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2">
+          <Textarea
+            placeholder="Describe the task for the agent..."
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            className="min-h-[120px] resize-none"
+            maxLength={10_000}
+            autoFocus
+            onKeyDown={e => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                handleStart();
+              }
+            }}
+          />
+          <p className="text-muted-foreground text-xs">
+            Press Cmd+Enter to start. The agent runs as{' '}
+            <code className="text-[11px]">kilo run --auto</code>.
+          </p>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleStart}
+            disabled={!prompt.trim() || isNavigating}
+            className="bg-emerald-600 text-white hover:bg-emerald-700"
+          >
+            {isNavigating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Starting...
+              </>
+            ) : (
+              <>
+                <Terminal className="h-4 w-4" />
+                Start Run
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

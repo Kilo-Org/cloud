@@ -18,6 +18,13 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     deployHint: 'upgrade_required',
   },
   {
+    date: '2026-03-26',
+    description:
+      'Added "Run Kilo Agent" — start a kilo run --auto task directly from the dashboard. Monitor output in real time with polling, cancel runs, and view run history.',
+    category: 'feature',
+    deployHint: 'redeploy_suggested',
+  },
+  {
     date: '2026-03-24',
     description:
       'Fixed Kilo CLI discovery — OpenClaw now knows about the kilo CLI on all instances. Previously, instances provisioned before the CLI was added did not advertise it in TOOLS.md, so the agent could not find it.',

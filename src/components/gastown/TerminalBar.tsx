@@ -500,6 +500,7 @@ function TabBar({
                     : 'text-white/35 hover:bg-white/[0.03] hover:text-white/55'
                 }`}
                 title={horizontal ? undefined : tab.label}
+                {...(isMayor ? { 'data-onboarding-target': 'onboarding-mayor' } : {})}
               >
                 {isMayor && (
                   <Crown

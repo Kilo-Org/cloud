@@ -251,6 +251,10 @@ export type PRFeedbackCheckResult = {
   hasUnresolvedComments: boolean;
   hasFailingChecks: boolean;
   allChecksPass: boolean;
+  /** True when the check-runs response was paginated and not all runs were
+   *  inspected. allChecksPass is already false in this case, but
+   *  hasFailingChecks only reflects the runs we actually saw. */
+  hasUncheckedRuns: boolean;
 };
 
 export type ApplyActionContext = {

@@ -4111,7 +4111,10 @@ export class TownDO extends DurableObject<Env> {
       console.warn(`${TOWN_LOG} checkPRFeedback: GraphQL failed for ${prUrl}`, err);
     }
 
-    // Check CI status via check-runs API
+    // Check CI status via check-runs API.
+    // Uses per_page=100 (GitHub max) and compares total_count to detect
+    // unpaginated runs — if there are more runs than returned, conservatively
+    // marks allChecksPass as false to prevent premature auto-merge.
     let hasFailingChecks = false;
     let allChecksPass = false;
     try {
@@ -4125,7 +4128,7 @@ export class TownDO extends DurableObject<Env> {
         const sha = prData.head?.sha;
         if (sha) {
           const checksRes = await fetch(
-            `https://api.github.com/repos/${owner}/${repo}/commits/${sha}/check-runs`,
+            `https://api.github.com/repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=100`,
             { headers }
           );
           if (checksRes.ok) {
@@ -4137,12 +4140,17 @@ export class TownDO extends DurableObject<Env> {
               }>;
             };
             const runs = checksData.check_runs ?? [];
+            const totalCount = checksData.total_count ?? runs.length;
+            const hasMorePages = totalCount > runs.length;
+
             hasFailingChecks = runs.some(
               r => r.status === 'completed' && r.conclusion !== 'success' && r.conclusion !== 'skipped'
             );
-            // All checks pass = at least one check and all completed successfully
+            // All checks pass = at least one check, all returned runs completed
+            // successfully, and no unpaginated runs exist
             allChecksPass =
               runs.length > 0 &&
+              !hasMorePages &&
               runs.every(
                 r =>
                   r.status === 'completed' &&

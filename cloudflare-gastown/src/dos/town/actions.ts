@@ -753,6 +753,36 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
       return async () => {
         try {
+          // Re-check feedback immediately before merging to avoid acting on
+          // stale state. If a reviewer posted new comments or CI regressed
+          // since the last poll, abort and reset the timer.
+          const freshFeedback = await ctx.checkPRFeedback(action.pr_url);
+          if (freshFeedback && (freshFeedback.hasUnresolvedComments || freshFeedback.hasFailingChecks || !freshFeedback.allChecksPass)) {
+            console.log(
+              `${LOG} merge_pr: fresh feedback check found issues, aborting merge for bead=${action.bead_id}`
+            );
+            query(
+              sql,
+              /* sql */ `
+                UPDATE ${beads}
+                SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.auto_merge_pending'),
+                    ${beads.columns.updated_at} = ?
+                WHERE ${beads.bead_id} = ?
+              `,
+              [now(), action.bead_id]
+            );
+            query(
+              sql,
+              /* sql */ `
+                UPDATE ${review_metadata}
+                SET ${review_metadata.columns.auto_merge_ready_since} = NULL
+                WHERE ${review_metadata.bead_id} = ?
+              `,
+              [action.bead_id]
+            );
+            return;
+          }
+
           const merged = await ctx.mergePR(action.pr_url);
           if (merged) {
             ctx.insertEvent('pr_status_changed', {

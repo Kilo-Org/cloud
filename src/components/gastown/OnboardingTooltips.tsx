@@ -52,13 +52,22 @@ export function OnboardingTooltips({ townId }: OnboardingTooltipsProps) {
   // ── Detect first bead closure ────────────────────────────────────────
   // Query rigs, then beads per rig, to detect when any non-agent bead
   // transitions to closed status.
-  const rigsQuery = useQuery(trpc.gastown.listRigs.queryOptions({ townId }));
+  //
+  // needsPolling: only poll while we haven't yet detected a first-task
+  // completion. Once tooltips are triggered (or were already completed in
+  // a prior session), stop polling to avoid a permanent N+1 background hit.
+  const [needsPolling, setNeedsPolling] = useState(!alreadyCompleted);
+
+  const rigsQuery = useQuery({
+    ...trpc.gastown.listRigs.queryOptions({ townId }),
+    enabled: needsPolling,
+  });
   const rigs = rigsQuery.data ?? [];
 
   const rigBeadQueries = useQueries({
     queries: rigs.map(rig => ({
       ...trpc.gastown.listBeads.queryOptions({ rigId: rig.id }),
-      refetchInterval: 8_000,
+      refetchInterval: needsPolling ? 8_000 : false,
     })),
   });
 
@@ -70,6 +79,7 @@ export function OnboardingTooltips({ townId }: OnboardingTooltipsProps) {
   useEffect(() => {
     if (hasClosedBead && !triggeredRef.current && !alreadyCompleted) {
       triggeredRef.current = true;
+      setNeedsPolling(false);
       markFirstTaskCompleted(townId);
       triggerTooltips();
     }

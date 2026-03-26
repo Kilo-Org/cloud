@@ -1,5 +1,6 @@
 import 'server-only';
 import { createTRPCRouter } from '@/lib/trpc/init';
+import { appConfigRouter } from '@/routers/app-config-router';
 import { organizationsRouter } from '@/routers/organizations/organization-router';
 import { testRouter } from '@/routers/test-router';
 import { debugRouter } from '@/routers/debug-router';
@@ -36,6 +37,7 @@ import { kiloclawRouter } from '@/routers/kiloclaw-router';
 import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
 export const rootRouter = createTRPCRouter({
+  appConfig: appConfigRouter,
   test: testRouter,
   organizations: organizationsRouter,
   debug: debugRouter,

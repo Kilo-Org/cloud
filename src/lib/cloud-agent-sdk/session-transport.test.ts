@@ -1,9 +1,6 @@
-import {
-  createCloudAgentSession,
-  type CloudAgentSession,
-  type CloudAgentSessionTransport,
-} from './session';
-import { kiloId, cloudAgentId } from './test-helpers';
+import { createCloudAgentSession, type CloudAgentSession } from './session';
+import type { CloudAgentApi } from './transport';
+import { kiloId, cloudAgentId, makeSnapshot } from './test-helpers';
 
 // ---------------------------------------------------------------------------
 // WebSocket mock — needed because connect() → resolveSession → transport → WS
@@ -48,7 +45,23 @@ afterEach(() => {
 const kiloSessionId = kiloId('ses_transport-tests');
 const cloudAgentSessionId = cloudAgentId('agent_12345678-1234-1234-1234-123456789abc');
 
-function createResolvedSession(transport: CloudAgentSessionTransport): CloudAgentSession {
+function createMockApi(): CloudAgentApi & {
+  send: jest.Mock;
+  interrupt: jest.Mock;
+  answer: jest.Mock;
+  reject: jest.Mock;
+  respondToPermission: jest.Mock;
+} {
+  return {
+    send: jest.fn(() => Promise.resolve('sent')),
+    interrupt: jest.fn(() => Promise.resolve('interrupted')),
+    answer: jest.fn(() => Promise.resolve('answered')),
+    reject: jest.fn(() => Promise.resolve('rejected')),
+    respondToPermission: jest.fn(() => Promise.resolve('responded')),
+  };
+}
+
+function createCloudAgentResolvedSession(api: CloudAgentApi): CloudAgentSession {
   return createCloudAgentSession({
     kiloSessionId,
     resolveSession: async () => ({
@@ -56,7 +69,11 @@ function createResolvedSession(transport: CloudAgentSessionTransport): CloudAgen
       cloudAgentSessionId,
       isLive: true,
     }),
-    transport,
+    transport: {
+      getTicket: () => 'ticket',
+      api,
+      fetchSnapshot: () => Promise.resolve(makeSnapshot({ id: 'ses_transport-tests' })),
+    },
     websocketBaseUrl: 'ws://localhost:9999',
   });
 }
@@ -75,55 +92,46 @@ async function connectSession(session: CloudAgentSession): Promise<void> {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('session transport delegation', () => {
-  it('session.send() delegates to transport.send with resolved cloudAgentSessionId', async () => {
-    const send = jest.fn((_payload: Record<string, unknown>) => Promise.resolve('ok'));
-    const session = createResolvedSession({ getTicket: () => 'ticket', send });
+describe('session transport delegation (cloud agent)', () => {
+  it('session.send() delegates to api.send with resolved cloudAgentSessionId', async () => {
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
 
     await connectSession(session);
-    await Promise.resolve(session.send({ message: 'hello', mode: 'auto' }));
+    await session.send({ prompt: 'hello', mode: 'auto' });
 
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(send).toHaveBeenCalledWith({
+    expect(api.send).toHaveBeenCalledTimes(1);
+    expect(api.send).toHaveBeenCalledWith({
       sessionId: cloudAgentSessionId,
-      message: 'hello',
+      prompt: 'hello',
       mode: 'auto',
     });
 
     session.destroy();
   });
 
-  it('session.interrupt() delegates to transport.interrupt with resolved cloudAgentSessionId', async () => {
-    const interrupt = jest.fn((_payload: { sessionId: string }) => Promise.resolve('ok'));
-    const session = createResolvedSession({
-      getTicket: () => 'ticket',
-      interrupt,
-    });
+  it('session.interrupt() delegates to api.interrupt with resolved cloudAgentSessionId', async () => {
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
 
     await connectSession(session);
-    await Promise.resolve(session.interrupt());
+    await session.interrupt();
 
-    expect(interrupt).toHaveBeenCalledTimes(1);
-    expect(interrupt).toHaveBeenCalledWith({ sessionId: cloudAgentSessionId });
+    expect(api.interrupt).toHaveBeenCalledTimes(1);
+    expect(api.interrupt).toHaveBeenCalledWith({ sessionId: cloudAgentSessionId });
 
     session.destroy();
   });
 
-  it('session.answer() delegates to transport.answer with resolved cloudAgentSessionId', async () => {
-    const answer = jest.fn(
-      (_payload: { sessionId: string; requestId: string; answers: string[][] }) =>
-        Promise.resolve('ok')
-    );
-    const session = createResolvedSession({
-      getTicket: () => 'ticket',
-      answer,
-    });
+  it('session.answer() delegates to api.answer with resolved cloudAgentSessionId', async () => {
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
 
     await connectSession(session);
-    await Promise.resolve(session.answer({ requestId: 'req-1', answers: [['yes']] }));
+    await session.answer({ requestId: 'req-1', answers: [['yes']] });
 
-    expect(answer).toHaveBeenCalledTimes(1);
-    expect(answer).toHaveBeenCalledWith({
+    expect(api.answer).toHaveBeenCalledTimes(1);
+    expect(api.answer).toHaveBeenCalledWith({
       sessionId: cloudAgentSessionId,
       requestId: 'req-1',
       answers: [['yes']],
@@ -132,20 +140,15 @@ describe('session transport delegation', () => {
     session.destroy();
   });
 
-  it('session.reject() delegates to transport.reject with resolved cloudAgentSessionId', async () => {
-    const reject = jest.fn((_payload: { sessionId: string; requestId: string }) =>
-      Promise.resolve('ok')
-    );
-    const session = createResolvedSession({
-      getTicket: () => 'ticket',
-      reject,
-    });
+  it('session.reject() delegates to api.reject with resolved cloudAgentSessionId', async () => {
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
 
     await connectSession(session);
-    await Promise.resolve(session.reject({ requestId: 'req-2' }));
+    await session.reject({ requestId: 'req-2' });
 
-    expect(reject).toHaveBeenCalledTimes(1);
-    expect(reject).toHaveBeenCalledWith({
+    expect(api.reject).toHaveBeenCalledTimes(1);
+    expect(api.reject).toHaveBeenCalledWith({
       sessionId: cloudAgentSessionId,
       requestId: 'req-2',
     });
@@ -153,21 +156,15 @@ describe('session transport delegation', () => {
     session.destroy();
   });
 
-  it('session.respondToPermission() delegates with resolved cloudAgentSessionId', async () => {
-    const respondToPermission = jest.fn(
-      (_payload: { sessionId: string; requestId: string; response: string }) =>
-        Promise.resolve('ok')
-    );
-    const session = createResolvedSession({
-      getTicket: () => 'ticket',
-      respondToPermission,
-    });
+  it('session.respondToPermission() delegates to api.respondToPermission', async () => {
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
 
     await connectSession(session);
-    await Promise.resolve(session.respondToPermission({ requestId: 'req-3', response: 'once' }));
+    await session.respondToPermission({ requestId: 'req-3', response: 'once' });
 
-    expect(respondToPermission).toHaveBeenCalledTimes(1);
-    expect(respondToPermission).toHaveBeenCalledWith({
+    expect(api.respondToPermission).toHaveBeenCalledTimes(1);
+    expect(api.respondToPermission).toHaveBeenCalledWith({
       sessionId: cloudAgentSessionId,
       requestId: 'req-3',
       response: 'once',
@@ -177,45 +174,65 @@ describe('session transport delegation', () => {
   });
 });
 
-describe('commands throw before session is resolved', () => {
+describe('commands throw before transport is connected', () => {
   it('session.send() throws if called before connect()', () => {
-    const session = createResolvedSession({
-      getTicket: () => 'ticket',
-      send: jest.fn(),
-    });
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
 
-    expect(() => session.send({ message: 'hello' })).toThrow('Session not resolved yet');
-
-    session.destroy();
-  });
-
-  it('session.interrupt() throws if called before connect()', () => {
-    const session = createResolvedSession({
-      getTicket: () => 'ticket',
-      interrupt: jest.fn(),
-    });
-
-    expect(() => session.interrupt()).toThrow('Session not resolved yet');
-
-    session.destroy();
-  });
-});
-
-describe('session transport missing command methods', () => {
-  it('session.send() throws when transport.send is missing', async () => {
-    const session = createResolvedSession({ getTicket: () => 'ticket' });
-    await connectSession(session);
-
-    expect(() => session.send({ message: 'hello' })).toThrow(
+    expect(() => session.send({ prompt: 'hello' })).toThrow(
       'CloudAgentSession transport.send is not configured'
     );
 
     session.destroy();
   });
 
-  it('session.interrupt() throws when transport.interrupt is missing', async () => {
-    const session = createResolvedSession({ getTicket: () => 'ticket' });
-    await connectSession(session);
+  it('session.interrupt() throws if called before connect()', () => {
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
+
+    expect(() => session.interrupt()).toThrow(
+      'CloudAgentSession transport.interrupt is not configured'
+    );
+
+    session.destroy();
+  });
+});
+
+describe('session transport missing command methods (historical session)', () => {
+  function createHistoricalSession(): CloudAgentSession {
+    return createCloudAgentSession({
+      kiloSessionId: kiloId('ses_historical'),
+      resolveSession: async () => ({
+        kiloSessionId: kiloId('ses_historical'),
+        cloudAgentSessionId: null,
+        isLive: false,
+      }),
+      transport: {
+        fetchSnapshot: () => Promise.resolve(makeSnapshot({ id: 'ses_historical' })),
+      },
+    });
+  }
+
+  async function connectHistorical(session: CloudAgentSession): Promise<void> {
+    session.connect();
+    await new Promise(r => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
+  }
+
+  it('session.send() throws for historical session', async () => {
+    const session = createHistoricalSession();
+    await connectHistorical(session);
+
+    expect(() => session.send({ prompt: 'hello' })).toThrow(
+      'CloudAgentSession transport.send is not configured'
+    );
+
+    session.destroy();
+  });
+
+  it('session.interrupt() throws for historical session', async () => {
+    const session = createHistoricalSession();
+    await connectHistorical(session);
 
     expect(() => session.interrupt()).toThrow(
       'CloudAgentSession transport.interrupt is not configured'
@@ -224,9 +241,9 @@ describe('session transport missing command methods', () => {
     session.destroy();
   });
 
-  it('session.answer() throws when transport.answer is missing', async () => {
-    const session = createResolvedSession({ getTicket: () => 'ticket' });
-    await connectSession(session);
+  it('session.answer() throws for historical session', async () => {
+    const session = createHistoricalSession();
+    await connectHistorical(session);
 
     expect(() => session.answer({ requestId: 'req-3', answers: [[]] })).toThrow(
       'CloudAgentSession transport.answer is not configured'
@@ -235,9 +252,9 @@ describe('session transport missing command methods', () => {
     session.destroy();
   });
 
-  it('session.reject() throws when transport.reject is missing', async () => {
-    const session = createResolvedSession({ getTicket: () => 'ticket' });
-    await connectSession(session);
+  it('session.reject() throws for historical session', async () => {
+    const session = createHistoricalSession();
+    await connectHistorical(session);
 
     expect(() => session.reject({ requestId: 'req-4' })).toThrow(
       'CloudAgentSession transport.reject is not configured'
@@ -247,13 +264,10 @@ describe('session transport missing command methods', () => {
   });
 });
 
-describe('CLI live session send via sendCommand', () => {
-  // Simulates the CLI live transport path where cloudAgentSessionId is null.
-  // The session should send commands using kiloSessionId, not cloudAgentSessionId.
+describe('CLI live session send via typed transport methods', () => {
   const cliKiloSessionId = kiloId('ses_cli-live-session');
 
-  it('session.send() uses kiloSessionId (not cloudAgentSessionId) for sendCommand path', async () => {
-    // Create a session that resolves as CLI live (cloudAgentSessionId = null)
+  it('session.send() uses kiloSessionId for CLI live sessions', async () => {
     const session = createCloudAgentSession({
       kiloSessionId: cliKiloSessionId,
       resolveSession: async () => ({
@@ -278,16 +292,14 @@ describe('CLI live session send via sendCommand', () => {
     // Open the WebSocket
     mockWs.onopen?.(new Event('open'));
 
-    // Now send a message. This should use transport.sendCommand with
-    // kiloSessionId as the sessionID, NOT throw "Session not resolved yet".
+    // Now send a message via the typed send method
     const sendPromise = session.send({
       prompt: 'Hello world',
       mode: 'code',
       model: 'test/model-1',
     });
 
-    // The sendCommand sends a JSON message over the WebSocket.
-    // Verify it was sent with the correct sessionID.
+    // The transport wraps this into a WebSocket command
     const lastCall = mockWs.send.mock.calls.at(-1);
     expect(lastCall).toBeDefined();
     const sentPayload = JSON.parse(lastCall![0]) as {
@@ -323,46 +335,105 @@ describe('CLI live session send via sendCommand', () => {
 });
 
 describe('session capabilities', () => {
-  it('canSend is true when transport.send is configured', () => {
-    const session = createResolvedSession({
-      getTicket: () => 'ticket',
-      send: jest.fn(),
-    });
+  it('canSend is true after connecting a cloud agent session', async () => {
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
+    await connectSession(session);
     expect(session.canSend).toBe(true);
     session.destroy();
   });
 
-  it('canSend is false when transport.send is NOT configured', () => {
-    const session = createResolvedSession({ getTicket: () => 'ticket' });
+  it('canSend is false before connect()', () => {
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
     expect(session.canSend).toBe(false);
     session.destroy();
   });
 
-  it('canInterrupt is true when transport.interrupt is configured and session is resolved', async () => {
-    const session = createResolvedSession({
-      getTicket: () => 'ticket',
-      interrupt: jest.fn(),
+  it('canSend is true after connecting a CLI live session', async () => {
+    const session = createCloudAgentSession({
+      kiloSessionId: kiloId('ses_cli-live'),
+      resolveSession: async () => ({
+        kiloSessionId: kiloId('ses_cli-live'),
+        cloudAgentSessionId: null,
+        isLive: true,
+      }),
+      transport: {
+        cliWebsocketUrl: 'wss://localhost:9999/api/user/web',
+        getAuthToken: () => 'test-token',
+      },
     });
+
+    session.connect();
+    await new Promise(r => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(session.canSend).toBe(true);
+    session.destroy();
+  });
+
+  it('canSend is false after connecting a historical session', async () => {
+    const session = createCloudAgentSession({
+      kiloSessionId: kiloId('ses_historical'),
+      resolveSession: async () => ({
+        kiloSessionId: kiloId('ses_historical'),
+        cloudAgentSessionId: null,
+        isLive: false,
+      }),
+      transport: {
+        fetchSnapshot: () => Promise.resolve(makeSnapshot({ id: 'ses_historical' })),
+      },
+    });
+
+    session.connect();
+    await new Promise(r => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(session.canSend).toBe(false);
+    session.destroy();
+  });
+
+  it('canInterrupt is true after connecting a cloud agent session', async () => {
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
     await connectSession(session);
     expect(session.canInterrupt).toBe(true);
     session.destroy();
   });
 
-  it('canInterrupt is false when transport.interrupt is NOT configured', () => {
-    const session = createResolvedSession({ getTicket: () => 'ticket' });
+  it('canInterrupt is false before connect()', () => {
+    const api = createMockApi();
+    const session = createCloudAgentResolvedSession(api);
     expect(session.canInterrupt).toBe(false);
     session.destroy();
   });
 
-  it('canSend is false when only getTicket is configured (no send, no sendCommand)', () => {
-    const session = createResolvedSession({});
-    expect(session.canSend).toBe(false);
+  it('canInterrupt is false for historical sessions', async () => {
+    const session = createCloudAgentSession({
+      kiloSessionId: kiloId('ses_historical'),
+      resolveSession: async () => ({
+        kiloSessionId: kiloId('ses_historical'),
+        cloudAgentSessionId: null,
+        isLive: false,
+      }),
+      transport: {
+        fetchSnapshot: () => Promise.resolve(makeSnapshot({ id: 'ses_historical' })),
+      },
+    });
+
+    session.connect();
+    await new Promise(r => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(session.canInterrupt).toBe(false);
     session.destroy();
   });
 });
 
 describe('disconnect during resolution', () => {
   it('disconnect() before resolveSession settles prevents transport from attaching', async () => {
+    const api = createMockApi();
     let resolveSession!: (value: {
       kiloSessionId: typeof kiloSessionId;
       cloudAgentSessionId: typeof cloudAgentSessionId;
@@ -379,7 +450,11 @@ describe('disconnect during resolution', () => {
     const session = createCloudAgentSession({
       kiloSessionId,
       resolveSession: () => resolvePromise,
-      transport: { getTicket: () => 'ticket' },
+      transport: {
+        getTicket: () => 'ticket',
+        api,
+        fetchSnapshot: () => Promise.resolve(makeSnapshot({ id: 'ses_transport-tests' })),
+      },
       websocketBaseUrl: 'ws://localhost:9999',
     });
 

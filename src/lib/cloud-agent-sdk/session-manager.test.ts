@@ -17,8 +17,10 @@ const mockSession = {
   disconnect: jest.fn(),
   destroy: jest.fn(),
   send: jest.fn(),
+  interrupt: jest.fn(),
   answer: jest.fn(),
   reject: jest.fn(),
+  respondToPermission: jest.fn(),
   canSend: true,
   canInterrupt: true,
   state: {
@@ -92,11 +94,13 @@ function createMockConfig(overrides: Partial<SessionManagerConfig> = {}): Sessio
     getTicket: jest.fn().mockResolvedValue('ticket-123'),
     fetchSnapshot: jest.fn().mockResolvedValue({ info: {}, messages: [] }),
     getAuthToken: jest.fn().mockResolvedValue('token-123'),
-    send: jest.fn().mockResolvedValue({}),
-    interrupt: jest.fn().mockResolvedValue({}),
-    answer: jest.fn().mockResolvedValue({}),
-    reject: jest.fn().mockResolvedValue({}),
-    respondToPermission: jest.fn().mockResolvedValue({}),
+    api: {
+      send: jest.fn().mockResolvedValue({}),
+      interrupt: jest.fn().mockResolvedValue({}),
+      answer: jest.fn().mockResolvedValue({}),
+      reject: jest.fn().mockResolvedValue({}),
+      respondToPermission: jest.fn().mockResolvedValue({}),
+    },
     prepare: jest.fn().mockResolvedValue({ cloudAgentSessionId: cloudAgentId('agent-new') }),
     initiate: jest.fn().mockResolvedValue({}),
     fetchSession: jest.fn().mockResolvedValue(defaultFetchedSession),
@@ -121,6 +125,8 @@ describe('createSessionManager', () => {
     mockSession.disconnect.mockClear();
     mockSession.destroy.mockClear();
     mockSession.send.mockClear();
+    mockSession.interrupt.mockClear();
+    mockSession.respondToPermission.mockClear();
     mockSession.canSend = true;
     mockSession.canInterrupt = true;
     mockSession.state.subscribe.mockImplementation(() => () => {});
@@ -564,14 +570,14 @@ describe('createSessionManager', () => {
   // -------------------------------------------------------------------------
 
   describe('interrupt', () => {
-    it('calls config.interrupt and sets info indicator', async () => {
+    it('calls session.interrupt and sets info indicator', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
 
       await mgr.switchSession(kiloId('ses-1'));
       await mgr.interrupt();
 
-      expect(config.interrupt).toHaveBeenCalledWith({ sessionId: 'agent-1' });
+      expect(mockSession.interrupt).toHaveBeenCalledTimes(1);
       const indicator = atomValue<{ type: string; message: string } | null>(
         config.store,
         mgr.atoms.statusIndicator
@@ -582,12 +588,11 @@ describe('createSessionManager', () => {
     });
 
     it('sets error on failure', async () => {
-      const config = createMockConfig({
-        interrupt: jest.fn().mockRejectedValue(new Error('interrupt failed')),
-      });
+      const config = createMockConfig();
       const mgr = createSessionManager(config);
 
       await mgr.switchSession(kiloId('ses-1'));
+      mockSession.interrupt.mockRejectedValueOnce(new Error('interrupt failed'));
       await mgr.interrupt();
 
       expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
@@ -602,7 +607,7 @@ describe('createSessionManager', () => {
       // No switchSession
       await mgr.interrupt();
 
-      expect(config.interrupt).not.toHaveBeenCalled();
+      expect(mockSession.interrupt).not.toHaveBeenCalled();
     });
   });
 

@@ -13,7 +13,7 @@ import type { ServiceState } from './service-state';
 import { createCloudAgentTransport } from './cloud-agent-transport';
 import { createCliLiveTransport } from './cli-live-transport';
 import { createCliHistoricalTransport } from './cli-historical-transport';
-import type { TransportFactory, TransportSink, Transport } from './transport';
+import type { CloudAgentApi, TransportFactory, TransportSink, Transport } from './transport';
 import { createMemoryStorage } from './storage/memory';
 import type { SessionStorage } from './storage/types';
 import type {
@@ -47,10 +47,11 @@ type CloudAgentSessionConfig = {
   onEvent?: (event: NormalizedEvent) => void;
 };
 
-type CloudAgentSessionSendInput = Record<string, unknown>;
-
-type CloudAgentSessionTransportInterruptInput = {
-  sessionId: CloudAgentSessionId;
+type CloudAgentSessionSendInput = {
+  prompt: string;
+  mode?: string;
+  model?: string;
+  variant?: string;
 };
 
 type CloudAgentSessionAnswerInput = {
@@ -58,16 +59,8 @@ type CloudAgentSessionAnswerInput = {
   answers: string[][];
 };
 
-type CloudAgentSessionTransportAnswerInput = CloudAgentSessionAnswerInput & {
-  sessionId: CloudAgentSessionId;
-};
-
 type CloudAgentSessionRejectInput = {
   requestId: string;
-};
-
-type CloudAgentSessionTransportRejectInput = CloudAgentSessionRejectInput & {
-  sessionId: CloudAgentSessionId;
 };
 
 type PermissionResponse = 'once' | 'always' | 'reject';
@@ -77,26 +70,15 @@ type CloudAgentSessionRespondToPermissionInput = {
   response: PermissionResponse;
 };
 
-type CloudAgentSessionTransportRespondToPermissionInput =
-  CloudAgentSessionRespondToPermissionInput & {
-    sessionId: CloudAgentSessionId;
-  };
-
 type CloudAgentSessionTransport = {
-  // For Cloud Agent sessions
+  // Cloud Agent transport construction
   getTicket?: (sessionId: CloudAgentSessionId) => string | Promise<string>;
-  send?: (
-    payload: CloudAgentSessionSendInput & { sessionId: CloudAgentSessionId }
-  ) => unknown | Promise<unknown>;
-  interrupt?: (payload: CloudAgentSessionTransportInterruptInput) => unknown | Promise<unknown>;
-  answer?: (payload: CloudAgentSessionTransportAnswerInput) => unknown | Promise<unknown>;
-  reject?: (payload: CloudAgentSessionTransportRejectInput) => unknown | Promise<unknown>;
-  respondToPermission?: (
-    payload: CloudAgentSessionTransportRespondToPermissionInput
-  ) => unknown | Promise<unknown>;
+  api?: CloudAgentApi;
 
-  // For CLI sessions
+  // Shared
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
+
+  // CLI live transport construction
   getAuthToken?: () => string | Promise<string>;
   cliWebsocketUrl?: string;
 };
@@ -142,7 +124,6 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   });
 
   let transport: Transport | null = null;
-  let resolvedCloudAgentSessionId: CloudAgentSessionId | null = null;
   let connectGeneration = 0;
 
   const sink: TransportSink = {
@@ -171,6 +152,9 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           'CloudAgentSession transport.fetchSnapshot is required for Cloud Agent sessions'
         );
       }
+      if (!config.transport.api) {
+        throw new Error('CloudAgentSession transport.api is required for Cloud Agent sessions');
+      }
       console.log(
         '[cli-debug] pickTransportFactory: → Cloud Agent transport (cloudAgentSessionId=%s)',
         resolved.cloudAgentSessionId
@@ -178,6 +162,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       return createCloudAgentTransport({
         sessionId: resolved.cloudAgentSessionId,
         kiloSessionId: config.kiloSessionId,
+        api: config.transport.api,
         getTicket: config.transport.getTicket,
         fetchSnapshot: config.transport.fetchSnapshot,
         websocketBaseUrl: config.websocketBaseUrl,
@@ -239,8 +224,6 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
     if (expectedGeneration !== connectGeneration) return;
 
-    resolvedCloudAgentSessionId = resolved.cloudAgentSessionId;
-
     console.log('[cli-debug] resolveAndConnect: resolved=%o', resolved);
 
     let factory: TransportFactory;
@@ -260,98 +243,44 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     transport.connect();
   }
 
-  function throwTransportNotConfigured(
-    method: 'send' | 'interrupt' | 'answer' | 'reject' | 'respondToPermission'
-  ): never {
-    throw new Error(`CloudAgentSession transport.${method} is not configured`);
-  }
-
-  function commandSessionId(): CloudAgentSessionId {
-    if (!resolvedCloudAgentSessionId) {
-      throw new Error('Session not resolved yet — call connect() and wait for resolution');
-    }
-    return resolvedCloudAgentSessionId;
-  }
-
   return {
     storage,
     state: serviceState,
     send: payload => {
-      if (transport?.sendCommand) {
-        const parts = [{ type: 'text' as const, text: payload.prompt }];
-        const agent = payload.mode || undefined;
-        const model = payload.model || undefined;
-        const variant = payload.variant || undefined;
-        return transport.sendCommand('send_message', {
-          sessionID: config.kiloSessionId,
-          parts,
-          ...(agent ? { agent } : {}),
-          ...(model ? { model } : {}),
-          ...(variant ? { variant } : {}),
-        });
+      if (!transport?.send) {
+        throw new Error('CloudAgentSession transport.send is not configured');
       }
-      const send = config.transport.send;
-      if (!send) {
-        throwTransportNotConfigured('send');
-      }
-      return send({ ...payload, sessionId: commandSessionId() });
+      return transport.send(payload);
     },
     interrupt: () => {
-      if (transport?.sendCommand) {
-        return transport.sendCommand('interrupt', {});
+      if (!transport?.interrupt) {
+        throw new Error('CloudAgentSession transport.interrupt is not configured');
       }
-      const interrupt = config.transport.interrupt;
-      if (!interrupt) {
-        throwTransportNotConfigured('interrupt');
-      }
-      return interrupt({ sessionId: commandSessionId() });
+      return transport.interrupt();
     },
     answer: payload => {
-      if (transport?.sendCommand) {
-        return transport.sendCommand('question_reply', {
-          requestID: payload.requestId,
-          answers: payload.answers,
-        });
+      if (!transport?.answer) {
+        throw new Error('CloudAgentSession transport.answer is not configured');
       }
-      const answer = config.transport.answer;
-      if (!answer) {
-        throwTransportNotConfigured('answer');
-      }
-      return answer({ ...payload, sessionId: commandSessionId() });
+      return transport.answer(payload);
     },
     reject: payload => {
-      if (transport?.sendCommand) {
-        return transport.sendCommand('question_reject', {
-          requestID: payload.requestId,
-        });
+      if (!transport?.reject) {
+        throw new Error('CloudAgentSession transport.reject is not configured');
       }
-      const reject = config.transport.reject;
-      if (!reject) {
-        throwTransportNotConfigured('reject');
-      }
-      return reject({ ...payload, sessionId: commandSessionId() });
+      return transport.reject(payload);
     },
     respondToPermission: payload => {
-      if (transport?.sendCommand) {
-        return transport.sendCommand('permission_respond', {
-          requestID: payload.requestId,
-          reply: payload.response,
-        });
+      if (!transport?.respondToPermission) {
+        throw new Error('CloudAgentSession transport.respondToPermission is not configured');
       }
-      const respondToPermission = config.transport.respondToPermission;
-      if (!respondToPermission) {
-        throwTransportNotConfigured('respondToPermission');
-      }
-      return respondToPermission({ ...payload, sessionId: commandSessionId() });
+      return transport.respondToPermission(payload);
     },
     get canSend() {
-      return transport?.sendCommand !== undefined || config.transport.send !== undefined;
+      return transport?.send !== undefined;
     },
     get canInterrupt() {
-      return (
-        transport?.sendCommand !== undefined ||
-        (config.transport.interrupt !== undefined && resolvedCloudAgentSessionId !== null)
-      );
+      return transport?.interrupt !== undefined;
     },
     connect() {
       console.log(
@@ -362,7 +291,6 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
         transport.destroy();
         transport = null;
       }
-      resolvedCloudAgentSessionId = null;
       connectGeneration += 1;
       serviceState.setActivity({ type: 'connecting' });
       void resolveAndConnect(connectGeneration);
@@ -395,9 +323,5 @@ export type {
   CloudAgentSessionRespondToPermissionInput,
   CloudAgentSessionSendInput,
   CloudAgentSessionTransport,
-  CloudAgentSessionTransportAnswerInput,
-  CloudAgentSessionTransportInterruptInput,
-  CloudAgentSessionTransportRejectInput,
-  CloudAgentSessionTransportRespondToPermissionInput,
   PermissionResponse,
 };

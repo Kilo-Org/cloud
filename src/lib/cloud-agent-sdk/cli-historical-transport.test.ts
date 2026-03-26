@@ -183,4 +183,17 @@ describe('CliHistoricalTransport', () => {
     expect(chatEvents).toHaveLength(0);
     expect(serviceEvents).toHaveLength(0);
   });
+
+  it('exposes no command methods (read-only transport)', async () => {
+    const snapshot = makeSnapshot({ id: SES_ID });
+    const { transport } = createTransportWithSinks(() => Promise.resolve(snapshot));
+
+    expect(transport.send).toBeUndefined();
+    expect(transport.interrupt).toBeUndefined();
+    expect(transport.answer).toBeUndefined();
+    expect(transport.reject).toBeUndefined();
+    expect(transport.respondToPermission).toBeUndefined();
+
+    transport.destroy();
+  });
 });

@@ -60,9 +60,20 @@ function sendRaw(event: CloudAgentEvent): void {
   mockWs.onmessage?.({ data: JSON.stringify(event) } as MessageEvent);
 }
 
+function createMockApi() {
+  return {
+    send: jest.fn(() => Promise.resolve('sent')),
+    interrupt: jest.fn(() => Promise.resolve('interrupted')),
+    answer: jest.fn(() => Promise.resolve('answered')),
+    reject: jest.fn(() => Promise.resolve('rejected')),
+    respondToPermission: jest.fn(() => Promise.resolve('responded')),
+  };
+}
+
 function createTransportWithSinks(
   getTicket: (sessionId: string) => string | Promise<string> = () => 'test-ticket',
-  onError?: (message: string) => void
+  onError?: (message: string) => void,
+  api = createMockApi()
 ) {
   const chatEvents: ChatEvent[] = [];
   const serviceEvents: ServiceEvent[] = [];
@@ -70,6 +81,7 @@ function createTransportWithSinks(
   const factory = createCloudAgentTransport({
     sessionId: cloudAgentId('ses-1'),
     kiloSessionId: kiloId('ses-1'),
+    api,
     getTicket,
     fetchSnapshot: () => Promise.resolve(emptySnapshot),
     websocketBaseUrl: 'ws://localhost:9999',
@@ -81,7 +93,7 @@ function createTransportWithSinks(
     onServiceEvent: event => serviceEvents.push(event),
   });
 
-  return { transport, chatEvents, serviceEvents };
+  return { transport, chatEvents, serviceEvents, api };
 }
 
 const { createEvent, kilocode, resetCounter } = createEventHelpers();
@@ -299,5 +311,78 @@ describe('CloudAgentTransport lifecycle', () => {
     // The initial connect() didn't create a WS (ticket was async and unresolved),
     // so no WS should have been constructed at all.
     expect(constructorCallsAfterDisconnect).toBe(0);
+  });
+});
+
+describe('CloudAgentTransport command delegation', () => {
+  it('send() delegates to api.send with bound sessionId', () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    void transport.send!({ prompt: 'hello', mode: 'code', model: 'gpt-4' });
+
+    expect(api.send).toHaveBeenCalledWith({
+      sessionId: 'ses-1',
+      prompt: 'hello',
+      mode: 'code',
+      model: 'gpt-4',
+    });
+
+    transport.destroy();
+  });
+
+  it('interrupt() delegates to api.interrupt with bound sessionId', () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    void transport.interrupt!();
+
+    expect(api.interrupt).toHaveBeenCalledWith({ sessionId: 'ses-1' });
+
+    transport.destroy();
+  });
+
+  it('answer() delegates to api.answer with bound sessionId', () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    void transport.answer!({ requestId: 'req-1', answers: [['yes']] });
+
+    expect(api.answer).toHaveBeenCalledWith({
+      sessionId: 'ses-1',
+      requestId: 'req-1',
+      answers: [['yes']],
+    });
+
+    transport.destroy();
+  });
+
+  it('reject() delegates to api.reject with bound sessionId', () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    void transport.reject!({ requestId: 'req-2' });
+
+    expect(api.reject).toHaveBeenCalledWith({
+      sessionId: 'ses-1',
+      requestId: 'req-2',
+    });
+
+    transport.destroy();
+  });
+
+  it('respondToPermission() delegates to api.respondToPermission with bound sessionId', () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    void transport.respondToPermission!({ requestId: 'req-3', response: 'once' });
+
+    expect(api.respondToPermission).toHaveBeenCalledWith({
+      sessionId: 'ses-1',
+      requestId: 'req-3',
+      response: 'once',
+    });
+
+    transport.destroy();
   });
 });

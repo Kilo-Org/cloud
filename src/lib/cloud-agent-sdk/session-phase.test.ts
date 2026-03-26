@@ -91,6 +91,13 @@ function createSessionWithStateCapture(
     transport: {
       getTicket: getTicketMock,
       fetchSnapshot: () => Promise.resolve(emptySnapshot),
+      api: {
+        send: () => Promise.resolve(),
+        interrupt: () => Promise.resolve(),
+        answer: () => Promise.resolve(),
+        reject: () => Promise.resolve(),
+        respondToPermission: () => Promise.resolve(),
+      },
     },
     onError: (msg: string) => errors.push(msg),
     onBranchChanged: (branch: string) => branches.push(branch),
@@ -376,6 +383,13 @@ describe('session state transitions', () => {
       transport: {
         getTicket: getTicketMock,
         fetchSnapshot: () => Promise.resolve(emptySnapshot),
+        api: {
+          send: () => Promise.resolve(),
+          interrupt: () => Promise.resolve(),
+          answer: () => Promise.resolve(),
+          reject: () => Promise.resolve(),
+          respondToPermission: () => Promise.resolve(),
+        },
       },
       onSessionCreated: (info: SessionInfo) => sessions.push(info),
     });

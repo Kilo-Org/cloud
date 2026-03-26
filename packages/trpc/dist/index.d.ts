@@ -6201,6 +6201,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     prompt?: string | undefined;
                     mode?: "custom" | "plan" | "code" | "architect" | "ask" | "debug" | "orchestrator" | "build" | undefined;
                     model?: string | undefined;
+                    variant?: string | undefined;
                     autoCommit?: boolean | undefined;
                     upstreamBranch?: string | undefined;
                     envVarCount?: number | undefined;
@@ -12062,6 +12063,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     prompt?: string | undefined;
                     mode?: "custom" | "plan" | "code" | "architect" | "ask" | "debug" | "orchestrator" | "build" | undefined;
                     model?: string | undefined;
+                    variant?: string | undefined;
                     autoCommit?: boolean | undefined;
                     upstreamBranch?: string | undefined;
                     envVarCount?: number | undefined;
@@ -13091,6 +13093,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                 prompt?: string | undefined;
                 mode?: "custom" | "plan" | "code" | "architect" | "ask" | "debug" | "orchestrator" | "build" | undefined;
                 model?: string | undefined;
+                variant?: string | undefined;
                 autoCommit?: boolean | undefined;
                 upstreamBranch?: string | undefined;
                 envVarCount?: number | undefined;

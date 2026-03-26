@@ -21,10 +21,6 @@ export type {
   CloudAgentSessionRespondToPermissionInput,
   CloudAgentSessionSendInput,
   CloudAgentSessionTransport,
-  CloudAgentSessionTransportAnswerInput,
-  CloudAgentSessionTransportInterruptInput,
-  CloudAgentSessionTransportRejectInput,
-  CloudAgentSessionTransportRespondToPermissionInput,
   PermissionResponse,
 } from './session';
 
@@ -51,7 +47,7 @@ export type { CliHistoricalTransportConfig } from './cli-historical-transport';
 export { createCliLiveTransport } from './cli-live-transport';
 export type { CliLiveTransportConfig } from './cli-live-transport';
 
-export type { TransportSink, Transport, TransportFactory } from './transport';
+export type { TransportSink, Transport, TransportFactory, CloudAgentApi } from './transport';
 
 export { createConnection } from './cloud-agent-connection';
 export type { Connection, ConnectionConfig } from './cloud-agent-connection';

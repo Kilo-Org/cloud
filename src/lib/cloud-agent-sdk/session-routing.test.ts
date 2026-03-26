@@ -89,6 +89,13 @@ describe('session transport routing', () => {
         transport: {
           getTicket: () => 'test-ticket',
           fetchSnapshot: () => Promise.resolve(makeSnapshot({ id: 'ses-1' })),
+          api: {
+            send: () => Promise.resolve(),
+            interrupt: () => Promise.resolve(),
+            answer: () => Promise.resolve(),
+            reject: () => Promise.resolve(),
+            respondToPermission: () => Promise.resolve(),
+          },
         },
       });
 
@@ -185,6 +192,10 @@ describe('session transport routing', () => {
       // Messages in storage
       const messageIds = session.storage.getMessageIds();
       expect(messageIds).toContain('msg-1');
+
+      // Historical session should not be interactive
+      expect(session.canSend).toBe(false);
+      expect(session.canInterrupt).toBe(false);
 
       session.destroy();
     });
@@ -304,6 +315,40 @@ describe('session transport routing', () => {
 
       expect(onError).toHaveBeenCalledWith(
         'CloudAgentSession transport.fetchSnapshot is required for Cloud Agent sessions'
+      );
+      expect(session.state.getActivity()).toEqual({ type: 'idle' });
+      expect(session.state.getStatus().type).toBe('error');
+
+      session.destroy();
+    });
+
+    it('sets error state when Cloud Agent session lacks api', async () => {
+      const onError = jest.fn();
+
+      const resolveSession = jest.fn(
+        (): Promise<ResolvedSession> =>
+          Promise.resolve({
+            kiloSessionId: kiloId('ses-1'),
+            cloudAgentSessionId: cloudAgentId('do-1'),
+            isLive: true,
+          })
+      );
+
+      const session = createCloudAgentSession({
+        kiloSessionId: kiloId('ses-1'),
+        resolveSession,
+        transport: {
+          getTicket: () => 'ticket',
+          fetchSnapshot: () => Promise.resolve(makeSnapshot({ id: 'ses-1' })),
+        },
+        onError,
+      });
+
+      session.connect();
+      await Promise.resolve();
+
+      expect(onError).toHaveBeenCalledWith(
+        'CloudAgentSession transport.api is required for Cloud Agent sessions'
       );
       expect(session.state.getActivity()).toEqual({ type: 'idle' });
       expect(session.state.getStatus().type).toBe('error');

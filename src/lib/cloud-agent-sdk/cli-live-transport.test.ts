@@ -576,28 +576,21 @@ describe('CliLiveTransport lifecycle', () => {
   });
 });
 
-function requireSendCommand(transport: ReturnType<typeof createTransportWithSinks>['transport']) {
-  const { sendCommand } = transport;
-  if (!sendCommand) throw new Error('sendCommand not available on transport');
-  return sendCommand.bind(transport);
-}
-
-describe('CliLiveTransport sendCommand', () => {
+describe('CliLiveTransport typed command methods', () => {
   beforeEach(() => {
     jest
       .spyOn(crypto, 'randomUUID')
       .mockReturnValue('mock-uuid-1234' as `${string}-${string}-${string}-${string}-${string}`);
   });
 
-  it('sends command message over WebSocket with correct format', () => {
+  it('send() formats and sends command message over WebSocket', () => {
     const { transport } = createTransportWithSinks();
-    const sendCommand = requireSendCommand(transport);
 
     transport.connect();
     openConnection();
     mockWs.send.mockClear();
 
-    const promise = sendCommand('send_message', { message: 'hello' });
+    const promise = transport.send!({ prompt: 'hello', mode: 'code', model: 'test-model' });
 
     expect(mockWs.send).toHaveBeenCalledWith(
       JSON.stringify({
@@ -605,7 +598,12 @@ describe('CliLiveTransport sendCommand', () => {
         id: 'mock-uuid-1234',
         command: 'send_message',
         sessionId: KILO_SESSION_ID,
-        data: { message: 'hello' },
+        data: {
+          sessionID: KILO_SESSION_ID,
+          parts: [{ type: 'text', text: 'hello' }],
+          agent: 'code',
+          model: 'test-model',
+        },
       })
     );
 
@@ -614,18 +612,113 @@ describe('CliLiveTransport sendCommand', () => {
     return promise;
   });
 
+  it('send() omits agent and model when not provided', () => {
+    const { transport } = createTransportWithSinks();
+
+    transport.connect();
+    openConnection();
+    mockWs.send.mockClear();
+
+    const promise = transport.send!({ prompt: 'hi' });
+
+    const sent = JSON.parse(mockWs.send.mock.calls[0][0]) as { data: Record<string, unknown> };
+    expect(sent.data).toEqual({
+      sessionID: KILO_SESSION_ID,
+      parts: [{ type: 'text', text: 'hi' }],
+    });
+    // agent and model should not be in the payload
+    expect(sent.data).not.toHaveProperty('agent');
+    expect(sent.data).not.toHaveProperty('model');
+
+    sendInbound({ type: 'response', id: 'mock-uuid-1234', result: {} });
+    return promise;
+  });
+
+  it('interrupt() sends interrupt command', () => {
+    const { transport } = createTransportWithSinks();
+
+    transport.connect();
+    openConnection();
+    mockWs.send.mockClear();
+
+    const promise = transport.interrupt!();
+
+    const sent = JSON.parse(mockWs.send.mock.calls[0][0]) as { command: string };
+    expect(sent.command).toBe('interrupt');
+
+    sendInbound({ type: 'response', id: 'mock-uuid-1234', result: {} });
+    return promise;
+  });
+
+  it('answer() sends question_reply command', () => {
+    const { transport } = createTransportWithSinks();
+
+    transport.connect();
+    openConnection();
+    mockWs.send.mockClear();
+
+    const promise = transport.answer!({ requestId: 'req-1', answers: [['yes']] });
+
+    const sent = JSON.parse(mockWs.send.mock.calls[0][0]) as {
+      command: string;
+      data: Record<string, unknown>;
+    };
+    expect(sent.command).toBe('question_reply');
+    expect(sent.data).toEqual({ requestID: 'req-1', answers: [['yes']] });
+
+    sendInbound({ type: 'response', id: 'mock-uuid-1234', result: {} });
+    return promise;
+  });
+
+  it('reject() sends question_reject command', () => {
+    const { transport } = createTransportWithSinks();
+
+    transport.connect();
+    openConnection();
+    mockWs.send.mockClear();
+
+    const promise = transport.reject!({ requestId: 'req-2' });
+
+    const sent = JSON.parse(mockWs.send.mock.calls[0][0]) as {
+      command: string;
+      data: Record<string, unknown>;
+    };
+    expect(sent.command).toBe('question_reject');
+    expect(sent.data).toEqual({ requestID: 'req-2' });
+
+    sendInbound({ type: 'response', id: 'mock-uuid-1234', result: {} });
+    return promise;
+  });
+
+  it('respondToPermission() sends permission_respond command', () => {
+    const { transport } = createTransportWithSinks();
+
+    transport.connect();
+    openConnection();
+    mockWs.send.mockClear();
+
+    const promise = transport.respondToPermission!({ requestId: 'req-3', response: 'always' });
+
+    const sent = JSON.parse(mockWs.send.mock.calls[0][0]) as {
+      command: string;
+      data: Record<string, unknown>;
+    };
+    expect(sent.command).toBe('permission_respond');
+    expect(sent.data).toEqual({ requestID: 'req-3', reply: 'always' });
+
+    sendInbound({ type: 'response', id: 'mock-uuid-1234', result: {} });
+    return promise;
+  });
+
   it('resolves when response arrives', async () => {
     const { transport } = createTransportWithSinks();
-    const sendCommand = requireSendCommand(transport);
 
     transport.connect();
     openConnection();
 
-    const promise = sendCommand('send_message', { message: 'hello' });
+    const promise = transport.send!({ prompt: 'hello' });
 
-    const sentPayload = JSON.parse(mockWs.send.mock.calls.at(-1)[0]) as {
-      id: string;
-    };
+    const sentPayload = JSON.parse(mockWs.send.mock.calls.at(-1)[0]) as { id: string };
     sendInbound({ type: 'response', id: sentPayload.id, result: { ok: true } });
 
     await expect(promise).resolves.toEqual({ ok: true });
@@ -635,16 +728,13 @@ describe('CliLiveTransport sendCommand', () => {
 
   it('rejects when error response arrives', async () => {
     const { transport } = createTransportWithSinks();
-    const sendCommand = requireSendCommand(transport);
 
     transport.connect();
     openConnection();
 
-    const promise = sendCommand('send_message', { message: 'fail' });
+    const promise = transport.send!({ prompt: 'fail' });
 
-    const sentPayload = JSON.parse(mockWs.send.mock.calls.at(-1)[0]) as {
-      id: string;
-    };
+    const sentPayload = JSON.parse(mockWs.send.mock.calls.at(-1)[0]) as { id: string };
     sendInbound({ type: 'response', id: sentPayload.id, error: 'bad request' });
 
     await expect(promise).rejects.toThrow('bad request');
@@ -654,21 +744,19 @@ describe('CliLiveTransport sendCommand', () => {
 
   it('rejects with "WebSocket is not connected" when not connected', async () => {
     const { transport } = createTransportWithSinks();
-    const sendCommand = requireSendCommand(transport);
 
-    await expect(sendCommand('send_message', { message: 'hello' })).rejects.toThrow(
+    await expect(transport.send!({ prompt: 'hello' })).rejects.toThrow(
       'WebSocket is not connected'
     );
   });
 
   it('rejects pending commands on disconnect', async () => {
     const { transport } = createTransportWithSinks();
-    const sendCommand = requireSendCommand(transport);
 
     transport.connect();
     openConnection();
 
-    const promise = sendCommand('send_message', { message: 'hello' });
+    const promise = transport.send!({ prompt: 'hello' });
 
     transport.disconnect();
 
@@ -677,12 +765,11 @@ describe('CliLiveTransport sendCommand', () => {
 
   it('rejects pending commands on destroy', async () => {
     const { transport } = createTransportWithSinks();
-    const sendCommand = requireSendCommand(transport);
 
     transport.connect();
     openConnection();
 
-    const promise = sendCommand('send_message', { message: 'hello' });
+    const promise = transport.send!({ prompt: 'hello' });
 
     transport.destroy();
 
@@ -705,12 +792,11 @@ describe('CliLiveTransport sendCommand', () => {
     jest.useFakeTimers();
     try {
       const { transport } = createTransportWithSinks();
-      const sendCommand = requireSendCommand(transport);
 
       transport.connect();
       openConnection();
 
-      const promise = sendCommand('send_message', { message: 'hello' });
+      const promise = transport.send!({ prompt: 'hello' });
 
       jest.advanceTimersByTime(30_000);
 
@@ -726,16 +812,13 @@ describe('CliLiveTransport sendCommand', () => {
     jest.useFakeTimers();
     try {
       const { transport } = createTransportWithSinks();
-      const sendCommand = requireSendCommand(transport);
 
       transport.connect();
       openConnection();
 
-      const promise = sendCommand('send_message', { message: 'hello' });
+      const promise = transport.send!({ prompt: 'hello' });
 
-      const sentPayload = JSON.parse(mockWs.send.mock.calls.at(-1)[0]) as {
-        id: string;
-      };
+      const sentPayload = JSON.parse(mockWs.send.mock.calls.at(-1)[0]) as { id: string };
       sendInbound({
         type: 'response',
         id: sentPayload.id,

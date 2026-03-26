@@ -15,6 +15,7 @@ import {
 } from './TerminalBarContext';
 import { useDrawerStack } from './DrawerStack';
 import { useXtermPty } from './useXtermPty';
+import { FIRST_TASK_STORAGE_PREFIX } from '@/app/(app)/gastown/onboarding/OnboardingStepTask';
 import {
   ChevronDown,
   ChevronUp,
@@ -1230,8 +1231,6 @@ function TerminalStatusBadge({
 }
 
 // ── Mayor Terminal Pane ──────────────────────────────────────────────────
-
-const FIRST_TASK_STORAGE_PREFIX = 'gastown_first_task_';
 
 function MayorTerminalPane({ townId, collapsed }: { townId: string; collapsed: boolean }) {
   const trpc = useGastownTRPC();

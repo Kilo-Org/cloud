@@ -135,10 +135,11 @@ export function useXtermPty({
         // Send queued initial message exactly once on first connection
         if (!initialMessageSentRef.current && initialMessageRef.current) {
           initialMessageSentRef.current = true;
+          const message = initialMessageRef.current; // capture before async delay
           // Small delay to let the PTY shell initialize before sending input
           setTimeout(() => {
             if (ws.readyState === WebSocket.OPEN) {
-              ws.send(initialMessageRef.current + '\n');
+              ws.send(message + '\n');
             }
           }, 500);
         }

@@ -2,23 +2,22 @@ import type { Phase } from '@/lib/custom-llm/schemas';
 import type { FileAnnotation } from './provider-metadata';
 import type { ReasoningDetailUnion } from './reasoning-details';
 
-// Type for OpenRouter Cache Control following Anthropic's pattern
-export type OpenRouterCacheControl = { type: 'ephemeral' };
+type OpenRouterCacheControl = { type: 'ephemeral' };
 
 export type OpenRouterChatCompletionsInput = Array<ChatCompletionMessageParam>;
 
-export type ChatCompletionMessageParam =
+type ChatCompletionMessageParam =
   | ChatCompletionSystemMessageParam
   | ChatCompletionUserMessageParam
   | ChatCompletionAssistantMessageParam
   | ChatCompletionToolMessageParam;
 
-export interface ChatCompletionSystemMessageParam {
+interface ChatCompletionSystemMessageParam {
   role: 'system';
   content: string | Array<ChatCompletionContentPartText>;
 }
 
-export interface ChatCompletionUserMessageParam {
+interface ChatCompletionUserMessageParam {
   role: 'user';
   content: string | Array<ChatCompletionContentPart>;
   cache_control?: OpenRouterCacheControl;
@@ -30,7 +29,7 @@ export type ChatCompletionContentPart =
   | ChatCompletionContentPartFile
   | ChatCompletionContentPartInputAudio;
 
-export interface ChatCompletionContentPartFile {
+interface ChatCompletionContentPartFile {
   type: 'file';
   file: {
     filename?: string;
@@ -40,7 +39,7 @@ export interface ChatCompletionContentPartFile {
   cache_control?: OpenRouterCacheControl;
 }
 
-export interface ChatCompletionContentPartImage {
+interface ChatCompletionContentPartImage {
   type: 'image_url';
   image_url: {
     url: string;
@@ -48,29 +47,16 @@ export interface ChatCompletionContentPartImage {
   cache_control?: OpenRouterCacheControl;
 }
 
-export interface ChatCompletionContentPartText {
+interface ChatCompletionContentPartText {
   type: 'text';
   text: string;
   reasoning?: string | null;
   cache_control?: OpenRouterCacheControl;
 }
 
-/** https://openrouter.ai/docs/guides/overview/multimodal/audio */
-export const OPENROUTER_AUDIO_FORMATS = [
-  'wav',
-  'mp3',
-  'aiff',
-  'aac',
-  'ogg',
-  'flac',
-  'm4a',
-  'pcm16',
-  'pcm24',
-] as const;
+type OpenRouterAudioFormat = 'wav' | 'mp3' | 'aiff' | 'aac' | 'ogg' | 'flac' | 'm4a' | 'pcm16' | 'pcm24';
 
-export type OpenRouterAudioFormat = (typeof OPENROUTER_AUDIO_FORMATS)[number];
-
-export interface ChatCompletionContentPartInputAudio {
+interface ChatCompletionContentPartInputAudio {
   type: 'input_audio';
   input_audio: {
     data: string;
@@ -90,7 +76,7 @@ export interface ChatCompletionAssistantMessageParam {
   phase?: Phase | null;
 }
 
-export interface ChatCompletionMessageToolCall {
+interface ChatCompletionMessageToolCall {
   type: 'function';
   id: string;
   function: {
@@ -99,7 +85,7 @@ export interface ChatCompletionMessageToolCall {
   };
 }
 
-export interface ChatCompletionToolMessageParam {
+interface ChatCompletionToolMessageParam {
   role: 'tool';
   content: string | Array<ChatCompletionContentPart>;
   tool_call_id: string;

@@ -11,7 +11,7 @@ const ImageResponseSchema = z
   })
   .passthrough();
 
-export type ImageResponse = z.infer<typeof ImageResponseSchema>;
+type ImageResponse = z.infer<typeof ImageResponseSchema>;
 
 const ImageResponseWithUnknownSchema = z.union([
   ImageResponseSchema,

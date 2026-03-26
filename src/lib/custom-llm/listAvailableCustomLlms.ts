@@ -15,7 +15,7 @@ const listColumns = {
 
 type ListRow = { [K in keyof typeof listColumns]: (typeof custom_llm.$inferSelect)[K] };
 
-export function convert(model: ListRow) {
+function convert(model: ListRow) {
   return {
     id: model.public_id,
     canonical_slug: model.public_id,

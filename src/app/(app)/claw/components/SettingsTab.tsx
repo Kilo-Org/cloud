@@ -830,6 +830,7 @@ export function SettingsTab({
               onSecretsChanged={onSecretsChanged}
               isDirty={dirtySecrets.has(entry.id)}
               onRedeploy={onRedeploy}
+              onUpgrade={onUpgrade}
             />
           ))}
         </div>
@@ -850,6 +851,7 @@ export function SettingsTab({
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
+                  onUpgrade={onUpgrade}
                 />
               ))}
           </div>
@@ -872,6 +874,7 @@ export function SettingsTab({
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
                   onRedeploy={onRedeploy}
+                  onUpgrade={onUpgrade}
                   actionRowExtra={
                     <span className="text-muted-foreground flex items-center gap-1 text-xs">
                       <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
@@ -917,8 +920,8 @@ export function SettingsTab({
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
-                  onRedeploy={onUpgrade ?? onRedeploy}
-                  redeployLabel="Upgrade"
+                  onRedeploy={onRedeploy}
+                  onUpgrade={onUpgrade}
                   actionRowExtra={<AgentCardSetupGuide />}
                 />
               ))}
@@ -941,6 +944,7 @@ export function SettingsTab({
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
+                  onUpgrade={onUpgrade}
                   actionRowExtra={<OnePasswordSetupGuide />}
                 />
               ))}

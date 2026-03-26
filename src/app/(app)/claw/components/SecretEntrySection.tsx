@@ -30,6 +30,7 @@ export function SecretEntrySection({
   defaultOpen,
   onRedeploy,
   redeployLabel = 'Redeploy',
+  onUpgrade,
 }: {
   entry: SecretCatalogEntry;
   configured: boolean;
@@ -41,6 +42,7 @@ export function SecretEntrySection({
   onRedeploy?: () => void;
   /** Label for the toast action button. Defaults to "Redeploy". */
   redeployLabel?: string;
+  onUpgrade?: () => void;
 }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   const [tokens, setTokens] = useState<Record<string, string>>({});
@@ -91,9 +93,13 @@ export function SecretEntrySection({
             `${entry.label} token${entry.fields.length > 1 ? 's' : ''} saved. ${redeployLabel} to apply.`,
             {
               duration: 8000,
-              ...(onRedeploy && {
-                action: { label: redeployLabel, onClick: onRedeploy },
-              }),
+              ...(onUpgrade
+                ? { action: { label: 'Upgrade', onClick: onUpgrade } }
+                : onRedeploy && { action: { label: redeployLabel, onClick: onRedeploy } }),
+              ...(onUpgrade &&
+                onRedeploy && {
+                  cancel: { label: redeployLabel, onClick: onRedeploy },
+                }),
             }
           );
           setTokens({});
@@ -118,9 +124,13 @@ export function SecretEntrySection({
             `${entry.label} token${entry.fields.length > 1 ? 's' : ''} removed. ${redeployLabel} to apply.`,
             {
               duration: 8000,
-              ...(onRedeploy && {
-                action: { label: redeployLabel, onClick: onRedeploy },
-              }),
+              ...(onUpgrade
+                ? { action: { label: 'Upgrade', onClick: onUpgrade } }
+                : onRedeploy && { action: { label: redeployLabel, onClick: onRedeploy } }),
+              ...(onUpgrade &&
+                onRedeploy && {
+                  cancel: { label: redeployLabel, onClick: onRedeploy },
+                }),
             }
           );
           setTokens({});

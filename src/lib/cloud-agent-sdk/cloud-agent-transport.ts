@@ -11,11 +11,12 @@ import { createConnection, type Connection } from './cloud-agent-connection';
 import { normalize, isChatEvent } from './normalizer';
 import type { ServiceEvent } from './normalizer';
 import type { CloudAgentSessionId, KiloSessionId, SessionSnapshot } from './types';
-import type { TransportFactory, TransportSink } from './transport';
+import type { CloudAgentApi, TransportFactory, TransportSink } from './transport';
 
 type CloudAgentTransportConfig = {
   sessionId: CloudAgentSessionId;
   kiloSessionId: KiloSessionId;
+  api: CloudAgentApi;
   getTicket: (sessionId: CloudAgentSessionId) => string | Promise<string>;
   fetchSnapshot: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
   websocketBaseUrl?: string;
@@ -141,6 +142,13 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         lifecycleGeneration += 1;
         closeConnection('destroy');
       },
+
+      send: payload => config.api.send({ sessionId: config.sessionId, ...payload }),
+      interrupt: () => config.api.interrupt({ sessionId: config.sessionId }),
+      answer: payload => config.api.answer({ sessionId: config.sessionId, ...payload }),
+      reject: payload => config.api.reject({ sessionId: config.sessionId, ...payload }),
+      respondToPermission: payload =>
+        config.api.respondToPermission({ sessionId: config.sessionId, ...payload }),
     };
   };
 }

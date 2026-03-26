@@ -18,6 +18,7 @@ import { WorkingIndicator } from './WorkingIndicator';
 import { QuestionToolCard } from './QuestionToolCard';
 import { QuestionContextProvider } from './QuestionContext';
 import { PermissionCard, PermissionContextProvider } from './PermissionCard';
+import { SessionContinuationPanel } from './SessionContinuationPanel';
 import { isMessageStreaming } from './types';
 import { useOrganizationModels } from './hooks/useOrganizationModels';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
@@ -115,6 +116,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
+  const fetchedSessionData = useAtomValue(manager.atoms.fetchedSessionData);
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
 
@@ -244,9 +246,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
       ? 'Setting up environment…'
       : cloudStatus?.type === 'finalizing'
         ? 'Wrapping up…'
-        : !canSend
-          ? 'This session is read-only'
-          : 'Ask anything…';
+        : 'Ask anything…';
 
   // -- Render ---------------------------------------------------------------
   return (
@@ -305,54 +305,56 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                 )}
               </div>
 
-              {activeQuestion && (
-                <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
-                  <QuestionToolCard
-                    key={activeQuestion.requestId}
-                    questions={activeQuestion.questions}
-                    requestId={activeQuestion.requestId}
-                    status="running"
-                  />
-                </div>
-              )}
-              {activePermission && (
-                <div className="flex items-center border-t p-4">
-                  <PermissionCard
-                    key={activePermission.requestId}
-                    requestId={activePermission.requestId}
-                    permission={activePermission.permission}
-                    patterns={activePermission.patterns}
-                    metadata={activePermission.metadata}
-                    always={activePermission.always}
-                  />
-                </div>
-              )}
-              <div className={activeQuestion || activePermission ? 'hidden' : ''}>
-                <ChatInput
-                  onSend={handleSendMessage}
-                  onStop={handleStopExecution}
-                  disabled={isStreaming || !canSend}
-                  isStreaming={isStreaming}
-                  placeholder={placeholder}
-                  slashCommands={availableCommands}
-                  mode={sessionConfig?.mode as AgentMode | undefined}
-                  model={sessionConfig?.model}
-                  modelOptions={modelOptions}
-                  isLoadingModels={isLoadingModels}
-                  onModeChange={handleModeChange}
-                  onModelChange={handleModelChange}
-                  variant={sessionConfig?.variant ?? undefined}
-                  onVariantChange={handleVariantChange}
-                  availableVariants={availableVariants}
-                  showToolbar={Boolean(sessionIdFromParams)}
-                  initialValue={failedPrompt ?? undefined}
-                />
-              </div>
-
-              {isReadOnly && !isLoading && sessionIdFromParams && (
-                <div className="border-border bg-muted/50 text-muted-foreground border-t px-4 py-2 text-center text-xs">
-                  This is a completed session — read only
-                </div>
+              {isReadOnly ? (
+                !isLoading && sessionIdFromParams && fetchedSessionData ? (
+                  <SessionContinuationPanel sessionId={sessionIdFromParams} />
+                ) : null
+              ) : (
+                <>
+                  {activeQuestion && (
+                    <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
+                      <QuestionToolCard
+                        key={activeQuestion.requestId}
+                        questions={activeQuestion.questions}
+                        requestId={activeQuestion.requestId}
+                        status="running"
+                      />
+                    </div>
+                  )}
+                  {activePermission && (
+                    <div className="flex items-center border-t p-4">
+                      <PermissionCard
+                        key={activePermission.requestId}
+                        requestId={activePermission.requestId}
+                        permission={activePermission.permission}
+                        patterns={activePermission.patterns}
+                        metadata={activePermission.metadata}
+                        always={activePermission.always}
+                      />
+                    </div>
+                  )}
+                  <div className={activeQuestion || activePermission ? 'hidden' : ''}>
+                    <ChatInput
+                      onSend={handleSendMessage}
+                      onStop={handleStopExecution}
+                      disabled={isStreaming || !canSend}
+                      isStreaming={isStreaming}
+                      placeholder={placeholder}
+                      slashCommands={availableCommands}
+                      mode={sessionConfig?.mode as AgentMode | undefined}
+                      model={sessionConfig?.model}
+                      modelOptions={modelOptions}
+                      isLoadingModels={isLoadingModels}
+                      onModeChange={handleModeChange}
+                      onModelChange={handleModelChange}
+                      variant={sessionConfig?.variant ?? undefined}
+                      onVariantChange={handleVariantChange}
+                      availableVariants={availableVariants}
+                      showToolbar={Boolean(sessionIdFromParams)}
+                      initialValue={failedPrompt ?? undefined}
+                    />
+                  </div>
+                </>
               )}
             </>
           ) : (

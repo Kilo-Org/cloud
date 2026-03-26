@@ -1,10 +1,11 @@
 /**
  * Transport interface — abstracts the connection between event sources and processors.
  *
- * For the current WebSocket case: one transport normalizes and routes to both sinks.
- * For future separate-source case: each processor gets its own transport.
+ * Each transport is the single source of truth for what it can do.
+ * Command methods are optional — present only on interactive transports.
  */
 import type { ChatEvent, ServiceEvent } from './normalizer';
+import type { CloudAgentSessionId } from './types';
 
 /** Sink callbacks that a transport pushes typed events into. */
 type TransportSink = {
@@ -17,11 +18,51 @@ type Transport = {
   connect(): void;
   disconnect(): void;
   destroy(): void;
-  /** Optional — only CliLiveTransport implements this. */
-  sendCommand?: (command: string, data: unknown) => Promise<unknown>;
+
+  // Commands — present only on interactive transports
+  send?: (payload: {
+    prompt: string;
+    mode?: string;
+    model?: string;
+    variant?: string;
+  }) => Promise<unknown>;
+  interrupt?: () => Promise<unknown>;
+  answer?: (payload: { requestId: string; answers: string[][] }) => Promise<unknown>;
+  reject?: (payload: { requestId: string }) => Promise<unknown>;
+  respondToPermission?: (payload: {
+    requestId: string;
+    response: 'once' | 'always' | 'reject';
+  }) => Promise<unknown>;
 };
 
 /** Factory signature — creates a transport wired to the given sink. */
 type TransportFactory = (sink: TransportSink) => Transport;
 
-export type { TransportSink, Transport, TransportFactory };
+/**
+ * Bundle of tRPC-backed cloud agent operations.
+ * Session-independent — the transport binds it to a specific session
+ * by closing over the cloudAgentSessionId.
+ */
+type CloudAgentApi = {
+  send: (payload: {
+    sessionId: CloudAgentSessionId;
+    prompt: string;
+    mode?: string;
+    model?: string;
+    variant?: string;
+  }) => Promise<unknown>;
+  interrupt: (payload: { sessionId: CloudAgentSessionId }) => Promise<unknown>;
+  answer: (payload: {
+    sessionId: CloudAgentSessionId;
+    requestId: string;
+    answers: string[][];
+  }) => Promise<unknown>;
+  reject: (payload: { sessionId: CloudAgentSessionId; requestId: string }) => Promise<unknown>;
+  respondToPermission: (payload: {
+    sessionId: CloudAgentSessionId;
+    requestId: string;
+    response: 'once' | 'always' | 'reject';
+  }) => Promise<unknown>;
+};
+
+export type { TransportSink, Transport, TransportFactory, CloudAgentApi };

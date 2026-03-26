@@ -100,91 +100,97 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
 
       cliWebsocketUrl: SESSION_INGEST_WS_URL ? `${SESSION_INGEST_WS_URL}/api/user/web` : undefined,
 
-      send: async payload => {
-        const castSessionId = payload.sessionId as string;
-        const prompt = payload.prompt as string;
-        const mode = payload.mode as 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
-        const model = payload.model as string;
-        const variant = payload.variant as string | undefined;
-        if (organizationId) {
-          return trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
-            {
-              cloudAgentSessionId: castSessionId,
-              prompt,
-              mode,
-              model,
-              variant,
-              autoCommit: true,
-              organizationId,
-            },
+      api: {
+        send: async payload => {
+          const castSessionId = payload.sessionId as string;
+          const prompt = payload.prompt as string;
+          const mode = payload.mode as 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
+          const model = payload.model as string;
+          const variant = payload.variant as string | undefined;
+          if (organizationId) {
+            return trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
+              {
+                cloudAgentSessionId: castSessionId,
+                prompt,
+                mode,
+                model,
+                variant,
+                autoCommit: true,
+                organizationId,
+              },
+              { context: { skipBatch: true } }
+            );
+          }
+          return trpcClient.cloudAgentNext.sendMessage.mutate(
+            { cloudAgentSessionId: castSessionId, prompt, mode, model, variant, autoCommit: true },
             { context: { skipBatch: true } }
           );
-        }
-        return trpcClient.cloudAgentNext.sendMessage.mutate(
-          { cloudAgentSessionId: castSessionId, prompt, mode, model, variant, autoCommit: true },
-          { context: { skipBatch: true } }
-        );
-      },
+        },
 
-      interrupt: async payload => {
-        if (organizationId) {
-          return trpcClient.organizations.cloudAgentNext.interruptSession.mutate(
-            { organizationId, sessionId: payload.sessionId },
+        interrupt: async payload => {
+          if (organizationId) {
+            return trpcClient.organizations.cloudAgentNext.interruptSession.mutate(
+              { organizationId, sessionId: payload.sessionId },
+              { context: { skipBatch: true } }
+            );
+          }
+          return trpcClient.cloudAgentNext.interruptSession.mutate(
+            { sessionId: payload.sessionId },
             { context: { skipBatch: true } }
           );
-        }
-        return trpcClient.cloudAgentNext.interruptSession.mutate(
-          { sessionId: payload.sessionId },
-          { context: { skipBatch: true } }
-        );
-      },
+        },
 
-      answer: async payload => {
-        // Manager uses requestId; tRPC schema uses questionId
-        if (organizationId) {
-          return trpcClient.organizations.cloudAgentNext.answerQuestion.mutate(
+        answer: async payload => {
+          // Manager uses requestId; tRPC schema uses questionId
+          if (organizationId) {
+            return trpcClient.organizations.cloudAgentNext.answerQuestion.mutate(
+              {
+                organizationId,
+                sessionId: payload.sessionId,
+                questionId: payload.requestId,
+                answers: payload.answers,
+              },
+              { context: { skipBatch: true } }
+            );
+          }
+          return trpcClient.cloudAgentNext.answerQuestion.mutate(
             {
-              organizationId,
               sessionId: payload.sessionId,
               questionId: payload.requestId,
               answers: payload.answers,
             },
             { context: { skipBatch: true } }
           );
-        }
-        return trpcClient.cloudAgentNext.answerQuestion.mutate(
-          { sessionId: payload.sessionId, questionId: payload.requestId, answers: payload.answers },
-          { context: { skipBatch: true } }
-        );
-      },
+        },
 
-      reject: async payload => {
-        // Manager uses requestId; tRPC schema uses questionId
-        if (organizationId) {
-          return trpcClient.organizations.cloudAgentNext.rejectQuestion.mutate(
-            { organizationId, sessionId: payload.sessionId, questionId: payload.requestId },
+        reject: async payload => {
+          // Manager uses requestId; tRPC schema uses questionId
+          if (organizationId) {
+            return trpcClient.organizations.cloudAgentNext.rejectQuestion.mutate(
+              { organizationId, sessionId: payload.sessionId, questionId: payload.requestId },
+              { context: { skipBatch: true } }
+            );
+          }
+          return trpcClient.cloudAgentNext.rejectQuestion.mutate(
+            { sessionId: payload.sessionId, questionId: payload.requestId },
             { context: { skipBatch: true } }
           );
-        }
-        return trpcClient.cloudAgentNext.rejectQuestion.mutate(
-          { sessionId: payload.sessionId, questionId: payload.requestId },
-          { context: { skipBatch: true } }
-        );
-      },
+        },
 
-      respondToPermission: async payload => {
-        const trpc = organizationId
-          ? trpcClient.organizations.cloudAgentNext
-          : trpcClient.cloudAgentNext;
-        await trpc.answerPermission.mutate(
-          {
-            ...(organizationId ? { organizationId } : {}),
-            sessionId: payload.sessionId,
-            permissionId: payload.requestId,
-            response: payload.response,
-          },
-          { context: { skipBatch: true } }
-        );
+        respondToPermission: async payload => {
+          const trpc = organizationId
+            ? trpcClient.organizations.cloudAgentNext
+            : trpcClient.cloudAgentNext;
+          await trpc.answerPermission.mutate(
+            {
+              ...(organizationId ? { organizationId } : {}),
+              sessionId: payload.sessionId,
+              permissionId: payload.requestId,
+              response: payload.response,
+            },
+            { context: { skipBatch: true } }
+          );
+        },
       },
 
       prepare: async input => {

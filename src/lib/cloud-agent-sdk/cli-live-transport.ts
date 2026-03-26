@@ -211,6 +211,30 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       );
     }
 
+    function rawSendCommand(command: string, data: unknown): Promise<unknown> {
+      if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
+        return Promise.reject(new Error('WebSocket is not connected'));
+      }
+      const id = crypto.randomUUID();
+      const ws = currentWs;
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          pendingCommands.delete(id);
+          reject(new Error('Command timed out'));
+        }, COMMAND_TIMEOUT_MS);
+        pendingCommands.set(id, { resolve, reject, timer });
+        ws.send(
+          JSON.stringify({
+            type: 'command',
+            id,
+            command,
+            sessionId: config.kiloSessionId,
+            data,
+          })
+        );
+      });
+    }
+
     return {
       connect() {
         console.log(
@@ -256,29 +280,29 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         );
       },
 
-      sendCommand(command: string, data: unknown): Promise<unknown> {
-        if (!currentWs || currentWs.readyState !== WebSocket.OPEN) {
-          return Promise.reject(new Error('WebSocket is not connected'));
-        }
-        const id = crypto.randomUUID();
-        const ws = currentWs;
-        return new Promise((resolve, reject) => {
-          const timer = setTimeout(() => {
-            pendingCommands.delete(id);
-            reject(new Error('Command timed out'));
-          }, COMMAND_TIMEOUT_MS);
-          pendingCommands.set(id, { resolve, reject, timer });
-          ws.send(
-            JSON.stringify({
-              type: 'command',
-              id,
-              command,
-              sessionId: config.kiloSessionId,
-              data,
-            })
-          );
-        });
-      },
+      send: (payload: { prompt: string; mode?: string; model?: string; variant?: string }) =>
+        rawSendCommand('send_message', {
+          sessionID: config.kiloSessionId,
+          parts: [{ type: 'text', text: payload.prompt }],
+          ...(payload.mode ? { agent: payload.mode } : {}),
+          ...(payload.model ? { model: payload.model } : {}),
+          ...(payload.variant ? { variant: payload.variant } : {}),
+        }),
+      interrupt: () => rawSendCommand('interrupt', {}),
+      answer: (payload: { requestId: string; answers: unknown }) =>
+        rawSendCommand('question_reply', {
+          requestID: payload.requestId,
+          answers: payload.answers,
+        }),
+      reject: (payload: { requestId: string }) =>
+        rawSendCommand('question_reject', {
+          requestID: payload.requestId,
+        }),
+      respondToPermission: (payload: { requestId: string; response: unknown }) =>
+        rawSendCommand('permission_respond', {
+          requestID: payload.requestId,
+          reply: payload.response,
+        }),
 
       disconnect() {
         generation += 1;

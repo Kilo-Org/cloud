@@ -5,6 +5,7 @@ import { createCloudAgentSession } from './session';
 import type { CloudAgentSession } from './session';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
+import type { CloudAgentApi } from './transport';
 import type {
   CloudAgentSessionId,
   KiloSessionId,
@@ -86,19 +87,7 @@ type SessionManagerConfig = {
   getAuthToken: () => string | Promise<string>;
   cliWebsocketUrl?: string;
   websocketBaseUrl?: string;
-  send: (payload: { sessionId: CloudAgentSessionId } & Record<string, unknown>) => Promise<unknown>;
-  interrupt: (payload: { sessionId: CloudAgentSessionId }) => Promise<unknown>;
-  answer: (payload: {
-    sessionId: CloudAgentSessionId;
-    requestId: string;
-    answers: string[][];
-  }) => Promise<unknown>;
-  reject: (payload: { sessionId: CloudAgentSessionId; requestId: string }) => Promise<unknown>;
-  respondToPermission: (payload: {
-    sessionId: CloudAgentSessionId;
-    requestId: string;
-    response: 'once' | 'always' | 'reject';
-  }) => Promise<unknown>;
+  api: CloudAgentApi;
   prepare: (input: PrepareInput) => Promise<{ cloudAgentSessionId: CloudAgentSessionId }>;
   initiate: (input: { cloudAgentSessionId: CloudAgentSessionId }) => Promise<unknown>;
   fetchSession: (kiloSessionId: KiloSessionId) => Promise<FetchedSessionData>;
@@ -114,7 +103,7 @@ type W<T> = WritableAtom<T, [T], void>;
 type SessionManagerAtoms = {
   isStreaming: W<boolean>;
   isLoading: W<boolean>;
-  /** Session structurally cannot accept input (no transport send/sendCommand). */
+  /** Session structurally cannot accept input (no transport send). */
   isReadOnly: W<boolean>;
   canSend: W<boolean>;
   canInterrupt: W<boolean>;
@@ -132,6 +121,7 @@ type SessionManagerAtoms = {
   chatUI: W<{ shouldAutoScroll: boolean }>;
   permission: W<PermissionState | null>;
   failedPrompt: W<string | null>;
+  fetchedSessionData: W<FetchedSessionData | null>;
   messagesList: Atom<StoredMessage[]>;
   staticMessages: Atom<StoredMessage[]>;
   dynamicMessages: Atom<StoredMessage[]>;
@@ -256,6 +246,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const permissionAtom = atom<PermissionState | null>(null);
   const activePermissionAtom = atom<StandalonePermission | null>(null);
   const failedPromptAtom = atom<string | null>(null);
+  const fetchedSessionDataAtom = atom<FetchedSessionData | null>(null);
 
   // Derived atoms
   const messagesListAtom = atom<StoredMessage[]>(get => {
@@ -346,6 +337,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(permissionAtom, null);
     store.set(activePermissionAtom, null);
     store.set(failedPromptAtom, null);
+    store.set(fetchedSessionDataAtom, null);
   }
 
   function subscribeToServiceState(
@@ -446,6 +438,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       return;
     }
     if (kiloSessionId !== activeSessionId) return;
+    store.set(fetchedSessionDataAtom, data);
 
     // Populate session metadata and swap in the new storage eagerly.
     // The storage starts empty; snapshot replay (inside session.connect)
@@ -467,10 +460,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       resolveSession: config.resolveSession,
       transport: {
         getTicket: config.getTicket,
-        send: config.send,
-        answer: config.answer,
-        reject: config.reject,
-        respondToPermission: config.respondToPermission,
+        api: config.api,
         fetchSnapshot: config.fetchSnapshot,
         getAuthToken: config.getAuthToken,
         cliWebsocketUrl: config.cliWebsocketUrl,
@@ -586,11 +576,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   async function interrupt(): Promise<void> {
     if (!currentSession) return;
-    const sid = store.get(sessionIdAtom);
     try {
-      if (sid) {
-        await config.interrupt({ sessionId: sid });
-      } else if (currentSession.canInterrupt) {
+      if (currentSession.canInterrupt) {
         await currentSession.interrupt();
       }
       currentSession.disconnect();
@@ -676,6 +663,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       permission: permissionAtom,
       activePermission: activePermissionAtom,
       failedPrompt: failedPromptAtom,
+      fetchedSessionData: fetchedSessionDataAtom,
       messagesList: messagesListAtom,
       staticMessages: staticMessagesAtom,
       dynamicMessages: dynamicMessagesAtom,

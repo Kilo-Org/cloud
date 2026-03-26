@@ -4,6 +4,13 @@ const config = {
   owner: 'kilocode',
   slug: 'kilo-app',
   version: '1.0.0',
+  runtimeVersion: {
+    policy: 'appVersion',
+  },
+  updates: {
+    url: 'https://u.expo.dev/2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4',
+    checkAutomatically: 'ON_ERROR_RECOVERY',
+  },
   orientation: 'portrait',
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',
@@ -43,6 +50,7 @@ const config = {
     'expo-image',
     'expo-secure-store',
     'expo-web-browser',
+    'expo-updates',
     [
       '@sentry/react-native/expo',
       {

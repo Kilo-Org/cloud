@@ -310,7 +310,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   let currentSession: CloudAgentSession | null = null;
   let stateUnsub: (() => void) | null = null;
   let indicatorTimer: ReturnType<typeof setTimeout> | null = null;
-  const notifiedSessionIds = new Set<string>();
 
   function setIndicator(ind: SessionStatusIndicator | null): void {
     if (indicatorTimer !== null) {
@@ -432,29 +431,36 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession = null;
     setIndicator(null);
 
-    // Keep old session content visible during fetch — only mark as loading and
-    // disable interactive controls so the user sees the previous session's
-    // messages with a subtle loading indicator instead of a blank flash.
+    // Clean slate immediately — the user asked to switch, so clear all
+    // previous session state and show a loading indicator.
+    clearAllAtoms();
     store.set(isLoadingAtom, true);
-    store.set(isStreamingAtom, false);
-    store.set(canSendAtom, false);
-    store.set(canInterruptAtom, false);
 
     let data: FetchedSessionData;
     try {
       data = await config.fetchSession(kiloSessionId);
     } catch (err) {
       if (kiloSessionId !== activeSessionId) return;
-      clearAllAtoms();
+      store.set(isLoadingAtom, false);
       setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
       return;
     }
     if (kiloSessionId !== activeSessionId) return;
 
-    // Create new storage but don't swap it into the store yet — old session
-    // content stays visible (dimmed) until the snapshot replay fires
-    // onSessionCreated, which atomically swaps everything in one render.
+    // Populate session metadata and swap in the new storage eagerly.
+    // The storage starts empty; snapshot replay (inside session.connect)
+    // will populate it and the UI updates reactively.
     const jotaiStorage = createJotaiStorage(store);
+    store.set(sessionConfigAtom, {
+      sessionId: data.cloudAgentSessionId ?? kiloSessionId,
+      repository: data.repository ?? '',
+      mode: data.mode ?? '',
+      model: data.model ?? '',
+      variant: data.variant ?? null,
+    });
+    store.set(sessionIdAtom, data.cloudAgentSessionId);
+    store.set(sessionStorageAtom, jotaiStorage);
+    config.onKiloSessionCreated?.(kiloSessionId);
 
     const session = createCloudAgentSession({
       kiloSessionId,
@@ -476,25 +482,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         parents.set(info.id, info.parentID ?? null);
         store.set(sessionParentsAtom, parents);
         if (!info.parentID) {
-          // Atomic swap: clear old state and populate new data in one
-          // synchronous block. The transport has already replayed messages
-          // into jotaiStorage, so swapping sessionStorageAtom makes them
-          // immediately visible — no blank frame.
-          clearAllAtoms();
-          store.set(sessionConfigAtom, {
-            sessionId: data.cloudAgentSessionId ?? kiloSessionId,
-            repository: data.repository ?? '',
-            mode: data.mode ?? '',
-            model: data.model ?? '',
-            variant: data.variant ?? null,
-          });
-          store.set(sessionIdAtom, data.cloudAgentSessionId);
-          store.set(sessionStorageAtom, jotaiStorage);
           store.set(isLoadingAtom, false);
-          if (!notifiedSessionIds.has(info.id)) {
-            notifiedSessionIds.add(info.id);
-            config.onKiloSessionCreated?.(info.id as KiloSessionId);
-          }
         }
       },
       onQuestionAsked: (requestId, questions) => {
@@ -550,20 +538,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession = session;
     subscribeToServiceState(session, {
       onFirstActivity: () => {
-        if (!store.get(isLoadingAtom)) return;
-        // Fallback: clear loading state when events start flowing even if
-        // no root session.created was replayed (e.g. CLI snapshot failure).
-        // Reset all per-session atoms first, same as the onSessionCreated
-        // path, so stale UI state from the previous session doesn't leak.
-        clearAllAtoms();
-        store.set(sessionConfigAtom, {
-          sessionId: data.cloudAgentSessionId ?? kiloSessionId,
-          repository: data.repository ?? '',
-          mode: data.mode ?? '',
-          model: data.model ?? '',
-        });
-        store.set(sessionIdAtom, data.cloudAgentSessionId);
-        store.set(sessionStorageAtom, jotaiStorage);
+        // Fallback: clear loading when events flow even if no root
+        // session.created was replayed (e.g. CLI snapshot failure).
         store.set(isLoadingAtom, false);
       },
     });

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 
+// Replace the iOS URL with the actual App Store ID once published
 const STORE_URL = Platform.select({
   ios: 'https://apps.apple.com/app/idYOUR_APP_ID',
   default: 'https://play.google.com/store/apps/details?id=com.kilocode.kiloapp',

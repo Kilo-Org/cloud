@@ -15,6 +15,7 @@ import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { ForceUpgradeScreen } from '@/components/force-upgrade-screen';
 import { ContextProvider, useAppContext } from '@/lib/context/context-context';
 import { useForceUpgrade } from '@/lib/hooks/use-force-upgrade';
+import { useOTAUpdates } from '@/lib/hooks/use-ota-updates';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
@@ -58,9 +59,10 @@ function RootLayoutNav() {
   const { context, isLoading: contextLoading } = useAppContext();
   const segments = useSegments();
   const router = useRouter();
-  const { blocked, isChecking: upgradeChecking } = useForceUpgrade();
+  const { blocked, otaForceUpdate, isChecking: upgradeChecking } = useForceUpgrade();
+  const { isBlocking: otaBlocking } = useOTAUpdates(!blocked && otaForceUpdate);
 
-  const isLoading = authLoading || contextLoading || upgradeChecking;
+  const isLoading = authLoading || contextLoading || upgradeChecking || otaBlocking;
   const inAuthGroup = segments[0] === '(auth)';
   const inContextGroup = segments[0] === '(context)';
 

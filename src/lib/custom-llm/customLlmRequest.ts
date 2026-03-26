@@ -1,6 +1,4 @@
 import type { OpenRouterChatCompletionRequest } from '@/lib/providers/openrouter/types';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import {
   APICallError,
   generateText,
@@ -36,14 +34,10 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { debugSaveLog, inStreamDebugMode } from '@/lib/debugUtils';
 import { ReasoningFormat } from '@/lib/custom-llm/format';
 import {
-  CustomLlmExtraBodySchema,
   CustomLlmExtraHeadersSchema,
-  InterleavedFormatSchema,
   ReasoningEffortSchema,
   VerbositySchema,
 } from '@kilocode/db/schema-types';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import type OpenAI from 'openai';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 import PROVIDERS from '@/lib/providers/provider-definitions';
 
@@ -570,15 +564,7 @@ function buildCommonParams(
     toolChoice: convertToolChoice(request.tool_choice),
     maxOutputTokens: request.max_completion_tokens ?? request.max_tokens ?? undefined,
     temperature: request.temperature ?? undefined,
-    headers: {
-      'anthropic-beta': 'context-1m-2025-08-07',
-    },
     providerOptions: {
-      anthropic: {
-        thinking: { type: 'adaptive' },
-        effort: verbosity,
-        disableParallelToolUse: request.parallel_tool_calls === false || isLegacyExtension,
-      } satisfies AnthropicProviderOptions,
       openai: {
         forceReasoning: (reasoningEffort !== 'none' && customLlm.force_reasoning) || undefined,
         reasoningSummary: 'auto',
@@ -671,14 +657,6 @@ function convertGenerateResultToResponse(
 
 function createModel(customLlm: CustomLlm) {
   const extraHeaders = CustomLlmExtraHeadersSchema.safeParse(customLlm.extra_headers).data;
-  if (customLlm.provider === 'anthropic') {
-    const anthropic = createAnthropic({
-      apiKey: customLlm.api_key,
-      baseURL: customLlm.base_url,
-      headers: extraHeaders,
-    });
-    return anthropic(customLlm.internal_id);
-  }
   if (customLlm.provider === 'openai') {
     const openai = createOpenAI({
       apiKey: customLlm.api_key,
@@ -686,48 +664,6 @@ function createModel(customLlm: CustomLlm) {
       headers: extraHeaders,
     });
     return openai(customLlm.internal_id);
-  }
-  if (customLlm.provider === 'openai-compatible') {
-    const interleavedFormat =
-      InterleavedFormatSchema.safeParse(customLlm.interleaved_format).data ??
-      InterleavedFormatSchema.enum.reasoning_content;
-    const openaiCompatible = createOpenAICompatible({
-      name: 'openaiCompatible',
-      apiKey: customLlm.api_key,
-      baseURL: customLlm.base_url,
-      headers: extraHeaders,
-      transformRequestBody: body => {
-        let messages = (body as OpenAI.ChatCompletionCreateParams).messages ?? [];
-        if (interleavedFormat === InterleavedFormatSchema.enum.think) {
-          messages = messages.map(msg => {
-            if (
-              msg.role !== 'assistant' ||
-              !('reasoning_content' in msg) ||
-              typeof msg.reasoning_content !== 'string'
-            ) {
-              return msg;
-            }
-            const think = '<think>' + msg.reasoning_content + '</think>';
-            if (Array.isArray(msg.content)) {
-              return {
-                ...msg,
-                content: [{ type: 'text', text: think }, ...msg.content],
-                reasoning_content: undefined,
-              };
-            } else {
-              return {
-                ...msg,
-                content: think + (msg.content ?? ''),
-                reasoning_content: undefined,
-              };
-            }
-          });
-        }
-        const extraBody = CustomLlmExtraBodySchema.safeParse(customLlm.extra_body).data;
-        return { ...body, messages, ...extraBody };
-      },
-    });
-    return openaiCompatible(customLlm.internal_id);
   }
   throw new Error(`Unknown provider: ${customLlm.provider}`);
 }

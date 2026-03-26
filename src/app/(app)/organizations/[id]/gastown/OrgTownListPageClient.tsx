@@ -41,7 +41,6 @@ export function OrgTownListPageClient({ organizationId, role }: OrgTownListPageC
     })
   );
 
-
   return (
     <PageContainer>
       <GastownBackdrop contentClassName="p-5 md:p-7">
@@ -167,7 +166,6 @@ export function OrgTownListPageClient({ organizationId, role }: OrgTownListPageC
           ))}
         </div>
       )}
-
     </PageContainer>
   );
 }

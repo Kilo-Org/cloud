@@ -42,14 +42,26 @@ export function OnboardingStepRepo() {
     state.repo?.platform === 'manual' ? (state.repo?.defaultBranch ?? 'main') : 'main'
   );
 
-  // Fetch repos from integrations (personal-scope only for onboarding)
+  // Use org-scoped endpoints when onboarding within an org, personal otherwise
+  const orgId = state.orgId;
+
   const githubReposQuery = useQuery({
-    ...mainTrpc.cloudAgent.listGitHubRepositories.queryOptions({ forceRefresh: false }),
+    ...(orgId
+      ? mainTrpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
+          organizationId: orgId,
+          forceRefresh: false,
+        })
+      : mainTrpc.cloudAgent.listGitHubRepositories.queryOptions({ forceRefresh: false })),
     enabled: mode === 'picker',
   });
 
   const gitlabReposQuery = useQuery({
-    ...mainTrpc.cloudAgent.listGitLabRepositories.queryOptions({ forceRefresh: false }),
+    ...(orgId
+      ? mainTrpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
+          organizationId: orgId,
+          forceRefresh: false,
+        })
+      : mainTrpc.cloudAgent.listGitLabRepositories.queryOptions({ forceRefresh: false })),
     enabled: mode === 'picker',
   });
 

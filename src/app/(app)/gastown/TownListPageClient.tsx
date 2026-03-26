@@ -24,11 +24,7 @@ export function TownListPageClient() {
 
   // Auto-redirect new users with no towns to the onboarding wizard (once per page load)
   useEffect(() => {
-    if (
-      !didAutoRedirect.current &&
-      townsQuery.data &&
-      townsQuery.data.length === 0
-    ) {
+    if (!didAutoRedirect.current && townsQuery.data && townsQuery.data.length === 0) {
       didAutoRedirect.current = true;
       router.replace('/gastown/onboarding');
     }
@@ -167,7 +163,6 @@ export function TownListPageClient() {
           ))}
         </div>
       )}
-
     </PageContainer>
   );
 }

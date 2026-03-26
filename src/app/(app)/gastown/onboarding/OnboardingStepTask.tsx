@@ -13,7 +13,7 @@ import { presetToConfig, FIRST_TASK_STORAGE_PREFIX, PHASE_LABELS } from './onboa
 import type { CreationPhase } from './onboarding.domain';
 
 export function OnboardingStepTask() {
-  const { state, setFirstTask } = useOnboarding();
+  const { state, setFirstTask, backgroundTownId, isProvisioning } = useOnboarding();
   const router = useRouter();
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
@@ -51,21 +51,32 @@ export function OnboardingStepTask() {
 
   const updateConfig = useMutation(trpc.gastown.updateTownConfig.mutationOptions({}));
 
-  async function handleSubmit() {
-    if (!state.firstTask.trim() || !state.repo || !state.townName.trim()) return;
+  const ensureMayor = useMutation(
+    trpc.gastown.ensureMayor.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.gastown.getMayorStatus.queryKey(),
+        });
+      },
+    })
+  );
 
-    try {
-      // Step 1: Create the town (org-scoped or personal)
-      setPhase('creating-town');
-      const town = state.orgId
-        ? await createOrgTown.mutateAsync({
-            organizationId: state.orgId,
-            name: state.townName.trim(),
-          })
-        : await createTown.mutateAsync({ name: state.townName.trim() });
-      const townId = town.id;
+  /** Resolve the town ID — either from background provisioning or by creating now. */
+  async function resolveTownId(): Promise<string> {
+    if (backgroundTownId) return backgroundTownId;
 
-      // Step 2: Create the rig (non-blocking — if it fails, user can add later)
+    const town = state.orgId
+      ? await createOrgTown.mutateAsync({
+          organizationId: state.orgId,
+          name: state.townName.trim(),
+        })
+      : await createTown.mutateAsync({ name: state.townName.trim() });
+    return town.id;
+  }
+
+  async function finalize(townId: string, firstTask: string | null) {
+    // Create the rig (non-blocking — if it fails, user can add later)
+    if (state.repo) {
       setPhase('creating-rig');
       try {
         const rigName = state.repo.fullName.split('/').pop() ?? state.repo.fullName;
@@ -82,8 +93,10 @@ export function OnboardingStepTask() {
         const message = rigErr instanceof Error ? rigErr.message : 'Failed to add repository';
         toast.error(`Rig creation failed: ${message}. You can add it later in settings.`);
       }
+    }
 
-      // Step 3: Set model config (non-blocking)
+    // If town was NOT background-provisioned, configure models + ensureMayor now
+    if (!backgroundTownId) {
       setPhase('configuring-models');
       try {
         const config = presetToConfig(state.modelPreset, state.customModels);
@@ -94,38 +107,64 @@ export function OnboardingStepTask() {
         toast.error(`Model config failed: ${message}. You can update it in settings.`);
       }
 
-      // Step 4: Queue first task for the Mayor terminal via localStorage
+      // Fire-and-forget ensureMayor — don't block redirect
+      ensureMayor.mutate({ townId });
+    }
+
+    // Queue first task for the Mayor terminal via localStorage
+    if (firstTask) {
       try {
-        localStorage.setItem(`${FIRST_TASK_STORAGE_PREFIX}${townId}`, state.firstTask.trim());
+        localStorage.setItem(`${FIRST_TASK_STORAGE_PREFIX}${townId}`, firstTask);
       } catch {
         // localStorage may be unavailable; the message just won't be auto-sent
       }
+    }
 
-      // Step 5: Redirect to the new town (org-scoped path when applicable)
-      setPhase('redirecting');
-      const townPath = state.orgId
-        ? `/organizations/${state.orgId}/gastown/${townId}`
-        : `/gastown/${townId}`;
-      router.push(townPath);
-    } catch (townErr) {
-      // Town creation is the critical path — if it fails, stay on the wizard
+    // Redirect to the new town
+    setPhase('redirecting');
+    const townPath = state.orgId
+      ? `/organizations/${state.orgId}/gastown/${townId}`
+      : `/gastown/${townId}`;
+    router.push(townPath);
+  }
+
+  async function handleSubmit() {
+    if (!state.firstTask.trim() || !state.townName.trim()) return;
+
+    try {
+      setPhase('creating-town');
+      const townId = await resolveTownId();
+      await finalize(townId, state.firstTask.trim());
+    } catch (err) {
       setPhase('idle');
-      const message = townErr instanceof Error ? townErr.message : 'Failed to create town';
+      const message = err instanceof Error ? err.message : 'Failed to create town';
+      toast.error(message);
+    }
+  }
+
+  async function handleSkip() {
+    if (!state.townName.trim()) return;
+
+    try {
+      setPhase('creating-town');
+      const townId = await resolveTownId();
+      await finalize(townId, null);
+    } catch (err) {
+      setPhase('idle');
+      const message = err instanceof Error ? err.message : 'Failed to create town';
       toast.error(message);
     }
   }
 
   const canSubmit =
-    state.firstTask.trim().length > 0 &&
-    state.repo !== null &&
-    state.townName.trim().length > 0 &&
-    !isSubmitting;
+    state.firstTask.trim().length > 0 && state.townName.trim().length > 0 && !isSubmitting;
+  const canSkip = state.townName.trim().length > 0 && !isSubmitting;
 
   return (
     <div className="flex flex-col items-center justify-center py-12">
       <h2 className="text-xl font-semibold text-white/90">Give your first task</h2>
       <p className="mt-2 text-sm text-white/40">
-        Tell your Mayor what to work on. This will be your first conversation.
+        Tell your Mayor what to work on, or skip to explore your town first.
       </p>
 
       <div className="mt-8 w-full max-w-lg">
@@ -152,10 +191,21 @@ export function OnboardingStepTask() {
         {isSubmitting ? (
           <div className="mt-6 flex flex-col items-center gap-3">
             <Loader2 className="size-6 animate-spin text-[color:oklch(95%_0.15_108_/_0.7)]" />
-            <p className="text-sm text-white/50">{PHASE_LABELS[phase]}</p>
+            <p className="text-sm text-white/50">
+              {PHASE_LABELS[phase]}
+              {isProvisioning && phase === 'creating-town' ? ' (already in progress)' : ''}
+            </p>
           </div>
         ) : (
-          <div className="mt-6 flex justify-center">
+          <div className="mt-6 flex items-center justify-center gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => void handleSkip()}
+              disabled={!canSkip}
+              className="h-11 px-6 text-sm text-white/50 hover:text-white/80"
+            >
+              Skip
+            </Button>
             <Button
               onClick={() => void handleSubmit()}
               disabled={!canSubmit}

@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
  * Onboarding Wizard E2E tests.
  *
  * Each test signs in a fresh user via fake-login and navigates to the
- * onboarding wizard. The wizard flow is: Name → Repo → Models → Task.
+ * onboarding wizard. The wizard flow is: Name → Models → Repo → Task.
  *
  * These tests verify the full wizard flow as rendered in the browser,
  * including step navigation, form input, and the submission path.
@@ -69,10 +69,10 @@ test.describe('Onboarding Wizard', () => {
     // Verify the input placeholder
     await expect(page.getByPlaceholder('my-town')).toBeVisible();
 
-    // Verify step indicator shows Name as current step
+    // Verify step indicator shows all steps in the new order
     await expect(page.getByText('Name')).toBeVisible();
-    await expect(page.getByText('Repo')).toBeVisible();
     await expect(page.getByText('Models')).toBeVisible();
+    await expect(page.getByText('Repo')).toBeVisible();
     await expect(page.getByText('Task')).toBeVisible();
 
     // Back button should be disabled on the first step (opacity-0 = hidden)
@@ -105,7 +105,7 @@ test.describe('Onboarding Wizard', () => {
     await expect(page.getByText('Town name cannot start or end with a hyphen')).toBeVisible();
   });
 
-  test('navigating forward to step 2 (Repo) using Next button', async ({ page }) => {
+  test('navigating forward to step 2 (Models) using Next button', async ({ page }) => {
     await signInFreshUser(page);
 
     const input = page.getByPlaceholder('my-town');
@@ -116,19 +116,19 @@ test.describe('Onboarding Wizard', () => {
     const nextButton = page.getByRole('button', { name: 'Next' });
     await nextButton.click();
 
-    // Verify step 2 is now shown
-    await expect(page.getByText('Connect a repo')).toBeVisible();
+    // Verify step 2 (Models) is now shown
+    await expect(page.getByText('Choose your models')).toBeVisible();
   });
 
   test('navigating backward from step 2 to step 1', async ({ page }) => {
     await signInFreshUser(page);
 
-    // Go to step 2
+    // Go to step 2 (Models)
     const input = page.getByPlaceholder('my-town');
     await input.fill('');
     await input.fill('test-town');
     await page.getByRole('button', { name: 'Next' }).click();
-    await expect(page.getByText('Connect a repo')).toBeVisible();
+    await expect(page.getByText('Choose your models')).toBeVisible();
 
     // Go back to step 1
     await page.getByRole('button', { name: 'Back' }).click();
@@ -138,13 +138,33 @@ test.describe('Onboarding Wizard', () => {
     await expect(page.getByPlaceholder('my-town')).toHaveValue('test-town');
   });
 
-  test('step 2: manual URL input mode', async ({ page }) => {
+  test('step 2: model preset selection defaults to Balanced', async ({ page }) => {
     await signInFreshUser(page);
 
-    // Navigate to step 2
+    // Navigate to step 2 (Models)
+    await page.getByPlaceholder('my-town').fill('test-town');
+    await page.getByRole('button', { name: 'Next' }).click();
+
+    // Verify step 2 heading
+    await expect(page.getByText('Choose your models')).toBeVisible();
+
+    // Verify presets are displayed
+    await expect(page.getByText('Maximum Frontier')).toBeVisible();
+    await expect(page.getByText('Balanced')).toBeVisible();
+    await expect(page.getByText('Cost-Effective')).toBeVisible();
+    await expect(page.getByText('Free Tier')).toBeVisible();
+    await expect(page.getByText('Custom')).toBeVisible();
+  });
+
+  test('step 3: manual URL input mode', async ({ page }) => {
+    await signInFreshUser(page);
+
+    // Navigate to step 3 (Repo): Name → Models → Repo
     const input = page.getByPlaceholder('my-town');
     await input.fill('');
     await input.fill('test-town');
+    await page.getByRole('button', { name: 'Next' }).click();
+    await expect(page.getByText('Choose your models')).toBeVisible();
     await page.getByRole('button', { name: 'Next' }).click();
     await expect(page.getByText('Connect a repo')).toBeVisible();
 
@@ -164,46 +184,25 @@ test.describe('Onboarding Wizard', () => {
     const continueButton = page.getByRole('button', { name: 'Continue' });
     await expect(continueButton).toBeEnabled();
 
-    // Click Continue to advance to step 3
+    // Click Continue to advance to step 4
     await continueButton.click();
-    await expect(page.getByText('Choose your models')).toBeVisible();
+    await expect(page.getByText('Give your first task')).toBeVisible();
   });
 
-  test('step 3: model preset selection defaults to Balanced', async ({ page }) => {
+  test('step 4: task textarea, submit button, and skip button', async ({ page }) => {
     await signInFreshUser(page);
 
-    // Navigate to step 3 via manual URL
+    // Navigate through to step 4: Name → Models → Repo (manual) → Task
     await page.getByPlaceholder('my-town').fill('test-town');
     await page.getByRole('button', { name: 'Next' }).click();
+    await expect(page.getByText('Choose your models')).toBeVisible();
+    await page.getByRole('button', { name: 'Next' }).click();
+    await expect(page.getByText('Connect a repo')).toBeVisible();
     await page.getByText('Or enter a git URL manually').click();
     await page
       .getByPlaceholder('https://github.com/org/repo.git')
       .fill('https://github.com/test/repo.git');
     await page.getByRole('button', { name: 'Continue' }).click();
-
-    // Verify step 3 heading
-    await expect(page.getByText('Choose your models')).toBeVisible();
-
-    // Verify presets are displayed
-    await expect(page.getByText('Maximum Frontier')).toBeVisible();
-    await expect(page.getByText('Balanced')).toBeVisible();
-    await expect(page.getByText('Cost-Effective')).toBeVisible();
-    await expect(page.getByText('Free Tier')).toBeVisible();
-    await expect(page.getByText('Custom')).toBeVisible();
-  });
-
-  test('step 4: task textarea and submit button', async ({ page }) => {
-    await signInFreshUser(page);
-
-    // Navigate through to step 4
-    await page.getByPlaceholder('my-town').fill('test-town');
-    await page.getByRole('button', { name: 'Next' }).click();
-    await page.getByText('Or enter a git URL manually').click();
-    await page
-      .getByPlaceholder('https://github.com/org/repo.git')
-      .fill('https://github.com/test/repo.git');
-    await page.getByRole('button', { name: 'Continue' }).click();
-    await page.getByRole('button', { name: 'Next' }).click();
 
     // Verify step 4 heading
     await expect(page.getByText('Give your first task')).toBeVisible();
@@ -215,6 +214,11 @@ test.describe('Onboarding Wizard', () => {
     // Verify submit button is disabled when textarea is empty
     const submitButton = page.getByRole('button', { name: 'Create Town & Start' });
     await expect(submitButton).toBeDisabled();
+
+    // Verify skip button is visible and enabled
+    const skipButton = page.getByRole('button', { name: 'Skip' });
+    await expect(skipButton).toBeVisible();
+    await expect(skipButton).toBeEnabled();
 
     // Type a task
     await textarea.fill('Fix the README formatting');
@@ -237,16 +241,17 @@ test.describe('Onboarding Wizard', () => {
     await nameInput.fill(townName);
     await page.getByRole('button', { name: 'Next' }).click();
 
-    // Step 2: Repo (manual URL)
+    // Step 2: Models (keep default Balanced)
+    await expect(page.getByText('Choose your models')).toBeVisible();
+    await page.getByRole('button', { name: 'Next' }).click();
+
+    // Step 3: Repo (manual URL)
+    await expect(page.getByText('Connect a repo')).toBeVisible();
     await page.getByText('Or enter a git URL manually').click();
     await page
       .getByPlaceholder('https://github.com/org/repo.git')
       .fill('https://github.com/test/e2e-repo.git');
     await page.getByRole('button', { name: 'Continue' }).click();
-
-    // Step 3: Models (keep default Balanced)
-    await expect(page.getByText('Choose your models')).toBeVisible();
-    await page.getByRole('button', { name: 'Next' }).click();
 
     // Step 4: Task
     await expect(page.getByText('Give your first task')).toBeVisible();

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { OnboardingProvider } from './OnboardingContext';
+import { OnboardingProvider, useOnboarding } from './OnboardingContext';
 import { OnboardingStepName } from './OnboardingStepName';
 import { OnboardingStepRepo } from './OnboardingStepRepo';
 import { OnboardingStepModel } from './OnboardingStepModel';
@@ -13,8 +13,8 @@ import { OnboardingStepTask } from './OnboardingStepTask';
 
 const STEPS = [
   { key: 'name', label: 'Name' },
-  { key: 'repo', label: 'Repo' },
   { key: 'model', label: 'Models' },
+  { key: 'repo', label: 'Repo' },
   { key: 'task', label: 'Task' },
 ] as const;
 
@@ -89,6 +89,19 @@ function StepIndicator({ currentIndex }: { currentIndex: number }) {
   );
 }
 
+/** Triggers background town creation + mayor pre-warm when the repo step is reached. */
+function BackgroundProvisioner({ currentStepKey }: { currentStepKey: StepKey }) {
+  const { provisionTownInBackground } = useOnboarding();
+
+  useEffect(() => {
+    if (currentStepKey === 'repo') {
+      provisionTownInBackground();
+    }
+  }, [currentStepKey, provisionTownInBackground]);
+
+  return null;
+}
+
 function WizardContent() {
   const searchParams = useSearchParams();
   const orgId = searchParams.get('orgId');
@@ -115,6 +128,7 @@ function WizardContent() {
 
   return (
     <OnboardingProvider goNext={goNext} orgId={orgId}>
+      <BackgroundProvisioner currentStepKey={currentStepKey} />
       <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center px-4 py-8">
         {/* Header */}
         <div className="mb-2 text-center">
@@ -140,8 +154,8 @@ function WizardContent() {
               transition={{ duration: 0.2 }}
             >
               {currentStepKey === 'name' && <OnboardingStepName />}
-              {currentStepKey === 'repo' && <OnboardingStepRepo />}
               {currentStepKey === 'model' && <OnboardingStepModel />}
+              {currentStepKey === 'repo' && <OnboardingStepRepo />}
               {currentStepKey === 'task' && <OnboardingStepTask />}
             </motion.div>
           </AnimatePresence>

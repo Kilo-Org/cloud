@@ -80,6 +80,8 @@ function DynamicMessages({
 // ---------------------------------------------------------------------------
 // CloudChatPage
 // ---------------------------------------------------------------------------
+const emptyQuestionRequestIds = new Map<string, string>();
+
 type CloudChatPageProps = { organizationId?: string };
 
 export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
@@ -106,9 +108,8 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const sessionId = useAtomValue(manager.atoms.sessionId);
   const activity = useAtomValue(manager.atoms.activity);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
-  const standaloneQuestion = useAtomValue(manager.atoms.standaloneQuestion);
-  const questionRequestIds = useAtomValue(manager.atoms.questionRequestIds);
-  const standalonePermission = useAtomValue(manager.atoms.standalonePermission);
+  const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
+  const activePermission = useAtomValue(manager.atoms.activePermission);
   const failedPrompt = useAtomValue(manager.atoms.failedPrompt);
   const staticMessages = useAtomValue(manager.atoms.staticMessages);
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
@@ -250,7 +251,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   // -- Render ---------------------------------------------------------------
   return (
     <QuestionContextProvider
-      questionRequestIds={questionRequestIds}
+      questionRequestIds={emptyQuestionRequestIds}
       cloudAgentSessionId={sessionId}
       organizationId={organizationId ?? null}
       answerQuestion={handleAnswerQuestion}
@@ -304,29 +305,29 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                 )}
               </div>
 
-              <div className="relative">
-                {standaloneQuestion && (
-                  <div className="bg-background absolute inset-0 z-10 overflow-y-auto border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
-                    <QuestionToolCard
-                      key={standaloneQuestion.requestId}
-                      questions={standaloneQuestion.questions}
-                      requestId={standaloneQuestion.requestId}
-                      status="running"
-                    />
-                  </div>
-                )}
-                {standalonePermission && (
-                  <div className="bg-background absolute inset-0 z-10 flex items-center justify-center border-t p-4">
-                    <PermissionCard
-                      key={standalonePermission.requestId}
-                      requestId={standalonePermission.requestId}
-                      permission={standalonePermission.permission}
-                      patterns={standalonePermission.patterns}
-                      metadata={standalonePermission.metadata}
-                      always={standalonePermission.always}
-                    />
-                  </div>
-                )}
+              {activeQuestion && (
+                <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
+                  <QuestionToolCard
+                    key={activeQuestion.requestId}
+                    questions={activeQuestion.questions}
+                    requestId={activeQuestion.requestId}
+                    status="running"
+                  />
+                </div>
+              )}
+              {activePermission && (
+                <div className="flex items-center border-t p-4">
+                  <PermissionCard
+                    key={activePermission.requestId}
+                    requestId={activePermission.requestId}
+                    permission={activePermission.permission}
+                    patterns={activePermission.patterns}
+                    metadata={activePermission.metadata}
+                    always={activePermission.always}
+                  />
+                </div>
+              )}
+              <div className={activeQuestion || activePermission ? 'hidden' : ''}>
                 <ChatInput
                   onSend={handleSendMessage}
                   onStop={handleStopExecution}

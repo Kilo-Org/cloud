@@ -31,11 +31,10 @@ type CloudAgentSessionConfig = {
   websocketBaseUrl?: string;
   storage?: SessionStorage;
   onError?: (message: string) => void;
-  onQuestionAsked?: (requestId: string, callId?: string, questions?: QuestionInfo[]) => void;
+  onQuestionAsked?: (requestId: string, questions?: QuestionInfo[]) => void;
   onQuestionResolved?: (requestId: string) => void;
   onPermissionAsked?: (
     requestId: string,
-    callId?: string,
     permission?: string,
     patterns?: string[],
     metadata?: Record<string, unknown>,

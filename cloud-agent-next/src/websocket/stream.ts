@@ -144,8 +144,8 @@ export function createStreamHandler(
       }
 
       // Send `connected` event with current service state.
-      // sessionStatus is omitted here — it arrives later via kilo_snapshot broadcast
-      // from the wrapper, which is the authoritative source.
+      // sessionStatus is omitted here — it arrives later via the wrapper's
+      // session.status kilocode event, which is the authoritative source.
       {
         const connectedData: ConnectedEventData = {};
         const cloudStatus = await options?.deriveCloudStatus?.();

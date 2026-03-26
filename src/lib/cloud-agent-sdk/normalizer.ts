@@ -4,7 +4,7 @@
  * boundary `as` casts so downstream code receives properly typed NormalizedEvents.
  */
 import type { Part, SessionStatus, QuestionInfo, Message } from '@/types/opencode.gen';
-import type { SessionInfo, CloudStatus, QuestionState, PermissionState } from './types';
+import type { SessionInfo, CloudStatus } from './types';
 import {
   cloudAgentEventSchema,
   kilocodePayloadSchema,
@@ -63,7 +63,6 @@ export type ServiceEvent =
   | {
       type: 'question.asked';
       requestId: string;
-      callId?: string;
       questions?: QuestionInfo[];
     }
   | { type: 'question.replied'; requestId: string }
@@ -71,7 +70,6 @@ export type ServiceEvent =
   | {
       type: 'permission.asked';
       requestId: string;
-      callId?: string;
       permission: string;
       patterns: string[];
       metadata: Record<string, unknown>;
@@ -100,8 +98,6 @@ export type ServiceEvent =
       type: 'connected';
       sessionStatus?: SessionStatus;
       cloudStatus?: CloudStatus;
-      question?: QuestionState;
-      permission?: PermissionState;
     };
 
 export type NormalizedEvent = ChatEvent | ServiceEvent;
@@ -237,7 +233,6 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       return {
         type: 'question.asked',
         requestId: r.data.id,
-        callId: r.data.tool?.callID,
         questions: r.data.questions as QuestionInfo[] | undefined,
       };
     }
@@ -260,7 +255,6 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       return {
         type: 'permission.asked',
         requestId: r.data.id,
-        callId: r.data.tool?.callID,
         permission: r.data.permission,
         patterns: r.data.patterns,
         metadata: r.data.metadata as Record<string, unknown>,
@@ -334,10 +328,6 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         type: 'connected',
         ...(r.data.sessionStatus !== undefined && { sessionStatus: r.data.sessionStatus }),
         ...(r.data.cloudStatus !== undefined && { cloudStatus: r.data.cloudStatus }),
-        ...(r.data.question !== undefined && { question: r.data.question as QuestionState }),
-        ...(r.data.permission !== undefined && {
-          permission: r.data.permission as PermissionState,
-        }),
       };
     }
 

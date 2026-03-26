@@ -10,7 +10,7 @@
  */
 
 import type { WrapperState } from './state.js';
-import type { IngestEvent, WrapperCommand, KiloSnapshotData } from '../../src/shared/protocol.js';
+import type { IngestEvent, WrapperCommand } from '../../src/shared/protocol.js';
 import { trimPayload } from '../../src/shared/trim-payload.js';
 import { logToFile } from './utils.js';
 import type { WrapperKiloClient } from './kilo-api.js';
@@ -86,7 +86,7 @@ export type ConnectionManager = {
   isReconnecting: () => boolean;
   /** Abort and restart the SDK event subscription (does not tear down ingest WS). */
   reconnectEventSubscription: () => void;
-  /** Fetch fresh kilo server state and send a kilo_snapshot event to the DO. Best-effort. */
+  /** Fetch fresh kilo server state and send it as regular kilocode events to the DO. Best-effort. */
   sendKiloSnapshot: () => Promise<void>;
 };
 
@@ -160,7 +160,7 @@ export function createConnectionManager(
   }
 
   /**
-   * Fetch current kilo server state and send a kilo_snapshot event to the DO.
+   * Fetch current kilo server state and send it as regular kilocode events to the DO.
    * Called after ingest WS opens (initial connect and reconnect).
    * Best-effort: failures are logged but don't block the connection.
    */
@@ -179,38 +179,54 @@ export function createConnectionManager(
       ]);
 
       const statusEntry = statuses[kiloSessionId];
-      const sessionStatus = (statusEntry ?? { type: 'idle' }) as KiloSnapshotData['sessionStatus'];
+      const sessionStatus = (statusEntry ?? { type: 'idle' }) as {
+        type: string;
+        [key: string]: unknown;
+      };
 
       const pendingQuestion = questions.find(q => q.sessionID === kiloSessionId);
-
       const pendingPermission = permissions.find(p => p.sessionID === kiloSessionId);
 
-      const snapshot: KiloSnapshotData = { sessionStatus };
-      if (pendingQuestion) {
-        snapshot.question = {
-          requestId: pendingQuestion.id,
-          callId: pendingQuestion.tool?.callID,
-        };
-      }
-      if (pendingPermission) {
-        snapshot.permission = {
-          requestId: pendingPermission.id,
-          callId: pendingPermission.tool?.callID,
-          permission: pendingPermission.permission,
-          patterns: pendingPermission.patterns,
-          metadata: pendingPermission.metadata,
-          always: pendingPermission.always,
-        };
-      }
-
+      // Send session status as a regular kilocode event
+      const statusProperties = { sessionID: kiloSessionId, status: sessionStatus };
       sendToIngest({
-        streamEventType: 'kilo_snapshot',
-        data: snapshot,
+        streamEventType: 'kilocode',
+        data: {
+          ...statusProperties,
+          event: 'session.status',
+          type: 'session.status',
+          properties: statusProperties,
+        },
         timestamp: new Date().toISOString(),
       });
 
+      // Replay pending questions/permissions as regular events
+      // (same format as real-time delivery — matches CLI behavior)
+      if (pendingQuestion) {
+        sendToIngest({
+          streamEventType: 'kilocode',
+          data: {
+            event: 'question.asked',
+            type: 'question.asked',
+            properties: pendingQuestion,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+      if (pendingPermission) {
+        sendToIngest({
+          streamEventType: 'kilocode',
+          data: {
+            event: 'permission.asked',
+            type: 'permission.asked',
+            properties: pendingPermission,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       logToFile(
-        `kilo snapshot sent: status=${sessionStatus.type}, question=${pendingQuestion?.id ?? 'none'}, permission=${pendingPermission?.id ?? 'none'}`
+        `kilo state sent: status=${sessionStatus.type}, question=${pendingQuestion?.id ?? 'none'}, permission=${pendingPermission?.id ?? 'none'}`
       );
     } catch (err) {
       logToFile(

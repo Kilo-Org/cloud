@@ -218,6 +218,45 @@ describe('createServiceState', () => {
       expect(state.getStatus()).toEqual({ type: 'disconnected' });
       expect(onError).toHaveBeenCalledWith('Connection to agent lost');
     });
+
+    it('stopped resets cloudStatus to null when it was preparing', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'cloud.status',
+        cloudStatus: { type: 'preparing', step: 'cloning', message: 'Cloning...' },
+      });
+      expect(state.getCloudStatus()).not.toBeNull();
+
+      state.process({ type: 'stopped', reason: 'error' });
+
+      expect(state.getCloudStatus()).toBeNull();
+    });
+
+    it('stopped resets cloudStatus to null when it was finalizing', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'cloud.status',
+        cloudStatus: { type: 'finalizing', step: 'committing', message: 'Committing...' },
+      });
+      expect(state.getCloudStatus()).not.toBeNull();
+
+      state.process({ type: 'stopped', reason: 'complete' });
+
+      expect(state.getCloudStatus()).toBeNull();
+    });
+
+    it('stopped resets cloudStatus to null on disconnected', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'cloud.status',
+        cloudStatus: { type: 'preparing', step: 'cloning', message: 'Cloning...' },
+      });
+      expect(state.getCloudStatus()).not.toBeNull();
+
+      state.process({ type: 'stopped', reason: 'disconnected' });
+
+      expect(state.getCloudStatus()).toBeNull();
+    });
   });
 
   describe('session.error', () => {
@@ -338,7 +377,7 @@ describe('createServiceState', () => {
   });
 
   describe('question.asked', () => {
-    it('sets question state with callId and fires callback', () => {
+    it('sets question state and fires callback', () => {
       const onQuestionAsked = jest.fn();
       const state = createServiceState(makeConfig({ onQuestionAsked }));
       const questions: QuestionInfo[] = [
@@ -348,19 +387,17 @@ describe('createServiceState', () => {
       state.process({
         type: 'question.asked',
         requestId: 'req-1',
-        callId: 'call-1',
         questions,
       });
 
       expect(state.getQuestion()).toEqual({
         requestId: 'req-1',
-        callId: 'call-1',
         questions,
       });
-      expect(onQuestionAsked).toHaveBeenCalledWith('req-1', 'call-1', questions);
+      expect(onQuestionAsked).toHaveBeenCalledWith('req-1', questions);
     });
 
-    it('sets question state without callId (standalone question)', () => {
+    it('sets question state without questions (standalone question)', () => {
       const onQuestionAsked = jest.fn();
       const state = createServiceState(makeConfig({ onQuestionAsked }));
 
@@ -368,10 +405,9 @@ describe('createServiceState', () => {
 
       expect(state.getQuestion()).toEqual({
         requestId: 'req-2',
-        callId: undefined,
         questions: undefined,
       });
-      expect(onQuestionAsked).toHaveBeenCalledWith('req-2', undefined, undefined);
+      expect(onQuestionAsked).toHaveBeenCalledWith('req-2', undefined);
     });
   });
 
@@ -380,7 +416,7 @@ describe('createServiceState', () => {
       const onQuestionResolved = jest.fn();
       const state = createServiceState(makeConfig({ onQuestionResolved }));
 
-      state.process({ type: 'question.asked', requestId: 'req-1', callId: 'call-1' });
+      state.process({ type: 'question.asked', requestId: 'req-1' });
       state.process({ type: 'question.replied', requestId: 'req-1' });
 
       expect(state.getQuestion()).toBeNull();
@@ -552,44 +588,70 @@ describe('createServiceState', () => {
       expect(state.getCloudStatus()).toBeNull();
     });
 
-    it('sets question when provided', () => {
-      const state = createServiceState(makeConfig());
-      state.process({
-        type: 'connected',
-        sessionStatus: { type: 'busy' },
-        question: { requestId: 'req-1', callId: 'call-1' },
-      });
-      expect(state.getQuestion()).toEqual({
-        requestId: 'req-1',
-        callId: 'call-1',
-        questions: undefined,
-      });
-    });
-
-    it('fires onQuestionAsked callback when question is provided', () => {
-      const onQuestionAsked = jest.fn();
-      const state = createServiceState(makeConfig({ onQuestionAsked }));
-      state.process({
-        type: 'connected',
-        sessionStatus: { type: 'busy' },
-        question: { requestId: 'req-1', callId: 'call-1', questions: [] },
-      });
-      expect(onQuestionAsked).toHaveBeenCalledWith('req-1', 'call-1', []);
-    });
-
     it('clears question when not provided on reconnect', () => {
       const state = createServiceState(makeConfig());
       // Set a question via question.asked
-      state.process({
-        type: 'question.asked',
-        requestId: 'req-stale',
-        callId: 'call-stale',
-        questions: [],
-      });
+      state.process({ type: 'question.asked', requestId: 'req-stale' });
       expect(state.getQuestion()).not.toBeNull();
       // Reconnect without question — it was answered while disconnected
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
       expect(state.getQuestion()).toBeNull();
+    });
+
+    it('clears permission when not provided on reconnect', () => {
+      const state = createServiceState(makeConfig());
+      // Set a permission via permission.asked
+      state.process({
+        type: 'permission.asked',
+        requestId: 'perm-stale',
+        permission: 'file-edit',
+        patterns: ['**/*'],
+        metadata: {},
+        always: [],
+      });
+      expect(state.getPermission()).not.toBeNull();
+      // Reconnect without permission — it was resolved while disconnected
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+      expect(state.getPermission()).toBeNull();
+    });
+
+    it('fires onQuestionResolved when clearing stale question on reconnect', () => {
+      const onQuestionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onQuestionResolved }));
+      // Set a question
+      state.process({ type: 'question.asked', requestId: 'req-stale' });
+      onQuestionResolved.mockClear();
+      // Reconnect — question was answered while disconnected
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+      expect(onQuestionResolved).toHaveBeenCalledWith('req-stale');
+    });
+
+    it('fires onPermissionResolved when clearing stale permission on reconnect', () => {
+      const onPermissionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onPermissionResolved }));
+      // Set a permission
+      state.process({
+        type: 'permission.asked',
+        requestId: 'perm-stale',
+        permission: 'file-edit',
+        patterns: ['**/*'],
+        metadata: {},
+        always: [],
+      });
+      onPermissionResolved.mockClear();
+      // Reconnect — permission was resolved while disconnected
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+      expect(onPermissionResolved).toHaveBeenCalledWith('perm-stale');
+    });
+
+    it('does not fire resolve callbacks when no question/permission was pending', () => {
+      const onQuestionResolved = jest.fn();
+      const onPermissionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onQuestionResolved, onPermissionResolved }));
+      // Connect with no prior question/permission
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+      expect(onQuestionResolved).not.toHaveBeenCalled();
+      expect(onPermissionResolved).not.toHaveBeenCalled();
     });
 
     it('clears terminated flag', () => {
@@ -611,15 +673,9 @@ describe('createServiceState', () => {
         type: 'connected',
         sessionStatus: { type: 'busy' },
         cloudStatus: { type: 'ready' },
-        question: { requestId: 'req-1' },
       });
       expect(state.getActivity()).toEqual({ type: 'busy' });
       expect(state.getCloudStatus()).toEqual({ type: 'ready' });
-      expect(state.getQuestion()).toEqual({
-        requestId: 'req-1',
-        callId: undefined,
-        questions: undefined,
-      });
     });
 
     it('notifies subscribers once', () => {
@@ -928,7 +984,6 @@ describe('createServiceState', () => {
       state.process({
         type: 'permission.asked',
         requestId: 'perm-1',
-        callId: 'call-1',
         permission: 'file-edit',
         patterns: ['src/**/*.ts'],
         metadata: { reason: 'code generation' },
@@ -937,7 +992,6 @@ describe('createServiceState', () => {
 
       expect(state.getPermission()).toEqual({
         requestId: 'perm-1',
-        callId: 'call-1',
         permission: 'file-edit',
         patterns: ['src/**/*.ts'],
         metadata: { reason: 'code generation' },
@@ -952,7 +1006,6 @@ describe('createServiceState', () => {
       state.process({
         type: 'permission.asked',
         requestId: 'perm-1',
-        callId: 'call-1',
         permission: 'file-edit',
         patterns: ['src/**/*.ts'],
         metadata: { reason: 'code generation' },
@@ -961,7 +1014,6 @@ describe('createServiceState', () => {
 
       expect(onPermissionAsked).toHaveBeenCalledWith(
         'perm-1',
-        'call-1',
         'file-edit',
         ['src/**/*.ts'],
         { reason: 'code generation' },
@@ -983,7 +1035,6 @@ describe('createServiceState', () => {
 
       expect(state.snapshot().permission).toEqual({
         requestId: 'perm-1',
-        callId: undefined,
         permission: 'file-edit',
         patterns: ['**/*'],
         metadata: {},
@@ -1026,96 +1077,6 @@ describe('createServiceState', () => {
       state.process({ type: 'permission.replied', requestId: 'perm-1' });
 
       expect(onPermissionResolved).toHaveBeenCalledWith('perm-1');
-    });
-  });
-
-  describe('connected permission sync', () => {
-    it('sets permission from connected event', () => {
-      const state = createServiceState(makeConfig());
-
-      state.process({
-        type: 'connected',
-        sessionStatus: { type: 'busy' },
-        permission: {
-          requestId: 'perm-1',
-          callId: 'call-1',
-          permission: 'file-edit',
-          patterns: ['src/**'],
-          metadata: {},
-          always: [],
-        },
-      });
-
-      expect(state.getPermission()).toEqual({
-        requestId: 'perm-1',
-        callId: 'call-1',
-        permission: 'file-edit',
-        patterns: ['src/**'],
-        metadata: {},
-        always: [],
-      });
-    });
-
-    it('clears permission when not provided on reconnect', () => {
-      const state = createServiceState(makeConfig());
-
-      // Set a permission via permission.asked
-      state.process({
-        type: 'permission.asked',
-        requestId: 'perm-stale',
-        permission: 'file-edit',
-        patterns: ['**/*'],
-        metadata: {},
-        always: [],
-      });
-      expect(state.getPermission()).not.toBeNull();
-
-      // Reconnect without permission — it was resolved while disconnected
-      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
-
-      expect(state.getPermission()).toBeNull();
-    });
-
-    it('preserves question when permission changes on reconnect', () => {
-      const state = createServiceState(makeConfig());
-
-      // Set both question and permission
-      state.process({ type: 'question.asked', requestId: 'q-1', callId: 'call-q' });
-      state.process({
-        type: 'permission.asked',
-        requestId: 'perm-1',
-        permission: 'file-edit',
-        patterns: ['**/*'],
-        metadata: {},
-        always: [],
-      });
-
-      expect(state.getQuestion()).not.toBeNull();
-      expect(state.getPermission()).not.toBeNull();
-
-      // Reconnect with permission but without question
-      state.process({
-        type: 'connected',
-        sessionStatus: { type: 'busy' },
-        permission: {
-          requestId: 'perm-2',
-          permission: 'shell',
-          patterns: ['*'],
-          metadata: {},
-          always: [],
-        },
-      });
-
-      // Question cleared (not in connected), permission updated
-      expect(state.getQuestion()).toBeNull();
-      expect(state.getPermission()).toEqual({
-        requestId: 'perm-2',
-        callId: undefined,
-        permission: 'shell',
-        patterns: ['*'],
-        metadata: {},
-        always: [],
-      });
     });
   });
 

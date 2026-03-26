@@ -286,8 +286,6 @@ export type CloudStatusData = z.infer<typeof cloudStatusDataSchema>;
 export const connectedDataSchema = z.object({
   sessionStatus: sessionStatusSchema.optional().catch(undefined),
   cloudStatus: cloudStatusSchema.optional().catch(undefined),
-  question: questionPayloadSchema.optional().catch(undefined),
-  permission: permissionPayloadSchema.optional().catch(undefined),
 });
 export type ConnectedData = z.infer<typeof connectedDataSchema>;
 

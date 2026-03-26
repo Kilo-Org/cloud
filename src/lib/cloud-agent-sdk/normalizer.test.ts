@@ -581,7 +581,7 @@ describe('normalize', () => {
   });
 
   describe('question.asked', () => {
-    it('includes callId from tool.callID', () => {
+    it('extracts requestId and questions from tool.callID', () => {
       const data = {
         id: 'q-1',
         tool: { callID: 'call-1' },
@@ -591,18 +591,16 @@ describe('normalize', () => {
       expect(result).toEqual({
         type: 'question.asked',
         requestId: 'q-1',
-        callId: 'call-1',
         questions: [{ text: 'Continue?' }],
       });
     });
 
-    it('has callId undefined when tool is absent', () => {
+    it('works when tool is absent', () => {
       const data = { id: 'q-1', questions: [{ text: 'Yes?' }] };
       const result = normalize(createRaw('question.asked', data));
       expect(result).toEqual({
         type: 'question.asked',
         requestId: 'q-1',
-        callId: undefined,
         questions: [{ text: 'Yes?' }],
       });
     });
@@ -613,7 +611,6 @@ describe('normalize', () => {
       expect(result).toEqual({
         type: 'question.asked',
         requestId: 'q-1',
-        callId: undefined,
         questions: undefined,
       });
     });
@@ -671,7 +668,6 @@ describe('normalize', () => {
       expect(result).toEqual({
         type: 'permission.asked',
         requestId: 'perm-1',
-        callId: 'call-1',
         permission: 'bash',
         patterns: ['**/*'],
         metadata: { command: 'ls -la' },
@@ -685,7 +681,6 @@ describe('normalize', () => {
       expect(result).toEqual({
         type: 'permission.asked',
         requestId: 'perm-2',
-        callId: undefined,
         permission: 'write',
         patterns: [],
         metadata: {},
@@ -710,7 +705,6 @@ describe('normalize', () => {
       expect(result).toEqual({
         type: 'permission.asked',
         requestId: 'perm-3',
-        callId: undefined,
         permission: 'read',
         patterns: [],
         metadata: {},
@@ -1089,7 +1083,7 @@ describe('normalize', () => {
       });
     });
 
-    it('normalizes with sessionStatus, cloudStatus, and question', () => {
+    it('normalizes with sessionStatus and cloudStatus', () => {
       const result = normalize(
         createRaw('connected', {
           sessionStatus: { type: 'busy' },
@@ -1101,7 +1095,6 @@ describe('normalize', () => {
         type: 'connected',
         sessionStatus: { type: 'busy' },
         cloudStatus: { type: 'preparing', step: 'cloning' },
-        question: { requestId: 'req-1', callId: 'call-1' },
       });
     });
 
@@ -1130,7 +1123,7 @@ describe('normalize', () => {
       });
     });
 
-    it('ignores invalid question', () => {
+    it('strips unknown fields like question from connected event', () => {
       const result = normalize(
         createRaw('connected', {
           sessionStatus: { type: 'idle' },
@@ -1141,9 +1134,10 @@ describe('normalize', () => {
         type: 'connected',
         sessionStatus: { type: 'idle' },
       });
+      expect(result).not.toHaveProperty('question');
     });
 
-    it('normalizes connected event with permission', () => {
+    it('strips unknown fields like permission from connected event', () => {
       const result = normalize(
         createRaw('connected', {
           sessionStatus: { type: 'busy' },
@@ -1160,40 +1154,6 @@ describe('normalize', () => {
       expect(result).toEqual({
         type: 'connected',
         sessionStatus: { type: 'busy' },
-        permission: {
-          requestId: 'perm-1',
-          callId: 'call-1',
-          permission: 'bash',
-          patterns: ['**/*'],
-          metadata: { command: 'ls' },
-          always: [],
-        },
-      });
-    });
-
-    it('normalizes connected event without permission', () => {
-      const result = normalize(
-        createRaw('connected', {
-          sessionStatus: { type: 'idle' },
-        })
-      );
-      expect(result).toEqual({
-        type: 'connected',
-        sessionStatus: { type: 'idle' },
-      });
-      expect(result).not.toHaveProperty('permission');
-    });
-
-    it('normalizes connected event with invalid permission', () => {
-      const result = normalize(
-        createRaw('connected', {
-          sessionStatus: { type: 'idle' },
-          permission: { callId: 'call-1' }, // missing requestId
-        })
-      );
-      expect(result).toEqual({
-        type: 'connected',
-        sessionStatus: { type: 'idle' },
       });
       expect(result).not.toHaveProperty('permission');
     });
@@ -1328,7 +1288,6 @@ describe('normalizeCliEvent', () => {
       expect(normalizeCliEvent('question.asked', data)).toEqual({
         type: 'question.asked',
         requestId: 'q-1',
-        callId: 'call-1',
         questions: [{ text: 'Continue?' }],
       });
     });

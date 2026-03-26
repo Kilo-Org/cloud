@@ -121,7 +121,8 @@ type SessionManagerAtoms = {
   statusIndicator: W<SessionStatusIndicator | null>;
   error: W<string | null>;
   question: W<QuestionState | null>;
-  questionRequestIds: W<Map<string, string>>;
+  activeQuestion: W<StandaloneQuestion | null>;
+  activePermission: W<StandalonePermission | null>;
   sessionInfo: W<SessionInfo | null>;
   sessionId: W<CloudAgentSessionId | null>;
   activity: W<SessionActivity>;
@@ -129,10 +130,7 @@ type SessionManagerAtoms = {
   cloudStatus: W<CloudStatus | null>;
   sessionConfig: W<SessionConfig | null>;
   chatUI: W<{ shouldAutoScroll: boolean }>;
-  standaloneQuestion: W<StandaloneQuestion | null>;
   permission: W<PermissionState | null>;
-  permissionRequestIds: W<Map<string, string>>;
-  standalonePermission: W<StandalonePermission | null>;
   failedPrompt: W<string | null>;
   messagesList: Atom<StoredMessage[]>;
   staticMessages: Atom<StoredMessage[]>;
@@ -247,7 +245,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const statusIndicatorAtom = atom<SessionStatusIndicator | null>(null);
   const errorAtom = atom<string | null>(null);
   const questionAtom = atom<QuestionState | null>(null);
-  const questionRequestIdsAtom = atom<Map<string, string>>(new Map());
   const sessionInfoAtom = atom<SessionInfo | null>(null);
   const sessionIdAtom = atom<CloudAgentSessionId | null>(null);
   const activityAtom = atom<SessionActivity>({ type: 'connecting' });
@@ -255,10 +252,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const cloudStatusAtom = atom<CloudStatus | null>(null);
   const sessionConfigAtom = atom<SessionConfig | null>(null);
   const chatUIAtom = atom<{ shouldAutoScroll: boolean }>({ shouldAutoScroll: true });
-  const standaloneQuestionAtom = atom<StandaloneQuestion | null>(null);
+  const activeQuestionAtom = atom<StandaloneQuestion | null>(null);
   const permissionAtom = atom<PermissionState | null>(null);
-  const permissionRequestIdsAtom = atom<Map<string, string>>(new Map());
-  const standalonePermissionAtom = atom<StandalonePermission | null>(null);
+  const activePermissionAtom = atom<StandalonePermission | null>(null);
   const failedPromptAtom = atom<string | null>(null);
 
   // Derived atoms
@@ -341,17 +337,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(statusIndicatorAtom, null);
     store.set(errorAtom, null);
     store.set(questionAtom, null);
-    store.set(questionRequestIdsAtom, new Map());
     store.set(sessionInfoAtom, null);
     store.set(sessionIdAtom, null);
     store.set(activityAtom, { type: 'connecting' });
     store.set(agentStatusAtom, { type: 'idle' });
     store.set(cloudStatusAtom, null);
     store.set(sessionConfigAtom, null);
-    store.set(standaloneQuestionAtom, null);
+    store.set(activeQuestionAtom, null);
     store.set(permissionAtom, null);
-    store.set(permissionRequestIdsAtom, new Map());
-    store.set(standalonePermissionAtom, null);
+    store.set(activePermissionAtom, null);
     store.set(failedPromptAtom, null);
   }
 
@@ -503,26 +497,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           }
         }
       },
-      onQuestionAsked: (requestId, callId, questions) => {
-        if (callId) {
-          const ids = new Map(store.get(questionRequestIdsAtom));
-          ids.set(callId, requestId);
-          store.set(questionRequestIdsAtom, ids);
-        } else if (questions) {
-          store.set(standaloneQuestionAtom, { requestId, questions });
+      onQuestionAsked: (requestId, questions) => {
+        if (questions) {
+          store.set(activeQuestionAtom, { requestId, questions });
         }
       },
       onQuestionResolved: requestId => {
-        const sq = store.get(standaloneQuestionAtom);
-        if (sq?.requestId === requestId) store.set(standaloneQuestionAtom, null);
+        const aq = store.get(activeQuestionAtom);
+        if (aq?.requestId === requestId) store.set(activeQuestionAtom, null);
       },
-      onPermissionAsked: (requestId, callId, permission, patterns, metadata, always) => {
-        if (callId) {
-          const ids = new Map(store.get(permissionRequestIdsAtom));
-          ids.set(callId, requestId);
-          store.set(permissionRequestIdsAtom, ids);
-        } else if (permission) {
-          store.set(standalonePermissionAtom, {
+      onPermissionAsked: (requestId, permission, patterns, metadata, always) => {
+        if (permission) {
+          store.set(activePermissionAtom, {
             requestId,
             permission,
             patterns: patterns ?? [],
@@ -532,8 +518,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
       },
       onPermissionResolved: requestId => {
-        const sp = store.get(standalonePermissionAtom);
-        if (sp?.requestId === requestId) store.set(standalonePermissionAtom, null);
+        const ap = store.get(activePermissionAtom);
+        if (ap?.requestId === requestId) store.set(activePermissionAtom, null);
       },
       onBranchChanged: branch => config.onBranchChanged?.(branch),
       onError: message => store.set(errorAtom, message),
@@ -703,7 +689,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       statusIndicator: statusIndicatorAtom,
       error: errorAtom,
       question: questionAtom,
-      questionRequestIds: questionRequestIdsAtom,
       sessionInfo: sessionInfoAtom,
       sessionId: sessionIdAtom,
       activity: activityAtom,
@@ -711,10 +696,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       cloudStatus: cloudStatusAtom,
       sessionConfig: sessionConfigAtom,
       chatUI: chatUIAtom,
-      standaloneQuestion: standaloneQuestionAtom,
+      activeQuestion: activeQuestionAtom,
       permission: permissionAtom,
-      permissionRequestIds: permissionRequestIdsAtom,
-      standalonePermission: standalonePermissionAtom,
+      activePermission: activePermissionAtom,
       failedPrompt: failedPromptAtom,
       messagesList: messagesListAtom,
       staticMessages: staticMessagesAtom,

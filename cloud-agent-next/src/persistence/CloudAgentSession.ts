@@ -51,13 +51,7 @@ import {
   type IngestDOContext,
 } from '../websocket/ingest.js';
 import type { StoredEvent } from '../websocket/types.js';
-import type {
-  WrapperCommand,
-  PreparingStep,
-  CloudStatusData,
-  ConnectedEventData,
-  KiloSnapshotData,
-} from '../shared/protocol.js';
+import type { WrapperCommand, PreparingStep, CloudStatusData } from '../shared/protocol.js';
 import { STALE_THRESHOLD_MS, SANDBOX_SLEEP_AFTER_SECONDS } from '../core/lease.js';
 import { ExecutionOrchestrator, type OrchestratorDeps } from '../execution/orchestrator.js';
 import type {
@@ -274,9 +268,6 @@ export class CloudAgentSession extends DurableObject {
         clearActiveExecution: () => this.clearActiveExecution(),
         getActiveExecutionId: () => this.executionQueries.getActiveExecutionId(),
         cancelDisconnectGrace: () => this.cancelDisconnectGrace(),
-        onKiloSnapshot: (data: KiloSnapshotData) => {
-          void this.broadcastConnectedEvent(data);
-        },
         getExecution: async (executionId: string) => {
           const execution = await this.executionQueries.get(executionId as ExecutionId);
           if (!execution) return null;
@@ -379,8 +370,8 @@ export class CloudAgentSession extends DurableObject {
       const response = await streamHandler.handleStreamRequest(request);
 
       // Request fresh kilo state from wrapper if connected.
-      // The wrapper will respond with a kilo_snapshot event, which triggers
-      // broadcastConnectedEvent() and sends a `connected` event with real data.
+      // The wrapper will respond with regular kilocode events (session.status,
+      // question.asked, permission.asked) that are broadcast via the normal pipeline.
       this.requestKiloSnapshot();
 
       return response;
@@ -560,41 +551,6 @@ export class CloudAgentSession extends DurableObject {
 
     // Running executions mean the agent has control — infrastructure is ready
     return { type: 'ready' };
-  }
-
-  /**
-   * Broadcast a `connected` event to all /stream clients with current state.
-   * Called when a kilo_snapshot arrives (wrapper just connected/reconnected)
-   * or when a snapshot is requested for a newly connected client.
-   */
-  private async broadcastConnectedEvent(snapshot: KiloSnapshotData): Promise<void> {
-    try {
-      const sessionId = await this.resolveSessionId();
-      if (!sessionId) return;
-
-      const connectedData: ConnectedEventData = {
-        sessionStatus: snapshot.sessionStatus,
-      };
-      const cloudStatus = await this.deriveCloudStatus();
-      if (cloudStatus) connectedData.cloudStatus = cloudStatus;
-      if (snapshot.question) connectedData.question = snapshot.question;
-      if (snapshot.permission) connectedData.permission = snapshot.permission;
-
-      const activeExecId = await this.executionQueries.getActiveExecutionId();
-
-      this.broadcastEvent({
-        id: 0 as EventId,
-        execution_id: (activeExecId ?? '') as ExecutionId,
-        session_id: sessionId,
-        stream_event_type: 'connected',
-        payload: JSON.stringify(connectedData),
-        timestamp: Date.now(),
-      });
-    } catch (err) {
-      logger
-        .withFields({ error: err instanceof Error ? err.message : String(err) })
-        .error('Failed to broadcast connected event');
-    }
   }
 
   /**
@@ -793,8 +749,9 @@ export class CloudAgentSession extends DurableObject {
   }
 
   /**
-   * Request a fresh kilo state snapshot from the wrapper.
-   * The wrapper will respond with a kilo_snapshot ingest event.
+   * Request fresh kilo state from the wrapper.
+   * The wrapper will respond with regular kilocode events (session.status,
+   * question.asked, permission.asked) that flow through the normal ingest pipeline.
    * Best-effort: silently does nothing if no wrapper is connected.
    */
   private requestKiloSnapshot(): void {

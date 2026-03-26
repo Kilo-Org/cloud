@@ -9,25 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useOnboarding } from './OnboardingContext';
-import { presetToConfig } from './OnboardingStepModel';
-
-/** localStorage key used to queue the first task for the Mayor terminal. */
-export const FIRST_TASK_STORAGE_PREFIX = 'gastown_first_task_';
-
-type CreationPhase =
-  | 'idle'
-  | 'creating-town'
-  | 'creating-rig'
-  | 'configuring-models'
-  | 'redirecting';
-
-const PHASE_LABELS: Record<CreationPhase, string> = {
-  idle: '',
-  'creating-town': 'Creating your town...',
-  'creating-rig': 'Adding repository...',
-  'configuring-models': 'Configuring models...',
-  redirecting: 'Launching your town...',
-};
+import { presetToConfig, FIRST_TASK_STORAGE_PREFIX, PHASE_LABELS } from './onboarding.domain';
+import type { CreationPhase } from './onboarding.domain';
 
 export function OnboardingStepTask() {
   const { state, setFirstTask } = useOnboarding();

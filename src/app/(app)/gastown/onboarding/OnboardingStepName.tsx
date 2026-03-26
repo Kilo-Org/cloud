@@ -4,27 +4,12 @@ import { useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { useUser } from '@/hooks/useUser';
 import { useOnboarding } from './OnboardingContext';
-
-const TOWN_NAME_MAX_LENGTH = 48;
-const TOWN_NAME_PATTERN = /^[a-zA-Z0-9-]*$/;
-
-function deriveDefaultTownName(userName: string | null | undefined): string {
-  if (!userName) return '';
-  const firstName = userName.split(/\s+/)[0];
-  if (!firstName) return '';
-  const slug = firstName.toLowerCase().replace(/[^a-z0-9-]/g, '');
-  return slug ? `${slug}-town` : '';
-}
-
-function validateTownName(name: string): string | null {
-  if (!name.trim()) return 'Town name is required';
-  if (name.length > TOWN_NAME_MAX_LENGTH)
-    return `Town name must be ${TOWN_NAME_MAX_LENGTH} characters or fewer`;
-  if (!TOWN_NAME_PATTERN.test(name)) return 'Only letters, numbers, and hyphens are allowed';
-  if (name.startsWith('-') || name.endsWith('-'))
-    return 'Town name cannot start or end with a hyphen';
-  return null;
-}
+import {
+  TOWN_NAME_MAX_LENGTH,
+  TOWN_NAME_PATTERN,
+  deriveDefaultTownName,
+  validateTownName,
+} from './onboarding.domain';
 
 export function OnboardingStepName() {
   const { state, setTownName, goNext } = useOnboarding();

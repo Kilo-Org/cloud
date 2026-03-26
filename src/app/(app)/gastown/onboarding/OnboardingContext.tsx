@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
+import type { ModelPreset, CustomModels } from './onboarding.domain';
 
 type OnboardingRepo = {
   platform: 'github' | 'gitlab' | 'manual';
@@ -9,14 +10,6 @@ type OnboardingRepo = {
   gitUrl: string;
   defaultBranch: string;
   platformIntegrationId?: string;
-};
-
-type ModelPreset = 'frontier' | 'balanced' | 'cost-effective' | 'free' | 'custom';
-
-type CustomModels = {
-  mayor?: string;
-  refinery?: string;
-  polecat?: string;
 };
 
 type OnboardingState = {

@@ -9,20 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, GitBranch, Link2 } from 'lucide-react';
 import { useOnboarding } from './OnboardingContext';
+import { resolveGitUrlFromRepo } from './onboarding.domain';
 
 type InputMode = 'picker' | 'manual';
-
-function resolveGitUrlFromRepo(
-  platform: 'github' | 'gitlab',
-  fullName: string,
-  gitlabInstanceUrl?: string
-): string {
-  if (platform === 'gitlab') {
-    const baseUrl = (gitlabInstanceUrl ?? 'https://gitlab.com').replace(/\/+$/, '');
-    return `${baseUrl}/${fullName}.git`;
-  }
-  return `https://github.com/${fullName}.git`;
-}
 
 export function OnboardingStepRepo() {
   const { state, setRepo, setTownName, goNext } = useOnboarding();

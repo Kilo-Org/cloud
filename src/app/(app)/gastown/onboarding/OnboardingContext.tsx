@@ -21,6 +21,7 @@ type CustomModels = {
 
 type OnboardingState = {
   townName: string;
+  townNameSetByUser: boolean;
   repo: OnboardingRepo | null;
   modelPreset: ModelPreset;
   customModels: CustomModels;
@@ -29,7 +30,7 @@ type OnboardingState = {
 
 type OnboardingContextValue = {
   state: OnboardingState;
-  setTownName: (name: string) => void;
+  setTownName: (name: string, setByUser?: boolean) => void;
   setRepo: (repo: OnboardingRepo | null) => void;
   setModelPreset: (preset: ModelPreset) => void;
   setCustomModels: (models: CustomModels) => void;
@@ -41,6 +42,7 @@ const OnboardingContext = createContext<OnboardingContextValue | null>(null);
 
 const defaultState: OnboardingState = {
   townName: '',
+  townNameSetByUser: false,
   repo: null,
   modelPreset: 'balanced',
   customModels: {},
@@ -59,7 +61,12 @@ export function OnboardingProvider({
   const [state, setState] = useState<OnboardingState>(defaultState);
 
   const setTownName = useCallback(
-    (townName: string) => setState(prev => ({ ...prev, townName })),
+    (townName: string, setByUser?: boolean) =>
+      setState(prev => ({
+        ...prev,
+        townName,
+        townNameSetByUser: setByUser ?? prev.townNameSetByUser,
+      })),
     []
   );
   const setRepo = useCallback(

@@ -64,7 +64,7 @@ export function OnboardingStepName() {
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
     if (value.length <= TOWN_NAME_MAX_LENGTH + 1 && TOWN_NAME_PATTERN.test(value)) {
-      setTownName(value);
+      setTownName(value, true);
     }
   }
 

@@ -173,6 +173,7 @@ export const baseGetSessionNextOutputSchema = z.object({
   prompt: z.string().optional(),
   mode: agentModeNextSchema.optional(),
   model: z.string().optional(),
+  variant: z.string().optional(),
   autoCommit: z.boolean().optional(),
   upstreamBranch: z.string().optional(),
 
@@ -207,6 +208,13 @@ export const baseAnswerQuestionNextSchema = z.object({
 export const baseRejectQuestionNextSchema = z.object({
   sessionId: z.string(),
   questionId: z.string().min(1),
+});
+
+// Schema for answering a permission request
+export const baseAnswerPermissionNextSchema = z.object({
+  sessionId: z.string(),
+  permissionId: z.string().min(1),
+  response: z.enum(['once', 'always', 'reject']),
 });
 
 // Output schema for V2 initiation/message procedures

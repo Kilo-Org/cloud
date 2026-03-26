@@ -4,10 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsgo --noEmit --incremental false",
-    "lint": "pnpm run lint:oxlint && pnpm run lint:eslint:fallback",
-    "lint:oxlint": "pnpm -w exec oxlint --config .oxlintrc.json packages/db/src",
-    "lint:eslint:fallback": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'"
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/db/src"
   },
   "exports": {
     ".": "./src/index.ts",
@@ -21,11 +19,9 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@kilocode/eslint-config": "workspace:*",
     "@types/pg": "^8.18.0",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "^0.31.9",
-    "eslint": "catalog:",
     "typescript": "catalog:"
   }
 }

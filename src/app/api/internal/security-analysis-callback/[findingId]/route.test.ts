@@ -44,7 +44,6 @@ let afterPromises: Promise<void>[] = [];
 
 jest.mock('next/server', () => {
   return {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     ...(jest.requireActual('next/server') as Record<string, unknown>),
     after: (fn: () => Promise<void>) => {
       afterPromises.push(fn());
@@ -107,7 +106,6 @@ jest.mock('@/lib/drizzle', () => {
   const chain = {
     from: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     limit: jest.fn(() => mockDbSelect()),
   };
   return {

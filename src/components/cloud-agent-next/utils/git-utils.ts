@@ -38,12 +38,20 @@ export function extractRepoFromGitUrl(gitUrl: string | null | undefined): string
     const pathParts = url.pathname.split('/').filter(Boolean);
     if (pathParts.length >= 2) {
       // For clone URLs (ending in .git), use the full path (supports nested GitLab groups)
-      // For non-clone URLs (like GitHub tree URLs), only use first two segments
       const fullPath = pathParts.join('/');
       if (fullPath.endsWith('.git')) {
         return fullPath.replace(/\.git$/, '');
       }
-      // Non-clone URL: only take owner/repo (first two segments)
+      // GitLab uses /-/ to separate the project path from resource paths
+      // (e.g. gitlab.com/group/subgroup/project/-/merge_requests/1)
+      const dashIdx = pathParts.indexOf('-');
+      if (dashIdx >= 2) {
+        return pathParts.slice(0, dashIdx).join('/');
+      }
+      if (url.hostname === 'gitlab.com') {
+        return fullPath;
+      }
+      // Fallback for GitHub-style URLs: owner/repo (first two segments)
       return `${pathParts[0]}/${pathParts[1]}`;
     }
   } catch {
@@ -114,4 +122,16 @@ export function detectGitPlatform(gitUrl: string | null | undefined): GitPlatfor
   if (hostname === 'github.com') return 'github';
   if (hostname === 'gitlab.com') return 'gitlab';
   return undefined;
+}
+
+/**
+ * Find all GitHub or GitLab URLs in free-form text, in order of appearance.
+ *
+ * Useful for detecting when a user pastes links to issues, PRs, etc.
+ * Returns all matches so the caller can iterate and pick the first one
+ * that corresponds to a connected repository.
+ */
+export function findAllGitPlatformUrls(text: string): string[] {
+  const matches = text.matchAll(/https?:\/\/(?:github\.com|gitlab\.com)\/[^\s)>\]]+/g);
+  return Array.from(matches, m => m[0].replace(/[.,;:!?]+$/, ''));
 }

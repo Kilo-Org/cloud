@@ -19,7 +19,6 @@ import { createOrganizationUsage } from '@/tests/helpers/microdollar-usage.helpe
 
 // Mock next/server's after function which requires request context
 jest.mock('next/server', () => {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return {
     ...jest.requireActual('next/server'),
     after: jest.fn((fn: () => Promise<void>) => {

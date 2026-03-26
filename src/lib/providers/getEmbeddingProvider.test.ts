@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { getEmbeddingProvider, PROVIDERS } from '@/lib/providers';
+import { getEmbeddingProvider } from '@/lib/providers';
+import PROVIDERS from '@/lib/providers/provider-definitions';
 import { createAnonymousContext } from '@/lib/anonymous';
 import { getModelUserByokProviders, getBYOKforUser, getBYOKforOrganization } from '@/lib/byok';
 import type { User } from '@kilocode/db/schema';

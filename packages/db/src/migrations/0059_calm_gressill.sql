@@ -1,0 +1,1 @@
+ALTER TABLE "kiloclaw_instances" ADD COLUMN "name" text;

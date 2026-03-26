@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { SetPageTitle } from '@/components/SetPageTitle';
 import { Button } from '@/components/ui/button';
 import {
   AlertTriangle,
@@ -78,12 +79,11 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
 
   return (
     <div className="space-y-6">
+      <SetPageTitle title="Security Agent">
+        <Badge variant="beta">Beta</Badge>
+      </SetPageTitle>
       {/* Header */}
       <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-bold">Security Agent</h1>
-          <Badge variant="beta">Beta</Badge>
-        </div>
         <p className="text-muted-foreground">
           Monitor and manage Dependabot security alerts for your repositories
         </p>

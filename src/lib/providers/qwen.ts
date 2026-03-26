@@ -1,11 +1,4 @@
-import { ReasoningDetailType } from '@/lib/custom-llm/reasoning-details';
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
-import { addCacheBreakpoints } from '@/lib/providers/openrouter/request-helpers';
-import type {
-  GatewayRequest,
-  MessageWithReasoning,
-  OpenRouterChatCompletionRequest,
-} from '@/lib/providers/openrouter/types';
 
 export const qwen35_plus_free_model: KiloFreeModel = {
   public_id: 'qwen/qwen3.5-plus:free',
@@ -20,34 +13,3 @@ export const qwen35_plus_free_model: KiloFreeModel = {
   internal_id: 'qwen3.5-plus',
   inference_provider: 'alibaba',
 };
-
-export function isQwenModel(requestedModelId: string) {
-  return requestedModelId.startsWith('qwen/');
-}
-
-export function convertReasoningDetailsToReasoningContent(
-  requestToMutate: OpenRouterChatCompletionRequest
-) {
-  for (const message of requestToMutate.messages) {
-    if (message.role !== 'assistant') {
-      continue;
-    }
-    const msgWithReasoning = message as MessageWithReasoning;
-    const reasoningDetailsText = (msgWithReasoning.reasoning_details ?? [])
-      .filter(r => r.type === ReasoningDetailType.Text)
-      .map(r => r.text)
-      .join('');
-    if (reasoningDetailsText) {
-      msgWithReasoning.reasoning_content = reasoningDetailsText;
-      delete msgWithReasoning.reasoning_details;
-      delete msgWithReasoning.reasoning;
-    }
-  }
-}
-
-export function applyAlibabaProviderSettings(requestToMutate: GatewayRequest) {
-  if (requestToMutate.kind === 'chat_completions') {
-    convertReasoningDetailsToReasoningContent(requestToMutate.body);
-  }
-  addCacheBreakpoints(requestToMutate);
-}

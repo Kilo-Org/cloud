@@ -5,10 +5,9 @@ import * as fly from '../../fly/client';
 import {
   DEFAULT_VOLUME_SIZE_GB,
   STARTUP_TIMEOUT_SECONDS,
-  DEFAULT_FLY_REGION,
   STALE_PROVISION_THRESHOLD_MS,
 } from '../../config';
-import { parseRegions, deprioritizeRegion } from '../regions';
+import { parseRegions, deprioritizeRegion, resolveRegions } from '../regions';
 import { guestFromSize, volumeNameFromSandboxId } from '../machine-config';
 import type { InstanceMutableState } from './types';
 import { storageUpdate } from './state';
@@ -27,7 +26,9 @@ export async function ensureVolume(
   if (state.flyVolumeId) return;
   if (!state.sandboxId) return;
 
-  const regions = parseRegions(state.flyRegion ?? env.FLY_REGION ?? DEFAULT_FLY_REGION);
+  const regions = state.flyRegion
+    ? parseRegions(state.flyRegion)
+    : await resolveRegions(env.KV_CLAW_CACHE, env.FLY_REGION);
   const volume = await fly.createVolumeWithFallback(
     flyConfig,
     {
@@ -64,7 +65,7 @@ export async function replaceStrandedVolume(
   const oldVolumeId = state.flyVolumeId;
   const oldRegion = state.flyRegion;
   const hasUserData = state.lastStartedAt !== null;
-  const allRegions = parseRegions(env.FLY_REGION ?? DEFAULT_FLY_REGION);
+  const allRegions = await resolveRegions(env.KV_CLAW_CACHE, env.FLY_REGION);
   const regions = deprioritizeRegion(allRegions, oldRegion);
   const compute = guestFromSize(state.machineSize);
 

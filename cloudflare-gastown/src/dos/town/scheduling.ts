@@ -7,8 +7,7 @@
  */
 
 import * as Sentry from '@sentry/cloudflare';
-import { z } from 'zod';
-import { beads, AgentBeadRecord } from '../../db/tables/beads.table';
+import { beads } from '../../db/tables/beads.table';
 import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { query } from '../../util/query.util';
 import * as beadOps from './beads';

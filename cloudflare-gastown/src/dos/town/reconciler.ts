@@ -20,7 +20,6 @@ import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
 import { agent_nudges } from '../../db/tables/agent-nudges.table';
 import { query } from '../../util/query.util';
 import {
-  GUPP_WARN_MS,
   GUPP_ESCALATE_MS,
   GUPP_FORCE_STOP_MS,
   AGENT_GC_RETENTION_MS,

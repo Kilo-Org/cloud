@@ -1,6 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import type { GastownEnv } from '../gastown.worker';
 import { resError } from '../util/res.util';
+import { logger } from '../util/log.util';
 
 /**
  * Verifies the authenticated Kilo user is a member of the org identified
@@ -24,5 +25,6 @@ export const orgAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =>
 
   c.set('orgId', orgId);
   c.set('orgRole', membership.role);
+  logger.setTags({ orgId });
   await next();
 });

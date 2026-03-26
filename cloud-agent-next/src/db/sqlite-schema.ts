@@ -9,6 +9,7 @@ export const events = sqliteTable(
     stream_event_type: text('stream_event_type').notNull(),
     payload: text('payload').notNull(),
     timestamp: integer('timestamp').notNull(),
+    entity_id: text('entity_id').unique(),
   },
   table => [
     index('idx_events_execution').on(table.execution_id),

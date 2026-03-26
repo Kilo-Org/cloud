@@ -9,6 +9,7 @@ export type ActiveKiloClawInstance = {
   id: string;
   userId: string;
   sandboxId: string;
+  name: string | null;
 };
 
 /**
@@ -31,6 +32,7 @@ export async function ensureActiveInstance(userId: string): Promise<ActiveKiloCl
       id: kiloclaw_instances.id,
       userId: kiloclaw_instances.user_id,
       sandboxId: kiloclaw_instances.sandbox_id,
+      name: kiloclaw_instances.name,
     })
     .from(kiloclaw_instances)
     .where(
@@ -73,9 +75,23 @@ export async function markActiveInstanceDestroyed(
       id: kiloclaw_instances.id,
       userId: kiloclaw_instances.user_id,
       sandboxId: kiloclaw_instances.sandbox_id,
+      name: kiloclaw_instances.name,
     });
 
   return row ?? null;
+}
+
+/**
+ * Soft-delete a specific instance row by its primary key.
+ * Unlike {@link markActiveInstanceDestroyed} (which targets the user's
+ * current active row), this targets exactly one row and is safe to use
+ * for rollback when the caller knows which row it created.
+ */
+export async function markInstanceDestroyedById(instanceId: string): Promise<void> {
+  await db
+    .update(kiloclaw_instances)
+    .set({ destroyed_at: new Date().toISOString() })
+    .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)));
 }
 
 /**
@@ -86,4 +102,58 @@ export async function restoreDestroyedInstance(instanceId: string): Promise<void
     .update(kiloclaw_instances)
     .set({ destroyed_at: null })
     .where(eq(kiloclaw_instances.id, instanceId));
+}
+
+/**
+ * Fetch the user's active KiloClaw instance (read-only, no upsert).
+ */
+export async function getActiveInstance(userId: string): Promise<ActiveKiloClawInstance | null> {
+  const sandboxId = sandboxIdFromUserId(userId);
+
+  const [row] = await db
+    .select({
+      id: kiloclaw_instances.id,
+      userId: kiloclaw_instances.user_id,
+      sandboxId: kiloclaw_instances.sandbox_id,
+      name: kiloclaw_instances.name,
+    })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .limit(1);
+
+  return row ?? null;
+}
+
+/**
+ * Update the display name of the user's active KiloClaw instance.
+ * Pass null to clear the name.
+ */
+export async function renameInstance(userId: string, name: string | null): Promise<void> {
+  const sandboxId = sandboxIdFromUserId(userId);
+  const trimmed = name?.trim() || null;
+
+  if (trimmed !== null && trimmed.length > 50) {
+    throw new Error('Instance name must be 50 characters or fewer');
+  }
+
+  const result = await db
+    .update(kiloclaw_instances)
+    .set({ name: trimmed })
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    );
+
+  if (result.rowCount === 0) {
+    throw new Error('No active instance found');
+  }
 }

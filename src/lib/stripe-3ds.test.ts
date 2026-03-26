@@ -23,9 +23,7 @@ import { handleUpdateSeatCount } from './stripe';
 import { client } from '@/lib/stripe-client';
 
 // Get references to the mocked functions after import
-// eslint-disable-next-line @typescript-eslint/unbound-method
 const mockSubscriptionsRetrieve = client.subscriptions.retrieve as jest.Mock;
-// eslint-disable-next-line @typescript-eslint/unbound-method
 const mockSubscriptionsUpdate = client.subscriptions.update as jest.Mock;
 
 describe('handleUpdateSeatCount with 3DS', () => {

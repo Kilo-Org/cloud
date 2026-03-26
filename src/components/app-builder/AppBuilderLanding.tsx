@@ -13,20 +13,12 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  Sparkles,
-  Clock,
-  FolderOpen,
-  Search,
-  ChevronRight,
-  Trash2,
-  Users,
-  User,
-} from 'lucide-react';
+import { Clock, FolderOpen, Search, ChevronRight, Trash2, Users, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { SetPageTitle } from '@/components/SetPageTitle';
 import {
   Sheet,
   SheetContent,
@@ -774,13 +766,9 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
       <div className="my-auto w-full max-w-3xl">
         {/* Header */}
         <div className="mb-8 text-center">
-          <div className="bg-primary/10 mx-auto mb-4 w-fit rounded-full p-4">
-            <Sparkles className="text-primary h-8 w-8" />
-          </div>
-          <div className="flex items-center justify-center gap-3">
-            <h1 className="text-2xl font-bold md:text-3xl">App Builder</h1>
+          <SetPageTitle title="App Builder">
             <Badge variant="new">new</Badge>
-          </div>
+          </SetPageTitle>
           <p className="text-muted-foreground mt-2 text-sm md:text-base">
             Describe the app you want to build, and we'll create it for you
           </p>

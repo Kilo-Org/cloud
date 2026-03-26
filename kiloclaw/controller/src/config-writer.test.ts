@@ -99,10 +99,23 @@ describe('generateBaseConfig', () => {
     expect(config.tools.exec.security).toBe('allowlist');
     expect(config.tools.exec.ask).toBe('on-miss');
 
+    // Update checks disabled — KiloClaw manages updates via Docker images
+    expect(config.update.checkOnStart).toBe(false);
+
     // Browser
     expect(config.browser.enabled).toBe(true);
     expect(config.browser.headless).toBe(true);
     expect(config.browser.noSandbox).toBe(true);
+  });
+
+  it('disables update.checkOnStart even when existing config has it enabled', () => {
+    const existing = JSON.stringify({ update: { checkOnStart: true, channel: 'stable' } });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.update.checkOnStart).toBe(false);
+    // Preserves other update keys
+    expect(config.update.channel).toBe('stable');
   });
 
   it('preserves user tool profile on non-fresh boot', () => {

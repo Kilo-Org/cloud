@@ -147,6 +147,7 @@ export class KiloClient {
             modelID: options.model.modelID,
           }
         : undefined,
+      variant: options?.variant,
       agent: options?.agent,
       noReply: options?.noReply,
       system: options?.system,

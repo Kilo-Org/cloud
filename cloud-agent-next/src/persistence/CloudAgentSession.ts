@@ -51,7 +51,7 @@ import {
   type IngestDOContext,
 } from '../websocket/ingest.js';
 import type { StoredEvent } from '../websocket/types.js';
-import type { WrapperCommand, PreparingStep } from '../shared/protocol.js';
+import type { WrapperCommand, PreparingStep, CloudStatusData } from '../shared/protocol.js';
 import { STALE_THRESHOLD_MS, SANDBOX_SLEEP_AFTER_SECONDS } from '../core/lease.js';
 import { ExecutionOrchestrator, type OrchestratorDeps } from '../execution/orchestrator.js';
 import type {
@@ -126,7 +126,6 @@ export class CloudAgentSession extends DurableObject {
   private ingestHandlerSessionId?: SessionId;
   private sessionId?: SessionId;
   private orchestrator?: ExecutionOrchestrator;
-
   private isTerminalStatus(
     status: ExecutionStatus
   ): status is 'completed' | 'failed' | 'interrupted' {
@@ -251,7 +250,9 @@ export class CloudAgentSession extends DurableObject {
   private async getStreamHandler(expected?: SessionId): Promise<StreamHandler> {
     const sessionId = await this.requireSessionId(expected);
     if (!this.streamHandler || this.streamHandlerSessionId !== sessionId) {
-      this.streamHandler = createStreamHandler(this.ctx, this.eventQueries, sessionId);
+      this.streamHandler = createStreamHandler(this.ctx, this.eventQueries, sessionId, {
+        deriveCloudStatus: () => this.deriveCloudStatus(),
+      });
       this.streamHandlerSessionId = sessionId;
     }
     return this.streamHandler;
@@ -366,7 +367,14 @@ export class CloudAgentSession extends DurableObject {
       }
 
       const streamHandler = await this.getStreamHandler(sessionIdParam ?? undefined);
-      return streamHandler.handleStreamRequest(request);
+      const response = await streamHandler.handleStreamRequest(request);
+
+      // Request fresh kilo state from wrapper if connected.
+      // The wrapper will respond with regular kilocode events (session.status,
+      // question.asked, permission.asked) that are broadcast via the normal pipeline.
+      this.requestKiloSnapshot();
+
+      return response;
     }
 
     // Route ingest WebSocket (internal only - from queue consumer)
@@ -521,6 +529,28 @@ export class CloudAgentSession extends DurableObject {
       payload: params.payload,
       timestamp: params.timestamp,
     });
+  }
+
+  /**
+   * Derive current cloud infrastructure status from execution state.
+   * Used to populate the `connected` event on WebSocket upgrade.
+   */
+  private async deriveCloudStatus(): Promise<CloudStatusData['cloudStatus'] | null> {
+    const activeExecId = await this.executionQueries.getActiveExecutionId();
+    if (!activeExecId) {
+      const metadata = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
+      return metadata?.preparedAt ? { type: 'ready' } : null;
+    }
+
+    const exec = await this.executionQueries.get(activeExecId);
+    if (!exec) return null;
+
+    if (exec.status === 'pending') {
+      return { type: 'preparing' };
+    }
+
+    // Running executions mean the agent has control — infrastructure is ready
+    return { type: 'ready' };
   }
 
   /**
@@ -719,6 +749,19 @@ export class CloudAgentSession extends DurableObject {
   }
 
   /**
+   * Request fresh kilo state from the wrapper.
+   * The wrapper will respond with regular kilocode events (session.status,
+   * question.asked, permission.asked) that flow through the normal ingest pipeline.
+   * Best-effort: silently does nothing if no wrapper is connected.
+   */
+  private requestKiloSnapshot(): void {
+    void this.executionQueries.getActiveExecutionId().then(activeExecId => {
+      if (!activeExecId) return;
+      this.sendToWrapper(activeExecId, { type: 'request_snapshot' });
+    });
+  }
+
+  /**
    * Interrupt the currently active execution by sending a kill command to the wrapper.
    * Returns success/failure status.
    *
@@ -903,12 +946,28 @@ export class CloudAgentSession extends DurableObject {
     const env = this.env as unknown as WorkerEnv;
 
     const emitProgress = (step: PreparingStep, message: string) => {
+      const now = Date.now();
+      // Backward-compatible preparing event
       this.broadcastVolatileEvent({
         executionId: prepExecutionId,
         sessionId: input.sessionId,
         streamEventType: 'preparing',
         payload: JSON.stringify({ step, message }),
-        timestamp: Date.now(),
+        timestamp: now,
+      });
+      // cloud.status event derived from preparation step
+      const cloudStatus =
+        step === 'ready'
+          ? { type: 'ready' as const }
+          : step === 'failed'
+            ? { type: 'error' as const, message }
+            : { type: 'preparing' as const, step, message };
+      this.broadcastVolatileEvent({
+        executionId: prepExecutionId,
+        sessionId: input.sessionId,
+        streamEventType: 'cloud.status',
+        payload: JSON.stringify({ cloudStatus }),
+        timestamp: now,
       });
     };
 
@@ -1193,15 +1252,21 @@ export class CloudAgentSession extends DurableObject {
 
           if (this.sessionId) {
             const prepId: EventSourceId = `prep_${this.sessionId}`;
+            const failNow = Date.now();
+            const failMessage = 'Internal error: invalid preparation data';
             this.broadcastVolatileEvent({
               executionId: prepId,
               sessionId: this.sessionId,
               streamEventType: 'preparing',
-              payload: JSON.stringify({
-                step: 'failed',
-                message: 'Internal error: invalid preparation data',
-              }),
-              timestamp: Date.now(),
+              payload: JSON.stringify({ step: 'failed', message: failMessage }),
+              timestamp: failNow,
+            });
+            this.broadcastVolatileEvent({
+              executionId: prepId,
+              sessionId: this.sessionId,
+              streamEventType: 'cloud.status',
+              payload: JSON.stringify({ cloudStatus: { type: 'error', message: failMessage } }),
+              timestamp: failNow,
             });
           }
         }
@@ -2528,16 +2593,36 @@ export class CloudAgentSession extends DurableObject {
       const orchestrator = this.getOrCreateOrchestrator();
 
       const emitProgress = (step: string, message: string) => {
+        const now = Date.now();
         this.broadcastVolatileEvent({
           executionId,
           sessionId,
           streamEventType: 'preparing',
           payload: JSON.stringify({ step, message }),
-          timestamp: Date.now(),
+          timestamp: now,
+        });
+        // cloud.status mirrors the preparation step
+        this.broadcastVolatileEvent({
+          executionId,
+          sessionId,
+          streamEventType: 'cloud.status',
+          payload: JSON.stringify({
+            cloudStatus: { type: 'preparing' as const, step, message },
+          }),
+          timestamp: now,
         });
       };
 
       const result = await orchestrator.execute(plan, { onProgress: emitProgress });
+
+      // Emit cloud.status = ready after successful execution start
+      this.broadcastVolatileEvent({
+        executionId,
+        sessionId,
+        streamEventType: 'cloud.status',
+        payload: JSON.stringify({ cloudStatus: { type: 'ready' } }),
+        timestamp: Date.now(),
+      });
 
       logger
         .withFields({ sessionId, executionId, kiloSessionId: result.kiloSessionId })
@@ -2546,6 +2631,14 @@ export class CloudAgentSession extends DurableObject {
       return this.buildStartResult(executionId);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+
+      this.broadcastVolatileEvent({
+        executionId,
+        sessionId,
+        streamEventType: 'cloud.status',
+        payload: JSON.stringify({ cloudStatus: { type: 'error', message: errorMessage } }),
+        timestamp: Date.now(),
+      });
 
       await this.failExecution({
         executionId,

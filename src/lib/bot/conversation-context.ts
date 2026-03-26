@@ -14,6 +14,7 @@ type ConversationContext = {
 type FormattedMessage = {
   authorName: string;
   text: string;
+  time: string; // ISO-8601 timestamp from message.metadata.dateSent
 };
 
 function truncate(text: string, maxLen: number): string {
@@ -33,6 +34,7 @@ function formatMessage(msg: Message): FormattedMessage {
       msg.author.fullName || msg.author.userName || msg.author.userId
     ),
     text: sanitizeForDelimiters(truncate(collapsed, MAX_MESSAGE_TEXT_LENGTH)),
+    time: msg.metadata.dateSent.toISOString(),
   };
 }
 
@@ -81,11 +83,11 @@ export async function getConversationContext(
     // thread.messages yields newest-first; reverse to chronological
     .reverse();
 
-  // Channel messages are also newest-first; keep that order (most recent at top)
-  // to match the old Slack bot's "Recent channel messages (most recent first)".
+  // Channel messages are also newest-first; reverse to chronological.
   const channelMessages = channelMessagesRaw
     .filter(m => m.id !== triggerMessage.id)
-    .map(formatMessage);
+    .map(formatMessage)
+    .reverse();
 
   // Channel metadata may carry topic/purpose in the metadata bag.
   const metadata = channelInfo?.metadata ?? {};
@@ -126,12 +128,14 @@ export function formatConversationContextForPrompt(ctx: ConversationContext): st
     );
   }
 
-  // Channel messages (most recent first), wrapped in delimiters to
-  // distinguish user-generated content from system instructions.
+  // Channel messages wrapped in delimiters to distinguish user-generated
+  // content from system instructions.
   if (ctx.recentChannelMessages.length > 0) {
-    lines.push('\nRecent channel messages (most recent first):');
+    lines.push('\nRecent channel messages (oldest first):');
     for (const msg of ctx.recentChannelMessages) {
-      lines.push(`<user_message author="${msg.authorName}">${msg.text}</user_message>`);
+      lines.push(
+        `<user_message author="${msg.authorName}" time="${msg.time}">${msg.text}</user_message>`
+      );
     }
   }
 
@@ -139,7 +143,9 @@ export function formatConversationContextForPrompt(ctx: ConversationContext): st
   if (ctx.recentThreadMessages.length > 0) {
     lines.push('\nThread messages (oldest first):');
     for (const msg of ctx.recentThreadMessages) {
-      lines.push(`<user_message author="${msg.authorName}">${msg.text}</user_message>`);
+      lines.push(
+        `<user_message author="${msg.authorName}" time="${msg.time}">${msg.text}</user_message>`
+      );
     }
   }
 

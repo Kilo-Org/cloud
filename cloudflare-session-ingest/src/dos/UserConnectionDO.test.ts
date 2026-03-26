@@ -217,22 +217,13 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('heartbeat processing', () => {
-    it('updates session ownership and broadcasts to web clients', () => {
+    it('updates session ownership and persists attachment', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
-      const webWs = addWebSocket(mockCtx, 'web-1');
+      addWebSocket(mockCtx, 'web-1');
 
       const sessions = [makeSession('s1'), makeSession('s2')];
       sendHeartbeat(doInstance, cliWs, sessions);
-
-      // Web should receive sessions.heartbeat system message
-      expect(webWs.send).toHaveBeenCalledTimes(1);
-      const sent = parseSent(webWs);
-      expect(sent).toEqual({
-        type: 'system',
-        event: 'sessions.heartbeat',
-        data: { connectionId: 'cli-1', sessions },
-      });
 
       // CLI attachment updated with sessions
       const att = cliWs.deserializeAttachment() as { sessions: unknown[] };
@@ -283,6 +274,67 @@ describe('UserConnectionDO', () => {
       // cli2 should have received the replayed subscribe for s1
       const cli2Msgs = allSent(cli2);
       expect(cli2Msgs).toContainEqual({ type: 'subscribe', sessionId: 's1' });
+    });
+
+    it('sends heartbeat only to web clients subscribed to sessions from this connection', () => {
+      const { doInstance, mockCtx } = setup();
+      const cli1 = addCliSocket(mockCtx, 'cli-1');
+      const cli2 = addCliSocket(mockCtx, 'cli-2');
+      const subWeb = addWebSocket(mockCtx, 'web-sub');
+      const otherWeb = addWebSocket(mockCtx, 'web-other');
+
+      // cli1 owns s1, cli2 owns s2
+      sendHeartbeat(doInstance, cli1, [makeSession('s1')]);
+      sendHeartbeat(doInstance, cli2, [makeSession('s2')]);
+
+      // subWeb subscribes to s1, otherWeb subscribes to s2
+      sendSubscribe(doInstance, subWeb, 's1');
+      sendSubscribe(doInstance, otherWeb, 's2');
+      subWeb.send.mockClear();
+      otherWeb.send.mockClear();
+
+      // cli1 sends heartbeat — only subWeb (watching s1) should receive it
+      sendHeartbeat(doInstance, cli1, [makeSession('s1')]);
+
+      expect(subWeb.send).toHaveBeenCalledTimes(1);
+      expect(parseSent(subWeb)).toMatchObject({
+        type: 'system',
+        event: 'sessions.heartbeat',
+        data: { connectionId: 'cli-1' },
+      });
+      expect(otherWeb.send).not.toHaveBeenCalled();
+    });
+
+    it('sends heartbeat to subscribers of removed sessions', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      // cli1 owns s1
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      sendSubscribe(doInstance, webWs, 's1');
+      webWs.send.mockClear();
+
+      // s1 disappears from heartbeat — subscriber should still get the heartbeat
+      sendHeartbeat(doInstance, cliWs, []);
+
+      expect(webWs.send).toHaveBeenCalledTimes(1);
+      expect(parseSent(webWs)).toMatchObject({
+        type: 'system',
+        event: 'sessions.heartbeat',
+        data: { connectionId: 'cli-1', sessions: [] },
+      });
+    });
+
+    it('does not send heartbeat to unsubscribed web clients', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      // webWs is not subscribed to anything
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+
+      expect(webWs.send).not.toHaveBeenCalled();
     });
 
     it('schedules stale alarm on heartbeat', () => {
@@ -1060,11 +1112,17 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
 
   describe('broadcast resilience', () => {
-    it('one closed socket does not abort broadcast to others', () => {
+    it('one closed socket does not abort send to other subscribers', () => {
       const { doInstance, mockCtx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const failWeb = addWebSocket(mockCtx, 'web-fail');
       const okWeb = addWebSocket(mockCtx, 'web-ok');
+
+      // Both subscribe to s1 so they receive heartbeats
+      sendSubscribe(doInstance, failWeb, 's1');
+      sendSubscribe(doInstance, okWeb, 's1');
+      failWeb.send.mockClear();
+      okWeb.send.mockClear();
 
       // Make failWeb throw on send
       failWeb.send.mockImplementation(() => {

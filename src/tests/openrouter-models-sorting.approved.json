@@ -86,6 +86,7 @@
           "apply_diff"
         ]
       },
+      "opencode": {},
       "preferredIndex": 1,
       "isFree": false
     },
@@ -93,7 +94,7 @@
       "id": "kilo-auto/free",
       "name": "Kilo Auto Free",
       "created": 0,
-      "description": "Free with limited capability. No credits required. Uses MiniMax M2.5.",
+      "description": "Free with limited capability. No credits required. Uses MiMo-V2-Pro.",
       "architecture": {
         "input_modalities": [
           "text"
@@ -105,7 +106,7 @@
       },
       "top_provider": {
         "is_moderated": false,
-        "context_length": 204800,
+        "context_length": 1048576,
         "max_completion_tokens": 131072
       },
       "pricing": {
@@ -116,7 +117,7 @@
         "web_search": "0",
         "internal_reasoning": "0"
       },
-      "context_length": 204800,
+      "context_length": 1048576,
       "supported_parameters": [
         "max_tokens",
         "temperature",
@@ -133,6 +134,7 @@
           "edit_file"
         ]
       },
+      "opencode": {},
       "preferredIndex": 2,
       "isFree": true
     },
@@ -309,7 +311,8 @@
             "apply_diff"
           ]
         }
-      }
+      },
+      "opencode": {}
     },
     {
       "id": "openai/gpt-4.1",
@@ -414,7 +417,8 @@
         "internal_reasoning": "0"
       },
       "context_length": 32000,
-      "isFree": false
+      "isFree": false,
+      "opencode": {}
     },
     {
       "id": "qwen/qwen3-coder",
@@ -444,7 +448,8 @@
         "internal_reasoning": "0"
       },
       "context_length": 32000,
-      "isFree": false
+      "isFree": false,
+      "opencode": {}
     },
     {
       "id": "corethink:free",
@@ -485,7 +490,8 @@
         "tools"
       ],
       "default_parameters": {},
-      "isFree": true
+      "isFree": true,
+      "opencode": {}
     },
     {
       "id": "minimax/minimax-m2.5:free",
@@ -538,7 +544,8 @@
           "apply_diff",
           "edit_file"
         ]
-      }
+      },
+      "opencode": {}
     },
     {
       "id": "x-ai/grok-code-fast-1:optimized:free",
@@ -582,17 +589,19 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "isFree": true
+      "isFree": true,
+      "opencode": {
+        "ai_sdk_provider": "openai"
+      }
     },
     {
       "id": "kilo-auto/small",
       "name": "Kilo Auto Small",
       "created": 0,
-      "description": "Automatically routes your request to a small model.",
+      "description": "Automatically routes your request to a small model. Uses GPT-5 Nano (default) or gpt-oss-20b (free fallback).",
       "architecture": {
         "input_modalities": [
-          "text",
-          "image"
+          "text"
         ],
         "output_modalities": [
           "text"
@@ -601,8 +610,8 @@
       },
       "top_provider": {
         "is_moderated": false,
-        "context_length": 400000,
-        "max_completion_tokens": 128000
+        "context_length": 131072,
+        "max_completion_tokens": 32768
       },
       "pricing": {
         "prompt": "0.00000005",
@@ -612,7 +621,7 @@
         "web_search": "0",
         "internal_reasoning": "0"
       },
-      "context_length": 400000,
+      "context_length": 131072,
       "supported_parameters": [
         "max_tokens",
         "temperature",
@@ -620,10 +629,7 @@
         "reasoning",
         "include_reasoning"
       ],
-      "opencode": {
-        "family": "gpt",
-        "prompt": "codex"
-      },
+      "opencode": {},
       "isFree": false
     }
   ]

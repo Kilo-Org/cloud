@@ -55,6 +55,8 @@ import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PairingSection } from './PairingSection';
 import { VersionPinCard } from './VersionPinCard';
 import { WorkspaceFileEditor } from './WorkspaceFileEditor';
+import { PermissionPresetCards } from './PermissionPresetCards';
+import { type ExecPreset, configToExecPreset, execPresetToConfig } from './claw.types';
 
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
@@ -434,6 +436,86 @@ function GoogleAccountCard({
 }
 
 // ---------------------------------------------------------------------------
+// Default Permissions section
+// ---------------------------------------------------------------------------
+
+function PermissionPresetSection({
+  isRunning,
+  status,
+  mutations,
+  onRedeploy,
+}: {
+  isRunning: boolean;
+  status: KiloClawDashboardStatus;
+  mutations: ClawMutations;
+  onRedeploy?: () => void;
+}) {
+  const currentPreset = configToExecPreset(status.execSecurity, status.execAsk);
+  const [selected, setSelected] = useState<ExecPreset | null>(currentPreset);
+  const saving = mutations.patchExecPreset.isPending || mutations.patchOpenclawConfig.isPending;
+  const dirty = selected !== null && selected !== currentPreset;
+
+  function handleSave() {
+    if (!selected) return;
+    const { security, ask } = execPresetToConfig(selected);
+
+    // Persist to durable storage (survives redeploys)
+    mutations.patchExecPreset.mutate(
+      { security, ask },
+      {
+        onError: (err: { message: string }) => toast.error(`Failed to save: ${err.message}`),
+      }
+    );
+
+    // Apply to the live openclaw.json if the instance is running
+    if (isRunning) {
+      mutations.patchOpenclawConfig.mutate(
+        { patch: { tools: { exec: { security, ask } } } },
+        {
+          onSuccess: () => {
+            toast.success('Default permissions saved. Redeploy to ensure the change persists.', {
+              duration: 8000,
+              ...(onRedeploy && {
+                action: { label: 'Redeploy', onClick: onRedeploy },
+              }),
+            });
+          },
+          onError: (err: { message: string }) =>
+            toast.error(`Saved to storage but failed to apply live: ${err.message}`),
+        }
+      );
+    } else {
+      toast.success(
+        'Default permissions saved. Start your instance and redeploy for the change to take effect.'
+      );
+    }
+  }
+
+  return (
+    <div>
+      <h2 className="text-foreground mb-3 text-base font-semibold">Default Permissions</h2>
+      <div className="rounded-lg border p-5">
+        <p className="text-muted-foreground mb-1 text-sm">
+          Choose how your bot handles actions by default. This sets the{' '}
+          <strong className="text-foreground">default permission level</strong> for all tool
+          executions.
+        </p>
+        <p className="mb-4 text-xs text-amber-400">
+          You must redeploy your instance for this change to take effect.
+        </p>
+        <PermissionPresetCards selected={selected} onSelect={setSelected} />
+        <div className="mt-4 flex justify-end">
+          <Button size="sm" disabled={!dirty || saving} onClick={handleSave}>
+            <Save className="h-4 w-4" />
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // SettingsTab
 // ---------------------------------------------------------------------------
 
@@ -726,6 +808,14 @@ export function SettingsTab({
           </div>
         </div>
       </div>
+
+      {/* ── Default Permissions ── */}
+      <PermissionPresetSection
+        isRunning={isRunning}
+        status={status}
+        mutations={mutations}
+        onRedeploy={onRedeploy}
+      />
 
       {/* ── Messaging Channels ── */}
       <div>

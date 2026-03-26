@@ -6,10 +6,8 @@
   "scripts": {
     "dev": "wrangler dev --env dev",
     "deploy": "wrangler deploy",
-    "typecheck": "tsgo --noEmit --incremental false",
-    "lint": "pnpm run lint:oxlint && pnpm run lint:eslint:fallback",
-    "lint:oxlint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-ai-attribution/src",
-    "lint:eslint:fallback": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-ai-attribution/src",
     "test": "jest"
   },
   "keywords": [
@@ -21,11 +19,9 @@
   "author": "Kilo Code",
   "license": "UNLICENSED",
   "devDependencies": {
-    "@kilocode/eslint-config": "workspace:*",
     "@types/jest": "^29.5.14",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
-    "eslint": "catalog:",
     "jest": "^29.7.0",
     "typescript": "catalog:",
     "wrangler": "catalog:"

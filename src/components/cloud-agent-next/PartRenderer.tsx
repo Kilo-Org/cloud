@@ -2,7 +2,7 @@
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronDown, Loader2 } from 'lucide-react';
+import { Brain, ChevronDown, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ReadToolCard } from './ReadToolCard';
 import { EditToolCard } from './EditToolCard';
@@ -15,9 +15,10 @@ import { ListToolCard } from './ListToolCard';
 import { GenericToolCard } from './GenericToolCard';
 import { TodoReadToolCard } from './TodoReadToolCard';
 import { TodoWriteToolCard } from './TodoWriteToolCard';
-import { QuestionToolCard } from './QuestionToolCard';
+import { QuestionToolStatus } from './QuestionToolStatus';
 import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection';
 import type { RenderPartFn } from './ChildSessionSection';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import type { Part, StoredMessage } from './types';
@@ -67,28 +68,13 @@ const markdownComponents = { a: LinkRenderer };
 /**
  * Renders a TextPart as markdown
  */
-function TextPartRenderer({
-  part,
-  isStreaming,
-}: {
-  part: Extract<Part, { type: 'text' }>;
-  isStreaming?: boolean;
-}) {
-  const streaming = isStreaming ?? isPartStreaming(part);
-
+function TextPartRenderer({ part }: { part: Extract<Part, { type: 'text' }> }) {
   return (
-    <div
-      className={cn(
-        'prose prose-sm prose-invert max-w-none overflow-hidden',
-        streaming && 'animate-pulse'
-      )}
-    >
+    <div className="prose prose-sm prose-invert max-w-none overflow-hidden">
       {part.text ? (
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
           {part.text}
         </ReactMarkdown>
-      ) : streaming ? (
-        'Thinking...'
       ) : null}
     </div>
   );
@@ -250,9 +236,9 @@ function ToolPartRenderer({
     return <TodoWriteToolCard toolPart={part} />;
   }
 
-  // Special handling for question tool - compact display with tabs
+  // Question tool — read-only status in message stream (interactive UI is in the dock)
   if (part.tool === 'question') {
-    return <QuestionToolCard toolPart={part} />;
+    return <QuestionToolStatus toolPart={part} />;
   }
 
   return <GenericToolCard toolPart={part} />;
@@ -310,7 +296,7 @@ function FilePartRenderer({ part }: { part: Extract<Part, { type: 'file' }> }) {
 }
 
 /**
- * Renders a ReasoningPart as a collapsible details/summary element
+ * Renders a ReasoningPart as a collapsible card matching tool card visual language
  */
 function ReasoningPartRenderer({
   part,
@@ -319,34 +305,41 @@ function ReasoningPartRenderer({
   part: Extract<Part, { type: 'reasoning' }>;
   isStreaming?: boolean;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const streaming = isStreaming ?? isPartStreaming(part);
 
   return (
-    <details className="bg-muted/20 border-muted/50 my-2 rounded-md border">
-      <summary className="text-muted-foreground flex cursor-pointer items-center gap-2 px-3 py-2 text-sm font-medium">
-        <ChevronDown className="h-4 w-4 transition-transform [[open]>&]:rotate-180" />
-        <span>
+    <div className="border-muted bg-muted/30 rounded-md border">
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+      >
+        <Brain className="text-muted-foreground h-4 w-4 shrink-0" />
+        <span className="text-muted-foreground min-w-0 flex-1 text-sm">
           Reasoning
           {streaming && <span className="ml-2 animate-pulse text-xs">(thinking...)</span>}
         </span>
-      </summary>
-      <div className="border-muted/50 border-t px-3 py-2">
-        <div
+        <ChevronDown
           className={cn(
-            'prose prose-sm prose-invert max-w-none overflow-hidden',
-            streaming && 'animate-pulse'
+            'text-muted-foreground h-4 w-4 shrink-0 transition-transform',
+            isExpanded && 'rotate-180'
           )}
-        >
-          {part.text ? (
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-              {part.text}
-            </ReactMarkdown>
-          ) : streaming ? (
-            <span className="text-muted-foreground text-sm italic">Thinking...</span>
-          ) : null}
+        />
+      </button>
+
+      {isExpanded && (
+        <div className="border-muted space-y-2 border-t px-3 py-2">
+          <div className="prose prose-sm prose-invert text-muted-foreground max-w-none overflow-hidden">
+            {part.text ? (
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                {part.text}
+              </ReactMarkdown>
+            ) : null}
+          </div>
         </div>
-      </div>
-    </details>
+      )}
+    </div>
   );
 }
 
@@ -435,7 +428,7 @@ export function PartRenderer({
   if (isTextPart(part)) {
     return (
       <MessageErrorBoundary fallback={<PartErrorFallback partType="text" />}>
-        <TextPartRenderer part={part} isStreaming={isStreaming} />
+        <TextPartRenderer part={part} />
       </MessageErrorBoundary>
     );
   }

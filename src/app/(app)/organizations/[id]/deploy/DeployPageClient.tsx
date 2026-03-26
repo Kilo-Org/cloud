@@ -7,6 +7,7 @@ import { NewDeploymentDialog } from '@/components/deployments/NewDeploymentDialo
 import { OrgDeploymentProvider } from '@/components/deployments/OrgDeploymentProvider';
 import { Button } from '@/components/Button';
 import { Badge } from '@/components/ui/badge';
+import { SetPageTitle } from '@/components/SetPageTitle';
 import { ExternalLink, Plus } from 'lucide-react';
 import { useState } from 'react';
 
@@ -39,13 +40,12 @@ export function DeployPageClient({ organizationId, initialDeploymentId }: Deploy
 
   return (
     <OrgDeploymentProvider organizationId={organizationId}>
+      <SetPageTitle title="Deployments">
+        <Badge variant="new">new</Badge>
+      </SetPageTitle>
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-gray-100">Deployments</h1>
-              <Badge variant="new">new</Badge>
-            </div>
             <p className="text-gray-400">Deploy your web project</p>
             <a
               href="https://kilo.ai/docs/advanced-usage/deploy"

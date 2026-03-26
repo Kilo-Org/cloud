@@ -34,7 +34,7 @@ export function useRefreshPairing() {
     // Fetch with refresh=true to bust KV cache, then write the result
     // into the normal (no-input) query so the component sees it immediately.
     const fresh = await queryClient.fetchQuery(
-      trpc.kiloclaw.listPairingRequests.queryOptions({ refresh: true })
+      trpc.kiloclaw.listPairingRequests.queryOptions({ refresh: true }, { staleTime: 0 })
     );
     queryClient.setQueryData(trpc.kiloclaw.listPairingRequests.queryKey(), fresh);
   };
@@ -71,6 +71,16 @@ export function useKiloClawGatewayStatus(enabled: boolean) {
   );
 }
 
+export function useGatewayReady(enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.gatewayReady.queryOptions(undefined, {
+      enabled,
+      refetchInterval: enabled ? 5_000 : false,
+    })
+  );
+}
+
 export function useControllerVersion(enabled: boolean) {
   const trpc = useTRPC();
   return useQuery(
@@ -98,10 +108,26 @@ export function useKiloClawMutations() {
     });
   };
 
+  // Wipe all instance-scoped caches so no stale data (e.g. gatewayReady
+  // from the old instance) bleeds into a subsequent re-provision flow.
+  // removeQueries drops the cached payload entirely; invalidateQueries
+  // only marks stale but leaves the old value readable synchronously.
+  const resetAllInstanceState = async () => {
+    await invalidateStatus();
+    await queryClient.invalidateQueries({
+      queryKey: trpc.kiloclaw.getBillingStatus.queryKey(),
+    });
+    queryClient.removeQueries({ queryKey: trpc.kiloclaw.gatewayReady.queryKey() });
+    queryClient.removeQueries({ queryKey: trpc.kiloclaw.gatewayStatus.queryKey() });
+    queryClient.removeQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
+  };
+
   return {
     start: useMutation(trpc.kiloclaw.start.mutationOptions({ onSuccess: invalidateStatus })),
     stop: useMutation(trpc.kiloclaw.stop.mutationOptions({ onSuccess: invalidateStatus })),
-    destroy: useMutation(trpc.kiloclaw.destroy.mutationOptions({ onSuccess: invalidateStatus })),
+    destroy: useMutation(
+      trpc.kiloclaw.destroy.mutationOptions({ onSuccess: resetAllInstanceState })
+    ),
     provision: useMutation(
       trpc.kiloclaw.provision.mutationOptions({ onSuccess: invalidateStatusAndBilling })
     ),
@@ -222,13 +248,18 @@ export function useKiloClawMutations() {
         },
       })
     ),
-    patchExecPreset: useMutation(trpc.kiloclaw.patchExecPreset.mutationOptions()),
+    patchExecPreset: useMutation(
+      trpc.kiloclaw.patchExecPreset.mutationOptions({ onSuccess: invalidateStatus })
+    ),
     patchOpenclawConfig: useMutation(trpc.kiloclaw.patchOpenclawConfig.mutationOptions()),
     disconnectGoogle: useMutation(
       trpc.kiloclaw.disconnectGoogle.mutationOptions({ onSuccess: invalidateStatus })
     ),
     setGmailNotifications: useMutation(
       trpc.kiloclaw.setGmailNotifications.mutationOptions({ onSuccess: invalidateStatus })
+    ),
+    rename: useMutation(
+      trpc.kiloclaw.renameInstance.mutationOptions({ onSuccess: invalidateStatus })
     ),
   };
 }

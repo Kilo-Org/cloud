@@ -190,8 +190,13 @@ export function buildPrompt(params: {
   beadTitle: string;
   beadBody: string;
   checkpoint: unknown;
+  conversationHistory?: string;
 }): string {
-  const parts: string[] = [params.beadTitle];
+  const parts: string[] = [];
+  if (params.conversationHistory) {
+    parts.push(params.conversationHistory);
+  }
+  parts.push(params.beadTitle);
   if (params.beadBody) parts.push(params.beadBody);
   if (params.checkpoint) {
     parts.push(
@@ -292,6 +297,8 @@ export async function startAgentInContainer(
     beadTitle: string;
     beadBody: string;
     checkpoint: unknown;
+    /** Reconstructed conversation transcript for prompt injection on re-dispatch. */
+    conversationHistory?: string;
     gitUrl: string;
     defaultBranch: string;
     kilocodeToken?: string;
@@ -401,6 +408,7 @@ export async function startAgentInContainer(
           beadTitle: params.beadTitle,
           beadBody: params.beadBody,
           checkpoint: params.checkpoint,
+          conversationHistory: params.conversationHistory,
         }),
         model: resolveModel(params.townConfig, params.rigId, params.role),
         smallModel: resolveSmallModel(params.townConfig),
@@ -666,14 +674,24 @@ export async function updateAgentModelInContainer(
   townId: string,
   agentId: string,
   model: string,
-  smallModel?: string
+  smallModel?: string,
+  conversationHistory?: string,
+  containerConfig?: Record<string, unknown>
 ): Promise<boolean> {
   try {
     const container = getTownContainerStub(env, townId);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (containerConfig) {
+      headers['X-Town-Config'] = JSON.stringify(containerConfig);
+    }
     const response = await container.fetch(`http://container/agents/${agentId}/model`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, ...(smallModel ? { smallModel } : {}) }),
+      headers,
+      body: JSON.stringify({
+        model,
+        ...(smallModel ? { smallModel } : {}),
+        ...(conversationHistory ? { conversationHistory } : {}),
+      }),
     });
     return response.ok;
   } catch {

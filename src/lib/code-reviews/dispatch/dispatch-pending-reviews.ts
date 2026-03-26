@@ -11,7 +11,7 @@
 
 import { db } from '@/lib/drizzle';
 import { cloud_agent_code_reviews, type CloudAgentCodeReview } from '@kilocode/db/schema';
-import { eq, and, or, count } from 'drizzle-orm';
+import { eq, and, or, count, gte, lt, sql } from 'drizzle-orm';
 import type { Owner } from '../core';
 import { prepareReviewPayload } from '../triggers/prepare-review-payload';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -23,6 +23,11 @@ import { codeReviewWorkerClient } from '../client/code-review-worker-client';
 import type { CodeReviewPlatform } from '../core/schemas';
 
 const MAX_CONCURRENT_REVIEWS_PER_OWNER = 20;
+
+// Reviews claimed (queued) but not picked up by the worker within this
+// window are considered abandoned (e.g. process crashed after claim) and
+// become eligible for re-dispatch.
+const STALE_CLAIM_MINUTES = 5;
 
 export interface DispatchResult {
   dispatched: number;
@@ -38,7 +43,10 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
   try {
     logExceptInTest(`[tryDispatchPendingReviews] Starting dispatch check`, { owner });
 
-    // 1. Get active review count for this owner
+    const staleCutoff = sql`now() - interval '${sql.raw(String(STALE_CLAIM_MINUTES))} minutes'`;
+
+    // 1. Get active review count for this owner.
+    //    Stale queued rows are excluded so abandoned claims do not block recovery.
     const activeCountResult = await db
       .select({ count: count() })
       .from(cloud_agent_code_reviews)
@@ -48,8 +56,11 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
             ? eq(cloud_agent_code_reviews.owned_by_organization_id, owner.id)
             : eq(cloud_agent_code_reviews.owned_by_user_id, owner.id),
           or(
-            eq(cloud_agent_code_reviews.status, 'queued'),
-            eq(cloud_agent_code_reviews.status, 'running')
+            eq(cloud_agent_code_reviews.status, 'running'),
+            and(
+              eq(cloud_agent_code_reviews.status, 'queued'),
+              gte(cloud_agent_code_reviews.updated_at, staleCutoff)
+            )
           )
         )
       );
@@ -69,7 +80,9 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
       return { dispatched: 0, pending: 0, activeCount };
     }
 
-    // 3. Get pending reviews for this owner (FIFO)
+    // 3. Get dispatchable reviews: pending, or queued-but-stale (abandoned claim).
+    //    A review is stale-queued if it was claimed but the process crashed
+    //    before the worker dispatch completed.
     const pendingReviews = await db
       .select()
       .from(cloud_agent_code_reviews)
@@ -78,7 +91,13 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
           owner.type === 'org'
             ? eq(cloud_agent_code_reviews.owned_by_organization_id, owner.id)
             : eq(cloud_agent_code_reviews.owned_by_user_id, owner.id),
-          eq(cloud_agent_code_reviews.status, 'pending')
+          or(
+            eq(cloud_agent_code_reviews.status, 'pending'),
+            and(
+              eq(cloud_agent_code_reviews.status, 'queued'),
+              lt(cloud_agent_code_reviews.updated_at, staleCutoff)
+            )
+          )
         )
       )
       .orderBy(cloud_agent_code_reviews.created_at)
@@ -95,13 +114,21 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
       return { dispatched: 0, pending: 0, activeCount };
     }
 
-    // 5. Dispatch each pending review
+    // 5. Dispatch all pending reviews in parallel
+    const results = await Promise.allSettled(
+      pendingReviews.map(review => dispatchReview(review, owner, staleCutoff))
+    );
+
     let dispatched = 0;
-    for (const review of pendingReviews) {
-      try {
-        await dispatchReview(review, owner);
-        dispatched++;
-      } catch (error) {
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === 'fulfilled') {
+        if (result.value) {
+          dispatched++;
+        }
+      } else {
+        const review = pendingReviews[i];
+        const error = result.reason;
         errorExceptInTest('[tryDispatchPendingReviews] Failed to dispatch review', {
           reviewId: review.id,
           error,
@@ -147,9 +174,15 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
 }
 
 /**
- * Dispatch a single review to Cloudflare Worker
+ * Dispatch a single review to Cloudflare Worker.
+ * Returns true if the review was dispatched, false if it was already claimed
+ * by another concurrent dispatcher.
  */
-async function dispatchReview(review: CloudAgentCodeReview, owner: Owner): Promise<void> {
+async function dispatchReview(
+  review: CloudAgentCodeReview,
+  owner: Owner,
+  staleCutoff: ReturnType<typeof sql>
+): Promise<boolean> {
   // Get platform from review (defaults to 'github' for backward compatibility)
   const platform = (review.platform || 'github') as CodeReviewPlatform;
 
@@ -187,19 +220,79 @@ async function dispatchReview(review: CloudAgentCodeReview, owner: Owner): Promi
     platform,
   });
 
-  // 4. Update status to "queued" (no longer pending) and record which agent version to use
-  const agentVersion = useCloudAgentNext ? 'v2' : 'v1';
-  await updateCodeReviewStatus(review.id, 'queued', { agentVersion });
+  // 4. Atomically claim the review to prevent concurrent dispatchers from
+  //    picking the same review. Done as late as possible (after all prep work)
+  //    to minimise the crash window between claim and dispatch.
+  //    Accepts 'pending' (normal) or stale 'queued' (abandoned claim recovery).
+  const claimed = await db
+    .update(cloud_agent_code_reviews)
+    .set({ status: 'queued' })
+    .where(
+      and(
+        eq(cloud_agent_code_reviews.id, review.id),
+        or(
+          eq(cloud_agent_code_reviews.status, 'pending'),
+          and(
+            eq(cloud_agent_code_reviews.status, 'queued'),
+            lt(cloud_agent_code_reviews.updated_at, staleCutoff)
+          )
+        )
+      )
+    )
+    .returning({ id: cloud_agent_code_reviews.id });
 
-  // 5. Dispatch to Cloudflare Worker to create CodeReviewOrchestrator DO
-  await codeReviewWorkerClient.dispatchReview({
-    ...payload,
-    skipBalanceCheck: true,
-    agentVersion,
-  });
+  if (claimed.length === 0) {
+    logExceptInTest('[dispatchReview] Review already claimed by another dispatcher', {
+      reviewId: review.id,
+    });
+    return false;
+  }
+
+  // 5. Dispatch to Cloudflare Worker to create CodeReviewOrchestrator DO.
+  //    If this fails, keep the claim in `queued` and rely on stale-claim
+  //    recovery. A transport failure is ambiguous: the worker may have
+  //    created the DO even if this request did not observe the response.
+  const agentVersion = useCloudAgentNext ? 'v2' : 'v1';
+  try {
+    await codeReviewWorkerClient.dispatchReview({
+      ...payload,
+      skipBalanceCheck: true,
+      agentVersion,
+    });
+  } catch (dispatchError) {
+    errorExceptInTest('[dispatchReview] Worker dispatch failed, leaving review queued', {
+      reviewId: review.id,
+      error: dispatchError,
+    });
+    captureException(dispatchError, {
+      tags: { operation: 'dispatch-review-worker-call' },
+      extra: { reviewId: review.id, owner },
+    });
+    return false;
+  }
+
+  // 6. Record which agent version was dispatched without rewriting status.
+  //    The worker may already have advanced the review to running/completed.
+  try {
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ agent_version: agentVersion })
+      .where(eq(cloud_agent_code_reviews.id, review.id));
+  } catch (error) {
+    errorExceptInTest('[dispatchReview] Failed to persist agent version after dispatch', {
+      reviewId: review.id,
+      error,
+    });
+    captureException(error, {
+      tags: { operation: 'dispatch-review-record-agent-version' },
+      extra: { reviewId: review.id, owner, agentVersion },
+    });
+  }
 
   logExceptInTest('[dispatchReview] Review dispatched successfully', {
     reviewId: review.id,
     platform,
   });
+
+  return true;
 }

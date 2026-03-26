@@ -41,8 +41,7 @@ import {
   EscalationBeadRecord,
   ConvoyBeadRecord,
 } from '../db/tables/beads.table';
-import { agent_metadata, AgentMetadataRecord } from '../db/tables/agent-metadata.table';
-import { review_metadata } from '../db/tables/review-metadata.table';
+import { agent_metadata } from '../db/tables/agent-metadata.table';
 import { escalation_metadata } from '../db/tables/escalation-metadata.table';
 import { convoy_metadata } from '../db/tables/convoy-metadata.table';
 import { bead_dependencies } from '../db/tables/bead-dependencies.table';
@@ -58,6 +57,7 @@ import { getAgentDOStub } from './Agent.do';
 import { getTownContainerStub } from './TownContainer.do';
 
 import { writeEvent, type GastownEventData } from '../util/analytics.util';
+import { logger, withLogTags } from '../util/log.util';
 import { BeadPriority } from '../types';
 import type {
   TownConfig,
@@ -277,8 +277,6 @@ export class TownDO extends DurableObject<Env> {
         let systemPromptOverride: string | undefined;
         if (agent.role === 'refinery' && bead.type === 'merge_request') {
           const reviewMeta = reviewQueue.getReviewMetadata(this.sql, beadId);
-          const sourceBeadId =
-            typeof bead.metadata?.source_bead_id === 'string' ? bead.metadata.source_bead_id : null;
           const townConfig = await this.getTownConfig();
           systemPromptOverride = buildRefinerySystemPrompt({
             identity: agent.identity,
@@ -675,15 +673,20 @@ export class TownDO extends DurableObject<Env> {
   // ── Rig Config (KV, per-rig — configuration needed for container dispatch) ──
 
   async configureRig(rigConfig: RigConfig): Promise<void> {
-    console.log(
-      `${TOWN_LOG} configureRig: rigId=${rigConfig.rigId} hasKilocodeToken=${!!rigConfig.kilocodeToken}`
+    return withLogTags({ source: 'Town.do', tags: { townId: this.townId } }, () =>
+      this._configureRig(rigConfig)
     );
+  }
+
+  private async _configureRig(rigConfig: RigConfig): Promise<void> {
+    logger.setTags({ rigId: rigConfig.rigId, userId: rigConfig.userId });
+    logger.info('configureRig: start', { hasKilocodeToken: !!rigConfig.kilocodeToken });
     await this.ctx.storage.put(`rig:${rigConfig.rigId}:config`, rigConfig);
 
     if (rigConfig.kilocodeToken) {
       const townConfig = await this.getTownConfig();
       if (!townConfig.kilocode_token || townConfig.kilocode_token !== rigConfig.kilocodeToken) {
-        console.log(`${TOWN_LOG} configureRig: propagating kilocodeToken to town config`);
+        logger.info('configureRig: propagating kilocodeToken to town config');
         await this.updateTownConfig({
           kilocode_token: rigConfig.kilocodeToken,
         });
@@ -695,13 +698,15 @@ export class TownDO extends DurableObject<Env> {
       try {
         const container = getTownContainerStub(this.env, this.townId);
         await container.setEnvVar('KILOCODE_TOKEN', token);
-        console.log(`${TOWN_LOG} configureRig: stored KILOCODE_TOKEN on TownContainerDO`);
+        logger.info('configureRig: stored KILOCODE_TOKEN on TownContainerDO');
       } catch (err) {
-        console.warn(`${TOWN_LOG} configureRig: failed to store token on container DO:`, err);
+        logger.warn('configureRig: failed to store token on container DO', {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
-    console.log(`${TOWN_LOG} configureRig: proactively starting container`);
+    logger.info('configureRig: proactively starting container');
     await this.armAlarmIfNeeded();
     try {
       const container = getTownContainerStub(this.env, this.townId);
@@ -714,7 +719,9 @@ export class TownDO extends DurableObject<Env> {
     // the mayor has immediate access to the codebase without waiting for
     // the first agent dispatch.
     this.setupRigRepoInContainer(rigConfig).catch(err =>
-      console.warn(`${TOWN_LOG} configureRig: background repo setup failed:`, err)
+      logger.warn('configureRig: background repo setup failed', {
+        error: err instanceof Error ? err.message : String(err),
+      })
     );
   }
 
@@ -723,6 +730,7 @@ export class TownDO extends DurableObject<Env> {
    * Fire-and-forget — failures are logged but don't block the caller.
    */
   private async setupRigRepoInContainer(rigConfig: RigConfig): Promise<void> {
+    logger.setTags({ rigId: rigConfig.rigId });
     const townConfig = await this.getTownConfig();
     const envVars: Record<string, string> = {};
     if (townConfig.git_auth?.github_token) {
@@ -760,11 +768,12 @@ export class TownDO extends DurableObject<Env> {
 
     if (!response.ok) {
       const text = await response.text().catch(() => '(unreadable)');
-      console.warn(
-        `${TOWN_LOG} setupRigRepoInContainer: failed for rig=${rigConfig.rigId}: ${response.status} ${text.slice(0, 200)}`
-      );
+      logger.warn('setupRigRepoInContainer: failed', {
+        status: response.status,
+        body: text.slice(0, 200),
+      });
     } else {
-      console.log(`${TOWN_LOG} setupRigRepoInContainer: accepted for rig=${rigConfig.rigId}`);
+      logger.info('setupRigRepoInContainer: accepted');
     }
   }
 
@@ -1060,6 +1069,24 @@ export class TownDO extends DurableObject<Env> {
   async getAgentEvents(agentId: string, afterId?: number, limit?: number): Promise<unknown[]> {
     const agentDO = getAgentDOStub(this.env, agentId);
     return agentDO.getEvents(afterId, limit);
+  }
+
+  /**
+   * Reconstruct a conversation transcript from an agent's persisted
+   * streaming events. Delegates to the AgentDO so the TownDO doesn't
+   * bear the cost of fetching and reducing thousands of events.
+   */
+  async reconstructConversation(agentId: string): Promise<string> {
+    try {
+      const agentDO = getAgentDOStub(this.env, agentId);
+      return await agentDO.reconstructConversation();
+    } catch (err) {
+      console.error(
+        `${TOWN_LOG} reconstructConversation: failed for agent=${agentId}:`,
+        err instanceof Error ? err.message : err
+      );
+      return '';
+    }
   }
 
   // ── Prime & Checkpoint ────────────────────────────────────────────
@@ -1822,6 +1849,19 @@ export class TownDO extends DurableObject<Env> {
     agentId: string;
     sessionStatus: 'idle' | 'active' | 'starting';
   }> {
+    return withLogTags({ source: 'Town.do', tags: { townId: this.townId } }, () =>
+      this._sendMayorMessage(message, _model, uiContext)
+    );
+  }
+
+  private async _sendMayorMessage(
+    message: string,
+    _model?: string,
+    uiContext?: string
+  ): Promise<{
+    agentId: string;
+    sessionStatus: 'idle' | 'active' | 'starting';
+  }> {
     const townId = this.townId;
 
     let mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
@@ -1837,9 +1877,11 @@ export class TownDO extends DurableObject<Env> {
     const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
 
-    console.log(
-      `${TOWN_LOG} sendMayorMessage: townId=${townId} mayorId=${mayor.id} containerStatus=${containerStatus.status} isAlive=${isAlive}`
-    );
+    logger.setTags({ agentId: mayor.id });
+    logger.info('sendMayorMessage', {
+      containerStatus: containerStatus.status,
+      isAlive,
+    });
 
     const effectiveContext = uiContext ?? this._dashboardContext;
     const combinedMessage = effectiveContext
@@ -1856,9 +1898,14 @@ export class TownDO extends DurableObject<Env> {
       const rigConfig = await this.getMayorRigConfig();
       const kilocodeToken = await this.resolveKilocodeToken();
 
-      console.log(
-        `${TOWN_LOG} sendMayorMessage: townId=${townId} hasRigConfig=${!!rigConfig} hasKilocodeToken=${!!kilocodeToken} townConfigToken=${!!townConfig.kilocode_token} rigConfigToken=${!!rigConfig?.kilocodeToken}`
-      );
+      logger.info('sendMayorMessage: starting container', {
+        hasRigConfig: !!rigConfig,
+        hasKilocodeToken: !!kilocodeToken,
+        townConfigToken: !!townConfig.kilocode_token,
+        rigConfigToken: !!rigConfig?.kilocodeToken,
+        userId: townConfig.owner_user_id ?? rigConfig?.userId,
+        orgId: townConfig.organization_id,
+      });
 
       if (kilocodeToken) {
         try {
@@ -1878,9 +1925,10 @@ export class TownDO extends DurableObject<Env> {
         role: 'mayor',
         identity: mayor.identity,
         beadId: '',
-        beadTitle: message,
+        beadTitle: combinedMessage,
         beadBody: '',
-        checkpoint: null,
+        checkpoint: agents.readCheckpoint(this.sql, mayor.id),
+        conversationHistory: await this.reconstructConversation(mayor.id),
         gitUrl: rigConfig?.gitUrl ?? '',
         defaultBranch: rigConfig?.defaultBranch ?? 'main',
         kilocodeToken,
@@ -1909,6 +1957,15 @@ export class TownDO extends DurableObject<Env> {
     agentId: string;
     sessionStatus: 'idle' | 'active' | 'starting';
   }> {
+    return withLogTags({ source: 'Town.do', tags: { townId: this.townId } }, () =>
+      this._ensureMayor()
+    );
+  }
+
+  private async _ensureMayor(): Promise<{
+    agentId: string;
+    sessionStatus: 'idle' | 'active' | 'starting';
+  }> {
     const townId = this.townId;
 
     let mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
@@ -1919,8 +1976,10 @@ export class TownDO extends DurableObject<Env> {
         name: 'mayor',
         identity,
       });
-      console.log(`${TOWN_LOG} ensureMayor: created mayor agent ${mayor.id}`);
+      logger.info('ensureMayor: created mayor agent', { agentId: mayor.id });
     }
+
+    logger.setTags({ agentId: mayor.id });
 
     // Check if the container is already running
     const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
@@ -1941,7 +2000,10 @@ export class TownDO extends DurableObject<Env> {
     // will retry via status polling once a rig is created and the token
     // becomes available.
     if (!kilocodeToken) {
-      console.warn(`${TOWN_LOG} ensureMayor: no kilocodeToken available, deferring start`);
+      logger.warn('ensureMayor: no kilocodeToken available, deferring start', {
+        userId: townConfig.owner_user_id,
+        orgId: townConfig.organization_id,
+      });
       return { agentId: mayor.id, sessionStatus: 'idle' };
     }
 
@@ -1966,7 +2028,8 @@ export class TownDO extends DurableObject<Env> {
       beadId: '',
       beadTitle: 'Mayor ready. Waiting for instructions.',
       beadBody: '',
-      checkpoint: null,
+      checkpoint: agents.readCheckpoint(this.sql, mayor.id),
+      conversationHistory: await this.reconstructConversation(mayor.id),
       gitUrl: rigConfig?.gitUrl ?? '',
       defaultBranch: rigConfig?.defaultBranch ?? 'main',
       kilocodeToken,
@@ -1996,12 +2059,22 @@ export class TownDO extends DurableObject<Env> {
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
 
     if (isAlive) {
+      // Reconstruct conversation history so the new session retains context
+      // (same mechanism used for container restarts — see PR #1494).
+      const conversationHistory = await this.reconstructConversation(mayor.id);
+
+      // Attach fresh town config so the container can update process.env
+      // before restarting the SDK server (tokens, git identity, etc.).
+      const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+
       const updated = await dispatch.updateAgentModelInContainer(
         this.env,
         townId,
         mayor.id,
         model,
-        smallModel
+        smallModel,
+        conversationHistory || undefined,
+        containerConfig
       );
       if (updated) {
         console.log(
@@ -2897,26 +2970,35 @@ export class TownDO extends DurableObject<Env> {
   // ══════════════════════════════════════════════════════════════════
 
   async alarm(): Promise<void> {
+    return withLogTags({ source: 'Town.do' }, async () => {
+      await this._alarm();
+    });
+  }
+
+  private async _alarm(): Promise<void> {
     // Exit condition: if this DO was destroyed, don't re-arm.
     // After destroy(), deleteAll() wipes storage but may not clear
     // the alarm (compat date < 2026-02-24). A resurrected alarm
     // will find no town:id — stop the loop immediately.
     const storedId = await this.ctx.storage.get<string>('town:id');
     if (!storedId) {
-      console.log(`${TOWN_LOG} alarm: no town:id — town was destroyed, not re-arming`);
+      logger.info('alarm: no town:id — town was destroyed, not re-arming');
       await this.ctx.storage.deleteAlarm();
       return;
     }
 
     const townId = this.townId;
-    console.log(`${TOWN_LOG} alarm: fired for town=${townId}`);
+    logger.setTags({ townId });
+    logger.info('alarm: fired');
 
     const hasRigs = rigs.listRigs(this.sql).length > 0;
     if (hasRigs) {
       try {
         await this.ensureContainerReady();
       } catch (err) {
-        console.warn(`${TOWN_LOG} alarm: container health check failed`, err);
+        logger.warn('alarm: container health check failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
       // Refresh the container-scoped JWT before any work that might
@@ -2928,7 +3010,9 @@ export class TownDO extends DurableObject<Env> {
       try {
         await this.refreshContainerToken();
       } catch (err) {
-        console.warn(`${TOWN_LOG} alarm: refreshContainerToken failed`, err);
+        logger.warn('alarm: refreshContainerToken failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
@@ -2971,16 +3055,18 @@ export class TownDO extends DurableObject<Env> {
               });
             }
           } catch (err) {
-            console.warn(
-              `${TOWN_LOG} alarm: container status check failed for agent=${row.bead_id}`,
-              err
-            );
+            logger.warn('alarm: container status check failed', {
+              agentId: row.bead_id,
+              error: err instanceof Error ? err.message : String(err),
+            });
           }
         });
         await Promise.allSettled(statusChecks);
       }
     } catch (err) {
-      console.error(`${TOWN_LOG} alarm: container observation failed`, err);
+      logger.error('alarm: container observation failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     // ── Reconciler loop (Phase 0-2) with metrics ─────────────────────
@@ -3002,17 +3088,18 @@ export class TownDO extends DurableObject<Env> {
       const pending = events.drainEvents(this.sql);
       metrics.eventsDrained = pending.length;
       if (pending.length > 0) {
-        console.log(`${TOWN_LOG} [reconciler] town=${townId} draining ${pending.length} event(s)`);
+        logger.info('reconciler: draining events', { count: pending.length });
       }
       for (const event of pending) {
         try {
           reconciler.applyEvent(this.sql, event);
           events.markProcessed(this.sql, event.event_id);
         } catch (err) {
-          console.error(
-            `${TOWN_LOG} [reconciler] town=${townId} applyEvent failed: event=${event.event_id} type=${event.event_type}`,
-            err
-          );
+          logger.error('reconciler: applyEvent failed', {
+            eventId: event.event_id,
+            eventType: event.event_type,
+            error: err instanceof Error ? err.message : String(err),
+          });
           // Event stays unprocessed — will be retried on the next alarm tick.
           // Mark it processed anyway after 3 consecutive failures to prevent
           // a poison event from blocking the entire queue forever.
@@ -3020,7 +3107,9 @@ export class TownDO extends DurableObject<Env> {
         }
       }
     } catch (err) {
-      console.error(`${TOWN_LOG} [reconciler] town=${townId} event drain failed`, err);
+      logger.error('reconciler: event drain failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       Sentry.captureException(err);
     }
 
@@ -3033,9 +3122,10 @@ export class TownDO extends DurableObject<Env> {
         metrics.actionsByType[a.type] = (metrics.actionsByType[a.type] ?? 0) + 1;
       }
       if (actions.length > 0) {
-        console.log(
-          `${TOWN_LOG} [reconciler] town=${townId} actions=${actions.length} types=${[...new Set(actions.map(a => a.type))].join(',')}`
-        );
+        logger.info('reconciler: actions computed', {
+          count: actions.length,
+          types: [...new Set(actions.map(a => a.type))].join(','),
+        });
       }
       const ctx = this.applyActionCtx;
       for (const action of actions) {
@@ -3043,14 +3133,16 @@ export class TownDO extends DurableObject<Env> {
           const effect = applyAction(ctx, action);
           if (effect) sideEffects.push(effect);
         } catch (err) {
-          console.error(
-            `${TOWN_LOG} [reconciler] town=${townId} applyAction failed: type=${action.type}`,
-            err
-          );
+          logger.error('reconciler: applyAction failed', {
+            actionType: action.type,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
     } catch (err) {
-      console.error(`${TOWN_LOG} [reconciler] town=${townId} reconcile failed`, err);
+      logger.error('reconciler: reconcile failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       Sentry.captureException(err);
     }
 
@@ -3102,7 +3194,9 @@ export class TownDO extends DurableObject<Env> {
         }
       }
     } catch (err) {
-      console.warn(`${TOWN_LOG} [reconciler:invariants] town=${townId} check failed`, err);
+      logger.warn('reconciler: invariant check failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     metrics.wallClockMs = Date.now() - reconcilerStart;
@@ -3137,23 +3231,33 @@ export class TownDO extends DurableObject<Env> {
     // ── Phase 3: Housekeeping (independent, all parallelizable) ────
     await Promise.allSettled([
       this.deliverPendingMail().catch(err =>
-        console.warn(`${TOWN_LOG} alarm: deliverPendingMail failed`, err)
+        logger.warn('alarm: deliverPendingMail failed', {
+          error: err instanceof Error ? err.message : String(err),
+        })
       ),
       this.expireStaleNudges().catch(err =>
-        console.warn(`${TOWN_LOG} alarm: expireStaleNudges failed`, err)
+        logger.warn('alarm: expireStaleNudges failed', {
+          error: err instanceof Error ? err.message : String(err),
+        })
       ),
       this.reEscalateStaleEscalations().catch(err =>
-        console.warn(`${TOWN_LOG} alarm: reEscalation failed`, err)
+        logger.warn('alarm: reEscalation failed', {
+          error: err instanceof Error ? err.message : String(err),
+        })
       ),
       this.maybeDispatchTriageAgent().catch(err =>
-        console.warn(`${TOWN_LOG} alarm: maybeDispatchTriageAgent failed`, err)
+        logger.warn('alarm: maybeDispatchTriageAgent failed', {
+          error: err instanceof Error ? err.message : String(err),
+        })
       ),
       // Prune processed reconciler events older than 7 days
       Promise.resolve().then(() => {
         try {
           events.pruneOldEvents(this.sql, 7 * 24 * 60 * 60 * 1000);
         } catch (err) {
-          console.warn(`${TOWN_LOG} alarm: event pruning failed`, err);
+          logger.warn('alarm: event pruning failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }),
     ]);
@@ -3167,7 +3271,9 @@ export class TownDO extends DurableObject<Env> {
       const snapshot = await this.getAlarmStatus();
       this.broadcastAlarmStatus(snapshot);
     } catch (err) {
-      console.warn(`${TOWN_LOG} alarm: status broadcast failed`, err);
+      logger.warn('alarm: status broadcast failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

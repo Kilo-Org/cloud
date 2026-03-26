@@ -16,6 +16,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'minimax',
   'mistral',
   'novita',
+  'seed',
   'streamlake',
   'stealth',
   'xiaomi',
@@ -29,6 +30,7 @@ export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'anthropic',
   'bedrock',
   'google', // Google AI Studio
+  'inception',
   'openai',
   'minimax',
   'mistral',
@@ -53,6 +55,7 @@ export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.anthropic]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.bedrock]: 'anthropic/claude-haiku-4.5',
+  [VercelUserByokInferenceProviderIdSchema.enum.inception]: 'inception/mercury-2',
   [VercelUserByokInferenceProviderIdSchema.enum.google]: 'google/gemini-2.5-flash-lite',
   [VercelUserByokInferenceProviderIdSchema.enum.minimax]: 'minimax/minimax-m2.5',
   [VercelUserByokInferenceProviderIdSchema.enum.mistral]: 'mistral/devstral-2',
@@ -62,7 +65,11 @@ export const UserByokTestModels = {
   [AutocompleteUserByokProviderIdSchema.enum.codestral]: 'mistral/codestral',
 } satisfies Record<UserByokProviderId, string>;
 
-export const VercelNonUserByokInferenceProviderIdSchema = z.enum(['alibaba', 'vertex']);
+export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
+  'alibaba',
+  'bytedance',
+  'vertex',
+]);
 
 export const VercelInferenceProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(
   VercelNonUserByokInferenceProviderIdSchema
@@ -79,6 +86,8 @@ const openRouterToVercelInferenceProviderMapping = {
     VercelUserByokInferenceProviderIdSchema.enum.google,
   [OpenRouterInferenceProviderIdSchema.enum['google-vertex']]:
     VercelNonUserByokInferenceProviderIdSchema.enum.vertex,
+  [OpenRouterInferenceProviderIdSchema.enum.seed]:
+    VercelNonUserByokInferenceProviderIdSchema.enum.bytedance,
   [OpenRouterInferenceProviderIdSchema.enum['z-ai']]:
     VercelUserByokInferenceProviderIdSchema.enum.zai,
 } as Record<string, VercelInferenceProviderId | undefined>;

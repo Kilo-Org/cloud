@@ -482,25 +482,49 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
       // Resolve credentials per-rig since each may use a different
       // GitHub App installation (platformIntegrationId).
       const baseEnvVars = request.envVars ?? {};
-      await Promise.allSettled(
+      const rigSetupResults = await Promise.allSettled(
         request.rigs.map(async rig => {
-          try {
-            const envVars = await resolveGitCredentials({
-              envVars: baseEnvVars,
-              platformIntegrationId: rig.platformIntegrationId,
-            });
-            await setupRigBrowseWorktree({
-              rigId: rig.rigId,
-              gitUrl: rig.gitUrl,
-              defaultBranch: rig.defaultBranch,
-              envVars,
-            });
-          } catch (err) {
-            const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
-            console.warn(`[runAgent] browse worktree setup failed for rig=${rig.rigId}: ${msg}`);
-          }
+          const envVars = await resolveGitCredentials({
+            envVars: baseEnvVars,
+            platformIntegrationId: rig.platformIntegrationId,
+          });
+          const hasGitToken = !!(envVars.GIT_TOKEN || envVars.GITHUB_TOKEN || envVars.GITLAB_TOKEN);
+          console.log(
+            `[runAgent] setting up browse worktree: rig=${rig.rigId} gitUrl=${rig.gitUrl} hasGitToken=${hasGitToken}`
+          );
+          await setupRigBrowseWorktree({
+            rigId: rig.rigId,
+            gitUrl: rig.gitUrl,
+            defaultBranch: rig.defaultBranch,
+            envVars,
+          });
+          return rig.rigId;
         })
       );
+
+      const failures: Array<{ rigId: string; error: unknown }> = [];
+      for (let i = 0; i < rigSetupResults.length; i++) {
+        const r = rigSetupResults[i];
+        if (r.status === 'rejected') {
+          const reason: unknown = r.reason;
+          failures.push({ rigId: request.rigs[i].rigId, error: reason });
+        }
+      }
+
+      if (failures.length > 0) {
+        for (const f of failures) {
+          const msg = f.error instanceof Error ? f.error.message : String(f.error);
+          const stack = f.error instanceof Error ? f.error.stack : undefined;
+          console.error(
+            `[runAgent] browse worktree setup FAILED for rig=${f.rigId}: ${msg}`,
+            stack ? `\n${stack}` : ''
+          );
+        }
+        console.error(
+          `[runAgent] mayor rig setup: ${failures.length}/${request.rigs.length} rigs failed. ` +
+            `Mayor will start but may not be able to browse these codebases.`
+        );
+      }
     }
 
     // Write the system prompt to AGENTS.md so the mayor AND its built-in

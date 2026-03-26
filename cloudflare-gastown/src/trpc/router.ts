@@ -17,6 +17,7 @@ import type { JwtOrgMembership } from '../middleware/auth.middleware';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
 import { TownConfigSchema, TownConfigUpdateSchema } from '../types';
+import { resolveModel } from '../dos/town/config';
 import type { UserRigRecord } from '../db/tables/user-rigs.table';
 import {
   RpcTownOutput,
@@ -981,17 +982,22 @@ export const gastownRouter = router({
         console.warn('[gastown-trpc] updateTownConfig: syncConfigToContainer failed:', err);
       }
 
-      // If the model changed, hot-update the running mayor session so it
-      // picks up the new model without losing conversation context.
-      const modelChanged =
-        result.default_model !== existingConfig.default_model ||
-        result.small_model !== existingConfig.small_model;
-      if (modelChanged) {
+      // Hot-update the running mayor session when the effective model or
+      // auth-relevant config changed. The SDK server is a child process
+      // that captures env at spawn time, so it must be restarted to pick
+      // up rotated tokens or cleared credentials.
+      const oldMayorModel = resolveModel(existingConfig, '', 'mayor');
+      const newMayorModel = resolveModel(result, '', 'mayor');
+      const mayorModelChanged =
+        newMayorModel !== oldMayorModel || result.small_model !== existingConfig.small_model;
+      const authConfigChanged =
+        result.github_cli_pat !== existingConfig.github_cli_pat ||
+        result.git_auth?.github_token !== existingConfig.git_auth?.github_token ||
+        result.git_auth?.gitlab_token !== existingConfig.git_auth?.gitlab_token ||
+        result.git_auth?.gitlab_instance_url !== existingConfig.git_auth?.gitlab_instance_url;
+      if (mayorModelChanged || authConfigChanged) {
         try {
-          await townStub.updateMayorModel(
-            result.default_model ?? 'anthropic/claude-sonnet-4.6',
-            result.small_model ?? undefined
-          );
+          await townStub.updateMayorModel(newMayorModel, result.small_model ?? undefined);
         } catch (err) {
           console.warn('[gastown-trpc] updateTownConfig: updateMayorModel failed:', err);
         }

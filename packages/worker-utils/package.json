@@ -9,10 +9,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsgo --noEmit --incremental false",
-    "lint": "pnpm run lint:oxlint && pnpm run lint:eslint:fallback",
-    "lint:oxlint": "pnpm -w exec oxlint --config .oxlintrc.json packages/worker-utils/src",
-    "lint:eslint:fallback": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'"
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/worker-utils/src"
   },
   "dependencies": {
     "aws4fetch": "catalog:",
@@ -21,9 +19,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@kilocode/eslint-config": "workspace:*",
     "@typescript/native-preview": "catalog:",
-    "eslint": "catalog:",
     "typescript": "catalog:",
     "vitest": "~3.2.4"
   }

@@ -45,6 +45,22 @@ export const ControllerVersionResponseSchema = z.object({
   openclawCommit: z.string().nullable().optional(),
 });
 
+export type ControllerHealthResponse = {
+  status: 'ok';
+  state: 'bootstrapping' | 'starting' | 'ready' | 'degraded';
+  phase?: string;
+  error?: string;
+};
+
+export const ControllerHealthResponseSchema: ZodType<ControllerHealthResponse> = z.object({
+  status: z.literal('ok'),
+  state: z.enum(['bootstrapping', 'starting', 'ready', 'degraded']),
+  phase: z.string().optional(),
+  error: z.string().optional(),
+});
+
+export const GatewayReadyResponseSchema = z.record(z.string(), z.unknown());
+
 export const EnvPatchResponseSchema = z.object({
   ok: z.boolean(),
   signaled: z.boolean(),

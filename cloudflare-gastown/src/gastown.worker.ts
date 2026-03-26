@@ -120,6 +120,9 @@ import { townAuthMiddleware } from './middleware/town-auth.middleware';
 import { orgAuthMiddleware } from './middleware/org-auth.middleware';
 import { adminAuditMiddleware } from './middleware/admin-audit.middleware';
 import { timingMiddleware, instrumented } from './middleware/analytics.middleware';
+import { logger } from './util/log.util';
+import { useWorkersLogger } from 'workers-tagged-logger';
+import type { MiddlewareHandler } from 'hono';
 import { handleGetTownConfig, handleUpdateTownConfig } from './handlers/town-config.handler';
 import {
   handleGetMoleculeCurrentStep,
@@ -146,20 +149,42 @@ export type GastownEnv = {
 
 const app = new Hono<GastownEnv>();
 
-const WORKER_LOG = '[gastown-worker]';
-
 // ── Timing ──────────────────────────────────────────────────────────────
 // Capture high-resolution start timestamp before any other middleware.
 app.use('*', timingMiddleware);
 
+// ── Structured logging context ──────────────────────────────────────────
+// Establishes AsyncLocalStorage context so all downstream logs are tagged.
+// Cast needed: workers-tagged-logger@1.0.0 was built against an older Hono.
+app.use('*', useWorkersLogger('gastown-worker') as unknown as MiddlewareHandler);
+
 // ── Request logging ─────────────────────────────────────────────────────
+// Extract IDs from the URL path directly — c.req.param() only works
+// after Hono has matched a route, which hasn't happened yet in a
+// wildcard middleware.
+// Matches /orgs/:orgId, /towns/:townId, /rigs/:rigId, /agents/:agentId
+// in any combination that appears in our route patterns.
+const RE_ORG = /\/orgs\/(?<orgId>[^/]+)/;
+const RE_TOWN = /\/towns\/(?<townId>[^/]+)/;
+const RE_RIG = /\/rigs\/(?<rigId>[^/]+)/;
+const RE_AGENT = /\/agents\/(?<agentId>[^/]+)/;
+
 app.use('*', async (c, next) => {
   const method = c.req.method;
   const path = c.req.path;
-  console.log(`${WORKER_LOG} --> ${method} ${path}`);
+  // Tag with route params immediately so all downstream logs (auth,
+  // handlers, DO calls) inherit them. Auth-derived tags (userId, orgId)
+  // are set by kiloAuthMiddleware and orgAuthMiddleware when they run.
+  logger.setTags({
+    orgId: RE_ORG.exec(path)?.groups?.orgId,
+    townId: RE_TOWN.exec(path)?.groups?.townId,
+    rigId: RE_RIG.exec(path)?.groups?.rigId,
+    agentId: RE_AGENT.exec(path)?.groups?.agentId,
+  });
+  logger.info(`--> ${method} ${path}`);
   await next();
   const elapsed = Math.round(performance.now() - (c.get('requestStartTime') ?? 0));
-  console.log(`${WORKER_LOG} <-- ${method} ${path} ${c.res.status} (${elapsed}ms)`);
+  logger.info(`<-- ${method} ${path} ${c.res.status}`, { durationMs: elapsed });
 });
 
 // ── CORS ────────────────────────────────────────────────────────────────

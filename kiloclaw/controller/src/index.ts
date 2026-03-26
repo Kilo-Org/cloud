@@ -26,6 +26,7 @@ import { bootstrap } from './bootstrap';
 import type { ControllerStateRef, ControllerState } from './bootstrap';
 import { getOpenclawVersion } from './openclaw-version';
 import { startCheckin } from './checkin';
+import { collectProductTelemetry } from './product-telemetry';
 
 export type RuntimeConfig = {
   port: number;
@@ -407,6 +408,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
       getCheckinUrl: () => env.KILOCLAW_CHECKIN_URL ?? '',
       getSupervisorStats: () => supervisor.getStats(),
       getOpenclawVersion,
+      getProductTelemetry: openclawVersion => collectProductTelemetry(openclawVersion),
     });
 
     console.log(

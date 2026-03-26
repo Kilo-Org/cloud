@@ -30,7 +30,7 @@ RUN apt-get update \
     && curl -fsSL https://downloads.1password.com/linux/keys/1password.asc \
        | gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg \
     && apt-get update \
-    && apt-get install -y --no-install-recommends gh 1password-cli=2.33.0-1 \
+    && apt-get install -y --no-install-recommends gh 1password-cli \
     && apt-get purge -y xz-utils \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* \

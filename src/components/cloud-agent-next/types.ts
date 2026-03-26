@@ -366,6 +366,8 @@ export type StoredSession = {
   cloudAgentSessionId?: string | null;
   /** Platform where session was created: 'cli', 'cloud-agent', 'agent-manager', or extension identifier */
   createdOnPlatform?: string | null;
+  /** Git branch name, shown separately from repository in the sidebar */
+  branch?: string | null;
 };
 
 // ============================================================================

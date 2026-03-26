@@ -17,6 +17,13 @@ export function execPresetToConfig(preset: ExecPreset): { security: string; ask:
   }
 }
 
+/** Reverse-map stored exec config values back to a preset, or null if unrecognised. */
+export function configToExecPreset(security: string | null, ask: string | null): ExecPreset | null {
+  if (security === 'full' && ask === 'off') return 'never-ask';
+  if (security === 'allowlist' && ask === 'on-miss') return 'always-ask';
+  return null;
+}
+
 /**
  * Build the openclaw.json config patch that enables a channel with its token(s).
  * The shape must match what the controller writes in config-writer.ts.
@@ -92,5 +99,9 @@ export const CLAW_STATUS_BADGE: Record<
   destroying: {
     label: 'Destroying',
     className: 'border-amber-500/30 bg-amber-500/15 text-amber-400 animate-pulse',
+  },
+  restoring: {
+    label: 'Restoring',
+    className: 'border-purple-500/30 bg-purple-500/15 text-purple-400 animate-pulse',
   },
 };

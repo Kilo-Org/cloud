@@ -571,7 +571,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
-    promotion_ends_at: new Date('2026-03-01'),
+    promotion_ends_at: new Date('2027-01-01'),
     description: 'Emilie Valentine Experiment',
     total_redemptions_allowed: 5000,
   },

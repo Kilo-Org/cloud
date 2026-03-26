@@ -6,19 +6,15 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts",
-    "typecheck": "tsgo --noEmit --incremental false",
-    "lint": "pnpm run lint:oxlint && pnpm run lint:eslint:fallback",
-    "lint:oxlint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-deploy-infra/dispatcher/src",
-    "lint:eslint:fallback": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-deploy-infra/dispatcher/src",
     "test": "jest"
   },
   "devDependencies": {
-    "@kilocode/eslint-config": "workspace:*",
     "@swc/jest": "^0.2.39",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "eslint": "catalog:",
     "jest": "^30.3.0",
     "typescript": "catalog:",
     "wrangler": "catalog:"

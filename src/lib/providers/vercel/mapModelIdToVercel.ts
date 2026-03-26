@@ -7,6 +7,9 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   'mistralai/devstral-2512': 'mistral/devstral-2',
   'mistralai/mistral-embed-2312': 'mistral/mistral-embed',
   'mistralai/codestral-embed-2505': 'mistral/codestral-embed',
+  'x-ai/grok-4-fast': 'xai/grok-4-fast-reasoning',
+  'x-ai/grok-4.1-fast': 'xai/grok-4.1-fast-reasoning',
+  'x-ai/grok-4.20-beta': 'xai/grok-4.20-reasoning',
 };
 
 export function mapModelIdToVercel(modelId: string) {

@@ -112,7 +112,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
   // router the middleware always injects `{ organizationId }`.  The cast is
   // the single unavoidable type-unsafe bridge between tRPC's `unknown` input
   // and our generic callbacks.
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const toExtra = (input: unknown): TExtra => (input ?? {}) as any;
 
   return {

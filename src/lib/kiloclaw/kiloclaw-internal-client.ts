@@ -21,6 +21,7 @@ import type {
   GatewayProcessStatusResponse,
   GatewayProcessActionResponse,
   ConfigRestoreResponse,
+  GatewayReadyResponse,
   ControllerVersionResponse,
   OpenclawConfigResponse,
   GoogleCredentialsInput,
@@ -28,6 +29,9 @@ import type {
   GmailNotificationsResponse,
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
+  RestoreVolumeSnapshotResponse,
+  RegionsResponse,
+  UpdateRegionsResponse,
 } from './types';
 
 /** Keep in sync with: kiloclaw/controller/src/routes/files.ts, kiloclaw/src/.../gateway.ts (Zod) */
@@ -295,6 +299,14 @@ export class KiloClawInternalClient {
     );
   }
 
+  async getGatewayReady(userId: string): Promise<GatewayReadyResponse> {
+    return this.request(
+      `/api/platform/gateway/ready?userId=${encodeURIComponent(userId)}`,
+      undefined,
+      { userId }
+    );
+  }
+
   async getControllerVersion(userId: string): Promise<ControllerVersionResponse> {
     return this.request(
       `/api/platform/controller-version?userId=${encodeURIComponent(userId)}`,
@@ -483,5 +495,30 @@ export class KiloClawInternalClient {
       },
       { userId }
     );
+  }
+
+  async restoreVolumeFromSnapshot(
+    userId: string,
+    snapshotId: string
+  ): Promise<RestoreVolumeSnapshotResponse> {
+    return this.request(
+      '/api/platform/restore-volume-snapshot',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, snapshotId }),
+      },
+      { userId }
+    );
+  }
+
+  async getRegions(): Promise<RegionsResponse> {
+    return this.request('/api/platform/regions');
+  }
+
+  async updateRegions(regions: string[]): Promise<UpdateRegionsResponse> {
+    return this.request('/api/platform/regions', {
+      method: 'PUT',
+      body: JSON.stringify({ regions }),
+    });
   }
 }

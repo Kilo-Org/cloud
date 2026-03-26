@@ -7,6 +7,7 @@ import { NewDeploymentDialog } from '@/components/deployments/NewDeploymentDialo
 import { UserDeploymentProvider } from '@/components/deployments/UserDeploymentProvider';
 import { Button } from '@/components/Button';
 import { Badge } from '@/components/ui/badge';
+import { SetPageTitle } from '@/components/SetPageTitle';
 import { ExternalLink, Plus } from 'lucide-react';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { useState } from 'react';
@@ -43,10 +44,9 @@ export function DeployPageClient({ initialDeploymentId }: DeployPageClientProps)
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold text-gray-100">Deployments</h1>
+              <SetPageTitle title="Deployments">
                 <Badge variant="new">new</Badge>
-              </div>
+              </SetPageTitle>
               <p className="text-gray-400">Deploy your web project</p>
               <a
                 href="https://kilo.ai/docs/advanced-usage/deploy"

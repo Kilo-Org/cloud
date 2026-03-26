@@ -22,6 +22,7 @@ import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
 import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
 import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
 import { adminKiloclawVersionsRouter } from '@/routers/admin-kiloclaw-versions-router';
+import { adminKiloclawRegionsRouter } from '@/routers/admin-kiloclaw-regions-router';
 import { adminFeatureInterestRouter } from '@/routers/admin-feature-interest-router';
 import { adminCodeReviewsRouter } from '@/routers/admin-code-reviews-router';
 import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router';
@@ -65,6 +66,7 @@ import {
   getKilocodeRepoOpenPullRequestsSummary,
   getKilocodeRepoRecentlyClosedExternalPRs,
   getKilocodeRepoRecentlyMergedExternalPRs,
+  ALL_REPO_IDS,
 } from '@/lib/github/open-pull-request-counts';
 
 const SyncResponseSchema = z.object({
@@ -182,11 +184,22 @@ export const adminRouter = createTRPCRouter({
     }),
 
     getKilocodeOpenPullRequestsSummary: adminProcedure
-      .input(z.object({ includeDrafts: z.boolean().optional() }).optional())
+      .input(
+        z
+          .object({
+            includeDrafts: z.boolean().optional(),
+            repos: z
+              .array(z.enum(['kilocode', 'cloud', 'kilo-marketplace', 'kilocode-legacy']))
+              .optional(),
+          })
+          .optional()
+      )
       .query(async ({ input }) => {
+        const repos = input?.repos ?? [...ALL_REPO_IDS];
         return getKilocodeRepoOpenPullRequestsSummary({
           ttlMs: 2 * 60_000,
           includeDrafts: input?.includeDrafts ?? false,
+          repos,
         });
       }),
 
@@ -194,9 +207,24 @@ export const adminRouter = createTRPCRouter({
       return getKilocodeRepoRecentlyMergedExternalPRs({ ttlMs: 2 * 60_000, maxResults: 50 });
     }),
 
-    getKilocodeRecentlyClosedExternalPRs: adminProcedure.query(async () => {
-      return getKilocodeRepoRecentlyClosedExternalPRs({ ttlMs: 2 * 60_000, maxResults: 50 });
-    }),
+    getKilocodeRecentlyClosedExternalPRs: adminProcedure
+      .input(
+        z
+          .object({
+            repos: z
+              .array(z.enum(['kilocode', 'cloud', 'kilo-marketplace', 'kilocode-legacy']))
+              .optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input }) => {
+        const repos = input?.repos ?? [...ALL_REPO_IDS];
+        return getKilocodeRepoRecentlyClosedExternalPRs({
+          ttlMs: 2 * 60_000,
+          maxResults: 50,
+          repos,
+        });
+      }),
   }),
 
   users: createTRPCRouter({
@@ -1309,6 +1337,7 @@ export const adminRouter = createTRPCRouter({
   appBuilder: adminAppBuilderRouter,
   kiloclawInstances: adminKiloclawInstancesRouter,
   kiloclawVersions: adminKiloclawVersionsRouter,
+  kiloclawRegions: adminKiloclawRegionsRouter,
   aiAttribution: adminAIAttributionRouter,
   ossSponsorship: ossSponsorshipRouter,
   bulkUserCredits: bulkUserCreditsRouter,

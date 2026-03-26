@@ -4,7 +4,7 @@
  * These tests verify the EventProcessor's ability to:
  * - Process cloud agent events and emit callbacks for streaming messages
  * - Handle message.updated events with pending parts queue
- * - Handle message.part.updated events with delta streaming
+ * - Handle message.part.updated events
  * - Track child sessions (sessions with parentID) via callbacks
  * - Manage session status and streaming state via callbacks
  * - Fire onMessageCompleted when messages finish
@@ -345,76 +345,6 @@ describe('createEventProcessor', () => {
       );
     });
 
-    it('should handle delta streaming for text parts', () => {
-      let capturedMessage: ProcessedMessage | undefined;
-      const callbacks: EventProcessorCallbacks = {
-        onMessageUpdated: jest.fn((_, __, message) => {
-          capturedMessage = message;
-        }),
-        onPartUpdated: jest.fn((_, __, ___, part) => {
-          // Update captured message with the part for verification
-          if (capturedMessage) {
-            const partIndex = capturedMessage.parts.findIndex(p => p.id === part.id);
-            if (partIndex >= 0) {
-              capturedMessage.parts[partIndex] = part;
-            }
-          }
-        }),
-      };
-      const processor = createEventProcessor({ callbacks });
-
-      // Create message
-      processor.processEvent(
-        createKilocodeEvent('message.updated', { info: createAssistantInfo('msg-1') })
-      );
-
-      // Initial part with delta
-      processor.processEvent(
-        createKilocodeEvent('message.part.updated', {
-          part: {
-            id: 'part-1',
-            sessionID: 'session-123',
-            messageID: 'msg-1',
-            type: 'text',
-            text: '',
-          },
-          delta: 'Hello',
-        })
-      );
-
-      // First delta should set text to 'Hello'
-      expect(callbacks.onPartUpdated).toHaveBeenCalledWith(
-        'session-123',
-        'msg-1',
-        'part-1',
-        expect.objectContaining({ text: 'Hello' }),
-        null
-      );
-
-      // Streaming delta
-      processor.processEvent(
-        createKilocodeEvent('message.part.updated', {
-          part: {
-            id: 'part-1',
-            sessionID: 'session-123',
-            messageID: 'msg-1',
-            type: 'text',
-            text: '',
-          },
-          delta: ' World',
-        })
-      );
-
-      // Second delta should accumulate to 'Hello World'
-      expect(callbacks.onPartUpdated).toHaveBeenLastCalledWith(
-        'session-123',
-        'msg-1',
-        'part-1',
-        expect.objectContaining({ text: 'Hello World' }),
-        null
-      );
-    });
-
     it('should complete message when assistant message has completed time', () => {
       const callbacks: EventProcessorCallbacks = {
         onMessageUpdated: jest.fn(),
@@ -484,9 +414,8 @@ describe('createEventProcessor', () => {
             sessionID: 'session-123',
             messageID: 'msg-1',
             type: 'text',
-            text: '',
+            text: 'Hello',
           },
-          delta: 'Hello',
         })
       );
       processor.processEvent(
@@ -497,6 +426,7 @@ describe('createEventProcessor', () => {
 
       expect(callbacks.onMessageCompleted).toHaveBeenCalledTimes(1);
 
+      // Late part update after completion — full replacement
       processor.processEvent(
         createKilocodeEvent('message.part.updated', {
           part: {
@@ -504,9 +434,8 @@ describe('createEventProcessor', () => {
             sessionID: 'session-123',
             messageID: 'msg-1',
             type: 'text',
-            text: '',
+            text: 'Hello world',
           },
-          delta: ' world',
         })
       );
 

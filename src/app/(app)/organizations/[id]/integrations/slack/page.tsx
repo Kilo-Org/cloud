@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { SlackIntegrationDetails } from '@/components/integrations/SlackIntegrationDetails';
 import { Button } from '@/components/ui/button';
+import { SetPageTitle } from '@/components/SetPageTitle';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,12 +31,10 @@ export default async function OrgSlackIntegrationPage({
                 Back to Integrations
               </Button>
             </Link>
-            <div>
-              <h1 className="text-3xl font-bold">Slack Integration</h1>
-              <p className="text-muted-foreground mt-2">
-                Manage Slack integration for {organization.name}
-              </p>
-            </div>
+            <SetPageTitle title="Slack Integration" />
+            <p className="text-muted-foreground">
+              Manage Slack integration for {organization.name}
+            </p>
           </div>
 
           <Suspense

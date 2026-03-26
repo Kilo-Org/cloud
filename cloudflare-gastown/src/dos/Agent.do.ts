@@ -15,6 +15,7 @@ import {
   getIndexesRigAgentEvents,
 } from '../db/tables/rig-agent-events.table';
 import { query } from '../util/query.util';
+import { reconstructConversation, formatTranscriptForPrompt } from './town/conversation';
 
 const AGENT_DO_LOG = '[Agent.do]';
 
@@ -105,6 +106,32 @@ export class AgentDO extends DurableObject<Env> {
       ),
     ];
     return RigAgentEventRecord.array().parse(rows);
+  }
+
+  /**
+   * Reconstruct the conversation transcript from persisted events.
+   * Returns a formatted string for prompt injection, or empty string
+   * if no conversation history exists.
+   *
+   * Runs inside the AgentDO so the TownDO doesn't bear the cost of
+   * fetching and reducing potentially thousands of events.
+   */
+  async reconstructConversation(): Promise<string> {
+    await this.ensureInitialized();
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT * FROM ${rig_agent_events}
+          ORDER BY ${rig_agent_events.columns.id} ASC
+          LIMIT 10000
+        `,
+        []
+      ),
+    ];
+    const events = RigAgentEventRecord.array().parse(rows);
+    const turns = reconstructConversation(events);
+    return formatTranscriptForPrompt(turns);
   }
 
   /**

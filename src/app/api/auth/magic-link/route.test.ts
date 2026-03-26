@@ -54,7 +54,7 @@ describe('POST /api/auth/magic-link', () => {
 
     // Default: Magic link creation succeeds
     mockCreateMagicLinkToken.mockResolvedValue(mockMagicLinkToken);
-    mockSendMagicLinkEmail.mockResolvedValue(undefined);
+    mockSendMagicLinkEmail.mockResolvedValue({ sent: true });
 
     // Default: User does not exist (new user signup)
     mockFindUserByEmail.mockResolvedValue(undefined);

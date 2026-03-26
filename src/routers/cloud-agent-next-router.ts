@@ -31,6 +31,7 @@ import {
   baseGetSessionNextOutputSchema,
   baseAnswerQuestionNextSchema,
   baseRejectQuestionNextSchema,
+  baseAnswerPermissionNextSchema,
 } from './cloud-agent-next-schemas';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -219,6 +220,15 @@ export const cloudAgentNextRouter = createTRPCRouter({
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
       return await client.rejectQuestion(input);
+    }),
+
+  answerPermission: baseProcedure
+    .input(baseAnswerPermissionNextSchema)
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const authToken = generateCloudAgentToken(ctx.user);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.answerPermission(input);
     }),
 
   /**

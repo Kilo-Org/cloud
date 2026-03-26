@@ -218,12 +218,25 @@ export const organizationsMembersRouter = createTRPCRouter({
     }
     const acceptInviteUrl = getAcceptInviteUrl(invitation.token);
 
-    await sendOrganizationInviteEmail({
+    const emailResult = await sendOrganizationInviteEmail({
       to: email,
       organizationName: organization.name,
       inviterName: user.google_user_name,
       acceptInviteUrl,
     });
+
+    if (!emailResult.sent) {
+      // Expire the invitation so it doesn't block future invites to the same email
+      await db
+        .update(organization_invitations)
+        .set({ expires_at: sql`NOW()` })
+        .where(eq(organization_invitations.id, invitation.id));
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message:
+          'Unable to deliver the invitation email to this address. Please use a different email.',
+      });
+    }
 
     await createAuditLog({
       action: 'organization.user.send_invite',

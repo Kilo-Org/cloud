@@ -1,0 +1,173 @@
+{
+  "$schema": "../node_modules/oxlint/configuration_schema.json",
+  "plugins": ["oxc", "typescript", "unicorn", "react", "import", "promise"],
+  "jsPlugins": [
+    { "name": "react-native", "specifier": "oxlint-plugin-react-native" },
+    { "name": "sonarjs", "specifier": "eslint-plugin-sonarjs" }
+  ],
+  "options": {
+    "typeAware": true
+  },
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "error",
+    "style": "error",
+    "perf": "error",
+    "restriction": "error",
+    "nursery": "error"
+  },
+  "ignorePatterns": ["dist/*", "node_modules/**"],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "react-native",
+            "importNames": ["Image"],
+            "message": "Import Image from @/components/ui/image instead."
+          },
+          {
+            "name": "expo-image",
+            "message": "Import Image from @/components/ui/image instead."
+          }
+        ]
+      }
+    ],
+    "import/no-default-export": "error",
+    "import/no-cycle": "error",
+    "import/no-self-import": "error",
+    "import/no-duplicates": "error",
+    "import/no-mutable-exports": "error",
+    "import/consistent-type-specifier-style": ["error", "prefer-inline"],
+    "promise/always-return": "error",
+    "promise/catch-or-return": "error",
+    "promise/no-nesting": "error",
+    "promise/no-promise-in-callback": "error",
+    "promise/no-callback-in-promise": "error",
+    "promise/prefer-await-to-then": "error",
+    "promise/prefer-await-to-callbacks": "error",
+    "promise/no-return-wrap": "error",
+    "promise/no-return-in-finally": "error",
+    "react-native/no-unused-styles": "error",
+    "react-native/no-inline-styles": "error",
+    "react-native/no-raw-text": "error",
+    "react-native/no-single-element-style-arrays": "error",
+    "react-native/no-color-literals": "error",
+    "@typescript-eslint/consistent-type-assertions": [
+      "error",
+      {
+        "assertionStyle": "as",
+        "objectLiteralTypeAssertions": "never"
+      }
+    ],
+    "@typescript-eslint/consistent-type-imports": "error",
+    "@typescript-eslint/no-empty-object-type": "error",
+    "@typescript-eslint/no-require-imports": "error",
+    "@typescript-eslint/no-wrapper-object-types": "error",
+    "@typescript-eslint/no-unsafe-type-assertion": "off",
+    "@typescript-eslint/no-unnecessary-condition": "error",
+    "@typescript-eslint/no-confusing-void-expression": "error",
+    "@typescript-eslint/await-thenable": "error",
+    "@typescript-eslint/no-base-to-string": "error",
+    "@typescript-eslint/no-duplicate-type-constituents": "error",
+    "@typescript-eslint/no-for-in-array": "error",
+    "@typescript-eslint/no-implied-eval": "error",
+    "@typescript-eslint/no-redundant-type-constituents": "error",
+    "@typescript-eslint/no-unnecessary-type-assertion": "error",
+    "@typescript-eslint/no-unsafe-argument": "error",
+    "@typescript-eslint/no-unsafe-assignment": "error",
+    "@typescript-eslint/no-unsafe-call": "error",
+    "@typescript-eslint/no-unsafe-enum-comparison": "error",
+    "@typescript-eslint/no-unsafe-member-access": "error",
+    "@typescript-eslint/no-unsafe-return": "error",
+    "@typescript-eslint/no-unsafe-unary-minus": "error",
+    "@typescript-eslint/restrict-plus-operands": "error",
+    "@typescript-eslint/restrict-template-expressions": "error",
+    "@typescript-eslint/unbound-method": "error",
+    "no-unused-vars": [
+      "error",
+      {
+        "vars": "all",
+        "args": "all",
+        "argsIgnorePattern": "^_",
+        "ignoreRestSiblings": true,
+        "caughtErrors": "all"
+      }
+    ],
+    "react/no-is-mounted": "off",
+    "react/jsx-no-useless-fragment": "off",
+    "react/jsx-max-depth": ["error", { "max": 10 }],
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
+    "react/react-in-jsx-scope": "off",
+    "react/no-unescaped-entities": "off",
+    "react/jsx-filename-extension": "off",
+    "react/jsx-props-no-spreading": "off",
+    "react/no-multi-comp": "off",
+    "react/no-array-index-key": "off",
+    "import/no-unassigned-import": "off",
+    "import/no-named-export": "off",
+    "import/prefer-default-export": "off",
+    "import/group-exports": "off",
+    "import/exports-last": "off",
+    "import/no-relative-parent-imports": "off",
+    "no-magic-numbers": "off",
+    "no-ternary": "off",
+    "no-undefined": "off",
+    "no-void": "off",
+    "no-null": "off",
+    "no-undef": "off",
+    "no-eq-null": "off",
+    "sort-keys": "off",
+    "sort-imports": ["error", { "ignoreCase": true, "ignoreDeclarationSort": true }],
+    "func-style": "off",
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "curly": "error",
+    "no-promise-executor-return": "off",
+    "capitalized-comments": "off",
+    "id-length": "off",
+    "max-lines-per-function": "off",
+    "max-statements": "off",
+    "import/max-dependencies": "off",
+    "no-negated-condition": "off",
+    "no-use-before-define": "off",
+    "complexity": "off",
+    "prefer-destructuring": "off",
+    "promise/avoid-new": "off",
+    "unicorn/no-useless-undefined": "off",
+    "no-async-await": "off",
+    "@typescript-eslint/explicit-function-return-type": "off",
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/prefer-readonly-parameter-types": "off",
+    "oxc/no-optional-chaining": "off",
+    "@typescript-eslint/strict-boolean-expressions": "off",
+    "@typescript-eslint/no-import-type-side-effects": "off",
+    "@typescript-eslint/consistent-type-definitions": ["error", "type"],
+    "@typescript-eslint/no-namespace": "off",
+    "import/no-namespace": "off",
+    "oxc/no-rest-spread-properties": "off",
+    "react/only-export-components": "off"
+  },
+  "overrides": [
+    {
+      "files": ["src/components/ui/image.tsx"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/components/ui/**/*.tsx"],
+      "rules": {
+        "react/jsx-no-constructed-context-values": "off"
+      }
+    },
+    {
+      "files": ["src/app/**/_layout.tsx", "src/app/**/*.tsx"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    }
+  ]
+}

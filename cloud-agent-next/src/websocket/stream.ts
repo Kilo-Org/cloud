@@ -18,6 +18,7 @@ import type {
 import type { SessionId, EventId } from '../types/ids.js';
 import { parseStreamFilters, matchesFilters } from './filters.js';
 import type { EventQueries } from '../session/queries/index.js';
+import type { CloudStatusData, ConnectedEventData } from '../shared/protocol.js';
 
 /**
  * Approximate byte budget per replay round.
@@ -70,6 +71,11 @@ export function createErrorMessage(code: StreamErrorCode, message: string): Stre
 // Stream Handler Factory
 // ---------------------------------------------------------------------------
 
+/** Options for deriving current session state in the `connected` event. */
+export type StreamHandlerOptions = {
+  deriveCloudStatus?: () => Promise<CloudStatusData['cloudStatus'] | null>;
+};
+
 /**
  * Create a stream handler for the /stream WebSocket endpoint.
  *
@@ -81,12 +87,14 @@ export function createErrorMessage(code: StreamErrorCode, message: string): Stre
  * @param state - Durable Object state for WebSocket management
  * @param eventQueries - Event queries module for replaying historical events
  * @param sessionId - Session ID for this DO instance
+ * @param options - Optional derivation functions for the `connected` event
  * @returns Stream handler object with methods for WebSocket operations
  */
 export function createStreamHandler(
   state: DurableObjectState,
   eventQueries: EventQueries,
-  sessionId: SessionId
+  sessionId: SessionId,
+  options?: StreamHandlerOptions
 ) {
   return {
     /**
@@ -112,6 +120,7 @@ export function createStreamHandler(
 
       const url = new URL(request.url);
       const filters = parseStreamFilters(url, sessionId);
+      const skipReplay = url.searchParams.get('replay') === 'false';
 
       // Create WebSocket pair
       const pair = new WebSocketPair();
@@ -129,8 +138,30 @@ export function createStreamHandler(
       state.acceptWebSocket(server, ['stream']);
       server.serializeAttachment(attachment);
 
-      // Replay historical events immediately after accepting
-      await this.replayEvents(server, filters);
+      // Replay historical events unless client opted out
+      if (!skipReplay) {
+        await this.replayEvents(server, filters);
+      }
+
+      // Send `connected` event with current service state.
+      // sessionStatus is omitted here — it arrives later via the wrapper's
+      // session.status kilocode event, which is the authoritative source.
+      {
+        const connectedData: ConnectedEventData = {};
+        const cloudStatus = await options?.deriveCloudStatus?.();
+        if (cloudStatus) connectedData.cloudStatus = cloudStatus;
+
+        server.send(
+          JSON.stringify({
+            eventId: 0,
+            executionId: null,
+            sessionId,
+            streamEventType: 'connected' as const,
+            timestamp: new Date().toISOString(),
+            data: connectedData,
+          })
+        );
+      }
 
       return new Response(null, { status: 101, webSocket: client });
     },

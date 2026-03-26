@@ -19,6 +19,15 @@ export CF_ACCESS_CLIENT_ID="<service-token-client-id>"
 export CF_ACCESS_CLIENT_SECRET="<service-token-client-secret>"
 ```
 
+For querying Cloudflare logs and Analytics Engine, you also need:
+
+```bash
+# Cloudflare API token with Workers Observability + Analytics Engine read permissions
+export GASTOWN_CF_ANALYTICS_API_KEY="<api-token>"
+# Cloudflare account ID (found at: Workers & Pages → Overview, right sidebar)
+export CF_ACCOUNT_ID="<account-id>"
+```
+
 All `curl` commands in this document use a helper function that includes these headers:
 
 ```bash
@@ -252,3 +261,179 @@ done
 | Alarm interval        | `active (5s)` with work                 | Stuck at same `nextFireAt`            |
 | Reconciler wall clock | <100ms                                  | >500ms consistently                   |
 | Pending event count   | 0 between ticks                         | Growing (events not draining)         |
+
+## 6. Querying Cloudflare Logs (Workers Observability)
+
+Workers Observability is enabled at 100% sampling (`wrangler.jsonc` → `observability`). All `console.log/warn/error` output is indexed and searchable via the Cloudflare API. Key log lines emit structured JSON with `townId`, `rigId`, `userId`, `orgId`, and `agentId` fields for filtering.
+
+### Log Query Script
+
+The `scripts/query-logs.sh` script wraps the Workers Observability and Analytics Engine APIs:
+
+```bash
+export GASTOWN_CF_ANALYTICS_API_KEY="<api-token>"
+export CF_ACCOUNT_ID="<account-id>"
+
+# Fetch recent logs mentioning a town (last 30 min by default)
+./scripts/query-logs.sh logs <townId> [minutes]
+
+# Fetch only errors/warnings for a town
+./scripts/query-logs.sh errors <townId> [minutes]
+
+# Query Analytics Engine events for a town
+./scripts/query-logs.sh ae-events <townId> [hours]
+
+# Query reconciler tick metrics from Analytics Engine
+./scripts/query-logs.sh ae-reconciler <townId> [hours]
+```
+
+### Manual Log Queries
+
+Query the Workers Observability API directly. The structured logs use JSON format with fields like `townId`, `rigId`, `userId`, `orgId`, `agentId`:
+
+```bash
+# Search for all logs mentioning a specific town in the last hour
+curl -s "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/workers/observability/telemetry/query" \
+  -H "Authorization: Bearer $GASTOWN_CF_ANALYTICS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "queryId": "",
+    "timeframe": { "from": '$(($(date +%s) - 3600))'000, "to": '$(date +%s)'000 },
+    "limit": 50,
+    "view": "events",
+    "parameters": {
+      "datasets": ["gastown"],
+      "calculations": [{ "operator": "count" }],
+      "filters": [
+        { "key": "message", "operation": "contains", "value": "'$TOWN_ID'", "type": "string" }
+      ],
+      "orderBy": { "value": "timestamp", "order": "desc" }
+    }
+  }' | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for ds, evts in data.get('result',{}).get('events',{}).items():
+    for e in evts:
+        ts = e.get('timestamp','')
+        msg = e.get('message','')[:200]
+        level = e.get('level','info')
+        print(f'{ts}  [{level}]  {msg}')
+"
+```
+
+### Useful search patterns
+
+Since the structured logs are JSON, you can search for specific fields:
+
+- **All errors for a town**: filter `message contains "<townId>"` + `level in ["error","warn"]`
+- **Mayor session issues**: search for `"ensureMayor"` or `"sendMayorMessage"` in message
+- **Rig configuration**: search for `"configureRig"` in message
+- **Reconciler problems**: search for `"reconciler"` + `level = "error"`
+- **Container dispatch failures**: search for `"startAgentInContainer"` + `level = "error"`
+- **Git credential issues**: search for `"git credential"` or `"refreshGitCredentials"` in message
+- **Rig repo setup failures (container)**: search for `"/repos/setup: FAILED"` or `"browse worktree setup FAILED"` — these are container-side errors logged at `error` level when git clone or worktree creation fails. Visible in Workers Observability via `$containers` log enrichment.
+- **Mayor can't see rigs**: search for `"mayor rig setup:"` to see summary of rig setup failures during mayor startup
+
+### Dashboard
+
+The Cloudflare Workers Observability dashboard provides an interactive UI for the same data:
+
+1. Go to **Workers & Pages** → select **gastown** → **Observability** → **Overview**
+2. Use the search bar with the query language: `message : "<townId>"`
+3. Filter by level: `level = "error"` or `level = "warn"`
+4. Group by invocation to see all logs from a single request
+
+## 7. Querying Analytics Engine
+
+The `gastown_events` Analytics Engine dataset stores all lifecycle events (bead status changes, agent dispatches, reconciler ticks, reviews, etc.). Unlike logs, AE data is designed for aggregation and time-series queries.
+
+### Dataset schema
+
+The `gastown_events` dataset maps fields as follows:
+
+| Column  | Field               | Description                                       |
+| ------- | ------------------- | ------------------------------------------------- |
+| blob1   | event               | Event name (e.g. `bead.created`, `agent.spawned`) |
+| blob2   | userId              | User who triggered the event                      |
+| blob3   | delivery            | `http`, `trpc`, or `internal`                     |
+| blob4   | route               | HTTP route pattern (for HTTP events)              |
+| blob5   | error               | Error message (if any)                            |
+| blob6   | townId              | Town ID                                           |
+| blob7   | rigId               | Rig ID                                            |
+| blob8   | agentId             | Agent ID                                          |
+| blob9   | beadId              | Bead ID                                           |
+| blob10  | label               | Free-form label (e.g. actionsByType JSON)         |
+| blob11  | convoyId            | Convoy ID                                         |
+| blob12  | role                | Agent role (`polecat`, `refinery`, `mayor`)       |
+| blob13  | beadType            | Bead type                                         |
+| double1 | durationMs          | Duration in milliseconds                          |
+| double2 | value               | Generic numeric value                             |
+| double3 | actionsEmitted      | (reconciler_tick) actions count                   |
+| double7 | invariantViolations | (reconciler_tick) violation count                 |
+| double8 | pendingEventCount   | (reconciler_tick) pending event count             |
+
+### Example AE queries
+
+```bash
+AE_API="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/analytics_engine/sql"
+
+# Count events by type for a town in the last hour
+curl -s "$AE_API" \
+  -H "Authorization: Bearer $GASTOWN_CF_ANALYTICS_API_KEY" \
+  -d "SELECT blob1 AS event, SUM(_sample_interval) AS count
+      FROM gastown_events
+      WHERE blob6 = '$TOWN_ID'
+        AND timestamp > NOW() - INTERVAL '1' HOUR
+      GROUP BY event ORDER BY count DESC LIMIT 20
+      FORMAT JSONCompact"
+
+# Reconciler health over the last 6 hours (5-min buckets)
+curl -s "$AE_API" \
+  -H "Authorization: Bearer $GASTOWN_CF_ANALYTICS_API_KEY" \
+  -d "SELECT
+        intDiv(toUInt32(timestamp), 300) * 300 AS t,
+        SUM(_sample_interval * double1) / SUM(_sample_interval) AS avg_wall_ms,
+        SUM(_sample_interval * double3) AS total_actions,
+        SUM(_sample_interval * double7) AS total_violations
+      FROM gastown_events
+      WHERE blob1 = 'reconciler_tick' AND blob6 = '$TOWN_ID'
+        AND timestamp > NOW() - INTERVAL '6' HOUR
+      GROUP BY t ORDER BY t
+      FORMAT JSONCompact"
+
+# Agent dispatch failures in the last day
+curl -s "$AE_API" \
+  -H "Authorization: Bearer $GASTOWN_CF_ANALYTICS_API_KEY" \
+  -d "SELECT timestamp, blob8 AS agent_id, blob12 AS role, blob5 AS error
+      FROM gastown_events
+      WHERE blob1 = 'agent.dispatch_failed' AND blob6 = '$TOWN_ID'
+        AND timestamp > NOW() - INTERVAL '1' DAY
+      ORDER BY timestamp DESC LIMIT 20
+      FORMAT JSONCompact"
+
+# Bead lifecycle for a specific town (status changes)
+curl -s "$AE_API" \
+  -H "Authorization: Bearer $GASTOWN_CF_ANALYTICS_API_KEY" \
+  -d "SELECT timestamp, blob1 AS event, blob9 AS bead_id, blob10 AS label
+      FROM gastown_events
+      WHERE blob1 LIKE 'bead.%' AND blob6 = '$TOWN_ID'
+        AND timestamp > NOW() - INTERVAL '1' HOUR
+      ORDER BY timestamp DESC LIMIT 50
+      FORMAT JSONCompact"
+```
+
+### Structured log fields
+
+Worker logs now emit JSON-structured entries. Key fields available for filtering in Workers Observability:
+
+| JSON field | Description                 | Example filter                  |
+| ---------- | --------------------------- | ------------------------------- |
+| `source`   | Module that emitted the log | `"Town.do"`, `"gastown-worker"` |
+| `townId`   | Town UUID                   | `message : "townId":"<uuid>"`   |
+| `rigId`    | Rig UUID                    | `message : "rigId":"<uuid>"`    |
+| `userId`   | User UUID                   | `message : "userId":"<uuid>"`   |
+| `orgId`    | Organization UUID           | `message : "orgId":"<uuid>"`    |
+| `agentId`  | Agent UUID                  | `message : "agentId":"<uuid>"`  |
+| `level`    | `info`, `warn`, or `error`  | `message : "level":"error"`     |
+
+These fields are embedded in the `message` text as JSON, so use the `contains` operator or `:` in the dashboard query language to filter by them.

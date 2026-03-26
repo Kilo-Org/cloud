@@ -6,10 +6,8 @@
     "deploy:prod": "wrangler deploy",
     "deploy:dev": "wrangler deploy --env dev",
     "dev": "wrangler dev --env dev",
-    "lint": "pnpm run lint:oxlint && pnpm run lint:eslint:fallback",
-    "lint:oxlint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-security-auto-analysis/src",
-    "lint:eslint:fallback": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'",
-    "typecheck": "tsgo --noEmit --incremental false",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-security-auto-analysis/src",
     "types": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts",
     "test": "vitest run"
   },
@@ -20,7 +18,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@kilocode/eslint-config": "workspace:*",
     "@types/node": "^22.19.15",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",

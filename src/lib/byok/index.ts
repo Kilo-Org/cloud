@@ -12,11 +12,7 @@ import {
 import { isCodestralModel } from '@/lib/providers/mistral';
 import { unstable_cache } from 'next/cache';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
-
-export type BYOKResult = {
-  decryptedAPIKey: string;
-  providerId: UserByokProviderId;
-};
+import type { BYOKResult } from '@/lib/providers/types';
 
 const getModelUserByokProviders_cached = unstable_cache(
   async (modelId: string) => {

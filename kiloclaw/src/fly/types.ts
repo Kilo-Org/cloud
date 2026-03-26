@@ -130,6 +130,7 @@ type CreateVolumeBaseRequest = {
 type CreateFreshVolumeRequest = {
   size_gb: number;
   source_volume_id?: never;
+  snapshot_id?: never;
 };
 
 type CreateForkedVolumeRequest = {
@@ -140,14 +141,23 @@ type CreateForkedVolumeRequest = {
    * Forked volume size is inherited from the source volume.
    */
   size_gb?: never;
+  snapshot_id?: never;
+};
+
+type CreateSnapshotVolumeRequest = {
+  /** Create a new volume from a snapshot. Fly requires size_gb even for snapshots. */
+  snapshot_id: string;
+  size_gb: number;
+  source_volume_id?: never;
 };
 
 export type CreateVolumeRequest =
   | (CreateVolumeBaseRequest & CreateFreshVolumeRequest)
-  | (CreateVolumeBaseRequest & CreateForkedVolumeRequest);
+  | (CreateVolumeBaseRequest & CreateForkedVolumeRequest)
+  | (CreateVolumeBaseRequest & CreateSnapshotVolumeRequest);
 
 export type CreateVolumeRequestWithoutRegion = Omit<CreateVolumeBaseRequest, 'region'> &
-  (CreateFreshVolumeRequest | CreateForkedVolumeRequest);
+  (CreateFreshVolumeRequest | CreateForkedVolumeRequest | CreateSnapshotVolumeRequest);
 
 // -- Volume snapshot types --
 

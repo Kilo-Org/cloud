@@ -34,11 +34,9 @@ export default function EmailTestingPage() {
   const { data: session } = useSession();
 
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [recipient, setRecipient] = useState<string>('');
 
   const { data: templates } = useQuery(trpc.admin.emailTesting.getTemplates.queryOptions());
-  const { data: providers } = useQuery(trpc.admin.emailTesting.getProviders.queryOptions());
 
   // Pre-fill recipient with logged-in admin's email
   useEffect(() => {
@@ -47,44 +45,36 @@ export default function EmailTestingPage() {
     }
   }, [session?.user?.email, recipient]);
 
-  // Auto-select first template and provider on load
+  // Auto-select first template on load
   useEffect(() => {
     if (templates && templates.length > 0 && !selectedTemplate) {
       setSelectedTemplate(templates[0].name);
     }
   }, [templates, selectedTemplate]);
 
-  useEffect(() => {
-    if (providers && providers.length > 0 && !selectedProvider) {
-      setSelectedProvider(providers[0]);
-    }
-  }, [providers, selectedProvider]);
-
   const previewQuery = useQuery(
     trpc.admin.emailTesting.getPreview.queryOptions(
       {
-        // Values come directly from the server's getTemplates/getProviders responses,
+        // Values come directly from the server's getTemplates response,
         // so the cast is safe — tRPC zod will reject anything invalid at runtime anyway.
         template: (selectedTemplate ?? 'orgSubscription') as TemplateName,
-        provider: (selectedProvider ?? 'customerio') as 'customerio' | 'mailgun',
       },
-      { enabled: selectedTemplate !== null && selectedProvider !== null }
+      { enabled: selectedTemplate !== null }
     )
   );
 
   const sendTestMutation = useMutation(trpc.admin.emailTesting.sendTest.mutationOptions());
 
   const handleSend = () => {
-    if (!selectedTemplate || !selectedProvider || !recipient) return;
+    if (!selectedTemplate || !recipient) return;
     sendTestMutation.mutate(
       {
         template: selectedTemplate as TemplateName,
-        provider: selectedProvider as 'customerio' | 'mailgun',
         recipient,
       },
       {
         onSuccess: result => {
-          toast.success(`Test email sent via ${result?.provider} to ${result?.recipient}`);
+          toast.success(`Test email sent to ${result?.recipient}`);
         },
         onError: error => {
           toast.error(error.message || 'Failed to send test email');
@@ -111,11 +101,11 @@ export default function EmailTestingPage() {
               Test Email Controls
             </CardTitle>
             <CardDescription>
-              Select a template and provider, then send a test email to any address.
+              Select a template, then send a test email to any address.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="template">Template</Label>
                 <Select value={selectedTemplate ?? ''} onValueChange={v => setSelectedTemplate(v)}>
@@ -126,22 +116,6 @@ export default function EmailTestingPage() {
                     {templates?.map(t => (
                       <SelectItem key={t.name} value={t.name}>
                         {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="provider">Provider</Label>
-                <Select value={selectedProvider ?? ''} onValueChange={v => setSelectedProvider(v)}>
-                  <SelectTrigger id="provider">
-                    <SelectValue placeholder="Select provider..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {providers?.map(p => (
-                      <SelectItem key={p} value={p}>
-                        {p}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -162,9 +136,7 @@ export default function EmailTestingPage() {
 
             <Button
               onClick={handleSend}
-              disabled={
-                !selectedTemplate || !selectedProvider || !recipient || sendTestMutation.isPending
-              }
+              disabled={!selectedTemplate || !recipient || sendTestMutation.isPending}
             >
               <Send className="mr-2 h-4 w-4" />
               {sendTestMutation.isPending ? 'Sending...' : 'Send Test Email'}
@@ -173,7 +145,7 @@ export default function EmailTestingPage() {
         </Card>
 
         {/* Preview Pane */}
-        {selectedTemplate && selectedProvider && (
+        {selectedTemplate && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -185,49 +157,13 @@ export default function EmailTestingPage() {
                   </span>
                 )}
               </CardTitle>
-              <CardDescription>
-                {selectedProvider === 'customerio'
-                  ? 'Variables that will be sent to the Customer.io API'
-                  : 'Rendered HTML email'}
-              </CardDescription>
+              <CardDescription>Rendered HTML email</CardDescription>
             </CardHeader>
             <CardContent>
               {previewQuery.isPending && (
                 <p className="text-muted-foreground text-sm">Loading preview...</p>
               )}
-              {previewQuery.data?.type === 'customerio' && (
-                <div className="space-y-2">
-                  <p className="text-muted-foreground text-xs">
-                    Template ID:{' '}
-                    <span className="font-mono">{previewQuery.data.transactional_message_id}</span>
-                  </p>
-                  <div className="rounded-lg border">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-muted-foreground px-4 py-2 text-left font-medium">
-                            Variable
-                          </th>
-                          <th className="text-muted-foreground px-4 py-2 text-left font-medium">
-                            Value
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(previewQuery.data.message_data).map(([key, value]) => (
-                          <tr key={key} className="border-b last:border-0">
-                            <td className="px-4 py-2 font-mono text-xs">{key}</td>
-                            <td className="px-4 py-2 font-mono text-xs break-all">
-                              {String(value)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-              {previewQuery.data?.type === 'mailgun' && (
+              {previewQuery.data && (
                 <iframe
                   srcDoc={previewQuery.data.html}
                   className="h-[600px] w-full rounded-lg border"

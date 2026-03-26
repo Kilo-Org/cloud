@@ -115,11 +115,25 @@ export type MachineSize = {
   cpu_kind?: 'shared' | 'performance';
 };
 
+/** Response from POST /api/platform/restore-volume-snapshot */
+export type RestoreVolumeSnapshotResponse = {
+  acknowledged: boolean;
+  previousVolumeId: string;
+};
+
 /** Response from GET /api/platform/status and GET /api/kiloclaw/status */
 export type PlatformStatusResponse = {
   userId: string | null;
   sandboxId: string | null;
-  status: 'provisioned' | 'starting' | 'restarting' | 'running' | 'stopped' | 'destroying' | null;
+  status:
+    | 'provisioned'
+    | 'starting'
+    | 'restarting'
+    | 'running'
+    | 'stopped'
+    | 'destroying'
+    | 'restoring'
+    | null;
   provisionedAt: number | null;
   lastStartedAt: number | null;
   lastStoppedAt: number | null;
@@ -137,6 +151,8 @@ export type PlatformStatusResponse = {
   trackedImageDigest: string | null;
   googleConnected: boolean;
   gmailNotificationsEnabled: boolean;
+  execSecurity: string | null;
+  execAsk: string | null;
 };
 
 /** Response from GET /api/platform/debug-status (internal/admin only). */
@@ -153,6 +169,10 @@ export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   lastDestroyErrorAt: number | null;
   lastRestartErrorMessage: string | null;
   lastRestartErrorAt: number | null;
+  previousVolumeId: string | null;
+  restoreStartedAt: string | null;
+  pendingRestoreVolumeId: string | null;
+  instanceReadyEmailSent: boolean;
 };
 
 /** A Fly volume snapshot. */
@@ -219,6 +239,9 @@ export type ConfigRestoreResponse = {
   signaled: boolean;
 };
 
+/** Response from GET /api/platform/gateway/ready (opaque — shape depends on OpenClaw version) */
+export type GatewayReadyResponse = Record<string, unknown>;
+
 /** Response from GET /api/platform/controller-version. Null fields = old controller. */
 export type ControllerVersionResponse = {
   version: string | null;
@@ -276,8 +299,23 @@ export type ReassociateVolumeResponse = {
   newRegion: string;
 };
 
+/** Response from GET /api/platform/regions */
+export type RegionsResponse = {
+  regions: string[];
+  source: 'kv' | 'env' | 'default';
+  raw: string;
+};
+
+/** Response from PUT /api/platform/regions */
+export type UpdateRegionsResponse = {
+  ok: true;
+  regions: string[];
+  raw: string;
+};
+
 /** Combined status returned by tRPC getStatus */
 export type KiloClawDashboardStatus = PlatformStatusResponse & {
   /** Worker base URL for constructing the "Open" link. Falls back to claw.kilo.ai. */
   workerUrl: string;
+  name: string | null;
 };

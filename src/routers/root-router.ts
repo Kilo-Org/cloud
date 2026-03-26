@@ -34,6 +34,7 @@ import { appBuilderFeedbackRouter } from '@/routers/app-builder-feedback-router'
 import { cloudAgentNextFeedbackRouter } from '@/routers/cloud-agent-next-feedback-router';
 import { kiloclawRouter } from '@/routers/kiloclaw-router';
 import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
+import { activeSessionsRouter } from '@/routers/active-sessions-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -69,6 +70,7 @@ export const rootRouter = createTRPCRouter({
   cloudAgentNextFeedback: cloudAgentNextFeedbackRouter,
   kiloclaw: kiloclawRouter,
   unifiedSessions: unifiedSessionsRouter,
+  activeSessions: activeSessionsRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

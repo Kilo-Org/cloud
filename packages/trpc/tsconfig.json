@@ -9,6 +9,7 @@
     "declaration": true,
     "declarationMap": true,
     "emitDeclarationOnly": true,
+    "rootDir": "../..",
     "outDir": "dist/tsc",
     "isolatedModules": true,
     "esModuleInterop": true,

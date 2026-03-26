@@ -2,38 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import type { Organization } from '@kilocode/db/schema';
 import { getMagicLinkUrl, type MagicLinkTokenWithPlaintext } from '@/lib/auth/magic-link-tokens';
-import { EMAIL_PROVIDER, NEXTAUTH_URL } from '@/lib/config.server';
-import { sendViaCustomerIo } from '@/lib/email-customerio';
+import { NEXTAUTH_URL } from '@/lib/config.server';
 import { sendViaMailgun } from '@/lib/email-mailgun';
+import { verifyEmail } from '@/lib/email-neverbounce';
 
-export const templates = {
-  orgSubscription: '10',
-  orgRenewed: '11',
-  orgCancelled: '12',
-  orgSSOUserJoined: '13',
-  orgInvitation: '6',
-  magicLink: '14',
-  balanceAlert: '16',
-  autoTopUpFailed: '17',
-  ossInviteNewUser: '18',
-  ossInviteExistingUser: '19',
-  ossExistingOrgProvisioned: '20',
-  deployFailed: '21',
-  clawTrialEndingSoon: '22',
-  clawTrialExpiresTomorrow: '23',
-  clawSuspendedTrial: '24',
-  clawSuspendedSubscription: '25',
-  clawSuspendedPayment: '26',
-  clawDestructionWarning: '27',
-  clawInstanceDestroyed: '28',
-  clawEarlybirdEndingSoon: '29',
-  clawEarlybirdExpiresTomorrow: '30',
-} as const;
-
-export type TemplateName = keyof typeof templates;
-
-// Subject lines for each template — used by Mailgun (PR 2) and the admin testing page
-export const subjects: Record<TemplateName, string> = {
+// Subject lines for each template — also serves as the canonical list of template names
+export const subjects = {
   orgSubscription: 'Welcome to Kilo for Teams!',
   orgRenewed: 'Kilo: Your Teams Subscription Renewal',
   orgCancelled: 'Kilo: Your Teams Subscription is Cancelled',
@@ -55,7 +29,10 @@ export const subjects: Record<TemplateName, string> = {
   clawInstanceDestroyed: 'Your KiloClaw Instance Has Been Deleted',
   clawEarlybirdEndingSoon: 'Your KiloClaw Earlybird Access Ends Soon',
   clawEarlybirdExpiresTomorrow: 'Your KiloClaw Earlybird Access Expires Tomorrow',
-};
+  clawInstanceReady: 'Your KiloClaw Instance Is Ready',
+} as const;
+
+export type TemplateName = keyof typeof subjects;
 
 function escapeHtml(str: string): string {
   return str
@@ -93,17 +70,15 @@ export function buildCreditsSection(monthlyCreditsUsd: number): RawHtml {
   );
 }
 
-// CIO templates still use Liquid {% if has_credits %}{{ monthly_credits_usd }}{% endif %}.
-// Mailgun templates use {{ credits_section }} instead. Pass both so each provider
-// gets the vars it needs; unrecognized keys are harmlessly ignored by both paths.
 export function creditsVars(monthlyCreditsUsd: number): TemplateVars {
   return {
     credits_section: buildCreditsSection(monthlyCreditsUsd),
-    ...(monthlyCreditsUsd > 0
-      ? { has_credits: 'true', monthly_credits_usd: String(monthlyCreditsUsd) }
-      : {}),
   };
 }
+
+export type SendResult =
+  | { sent: true }
+  | { sent: false; reason: 'neverbounce_rejected' | 'provider_not_configured' };
 
 type SendParams = {
   to: string;
@@ -112,31 +87,20 @@ type SendParams = {
   subjectOverride?: string;
 };
 
-export async function send(params: SendParams) {
-  if (EMAIL_PROVIDER === 'mailgun') {
-    const subject = params.subjectOverride ?? subjects[params.templateName];
-    const html = renderTemplate(params.templateName, {
-      ...params.templateVars,
-      year: String(new Date().getFullYear()),
-    });
-    return sendViaMailgun({ to: params.to, subject, html });
+export async function send(params: SendParams): Promise<SendResult> {
+  const isSafeToSend = await verifyEmail(params.to);
+  if (!isSafeToSend) {
+    return { sent: false, reason: 'neverbounce_rejected' };
   }
-  // Customer.io handles its own rendering; pass raw string values.
-  // If a subjectOverride is provided, include it as `subject` in message_data
-  // so CIO templates can reference it via Liquid ({{ subject }}).
-  const messageData: Record<string, string> = Object.fromEntries(
-    Object.entries(params.templateVars).map(([k, v]) => [k, v instanceof RawHtml ? v.html : v])
-  );
-  if (params.subjectOverride) {
-    messageData.subject = params.subjectOverride;
-  }
-  return sendViaCustomerIo({
-    transactional_message_id: templates[params.templateName],
-    to: params.to,
-    message_data: messageData,
-    identifiers: { email: params.to },
-    reply_to: 'hi@kilocode.ai',
+
+  const subject = params.subjectOverride ?? subjects[params.templateName];
+  const html = renderTemplate(params.templateName, {
+    ...params.templateVars,
+    year: String(new Date().getFullYear()),
   });
+  const result = await sendViaMailgun({ to: params.to, subject, html });
+  if (!result) return { sent: false, reason: 'provider_not_configured' as const };
+  return { sent: true };
 }
 
 type OrganizationInviteEmailData = {
@@ -151,7 +115,7 @@ type Props = {
   organizationId: string;
 };
 
-export async function sendOrgSubscriptionEmail(to: string, props: Props) {
+export async function sendOrgSubscriptionEmail(to: string, props: Props): Promise<SendResult> {
   const seats = `${props.seatCount} seat${props.seatCount === 1 ? '' : 's'}`;
   const organization_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}`;
   const invoices_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`;
@@ -162,7 +126,7 @@ export async function sendOrgSubscriptionEmail(to: string, props: Props) {
   });
 }
 
-export async function sendOrgRenewedEmail(to: string, props: Props) {
+export async function sendOrgRenewedEmail(to: string, props: Props): Promise<SendResult> {
   const seats = `${props.seatCount} seat${props.seatCount === 1 ? '' : 's'}`;
   const invoices_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`;
   return send({
@@ -172,7 +136,10 @@ export async function sendOrgRenewedEmail(to: string, props: Props) {
   });
 }
 
-export async function sendOrgCancelledEmail(to: string, props: Omit<Props, 'seatCount'>) {
+export async function sendOrgCancelledEmail(
+  to: string,
+  props: Omit<Props, 'seatCount'>
+): Promise<SendResult> {
   const invoices_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`;
   return send({
     to,
@@ -184,7 +151,7 @@ export async function sendOrgCancelledEmail(to: string, props: Omit<Props, 'seat
 export async function sendOrgSSOUserJoinedEmail(
   to: string,
   props: Omit<Props, 'seatCount'> & { new_user_email: string }
-) {
+): Promise<SendResult> {
   const organization_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}`;
   return send({
     to,
@@ -193,7 +160,9 @@ export async function sendOrgSSOUserJoinedEmail(
   });
 }
 
-export async function sendOrganizationInviteEmail(data: OrganizationInviteEmailData) {
+export async function sendOrganizationInviteEmail(
+  data: OrganizationInviteEmailData
+): Promise<SendResult> {
   return send({
     to: data.to,
     templateName: 'orgInvitation',
@@ -208,7 +177,7 @@ export async function sendOrganizationInviteEmail(data: OrganizationInviteEmailD
 export async function sendMagicLinkEmail(
   magicLink: MagicLinkTokenWithPlaintext,
   callbackUrl?: string
-) {
+): Promise<SendResult> {
   return send({
     to: magicLink.email,
     templateName: 'magicLink',
@@ -225,7 +194,7 @@ export async function sendMagicLinkEmail(
 export async function sendAutoTopUpFailedEmail(
   to: string,
   props: { reason: string; organizationId?: string }
-) {
+): Promise<SendResult> {
   const credits_url = props.organizationId
     ? `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`
     : `${NEXTAUTH_URL}/credits?show-auto-top-up`;
@@ -243,7 +212,9 @@ type SendDeploymentFailedEmailProps = {
   repository: string;
 };
 
-export async function sendDeploymentFailedEmail(props: SendDeploymentFailedEmailProps) {
+export async function sendDeploymentFailedEmail(
+  props: SendDeploymentFailedEmailProps
+): Promise<SendResult> {
   return send({
     to: props.to,
     templateName: 'deployFailed',
@@ -261,7 +232,7 @@ type SendBalanceAlertEmailProps = {
   to: string[];
 };
 
-export async function sendBalanceAlertEmail(props: SendBalanceAlertEmailProps) {
+export async function sendBalanceAlertEmail(props: SendBalanceAlertEmailProps): Promise<void> {
   const { organizationId, minimum_balance, to } = props;
 
   if (!to || to.length === 0) {
@@ -306,7 +277,7 @@ type OssInviteEmailData = {
   monthlyCreditsUsd: number;
 };
 
-export async function sendOssInviteNewUserEmail(data: OssInviteEmailData) {
+export async function sendOssInviteNewUserEmail(data: OssInviteEmailData): Promise<SendResult> {
   const integrations_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/integrations`;
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/code-reviews`;
   const tierConfig = ossTierConfig[data.tier];
@@ -328,7 +299,7 @@ export async function sendOssInviteNewUserEmail(data: OssInviteEmailData) {
 
 export async function sendOssInviteExistingUserEmail(
   data: Omit<OssInviteEmailData, 'acceptInviteUrl' | 'inviteCode'>
-) {
+): Promise<SendResult> {
   const organization_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}`;
   const integrations_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/integrations`;
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/code-reviews`;
@@ -357,7 +328,9 @@ type OssProvisionEmailData = {
   monthlyCreditsUsd: number;
 };
 
-export async function sendOssExistingOrgProvisionedEmail(data: OssProvisionEmailData) {
+export async function sendOssExistingOrgProvisionedEmail(
+  data: OssProvisionEmailData
+): Promise<void> {
   const organization_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}`;
   const integrations_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/integrations`;
   const code_reviews_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/code-reviews`;

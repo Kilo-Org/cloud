@@ -211,7 +211,55 @@ app.patch('/agents/:agentId/model', async c => {
     return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
   }
 
-  await updateAgentModel(agentId, parsed.data.model, parsed.data.smallModel);
+  // Sync config-derived env vars from X-Town-Config into process.env so
+  // the SDK server restart picks up fresh tokens and git identity.
+  // The middleware already parsed the header into lastKnownTownConfig.
+  const cfg = getCurrentTownConfig();
+  if (cfg) {
+    const CONFIG_ENV_MAP: Array<[string, string]> = [
+      ['github_cli_pat', 'GITHUB_CLI_PAT'],
+      ['git_author_name', 'GASTOWN_GIT_AUTHOR_NAME'],
+      ['git_author_email', 'GASTOWN_GIT_AUTHOR_EMAIL'],
+    ];
+    for (const [cfgKey, envKey] of CONFIG_ENV_MAP) {
+      const val = cfg[cfgKey];
+      if (typeof val === 'string' && val) {
+        process.env[envKey] = val;
+      } else {
+        delete process.env[envKey];
+      }
+    }
+    // git_auth tokens
+    const gitAuth = cfg.git_auth;
+    if (typeof gitAuth === 'object' && gitAuth !== null) {
+      const auth = gitAuth as Record<string, unknown>;
+      for (const [authKey, envKey] of [
+        ['github_token', 'GIT_TOKEN'],
+        ['gitlab_token', 'GITLAB_TOKEN'],
+        ['gitlab_instance_url', 'GITLAB_INSTANCE_URL'],
+      ] as const) {
+        const val = auth[authKey];
+        if (typeof val === 'string' && val) {
+          process.env[envKey] = val;
+        } else {
+          delete process.env[envKey];
+        }
+      }
+    }
+    // disable_ai_coauthor
+    if (cfg.disable_ai_coauthor) {
+      process.env.GASTOWN_DISABLE_AI_COAUTHOR = '1';
+    } else {
+      delete process.env.GASTOWN_DISABLE_AI_COAUTHOR;
+    }
+  }
+
+  await updateAgentModel(
+    agentId,
+    parsed.data.model,
+    parsed.data.smallModel,
+    parsed.data.conversationHistory
+  );
   return c.json({ updated: true });
 });
 
@@ -315,6 +363,11 @@ app.post('/repos/setup', async c => {
         platformIntegrationId: req.platformIntegrationId,
       });
 
+      const hasGitToken = !!(envVars.GIT_TOKEN || envVars.GITHUB_TOKEN || envVars.GITLAB_TOKEN);
+      console.log(
+        `[control-server] /repos/setup: cloning rigId=${req.rigId} hasGitToken=${hasGitToken} hasPlatformIntegration=${!!req.platformIntegrationId}`
+      );
+
       const browseDir = await setupRigBrowseWorktree({
         rigId: req.rigId,
         gitUrl: req.gitUrl,
@@ -323,16 +376,17 @@ app.post('/repos/setup', async c => {
       });
       console.log(`[control-server] /repos/setup: done rigId=${req.rigId} browse=${browseDir}`);
     } catch (err) {
-      // Log as a warning, not an error — this is a best-effort background
-      // operation. The mayor and agents can still function without the
-      // browse worktree; it will be retried on the next agent dispatch.
       const message = err instanceof Error ? err.message : String(err);
-      console.warn(
-        `[control-server] /repos/setup: FAILED for rigId=${req.rigId}: ${message.split('\n')[0]}`
+      const stack = err instanceof Error ? err.stack : undefined;
+      console.error(
+        `[control-server] /repos/setup: FAILED rigId=${req.rigId} gitUrl=${req.gitUrl}: ${message}`,
+        stack ? `\n${stack}` : ''
       );
     }
   };
-  doSetup().catch(() => {});
+  doSetup().catch(err => {
+    console.error(`[control-server] /repos/setup: unhandled error rigId=${req.rigId}:`, err);
+  });
 
   return c.json({ status: 'accepted', message: 'Repo setup started' }, 202);
 });

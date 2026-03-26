@@ -1,4 +1,5 @@
-import { openRouterRequest, PROVIDERS } from '../lib/providers';
+import { openRouterRequest } from '../lib/providers';
+import PROVIDERS from '../lib/providers/provider-definitions';
 
 describe('openRouterRequest timeout', () => {
   it('should abort after timeout', async () => {

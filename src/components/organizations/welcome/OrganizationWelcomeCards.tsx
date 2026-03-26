@@ -16,9 +16,9 @@ export function OrganizationWelcomeCards({
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="text-foreground mb-2 text-3xl font-bold">
+        <h2 className="text-foreground mb-2 text-3xl font-bold">
           You've created an account for your organization
-        </h1>
+        </h2>
         <p className="text-muted-foreground">
           With Kilo Teams you get powerful collaboration features and insights on top of our open
           source coding agent.

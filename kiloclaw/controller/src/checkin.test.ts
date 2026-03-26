@@ -1,5 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { parseNetDevText } from './checkin';
+import {
+  nextProductTelemetryDeadline,
+  parseNetDevText,
+  PRODUCT_TELEMETRY_INTERVAL_MS,
+  PRODUCT_TELEMETRY_JITTER_MS,
+} from './checkin';
+
+describe('nextProductTelemetryDeadline', () => {
+  const now = 1_000_000;
+
+  it('returns ~24h in the future with default random', () => {
+    const deadline = nextProductTelemetryDeadline(now);
+    const minExpected = now + PRODUCT_TELEMETRY_INTERVAL_MS - PRODUCT_TELEMETRY_JITTER_MS;
+    const maxExpected = now + PRODUCT_TELEMETRY_INTERVAL_MS + PRODUCT_TELEMETRY_JITTER_MS;
+    expect(deadline).toBeGreaterThanOrEqual(minExpected);
+    expect(deadline).toBeLessThanOrEqual(maxExpected);
+  });
+
+  it('applies negative jitter when randomFn returns 0', () => {
+    const deadline = nextProductTelemetryDeadline(now, () => 0);
+    expect(deadline).toBe(now + PRODUCT_TELEMETRY_INTERVAL_MS - PRODUCT_TELEMETRY_JITTER_MS);
+  });
+
+  it('applies zero jitter when randomFn returns 0.5', () => {
+    const deadline = nextProductTelemetryDeadline(now, () => 0.5);
+    expect(deadline).toBe(now + PRODUCT_TELEMETRY_INTERVAL_MS);
+  });
+
+  it('applies positive jitter when randomFn returns 1', () => {
+    const deadline = nextProductTelemetryDeadline(now, () => 1);
+    expect(deadline).toBe(now + PRODUCT_TELEMETRY_INTERVAL_MS + PRODUCT_TELEMETRY_JITTER_MS);
+  });
+});
 
 describe('parseNetDevText', () => {
   it('prefers eth0 when present', () => {

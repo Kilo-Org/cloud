@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { useGatewayReady } from '@/hooks/useKiloClaw';
 import {
   type ExecPreset,
   type ClawMutations,
@@ -35,15 +36,18 @@ export function ProvisioningStep({
   channelTokens,
   instanceRunning,
   mutations,
+  totalSteps = 4,
   onComplete,
 }: {
   preset: ExecPreset;
   channelTokens: Record<string, string> | null;
   instanceRunning: boolean;
   mutations: ClawMutations;
+  totalSteps?: number;
   onComplete: () => void;
 }) {
   const completedRef = useRef(false);
+  const [configReady, setConfigReady] = useState(false);
 
   // Keep stable references to callbacks so the effect only re-runs
   // when data values change, not when the parent re-renders or mutation
@@ -90,18 +94,14 @@ export function ProvisioningStep({
     }
 
     if (Object.keys(configPatch).length === 0) {
-      playChime();
-      onCompleteRef.current();
+      setConfigReady(true);
       return;
     }
 
     patchOpenclawConfigRef.current(
       { patch: configPatch },
       {
-        onSuccess: () => {
-          playChime();
-          onCompleteRef.current();
-        },
+        onSuccess: () => setConfigReady(true),
         onError: (err: { message: string }) => {
           completedRef.current = false;
           toast.error(err.message);
@@ -110,7 +110,21 @@ export function ProvisioningStep({
     );
   }, [instanceRunning, preset]);
 
-  return <ProvisioningStepView />;
+  // Poll the gateway /ready endpoint to know when channels are fully set up
+  // and the system's CPU load has settled after boot.
+  const { data: gatewayReady } = useGatewayReady(instanceRunning);
+  const isGatewaySettled = gatewayReady?.ready === true && gatewayReady?.settled === true;
+
+  // Advance to the next step when config is applied, gateway reports ready,
+  // and boot CPU pressure has subsided (settled === true).
+  useEffect(() => {
+    if (configReady && isGatewaySettled) {
+      playChime();
+      onCompleteRef.current();
+    }
+  }, [configReady, isGatewaySettled]);
+
+  return <ProvisioningStepView totalSteps={totalSteps} />;
 }
 
 const PROVISIONING_PHRASES = [
@@ -151,7 +165,7 @@ const PROVISIONING_PHRASES = [
 ];
 
 /** Pure visual shell — extracted so Storybook can render it without wiring up mutations. */
-export function ProvisioningStepView() {
+export function ProvisioningStepView({ totalSteps = 4 }: { totalSteps?: number }) {
   const [phraseIndex, setPhraseIndex] = useState(() =>
     Math.floor(Math.random() * PROVISIONING_PHRASES.length)
   );
@@ -177,7 +191,7 @@ export function ProvisioningStepView() {
   return (
     <OnboardingStepView
       currentStep={4}
-      totalSteps={4}
+      totalSteps={totalSteps}
       stepLabel="Almost there..."
       contentClassName="items-center gap-8"
     >

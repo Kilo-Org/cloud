@@ -23,6 +23,10 @@ GATEWAY_TOKEN_SECRET=dev-gateway-secret-kiloclaw
 # Fly app naming prefix ("dev-") for per-user app creation.
 WORKER_ENV=development
 
+# Backend app origin for internal API calls (e.g. instance-ready email).
+# In dev, point this at your local Next.js server.
+BACKEND_API_URL=http://localhost:3000
+
 # Tunnel URL (set automatically by the dev-start script)
 # OpenClaw's native kilocode provider hardcodes https://api.kilo.ai/api/gateway/.
 # In dev, the script sets this to the Cloudflare tunnel URL pointing to your
@@ -60,6 +64,9 @@ FLY_APP_NAME=kiloclaw-dev
 # NOTE: wrangler dev rewrites the Origin header to match the custom domain route
 # (claw.kilosessions.ai), so that origin must be included for local dev.
 OPENCLAW_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8795,http://claw.kilosessions.ai
+
+# PostHog product telemetry (public project token, same as .env).
+NEXT_PUBLIC_POSTHOG_KEY=phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z
 
 # Encryption (for user secrets)
 # Get the dev version from 1Password (engineering vault). Quote the value.

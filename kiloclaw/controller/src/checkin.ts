@@ -2,12 +2,18 @@ import { readFile } from 'node:fs/promises';
 import { loadavg } from 'node:os';
 import { z } from 'zod';
 import type { OpenclawVersionInfo } from './openclaw-version';
+import type { ProductTelemetry } from './product-telemetry';
 import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
 import type { SupervisorStats } from './supervisor';
 
 const CHECKIN_INTERVAL_MS = 5 * 60 * 1000;
 const INITIAL_DELAY_MS = 2 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10 * 1000;
+
+/** How often to include product telemetry in a checkin (~24h). */
+export const PRODUCT_TELEMETRY_INTERVAL_MS = 24 * 60 * 60 * 1000;
+/** Random jitter range added to the interval (±2h). */
+export const PRODUCT_TELEMETRY_JITTER_MS = 2 * 60 * 60 * 1000;
 
 export type NetStats = { bytesIn: number; bytesOut: number };
 
@@ -31,7 +37,10 @@ export type CheckinDeps = {
   getCheckinUrl: () => string;
   getSupervisorStats: () => SupervisorStats;
   getOpenclawVersion: () => Promise<OpenclawVersionInfo>;
+  getProductTelemetry: (openclawVersion: string | null) => ProductTelemetry;
   getMachineId?: () => string;
+  /** Exposed for testing — defaults to `Math.random()`. */
+  randomFn?: () => number;
 };
 
 export function parseNetLine(line: string): NetStats {
@@ -75,15 +84,31 @@ export async function readNetStats(): Promise<NetStats> {
   }
 }
 
+/**
+ * Compute the next product-telemetry deadline: base interval + uniform jitter
+ * in the range [-JITTER, +JITTER].
+ */
+export function nextProductTelemetryDeadline(
+  now: number,
+  randomFn: () => number = Math.random
+): number {
+  const jitter = (randomFn() * 2 - 1) * PRODUCT_TELEMETRY_JITTER_MS;
+  return now + PRODUCT_TELEMETRY_INTERVAL_MS + jitter;
+}
+
 export function startCheckin(deps: CheckinDeps): () => void {
   const checkinUrl = deps.getCheckinUrl();
   if (!checkinUrl) {
     return () => {};
   }
 
+  const randomFn = deps.randomFn ?? Math.random;
   let previousRestarts = deps.getSupervisorStats().restarts;
   let previousNetStats: NetStats = { bytesIn: 0, bytesOut: 0 };
   let checkinInFlight = false;
+
+  // Start with 0 so the first checkin always includes product telemetry.
+  let nextProductTelemetryAt = 0;
 
   void readNetStats().then(stats => {
     previousNetStats = stats;
@@ -119,6 +144,13 @@ export function startCheckin(deps: CheckinDeps): () => void {
             : ''
         : '';
 
+      // Include product telemetry when the deadline has passed.
+      const now = Date.now();
+      const includeProductTelemetry = now >= nextProductTelemetryAt;
+      const productTelemetry = includeProductTelemetry
+        ? deps.getProductTelemetry(openclawVersion.version)
+        : undefined;
+
       const controller = new AbortController();
       const timeout = setTimeout(() => {
         controller.abort();
@@ -149,6 +181,7 @@ export function startCheckin(deps: CheckinDeps): () => void {
             bandwidthBytesIn,
             bandwidthBytesOut,
             lastExitReason,
+            productTelemetry,
           }),
         });
       } finally {
@@ -164,6 +197,10 @@ export function startCheckin(deps: CheckinDeps): () => void {
       // Only advance baselines after a successful checkin.
       previousRestarts = stats.restarts;
       previousNetStats = currentNetStats;
+
+      if (includeProductTelemetry) {
+        nextProductTelemetryAt = nextProductTelemetryDeadline(Date.now(), randomFn);
+      }
     } catch (err) {
       console.error('[checkin] failed:', err);
     } finally {

@@ -30,22 +30,23 @@ import {
 import { unstable_cache } from 'next/cache';
 import { StoredModelSchema } from '@/lib/providers/vercel/types';
 import { createGateway, generateText } from 'ai';
-import { PROVIDERS } from '@/lib/providers';
+import PROVIDERS from '@/lib/providers/provider-definitions';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/providers/vercel';
 import { decryptByokRow } from '@/lib/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
+import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
 
 const fetchSupportedModels = unstable_cache(
   async (): Promise<Record<string, string[]>> => {
-    const vercelModelMetadataRaw = (
+    const modelMetadataRaw = (
       await readDb
-        .select({ vercel: modelsByProvider.vercel })
+        .select({ vercel: modelsByProvider.vercel, openrouter: modelsByProvider.openrouter })
         .from(modelsByProvider)
         .orderBy(desc(modelsByProvider.id))
         .limit(1)
     ).at(0);
 
-    if (!vercelModelMetadataRaw) {
+    if (!modelMetadataRaw) {
       throw new Error(
         'No Vercel model metadata in the database, run ' + MODELS_BY_PROVIDER_SCRIPT_NAME
       );
@@ -53,7 +54,7 @@ const fetchSupportedModels = unstable_cache(
 
     const vercelModelMetadata = z
       .record(z.string(), StoredModelSchema)
-      .safeParse(vercelModelMetadataRaw?.vercel);
+      .safeParse(modelMetadataRaw?.vercel);
 
     if (!vercelModelMetadata.success) {
       throw new Error(
@@ -61,14 +62,27 @@ const fetchSupportedModels = unstable_cache(
       );
     }
 
+    const openRouterModelMetadata = z
+      .record(z.string(), StoredModelSchema)
+      .safeParse(modelMetadataRaw?.openrouter);
+
+    if (!openRouterModelMetadata.success) {
+      throw new Error(
+        'Failed to parse OpenRouter model metadata:\n' +
+          z.prettifyError(openRouterModelMetadata.error)
+      );
+    }
+
     const result: Record<string, string[]> = {};
 
-    result['codestral'] = ['Codestral'];
+    result['codestral'] = ['Mistral AI: Codestral'];
 
-    for (const model of Object.values(vercelModelMetadata.data)) {
-      if (model.id.includes('codestral')) continue;
-      if (model.type !== 'language') continue;
-      for (const endpoint of model.endpoints) {
+    for (const model of Object.values(openRouterModelMetadata.data)) {
+      const vercelModel = vercelModelMetadata.data[mapModelIdToVercel(model.id)];
+      if (!vercelModel) continue;
+      if (vercelModel.id.includes('codestral')) continue;
+      if (vercelModel.type !== 'language') continue;
+      for (const endpoint of vercelModel.endpoints) {
         const providerParsed = VercelUserByokInferenceProviderIdSchema.safeParse(endpoint.tag);
         if (!providerParsed.success) continue;
         const providerId = providerParsed.data;

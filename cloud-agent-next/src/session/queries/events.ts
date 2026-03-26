@@ -19,6 +19,10 @@ export type InsertEventParams = {
   timestamp: number;
 };
 
+export type UpsertEventParams = InsertEventParams & {
+  entityId: string;
+};
+
 export type EventQueryFilters = {
   /** Exclusive: id > fromId */
   fromId?: EventId;
@@ -82,11 +86,43 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
       return row.id;
     },
 
+    upsert(params: UpsertEventParams): EventId {
+      const row = db
+        .insert(events)
+        .values({
+          execution_id: params.executionId,
+          session_id: params.sessionId,
+          stream_event_type: params.streamEventType,
+          payload: params.payload,
+          timestamp: params.timestamp,
+          entity_id: params.entityId,
+        })
+        .onConflictDoUpdate({
+          target: events.entity_id,
+          set: {
+            payload: params.payload,
+            timestamp: params.timestamp,
+          },
+        })
+        .returning({ id: events.id })
+        .get();
+
+      return row.id;
+    },
+
     findByFilters(filters: EventQueryFilters): StoredEvent[] {
       const conditions = buildConditions(filters);
       const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-      let query = db.select().from(events).where(where).orderBy(asc(events.id)).$dynamic();
+      const columns = {
+        id: events.id,
+        execution_id: events.execution_id,
+        session_id: events.session_id,
+        stream_event_type: events.stream_event_type,
+        payload: events.payload,
+        timestamp: events.timestamp,
+      };
+      let query = db.select(columns).from(events).where(where).orderBy(asc(events.id)).$dynamic();
 
       if (filters.limit !== undefined) {
         query = query.limit(filters.limit);
@@ -101,8 +137,16 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
     *iterateByFilters(filters: Omit<EventQueryFilters, 'limit'>): Generator<StoredEvent> {
       const conditions = buildConditions(filters);
       const where = conditions.length > 0 ? and(...conditions) : undefined;
+      const columns = {
+        id: events.id,
+        execution_id: events.execution_id,
+        session_id: events.session_id,
+        stream_event_type: events.stream_event_type,
+        payload: events.payload,
+        timestamp: events.timestamp,
+      };
       const { sql: query, params } = db
-        .select()
+        .select(columns)
         .from(events)
         .where(where)
         .orderBy(asc(events.id))

@@ -164,8 +164,7 @@ If you see either, check:
 pnpm start            # wrangler dev (local development)
 pnpm run dev          # alias for wrangler dev
 pnpm typecheck        # tsgo --noEmit
-pnpm lint             # eslint
-pnpm lint:fix         # eslint --fix
+pnpm lint             # oxlint
 pnpm format           # oxfmt
 pnpm format:check     # oxfmt --list-different
 pnpm test             # vitest run

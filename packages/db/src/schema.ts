@@ -2334,6 +2334,7 @@ export const AppBuilderSessionReason = {
   Initial: 'initial', // First session created with project
   GitHubMigration: 'github_migration', // New session after migrating to GitHub
   Upgrade: 'upgrade', // New session after worker version upgrade (v1→v2)
+  ModelVisionChange: 'model_vision_change', // New session after switching between vision and text-only models
 } satisfies Record<string, string>;
 
 export const app_builder_project_sessions = pgTable(
@@ -3308,6 +3309,7 @@ export const kiloclaw_instances = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     sandbox_id: text().notNull(),
+    name: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),
   },

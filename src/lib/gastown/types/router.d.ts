@@ -460,6 +460,13 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         organization_id?: string | undefined;
         kilocode_token?: string | undefined;
         default_model?: string | undefined;
+        role_models?:
+          | {
+              mayor?: string | undefined;
+              refinery?: string | undefined;
+              polecat?: string | undefined;
+            }
+          | undefined;
         small_model?: string | undefined;
         max_polecats_per_rig?: number | undefined;
         merge_strategy: 'direct' | 'pr';
@@ -505,6 +512,13 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           organization_id?: string | undefined;
           kilocode_token?: string | undefined;
           default_model?: string | undefined;
+          role_models?:
+            | {
+                mayor?: string | undefined;
+                refinery?: string | undefined;
+                polecat?: string | undefined;
+              }
+            | undefined;
           small_model?: string | undefined;
           max_polecats_per_rig?: number | undefined;
           merge_strategy?: 'direct' | 'pr' | undefined;
@@ -544,6 +558,13 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         organization_id?: string | undefined;
         kilocode_token?: string | undefined;
         default_model?: string | undefined;
+        role_models?:
+          | {
+              mayor?: string | undefined;
+              refinery?: string | undefined;
+              polecat?: string | undefined;
+            }
+          | undefined;
         small_model?: string | undefined;
         max_polecats_per_rig?: number | undefined;
         merge_strategy: 'direct' | 'pr';
@@ -1711,6 +1732,13 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             organization_id?: string | undefined;
             kilocode_token?: string | undefined;
             default_model?: string | undefined;
+            role_models?:
+              | {
+                  mayor?: string | undefined;
+                  refinery?: string | undefined;
+                  polecat?: string | undefined;
+                }
+              | undefined;
             small_model?: string | undefined;
             max_polecats_per_rig?: number | undefined;
             merge_strategy: 'direct' | 'pr';
@@ -1756,6 +1784,13 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               organization_id?: string | undefined;
               kilocode_token?: string | undefined;
               default_model?: string | undefined;
+              role_models?:
+                | {
+                    mayor?: string | undefined;
+                    refinery?: string | undefined;
+                    polecat?: string | undefined;
+                  }
+                | undefined;
               small_model?: string | undefined;
               max_polecats_per_rig?: number | undefined;
               merge_strategy?: 'direct' | 'pr' | undefined;
@@ -1795,6 +1830,13 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             organization_id?: string | undefined;
             kilocode_token?: string | undefined;
             default_model?: string | undefined;
+            role_models?:
+              | {
+                  mayor?: string | undefined;
+                  refinery?: string | undefined;
+                  polecat?: string | undefined;
+                }
+              | undefined;
             small_model?: string | undefined;
             max_polecats_per_rig?: number | undefined;
             merge_strategy: 'direct' | 'pr';

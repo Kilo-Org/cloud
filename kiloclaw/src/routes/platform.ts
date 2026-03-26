@@ -158,6 +158,8 @@ const SAFE_ERROR_PREFIXES = [
   'Cannot enable Gmail ', // no Google account connected
   'New volume ID is ', // reassociate: same volume
   'Volume ', // reassociate: volume not found / bad state
+  'Cannot restore: ', // snapshot restore: bad state
+  'Cannot destroy: ', // destroy while restoring
   'Cannot retry recovery', // force-retry-recovery guard messages
 ];
 
@@ -618,6 +620,28 @@ platform.get('/gateway/status', async c => {
   } catch (err) {
     const { message, status } = sanitizeError(err, 'gateway status');
     return jsonError(message, status);
+  }
+});
+
+// GET /api/platform/gateway/ready?userId=...
+// Non-fatal polling endpoint — always returns 200 so the frontend poll
+// doesn't generate a wall of errors during startup.
+platform.get('/gateway/ready', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  try {
+    const result = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.getGatewayReady(),
+      'getGatewayReady'
+    );
+    return c.json(result ?? { ready: false, error: 'controller too old' }, 200);
+  } catch (err) {
+    const { message } = sanitizeError(err, 'gateway ready');
+    return c.json({ ready: false, error: message }, 200);
   }
 });
 
@@ -1158,6 +1182,30 @@ platform.post('/reassociate-volume', async c => {
   }
 });
 
+// POST /api/platform/restore-volume-snapshot
+// Enqueues a snapshot restore job. Returns immediately; restore runs async via CF Queue.
+const RestoreVolumeSnapshotSchema = z.object({
+  userId: z.string().min(1),
+  snapshotId: z.string().min(1),
+});
+
+platform.post('/restore-volume-snapshot', async c => {
+  const result = await parseBody(c, RestoreVolumeSnapshotSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.enqueueSnapshotRestore(result.data.snapshotId),
+      'enqueueSnapshotRestore'
+    );
+    return c.json(response);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'restore-volume-snapshot');
+    return jsonError(message, status);
+  }
+});
+
 // GET /api/platform/versions
 // Lists all registered image versions from KV.
 // Used by admin triggerSync for reconciliation/backfill.
@@ -1258,6 +1306,56 @@ platform.post('/publish-image-version', async c => {
     setLatest ? '(latest)' : '(backfill)'
   );
   return c.json({ ok: true, setLatest, ...parsed.data }, 201);
+});
+
+// ---------------------------------------------------------------------------
+// Region configuration
+// ---------------------------------------------------------------------------
+
+import { FLY_REGIONS_KV_KEY, parseRegions, ALL_VALID_REGIONS } from '../durable-objects/regions';
+import { DEFAULT_FLY_REGION } from '../config';
+
+const UpdateRegionsSchema = z.object({
+  regions: z
+    .array(z.enum(ALL_VALID_REGIONS))
+    .min(2, 'At least 2 regions required')
+    .refine(
+      regions => new Set(regions).size >= 2,
+      'Must include at least 2 distinct regions (duplicates bias the shuffle, but need 2+ unique for fallback)'
+    ),
+});
+
+// GET /api/platform/regions
+// Returns the current region configuration with its source.
+platform.get('/regions', async c => {
+  try {
+    const kvValue = await c.env.KV_CLAW_CACHE.get(FLY_REGIONS_KV_KEY);
+    const source = kvValue ? 'kv' : c.env.FLY_REGION ? 'env' : 'default';
+    const raw = kvValue ?? c.env.FLY_REGION ?? DEFAULT_FLY_REGION;
+    const regions = parseRegions(raw);
+    return c.json({ regions, source, raw });
+  } catch (err) {
+    console.error('[platform] Failed to read regions:', err);
+    return c.json({ error: 'Failed to read regions' }, 500);
+  }
+});
+
+// PUT /api/platform/regions
+// Updates the region configuration in KV.
+platform.put('/regions', async c => {
+  const result = await parseBody(c, UpdateRegionsSchema);
+  if ('error' in result) return result.error;
+
+  const raw = result.data.regions.join(',');
+  try {
+    await c.env.KV_CLAW_CACHE.put(FLY_REGIONS_KV_KEY, raw);
+  } catch (err) {
+    console.error('[platform] Failed to write regions to KV:', err);
+    return c.json({ error: 'Failed to write regions' }, 500);
+  }
+
+  console.log('[platform] Regions updated:', raw);
+  return c.json({ ok: true, regions: result.data.regions, raw });
 });
 
 export { platform };

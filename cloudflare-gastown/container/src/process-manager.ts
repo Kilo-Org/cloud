@@ -10,7 +10,7 @@ import { createKilo, type KiloClient } from '@kilocode/sdk';
 import { z } from 'zod';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted } from './completion-reporter';
-import { buildKiloConfigContent, kiloModel } from './agent-runner';
+import { buildKiloConfigContent } from './agent-runner';
 import { log } from './logger';
 
 const MANAGER_LOG = '[process-manager]';
@@ -578,6 +578,7 @@ export async function startAgent(
     gastownSessionToken: request.envVars?.GASTOWN_SESSION_TOKEN ?? null,
     completionCallbackUrl: request.envVars?.GASTOWN_COMPLETION_CALLBACK_URL ?? null,
     model: request.model ?? null,
+    startupEnv: env,
   };
   agents.set(request.agentId, agent);
 
@@ -781,7 +782,8 @@ const MAYOR_STARTUP_PROMPT = 'Mayor ready. Waiting for instructions.';
 export async function updateAgentModel(
   agentId: string,
   model: string,
-  smallModel?: string
+  smallModel?: string,
+  conversationHistory?: string
 ): Promise<void> {
   const agent = agents.get(agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);
@@ -825,9 +827,50 @@ export async function updateAgentModel(
   sdkInstances.delete(agent.workdir);
   agent.model = model;
 
+  // Replay the full env from the initial dispatch so the new SDK server
+  // gets the same git identity, auth tokens, and plugin vars. Exclude
+  // KILO_CONFIG_CONTENT / OPENCODE_CONFIG_CONTENT — those were already
+  // rebuilt above with the new model and set on process.env.
+  //
+  // For env vars that syncConfigToContainer can update at runtime, prefer
+  // the live process.env value over the stale startupEnv snapshot.
+  const LIVE_ENV_KEYS = new Set([
+    'GASTOWN_CONTAINER_TOKEN',
+    'GIT_TOKEN',
+    'GITLAB_TOKEN',
+    'GITLAB_INSTANCE_URL',
+    'GITHUB_CLI_PAT',
+    'GASTOWN_GIT_AUTHOR_NAME',
+    'GASTOWN_GIT_AUTHOR_EMAIL',
+    'GASTOWN_DISABLE_AI_COAUTHOR',
+  ]);
+  const hotSwapEnv: Record<string, string> = {};
+  for (const [key, value] of Object.entries(agent.startupEnv)) {
+    if (key === 'KILO_CONFIG_CONTENT' || key === 'OPENCODE_CONFIG_CONTENT') continue;
+    if (LIVE_ENV_KEYS.has(key)) {
+      const live = process.env[key];
+      if (live) hotSwapEnv[key] = live;
+      continue;
+    }
+    hotSwapEnv[key] = value;
+  }
+
+  // Re-derive GH_TOKEN from live values using the same priority chain
+  // as buildAgentEnv: GITHUB_CLI_PAT > GIT_TOKEN > GITHUB_TOKEN.
+  // syncConfigToContainer updates these on process.env, but buildAgentEnv
+  // only ran once at initial dispatch. When all sources are cleared,
+  // remove GH_TOKEN so the SDK server doesn't retain stale credentials.
+  const liveGhCliPat = process.env.GITHUB_CLI_PAT;
+  const liveGhToken = liveGhCliPat ?? process.env.GIT_TOKEN ?? process.env.GITHUB_TOKEN;
+  if (liveGhToken) {
+    hotSwapEnv.GH_TOKEN = liveGhToken;
+  } else {
+    delete hotSwapEnv.GH_TOKEN;
+  }
+
   try {
     // 4. Create a new SDK server (spawns a fresh kilo serve with updated env)
-    const { client, port } = await ensureSDKServer(agent.workdir, {});
+    const { client, port } = await ensureSDKServer(agent.workdir, hotSwapEnv);
     agent.serverPort = port;
 
     // 5. Create a new session and send the startup prompt.
@@ -846,12 +889,17 @@ export async function updateAgentModel(
       newInstance.sessionCount++;
     }
 
-    // Send the startup prompt so the mayor is ready for instructions.
+    // Send the startup prompt, including conversation history if available
+    // so the mayor retains context across model changes (same mechanism
+    // used for container restarts — see PR #1494).
+    const prompt = conversationHistory
+      ? `${conversationHistory}\n\n${MAYOR_STARTUP_PROMPT}`
+      : MAYOR_STARTUP_PROMPT;
     const modelParam = { providerID: 'kilo', modelID: model };
     await client.session.prompt({
       path: { id: agent.sessionId },
       body: {
-        parts: [{ type: 'text', text: MAYOR_STARTUP_PROMPT }],
+        parts: [{ type: 'text', text: prompt }],
         model: modelParam,
       },
     });
@@ -868,7 +916,7 @@ export async function updateAgentModel(
       role: agent.role,
       name: agent.name,
       model,
-      prompt: MAYOR_STARTUP_PROMPT,
+      prompt,
       rigId: agent.rigId,
       townId: agent.townId,
       identity: '',

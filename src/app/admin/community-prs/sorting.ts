@@ -2,6 +2,7 @@ export type ExternalOpenPullRequestRow = {
   number: number;
   title: string;
   url: string;
+  repo: string;
   authorLogin: string;
   createdAt: string;
   ageDays: number;
@@ -10,7 +11,7 @@ export type ExternalOpenPullRequestRow = {
   reviewStatus: string;
 };
 
-export type ExternalPrSortKey = 'ageDays' | 'teamCommented' | 'reviewStatus';
+export type ExternalPrSortKey = 'ageDays' | 'teamCommented' | 'reviewStatus' | 'repo';
 
 export type ExternalPrSortDirection = 'asc' | 'desc';
 
@@ -33,6 +34,7 @@ export type ExternalClosedPullRequestRow = {
   number: number;
   title: string;
   url: string;
+  repo: string;
   authorLogin: string;
   closedAt: string;
   mergedAt: string | null;
@@ -47,7 +49,7 @@ export type MergedPrSort = {
   direction: ExternalPrSortDirection;
 };
 
-export type ClosedPrSortKey = 'displayDate' | 'status';
+export type ClosedPrSortKey = 'displayDate' | 'status' | 'repo';
 
 export type ClosedPrSort = {
   key: ClosedPrSortKey;
@@ -77,6 +79,8 @@ function compareBySort(
 ): number {
   const sign = sort.direction === 'asc' ? 1 : -1;
   if (sort.key === 'ageDays') return sign * (a.ageDays - b.ageDays);
+
+  if (sort.key === 'repo') return sign * a.repo.localeCompare(b.repo);
 
   if (sort.key === 'teamCommented') {
     // teamCommented: booleans, default ordering is false < true.
@@ -135,6 +139,8 @@ function compareByClosedSort(
     const dateB = new Date(b.displayDate).getTime();
     return sign * (dateA - dateB);
   }
+
+  if (sort.key === 'repo') return sign * a.repo.localeCompare(b.repo);
 
   // status: default ordering is closed < merged (closed first, more actionable)
   const aVal = a.status === 'closed' ? 0 : 1;

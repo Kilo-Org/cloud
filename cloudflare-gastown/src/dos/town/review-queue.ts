@@ -29,12 +29,6 @@ import { getAgent, unhookBead, updateAgentStatus } from './agents';
 import { getRig } from './rigs';
 import type { ReviewQueueInput, ReviewQueueEntry, AgentDoneInput, Molecule } from '../../types';
 
-// Review entries stuck in 'running' past this timeout are reset to 'pending'.
-// Only applies when no agent (working or idle) is hooked to the MR bead.
-// Set to 30 min — reviews can legitimately take 10-15 min for clone + build
-// + test + merge, and the refinery hook guard is the primary protection.
-const REVIEW_RUNNING_TIMEOUT_MS = 30 * 60 * 1000;
-
 function generateId(): string {
   return crypto.randomUUID();
 }

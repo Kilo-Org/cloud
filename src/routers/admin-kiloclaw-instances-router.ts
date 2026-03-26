@@ -1,6 +1,11 @@
 import { adminProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { kiloclaw_instances, kiloclaw_subscriptions, kilocode_users } from '@kilocode/db/schema';
+import {
+  kiloclaw_instances,
+  kiloclaw_subscriptions,
+  kiloclaw_email_log,
+  kilocode_users,
+} from '@kilocode/db/schema';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import {
@@ -17,11 +22,25 @@ import type {
   VolumeSnapshot,
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
+  RestoreVolumeSnapshotResponse,
 } from '@/lib/kiloclaw/types';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { eq, and, or, desc, asc, ilike, isNull, isNotNull, sql, gte, type SQL } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  ilike,
+  isNull,
+  isNotNull,
+  inArray,
+  sql,
+  gte,
+  type SQL,
+} from 'drizzle-orm';
 
 const ListInstancesSchema = z.object({
   offset: z.number().min(0).default(0),
@@ -645,6 +664,38 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       throw error;
     }
 
+    // Post-destroy cleanup: best-effort DB tidying that must not report
+    // failure after a successful destroy.
+    try {
+      // Clear lifecycle emails so they can fire again if the user re-provisions.
+      const resettableEmailTypes = [
+        'claw_suspended_trial',
+        'claw_suspended_subscription',
+        'claw_suspended_payment',
+        'claw_destruction_warning',
+        'claw_instance_destroyed',
+      ];
+      await db
+        .delete(kiloclaw_email_log)
+        .where(
+          and(
+            eq(kiloclaw_email_log.user_id, instance.user_id),
+            inArray(kiloclaw_email_log.email_type, resettableEmailTypes)
+          )
+        );
+      // Clear per-instance ready emails so a future re-provision triggers the notification.
+      await db
+        .delete(kiloclaw_email_log)
+        .where(
+          and(
+            eq(kiloclaw_email_log.user_id, instance.user_id),
+            sql`${kiloclaw_email_log.email_type} LIKE 'claw_instance_ready:%'`
+          )
+        );
+    } catch (cleanupError) {
+      console.error('[admin-kiloclaw] Post-destroy cleanup failed:', cleanupError);
+    }
+
     return { success: true };
   }),
 
@@ -763,6 +814,47 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       } catch (err) {
         console.error('Failed to reassociate volume for user:', input.userId, err);
         throwKiloclawAdminError(err, 'Failed to reassociate volume');
+      }
+    }),
+
+  restoreVolumeSnapshot: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        snapshotId: z.string().min(1),
+        reason: z.string().min(10).max(500),
+      })
+    )
+    .mutation(async ({ input, ctx }): Promise<RestoreVolumeSnapshotResponse> => {
+      console.log(
+        `[admin-kiloclaw] Snapshot restore triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) for user ${input.userId}: snapshot=${input.snapshotId} reason="${input.reason}"`
+      );
+      try {
+        const client = new KiloClawInternalClient();
+        const result = await client.restoreVolumeFromSnapshot(input.userId, input.snapshotId);
+
+        try {
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.snapshot.restore',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `Snapshot restore enqueued: snapshot=${input.snapshotId}, previousVolume=${result.previousVolumeId}. Reason: ${input.reason}`,
+            metadata: {
+              snapshotId: input.snapshotId,
+              previousVolumeId: result.previousVolumeId,
+              reason: input.reason,
+            },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for snapshot restore:', auditErr);
+        }
+
+        return result;
+      } catch (err) {
+        console.error('Failed to restore snapshot for user:', input.userId, err);
+        throwKiloclawAdminError(err, 'Failed to restore from snapshot');
       }
     }),
 });

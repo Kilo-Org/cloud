@@ -1,12 +1,23 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Cpu, HardDrive, Play, RefreshCw, RotateCw, Stethoscope } from 'lucide-react';
+import {
+  Check,
+  Cpu,
+  HardDrive,
+  Pencil,
+  Play,
+  RefreshCw,
+  RotateCw,
+  Stethoscope,
+  X,
+} from 'lucide-react';
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -56,10 +67,28 @@ export function InstanceControls({
   const isDestroying = status.status === 'destroying';
   // Auto-start runs only on fresh provision (status=provisioned), not re-provision
   const isAutoStarting = isProvisioned && mutations.provision.isPending;
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState('');
   const [doctorOpen, setDoctorOpen] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [confirmRedeploy, setConfirmRedeploy] = useState(false);
   const [redeployMode, setRedeployMode] = useState<'redeploy' | 'upgrade'>('redeploy');
+
+  const handleSaveName = () => {
+    const trimmed = nameValue.trim();
+    mutations.rename.mutate(
+      { name: trimmed || null },
+      {
+        onSuccess: () => {
+          setIsEditingName(false);
+          toast.success('Instance renamed');
+        },
+        onError: err => {
+          toast.error(err.message);
+        },
+      }
+    );
+  };
 
   // Toggle-flag pattern: parent sets upgradeRequested=true, we open the dialog
   // with "upgrade" preselected, then immediately reset via onUpgradeHandled.
@@ -74,6 +103,55 @@ export function InstanceControls({
 
   return (
     <div>
+      <div className="flex items-center gap-2">
+        {isEditingName ? (
+          <>
+            <Input
+              value={nameValue}
+              onChange={e => setNameValue(e.target.value)}
+              maxLength={50}
+              className="h-8 w-64"
+              autoFocus
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleSaveName();
+                if (e.key === 'Escape') {
+                  setIsEditingName(false);
+                  setNameValue(status.name ?? '');
+                }
+              }}
+            />
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSaveName}>
+              <Check className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => {
+                setIsEditingName(false);
+                setNameValue(status.name ?? '');
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </>
+        ) : (
+          <>
+            <h2 className="text-lg font-semibold">{status.name || 'Unnamed instance'}</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => {
+                setNameValue(status.name ?? '');
+                setIsEditingName(true);
+              }}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </>
+        )}
+      </div>
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h3 className="text-foreground mb-1 text-sm font-medium">Instance Controls</h3>

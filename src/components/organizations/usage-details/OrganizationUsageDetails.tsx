@@ -139,7 +139,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
           <FormattedMicrodollars
             microdollars={metricsTotals.cost}
             decimalPlaces={2}
-            className="text-2xl font-bold"
+            className="text-xl font-bold"
           />
         ),
         chartType: 'line' as const,
@@ -152,7 +152,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
         key: 'requests',
         title: 'Total Requests',
         value: (
-          <span className="text-2xl font-bold">{formatLargeNumber(metricsTotals.requests)}</span>
+          <span className="text-xl font-bold">{formatLargeNumber(metricsTotals.requests)}</span>
         ),
         chartType: 'line' as const,
         data: convertTimeseriesData(metricsTimeseriesData.requests),
@@ -162,11 +162,11 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
       },
       {
         key: 'avgCost',
-        title: 'Avg Cost per Request',
+        title: 'Avg Cost/Req',
         value: (
           <FormattedMicrodollars
             microdollars={metricsTotals.avg_cost_per_req}
-            className="text-2xl font-bold"
+            className="text-xl font-bold"
           />
         ),
         chartType: 'line' as const,
@@ -178,9 +178,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
       {
         key: 'tokens',
         title: 'Total Tokens',
-        value: (
-          <span className="text-2xl font-bold">{formatLargeNumber(metricsTotals.tokens)}</span>
-        ),
+        value: <span className="text-xl font-bold">{formatLargeNumber(metricsTotals.tokens)}</span>,
         chartType: 'line' as const,
         data: convertTimeseriesData(metricsTimeseriesData.tokens),
         icon: Hash,
@@ -191,9 +189,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
         key: 'inputTokens',
         title: 'Input Tokens',
         value: (
-          <span className="text-2xl font-bold">
-            {formatLargeNumber(metricsTotals.input_tokens)}
-          </span>
+          <span className="text-xl font-bold">{formatLargeNumber(metricsTotals.input_tokens)}</span>
         ),
         chartType: 'line' as const,
         data: convertTimeseriesData(metricsTimeseriesData.input_tokens),
@@ -205,7 +201,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
         key: 'outputTokens',
         title: 'Output Tokens',
         value: (
-          <span className="text-2xl font-bold">
+          <span className="text-xl font-bold">
             {formatLargeNumber(metricsTotals.output_tokens)}
           </span>
         ),
@@ -219,7 +215,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
         key: 'users',
         title: 'Active Users',
         value: (
-          <span className="text-2xl font-bold">
+          <span className="text-xl font-bold">
             {formatLargeNumber(Math.round(metricsTotals.active_users))}
           </span>
         ),
@@ -293,7 +289,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
+                  <div className="text-xl font-bold">
                     {isLoadingAutocompleteMetrics ? (
                       <Skeleton className="h-8 w-16" />
                     ) : (
@@ -310,7 +306,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
+                  <div className="text-xl font-bold">
                     {isLoadingAutocompleteMetrics ? (
                       <Skeleton className="h-8 w-20" />
                     ) : (
@@ -327,7 +323,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
+                  <div className="text-xl font-bold">
                     {isLoadingAutocompleteMetrics ? (
                       <Skeleton className="h-8 w-16" />
                     ) : (

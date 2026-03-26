@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { GitHubIntegrationDetails } from '@/components/integrations/GitHubIntegrationDetails';
 import { Button } from '@/components/ui/button';
+import { SetPageTitle } from '@/components/SetPageTitle';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,12 +33,10 @@ export default async function GitHubIntegrationPage({
                 Back to Integrations
               </Button>
             </Link>
-            <div>
-              <h1 className="text-3xl font-bold">GitHub Integration</h1>
-              <p className="text-muted-foreground mt-2">
-                Manage GitHub App installation for {organization.name}
-              </p>
-            </div>
+            <SetPageTitle title="GitHub Integration" />
+            <p className="text-muted-foreground">
+              Manage GitHub App installation for {organization.name}
+            </p>
           </div>
 
           <Suspense

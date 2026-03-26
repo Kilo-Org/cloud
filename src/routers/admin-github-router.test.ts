@@ -13,6 +13,7 @@ jest.mock('@/lib/github/open-pull-request-counts', () => ({
   getKilocodeRepoOpenPullRequestsSummary: jest.fn(),
   getKilocodeRepoRecentlyClosedExternalPRs: jest.fn(),
   getKilocodeRepoRecentlyMergedExternalPRs: jest.fn(),
+  ALL_REPO_IDS: ['kilocode', 'cloud', 'kilo-marketplace', 'kilocode-legacy'],
 }));
 
 let regularUser: User;
@@ -77,6 +78,7 @@ describe('admin.github.getKilocodeOpenPullRequestsSummary', () => {
           number: 123,
           title: 'Fix thing',
           url: 'https://github.com/Kilo-Org/kilocode/pull/123',
+          repo: 'kilocode',
           authorLogin: 'external-user',
           createdAt: new Date('2020-01-01T00:00:00.000Z').toISOString(),
           ageDays: 12,
@@ -96,6 +98,31 @@ describe('admin.github.getKilocodeOpenPullRequestsSummary', () => {
     expect(result).toEqual(mockSummary);
   });
 
+  it('passes repos parameter through to the service', async () => {
+    const mockSummary = {
+      totalOpenPullRequests: 1,
+      teamOpenPullRequests: 0,
+      externalOpenPullRequests: 1,
+      externalOpenPullRequestsList: [],
+      updatedAt: new Date().toISOString(),
+    };
+
+    (getKilocodeRepoOpenPullRequestsSummary as jest.Mock).mockResolvedValue(mockSummary);
+
+    const caller = await createCallerForUser(adminUser.id);
+    await caller.admin.github.getKilocodeOpenPullRequestsSummary({
+      repos: ['kilocode', 'cloud'],
+      includeDrafts: true,
+    });
+
+    expect(getKilocodeRepoOpenPullRequestsSummary).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repos: ['kilocode', 'cloud'],
+        includeDrafts: true,
+      })
+    );
+  });
+
   it('always returns numeric commentCount values for external PR rows', async () => {
     const mockSummary = {
       totalOpenPullRequests: 1,
@@ -106,6 +133,7 @@ describe('admin.github.getKilocodeOpenPullRequestsSummary', () => {
           number: 1,
           title: 'Example',
           url: 'https://github.com/Kilo-Org/kilocode/pull/1',
+          repo: 'kilocode',
           authorLogin: 'external-user',
           createdAt: new Date('2020-01-01T00:00:00.000Z').toISOString(),
           ageDays: 1,
@@ -191,6 +219,7 @@ describe('admin.github.getKilocodeRecentlyClosedExternalPRs', () => {
           number: 456,
           title: 'External feature',
           url: 'https://github.com/Kilo-Org/kilocode/pull/456',
+          repo: 'kilocode',
           authorLogin: 'external-contributor',
           closedAt: new Date('2024-01-15T10:00:00.000Z').toISOString(),
           mergedAt: new Date('2024-01-15T09:00:00.000Z').toISOString(),
@@ -201,6 +230,7 @@ describe('admin.github.getKilocodeRecentlyClosedExternalPRs', () => {
           number: 789,
           title: 'Declined change',
           url: 'https://github.com/Kilo-Org/kilocode/pull/789',
+          repo: 'kilocode',
           authorLogin: 'community-dev',
           closedAt: new Date('2024-01-14T08:00:00.000Z').toISOString(),
           mergedAt: null,
@@ -226,6 +256,28 @@ describe('admin.github.getKilocodeRecentlyClosedExternalPRs', () => {
     expect(typeof result.thisWeekMergedCount).toBe('number');
     expect(typeof result.thisWeekClosedCount).toBe('number');
     expect(typeof result.weekStart).toBe('string');
+  });
+
+  it('passes repos parameter through to the service', async () => {
+    const mockClosedPrs = {
+      prs: [],
+      thisWeekMergedCount: 0,
+      thisWeekClosedCount: 0,
+      weekStart: new Date('2024-01-15T00:00:00.000Z').toISOString(),
+    };
+
+    (getKilocodeRepoRecentlyClosedExternalPRs as jest.Mock).mockResolvedValue(mockClosedPrs);
+
+    const caller = await createCallerForUser(adminUser.id);
+    await caller.admin.github.getKilocodeRecentlyClosedExternalPRs({
+      repos: ['cloud'],
+    });
+
+    expect(getKilocodeRepoRecentlyClosedExternalPRs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repos: ['cloud'],
+      })
+    );
   });
 
   it('returns empty array when no closed PRs', async () => {

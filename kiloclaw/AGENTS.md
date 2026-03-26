@@ -100,15 +100,16 @@ src/
 
 ## Instance Statuses
 
-| Status        | Meaning                                                         |
-| ------------- | --------------------------------------------------------------- |
-| `provisioned` | Config stored, volume created, no machine yet                   |
-| `starting`    | startAsync() fired; start() running in background via waitUntil |
-| `running`     | Machine is started and healthy                                  |
-| `stopped`     | Machine is stopped, volume persists                             |
-| `destroying`  | Two-phase destroy in progress, pending resource deletion        |
+| Status        | Meaning                                                              |
+| ------------- | -------------------------------------------------------------------- |
+| `provisioned` | Config stored, volume created, no machine yet                        |
+| `starting`    | startAsync() fired; start() running in background via waitUntil      |
+| `running`     | Machine is started and healthy                                       |
+| `stopped`     | Machine is stopped, volume persists                                  |
+| `restoring`   | Snapshot restore in progress via CF Queue; all lifecycle ops blocked |
+| `destroying`  | Two-phase destroy in progress, pending resource deletion             |
 
-The alarm runs for ALL statuses (not just `running`). `destroying` short-circuits reconciliation -- only retries pending deletes, never recreates resources. `starting` uses a 1-min alarm cadence; reconcileStarting() checks Fly machine state and transitions to `running` or `stopped`. If `startingAt` is set and more than 5 minutes have elapsed, it falls back to `stopped` automatically.
+The alarm runs for ALL statuses (not just `running`). `destroying` short-circuits reconciliation -- only retries pending deletes, never recreates resources. `starting` uses a 1-min alarm cadence; reconcileStarting() checks Fly machine state and transitions to `running` or `stopped`. If `startingAt` is set and more than 5 minutes have elapsed, it falls back to `stopped` automatically. `restoring` skips reconciliation entirely (the CF Queue worker owns the lifecycle); the alarm detects stuck restores (>30 min) and resets to `stopped`.
 
 ## Environment Variables
 
@@ -143,7 +144,7 @@ Volumes are region-pinned. Once a user's volume is created in a region, their ma
 
 ```bash
 pnpm typecheck        # tsgo
-pnpm lint             # eslint v9 + typescript-eslint
+pnpm lint             # oxlint
 pnpm format           # oxfmt
 pnpm test             # vitest (node)
 pnpm types            # regenerate worker-configuration.d.ts (run after changing wrangler.jsonc)
@@ -295,14 +296,15 @@ update the `find` command in the workflow's "Compute source content hash" step t
 
 ## Fly Machine Lifecycle
 
-| Operation          | What happens                                                                                                                                                                                                       |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Provision**      | Creates a Fly Volume in the configured region. Stores config in DO. Schedules reconciliation alarm.                                                                                                                |
-| **Start**          | Ensures volume exists. Creates a Fly Machine (or starts an existing stopped one) with volume mounted at `/root`, metadata tags, and env vars. Persists machine ID immediately. Schedules health check alarm.       |
-| **Stop**           | Stops the Fly Machine via API. Volume persists. Alarm continues at idle cadence.                                                                                                                                   |
-| **Restart**        | Stops machine, updates config (env vars, image, metadata), starts it. Volume persists.                                                                                                                             |
-| **Destroy**        | Two-phase: persists pending IDs + `status='destroying'`, attempts Fly deletions, only clears DO state when both confirmed. Alarm retries failures.                                                                 |
-| **Reconciliation** | Alarm runs for all statuses. Running: 5 min. Destroying: 1 min. Idle (provisioned/stopped): 30 min. Fixes status drift, missing volumes, stale machine IDs, wrong mounts, and recovers lost IDs from Fly metadata. |
+| Operation          | What happens                                                                                                                                                                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Provision**      | Creates a Fly Volume in the configured region. Stores config in DO. Schedules reconciliation alarm.                                                                                                                                                                |
+| **Start**          | Ensures volume exists. Creates a Fly Machine (or starts an existing stopped one) with volume mounted at `/root`, metadata tags, and env vars. Persists machine ID immediately. Schedules health check alarm.                                                       |
+| **Stop**           | Stops the Fly Machine via API. Volume persists. Alarm continues at idle cadence.                                                                                                                                                                                   |
+| **Restart**        | Stops machine, updates config (env vars, image, metadata), starts it. Volume persists.                                                                                                                                                                             |
+| **Restore**        | Enqueues a CF Queue job, sets status to `restoring`. Queue worker: stops machine, destroys it (releases volume attachment), creates new volume from snapshot, swaps DO state, creates fresh machine. Old volume retained for revert.                               |
+| **Destroy**        | Two-phase: persists pending IDs + `status='destroying'`, attempts Fly deletions, only clears DO state when both confirmed. Alarm retries failures.                                                                                                                 |
+| **Reconciliation** | Alarm runs for all statuses. Running: 5 min. Destroying: 1 min. Restoring: 1 min (no-op, stuck detection only). Idle (provisioned/stopped): 30 min. Fixes status drift, missing volumes, stale machine IDs, wrong mounts, and recovers lost IDs from Fly metadata. |
 
 ## Metadata Recovery
 

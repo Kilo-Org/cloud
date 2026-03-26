@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { PROVIDERS, type Provider } from '@/lib/providers';
+import { type Provider } from '@/lib/providers/types';
+import PROVIDERS from '@/lib/providers/provider-definitions';
 import { getEnvVariable } from '@/lib/dotenvx';
 import type { GatewayRequest } from '@/lib/providers/openrouter/types';
 
@@ -13,11 +14,11 @@ import type { GatewayRequest } from '@/lib/providers/openrouter/types';
 export function generateProviderSpecificHash(payload: string, provider: Provider): string {
   const salt = 'd20250815';
   const pepper =
-    provider.id === 'custom'
-      ? provider.apiUrl
+    provider.id === 'vercel'
+      ? 'vercel'
       : provider.id === 'openrouter'
         ? 'henk is a boss'
-        : provider.id;
+        : provider.apiUrl;
   return crypto
     .createHash('sha256')
     .update(salt + pepper + payload)

@@ -1,8 +1,4 @@
 {
-  "eslint.codeActionsOnSave.mode": "all",
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": "explicit"
-  },
   "typescript.preferences.importModuleSpecifier": "non-relative",
   "editor.defaultFormatter": "oxc.oxc-vscode",
   "editor.formatOnSave": true,

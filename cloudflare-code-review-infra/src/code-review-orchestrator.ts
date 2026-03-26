@@ -426,6 +426,19 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     agentVersion?: string;
     previousCloudAgentSessionId?: string;
   }): Promise<{ status: CodeReviewStatus }> {
+    if (!this.state) {
+      await this.loadState();
+    }
+
+    if (this.state) {
+      console.log('[CodeReviewOrchestrator] Duplicate start ignored', {
+        reviewId: this.state.reviewId,
+        status: this.state.status,
+      });
+
+      return { status: this.state.status };
+    }
+
     this.state = {
       reviewId: params.reviewId,
       authToken: params.authToken,

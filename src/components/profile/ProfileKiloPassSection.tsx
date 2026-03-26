@@ -11,7 +11,7 @@ import { KiloPassLoadingCard } from '@/components/profile/kilo-pass/KiloPassLoad
 import { KiloPassSubscribeCard } from '@/components/profile/kilo-pass/KiloPassSubscribeCard';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { recommendKiloPassTierFromAverageMonthlyUsageUsd } from '@/lib/kilo-pass/recommend-tier';
-import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/constants';
+import { getKiloPassMonthlyFirst2MonthsPromoCutoff } from '@/lib/kilo-pass/constants';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 
 export function ProfileKiloPassSection() {
@@ -60,7 +60,7 @@ export function ProfileKiloPassSection() {
     const pending = checkoutMutation.isPending;
     const showFirstMonthPromo = query.data.isEligibleForFirstMonthPromo;
     const showSecondMonthPromo =
-      showFirstMonthPromo && dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
+      showFirstMonthPromo && dayjs().utc().isBefore(getKiloPassMonthlyFirst2MonthsPromoCutoff());
     const averageMonthlyUsageUsd = averageMonthlyUsageQuery.data?.averageMonthlyUsageUsd;
     const recommendedTier =
       typeof averageMonthlyUsageUsd === 'number'

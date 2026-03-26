@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KiloPassCadence } from '@/lib/kilo-pass/enums';
 import type { KiloPassTier } from '@/lib/kilo-pass/enums';
 import {
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
+  getKiloPassMonthlyFirst2MonthsPromoCutoff,
   KILO_PASS_TIER_CONFIG,
 } from '@/lib/kilo-pass/constants';
 import { cn } from '@/lib/utils';
@@ -38,7 +38,7 @@ export function KiloPassSubscribeCard(props: {
   const tiers = Object.keys(KILO_PASS_TIER_CONFIG) as KiloPassTier[];
 
   const promoCutoffLabel = formatIsoDateString_UsaDateOnlyFormat(
-    KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString()
+    getKiloPassMonthlyFirst2MonthsPromoCutoff().toISOString()
   );
   const cadenceOptions = [
     { value: KiloPassCadence.Monthly, label: 'Monthly' },

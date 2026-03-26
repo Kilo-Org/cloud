@@ -18,7 +18,7 @@ import {
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
 import { computeMonthlyCadenceBonusPercent, getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
-import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/constants';
+import { getKiloPassMonthlyFirst2MonthsPromoCutoff } from '@/lib/kilo-pass/constants';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { and, eq } from 'drizzle-orm';
 
@@ -121,7 +121,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       nextYearlyIssueAt: null,
       // Ensure this test remains a "regular ramp" case, not eligible for the month-2 grandfathered promo.
       startedAtIso: new Date(
-        KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.valueOf() + 1
+        getKiloPassMonthlyFirst2MonthsPromoCutoff().valueOf() + 1
       ).toISOString(),
     });
 
@@ -228,7 +228,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       stripeInvoiceId: 'inv_test_monthly_month2_grandfathered_ineligible_cutoff',
       currentStreakMonths: 2,
       nextYearlyIssueAt: null,
-      startedAtIso: KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString(),
+      startedAtIso: getKiloPassMonthlyFirst2MonthsPromoCutoff().toISOString(),
     });
 
     await maybeIssueKiloPassBonusFromUsageThreshold({
@@ -261,7 +261,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     const tier = KiloPassTier.Tier49;
     const streakMonths = 2;
     const startedAtIso = new Date(
-      KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.valueOf() + 1
+      getKiloPassMonthlyFirst2MonthsPromoCutoff().valueOf() + 1
     ).toISOString();
 
     const { issuanceId } = await seedBaseIssuance({

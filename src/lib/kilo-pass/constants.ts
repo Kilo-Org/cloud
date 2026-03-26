@@ -11,8 +11,19 @@ type KiloPassTierConfig = {
 export const KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT = 0.5;
 
 // First-time subscribers receive a 50% bonus for the first 2 months if they started
-// strictly before this cutoff. (For PST, Incorporating DST)
-export const KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF = dayjs('2026-04-04T06:59:59Z').utc();
+// strictly before this cutoff.
+// The cutoff auto-advances to next Thursday at 11:59:59 PM PST (06:59:59 UTC).
+// If today is Thursday, it targets the *following* Thursday so there's always ≥7 days.
+// To end the promo, revert this to a fixed past date.
+export function getKiloPassMonthlyFirst2MonthsPromoCutoff(now?: dayjs.Dayjs): dayjs.Dayjs {
+  const today = (now ?? dayjs.utc()).startOf('day');
+  const currentDow = today.day(); // 0=Sun … 4=Thu … 6=Sat
+  const thursday = 4;
+  let daysUntilThursday = (thursday - currentDow + 7) % 7;
+  // If today IS Thursday, use next Thursday (7 days out) so there's always ≥7 days.
+  if (daysUntilThursday === 0) daysUntilThursday = 7;
+  return today.add(daysUntilThursday, 'day').hour(6).minute(59).second(59).millisecond(0);
+}
 
 export const KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT = 0.5;
 

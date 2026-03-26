@@ -2,7 +2,7 @@ import type { KiloPassTier } from '@/lib/kilo-pass/enums';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT,
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
+  getKiloPassMonthlyFirst2MonthsPromoCutoff,
   KILO_PASS_TIER_CONFIG,
   KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,
 } from '@/lib/kilo-pass/constants';
@@ -33,7 +33,7 @@ export const computeMonthlyCadenceBonusPercent = (params: {
 
       if (
         startedAtUtc.isValid() &&
-        startedAtUtc.isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF)
+        startedAtUtc.isBefore(getKiloPassMonthlyFirst2MonthsPromoCutoff())
       ) {
         return KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT;
       }

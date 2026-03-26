@@ -25,7 +25,7 @@ import {
 } from '@/lib/kilo-pass/bonus';
 import {
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT,
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
+  getKiloPassMonthlyFirst2MonthsPromoCutoff,
 } from '@/lib/kilo-pass/constants';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -549,7 +549,7 @@ describe('kiloPassRouter', () => {
         cadence: KiloPassCadence.Monthly,
         status: 'active',
         currentStreakMonths: 2,
-        startedAt: KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString(),
+        startedAt: getKiloPassMonthlyFirst2MonthsPromoCutoff().toISOString(),
       });
 
       const caller = await createCallerForUser(user.id);

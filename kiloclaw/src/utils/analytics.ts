@@ -36,6 +36,7 @@ export type KiloClawEventName =
   | 'instance.started'
   | 'instance.provisioning_failed'
   | 'instance.start_capacity_recovery'
+  | 'instance.region_removed_from_kv'
   | 'instance.manual_start_succeeded'
   | 'instance.manual_start_failed'
   | 'instance.crash_recovery_succeeded'

@@ -37,7 +37,7 @@ import {
   ALL_SECRET_FIELD_KEYS,
   type SecretFieldKey,
 } from '@kilocode/kiloclaw-secret-catalog';
-import { parseRegions, prepareRegions, resolveRegions } from '../regions';
+import { parseRegions, prepareRegions, resolveRegions, removeRegionFromKv } from '../regions';
 import { buildMachineConfig, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
 import type { GatewayProcessStatus } from '../gateway-controller-types';
 
@@ -918,6 +918,26 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         statusCode: code,
         region: this.s.flyRegion ?? 'unknown',
       });
+
+      // Capture the failed region before replaceStrandedVolume mutates this.s.flyRegion.
+      const failedRegion = this.s.flyRegion;
+      if (failedRegion) {
+        const kvResult = await removeRegionFromKv(
+          this.env.KV_CLAW_CACHE,
+          this.env.FLY_REGION,
+          failedRegion
+        );
+        if (kvResult.action === 'removed' || kvResult.action === 'reverted_to_meta') {
+          // this.s.flyRegion still holds failedRegion at this point —
+          // emitEvent reads it before replaceStrandedVolume mutates it.
+          this.emitEvent({
+            event: 'instance.region_removed_from_kv',
+            status: this.s.status ?? undefined,
+            label: kvResult.action,
+          });
+        }
+      }
+
       await flyMachines.replaceStrandedVolume(
         flyConfig,
         this.ctx,

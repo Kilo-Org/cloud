@@ -1,5 +1,8 @@
 import { DEFAULT_FLY_REGION } from '../config';
 
+/** Meta regions used as the fallback when only one named region would remain. */
+const META_REGION_FALLBACK = 'eu,us';
+
 /** KV key used to store the runtime region configuration. */
 export const FLY_REGIONS_KV_KEY = 'fly-regions';
 
@@ -111,4 +114,78 @@ export async function resolveRegions(
   }
   const raw = kvValue ?? envFlyRegion ?? DEFAULT_FLY_REGION;
   return prepareRegions(parseRegions(raw));
+}
+
+/**
+ * Result of attempting to remove a failed region from the KV region list.
+ */
+export type RemoveRegionResult =
+  | { action: 'skipped_meta'; reason: string }
+  | { action: 'removed'; removedRegion: string; newRegions: string[]; newRaw: string }
+  | { action: 'reverted_to_meta'; removedRegion: string; newRaw: string }
+  | { action: 'not_in_list'; reason: string };
+
+/**
+ * Remove a failed named region from the KV region list after a capacity error.
+ *
+ * Rules:
+ * - If the current KV list consists entirely of meta-regions (eu, us), nothing
+ *   is done — Fly handles distribution internally.
+ * - If the failed region is not in the list, nothing is done.
+ * - If removing the region would leave only one distinct named region, the KV
+ *   value is replaced with the meta-region fallback ("eu,us") plus the last
+ *   remaining named region as a hint prefix: "TheLastRegion,eu,us".
+ * - Otherwise the region is removed from the list and KV is updated.
+ *
+ * KV write failures are swallowed so a transient outage never blocks provisioning.
+ */
+export async function removeRegionFromKv(
+  kv: KVNamespace,
+  envFlyRegion: string | undefined,
+  failedRegion: string
+): Promise<RemoveRegionResult> {
+  let kvValue: string | null = null;
+  try {
+    kvValue = await kv.get(FLY_REGIONS_KV_KEY);
+  } catch {
+    // KV read failed — treat as empty; fall back to env/default
+  }
+  const raw = kvValue ?? envFlyRegion ?? DEFAULT_FLY_REGION;
+  const regions = parseRegions(raw);
+
+  // If all regions are meta-regions, nothing to do.
+  if (regions.every(r => isMetaRegion(r))) {
+    return { action: 'skipped_meta', reason: 'all regions are meta-regions' };
+  }
+
+  // If the failed region is not present in the list, nothing to do.
+  if (!regions.includes(failedRegion)) {
+    return { action: 'not_in_list', reason: `${failedRegion} not in current region list` };
+  }
+
+  const remaining = regions.filter(r => r !== failedRegion);
+  const distinctRemaining = [...new Set(remaining.filter(r => !isMetaRegion(r)))];
+
+  if (distinctRemaining.length <= 1) {
+    // Only one (or zero) named region would remain — revert to meta fallback.
+    // Prefix with the last remaining named region as a breadcrumb (if any).
+    const lastRegion = distinctRemaining[0];
+    const newRaw = lastRegion
+      ? `${lastRegion},${META_REGION_FALLBACK}`
+      : META_REGION_FALLBACK;
+    try {
+      await kv.put(FLY_REGIONS_KV_KEY, newRaw);
+    } catch {
+      // Best-effort
+    }
+    return { action: 'reverted_to_meta', removedRegion: failedRegion, newRaw };
+  }
+
+  const newRaw = remaining.join(',');
+  try {
+    await kv.put(FLY_REGIONS_KV_KEY, newRaw);
+  } catch {
+    // Best-effort
+  }
+  return { action: 'removed', removedRegion: failedRegion, newRegions: remaining, newRaw };
 }

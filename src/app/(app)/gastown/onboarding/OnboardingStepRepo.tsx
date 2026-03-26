@@ -29,7 +29,9 @@ export function OnboardingStepRepo() {
   const { data: user } = useUser();
   const mainTrpc = useTRPC();
 
-  const [mode, setMode] = useState<InputMode>('picker');
+  const [mode, setMode] = useState<InputMode>(
+    state.repo?.platform === 'manual' ? 'manual' : 'picker'
+  );
   const [selectedRepoFullName, setSelectedRepoFullName] = useState(
     state.repo?.platform !== 'manual' ? (state.repo?.fullName ?? '') : ''
   );
@@ -94,9 +96,9 @@ export function OnboardingStepRepo() {
         ?.instanceUrl;
       const gitUrl = resolveGitUrlFromRepo(platform, fullName, gitlabInstanceUrl);
 
-      // Auto-derive rig name from repo name and set as town name if still default
+      // Auto-derive town name from repo name, but only if the user hasn't explicitly edited it
       const repoName = fullName.split('/').pop() ?? fullName;
-      if (state.townName.endsWith('-town')) {
+      if (!state.townNameSetByUser) {
         setTownName(repoName);
       }
 

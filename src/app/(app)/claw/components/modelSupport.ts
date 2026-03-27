@@ -17,6 +17,8 @@ export const KILOCODE_CATALOG_IDS = new Set([
   'google/gemini-3-flash-preview',
   'x-ai/grok-code-fast-1',
   'moonshotai/kimi-k2.5',
+  'xiaomi/mimo-v2-pro:free',
+  'xiaomi/mimo-v2-omni:free',
 ]);
 
 export const OPENCLAW_DYNAMIC_MODEL_DISCOVERY_VERSION = '2026.03.08';

@@ -1002,7 +1002,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           await this.scheduleAlarm();
           return { started: false };
         }
-        console.log('[DO] Status is running but machine state is:', machine.state, '-- restarting');
+        // Machine was force-deleted — clear stale ID so we take the createNewMachine path below.
+        if (machine.state === 'destroyed') {
+          console.log('[DO] Machine destroyed, clearing stale ID');
+          this.s.flyMachineId = null;
+          await this.persist({ flyMachineId: null });
+        } else {
+          console.log('[DO] Status is running but machine state is:', machine.state, '-- restarting');
+        }
       } catch (err) {
         console.log('[DO] Failed to get machine state, will recreate:', err);
       }

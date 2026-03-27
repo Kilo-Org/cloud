@@ -6365,3 +6365,65 @@ describe('Stream Chat backfill on restartMachine', () => {
     expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
   });
 });
+
+// ============================================================================
+// start: handles Fly 'destroyed' state after admin force-delete
+// ============================================================================
+
+describe('start: creates new machine when existing machine is in destroyed state', () => {
+  it('clears stale flyMachineId and creates a new machine when getMachine returns destroyed', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage);
+
+    // First getMachine call (running check in _startInner) returns destroyed
+    // Second getMachine call (in startExistingMachine) would also return destroyed,
+    // but our fix in _startInner clears flyMachineId before reaching startExistingMachine.
+    (flyClient.getMachine as Mock).mockResolvedValue(
+      fakeMachine({ id: 'machine-1', state: 'destroyed' })
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({
+      id: 'new-machine-1',
+      region: 'iad',
+    });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    const result = await instance.start('user-1');
+
+    expect(result.started).toBe(true);
+    // Should have created a new machine, not tried to start the destroyed one
+    expect(flyClient.createMachine).toHaveBeenCalledTimes(1);
+    expect(flyClient.updateMachine).not.toHaveBeenCalled();
+    // New machine ID should be persisted
+    expect(storage._store.get('flyMachineId')).toBe('new-machine-1');
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('startExistingMachine creates new machine when getMachine returns destroyed', async () => {
+    const { instance, storage } = createInstance();
+    // Seed as stopped with a stale flyMachineId — this bypasses the running check
+    // and goes straight to startExistingMachine.
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      flyMachineId: 'destroyed-machine',
+      lastStartedAt: Date.now() - 60000,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue(
+      fakeMachine({ id: 'destroyed-machine', state: 'destroyed' })
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({
+      id: 'fresh-machine',
+      region: 'iad',
+    });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    const result = await instance.start('user-1');
+
+    expect(result.started).toBe(true);
+    expect(flyClient.createMachine).toHaveBeenCalledTimes(1);
+    expect(storage._store.get('flyMachineId')).toBe('fresh-machine');
+    expect(storage._store.get('status')).toBe('running');
+  });
+});

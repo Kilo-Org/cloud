@@ -3,6 +3,119 @@ import { isReasoningExplicitlyDisabled } from '@/lib/providers/openrouter/reques
 
 export default [
   {
+    id: 'alibaba-coding',
+    name: 'Alibaba Coding Plan',
+    base_url: 'https://coding-intl.dashscope.aliyuncs.com/v1',
+    ai_sdk_provider: 'openai-compatible',
+    transformRequest(context) {
+      context.request.body.enable_thinking = !isReasoningExplicitlyDisabled(context.request);
+    },
+    models: [
+      {
+        id: 'qwen3.5-plus',
+        name: 'Qwen3.5-Plus',
+        flags: ['recommended', 'vision'],
+        context_length: 1000000,
+        max_completion_tokens: 65536,
+        description:
+          "Alibaba's flagship multimodal model. Fast, cost-effective, text+image+video input.",
+      },
+      {
+        id: 'kimi-k2.5',
+        name: 'Kimi-K2.5',
+        flags: ['recommended', 'vision'],
+        context_length: 262144,
+        max_completion_tokens: 32768,
+        description:
+          'Moonshot AI multimodal model with strong code/UI generation.',
+      },
+      {
+        id: 'glm-5',
+        name: 'GLM-5',
+        flags: ['recommended'],
+        context_length: 202752,
+        max_completion_tokens: 16384,
+        description:
+          "Z.ai's flagship for complex systems design and agent workflows.",
+      },
+      {
+        id: 'MiniMax-M2.5',
+        name: 'MiniMax-M2.5',
+        flags: ['recommended'],
+        context_length: 196608,
+        max_completion_tokens: 24576,
+        description:
+          'MiniMax latest with strong reasoning and tool-use for agentic coding.',
+      },
+      {
+        id: 'qwen3-coder-plus',
+        name: 'Qwen3-Coder-Plus',
+        flags: [],
+        context_length: 1000000,
+        max_completion_tokens: 65536,
+        description:
+          'Top-quality code generation for complex tasks. Supports context cache.',
+      },
+      {
+        id: 'qwen3-coder-next',
+        name: 'Qwen3-Coder-Next',
+        flags: [],
+        context_length: 262144,
+        max_completion_tokens: 65536,
+        description:
+          'Best balance of quality, speed, cost. Optimized for multi-turn tool calling.',
+      },
+      {
+        id: 'qwen3-max-2026-01-23',
+        name: 'Qwen3-Max (2026-01-23)',
+        flags: [],
+        context_length: 262144,
+        max_completion_tokens: 32768,
+        description: 'Qwen3-Max snapshot for complex reasoning.',
+      },
+      {
+        id: 'glm-4.7',
+        name: 'GLM-4.7',
+        flags: [],
+        context_length: 202752,
+        max_completion_tokens: 16384,
+        description:
+          "Z.ai's latest with enhanced programming and stable multi-step execution.",
+      },
+    ],
+  },
+  {
+    id: 'kimi-coding',
+    name: 'Kimi Coding Plan',
+    base_url: 'https://api.kimi.com/coding/v1',
+    ai_sdk_provider: 'openai-compatible',
+    transformRequest(context) {
+      context.request.body.thinking = {
+        type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
+      };
+    },
+    models: [
+      {
+        id: 'k2p5',
+        name: 'Kimi-K2.5',
+        flags: ['recommended'],
+        context_length: 262144,
+        max_completion_tokens: 32768,
+        description:
+          'Kimi K2.5 optimized for code generation and agentic coding. Up to 100 tokens/s.',
+      },
+      {
+        id: 'kimi-k2-thinking',
+        name: 'Kimi-K2 Thinking',
+        flags: [],
+        context_length: 262144,
+        max_completion_tokens: 32768,
+        description:
+          'Kimi K2 with extended thinking for complex multi-step reasoning.',
+      },
+    ],
+  },
+  {
     id: 'byteplus-coding',
     name: 'BytePlus Coding Plan',
     base_url: 'https://ark.ap-southeast.bytepluses.com/api/coding/v3',
@@ -39,15 +152,6 @@ export default [
         flags: ['recommended'],
         context_length: 204800,
         max_completion_tokens: 131072,
-      },
-      {
-        id: 'deepseek-v3.2',
-        name: 'DeepSeek-V3.2',
-        description:
-          'Designed to harmonize high computational efficiency with strong reasoning and agentic tool-use performance.',
-        flags: [],
-        context_length: 131072,
-        max_completion_tokens: 32768,
       },
       {
         id: 'gpt-oss-120b',
@@ -94,7 +198,7 @@ export default [
         name: 'GLM-5 Turbo',
         description:
           'GLM-5 Turbo is a new model from Z.ai designed for fast inference and strong performance in agent-driven environments such as OpenClaw scenarios. It is deeply optimized for real-world agent workflows involving long execution chains, with improved complex instruction decomposition, tool use, scheduled and persistent execution, and overall stability across extended tasks.',
-        flags: ['recommended'],
+        flags: [],
         context_length: 202752,
         max_completion_tokens: 131072,
       },
@@ -112,7 +216,7 @@ export default [
         name: 'GLM-5',
         description:
           "GLM-5 is Z.ai's flagship open-source foundation model engineered for complex systems design and long-horizon agent workflows. Built for expert developers, it delivers production-grade performance on large-scale programming tasks, rivaling leading closed-source models. With advanced agentic planning, deep backend reasoning, and iterative self-correction, GLM-5 moves beyond code generation to full-system construction and autonomous execution.",
-        flags: ['recommended'],
+        flags: [],
         context_length: 204800,
         max_completion_tokens: 131072,
       },
@@ -121,7 +225,7 @@ export default [
         name: 'GLM-4.7',
         description:
           "GLM-4.7 is Z.ai's latest flagship model, featuring upgrades in two key areas: enhanced programming capabilities and more stable multi-step reasoning/execution. It demonstrates significant improvements in executing complex agent tasks while delivering more natural conversational experiences and superior front-end aesthetics.",
-        flags: ['recommended'],
+        flags: [],
         context_length: 204800,
         max_completion_tokens: 131072,
       },

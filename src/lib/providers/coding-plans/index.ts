@@ -5,6 +5,8 @@ import { getBYOKforOrganization, getBYOKforUser } from '@/lib/byok';
 import { readDb } from '@/lib/drizzle';
 import { preferredModels } from '@/lib/models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import type { OpenCodeSettings } from '@kilocode/db';
+import { BINARY_THINKING_VARIANTS } from '@/lib/providers/model-settings';
 
 export function formatCodingPlanModelId(provider: CodingPlanProvider, model: CodingPlanModel) {
   return provider.id + '/' + model.id;
@@ -50,6 +52,10 @@ function convertModel(
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
     preferredIndex: model.flags.includes('recommended') ? preferredIndex : undefined,
+    opencode: {
+      ai_sdk_provider: provider.ai_sdk_provider,
+      variants: BINARY_THINKING_VARIANTS,
+    } satisfies OpenCodeSettings,
   };
 }
 

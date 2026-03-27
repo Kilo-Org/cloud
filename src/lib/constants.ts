@@ -53,7 +53,7 @@ export const SESSION_INGEST_WS_URL = process.env.NEXT_PUBLIC_SESSION_INGEST_WS_U
 // The browser talks directly to the gastown Cloudflare Worker for tRPC + WS.
 export const GASTOWN_URL = process.env.NEXT_PUBLIC_GASTOWN_URL ?? '';
 
-// Free model rate limits (applies to both anonymous and authenticated users)
+// Free model rate limits: per-IP for client-side products, per-user for server-side products
 export const FREE_MODEL_RATE_LIMIT_WINDOW_HOURS = 1;
 export const FREE_MODEL_MAX_REQUESTS_PER_WINDOW = 200;
 

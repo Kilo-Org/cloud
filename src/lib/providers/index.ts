@@ -18,7 +18,6 @@ import {
   isHaikuModel,
 } from '@/lib/providers/anthropic';
 import { getBYOKforOrganization, getBYOKforUser, getModelUserByokProviders } from '@/lib/byok';
-import type { CustomLlm } from '@kilocode/db/schema';
 import { custom_llm, type User } from '@kilocode/db/schema';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/providers/openrouter/inference-provider-id';
 import { hasAttemptCompletionTool } from '@/lib/tool-calling';
@@ -35,6 +34,15 @@ import { isXiaomiModel } from '@/lib/providers/xiaomi';
 import type { BYOKResult, Provider } from '@/lib/providers/types';
 import PROVIDERS from '@/lib/providers/provider-definitions';
 import { getCodingPlanModel } from '@/lib/providers/coding-plans';
+import type { CustomLlmProvider } from '@kilocode/db';
+
+function inferSupportedChatApis(aiSdkProvider: CustomLlmProvider) {
+  return aiSdkProvider === 'anthropic'
+    ? (['messages'] as const)
+    : aiSdkProvider === 'openai'
+      ? (['responses'] as const)
+      : (['chat_completions'] as const);
+}
 
 async function checkCodingPlanBYOK(
   user: User | AnonymousUserContext,
@@ -56,13 +64,14 @@ async function checkCodingPlanBYOK(
       id: 'coding-plan',
       apiUrl: codingPlan.base_url,
       apiKey: userByok[0].decryptedAPIKey,
+      supportedChatApis: inferSupportedChatApis(codingPlan.ai_sdk_provider),
       transformRequest(context) {
         context.request.body.model = codingPlanModel.id;
         codingPlan.transformRequest(context);
       },
     } satisfies Provider,
     userByok,
-    customLlm: null,
+    bypassAccessCheck: false,
   };
 }
 
@@ -85,7 +94,7 @@ export async function getProvider(
   user: User | AnonymousUserContext,
   organizationId: string | undefined,
   taskId: string | undefined
-): Promise<{ provider: Provider; userByok: BYOKResult[] | null; customLlm: CustomLlm | null }> {
+): Promise<{ provider: Provider; userByok: BYOKResult[] | null; bypassAccessCheck: boolean }> {
   const codingPlanByok = await checkCodingPlanBYOK(user, requestedModel, organizationId);
   if (codingPlanByok) {
     return codingPlanByok;
@@ -96,7 +105,7 @@ export async function getProvider(
     return {
       provider: PROVIDERS.VERCEL_AI_GATEWAY,
       userByok: vercelByok,
-      customLlm: null,
+      bypassAccessCheck: false,
     };
   }
 
@@ -111,6 +120,7 @@ export async function getProvider(
           id: 'custom',
           apiUrl: customLlm.base_url,
           apiKey: customLlm.api_key,
+          supportedChatApis: inferSupportedChatApis(customLlm.provider),
           transformRequest(context) {
             Object.assign(context.request.body, customLlm?.extra_body ?? {});
             for (const [key, value] of Object.entries(customLlm.extra_headers ?? {})) {
@@ -120,13 +130,13 @@ export async function getProvider(
           },
         },
         userByok: null,
-        customLlm,
+        bypassAccessCheck: true,
       };
     }
   }
 
   if (await shouldRouteToVercel(requestedModel, request, taskId || user.id)) {
-    return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, customLlm: null };
+    return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, bypassAccessCheck: false };
   }
 
   const kiloFreeModel = kiloFreeModels.find(m => m.public_id === requestedModel);
@@ -135,7 +145,7 @@ export async function getProvider(
   return {
     provider: freeModelProvider ?? PROVIDERS.OPENROUTER,
     userByok: null,
-    customLlm: null,
+    bypassAccessCheck: false,
   };
 }
 

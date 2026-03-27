@@ -99,6 +99,15 @@ export default [
         max_completion_tokens: 131072,
       },
       {
+        id: 'glm-5.1',
+        name: 'GLM-5.1',
+        description:
+          "GLM-5.1 is Z.ai's latest iteration of the flagship open-source foundation model engineered for complex systems design and long-horizon agent workflows. Built for expert developers, it delivers production-grade performance on large-scale programming tasks, rivaling leading closed-source models. With advanced agentic planning, deep backend reasoning, and iterative self-correction, GLM-5.1 moves beyond code generation to full-system construction and autonomous execution.",
+        flags: ['recommended'],
+        context_length: 204800,
+        max_completion_tokens: 131072,
+      },
+      {
         id: 'glm-5',
         name: 'GLM-5',
         description:

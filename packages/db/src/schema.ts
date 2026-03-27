@@ -3094,9 +3094,9 @@ export const user_period_cache = pgTable(
 
 export type UserPeriodCache = typeof user_period_cache.$inferSelect;
 
-// ============ FREE MODEL USAGE (IP-based rate limiting) ============
-// Lightweight table for IP-based rate limiting on free models
-// Applies to both anonymous and authenticated users
+// ============ FREE MODEL USAGE (rate limiting) ============
+// Lightweight table for rate limiting on free models
+// IP-based for client-side products, per-user for server-side products
 
 export const free_model_usage = pgTable(
   'free_model_usage',
@@ -3107,7 +3107,7 @@ export const free_model_usage = pgTable(
       .primaryKey(),
     ip_address: text().notNull(),
     model: text().notNull(),
-    // Optional: link to authenticated user if present (for analytics only)
+    // Optional: link to authenticated user if present (for analytics and per-user rate limiting)
     kilo_user_id: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
@@ -3116,6 +3116,10 @@ export const free_model_usage = pgTable(
     index('idx_free_model_usage_ip_created_at').on(table.ip_address, table.created_at),
     // Secondary index for analytics
     index('idx_free_model_usage_created_at').on(table.created_at),
+    // Index for per-user rate limiting (server-side products); partial to exclude anonymous rows
+    index('idx_free_model_usage_user_created_at')
+      .on(table.kilo_user_id, table.created_at)
+      .where(isNotNull(table.kilo_user_id)),
   ]
 );
 

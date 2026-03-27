@@ -193,12 +193,14 @@
         "variants": {
           "instant": {
             "reasoning": {
-              "enabled": false
+              "enabled": false,
+              "effort": "none"
             }
           },
           "thinking": {
             "reasoning": {
-              "enabled": true
+              "enabled": true,
+              "effort": "medium"
             }
           }
         }
@@ -237,7 +239,8 @@
         "variants": {
           "none": {
             "reasoning": {
-              "enabled": false
+              "enabled": false,
+              "effort": "none"
             }
           },
           "low": {
@@ -304,7 +307,8 @@
         "variants": {
           "none": {
             "reasoning": {
-              "enabled": false
+              "enabled": false,
+              "effort": "none"
             }
           },
           "low": {
@@ -661,12 +665,14 @@
         "variants": {
           "instant": {
             "reasoning": {
-              "enabled": false
+              "enabled": false,
+              "effort": "none"
             }
           },
           "thinking": {
             "reasoning": {
-              "enabled": true
+              "enabled": true,
+              "effort": "medium"
             }
           }
         }

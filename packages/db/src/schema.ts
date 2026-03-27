@@ -3535,6 +3535,27 @@ export const kiloclaw_email_log = pgTable(
 
 export type KiloClawEmailLog = typeof kiloclaw_email_log.$inferSelect;
 
+export const kiloclaw_trial_grants = pgTable(
+  'kiloclaw_trial_grants',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    email: text().notNull().unique(),
+    trial_days: integer().notNull(),
+    granted_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'set null',
+    }),
+    granted_by_email: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [index('IDX_kiloclaw_trial_grants_email').on(table.email)]
+);
+
+export type KiloClawTrialGrant = typeof kiloclaw_trial_grants.$inferSelect;
+
 // Bot Request Logs — tracks each message handled by the new bot (src/lib/bot.ts).
 // Rows are created as 'pending' on receipt and updated as processing progresses.
 export type BotRequestStatus = 'pending' | 'completed' | 'error';

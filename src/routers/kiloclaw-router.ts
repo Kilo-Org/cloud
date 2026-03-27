@@ -31,6 +31,7 @@ import {
   kiloclaw_instances,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
+  kiloclaw_trial_grants,
 } from '@kilocode/db/schema';
 import { and, eq, ne, desc, isNotNull, isNull, inArray, sql } from 'drizzle-orm';
 import { sentryLogger } from '@/lib/utils.server';
@@ -492,7 +493,16 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
     // is a no-op.
     const instance = await ensureActiveInstance(userId);
     const now = new Date();
-    const trialEndsAt = new Date(now.getTime() + KILOCLAW_TRIAL_DURATION_DAYS * 86_400_000);
+
+    // Check if an admin pre-granted a custom trial duration via bulk extend.
+    const [preGrant] = await db
+      .select({ trial_days: kiloclaw_trial_grants.trial_days })
+      .from(kiloclaw_trial_grants)
+      .where(eq(kiloclaw_trial_grants.email, userEmail.toLowerCase()))
+      .limit(1);
+
+    const trialDays = preGrant?.trial_days ?? KILOCLAW_TRIAL_DURATION_DAYS;
+    const trialEndsAt = new Date(now.getTime() + trialDays * 86_400_000);
     // Use onConflictDoNothing so concurrent requests (e.g. double-submit)
     // don't fail on the per-instance unique constraint.
     const [inserted] = await db
@@ -512,6 +522,14 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
       .returning({ id: kiloclaw_subscriptions.id });
 
     if (inserted) {
+      // Mark the grant as consumed so it's not applied again.
+      if (preGrant) {
+        await db
+          .update(kiloclaw_trial_grants)
+          .set({ consumed_at: now.toISOString() })
+          .where(eq(kiloclaw_trial_grants.email, userEmail.toLowerCase()));
+      }
+
       PostHogClient().capture({
         distinctId: userEmail,
         event: 'claw_trial_started',
@@ -519,6 +537,7 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
           user_id: userId,
           plan: 'trial',
           trial_ends_at: trialEndsAt.toISOString(),
+          ...(preGrant ? { pre_granted_days: preGrant.trial_days } : {}),
         },
       });
     }

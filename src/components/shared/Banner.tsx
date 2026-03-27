@@ -1,5 +1,6 @@
 'use client';
 
+import { createContext, useContext } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -34,99 +35,105 @@ const colorMap: Record<BannerColor, { border: string; bg: string; text: string; 
     },
   };
 
-type BannerBaseProps = {
-  icon?: React.ComponentType<{ className?: string }>;
-  /** Override default icon classes. */
-  iconClassName?: string;
-  title: string;
-  /** Override default title classes. */
-  titleClassName?: string;
-  description: React.ReactNode;
-  /** Override default description classes. */
-  descriptionClassName?: string;
-  color?: BannerColor;
-  /** Override default container classes. */
-  className?: string;
-  /** Optional ARIA role for the outer container. */
-  role?: string;
-  /** Icon after button label. */
-  buttonIcon?: React.ComponentType<{ className?: string }>;
-  /** Override default button icon classes. */
-  buttonIconClassName?: string;
-  /** Override default button classes. */
-  buttonClassName?: string;
-};
+const BannerContext = createContext<{ colors?: (typeof colorMap)[BannerColor] }>({});
 
-type BannerProps = BannerBaseProps &
-  (
-    | {
-        /** Custom action element. */ action: React.ReactNode;
-        buttonLabel?: never;
-        buttonHref?: never;
-      }
-    | {
-        action?: never;
-        buttonLabel: string;
-        buttonHref: string;
-      }
-    | { action?: never; buttonLabel?: never; buttonHref?: never }
-  );
-
-export function Banner({
-  icon: Icon,
-  iconClassName,
-  title,
-  titleClassName,
-  description,
-  descriptionClassName,
-  action,
-  buttonLabel,
-  buttonHref,
-  buttonIcon: ButtonIcon,
-  buttonIconClassName,
-  buttonClassName,
+function BannerRoot({
   color,
   className,
   role,
-}: BannerProps) {
+  children,
+}: {
+  color?: BannerColor;
+  className?: string;
+  role?: string;
+  children: React.ReactNode;
+}) {
   const colors = color ? colorMap[color] : undefined;
 
   return (
+    <BannerContext.Provider value={{ colors }}>
+      <div
+        role={role}
+        className={cn(
+          'flex w-full flex-wrap items-start gap-3 rounded-xl border p-4 sm:items-center sm:gap-4',
+          colors?.border,
+          colors?.bg,
+          colors?.text,
+          className
+        )}
+      >
+        {children}
+      </div>
+    </BannerContext.Provider>
+  );
+}
+
+function BannerIcon({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
     <div
-      role={role}
       className={cn(
-        'flex w-full flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:gap-4',
-        colors?.border,
-        colors?.bg,
-        colors?.text,
+        'mt-0.5 flex shrink-0 items-center sm:mt-0 [&>*]:h-5 [&>*]:w-5 sm:[&>*]:h-6 sm:[&>*]:w-6',
         className
       )}
     >
-      <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
-        {Icon && (
-          <div className="mt-0.5 flex shrink-0 items-center sm:mt-0">
-            <Icon className={cn('h-5 w-5 sm:h-6 sm:w-6', iconClassName)} />
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <p className={cn('text-sm font-semibold sm:font-bold', titleClassName)}>{title}</p>
-          <p className={cn('text-muted-foreground mt-0.5 text-sm sm:mt-0', descriptionClassName)}>
-            {description}
-          </p>
-        </div>
-      </div>
-      {action ??
-        (buttonLabel && buttonHref && (
-          <Button
-            asChild
-            className={cn('w-full shrink-0 sm:w-auto', colors?.button, buttonClassName)}
-          >
-            <Link href={buttonHref}>
-              {buttonLabel}
-              {ButtonIcon && <ButtonIcon className={cn('h-4 w-4', buttonIconClassName)} />}
-            </Link>
-          </Button>
-        ))}
+      {children}
     </div>
   );
 }
+
+function BannerContent({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={cn('min-w-0 flex-1', className)}>{children}</div>;
+}
+
+function BannerTitle({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <p className={cn('text-sm font-semibold sm:font-bold', className)}>{children}</p>;
+}
+
+function BannerDescription({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <p className={cn('text-muted-foreground mt-0.5 text-sm sm:mt-0', className)}>{children}</p>
+  );
+}
+
+function BannerAction({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={cn('w-full shrink-0 sm:w-auto', className)}>{children}</div>;
+}
+
+function BannerButton({
+  href,
+  children,
+  className,
+}: {
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const { colors } = useContext(BannerContext);
+  return (
+    <Button
+      asChild
+      className={cn(
+        'w-full shrink-0 sm:w-auto [&>*]:h-4 [&>*]:w-4',
+        colors?.button,
+        className
+      )}
+    >
+      <Link href={href}>{children}</Link>
+    </Button>
+  );
+}
+
+export const Banner = Object.assign(BannerRoot, {
+  Icon: BannerIcon,
+  Content: BannerContent,
+  Title: BannerTitle,
+  Description: BannerDescription,
+  Action: BannerAction,
+  Button: BannerButton,
+});

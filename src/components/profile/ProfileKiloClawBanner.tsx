@@ -27,40 +27,57 @@ export function ProfileKiloClawBanner() {
 
   if (hasInstance && billing.hasAccess) {
     return (
-      <Banner
-        icon={KiloCrabIcon}
-        color="emerald"
-        title="Your KiloClaw instance is active"
-        description="Manage your instance, configure integrations, and monitor your Claw."
-        buttonLabel="Go to KiloClaw"
-        buttonHref="/claw"
-        buttonIcon={ArrowRight}
-      />
+      <Banner color="emerald">
+        <Banner.Icon>
+          <KiloCrabIcon />
+        </Banner.Icon>
+        <Banner.Content>
+          <Banner.Title>Your KiloClaw instance is active</Banner.Title>
+          <Banner.Description>
+            Manage your instance, configure integrations, and monitor your Claw.
+          </Banner.Description>
+        </Banner.Content>
+        <Banner.Button href="/claw">
+          Go to KiloClaw
+          <ArrowRight />
+        </Banner.Button>
+      </Banner>
     );
   }
 
   if (hasInstance && !billing.hasAccess) {
     return (
-      <Banner
-        icon={AlertTriangle}
-        color="amber"
-        title="Your KiloClaw instance needs attention"
-        description="Your access has lapsed. Visit the dashboard to resolve billing and restore your instance."
-        buttonLabel="Resolve"
-        buttonHref="/claw"
-        buttonIcon={ArrowRight}
-      />
+      <Banner color="amber">
+        <Banner.Icon>
+          <AlertTriangle />
+        </Banner.Icon>
+        <Banner.Content>
+          <Banner.Title>Your KiloClaw instance needs attention</Banner.Title>
+          <Banner.Description>
+            Your access has lapsed. Visit the dashboard to resolve billing and restore your
+            instance.
+          </Banner.Description>
+        </Banner.Content>
+        <Banner.Button href="/claw">
+          Resolve
+          <ArrowRight />
+        </Banner.Button>
+      </Banner>
     );
   }
 
   return (
-    <Banner
-      icon={KiloCrabIcon}
-      color="blue"
-      title="Get started with KiloClaw"
-      description="Fully-managed OpenClaw, always online. Set up in minutes."
-      buttonLabel="Get Started"
-      buttonHref="/claw"
-    />
+    <Banner color="blue">
+      <Banner.Icon>
+        <KiloCrabIcon />
+      </Banner.Icon>
+      <Banner.Content>
+        <Banner.Title>Get started with KiloClaw</Banner.Title>
+        <Banner.Description>
+          Fully-managed OpenClaw, always online. Set up in minutes.
+        </Banner.Description>
+      </Banner.Content>
+      <Banner.Button href="/claw">Get Started</Banner.Button>
+    </Banner>
   );
 }

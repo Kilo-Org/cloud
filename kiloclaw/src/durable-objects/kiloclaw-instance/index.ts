@@ -1008,7 +1008,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           this.s.flyMachineId = null;
           await this.persist({ flyMachineId: null });
         } else {
-          console.log('[DO] Status is running but machine state is:', machine.state, '-- restarting');
+          console.log(
+            '[DO] Status is running but machine state is:',
+            machine.state,
+            '-- restarting'
+          );
         }
       } catch (err) {
         console.log('[DO] Failed to get machine state, will recreate:', err);

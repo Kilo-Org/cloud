@@ -6,7 +6,6 @@ import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getCodingPlanModelsForUser } from '@/lib/providers/coding-plans';
 import { unstable_cache } from 'next/cache';
-import { ENABLE_CODING_PLANS_UI } from '@/lib/constants';
 
 const getCodingPlanModelsForUser_cached = unstable_cache(
   (userId: string) => getCodingPlanModelsForUser(userId),
@@ -30,8 +29,6 @@ async function getCodingPlanModels() {
   }
 }
 
-export const revalidate = 60;
-
 /**
  * Test using:
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
@@ -42,9 +39,7 @@ export async function GET(
   try {
     const data = await getEnhancedOpenRouterModels();
     return NextResponse.json(
-      ENABLE_CODING_PLANS_UI && Array.isArray(data.data)
-        ? { data: data.data.concat(await getCodingPlanModels()) }
-        : data
+      Array.isArray(data.data) ? { data: data.data.concat(await getCodingPlanModels()) } : data
     );
   } catch (error) {
     captureException(error, {

@@ -117,7 +117,7 @@ export function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Profile" />
+      <ScreenHeader title="Profile" modal />
       <View className="flex-1 px-6 pt-4">
         {/* Active context */}
         <View className="gap-3">

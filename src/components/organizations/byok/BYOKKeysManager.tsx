@@ -44,7 +44,6 @@ import {
 } from '@/lib/providers/openrouter/inference-provider-id';
 import CODING_PLANS from '@/lib/providers/coding-plans/coding-plan-definitions';
 import * as z from 'zod';
-import { ENABLE_CODING_PLANS_UI } from '@/lib/constants';
 
 // Hardcoded BYOK providers list
 const VERCEL_BYOK_PROVIDERS = [
@@ -57,10 +56,7 @@ const VERCEL_BYOK_PROVIDERS = [
   { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Mistral AI (Codestral)' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.mistral, name: 'Mistral AI (other models)' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.xai, name: 'xAI' },
-  {
-    id: VercelUserByokInferenceProviderIdSchema.enum.zai,
-    name: ENABLE_CODING_PLANS_UI ? 'Z.ai (pay as you go)' : 'Z.ai',
-  },
+  { id: VercelUserByokInferenceProviderIdSchema.enum.zai, name: 'Z.ai (pay as you go)' },
 ] as const;
 
 const CODING_PLAN_PROVIDERS = CODING_PLANS.map(plan => ({
@@ -68,10 +64,9 @@ const CODING_PLAN_PROVIDERS = CODING_PLANS.map(plan => ({
   name: plan.name,
 }));
 
-const BYOK_PROVIDERS = [
-  ...(ENABLE_CODING_PLANS_UI ? CODING_PLAN_PROVIDERS : []),
-  ...VERCEL_BYOK_PROVIDERS,
-].toSorted((a, b) => a.name.localeCompare(b.name));
+const BYOK_PROVIDERS = [...CODING_PLAN_PROVIDERS, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
+  a.name.localeCompare(b.name)
+);
 
 function BYOKDescription() {
   return (

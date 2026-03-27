@@ -3106,6 +3106,7 @@ type BotRequestStep = {
         totalTokens?: number;
     };
 };
+type KiloClawCliRunStatus = 'running' | 'completed' | 'failed' | 'cancelled';
 
 /**
  * Auto Triage - Zod Validation Schemas
@@ -3351,6 +3352,21 @@ type UserConfigResponse = {
 type DoctorResponse = {
     success: boolean;
     output: string;
+};
+/** Response from POST /api/platform/kilo-cli-run/start */
+type KiloCliRunStartResponse = {
+    ok: boolean;
+    startedAt: string;
+};
+/** Response from GET /api/platform/kilo-cli-run/status */
+type KiloCliRunStatusResponse = {
+    hasRun: boolean;
+    status: 'running' | 'completed' | 'failed' | 'cancelled' | null;
+    output: string | null;
+    exitCode: number | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    prompt: string | null;
 };
 /** Response from POST /api/admin/machine/restart */
 type RestartMachineResponse = {
@@ -9970,6 +9986,68 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                 output: DoctorResponse;
                 meta: object;
             }>;
+            startKiloCliRun: _trpc_server.TRPCMutationProcedure<{
+                input: {
+                    userId: string;
+                    prompt: string;
+                };
+                output: KiloCliRunStartResponse;
+                meta: object;
+            }>;
+            getKiloCliRunStatus: _trpc_server.TRPCQueryProcedure<{
+                input: {
+                    userId: string;
+                };
+                output: KiloCliRunStatusResponse;
+                meta: object;
+            }>;
+            listKiloCliRuns: _trpc_server.TRPCQueryProcedure<{
+                input: {
+                    userId: string;
+                    limit?: number | undefined;
+                };
+                output: {
+                    runs: {
+                        id: string;
+                        user_id: string;
+                        prompt: string;
+                        status: KiloClawCliRunStatus;
+                        exit_code: number | null;
+                        output: string | null;
+                        started_at: string;
+                        completed_at: string | null;
+                    }[];
+                };
+                meta: object;
+            }>;
+            listAllCliRuns: _trpc_server.TRPCQueryProcedure<{
+                input: {
+                    offset?: number | undefined;
+                    limit?: number | undefined;
+                    search?: string | undefined;
+                    status?: "all" | "cancelled" | "completed" | "failed" | "running" | undefined;
+                };
+                output: {
+                    runs: {
+                        id: string;
+                        user_id: string;
+                        user_email: string | null;
+                        prompt: string;
+                        status: KiloClawCliRunStatus;
+                        exit_code: number | null;
+                        output: string | null;
+                        started_at: string;
+                        completed_at: string | null;
+                    }[];
+                    pagination: {
+                        offset: number;
+                        limit: number;
+                        total: number;
+                        totalPages: number;
+                    };
+                };
+                meta: object;
+            }>;
             restoreConfig: _trpc_server.TRPCMutationProcedure<{
                 input: {
                     userId: string;
@@ -15756,6 +15834,49 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
         runDoctor: _trpc_server.TRPCMutationProcedure<{
             input: void;
             output: DoctorResponse;
+            meta: object;
+        }>;
+        startKiloCliRun: _trpc_server.TRPCMutationProcedure<{
+            input: {
+                prompt: string;
+            };
+            output: {
+                ok: boolean;
+                startedAt: string;
+                id: string;
+            };
+            meta: object;
+        }>;
+        getKiloCliRunStatus: _trpc_server.TRPCQueryProcedure<{
+            input: {
+                runId: string;
+            };
+            output: KiloCliRunStatusResponse;
+            meta: object;
+        }>;
+        cancelKiloCliRun: _trpc_server.TRPCMutationProcedure<{
+            input: void;
+            output: {
+                ok: boolean;
+            };
+            meta: object;
+        }>;
+        listKiloCliRuns: _trpc_server.TRPCQueryProcedure<{
+            input: {
+                limit?: number | undefined;
+            } | undefined;
+            output: {
+                runs: {
+                    id: string;
+                    user_id: string;
+                    prompt: string;
+                    status: KiloClawCliRunStatus;
+                    exit_code: number | null;
+                    output: string | null;
+                    started_at: string;
+                    completed_at: string | null;
+                }[];
+            };
             meta: object;
         }>;
         restoreConfig: _trpc_server.TRPCMutationProcedure<{

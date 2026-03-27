@@ -532,6 +532,72 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       return { runs };
     }),
 
+  listAllCliRuns: adminProcedure
+    .input(
+      z.object({
+        offset: z.number().min(0).default(0),
+        limit: z.number().min(1).max(100).default(25),
+        search: z.string().optional(),
+        status: z
+          .enum(['all', 'running', 'completed', 'failed', 'cancelled'])
+          .default('all'),
+      })
+    )
+    .query(async ({ input }) => {
+      const { offset, limit, search, status } = input;
+      const conditions: SQL[] = [];
+
+      if (status !== 'all') {
+        conditions.push(eq(kiloclaw_cli_runs.status, status));
+      }
+
+      const searchTerm = search?.trim();
+      if (searchTerm) {
+        const escaped = searchTerm.replace(/[%_\\]/g, '\\$&');
+        const pattern = `%${escaped}%`;
+        const searchCond = or(
+          ilike(kilocode_users.google_user_email, pattern),
+          ilike(kiloclaw_cli_runs.prompt, pattern)
+        );
+        if (searchCond) conditions.push(searchCond);
+      }
+
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const [rows, countResult] = await Promise.all([
+        db
+          .select({
+            id: kiloclaw_cli_runs.id,
+            user_id: kiloclaw_cli_runs.user_id,
+            user_email: kilocode_users.google_user_email,
+            prompt: kiloclaw_cli_runs.prompt,
+            status: kiloclaw_cli_runs.status,
+            exit_code: kiloclaw_cli_runs.exit_code,
+            output: kiloclaw_cli_runs.output,
+            started_at: kiloclaw_cli_runs.started_at,
+            completed_at: kiloclaw_cli_runs.completed_at,
+          })
+          .from(kiloclaw_cli_runs)
+          .leftJoin(kilocode_users, eq(kiloclaw_cli_runs.user_id, kilocode_users.id))
+          .where(where)
+          .orderBy(desc(kiloclaw_cli_runs.started_at))
+          .limit(limit)
+          .offset(offset),
+        db
+          .select({ count: sql<number>`COUNT(*)::int` })
+          .from(kiloclaw_cli_runs)
+          .leftJoin(kilocode_users, eq(kiloclaw_cli_runs.user_id, kilocode_users.id))
+          .where(where),
+      ]);
+
+      const total = countResult[0]?.count ?? 0;
+
+      return {
+        runs: rows,
+        pagination: { offset, limit, total, totalPages: Math.ceil(total / limit) },
+      };
+    }),
+
   restoreConfig: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
     const fallbackMessage = 'Failed to restore config';
     try {

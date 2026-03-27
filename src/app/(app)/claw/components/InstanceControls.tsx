@@ -152,7 +152,7 @@ export function InstanceControls({
           </>
         )}
       </div>
-      <div className="mb-4 flex items-start justify-between gap-4">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
           <h3 className="text-foreground mb-1 text-sm font-medium">Instance Controls</h3>
           <p className="text-muted-foreground text-xs">Manage power state and gateway lifecycle.</p>

@@ -139,7 +139,7 @@ export function useStreamChatCredentials(enabled: boolean) {
   return useQuery(
     trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
       enabled,
-      staleTime: 5 * 60_000, // credentials don't change; avoid redundant refetches
+      staleTime: 5 * 60_000,
     })
   );
 }

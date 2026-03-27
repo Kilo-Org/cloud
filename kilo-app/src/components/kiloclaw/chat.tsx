@@ -3,12 +3,12 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { Settings } from 'lucide-react-native';
-import { StreamChat, type Channel as StreamChannel, type Event } from 'stream-chat';
+import { type Event, type Channel as StreamChannel, StreamChat } from 'stream-chat';
 import {
-  Chat,
   Channel,
-  MessageList,
+  Chat,
   MessageInput,
+  MessageList,
   OverlayProvider,
 } from 'stream-chat-react-native';
 
@@ -72,13 +72,7 @@ export function KiloClawChat({ instanceId, enabled }: Readonly<KiloClawChatProps
 
 // ─── Internal components ────────────────────────────────────────────────────
 
-function ChatShell({
-  instanceId,
-  children,
-}: {
-  instanceId: string;
-  children: React.ReactNode;
-}) {
+function ChatShell({ instanceId, children }: { instanceId: string; children: React.ReactNode }) {
   return (
     <View className="flex-1 bg-background">
       <ChatHeader instanceId={instanceId} />
@@ -87,22 +81,14 @@ function ChatShell({
   );
 }
 
-function ChatHeader({
-  instanceId,
-  botOnline,
-}: {
-  instanceId: string;
-  botOnline?: boolean;
-}) {
+function ChatHeader({ instanceId, botOnline }: { instanceId: string; botOnline?: boolean }) {
   const router = useRouter();
   const colors = useThemeColors();
 
   const settingsButton = (
     <Pressable
       onPress={() => {
-        router.push(
-          `/(app)/(tabs)/(1_kiloclaw)/${instanceId}/dashboard` as Href
-        );
+        router.push(`/(app)/(tabs)/(1_kiloclaw)/${instanceId}/dashboard` as Href);
       }}
       hitSlop={12}
       accessibilityLabel="Settings"
@@ -128,12 +114,8 @@ function ChatHeader({
 function BotStatusIndicator({ online }: { online: boolean }) {
   return (
     <View className="flex-row items-center gap-1.5">
-      <View
-        className={`h-2 w-2 rounded-full ${online ? 'bg-emerald-400' : 'bg-neutral-500'}`}
-      />
-      <Text className="text-xs text-muted-foreground">
-        {online ? 'Online' : 'Offline'}
-      </Text>
+      <View className={`h-2 w-2 rounded-full ${online ? 'bg-emerald-400' : 'bg-neutral-500'}`} />
+      <Text className="text-xs text-muted-foreground">{online ? 'Online' : 'Offline'}</Text>
     </View>
   );
 }
@@ -172,29 +154,28 @@ function StreamChatUI({
   useEffect(() => {
     const chatClient = StreamChat.getInstance(apiKey);
 
-    let didCancel = false;
+    let cancelled = false;
 
     const connect = async () => {
       try {
         await chatClient.connectUser({ id: userId }, tokenProvider);
-        if (didCancel) return;
-
         const ch = chatClient.channel('messaging', channelId);
         await ch.watch({ presence: true });
-        if (didCancel) return;
-
-        setClient(chatClient);
-        setChannel(ch);
-      } catch (err) {
-        if (didCancel) return;
-        setConnectError(err instanceof Error ? err.message : 'Failed to connect to chat.');
+        if (!cancelled) {
+          setClient(chatClient);
+          setChannel(ch);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setConnectError(error instanceof Error ? error.message : 'Failed to connect to chat.');
+        }
       }
     };
 
     void connect();
 
     return () => {
-      didCancel = true;
+      cancelled = true;
       void chatClient.disconnectUser();
       setClient(null);
       setChannel(null);
@@ -247,21 +228,21 @@ function useBotOnlineStatus(
   const [online, setOnline] = useState(false);
 
   useEffect(() => {
-    if (!client || !channel) return;
-
-    // Check initial state
-    const member = channel.state.members[botUserId];
-    setOnline(!!member?.user?.online);
-
     const handlePresenceChange = (event: Event) => {
       if (event.user?.id === botUserId) {
-        setOnline(!!event.user.online);
+        setOnline(Boolean(event.user.online));
       }
     };
 
-    client.on('user.presence.changed', handlePresenceChange);
+    if (client && channel) {
+      // Check initial state
+      const member = channel.state.members[botUserId];
+      setOnline(Boolean(member.user?.online));
+      client.on('user.presence.changed', handlePresenceChange);
+    }
+
     return () => {
-      client.off('user.presence.changed', handlePresenceChange);
+      client?.off('user.presence.changed', handlePresenceChange);
     };
   }, [client, channel, botUserId]);
 

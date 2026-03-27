@@ -21,11 +21,11 @@ const DEPLOY_HINT_STYLES = {
   },
   redeploy_required: {
     label: 'Redeploy Required',
-    className: 'border-red-500/30 bg-red-500/15 text-red-400',
+    className: 'border-purple-500/30 bg-purple-500/15 text-purple-400',
   },
   upgrade_required: {
     label: 'Upgrade Required',
-    className: 'border-purple-500/30 bg-purple-500/15 text-purple-400',
+    className: 'border-red-500/30 bg-red-500/15 text-red-400',
   },
 } as const;
 

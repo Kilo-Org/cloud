@@ -3314,6 +3314,8 @@ export const kiloclaw_instances = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     sandbox_id: text().notNull(),
+    // Null = personal instance. Non-null = org-owned instance.
+    organization_id: uuid().references(() => organizations.id),
     name: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),

@@ -116,8 +116,18 @@ export const SecretsPatchSchema = z.object({
     .optional(),
 });
 
+/**
+ * Zod schema for validating instanceId at IO boundaries (query params, path params).
+ * instanceId = kiloclaw_instances.id UUID.
+ */
+export const InstanceIdParam = z.string().uuid();
+
 export const ProvisionRequestSchema = z.object({
   userId: z.string().min(1),
+  /** Optional DB row UUID used as the DO key for multi-instance support. */
+  instanceId: z.string().uuid().optional(),
+  /** Optional org ID — null/absent means personal instance. */
+  orgId: z.string().uuid().nullable().optional(),
   ...InstanceConfigSchema.omit({ googleCredentials: true }).shape,
 });
 
@@ -142,6 +152,8 @@ export const DestroyRequestSchema = z.object({
 export const PersistedStateSchema = z.object({
   userId: z.string().default(''),
   sandboxId: z.string().default(''),
+  /** Organization ID — null for personal instances, set for org instances. */
+  orgId: z.string().nullable().default(null),
   status: z
     .enum([
       'provisioned',

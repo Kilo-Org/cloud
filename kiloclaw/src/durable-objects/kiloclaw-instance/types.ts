@@ -41,6 +41,7 @@ export type InstanceMutableState = {
   loaded: boolean;
   userId: string | null;
   sandboxId: string | null;
+  orgId: string | null;
   status: InstanceStatus | null;
   envVars: PersistedState['envVars'];
   encryptedSecrets: PersistedState['encryptedSecrets'];

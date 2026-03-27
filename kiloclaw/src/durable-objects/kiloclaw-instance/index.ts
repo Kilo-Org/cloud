@@ -21,7 +21,7 @@ import type {
 import { DEFAULT_INSTANCE_FEATURES } from '../../schemas/instance-config';
 import type { FlyVolume, FlyVolumeSnapshot } from '../../fly/types';
 import * as fly from '../../fly/client';
-import { sandboxIdFromUserId } from '../../auth/sandbox-id';
+import { sandboxIdFromUserId, sandboxIdFromInstanceId } from '../../auth/sandbox-id';
 import { resolveLatestVersion, resolveVersionByTag } from '../../lib/image-version';
 import { lookupCatalogVersion } from '../../lib/catalog-registration';
 import { ImageVariantSchema } from '../../schemas/image-version';
@@ -199,7 +199,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   // Lifecycle methods (called by platform API routes via RPC)
   // ========================================================================
 
-  async provision(userId: string, config: InstanceConfig): Promise<{ sandboxId: string }> {
+  async provision(
+    userId: string,
+    config: InstanceConfig,
+    opts?: { orgId?: string | null; instanceId?: string }
+  ): Promise<{ sandboxId: string }> {
     const provisionStart = performance.now();
     await this.loadState();
 
@@ -210,7 +214,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error('Cannot provision: instance is restoring from snapshot');
     }
 
-    const sandboxId = sandboxIdFromUserId(userId);
+    // For instance-keyed DOs (instanceId provided), derive sandboxId from instanceId.
+    // For legacy userId-keyed DOs, derive from userId.
+    const sandboxId = opts?.instanceId
+      ? sandboxIdFromInstanceId(opts.instanceId)
+      : sandboxIdFromUserId(userId);
     const isNew = !this.s.status;
 
     // Ensure per-user Fly App exists on first provision only.
@@ -322,6 +330,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const configFields = {
       userId,
       sandboxId,
+      orgId: opts?.orgId ?? null,
       status: (this.s.status ?? 'provisioned') satisfies InstanceStatus,
       envVars: config.envVars ?? null,
       encryptedSecrets: config.encryptedSecrets ?? null,
@@ -371,6 +380,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     this.s.userId = userId;
     this.s.sandboxId = sandboxId;
+    this.s.orgId = opts?.orgId ?? null;
     this.s.status = this.s.status ?? 'provisioned';
     this.s.envVars = config.envVars ?? null;
     this.s.encryptedSecrets = config.encryptedSecrets ?? null;
@@ -1278,6 +1288,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async getStatus(): Promise<{
     userId: string | null;
     sandboxId: string | null;
+    orgId: string | null;
     status: InstanceStatus | null;
     provisionedAt: number | null;
     lastStartedAt: number | null;
@@ -1314,6 +1325,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return {
       userId: this.s.userId,
       sandboxId: this.s.sandboxId,
+      orgId: this.s.orgId,
       status: this.s.status,
       provisionedAt: this.s.provisionedAt,
       lastStartedAt: this.s.lastStartedAt,
@@ -1374,6 +1386,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async getDebugState(): Promise<{
     userId: string | null;
     sandboxId: string | null;
+    orgId: string | null;
     status: InstanceStatus | null;
     provisionedAt: number | null;
     lastStartedAt: number | null;
@@ -1417,6 +1430,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return {
       userId: this.s.userId,
       sandboxId: this.s.sandboxId,
+      orgId: this.s.orgId,
       status: this.s.status,
       provisionedAt: this.s.provisionedAt,
       lastStartedAt: this.s.lastStartedAt,

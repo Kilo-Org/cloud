@@ -15890,7 +15890,9 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
             meta: object;
         }>;
         cancelKiloCliRun: _trpc_server.TRPCMutationProcedure<{
-            input: void;
+            input: {
+                runId: string;
+            };
             output: {
                 ok: boolean;
             };

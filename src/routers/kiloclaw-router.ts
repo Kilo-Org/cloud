@@ -940,25 +940,31 @@ export const kiloclawRouter = createTRPCRouter({
       };
     }),
 
-  cancelKiloCliRun: clawAccessProcedure.mutation(async ({ ctx }) => {
-    const client = new KiloClawInternalClient();
-    const result = await client.cancelKiloCliRun(ctx.user.id);
+  cancelKiloCliRun: clawAccessProcedure
+    .input(z.object({ runId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const client = new KiloClawInternalClient();
+      const result = await client.cancelKiloCliRun(ctx.user.id);
 
-    // Mark the running record as cancelled in DB
-    if (result.ok) {
-      await db
-        .update(kiloclaw_cli_runs)
-        .set({
-          status: 'cancelled',
-          completed_at: new Date().toISOString(),
-        })
-        .where(
-          and(eq(kiloclaw_cli_runs.user_id, ctx.user.id), eq(kiloclaw_cli_runs.status, 'running'))
-        );
-    }
+      // Mark the specific run as cancelled in DB
+      if (result.ok) {
+        await db
+          .update(kiloclaw_cli_runs)
+          .set({
+            status: 'cancelled',
+            completed_at: new Date().toISOString(),
+          })
+          .where(
+            and(
+              eq(kiloclaw_cli_runs.id, input.runId),
+              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              eq(kiloclaw_cli_runs.status, 'running')
+            )
+          );
+      }
 
-    return result;
-  }),
+      return result;
+    }),
 
   listKiloCliRuns: clawAccessProcedure
     .input(z.object({ limit: z.number().min(1).max(50).default(10) }).optional())

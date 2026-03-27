@@ -101,7 +101,7 @@ export default function KiloCliRunPage() {
                 variant="outline"
                 className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
                 disabled={mutations.cancelKiloCliRun.isPending}
-                onClick={() => mutations.cancelKiloCliRun.mutate(undefined)}
+                onClick={() => mutations.cancelKiloCliRun.mutate({ runId: id })}
               >
                 <Square className="h-3 w-3" />
                 Cancel

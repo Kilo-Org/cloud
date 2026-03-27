@@ -236,8 +236,10 @@ function useBotOnlineStatus(
 
     if (client && channel) {
       // Check initial state
-      const member = channel.state.members[botUserId];
-      setOnline(Boolean(member.user?.online));
+      const member = channel.state.members[botUserId] as
+        | (typeof channel.state.members)[string]
+        | undefined;
+      setOnline(Boolean(member?.user?.online));
       client.on('user.presence.changed', handlePresenceChange);
     }
 

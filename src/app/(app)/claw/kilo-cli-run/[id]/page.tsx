@@ -60,12 +60,12 @@ export default function KiloCliRunPage() {
 
   const isDone = runStatus?.hasRun && runStatus.status !== null && runStatus.status !== 'running';
 
-  // Auto-scroll output to bottom
+  // Auto-scroll output to bottom when new content arrives
   useEffect(() => {
-    if (outputRef.current && runStatus?.status === 'running') {
+    if (outputRef.current) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
     }
-  }, [runStatus?.output, runStatus?.status]);
+  }, [runStatus?.output]);
 
   return (
     <div className="mx-auto container max-w-285 space-y-6 p-6">
@@ -136,7 +136,7 @@ export default function KiloCliRunPage() {
           <div className="border-border bg-background overflow-hidden rounded-md border">
             <pre
               ref={outputRef}
-              className="overflow-auto p-4 text-xs leading-relaxed whitespace-pre"
+              className="overflow-auto p-4 text-xs leading-relaxed whitespace-pre-wrap break-words"
               style={{ fontFamily: "'Courier New', Courier, monospace", tabSize: 8 }}
             >
               {stripAnsi(runStatus.output)}

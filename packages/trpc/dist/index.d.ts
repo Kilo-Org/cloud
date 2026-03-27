@@ -5786,6 +5786,9 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
             initiateFromKilocodeSessionStream: _trpc_server.TRPCSubscriptionProcedure<{
                 input: {
                     organizationId: string;
+                    cloudAgentSessionId: string;
+                } | {
+                    organizationId: string;
                     kiloSessionId: string;
                     githubRepo: string;
                     prompt: string;
@@ -5794,9 +5797,6 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     envVars?: Record<string, string> | undefined;
                     setupCommands?: string[] | undefined;
                     autoCommit?: boolean | undefined;
-                } | {
-                    organizationId: string;
-                    cloudAgentSessionId: string;
                 };
                 output: AsyncIterable<StreamEvent, void, any>;
                 meta: object;
@@ -6026,6 +6026,9 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
             initiateFromKilocodeSessionV2: _trpc_server.TRPCMutationProcedure<{
                 input: {
                     organizationId: string;
+                    cloudAgentSessionId: string;
+                } | {
+                    organizationId: string;
                     kiloSessionId: string;
                     githubRepo: string;
                     prompt: string;
@@ -6034,9 +6037,6 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     envVars?: Record<string, string> | undefined;
                     setupCommands?: string[] | undefined;
                     autoCommit?: boolean | undefined;
-                } | {
-                    organizationId: string;
-                    cloudAgentSessionId: string;
                 };
                 output: {
                     cloudAgentSessionId: string;
@@ -10120,6 +10120,17 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                 output: RestartMachineResponse;
                 meta: object;
             }>;
+            destroyFlyMachine: _trpc_server.TRPCMutationProcedure<{
+                input: {
+                    userId: string;
+                    appName: string;
+                    machineId: string;
+                };
+                output: {
+                    ok: true;
+                };
+                meta: object;
+            }>;
             destroy: _trpc_server.TRPCMutationProcedure<{
                 input: {
                     id: string;
@@ -10136,7 +10147,7 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                     limit?: number | undefined;
                 };
                 output: {
-                    action: "kiloclaw.config.restore" | "kiloclaw.doctor.run" | "kiloclaw.gateway.restart" | "kiloclaw.gateway.start" | "kiloclaw.gateway.stop" | "kiloclaw.instance.destroy" | "kiloclaw.machine.start" | "kiloclaw.machine.stop" | "kiloclaw.snapshot.restore" | "kiloclaw.subscription.reset_trial" | "kiloclaw.subscription.update_trial_end" | "kiloclaw.volume.reassociate";
+                    action: "kiloclaw.config.restore" | "kiloclaw.doctor.run" | "kiloclaw.gateway.restart" | "kiloclaw.gateway.start" | "kiloclaw.gateway.stop" | "kiloclaw.instance.destroy" | "kiloclaw.machine.destroy_fly" | "kiloclaw.machine.start" | "kiloclaw.machine.stop" | "kiloclaw.snapshot.restore" | "kiloclaw.subscription.reset_trial" | "kiloclaw.subscription.update_trial_end" | "kiloclaw.volume.reassociate";
                     actor_email: string | null;
                     actor_id: string | null;
                     actor_name: string | null;
@@ -12779,8 +12790,6 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
         }>;
         initiateFromKilocodeSessionStream: _trpc_server.TRPCSubscriptionProcedure<{
             input: {
-                cloudAgentSessionId: string;
-            } | {
                 kiloSessionId: string;
                 githubRepo: string;
                 prompt: string;
@@ -12789,6 +12798,8 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                 envVars?: Record<string, string> | undefined;
                 setupCommands?: string[] | undefined;
                 autoCommit?: boolean | undefined;
+            } | {
+                cloudAgentSessionId: string;
             };
             output: AsyncIterable<StreamEvent, void, any>;
             meta: object;
@@ -13016,8 +13027,6 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
         }>;
         initiateFromKilocodeSessionV2: _trpc_server.TRPCMutationProcedure<{
             input: {
-                cloudAgentSessionId: string;
-            } | {
                 kiloSessionId: string;
                 githubRepo: string;
                 prompt: string;
@@ -13026,6 +13035,8 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                 envVars?: Record<string, string> | undefined;
                 setupCommands?: string[] | undefined;
                 autoCommit?: boolean | undefined;
+            } | {
+                cloudAgentSessionId: string;
             };
             output: {
                 cloudAgentSessionId: string;
@@ -15851,7 +15862,23 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
             input: {
                 runId: string;
             };
-            output: KiloCliRunStatusResponse;
+            output: {
+                hasRun: boolean;
+                status: null;
+                output: null;
+                exitCode: null;
+                startedAt: null;
+                completedAt: null;
+                prompt: null;
+            } | {
+                hasRun: boolean;
+                status: "cancelled" | "completed" | "failed" | "running" | null;
+                output: string | null;
+                exitCode: number | null;
+                startedAt: string | null;
+                completedAt: string | null;
+                prompt: string;
+            };
             meta: object;
         }>;
         cancelKiloCliRun: _trpc_server.TRPCMutationProcedure<{

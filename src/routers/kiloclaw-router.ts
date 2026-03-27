@@ -870,10 +870,48 @@ export const kiloclawRouter = createTRPCRouter({
   getKiloCliRunStatus: clawAccessProcedure
     .input(z.object({ runId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      // Load the requested run from the DB to avoid cross-run data leaks.
+      // The controller only tracks the *current* run, so polling it for an
+      // older run would return the wrong output.
+      const [row] = await db
+        .select()
+        .from(kiloclaw_cli_runs)
+        .where(
+          and(eq(kiloclaw_cli_runs.id, input.runId), eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+        )
+        .limit(1);
+
+      if (!row) {
+        return {
+          hasRun: false,
+          status: null,
+          output: null,
+          exitCode: null,
+          startedAt: null,
+          completedAt: null,
+          prompt: null,
+        };
+      }
+
+      // If the DB row is already terminal, return it directly — no need to
+      // poll the controller (which may be running a different job).
+      if (row.status !== 'running') {
+        return {
+          hasRun: true,
+          status: row.status as 'completed' | 'failed' | 'cancelled',
+          output: row.output,
+          exitCode: row.exit_code,
+          startedAt: row.started_at,
+          completedAt: row.completed_at ?? null,
+          prompt: row.prompt,
+        };
+      }
+
+      // Run is still active — poll the controller for live output.
       const client = new KiloClawInternalClient();
       const controllerStatus = await client.getKiloCliRunStatus(ctx.user.id);
 
-      // If controller reports a completed run, update the DB record
+      // If controller reports the run finished, persist to the DB row.
       if (
         controllerStatus.hasRun &&
         controllerStatus.status !== 'running' &&
@@ -896,7 +934,10 @@ export const kiloclawRouter = createTRPCRouter({
           );
       }
 
-      return controllerStatus;
+      return {
+        ...controllerStatus,
+        prompt: row.prompt,
+      };
     }),
 
   cancelKiloCliRun: clawAccessProcedure.mutation(async ({ ctx }) => {

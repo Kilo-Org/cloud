@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { useKiloClawMutations } from '@/hooks/useKiloClaw';
 
 export function StartKiloCliRunDialog({
   open,
@@ -23,19 +24,27 @@ export function StartKiloCliRunDialog({
 }) {
   const router = useRouter();
   const [prompt, setPrompt] = useState('');
-  const [isNavigating, setIsNavigating] = useState(false);
+  const mutations = useKiloClawMutations();
+  const startMutation = mutations.startKiloCliRun;
 
   const handleStart = () => {
-    if (!prompt.trim()) return;
-    setIsNavigating(true);
-    onOpenChange(false);
-    router.push(`/claw/kilo-run?prompt=${encodeURIComponent(prompt.trim())}`);
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+    startMutation.mutate(
+      { prompt: trimmed },
+      {
+        onSuccess: data => {
+          onOpenChange(false);
+          router.push(`/claw/kilo-cli-run/${data.id}`);
+        },
+      }
+    );
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setPrompt('');
-      setIsNavigating(false);
+      startMutation.reset();
     }
     onOpenChange(nextOpen);
   };
@@ -81,10 +90,10 @@ export function StartKiloCliRunDialog({
           </Button>
           <Button
             onClick={handleStart}
-            disabled={!prompt.trim() || isNavigating}
+            disabled={!prompt.trim() || startMutation.isPending}
             className="bg-emerald-600 text-white hover:bg-emerald-700"
           >
-            {isNavigating ? (
+            {startMutation.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Starting...

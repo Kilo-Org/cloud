@@ -101,13 +101,17 @@ export function useControllerVersion(enabled: boolean) {
   );
 }
 
-export function useKiloCliRunStatus(enabled: boolean) {
+export function useKiloCliRunStatus(runId: string | null) {
   const trpc = useTRPC();
   return useQuery(
-    trpc.kiloclaw.getKiloCliRunStatus.queryOptions(undefined, {
-      enabled,
-      refetchInterval: enabled ? 3_000 : false,
-    })
+    trpc.kiloclaw.getKiloCliRunStatus.queryOptions(
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by `enabled: runId !== null`
+      { runId: runId! },
+      {
+        enabled: runId !== null,
+        refetchInterval: runId !== null ? 3_000 : false,
+      }
+    )
   );
 }
 
@@ -228,7 +232,14 @@ export function useKiloClawMutations() {
       trpc.kiloclaw.runDoctor.mutationOptions({ onSuccess: invalidateStatus })
     ),
     startKiloCliRun: useMutation(
-      trpc.kiloclaw.startKiloCliRun.mutationOptions({ onSuccess: invalidateStatus })
+      trpc.kiloclaw.startKiloCliRun.mutationOptions({
+        onSuccess: async () => {
+          await invalidateStatus();
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.listKiloCliRuns.queryKey(),
+          });
+        },
+      })
     ),
     cancelKiloCliRun: useMutation(
       trpc.kiloclaw.cancelKiloCliRun.mutationOptions({ onSuccess: invalidateStatus })

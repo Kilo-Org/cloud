@@ -853,39 +853,32 @@ export const kiloclawRouter = createTRPCRouter({
       const client = new KiloClawInternalClient();
       const result = await client.startKiloCliRun(ctx.user.id, input.prompt);
 
-      // Persist the run in the database
-      await db.insert(kiloclaw_cli_runs).values({
-        user_id: ctx.user.id,
-        prompt: input.prompt,
-        status: 'running',
-        started_at: result.startedAt,
-      });
+      // Persist the run in the database and return its ID
+      const [row] = await db
+        .insert(kiloclaw_cli_runs)
+        .values({
+          user_id: ctx.user.id,
+          prompt: input.prompt,
+          status: 'running',
+          started_at: result.startedAt,
+        })
+        .returning({ id: kiloclaw_cli_runs.id });
 
-      return result;
+      return { ...result, id: row.id };
     }),
 
-  getKiloCliRunStatus: clawAccessProcedure.query(async ({ ctx }) => {
-    const client = new KiloClawInternalClient();
-    const controllerStatus = await client.getKiloCliRunStatus(ctx.user.id);
+  getKiloCliRunStatus: clawAccessProcedure
+    .input(z.object({ runId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const client = new KiloClawInternalClient();
+      const controllerStatus = await client.getKiloCliRunStatus(ctx.user.id);
 
-    // If controller reports a completed run, update the DB record
-    if (
-      controllerStatus.hasRun &&
-      controllerStatus.status !== 'running' &&
-      controllerStatus.startedAt
-    ) {
-      const matchingRun = await db
-        .select({ id: kiloclaw_cli_runs.id })
-        .from(kiloclaw_cli_runs)
-        .where(
-          and(
-            eq(kiloclaw_cli_runs.user_id, ctx.user.id),
-            eq(kiloclaw_cli_runs.status, 'running')
-          )
-        )
-        .limit(1);
-
-      if (matchingRun.length > 0) {
+      // If controller reports a completed run, update the DB record
+      if (
+        controllerStatus.hasRun &&
+        controllerStatus.status !== 'running' &&
+        controllerStatus.startedAt
+      ) {
         await db
           .update(kiloclaw_cli_runs)
           .set({
@@ -894,12 +887,17 @@ export const kiloclawRouter = createTRPCRouter({
             output: controllerStatus.output,
             completed_at: controllerStatus.completedAt ?? new Date().toISOString(),
           })
-          .where(eq(kiloclaw_cli_runs.id, matchingRun[0].id));
+          .where(
+            and(
+              eq(kiloclaw_cli_runs.id, input.runId),
+              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              eq(kiloclaw_cli_runs.status, 'running')
+            )
+          );
       }
-    }
 
-    return controllerStatus;
-  }),
+      return controllerStatus;
+    }),
 
   cancelKiloCliRun: clawAccessProcedure.mutation(async ({ ctx }) => {
     const client = new KiloClawInternalClient();

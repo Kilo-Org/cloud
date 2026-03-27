@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, Loader2, XCircle, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useKiloCliRunStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
@@ -47,35 +47,19 @@ function StatusBadge({ status }: { status: string | null }) {
   }
 }
 
-export default function KiloRunPage() {
+export default function KiloCliRunPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const prompt = searchParams.get('prompt');
+  const { id } = useParams<{ id: string }>();
   const outputRef = useRef<HTMLPreElement>(null);
   const mutations = useKiloClawMutations();
-  const startMutation = mutations.startKiloCliRun;
 
-  // Derive polling state from the mutation lifecycle — no callbacks needed.
-  // Poll only after the start mutation succeeded (isSuccess), and stop once
-  // the run completes (isDone).
-  const startSucceeded = startMutation.isSuccess;
-
-  const statusQuery = useKiloCliRunStatus(startSucceeded);
+  const statusQuery = useKiloCliRunStatus(id);
   const runStatus = statusQuery.data;
 
   const isDone =
     runStatus?.hasRun &&
     runStatus.status !== null &&
     runStatus.status !== 'running';
-
-  // Auto-start the run when the page opens with a prompt
-  const hasFired = useRef(false);
-  useEffect(() => {
-    if (prompt && !hasFired.current) {
-      hasFired.current = true;
-      startMutation.mutate({ prompt });
-    }
-  }, [prompt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll output to bottom
   useEffect(() => {
@@ -97,18 +81,16 @@ export default function KiloRunPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold">Kilo CLI Run</h1>
-            {/* Show the prompt from the URL while waiting, from the controller once polling */}
-            <p className="text-muted-foreground mt-1 text-sm">
-              Prompt: &quot;{(() => {
-                const displayPrompt = runStatus?.prompt ?? prompt ?? '';
-                return displayPrompt.length > 200
-                  ? displayPrompt.slice(0, 200) + '...'
-                  : displayPrompt;
-              })()}&quot;
-            </p>
+            {runStatus?.prompt && (
+              <p className="text-muted-foreground mt-1 text-sm">
+                Prompt: &quot;{runStatus.prompt.length > 200
+                  ? runStatus.prompt.slice(0, 200) + '...'
+                  : runStatus.prompt}&quot;
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-3">
-            {startSucceeded && runStatus && <StatusBadge status={runStatus.status} />}
+            {runStatus && <StatusBadge status={runStatus.status} />}
             {runStatus?.status === 'running' && (
               <Button
                 size="sm"
@@ -124,28 +106,20 @@ export default function KiloRunPage() {
           </div>
         </div>
 
-        {/* Loading state: start mutation in flight */}
-        {startMutation.isPending && (
-          <div className="flex flex-col items-center justify-center gap-3 py-16">
-            <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
-            <p className="text-muted-foreground text-sm">Starting kilo CLI run...</p>
-          </div>
-        )}
-
-        {/* Waiting for first poll result after start succeeded */}
-        {startSucceeded && !runStatus?.hasRun && (
+        {/* Loading state: waiting for first poll result */}
+        {!runStatus?.hasRun && !statusQuery.isError && (
           <div className="flex flex-col items-center justify-center gap-3 py-16">
             <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
             <p className="text-muted-foreground text-sm">Waiting for output...</p>
           </div>
         )}
 
-        {/* Error starting the run */}
-        {startMutation.isError && (
+        {/* Error loading the run */}
+        {statusQuery.isError && (
           <div className="flex flex-col items-center justify-center gap-3 py-16">
             <XCircle className="h-8 w-8 text-red-400" />
             <p className="text-sm text-red-400">
-              {startMutation.error?.message ?? 'Failed to start kilo CLI run'}
+              {statusQuery.error?.message ?? 'Failed to load run status'}
             </p>
             <Button variant="outline" size="sm" onClick={() => router.push('/claw')}>
               Back to Dashboard
@@ -154,7 +128,7 @@ export default function KiloRunPage() {
         )}
 
         {/* Output viewer */}
-        {startSucceeded && runStatus?.hasRun && runStatus.output !== null && (
+        {runStatus?.hasRun && runStatus.output !== null && (
           <div className="border-border bg-background overflow-hidden rounded-md border">
             <pre
               ref={outputRef}

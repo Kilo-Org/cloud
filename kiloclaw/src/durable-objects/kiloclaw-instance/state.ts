@@ -29,6 +29,7 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     const d = parsed.data;
     s.userId = d.userId || null;
     s.sandboxId = d.sandboxId || null;
+    s.orgId = d.orgId;
     s.status = d.userId ? d.status : null;
     s.envVars = d.envVars;
     s.encryptedSecrets = d.encryptedSecrets;
@@ -103,6 +104,7 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
 export function resetMutableState(s: InstanceMutableState): void {
   s.userId = null;
   s.sandboxId = null;
+  s.orgId = null;
   s.status = null;
   s.envVars = null;
   s.encryptedSecrets = null;
@@ -168,6 +170,7 @@ export function createMutableState(): InstanceMutableState {
     loaded: false,
     userId: null,
     sandboxId: null,
+    orgId: null,
     status: null,
     envVars: null,
     encryptedSecrets: null,

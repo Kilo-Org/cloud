@@ -1582,6 +1582,7 @@ export const kiloclawRouter = createTRPCRouter({
             id: kiloclaw_instances.id,
             userId: kiloclaw_instances.user_id,
             sandboxId: kiloclaw_instances.sandbox_id,
+            organizationId: kiloclaw_instances.organization_id,
             name: kiloclaw_instances.name,
           })
           .from(kiloclaw_instances)

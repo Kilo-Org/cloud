@@ -6,6 +6,7 @@ import {
   isCustomSecretEnvVar,
 } from '@kilocode/kiloclaw-secret-catalog';
 import { instrumented } from '../middleware/analytics';
+import { InstanceIdParam } from '../schemas/instance-config';
 
 /** Channel env var names — excluded from secretCount (channels have their own counts). */
 const CHANNEL_ENV_VARS = new Set(
@@ -28,7 +29,21 @@ const kiloclaw = new Hono<AppEnv>();
 kiloclaw.get('/config', c =>
   instrumented(c, 'GET /api/kiloclaw/config', async () => {
     const userId = c.get('userId');
-    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
+    const raw = c.req.query('instanceId');
+    if (raw && !InstanceIdParam.safeParse(raw).success) {
+      return c.json({ error: 'Invalid instance ID' }, 400);
+    }
+    const instanceId = raw || undefined;
+    const doKey = instanceId ?? userId;
+    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
+
+    // When accessing by instanceId, verify the authenticated user owns this instance.
+    if (instanceId) {
+      const status = await stub.getStatus();
+      if (status.userId !== userId) {
+        return c.json({ error: 'Access denied' }, 403);
+      }
+    }
 
     const config = await stub.getConfig();
 
@@ -53,9 +68,20 @@ kiloclaw.get('/config', c =>
 kiloclaw.get('/status', c =>
   instrumented(c, 'GET /api/kiloclaw/status', async () => {
     const userId = c.get('userId');
-    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
+    const raw = c.req.query('instanceId');
+    if (raw && !InstanceIdParam.safeParse(raw).success) {
+      return c.json({ error: 'Invalid instance ID' }, 400);
+    }
+    const instanceId = raw || undefined;
+    const doKey = instanceId ?? userId;
+    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
 
     const status = await stub.getStatus();
+
+    // When accessing by instanceId, verify the authenticated user owns this instance.
+    if (instanceId && status.userId !== userId) {
+      return c.json({ error: 'Access denied' }, 403);
+    }
 
     return c.json(status);
   })
@@ -65,7 +91,21 @@ kiloclaw.get('/status', c =>
 kiloclaw.get('/chat-credentials', c =>
   instrumented(c, 'GET /api/kiloclaw/chat-credentials', async () => {
     const userId = c.get('userId');
-    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
+    const raw = c.req.query('instanceId');
+    if (raw && !InstanceIdParam.safeParse(raw).success) {
+      return c.json({ error: 'Invalid instance ID' }, 400);
+    }
+    const instanceId = raw || undefined;
+    const doKey = instanceId ?? userId;
+    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
+
+    // When accessing by instanceId, verify the authenticated user owns this instance.
+    if (instanceId) {
+      const status = await stub.getStatus();
+      if (status.userId !== userId) {
+        return c.json({ error: 'Access denied' }, 403);
+      }
+    }
 
     const creds = await stub.getStreamChatCredentials();
 

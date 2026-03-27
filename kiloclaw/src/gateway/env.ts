@@ -30,6 +30,8 @@ export type UserConfig = {
   instanceFeatures?: string[];
   execSecurity?: string | null;
   execAsk?: string | null;
+  /** Organization ID — injected as KILOCODE_ORGANIZATION_ID for org instances. */
+  orgId?: string | null;
   customSecretMeta?: Record<string, { configPath?: string }> | null;
 };
 
@@ -186,6 +188,11 @@ export async function buildEnvVars(
         console.warn('Failed to decrypt Google credentials, starting without Google access:', err);
       }
     }
+  }
+
+  // Org identity (non-sensitive, plaintext)
+  if (userConfig?.orgId) {
+    plainEnv.KILOCODE_ORGANIZATION_ID = userConfig.orgId;
   }
 
   // Worker-level passthrough (non-sensitive)

@@ -72,6 +72,11 @@ const FRONTIER_CODE_MODEL: ResolvedAutoModel = {
 };
 
 const FRONTIER_MODE_TO_MODEL: Record<string, ResolvedAutoModel> = {
+  KiloClaw: {
+    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
+    reasoning: { enabled: true },
+    verbosity: 'high',
+  },
   plan: { model: CLAUDE_OPUS_CURRENT_MODEL_ID, reasoning: { enabled: true }, verbosity: 'high' },
   general: {
     model: CLAUDE_OPUS_CURRENT_MODEL_ID,
@@ -113,6 +118,7 @@ const BALANCED_IMAGE_MODEL: ResolvedAutoModel = {
 };
 
 const BALANCED_MODE_TO_MODEL: Record<string, ResolvedAutoModel> = {
+  KiloClaw: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   plan: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   general: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   architect: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
@@ -231,7 +237,7 @@ export async function resolveAutoModel(
       model: (await balancePromise) > 0 ? GPT_5_NANO_ID : gpt_oss_20b_free_model.public_id,
     };
   }
-  const mode = modeHeader?.trim().toLowerCase() ?? '';
+  const mode = modeHeader?.trim() ?? '';
   if (mappedModel === KILO_AUTO_BALANCED_MODEL.id) {
     if (hasImages) {
       return BALANCED_IMAGE_MODEL;
@@ -257,7 +263,7 @@ export async function applyResolvedAutoModel(
   const hasImages = requestContainsImages(request);
   const resolved = await resolveAutoModel(
     model,
-    featureHeader === 'kiloclaw' ? 'plan' : modeHeader,
+    featureHeader === 'kiloclaw' ? 'KiloClaw' : modeHeader,
     balancePromise,
     hasImages
   );

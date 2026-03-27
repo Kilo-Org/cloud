@@ -2,7 +2,7 @@
 
 ## What This Is
 
-Kilo App is an Expo (React Native) mobile application using Expo Router for file-based routing. It lives as a subpackage (`kilo-app/`) in the `cloud` monorepo. **This app targets iOS and Android only — never web.** Do not add `Platform.select({ web: ... })` patterns or web-specific code.
+Kilo App is an Expo (React Native) mobile application using Expo Router for file-based routing. It lives as a subpackage (`kilo-app/`) in the `cloud` monorepo. **This app targets iOS and Android only — never web.** Do not add `Platform.select({ web: ... })` patterns or web-specific code. **We use dev builds, not Expo Go.**
 
 ## Tech Stack
 

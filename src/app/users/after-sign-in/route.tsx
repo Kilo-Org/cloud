@@ -11,10 +11,7 @@ import { APP_URL } from '@/lib/constants';
  * the entry point is generic (e.g. /get-started, /profile) so we leave the
  * property unset rather than guessing.
  */
-function resolveSignupProduct(
-  callbackPath: string | null,
-  hasSource: boolean
-): string | null {
+function resolveSignupProduct(callbackPath: string | null, hasSource: boolean): string | null {
   if (hasSource) return 'kilo-code'; // IDE install flow
   if (!callbackPath) return null;
   if (callbackPath.startsWith('/claw')) return 'kiloclaw';

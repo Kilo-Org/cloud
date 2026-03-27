@@ -255,11 +255,16 @@ function RunDetail({
     prompt: string;
     status: string;
     exit_code: number | null;
-    output: string | null;
     started_at: string;
     completed_at: string | null;
   };
 }) {
+  const trpc = useTRPC();
+  const { data, isLoading } = useQuery(
+    trpc.admin.kiloclawInstances.getCliRunOutput.queryOptions({ runId: run.id })
+  );
+  const output = data?.output ?? null;
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
@@ -288,12 +293,17 @@ function RunDetail({
 
       {/* Output */}
       <div className="flex-1 overflow-auto p-4">
-        {run.output ? (
+        {isLoading ? (
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-muted-foreground text-sm">Loading output...</span>
+          </div>
+        ) : output ? (
           <pre
             className="text-xs leading-relaxed whitespace-pre"
             style={{ fontFamily: "'Courier New', Courier, monospace", tabSize: 8 }}
           >
-            {stripAnsi(run.output)}
+            {stripAnsi(output)}
           </pre>
         ) : (
           <p className="text-muted-foreground text-sm italic">

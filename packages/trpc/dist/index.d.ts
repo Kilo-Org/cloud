@@ -7711,11 +7711,11 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                 amountCents?: 2000 | 5000 | 10000 | undefined;
             };
             output: {
-                readonly redirectUrl?: undefined;
                 readonly enabled: false;
-            } | {
                 readonly redirectUrl?: undefined;
+            } | {
                 readonly enabled: true;
+                readonly redirectUrl?: undefined;
             } | {
                 readonly enabled: false;
                 readonly redirectUrl: string;
@@ -10035,7 +10035,6 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                         prompt: string;
                         status: KiloClawCliRunStatus;
                         exit_code: number | null;
-                        output: string | null;
                         started_at: string;
                         completed_at: string | null;
                     }[];
@@ -10045,6 +10044,15 @@ declare const rootRouter: _trpc_server.TRPCBuiltRouter<{
                         total: number;
                         totalPages: number;
                     };
+                };
+                meta: object;
+            }>;
+            getCliRunOutput: _trpc_server.TRPCQueryProcedure<{
+                input: {
+                    runId: string;
+                };
+                output: {
+                    output: string | null;
                 };
                 meta: object;
             }>;

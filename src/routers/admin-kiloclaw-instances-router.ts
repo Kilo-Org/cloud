@@ -571,7 +571,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             prompt: kiloclaw_cli_runs.prompt,
             status: kiloclaw_cli_runs.status,
             exit_code: kiloclaw_cli_runs.exit_code,
-            output: kiloclaw_cli_runs.output,
             started_at: kiloclaw_cli_runs.started_at,
             completed_at: kiloclaw_cli_runs.completed_at,
           })
@@ -594,6 +593,18 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         runs: rows,
         pagination: { offset, limit, total, totalPages: Math.ceil(total / limit) },
       };
+    }),
+
+  getCliRunOutput: adminProcedure
+    .input(z.object({ runId: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const [row] = await db
+        .select({ output: kiloclaw_cli_runs.output })
+        .from(kiloclaw_cli_runs)
+        .where(eq(kiloclaw_cli_runs.id, input.runId))
+        .limit(1);
+
+      return { output: row?.output ?? null };
     }),
 
   restoreConfig: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {

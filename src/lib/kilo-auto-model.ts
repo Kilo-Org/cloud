@@ -71,6 +71,10 @@ const FRONTIER_CODE_MODEL: ResolvedAutoModel = {
   verbosity: 'low',
 };
 
+// Maps Kilo Code workflow modes to concrete LLM models for the "frontier" tier.
+// "plan" here is a Kilo Code workflow mode (high-level reasoning/planning), not a billing plan.
+// KiloClaw requests are forced to the "plan" mode (see applyResolvedAutoModel), so they
+// always resolve to the highest-reasoning model in this map (currently Claude Opus).
 const FRONTIER_MODE_TO_MODEL: Record<string, ResolvedAutoModel> = {
   plan: { model: CLAUDE_OPUS_CURRENT_MODEL_ID, reasoning: { enabled: true }, verbosity: 'high' },
   general: {
@@ -112,6 +116,10 @@ const BALANCED_IMAGE_MODEL: ResolvedAutoModel = {
   reasoning: { enabled: true },
 };
 
+// Maps Kilo Code workflow modes to concrete LLM models for the "balanced" tier.
+// As with FRONTIER_MODE_TO_MODEL, "plan" is a workflow mode. KiloClaw requests are
+// routed here when the user's selected auto-model is "balanced", resolving to Kimi
+// with reasoning enabled (the strongest model in this tier).
 const BALANCED_MODE_TO_MODEL: Record<string, ResolvedAutoModel> = {
   plan: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   general: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
@@ -215,6 +223,10 @@ const legacyMapping: Record<string, AutoModel | undefined> = {
   'kilo/auto-small': KILO_AUTO_SMALL_MODEL,
 };
 
+// Resolves a kilo-auto model ID + workflow mode into a concrete provider model.
+// The `modeHeader` is a Kilo Code workflow mode (plan, code, architect, etc.).
+// For KiloClaw, the caller (applyResolvedAutoModel) overrides modeHeader to "plan",
+// so this function always picks the plan-mode model for KiloClaw traffic.
 export async function resolveAutoModel(
   model: string,
   modeHeader: string | null,
@@ -255,6 +267,12 @@ export async function applyResolvedAutoModel(
   balancePromise: Promise<number>
 ) {
   const hasImages = requestContainsImages(request);
+  // KiloClaw override: when the request originates from KiloClaw (identified by the
+  // feature header), force the workflow mode to "plan" regardless of the client-sent mode.
+  // This ensures KiloClaw always gets the highest-reasoning "plan" model for the selected
+  // tier — e.g. Claude Opus for frontier, Kimi for balanced — rather than a cheaper
+  // code-optimized model. Kilo Code extension requests pass through their actual mode
+  // (code, architect, ask, etc.) and resolve to the corresponding model in the tier map.
   const resolved = await resolveAutoModel(
     model,
     featureHeader === 'kiloclaw' ? 'plan' : modeHeader,

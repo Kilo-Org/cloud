@@ -323,7 +323,7 @@ export function generateBaseConfig(
   return config;
 }
 
-const DEFAULT_MCPORTER_CONFIG_PATH = '/root/.openclaw/workspace/config/mcporter.json';
+export const DEFAULT_MCPORTER_CONFIG_PATH = '/root/.openclaw/workspace/config/mcporter.json';
 
 /**
  * Write mcporter.json with MCP server definitions derived from environment variables.

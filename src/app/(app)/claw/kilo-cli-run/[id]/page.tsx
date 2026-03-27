@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, Loader2, XCircle, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useKiloCliRunStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { SetPageTitle } from '@/components/SetPageTitle';
+import KiloCrabIcon from '@/components/KiloCrabIcon';
 
 /** Strip ANSI escape codes so raw terminal output renders in a browser <pre>. */
 function stripAnsi(raw: string): string {
@@ -56,10 +58,7 @@ export default function KiloCliRunPage() {
   const statusQuery = useKiloCliRunStatus(id);
   const runStatus = statusQuery.data;
 
-  const isDone =
-    runStatus?.hasRun &&
-    runStatus.status !== null &&
-    runStatus.status !== 'running';
+  const isDone = runStatus?.hasRun && runStatus.status !== null && runStatus.status !== 'running';
 
   // Auto-scroll output to bottom
   useEffect(() => {
@@ -69,7 +68,11 @@ export default function KiloCliRunPage() {
   }, [runStatus?.output, runStatus?.status]);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
+    <div className="mx-auto container max-w-285 space-y-6 p-6">
+      <SetPageTitle
+        title="KiloClaw > CLI Run"
+        icon={<KiloCrabIcon className="text-muted-foreground h-4 w-4" />}
+      />
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => router.push('/claw')}>
           <ArrowLeft className="h-4 w-4" />
@@ -80,12 +83,13 @@ export default function KiloCliRunPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold">Kilo CLI Run</h1>
             {runStatus?.prompt && (
               <p className="text-muted-foreground mt-1 text-sm">
-                Prompt: &quot;{runStatus.prompt.length > 200
+                Prompt: &quot;
+                {runStatus.prompt.length > 200
                   ? runStatus.prompt.slice(0, 200) + '...'
-                  : runStatus.prompt}&quot;
+                  : runStatus.prompt}
+                &quot;
               </p>
             )}
           </div>
@@ -132,7 +136,7 @@ export default function KiloCliRunPage() {
           <div className="border-border bg-background overflow-hidden rounded-md border">
             <pre
               ref={outputRef}
-              className="max-h-[600px] overflow-auto p-4 text-xs leading-relaxed whitespace-pre"
+              className="overflow-auto p-4 text-xs leading-relaxed whitespace-pre"
               style={{ fontFamily: "'Courier New', Courier, monospace", tabSize: 8 }}
             >
               {stripAnsi(runStatus.output)}

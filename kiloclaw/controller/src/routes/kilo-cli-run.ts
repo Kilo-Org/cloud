@@ -3,6 +3,8 @@ import type { Hono } from 'hono';
 import { z } from 'zod';
 import { timingSafeTokenEqual } from '../auth';
 import { getBearerToken } from './gateway';
+import { CONFIG_FILE, KILO_CONFIG_DIR } from '../kilo-cli-config';
+import { DEFAULT_MCPORTER_CONFIG_PATH } from '../config-writer';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -34,9 +36,9 @@ export function buildRunPrompt(userPrompt: string): string {
 
 - OpenClaw config: \`/root/.openclaw/openclaw.json\` (the main config file — validated on load)
 - Config backups: \`/root/.openclaw/openclaw.json.bak.*\` (timestamped, up to 5 kept)
-- MCP servers: \`/root/.openclaw/workspace/config/mcporter.json\`
+- MCP servers: \`${DEFAULT_MCPORTER_CONFIG_PATH}\`
 - Agent workspace: \`/root/clawd/\` (current working directory)
-- Kilo CLI config: \`/root/.config/kilo/opencode.json\`
+- Kilo CLI config: \`${KILO_CONFIG_DIR}/${CONFIG_FILE}\`
 
 ## Architecture
 
@@ -49,6 +51,7 @@ The OpenClaw gateway process listens on \`127.0.0.1:3001\` (loopback), managed b
 - Process check: \`ps aux | grep openclaw\`
 - Validate config JSON: \`cat /root/.openclaw/openclaw.json | jq .\`
 - Logs are NOT written to disk — they go to stdout/stderr (Fly log aggregation). The user may paste log excerpts in the task description below.
+- Run \`openclaw doctor\` to check for common issues.
 
 ## How to Fix
 

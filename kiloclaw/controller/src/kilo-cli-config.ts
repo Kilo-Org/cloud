@@ -15,8 +15,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const KILO_CONFIG_DIR = '/root/.config/kilo';
-const CONFIG_FILE = 'opencode.json';
+export const KILO_CONFIG_DIR = '/root/.config/kilo';
+export const CONFIG_FILE = 'opencode.json';
 
 /** The Kilo CLI uses `kilo/` as the provider prefix, but KiloClaw uses `kilocode/`. */
 export function toKiloModelId(kilocodeModelId: string): string {

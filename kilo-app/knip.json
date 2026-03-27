@@ -2,7 +2,13 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": ["src/app/**/*.{ts,tsx}"],
   "project": ["src/**/*.{ts,tsx}"],
-  "ignoreDependencies": ["expo-updates", "expo-system-ui", "postcss", "eslint-plugin-sonarjs"],
+  "ignoreDependencies": [
+    "expo-updates",
+    "expo-system-ui",
+    "postcss",
+    "eslint-plugin-sonarjs",
+    "@sentry/cli"
+  ],
   "ignoreBinaries": ["oxfmt", "oxlint"],
   "ignore": ["src/components/ui/**"],
   "postcss": {

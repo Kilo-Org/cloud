@@ -19,7 +19,6 @@ import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { listAvailableCustomLlms } from '@/lib/custom-llm/listAvailableCustomLlms';
 import { getCodingPlanModelsForOrganization } from '@/lib/providers/coding-plans';
-import { ENABLE_CODING_PLANS_UI } from '@/lib/constants';
 
 /**
  * Allowlist of organization IDs that are allowed to modify experimental settings
@@ -177,9 +176,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
         filteredModels = models;
       }
 
-      if (ENABLE_CODING_PLANS_UI) {
-        filteredModels.push(...(await getCodingPlanModelsForOrganization(organizationId)));
-      }
+      filteredModels.push(...(await getCodingPlanModelsForOrganization(organizationId)));
       filteredModels.push(...(await listAvailableCustomLlms(organizationId)));
 
       return {

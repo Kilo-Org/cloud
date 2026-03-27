@@ -134,6 +134,16 @@ export function useKiloClawSecretCatalog() {
   );
 }
 
+export function useStreamChatCredentials(enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
+      enabled,
+      staleTime: 5 * 60_000, // credentials don't change; avoid redundant refetches
+    })
+  );
+}
+
 // ── Mutations ────────────────────────────────────────────────────────
 
 const onMutationError = (error: { message: string }) => {

@@ -1221,6 +1221,13 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         toast.success('Redeploy requested');
         invalidateMachineQueries();
         invalidateGatewayQueries();
+        if (data?.user_id) {
+          void queryClient.invalidateQueries({
+            queryKey: trpc.admin.kiloclawInstances.controllerVersion.queryKey({
+              userId: data.user_id,
+            }),
+          });
+        }
         setAwaitingRestartCompletion(true);
       },
       onError: err => {
@@ -1235,6 +1242,13 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         toast.success('Upgrade to latest requested');
         invalidateMachineQueries();
         invalidateGatewayQueries();
+        if (data?.user_id) {
+          void queryClient.invalidateQueries({
+            queryKey: trpc.admin.kiloclawInstances.controllerVersion.queryKey({
+              userId: data.user_id,
+            }),
+          });
+        }
         setAwaitingRestartCompletion(true);
       },
       onError: err => {

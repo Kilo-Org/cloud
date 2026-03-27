@@ -443,6 +443,10 @@ open_terminal_tab() {
   local title="$1"
   local cmd="$2"
 
+  # Escape backslashes and double quotes so $cmd is safe inside AppleScript strings
+  local safe_cmd="${cmd//\\/\\\\}"
+  safe_cmd="${safe_cmd//\"/\\\"}"
+
   if osascript -e 'tell application "System Events" to (name of processes) contains "iTerm2"' 2>/dev/null | grep -q true; then
     osascript <<EOF
 tell application "iTerm"
@@ -451,7 +455,7 @@ tell application "iTerm"
     create tab with default profile
     tell current session
       set name to "$title"
-      write text "echo '--- $title ---'; $cmd"
+      write text "echo '--- $title ---'; $safe_cmd"
     end tell
   end tell
 end tell
@@ -460,7 +464,7 @@ EOF
     osascript <<EOF
 tell application "Terminal"
   activate
-  do script "printf '\\\\e]0;$title\\\\a'; $cmd"
+  do script "printf '\\\\e]0;$title\\\\a'; $safe_cmd"
 end tell
 EOF
   fi
@@ -477,6 +481,11 @@ open_split_screen() {
   local title2="$3" cmd2="$4"
   local title3="$5" cmd3="$6"
 
+  # Escape backslashes and double quotes so commands are safe inside AppleScript strings
+  local safe1="${cmd1//\\/\\\\}"; safe1="${safe1//\"/\\\"}"
+  local safe2="${cmd2//\\/\\\\}"; safe2="${safe2//\"/\\\"}"
+  local safe3="${cmd3//\\/\\\\}"; safe3="${safe3//\"/\\\"}"
+
   osascript <<EOF
 tell application "iTerm"
   activate
@@ -486,7 +495,7 @@ tell application "iTerm"
     -- Left pane: tunnel (named "KiloClaw Dev" so the tab title is readable)
     tell current session
       set name to "KiloClaw Dev"
-      write text "echo '--- $title1 ---'; $cmd1"
+      write text "echo '--- $title1 ---'; $safe1"
 
       -- Split right
       set rightSession to (split vertically with default profile)
@@ -495,7 +504,7 @@ tell application "iTerm"
     -- Top-right pane: Next.js
     tell rightSession
       set name to "$title2"
-      write text "echo '--- $title2 ---'; $cmd2"
+      write text "echo '--- $title2 ---'; $safe2"
 
       -- Split bottom
       set bottomRightSession to (split horizontally with default profile)
@@ -504,7 +513,7 @@ tell application "iTerm"
     -- Bottom-right pane: worker
     tell bottomRightSession
       set name to "$title3"
-      write text "echo '--- $title3 ---'; $cmd3"
+      write text "echo '--- $title3 ---'; $safe3"
     end tell
   end tell
 end tell
@@ -708,6 +717,8 @@ case "$DISPLAY_MODE" in
         "KiloClaw worker" "$WORKER_CMD"
     else
       # Quick tunnel already running in its own tab; put Next.js + worker in splits
+      local safe_nextjs="${NEXTJS_CMD//\\/\\\\}"; safe_nextjs="${safe_nextjs//\"/\\\"}"
+      local safe_worker="${WORKER_CMD//\\/\\\\}"; safe_worker="${safe_worker//\"/\\\"}"
       osascript <<EOF
 tell application "iTerm"
   activate
@@ -716,13 +727,13 @@ tell application "iTerm"
 
     tell current session
       set name to "Next.js"
-      write text "echo '--- Next.js ---'; $NEXTJS_CMD"
+      write text "echo '--- Next.js ---'; $safe_nextjs"
       set workerSession to (split horizontally with default profile)
     end tell
 
     tell workerSession
       set name to "KiloClaw worker"
-      write text "echo '--- KiloClaw worker ---'; $WORKER_CMD"
+      write text "echo '--- KiloClaw worker ---'; $safe_worker"
     end tell
   end tell
 end tell

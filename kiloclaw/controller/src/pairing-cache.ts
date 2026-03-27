@@ -93,16 +93,11 @@ function approveFail(message: string, statusHint: 400 | 500): ApproveResult {
 export const OPENCLAW_BIN = '/usr/local/bin/openclaw';
 
 // Mirrors resolveStateDir() / resolveOAuthDir() in openclaw/src/config/paths.ts
-// Includes legacy CLAWDBOT_STATE_DIR fallback (openclaw paths.ts:65)
 // Note: openclaw's full resolveStateDir() also does filesystem-existence checks for
-// legacy .clawdbot dirs — those are omitted here because the container Dockerfile
-// always creates /root/.openclaw, making the existence check unreachable in practice.
+// legacy dirs — those are omitted here because the container Dockerfile always
+// creates /root/.openclaw, making the existence check unreachable in practice.
 export function resolveOpenClawStateDir(): string {
-  return (
-    process.env.OPENCLAW_STATE_DIR?.trim() ||
-    process.env.CLAWDBOT_STATE_DIR?.trim() ||
-    '/root/.openclaw'
-  );
+  return process.env.OPENCLAW_STATE_DIR?.trim() || '/root/.openclaw';
 }
 
 export function resolveCredentialsDir(): string {
@@ -195,10 +190,12 @@ export function detectChannels(config: unknown): string[] {
   const tg = isRecord(ch.telegram) ? ch.telegram : {};
   const dc = isRecord(ch.discord) ? ch.discord : {};
   const sl = isRecord(ch.slack) ? ch.slack : {};
+  const sc = isRecord(ch.streamchat) ? ch.streamchat : {};
   const channels: string[] = [];
   if (tg.enabled && tg.botToken) channels.push('telegram');
   if (dc.enabled && dc.token) channels.push('discord');
   if (sl.enabled && (sl.botToken || sl.appToken)) channels.push('slack');
+  if (sc.enabled && sc.apiKey) channels.push('streamchat');
   return channels;
 }
 

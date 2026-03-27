@@ -84,10 +84,11 @@ export function writeKiloCliConfig(
       // Override the kilo provider's base URL for local dev (e.g., ngrok tunnel).
       // In production this env var is not set and the built-in default is used.
       if (needsBaseUrlPatch) {
+        const origin = new URL(env.KILOCODE_API_BASE_URL!).origin;
         config.provider = config.provider || {};
         config.provider.kilo = config.provider.kilo || {};
         config.provider.kilo.options = config.provider.kilo.options || {};
-        delete config.provider.kilo.options.baseURL;
+        config.provider.kilo.options.baseURL = origin;
       }
 
       // Sync Kilo CLI's model with the user's KiloClaw default model.

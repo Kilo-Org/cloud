@@ -72,6 +72,7 @@ const FRONTIER_CODE_MODEL: ResolvedAutoModel = {
 };
 
 const FRONTIER_MODE_TO_MODEL: Record<string, ResolvedAutoModel> = {
+  // 'plan' is also the mode KiloClaw requests are forced to (see applyResolvedAutoModel).
   plan: { model: CLAUDE_OPUS_CURRENT_MODEL_ID, reasoning: { enabled: true }, verbosity: 'high' },
   general: {
     model: CLAUDE_OPUS_CURRENT_MODEL_ID,
@@ -113,6 +114,7 @@ const BALANCED_IMAGE_MODEL: ResolvedAutoModel = {
 };
 
 const BALANCED_MODE_TO_MODEL: Record<string, ResolvedAutoModel> = {
+  // 'plan' is also the mode KiloClaw requests are forced to (see applyResolvedAutoModel).
   plan: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   general: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   architect: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
@@ -255,12 +257,11 @@ export async function applyResolvedAutoModel(
   balancePromise: Promise<number>
 ) {
   const hasImages = requestContainsImages(request);
-  const resolved = await resolveAutoModel(
-    model,
-    featureHeader === 'kiloclaw' ? 'plan' : modeHeader,
-    balancePromise,
-    hasImages
-  );
+  // KiloClaw is an autonomous cloud agent without user-selected editor modes, so we
+  // force mode to 'plan' to route it to the highest-capability reasoning model
+  // (Opus for frontier, Kimi for balanced) with reasoning enabled and high verbosity.
+  const effectiveMode = featureHeader === 'kiloclaw' ? 'plan' : modeHeader;
+  const resolved = await resolveAutoModel(model, effectiveMode, balancePromise, hasImages);
   request.body.model = resolved.model;
   if (resolved.reasoning) {
     if (request.kind === 'messages') {

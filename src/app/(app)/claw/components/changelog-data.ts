@@ -20,7 +20,7 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: '2026-03-26',
     description:
-      'Added "Run Kilo Agent" — start a kilo run --auto task directly from the dashboard. Monitor output in real time with polling, cancel runs, and view run history.',
+      'Added "Recover with Kilo" — diagnose and fix stuck or broken instances using the Kilo CLI agent directly from the dashboard. Describe the problem, and the agent runs autonomously to resolve it. Monitor output in real time, cancel runs, and view run history.',
     category: 'feature',
     deployHint: 'redeploy_suggested',
   },

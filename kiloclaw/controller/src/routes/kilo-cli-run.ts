@@ -1,5 +1,4 @@
-import { spawn, execSync, type ChildProcess } from 'node:child_process';
-import fs from 'node:fs';
+import { spawn, type ChildProcess } from 'node:child_process';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import { timingSafeTokenEqual } from '../auth';
@@ -95,63 +94,6 @@ export function registerKiloCliRunRoutes(app: Hono, expectedToken: string): void
 
     const { prompt } = parsed.data;
 
-    // ── Debug: log environment and config before spawning ──────────
-    const kiloConfigDir = '/root/.config/kilo';
-    const kiloConfigFile = `${kiloConfigDir}/opencode.json`;
-
-    const debugInfo: string[] = [
-      '=== Kilo CLI Run Debug Info ===',
-      `KILO_API_KEY: ${process.env.KILO_API_KEY ? `set (${process.env.KILO_API_KEY.length} chars, starts with ${process.env.KILO_API_KEY.slice(0, 8)}...)` : 'NOT SET'}`,
-      `KILOCODE_API_KEY: ${process.env.KILOCODE_API_KEY ? `set (${process.env.KILOCODE_API_KEY.length} chars)` : 'NOT SET'}`,
-      `KILOCODE_API_BASE_URL: ${process.env.KILOCODE_API_BASE_URL ?? 'NOT SET'}`,
-      `KILOCLAW_KILO_CLI: ${process.env.KILOCLAW_KILO_CLI ?? 'NOT SET'}`,
-      `HOME: ${process.env.HOME ?? 'NOT SET'}`,
-      `PATH (first 200): ${(process.env.PATH ?? '').slice(0, 200)}`,
-    ];
-
-    // Check if kilo binary is on PATH
-    try {
-      const kiloPath = execSync('which kilo', { encoding: 'utf8', timeout: 5000 }).trim();
-      debugInfo.push(`kilo binary: ${kiloPath}`);
-      try {
-        const kiloVersion = execSync('kilo version 2>&1 || true', {
-          encoding: 'utf8',
-          timeout: 10_000,
-        }).trim();
-        debugInfo.push(`kilo version: ${kiloVersion.slice(0, 200)}`);
-      } catch (e) {
-        debugInfo.push(`kilo version: failed (${e instanceof Error ? e.message : String(e)})`);
-      }
-    } catch {
-      debugInfo.push('kilo binary: NOT FOUND on PATH');
-    }
-
-    // Check kilo config
-    if (fs.existsSync(kiloConfigFile)) {
-      try {
-        const configRaw = fs.readFileSync(kiloConfigFile, 'utf8');
-        const config = JSON.parse(configRaw);
-        // Log config structure without sensitive values
-        const safeConfig = JSON.parse(JSON.stringify(config));
-        if (safeConfig.provider?.kilo?.options?.apiKey) {
-          safeConfig.provider.kilo.options.apiKey = '[REDACTED]';
-        }
-        debugInfo.push(`kilo config (${kiloConfigFile}): ${JSON.stringify(safeConfig, null, 2)}`);
-      } catch (e) {
-        debugInfo.push(
-          `kilo config: exists but failed to read (${e instanceof Error ? e.message : String(e)})`
-        );
-      }
-    } else {
-      debugInfo.push(`kilo config: ${kiloConfigFile} DOES NOT EXIST`);
-      // Check if the directory exists
-      debugInfo.push(`kilo config dir: ${fs.existsSync(kiloConfigDir) ? 'exists' : 'MISSING'}`);
-    }
-
-    debugInfo.push('=== End Debug Info ===\n');
-    const debugOutput = debugInfo.join('\n');
-    console.log('[kilo-cli-run]', debugOutput);
-
     // Spawn the kilo CLI process
     // The prompt is passed as a separate argument to avoid shell injection
     const child = spawn('kilo', ['run', '--auto', prompt], {
@@ -161,7 +103,7 @@ export function registerKiloCliRunRoutes(app: Hono, expectedToken: string): void
 
     const run: RunState = {
       process: child,
-      output: debugOutput + '\n',
+      output: '',
       status: 'running',
       exitCode: null,
       startedAt: new Date().toISOString(),

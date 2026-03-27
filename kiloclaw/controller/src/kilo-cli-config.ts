@@ -72,8 +72,7 @@ export function writeKiloCliConfig(
       config.provider = config.provider || {};
       config.provider.kilo = config.provider.kilo || {};
       config.provider.kilo.options = config.provider.kilo.options || {};
-      config.provider.kilo.options.baseURL = env.KILOCODE_API_BASE_URL;
-      console.log('[kilo-cli] Patched base URL: ' + env.KILOCODE_API_BASE_URL);
+      delete config.provider.kilo.options.baseURL;
 
       deps.writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
     } catch (err) {

@@ -188,6 +188,11 @@ export function setupDirectories(env: EnvLike, deps: BootstrapDeps = defaultDeps
 
   // GOG_KEYRING_PASSWORD is NOT a secret — see gog-credentials.ts for context.
   env.GOG_KEYRING_PASSWORD = 'kiloclaw';
+
+  // Derive the API origin for the Kilo CLI from the full base URL.
+  if (env.KILOCODE_API_BASE_URL) {
+    env.KILO_API_URL = new URL(env.KILOCODE_API_BASE_URL).origin;
+  }
 }
 
 // ---- Step 3: Feature flags ----

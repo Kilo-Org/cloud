@@ -21,6 +21,47 @@ type RunState = {
 /** Cap output buffer at ~1MB to prevent OOM from verbose agent runs. */
 const MAX_OUTPUT_BYTES = 1_048_576;
 
+// ── Prompt template ───────────────────────────────────────────────────
+
+/**
+ * Wrap the user's prompt with system context so the agent knows where
+ * things are and how to diagnose / fix issues on this KiloClaw machine.
+ */
+export function buildRunPrompt(userPrompt: string): string {
+  return `You are a system repair agent on a KiloClaw instance — an OpenClaw AI assistant running on a Fly.io machine. Your job is to diagnose and fix the issue described below. These issues are usually configuration errors or broken integrations and are often straightforward to fix once you find the root cause.
+
+## Key Paths
+
+- OpenClaw config: \`/root/.openclaw/openclaw.json\` (the main config file — validated on load)
+- Config backups: \`/root/.openclaw/openclaw.json.bak.*\` (timestamped, up to 5 kept)
+- MCP servers: \`/root/.openclaw/workspace/config/mcporter.json\`
+- Agent workspace: \`/root/clawd/\` (current working directory)
+- Kilo CLI config: \`/root/.config/kilo/opencode.json\`
+
+## Architecture
+
+The OpenClaw gateway process listens on \`127.0.0.1:3001\` (loopback), managed by a Node.js controller on port \`18789\` (externally exposed). The controller handles auth, config management, and proxies traffic to the gateway.
+
+## Diagnostics
+
+- Gateway readiness: \`curl -sf http://127.0.0.1:3001/ready\`
+- Controller state: \`curl -sf http://127.0.0.1:18789/_kilo/health\`
+- Process check: \`ps aux | grep openclaw\`
+- Validate config JSON: \`cat /root/.openclaw/openclaw.json | jq .\`
+- Logs are NOT written to disk — they go to stdout/stderr (Fly log aggregation). The user may paste log excerpts in the task description below.
+
+## How to Fix
+
+- Edit \`/root/.openclaw/openclaw.json\` to correct config issues.
+- After config changes, restart the gateway: \`kill -USR1 $(pgrep -f "openclaw gateway")\`
+- The supervisor auto-restarts the gateway on crashes with exponential backoff.
+- If the gateway process is missing entirely, the supervisor will respawn it.
+
+## Task
+
+${userPrompt}`;
+}
+
 // ── Module-level state (one run at a time per machine) ────────────────
 
 let activeRun: RunState | null = null;
@@ -93,10 +134,11 @@ export function registerKiloCliRunRoutes(app: Hono, expectedToken: string): void
     }
 
     const { prompt } = parsed.data;
+    const fullPrompt = buildRunPrompt(prompt);
 
     // Spawn the kilo CLI process
     // The prompt is passed as a separate argument to avoid shell injection
-    const child = spawn('kilo', ['run', '--auto', prompt], {
+    const child = spawn('kilo', ['run', '--auto', fullPrompt], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: process.env,
     });

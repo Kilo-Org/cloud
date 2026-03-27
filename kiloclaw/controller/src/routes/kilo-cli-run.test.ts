@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
-import { registerKiloCliRunRoutes, _getActiveRun, _resetActiveRun } from './kilo-cli-run';
+import { spawn } from 'node:child_process';
+import {
+  registerKiloCliRunRoutes,
+  buildRunPrompt,
+  _getActiveRun,
+  _resetActiveRun,
+} from './kilo-cli-run';
 
 // Mock child_process.spawn
 const mockOn = vi.fn();
@@ -31,6 +37,23 @@ vi.mock('node:fs', () => ({
 function authHeaders(token = 'test-token'): HeadersInit {
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 }
+
+describe('buildRunPrompt', () => {
+  it('wraps user prompt with system context', () => {
+    const result = buildRunPrompt('Fix the Telegram bot');
+    expect(result).toContain('Fix the Telegram bot');
+    expect(result).toContain('/root/.openclaw/openclaw.json');
+    expect(result).toContain('127.0.0.1:3001');
+    expect(result).toContain('kill -USR1');
+  });
+
+  it('includes key diagnostic paths', () => {
+    const result = buildRunPrompt('check config');
+    expect(result).toContain('/root/.openclaw/workspace/config/mcporter.json');
+    expect(result).toContain('/root/clawd/');
+    expect(result).toContain('/_kilo/health');
+  });
+});
 
 describe('/_kilo/cli-run routes', () => {
   let app: Hono;
@@ -133,11 +156,19 @@ describe('/_kilo/cli-run routes', () => {
     expect(body.ok).toBe(true);
     expect(body.startedAt).toBeDefined();
 
-    // Verify active run exists
+    // RunState stores the original user prompt (for UI display)
     const run = _getActiveRun();
     expect(run).not.toBeNull();
     expect(run?.prompt).toBe('fix the bug');
     expect(run?.status).toBe('running');
+
+    // spawn receives the expanded prompt with system context
+    const spawnMock = vi.mocked(spawn);
+    const spawnArgs = spawnMock.mock.calls[0][1] as string[];
+    expect(spawnArgs[0]).toBe('run');
+    expect(spawnArgs[1]).toBe('--auto');
+    expect(spawnArgs[2]).toContain('fix the bug');
+    expect(spawnArgs[2]).toContain('/root/.openclaw/openclaw.json');
   });
 
   it('rejects concurrent runs', async () => {

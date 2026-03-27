@@ -96,7 +96,7 @@ describe('/_kilo/cli-run routes', () => {
       headers: authHeaders(),
     });
     expect(resp.status).toBe(200);
-    const body = await resp.json();
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.hasRun).toBe(false);
     expect(body.status).toBeNull();
   });
@@ -111,7 +111,7 @@ describe('/_kilo/cli-run routes', () => {
       body: JSON.stringify({ prompt: 'test task' }),
     });
     expect(resp.status).toBe(400);
-    const body = await resp.json();
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.error).toContain('not enabled');
   });
 
@@ -123,7 +123,7 @@ describe('/_kilo/cli-run routes', () => {
       body: JSON.stringify({ prompt: 'test task' }),
     });
     expect(resp.status).toBe(400);
-    const body = await resp.json();
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.error).toContain('KILO_API_KEY');
   });
 
@@ -152,7 +152,7 @@ describe('/_kilo/cli-run routes', () => {
       body: JSON.stringify({ prompt: 'fix the bug' }),
     });
     expect(resp.status).toBe(200);
-    const body = await resp.json();
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.ok).toBe(true);
     expect(body.startedAt).toBeDefined();
 
@@ -186,7 +186,7 @@ describe('/_kilo/cli-run routes', () => {
       body: JSON.stringify({ prompt: 'second task' }),
     });
     expect(resp.status).toBe(409);
-    const body = await resp.json();
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.error).toContain('already in progress');
   });
 
@@ -213,7 +213,7 @@ describe('/_kilo/cli-run routes', () => {
       headers: authHeaders(),
     });
     expect(resp.status).toBe(200);
-    const body = await resp.json();
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.ok).toBe(true);
 
     // Verify run is now cancelled
@@ -236,7 +236,7 @@ describe('/_kilo/cli-run routes', () => {
       headers: authHeaders(),
     });
     expect(resp.status).toBe(200);
-    const body = await resp.json();
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.hasRun).toBe(true);
     expect(body.status).toBe('running');
     expect(body.prompt).toBe('status test');

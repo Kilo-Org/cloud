@@ -168,9 +168,7 @@ export function CliRunsTab() {
                 onClick={() => setSelectedRunId(run.id)}
                 className={cn(
                   'flex w-full flex-col gap-1 border-b px-3 py-2.5 text-left transition-colors last:border-b-0',
-                  selectedRunId === run.id
-                    ? 'bg-accent'
-                    : 'hover:bg-muted/50'
+                  selectedRunId === run.id ? 'bg-accent' : 'hover:bg-muted/50'
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -247,7 +245,9 @@ export function CliRunsTab() {
   );
 }
 
-function RunDetail({ run }: {
+function RunDetail({
+  run,
+}: {
   run: {
     id: string;
     user_id: string;

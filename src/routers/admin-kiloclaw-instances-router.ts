@@ -538,9 +538,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         offset: z.number().min(0).default(0),
         limit: z.number().min(1).max(100).default(25),
         search: z.string().optional(),
-        status: z
-          .enum(['all', 'running', 'completed', 'failed', 'cancelled'])
-          .default('all'),
+        status: z.enum(['all', 'running', 'completed', 'failed', 'cancelled']).default('all'),
       })
     )
     .query(async ({ input }) => {

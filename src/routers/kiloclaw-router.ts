@@ -912,10 +912,7 @@ export const kiloclawRouter = createTRPCRouter({
           completed_at: new Date().toISOString(),
         })
         .where(
-          and(
-            eq(kiloclaw_cli_runs.user_id, ctx.user.id),
-            eq(kiloclaw_cli_runs.status, 'running')
-          )
+          and(eq(kiloclaw_cli_runs.user_id, ctx.user.id), eq(kiloclaw_cli_runs.status, 'running'))
         );
     }
 

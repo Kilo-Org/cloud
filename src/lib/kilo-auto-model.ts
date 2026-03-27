@@ -71,6 +71,9 @@ const FRONTIER_CODE_MODEL: ResolvedAutoModel = {
   verbosity: 'low',
 };
 
+// Mode-to-model routing for the frontier tier.
+// KiloClaw forces mode to 'plan' (see applyResolvedAutoModel), so KiloClaw
+// frontier requests always resolve to the 'plan' entry (Claude Opus).
 const FRONTIER_MODE_TO_MODEL: Record<string, ResolvedAutoModel> = {
   plan: { model: CLAUDE_OPUS_CURRENT_MODEL_ID, reasoning: { enabled: true }, verbosity: 'high' },
   general: {
@@ -112,6 +115,9 @@ const BALANCED_IMAGE_MODEL: ResolvedAutoModel = {
   reasoning: { enabled: true },
 };
 
+// Mode-to-model routing for the balanced tier.
+// KiloClaw forces mode to 'plan' (see applyResolvedAutoModel), so KiloClaw
+// balanced requests always resolve to the 'plan' entry (Kimi K2.5).
 const BALANCED_MODE_TO_MODEL: Record<string, ResolvedAutoModel> = {
   plan: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   general: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
@@ -255,6 +261,10 @@ export async function applyResolvedAutoModel(
   balancePromise: Promise<number>
 ) {
   const hasImages = requestContainsImages(request);
+  // KiloClaw sets featureHeader to 'kiloclaw' (via x-kilocode-feature header).
+  // Override the mode to 'plan' so KiloClaw always uses the planning-tier model
+  // (Claude Opus for frontier, Kimi K2.5 for balanced) regardless of the
+  // client-supplied mode. Kilo Code passes through the original modeHeader.
   const resolved = await resolveAutoModel(
     model,
     featureHeader === 'kiloclaw' ? 'plan' : modeHeader,

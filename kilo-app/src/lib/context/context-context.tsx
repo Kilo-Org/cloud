@@ -13,6 +13,9 @@ import { queryClient } from '@/lib/query-client';
 
 export const CONTEXT_KEY = 'app-context';
 
+// Pre-load context at module level so it's available before React mounts
+const preloadedContext = SecureStore.getItemAsync(CONTEXT_KEY);
+
 type AppContext =
   | {
       type: 'personal';
@@ -38,7 +41,7 @@ export function ContextProvider({ children }: { readonly children: ReactNode }) 
   useEffect(() => {
     const load = async () => {
       try {
-        const stored = await SecureStore.getItemAsync(CONTEXT_KEY);
+        const stored = await preloadedContext;
         if (stored) {
           setContextState(JSON.parse(stored) as AppContext);
         }

@@ -38,25 +38,40 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  AutocompleteUserByokProviderIdSchema,
+  DirectUserByokInferenceProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
   AwsCredentialsSchema,
 } from '@/lib/providers/openrouter/inference-provider-id';
+import CODING_PLANS from '@/lib/providers/coding-plans/coding-plan-definitions';
 import * as z from 'zod';
+import { ENABLE_CODING_PLANS_UI } from '@/lib/constants';
 
 // Hardcoded BYOK providers list
-const BYOK_PROVIDERS = [
+const VERCEL_BYOK_PROVIDERS = [
   { id: VercelUserByokInferenceProviderIdSchema.enum.anthropic, name: 'Anthropic' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.bedrock, name: 'AWS Bedrock' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.openai, name: 'OpenAI' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.inception, name: 'Inception' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.google, name: 'Google AI Studio' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.minimax, name: 'MiniMax' },
-  { id: AutocompleteUserByokProviderIdSchema.enum.codestral, name: 'Mistral AI: Codestral' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.mistral, name: 'Mistral AI: Devstral' },
+  { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Mistral AI (Codestral)' },
+  { id: VercelUserByokInferenceProviderIdSchema.enum.mistral, name: 'Mistral AI (other models)' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.xai, name: 'xAI' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.zai, name: 'Z.AI' },
+  {
+    id: VercelUserByokInferenceProviderIdSchema.enum.zai,
+    name: ENABLE_CODING_PLANS_UI ? 'Z.ai (pay as you go)' : 'Z.ai',
+  },
 ] as const;
+
+const CODING_PLAN_PROVIDERS = CODING_PLANS.map(plan => ({
+  id: plan.id,
+  name: plan.name,
+}));
+
+const BYOK_PROVIDERS = [
+  ...(ENABLE_CODING_PLANS_UI ? CODING_PLAN_PROVIDERS : []),
+  ...VERCEL_BYOK_PROVIDERS,
+].toSorted((a, b) => a.name.localeCompare(b.name));
 
 function BYOKDescription() {
   return (

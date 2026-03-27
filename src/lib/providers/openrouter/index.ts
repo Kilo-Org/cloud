@@ -38,6 +38,8 @@ function buildAutoModels(): OpenRouterModel[] {
     pricing: {
       prompt: m.prompt_price,
       completion: m.completion_price,
+      input_cache_read: m.input_cache_read_price,
+      input_cache_write: m.input_cache_write_price,
       request: '0',
       image: '0',
       web_search: '0',

@@ -23,6 +23,8 @@
       "pricing": {
         "prompt": "0.000005",
         "completion": "0.000025",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
         "request": "0",
         "image": "0",
         "web_search": "0",
@@ -50,7 +52,8 @@
       "description": "Great balance of price and capability. Uses Kimi K2.5 for plan, general, architect, orchestrator, ask, debug; MiniMax M2.7 for build, explore, code.",
       "architecture": {
         "input_modalities": [
-          "text"
+          "text",
+          "image"
         ],
         "output_modalities": [
           "text"
@@ -65,6 +68,7 @@
       "pricing": {
         "prompt": "0.0000006",
         "completion": "0.000003",
+        "input_cache_read": "0.000000225",
         "request": "0",
         "image": "0",
         "web_search": "0",
@@ -112,6 +116,8 @@
       "pricing": {
         "prompt": "0",
         "completion": "0",
+        "input_cache_read": "0",
+        "input_cache_write": "0",
         "request": "0",
         "image": "0",
         "web_search": "0",
@@ -183,7 +189,20 @@
       "default_parameters": {},
       "preferredIndex": 3,
       "isFree": true,
-      "opencode": {}
+      "opencode": {
+        "variants": {
+          "instant": {
+            "reasoning": {
+              "enabled": false
+            }
+          },
+          "thinking": {
+            "reasoning": {
+              "enabled": true
+            }
+          }
+        }
+      }
     },
     {
       "id": "anthropic/claude-sonnet-4",
@@ -638,7 +657,20 @@
       ],
       "default_parameters": {},
       "isFree": true,
-      "opencode": {}
+      "opencode": {
+        "variants": {
+          "instant": {
+            "reasoning": {
+              "enabled": false
+            }
+          },
+          "thinking": {
+            "reasoning": {
+              "enabled": true
+            }
+          }
+        }
+      }
     },
     {
       "id": "x-ai/grok-code-fast-1:optimized:free",
@@ -709,6 +741,7 @@
       "pricing": {
         "prompt": "0.00000005",
         "completion": "0.0000004",
+        "input_cache_read": "0.000000005",
         "request": "0",
         "image": "0",
         "web_search": "0",

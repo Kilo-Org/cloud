@@ -5,6 +5,7 @@ export type ProviderId =
   | 'openrouter'
   | 'alibaba'
   | 'bytedance'
+  | 'coding-plan'
   | 'corethink'
   | 'martian'
   | 'mistral'

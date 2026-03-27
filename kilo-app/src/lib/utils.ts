@@ -11,6 +11,10 @@ function cn(...inputs: ClassValue[]) {
  * so we normalise the space separator to `T` before parsing.
  */
 function parseTimestamp(value: string): Date {
+  // Date-only: "2026-09-26" → treat as UTC midnight
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date(`${value}T00:00:00Z`);
+  }
   // PostgreSQL: "2026-03-16 15:21:40.957+00" → need "T" separator and full tz offset "+00:00"
   const iso = value.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
   return new Date(iso);

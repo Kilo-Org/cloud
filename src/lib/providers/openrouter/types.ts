@@ -54,7 +54,7 @@ export type SharedGatewayRequestProperties = {
 
   // Non-standard reasoning configuration
   enable_thinking?: boolean; // Alibaba
-  thinking?: { type?: 'enabled' | 'adaptive' | 'disabled' }; // ByteDance
+  thinking?: { type?: 'enabled' | 'adaptive' | 'disabled' }; // ByteDance, Z.ai
 };
 
 export type GatewayResponsesRequest = SharedGatewayRequestProperties &

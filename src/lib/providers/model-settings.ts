@@ -5,6 +5,7 @@ import { isMoonshotModel } from '@/lib/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/providers/openai';
 import { qwen35_plus_free_model } from '@/lib/providers/qwen';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
+import { isXiaomiModel } from '@/lib/providers/xiaomi';
 import { isZaiModel } from '@/lib/providers/zai';
 import type {
   CustomLlmProvider,
@@ -62,7 +63,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
       efforts.map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }
-  if (isMoonshotModel(model) || isZaiModel(model)) {
+  if (isMoonshotModel(model) || isZaiModel(model) || isXiaomiModel(model)) {
     return {
       instant: { reasoning: { enabled: false } },
       thinking: { reasoning: { enabled: true } },

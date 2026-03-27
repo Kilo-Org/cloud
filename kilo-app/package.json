@@ -40,6 +40,7 @@
     "expo-router": "~55.0.7",
     "expo-secure-store": "~55.0.9",
     "expo-splash-screen": "~55.0.12",
+    "expo-status-bar": "~55.0.4",
     "expo-web-browser": "~55.0.10",
     "lucide-react-native": "^0.577.0",
     "nativewind": "5.0.0-preview.3",
@@ -57,7 +58,6 @@
     "tailwindcss": "^4.2.1"
   },
   "devDependencies": {
-    "@sentry/cli": "^3.3.3",
     "@types/react": "~19.2.2",
     "@typescript/native-preview": "catalog:",
     "eslint-plugin-sonarjs": "^4.0.2",

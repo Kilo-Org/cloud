@@ -43,7 +43,7 @@ npx expo install --dev <package-name>   # devDependencies
 
 - When you need data from the backend, **always add a new tRPC procedure** rather than copying data or inventing client-side alternatives. The app uses tRPC with React Query — adding a procedure is cheap and keeps the source of truth on the server.
 - When a component takes backend data as props, derive the prop types from the tRPC router's return types (e.g., `NonNullable<ReturnType<typeof useMyQuery>['data']>`) instead of manually copying type definitions. This keeps types in sync with the backend automatically.
-- **Never use `new Date()` on timestamp strings from the backend.** Drizzle uses `mode: 'string'` for timestamps, and PostgreSQL's format (`2026-03-13 14:30:00+00`) is not parseable by Hermes. Use `parseTimestamp()` from `@/lib/utils` instead.
+- **Never use `new Date()` on any date or timestamp string from the backend.** Hermes cannot reliably parse PostgreSQL timestamps (`2026-03-13 14:30:00+00`) or date-only strings (`2026-09-26`). Always use `parseTimestamp()` from `@/lib/utils` — it handles both formats.
 
 ### Mutations
 

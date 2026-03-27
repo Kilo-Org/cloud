@@ -36,6 +36,8 @@ export const AUTOCOMPLETE_MODEL = 'codestral-2508';
 
 export const ENABLE_DEPLOY_FEATURE = true;
 
+export const ENABLE_CODING_PLANS_UI = false; // Requires CLI update: https://github.com/Kilo-Org/kilocode/pull/7728
+
 export const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
 
 // Cloud Agent WebSocket URL (client-side, inlined at build time)

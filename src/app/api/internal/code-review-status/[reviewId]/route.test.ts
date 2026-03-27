@@ -599,5 +599,27 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         expect.stringContaining('https://app.kilo.ai/')
       );
     });
+
+    it('suggests switching to a free model in the billing notice', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockHasPRCommentWithMarker.mockResolvedValue(false);
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage: 'Insufficient credits',
+          terminalReason: 'billing',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockCreatePRComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        1,
+        expect.stringContaining('switch to a free model')
+      );
+    });
   });
 });

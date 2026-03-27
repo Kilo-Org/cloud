@@ -14,6 +14,9 @@ import { queryClient } from '@/lib/query-client';
 
 const TOKEN_KEY = 'auth-token';
 
+// Pre-load token at module level so it's available before React mounts
+const preloadedToken = SecureStore.getItemAsync(TOKEN_KEY);
+
 type AuthContextValue = {
   token: string | undefined;
   isLoading: boolean;
@@ -28,15 +31,15 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadToken = async () => {
+    const load = async () => {
       try {
-        const stored = await SecureStore.getItemAsync(TOKEN_KEY);
+        const stored = await preloadedToken;
         setToken(stored ?? undefined);
       } finally {
         setIsLoading(false);
       }
     };
-    void loadToken();
+    void load();
   }, []);
 
   const signIn = useCallback(async (tokenValue: string) => {

@@ -267,19 +267,14 @@ export function InstanceControls({
           size="sm"
           variant="outline"
           className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
-          disabled={
-            !isRunning ||
-            isDestroying ||
-            isStarting ||
-            isRestarting
-          }
+          disabled={!isRunning || isDestroying || isStarting || isRestarting}
           onClick={() => {
             posthog?.capture('claw_kilo_run_clicked', { instance_status: status.status });
             setKiloRunOpen(true);
           }}
         >
           <Terminal className="h-4 w-4" />
-          Run Kilo Agent
+          Recover with Kilo
         </Button>
       </div>
       <ConfirmActionDialog
@@ -405,10 +400,7 @@ export function InstanceControls({
         onOpenChange={setDoctorOpen}
         mutation={mutations.runDoctor}
       />
-      <StartKiloCliRunDialog
-        open={kiloRunOpen}
-        onOpenChange={setKiloRunOpen}
-      />
+      <StartKiloCliRunDialog open={kiloRunOpen} onOpenChange={setKiloRunOpen} />
     </div>
   );
 }

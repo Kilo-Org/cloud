@@ -51,24 +51,25 @@ export function StartKiloCliRunDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[550px]">
+      <DialogContent className="sm:max-w-137.5">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Terminal className="h-5 w-5" />
-            Run Kilo CLI Agent
+            Recover with Kilo CLI Agent
           </DialogTitle>
           <DialogDescription>
-            Run the Kilo CLI agent on your instance with a task prompt. The agent will execute
-            autonomously and you can monitor its output in real time.
+            If your KiloClaw instance is stuck or failing, the Kilo CLI agent can help diagnose and
+            fix the problem. Describe the issue below and the agent will work autonomously to
+            resolve it.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2">
           <Textarea
-            placeholder="Describe the task for the agent..."
+            placeholder="Describe the problem you're trying to solve (e.g. &quot;I can't connect to the gateway&quot; or &quot;The bot's cron jobs aren't checking in&quot;)"
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
-            className="min-h-[120px] resize-none"
+            className="min-h-30 resize-none"
             maxLength={10_000}
             autoFocus
             onKeyDown={e => {
@@ -79,7 +80,7 @@ export function StartKiloCliRunDialog({
             }}
           />
           <p className="text-muted-foreground text-xs">
-            Press Cmd+Enter to start. The agent runs as{' '}
+            Press Cmd+Enter to start. The agent will attempt to fix the issue using{' '}
             <code className="text-[11px]">kilo run --auto</code>.
           </p>
         </div>
@@ -101,7 +102,7 @@ export function StartKiloCliRunDialog({
             ) : (
               <>
                 <Terminal className="h-4 w-4" />
-                Start Run
+                Run Recovery
               </>
             )}
           </Button>

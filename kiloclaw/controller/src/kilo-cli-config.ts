@@ -18,6 +18,14 @@ import path from 'node:path';
 const KILO_CONFIG_DIR = '/root/.config/kilo';
 const CONFIG_FILE = 'opencode.json';
 
+/** The Kilo CLI uses `kilo/` as the provider prefix, but KiloClaw uses `kilocode/`. */
+export function toKiloModelId(kilocodeModelId: string): string {
+  if (kilocodeModelId.startsWith('kilocode/')) {
+    return 'kilo/' + kilocodeModelId.slice('kilocode/'.length);
+  }
+  return kilocodeModelId;
+}
+
 export type KiloCliConfigDeps = {
   mkdirSync: (dir: string, opts: { recursive: boolean }) => void;
   writeFileSync: (path: string, data: string, opts: { mode: number }) => void;
@@ -49,10 +57,13 @@ export function writeKiloCliConfig(
   // No provider block needed — the KiloAuthPlugin auto-registers the "kilo"
   // provider when KILO_API_KEY is in the environment (set by bootstrap).
   if (isFreshInstall && !deps.existsSync(configPath)) {
-    const config = {
+    const config: Record<string, unknown> = {
       $schema: 'https://app.kilo.ai/config.json',
       permission: { edit: 'allow', bash: 'allow' },
     };
+    if (env.KILOCODE_DEFAULT_MODEL) {
+      config.model = toKiloModelId(env.KILOCODE_DEFAULT_MODEL);
+    }
     deps.mkdirSync(configDir, { recursive: true });
     deps.writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
     console.log('[kilo-cli] Seeded config at ' + configPath);
@@ -60,19 +71,31 @@ export function writeKiloCliConfig(
 
   // Patch config on every boot (if it exists).
   // Only writes when a change is actually made to avoid silent no-op writes.
-  if (deps.existsSync(configPath) && env.KILOCODE_API_BASE_URL) {
+  const needsBaseUrlPatch = !!env.KILOCODE_API_BASE_URL;
+  const needsModelPatch = !!env.KILOCODE_DEFAULT_MODEL;
+
+  if (deps.existsSync(configPath) && (needsBaseUrlPatch || needsModelPatch)) {
     try {
       // JSON structure is open-ended (user may add arbitrary keys), so we use `any`
-      // rather than a strict schema. The patch only touches provider.kilo.options.baseURL.
+      // rather than a strict schema.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const config: any = JSON.parse(deps.readFileSync(configPath, 'utf8'));
 
       // Override the kilo provider's base URL for local dev (e.g., ngrok tunnel).
       // In production this env var is not set and the built-in default is used.
-      config.provider = config.provider || {};
-      config.provider.kilo = config.provider.kilo || {};
-      config.provider.kilo.options = config.provider.kilo.options || {};
-      delete config.provider.kilo.options.baseURL;
+      if (needsBaseUrlPatch) {
+        config.provider = config.provider || {};
+        config.provider.kilo = config.provider.kilo || {};
+        config.provider.kilo.options = config.provider.kilo.options || {};
+        delete config.provider.kilo.options.baseURL;
+      }
+
+      // Sync Kilo CLI's model with the user's KiloClaw default model.
+      // Updated on every boot so model changes in KiloClaw settings take effect.
+      const defaultModel = env.KILOCODE_DEFAULT_MODEL;
+      if (defaultModel) {
+        config.model = toKiloModelId(defaultModel);
+      }
 
       deps.writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
     } catch (err) {

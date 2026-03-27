@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { writeKiloCliConfig, type KiloCliConfigDeps } from './kilo-cli-config';
+import { writeKiloCliConfig, toKiloModelId, type KiloCliConfigDeps } from './kilo-cli-config';
 
 function fakeDeps(existingConfig?: string) {
   const written: { path: string; data: string; mode: number }[] = [];
@@ -33,6 +33,18 @@ function baseEnv(overrides: Record<string, string> = {}): Record<string, string 
     ...overrides,
   };
 }
+
+describe('toKiloModelId', () => {
+  it('replaces kilocode/ prefix with kilo/', () => {
+    expect(toKiloModelId('kilocode/anthropic/claude-opus-4.6')).toBe('kilo/anthropic/claude-opus-4.6');
+    expect(toKiloModelId('kilocode/openai/gpt-5')).toBe('kilo/openai/gpt-5');
+  });
+
+  it('passes through values without kilocode/ prefix', () => {
+    expect(toKiloModelId('kilo/anthropic/claude-opus-4.6')).toBe('kilo/anthropic/claude-opus-4.6');
+    expect(toKiloModelId('other/model')).toBe('other/model');
+  });
+});
 
 describe('writeKiloCliConfig', () => {
   it('returns false when feature flag is disabled', () => {
@@ -72,11 +84,23 @@ describe('writeKiloCliConfig', () => {
     expect(seedConfig.$schema).toBe('https://app.kilo.ai/config.json');
     // No provider block — KiloAuthPlugin auto-registers via KILO_API_KEY env var
     expect(seedConfig.provider).toBeUndefined();
-    // No model — CLI defaults to kilo-auto/small, user picks their own
+    // No model when KILOCODE_DEFAULT_MODEL is not set
     expect(seedConfig.model).toBeUndefined();
     expect(seedConfig.permission.edit).toBe('allow');
     expect(seedConfig.permission.bash).toBe('allow');
     expect(written[0].mode).toBe(0o600);
+  });
+
+  it('includes model in seed config when KILOCODE_DEFAULT_MODEL is set', () => {
+    const { deps, written } = fakeDeps();
+    const env = baseEnv({ KILOCODE_DEFAULT_MODEL: 'kilocode/anthropic/claude-opus-4.6' });
+    const result = writeKiloCliConfig(env, '/tmp/kilo', deps);
+
+    expect(result).toBe(true);
+    expect(written.length).toBeGreaterThanOrEqual(1);
+    const seedConfig = JSON.parse(written[0].data);
+    expect(seedConfig.model).toBe('kilo/anthropic/claude-opus-4.6');
+    expect(seedConfig.permission.edit).toBe('allow');
   });
 
   it('does not seed config on fresh install when config already exists', () => {
@@ -114,7 +138,22 @@ describe('writeKiloCliConfig', () => {
     expect(config.provider.kilo.options.baseURL).toBe('https://tunnel.example.com');
   });
 
-  it('does not set model from KILOCODE_DEFAULT_MODEL', () => {
+  it('patches model from KILOCODE_DEFAULT_MODEL on existing config', () => {
+    const existing = JSON.stringify({ permission: { edit: 'allow', bash: 'allow' } });
+    const { deps, written } = fakeDeps(existing);
+    const env = baseEnv({
+      KILOCLAW_FRESH_INSTALL: 'false',
+      KILOCODE_DEFAULT_MODEL: 'kilocode/openai/gpt-5',
+    });
+
+    writeKiloCliConfig(env, '/tmp/kilo', deps);
+
+    expect(written).toHaveLength(1);
+    const config = JSON.parse(written[0].data);
+    expect(config.model).toBe('kilo/openai/gpt-5');
+  });
+
+  it('patches both model and base URL when both are set', () => {
     const existing = JSON.stringify({ permission: { edit: 'allow', bash: 'allow' } });
     const { deps, written } = fakeDeps(existing);
     const env = baseEnv({
@@ -127,10 +166,22 @@ describe('writeKiloCliConfig', () => {
 
     expect(written).toHaveLength(1);
     const config = JSON.parse(written[0].data);
-    // KILOCODE_DEFAULT_MODEL is for OpenClaw, not Kilo CLI
+    expect(config.model).toBe('kilo/openai/gpt-5');
+  });
+
+  it('does not set model when KILOCODE_DEFAULT_MODEL is absent', () => {
+    const existing = JSON.stringify({ permission: { edit: 'allow', bash: 'allow' } });
+    const { deps, written } = fakeDeps(existing);
+    const env = baseEnv({
+      KILOCLAW_FRESH_INSTALL: 'false',
+      KILOCODE_API_BASE_URL: 'https://tunnel.example.com/api/gateway',
+    });
+
+    writeKiloCliConfig(env, '/tmp/kilo', deps);
+
+    expect(written).toHaveLength(1);
+    const config = JSON.parse(written[0].data);
     expect(config.model).toBeUndefined();
-    // But base URL is patched (origin only, path stripped)
-    expect(config.provider.kilo.options.baseURL).toBe('https://tunnel.example.com');
   });
 
   it('creates provider structure when patching base URL on minimal config', () => {

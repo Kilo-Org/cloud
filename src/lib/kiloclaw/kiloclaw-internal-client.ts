@@ -170,6 +170,19 @@ export class KiloClawInternalClient {
     });
   }
 
+  async getStreamChatCredentials(userId: string): Promise<{
+    apiKey: string;
+    userId: string;
+    userToken: string;
+    channelId: string;
+  } | null> {
+    return this.request(
+      `/api/platform/stream-chat-credentials?userId=${encodeURIComponent(userId)}`,
+      undefined,
+      { userId }
+    );
+  }
+
   async getDebugStatus(userId: string): Promise<PlatformDebugStatusResponse> {
     return this.request(
       `/api/platform/debug-status?userId=${encodeURIComponent(userId)}`,
@@ -506,6 +519,21 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         body: JSON.stringify({ userId, snapshotId }),
+      },
+      { userId }
+    );
+  }
+
+  async destroyFlyMachine(
+    userId: string,
+    appName: string,
+    machineId: string
+  ): Promise<{ ok: true }> {
+    return this.request(
+      '/api/platform/destroy-fly-machine',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, appName, machineId }),
       },
       { userId }
     );

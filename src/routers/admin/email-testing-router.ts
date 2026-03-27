@@ -105,6 +105,8 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       return { days_remaining: '14', expiry_date: '2026-09-26', claw_url: `${NEXTAUTH_URL}/claw` };
     case 'clawEarlybirdExpiresTomorrow':
       return { expiry_date: '2026-09-26', claw_url: `${NEXTAUTH_URL}/claw` };
+    case 'clawCreditRenewalFailed':
+      return { claw_url: `${NEXTAUTH_URL}/claw` };
   }
   throw new Error(`Unknown template: ${template}`);
 }

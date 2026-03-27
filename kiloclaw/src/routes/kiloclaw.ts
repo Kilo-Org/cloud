@@ -1,6 +1,10 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../types';
-import { SECRET_CATALOG, getFieldKeysByCategory } from '@kilocode/kiloclaw-secret-catalog';
+import {
+  SECRET_CATALOG,
+  getFieldKeysByCategory,
+  isCustomSecretEnvVar,
+} from '@kilocode/kiloclaw-secret-catalog';
 import { instrumented } from '../middleware/analytics';
 
 /** Channel env var names — excluded from secretCount (channels have their own counts). */
@@ -37,6 +41,10 @@ kiloclaw.get('/config', c =>
       hasKiloCodeApiKey: !!config.kilocodeApiKey,
       kilocodeApiKeyExpiresAt: config.kilocodeApiKeyExpiresAt ?? null,
       configuredSecrets: buildConfiguredSecrets(config),
+      customSecretKeys: config.encryptedSecrets
+        ? Object.keys(config.encryptedSecrets).filter(isCustomSecretEnvVar)
+        : [],
+      customSecretMeta: config.customSecretMeta ?? {},
     });
   })
 );
@@ -50,6 +58,18 @@ kiloclaw.get('/status', c =>
     const status = await stub.getStatus();
 
     return c.json(status);
+  })
+);
+
+// GET /api/kiloclaw/chat-credentials -- Stream Chat credentials for the user's channel
+kiloclaw.get('/chat-credentials', c =>
+  instrumented(c, 'GET /api/kiloclaw/chat-credentials', async () => {
+    const userId = c.get('userId');
+    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
+
+    const creds = await stub.getStreamChatCredentials();
+
+    return c.json(creds);
   })
 );
 

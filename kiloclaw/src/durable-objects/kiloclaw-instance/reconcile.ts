@@ -777,6 +777,30 @@ export async function syncStatusWithFly(
     return;
   }
 
+  // destroyed means the Fly machine is gone — clear the stale ID immediately
+  // so the DO doesn't keep referencing a dead machine.
+  if (flyState === 'destroyed') {
+    rctx.log('sync_status_destroyed', {
+      old_state: state.status,
+      new_state: 'stopped',
+      fly_state: flyState,
+      machine_id: state.flyMachineId,
+    });
+    state.flyMachineId = null;
+    state.status = 'stopped';
+    state.lastStoppedAt = Date.now();
+    state.healthCheckFailCount = 0;
+    await ctx.storage.put(
+      storageUpdate({
+        flyMachineId: null,
+        status: 'stopped',
+        lastStoppedAt: state.lastStoppedAt,
+        healthCheckFailCount: 0,
+      })
+    );
+    return;
+  }
+
   // failed is definitively terminal — transition immediately without waiting for
   // SELF_HEAL_THRESHOLD consecutive checks like we do for stopped/created.
   if (flyState === 'failed' && state.status !== 'stopped') {

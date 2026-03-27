@@ -56,6 +56,7 @@ import { PairingSection } from './PairingSection';
 import { VersionPinCard } from './VersionPinCard';
 import { WorkspaceFileEditor } from './WorkspaceFileEditor';
 import { PermissionPresetCards } from './PermissionPresetCards';
+import { CustomSecretsSection } from './CustomSecretsSection';
 import { type ExecPreset, configToExecPreset, execPresetToConfig } from './claw.types';
 
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
@@ -857,7 +858,7 @@ export function SettingsTab({
       )}
 
       {/* ── Developer Tools ── */}
-      {toolEntries.some(e => e.id === 'github') && (
+      {toolEntries.some(e => e.id === 'github' || e.id === 'linear') && (
         <div>
           <h2 className="text-foreground mb-3 text-base font-semibold">Developer Tools</h2>
           <div className="space-y-3">
@@ -896,6 +897,19 @@ export function SettingsTab({
                       minimally scoped to specific repos and permissions.
                     </span>
                   }
+                />
+              ))}
+            {toolEntries
+              .filter(e => e.id === 'linear')
+              .map(entry => (
+                <SecretEntrySection
+                  key={entry.id}
+                  entry={entry}
+                  configured={configuredSecrets[entry.id] ?? false}
+                  mutations={mutations}
+                  onSecretsChanged={onSecretsChanged}
+                  isDirty={dirtySecrets.has(entry.id)}
+                  onRedeploy={onRedeploy}
                 />
               ))}
           </div>
@@ -960,6 +974,14 @@ export function SettingsTab({
           />
         </div>
       </div>
+
+      {/* ── Additional Secrets ── */}
+      <CustomSecretsSection
+        customSecretKeys={config?.customSecretKeys ?? []}
+        customSecretMeta={config?.customSecretMeta ?? {}}
+        mutations={mutations}
+        onRedeploy={onRedeploy}
+      />
 
       {/* ── Danger Zone ── */}
       <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-5">

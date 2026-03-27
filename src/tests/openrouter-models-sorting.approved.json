@@ -4,7 +4,7 @@
       "id": "kilo-auto/frontier",
       "name": "Kilo Auto Frontier",
       "created": 0,
-      "description": "Highest performance and capability for any task. Uses Claude Opus 4.6 for plan, general, architect, orchestrator, ask, debug; Claude Sonnet 4.6 for build, explore, code.",
+      "description": "Highest performance and capability for any task. Uses Claude Opus 4.6 for KiloClaw, plan, general, architect, orchestrator, ask, debug; Claude Sonnet 4.6 for build, explore, code.",
       "architecture": {
         "input_modalities": [
           "text",
@@ -23,6 +23,8 @@
       "pricing": {
         "prompt": "0.000005",
         "completion": "0.000025",
+        "input_cache_read": "0.0000005",
+        "input_cache_write": "0.00000625",
         "request": "0",
         "image": "0",
         "web_search": "0",
@@ -47,10 +49,11 @@
       "id": "kilo-auto/balanced",
       "name": "Kilo Auto Balanced",
       "created": 0,
-      "description": "Great balance of price and capability. Uses Kimi K2.5 for plan, general, architect, orchestrator, ask, debug; MiniMax M2.7 for build, explore, code.",
+      "description": "Great balance of price and capability. Uses Kimi K2.5 for KiloClaw, plan, general, architect, orchestrator, ask, debug; MiniMax M2.7 for build, explore, code.",
       "architecture": {
         "input_modalities": [
-          "text"
+          "text",
+          "image"
         ],
         "output_modalities": [
           "text"
@@ -65,6 +68,7 @@
       "pricing": {
         "prompt": "0.0000006",
         "completion": "0.000003",
+        "input_cache_read": "0.000000225",
         "request": "0",
         "image": "0",
         "web_search": "0",
@@ -112,6 +116,8 @@
       "pricing": {
         "prompt": "0",
         "completion": "0",
+        "input_cache_read": "0",
+        "input_cache_write": "0",
         "request": "0",
         "image": "0",
         "web_search": "0",
@@ -183,7 +189,22 @@
       "default_parameters": {},
       "preferredIndex": 3,
       "isFree": true,
-      "opencode": {}
+      "opencode": {
+        "variants": {
+          "instant": {
+            "reasoning": {
+              "enabled": false,
+              "effort": "none"
+            }
+          },
+          "thinking": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "medium"
+            }
+          }
+        }
+      }
     },
     {
       "id": "anthropic/claude-sonnet-4",
@@ -218,7 +239,8 @@
         "variants": {
           "none": {
             "reasoning": {
-              "enabled": false
+              "enabled": false,
+              "effort": "none"
             }
           },
           "low": {
@@ -285,7 +307,8 @@
         "variants": {
           "none": {
             "reasoning": {
-              "enabled": false
+              "enabled": false,
+              "effort": "none"
             }
           },
           "low": {
@@ -584,7 +607,22 @@
       ],
       "default_parameters": {},
       "isFree": true,
-      "opencode": {}
+      "opencode": {
+        "variants": {
+          "instant": {
+            "reasoning": {
+              "enabled": false,
+              "effort": "none"
+            }
+          },
+          "thinking": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "medium"
+            }
+          }
+        }
+      }
     },
     {
       "id": "x-ai/grok-code-fast-1:optimized:free",
@@ -655,6 +693,7 @@
       "pricing": {
         "prompt": "0.00000005",
         "completion": "0.0000004",
+        "input_cache_read": "0.000000005",
         "request": "0",
         "image": "0",
         "web_search": "0",

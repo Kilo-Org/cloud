@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, AlertTriangle, Clock, CreditCard } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ArrowRightLeft, Clock, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { ClawBannerState, ClawBillingStatus } from './billing-types';
@@ -20,6 +20,13 @@ type BillingBannerProps = {
 function getBannerStyles(state: ClawBannerState) {
   switch (state) {
     case 'trial_active':
+      return {
+        bg: 'bg-blue-500/10',
+        border: 'border-blue-500/30',
+        text: 'text-blue-400',
+        icon: 'text-blue-400',
+      };
+    case 'subscription_converting':
       return {
         bg: 'bg-blue-500/10',
         border: 'border-blue-500/30',
@@ -57,6 +64,8 @@ function getBannerIcon(state: ClawBannerState) {
     case 'trial_active':
     case 'earlybird_active':
       return Clock;
+    case 'subscription_converting':
+      return ArrowRightLeft;
     case 'trial_ending_soon':
     case 'earlybird_ending_soon':
     case 'subscription_canceling':
@@ -111,6 +120,14 @@ function getBannerContent(state: ClawBannerState, billing: ClawBillingStatus) {
         message: `Your earlybird hosting expires on ${formatBillingDate(billing.earlybird?.expiresAt ?? '')}. Subscribe to continue.`,
         cta: 'Subscribe',
         action: 'subscribe' as const,
+      };
+    case 'subscription_converting':
+      return {
+        title: `Switching to credit billing on ${formatBillingDate(billing.subscription?.currentPeriodEnd ?? '')}`,
+        message:
+          'Your Stripe charge ends at the current period. After that, hosting renews from your credit balance.',
+        cta: null,
+        action: null,
       };
     case 'subscription_canceling':
       return {

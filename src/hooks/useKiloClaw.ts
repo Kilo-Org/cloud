@@ -61,6 +61,16 @@ export function useRefreshDevicePairing() {
   };
 }
 
+export function useStreamChatCredentials(enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
+      enabled,
+      staleTime: 5 * 60_000, // credentials don't change; avoid redundant refetches
+    })
+  );
+}
+
 export function useKiloClawGatewayStatus(enabled: boolean) {
   const trpc = useTRPC();
   return useQuery(

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeftRight, Building2, KeyRound, LogOut, User } from 'lucide-react-native';
 import { Alert, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { ScreenHeader } from '@/components/screen-header';
@@ -93,6 +94,8 @@ export function ProfileScreen() {
   const { data: orgs } = useQuery(trpc.organizations.list.queryOptions());
   const colors = useThemeColors();
 
+  const { bottom } = useSafeAreaInsets();
+
   const contextLabel =
     context?.type === 'personal'
       ? 'Personal'
@@ -114,7 +117,7 @@ export function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Profile" />
+      <ScreenHeader title="Profile" modal />
       <View className="flex-1 px-6 pt-4">
         {/* Active context */}
         <View className="gap-3">
@@ -183,7 +186,7 @@ export function ProfileScreen() {
         </Animated.View>
 
         {/* Actions */}
-        <View className="mt-auto gap-3 pb-8">
+        <View className="mt-auto gap-3" style={{ paddingBottom: Math.max(bottom, 16) }}>
           <Button
             variant="outline"
             className="flex-row gap-2"

@@ -44,6 +44,10 @@ export type KiloClawEnv = {
   FLY_IMAGE_DIGEST?: string;
   OPENCLAW_VERSION?: string;
 
+  // Stream Chat (default channel for new instances)
+  STREAM_CHAT_API_KEY?: string;
+  STREAM_CHAT_API_SECRET?: string;
+
   // OpenClaw gateway configuration
   OPENCLAW_ALLOWED_ORIGINS?: string;
   KILOCLAW_CHECKIN_URL?: string;

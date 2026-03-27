@@ -31,6 +31,13 @@ export {
   INTERNAL_SENSITIVE_ENV_VARS,
   getEntriesByCategory,
   getFieldKeysByCategory,
+  // Custom secret helpers
+  MAX_CUSTOM_SECRETS,
+  MAX_CUSTOM_SECRET_VALUE_LENGTH,
+  isValidCustomSecretKey,
+  isCustomSecretEnvVar,
+  isValidConfigPath,
+  getAllowedConfigPathPatterns,
 } from './catalog';
 
 export type { SecretFieldKey } from './catalog';

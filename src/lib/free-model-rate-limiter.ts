@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
 import { free_model_usage } from '@kilocode/db/schema';
-import { and, count, gte, sql } from 'drizzle-orm';
+import { and, count, eq, gte, sql } from 'drizzle-orm';
 import {
   FREE_MODEL_RATE_LIMIT_WINDOW_HOURS,
   FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
@@ -35,6 +35,23 @@ async function getModelUsageSinceTime(
   return Number(usage[0]?.totalRequests ?? 0);
 }
 
+async function getModelUsageSinceTimeByUser(
+  windowStart: Date,
+  kiloUserId: string
+): Promise<number> {
+  const usage = await db
+    .select({ totalRequests: count() })
+    .from(free_model_usage)
+    .where(
+      and(
+        eq(free_model_usage.kilo_user_id, kiloUserId),
+        gte(free_model_usage.created_at, windowStart.toISOString())
+      )
+    );
+
+  return Number(usage[0]?.totalRequests ?? 0);
+}
+
 /**
  * Check if an IP address is within the free model rate limit.
  * This applies to ALL free model requests, both anonymous and authenticated.
@@ -43,6 +60,22 @@ export async function checkFreeModelRateLimit(ipAddress: string): Promise<RateLi
   const windowStart = new Date(Date.now() - FREE_MODEL_RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000);
 
   const requestCount = await getModelUsageSinceTime(windowStart, ipAddress);
+
+  return {
+    allowed: requestCount < FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
+    requestCount,
+  };
+}
+
+/**
+ * Check if a user is within the free model rate limit.
+ * Used for server-side products (cloud-agent, code-review, app-builder)
+ * where all requests share infrastructure IPs.
+ */
+export async function checkFreeModelRateLimitByUser(kiloUserId: string): Promise<RateLimitResult> {
+  const windowStart = new Date(Date.now() - FREE_MODEL_RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000);
+
+  const requestCount = await getModelUsageSinceTimeByUser(windowStart, kiloUserId);
 
   return {
     allowed: requestCount < FREE_MODEL_MAX_REQUESTS_PER_WINDOW,

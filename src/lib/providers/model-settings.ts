@@ -5,6 +5,7 @@ import { isMoonshotModel } from '@/lib/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/providers/openai';
 import { qwen35_plus_free_model } from '@/lib/providers/qwen';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
+import { isXiaomiModel } from '@/lib/providers/xiaomi';
 import { isZaiModel } from '@/lib/providers/zai';
 import type {
   CustomLlmProvider,
@@ -42,35 +43,43 @@ export function getVersionedModelSettings(model: string): VersionedSettings | un
   return undefined;
 }
 
+export const BINARY_THINKING_VARIANTS = {
+  instant: { reasoning: { enabled: false, effort: 'none' } },
+  thinking: { reasoning: { enabled: true, effort: 'medium' } },
+} as const;
+
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   // Inlined to avoid importing anthropic.ts (which transitively pulls in Node.js crypto)
   if (model.startsWith('anthropic/')) {
     return {
-      none: { reasoning: { enabled: false } },
+      none: { reasoning: { enabled: false, effort: 'none' } },
       low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
       medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
       high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
       max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
     };
   }
-  if (isOpenAiModel(model) || isGemini3Model(model)) {
-    const filterNone = model.includes('codex') || isGemini3Model(model);
-    const efforts = filterNone
-      ? ReasoningEffortSchema.options.filter(e => e !== 'none')
-      : ReasoningEffortSchema.options;
+  if (model.includes('codex') || isGemini3Model(model)) {
     return Object.fromEntries(
-      efforts.map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
+      ReasoningEffortSchema.options
+        .filter(e => e !== 'none')
+        .map(effort => [effort, { reasoning: { enabled: true, effort } }])
     );
   }
-  if (isMoonshotModel(model) || isZaiModel(model)) {
-    return {
-      instant: { reasoning: { enabled: false } },
-      thinking: { reasoning: { enabled: true } },
-    };
+  if (isOpenAiModel(model)) {
+    return Object.fromEntries(
+      ReasoningEffortSchema.options.map(effort => [
+        effort,
+        { reasoning: { enabled: effort !== 'none', effort } },
+      ])
+    );
+  }
+  if (isMoonshotModel(model) || isZaiModel(model) || isXiaomiModel(model)) {
+    return BINARY_THINKING_VARIANTS;
   }
   if (model.startsWith('inception/mercury-2')) {
     return {
-      instant: { reasoning: { enabled: false } },
+      instant: { reasoning: { enabled: false, effort: 'none' } },
       low: { reasoning: { enabled: true, effort: 'low' } },
       medium: { reasoning: { enabled: true, effort: 'medium' } },
       high: { reasoning: { enabled: true, effort: 'high' } },
@@ -78,8 +87,8 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   }
   if (model.startsWith('x-ai/grok-4')) {
     return {
-      'non-reasoning': { reasoning: { enabled: false } },
-      reasoning: { reasoning: { enabled: true } },
+      'non-reasoning': { reasoning: { enabled: false, effort: 'none' } },
+      reasoning: { reasoning: { enabled: true, effort: 'medium' } },
     };
   }
   return undefined;

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Check, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { Check, MessageSquare, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import {
   useKiloClawGatewayStatus,
@@ -21,12 +22,23 @@ import { InstanceTab } from './InstanceTab';
 import { OpenClawButton } from './OpenClawButton';
 import { SettingsTab } from './SettingsTab';
 import { ChangelogTab } from './ChangelogTab';
+import { SubscriptionTab } from './SubscriptionTab';
 import { ChannelPairingStep } from './ChannelPairingStep';
 import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { PermissionStep } from './PermissionStep';
 import { ProvisioningStep } from './ProvisioningStep';
 import type { ExecPreset } from './claw.types';
 import { BillingWrapper } from './billing/BillingWrapper';
+
+// Lazy-load the Chat tab so the stream-chat-react bundle (~200KB) only loads
+// when the user opens that tab, not on every /claw page visit.
+const ChatTab = dynamic(() => import('./ChatTab').then(m => ({ default: m.ChatTab })), {
+  loading: () => (
+    <div className="flex h-96 items-center justify-center text-sm text-muted-foreground">
+      Loading chat…
+    </div>
+  ),
+});
 
 type PopulatedClawStatus = KiloClawDashboardStatus & {
   status: NonNullable<KiloClawDashboardStatus['status']>;
@@ -65,6 +77,30 @@ export function ClawDashboard({
     instanceStatus.provisionedAt !== null &&
     Date.now() - instanceStatus.provisionedAt < SEVEN_DAYS_MS;
   const configServiceNudgeVisible = !instanceStatus || instanceYoung;
+
+  const VALID_TABS = ['instance', 'chat', 'settings', 'subscription', 'changelog'] as const;
+  type TabValue = (typeof VALID_TABS)[number];
+
+  function tabFromHash(): TabValue {
+    if (typeof window === 'undefined') return 'instance';
+    const hash = window.location.hash.slice(1);
+    return VALID_TABS.includes(hash as TabValue) ? (hash as TabValue) : 'instance';
+  }
+
+  const [activeTab, setActiveTab] = useState<TabValue>(tabFromHash);
+
+  function handleTabChange(value: string) {
+    setActiveTab(value as TabValue);
+    window.history.replaceState(null, '', value === 'instance' ? '/claw' : `#${value}`);
+  }
+
+  useEffect(() => {
+    function onHashChange() {
+      setActiveTab(tabFromHash());
+    }
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   const [onboardingStep, setOnboardingStep] = useState<
     'permissions' | 'channels' | 'provisioning' | 'pairing' | 'done'
@@ -304,14 +340,21 @@ export function ClawDashboard({
                 onUpgradeHandled={onUpgradeHandled}
               />
             </CardContent>
-            <Tabs defaultValue="instance">
+            <Tabs value={activeTab} onValueChange={handleTabChange}>
               <div className="px-5">
                 <TabsList className="mt-4 h-auto w-full justify-start gap-2 rounded-none border-b bg-transparent p-0 pb-3">
                   <TabsTrigger value="instance" className={tabTriggerClass}>
                     Gateway Process
                   </TabsTrigger>
+                  <TabsTrigger value="chat" className={tabTriggerClass}>
+                    <MessageSquare className="mr-1.5 inline h-3.5 w-3.5" />
+                    Chat
+                  </TabsTrigger>
                   <TabsTrigger value="settings" className={tabTriggerClass}>
                     Settings
+                  </TabsTrigger>
+                  <TabsTrigger value="subscription" className={tabTriggerClass}>
+                    Subscription
                   </TabsTrigger>
                   <TabsTrigger value="changelog" className={tabTriggerClass}>
                     What&apos;s New <Sparkles className="ml-1 inline h-3 w-3 text-amber-400" />
@@ -327,6 +370,9 @@ export function ClawDashboard({
                     gatewayError={gatewayError}
                   />
                 </TabsContent>
+                <TabsContent value="chat" className="mt-0">
+                  <ChatTab enabled={activeTab === 'chat' && isRunning} />
+                </TabsContent>
                 <TabsContent value="settings" className="mt-0">
                   <SettingsTab
                     status={instanceStatus}
@@ -337,6 +383,9 @@ export function ClawDashboard({
                     onUpgrade={onUpgrade}
                     onRequestUpgrade={onRequestUpgrade}
                   />
+                </TabsContent>
+                <TabsContent value="subscription" className="mt-0">
+                  <SubscriptionTab />
                 </TabsContent>
                 <TabsContent value="changelog" className="mt-0">
                   <ChangelogTab />

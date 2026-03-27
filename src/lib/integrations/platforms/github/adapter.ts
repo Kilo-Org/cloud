@@ -809,6 +809,52 @@ export async function checkExistingFork(
 }
 
 // ============================================================================
+// Commit Inspection
+// ============================================================================
+
+/**
+ * Checks whether a commit is a merge commit (has 2+ parents).
+ * Used to skip code reviews triggered by "merge base into feature" pushes.
+ * Returns false if the API call fails so the review proceeds (fail-open).
+ */
+export async function isMergeCommit(
+  installationId: string,
+  owner: string,
+  repo: string,
+  commitSha: string,
+  appType: GitHubAppType = 'standard'
+): Promise<boolean> {
+  try {
+    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const octokit = new Octokit({ auth: tokenData.token });
+
+    const { data } = await octokit.git.getCommit({
+      owner,
+      repo,
+      commit_sha: commitSha,
+    });
+
+    const result = data.parents.length > 1;
+
+    logExceptInTest('[isMergeCommit] Checked commit parents', {
+      owner,
+      repo,
+      sha: commitSha.substring(0, 8),
+      parentCount: data.parents.length,
+      isMergeCommit: result,
+    });
+
+    return result;
+  } catch (error) {
+    logExceptInTest(
+      '[isMergeCommit] Failed to check commit parents, proceeding with review:',
+      error
+    );
+    return false;
+  }
+}
+
+// ============================================================================
 // Check Runs API (PR gate checks)
 // ============================================================================
 

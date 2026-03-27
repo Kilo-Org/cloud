@@ -41,6 +41,7 @@ import {
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
   KiloClawSubscriptionStatus,
+  KiloClawPaymentSource,
 } from './schema-types';
 import type { KiloClawAdminAuditAction } from './schema-types';
 import type {
@@ -3094,9 +3095,9 @@ export const user_period_cache = pgTable(
 
 export type UserPeriodCache = typeof user_period_cache.$inferSelect;
 
-// ============ FREE MODEL USAGE (IP-based rate limiting) ============
-// Lightweight table for IP-based rate limiting on free models
-// Applies to both anonymous and authenticated users
+// ============ FREE MODEL USAGE (rate limiting) ============
+// Lightweight table for rate limiting on free models
+// IP-based for client-side products, per-user for server-side products
 
 export const free_model_usage = pgTable(
   'free_model_usage',
@@ -3107,7 +3108,7 @@ export const free_model_usage = pgTable(
       .primaryKey(),
     ip_address: text().notNull(),
     model: text().notNull(),
-    // Optional: link to authenticated user if present (for analytics only)
+    // Optional: link to authenticated user if present (for analytics and per-user rate limiting)
     kilo_user_id: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
@@ -3116,6 +3117,10 @@ export const free_model_usage = pgTable(
     index('idx_free_model_usage_ip_created_at').on(table.ip_address, table.created_at),
     // Secondary index for analytics
     index('idx_free_model_usage_created_at').on(table.created_at),
+    // Index for per-user rate limiting (server-side products); partial to exclude anonymous rows
+    index('idx_free_model_usage_user_created_at')
+      .on(table.kilo_user_id, table.created_at)
+      .where(isNotNull(table.kilo_user_id)),
   ]
 );
 
@@ -3309,6 +3314,8 @@ export const kiloclaw_instances = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     sandbox_id: text().notNull(),
+    // Null = personal instance. Non-null = org-owned instance.
+    organization_id: uuid().references(() => organizations.id),
     name: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -3477,23 +3484,27 @@ export const kiloclaw_subscriptions = pgTable(
       .notNull(),
     user_id: text()
       .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' })
-      .unique(),
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     stripe_subscription_id: text().unique(),
     stripe_schedule_id: text(),
+    instance_id: uuid().references(() => kiloclaw_instances.id),
+    payment_source: text().$type<KiloClawPaymentSource>(),
     plan: text().notNull().$type<KiloClawPlan>(),
     scheduled_plan: text().$type<KiloClawScheduledPlan>(),
     scheduled_by: text().$type<KiloClawScheduledBy>(),
     status: text().notNull().$type<KiloClawSubscriptionStatus>(),
     cancel_at_period_end: boolean().notNull().default(false),
+    pending_conversion: boolean().notNull().default(false),
     trial_started_at: timestamp({ withTimezone: true, mode: 'string' }),
     trial_ends_at: timestamp({ withTimezone: true, mode: 'string' }),
     current_period_start: timestamp({ withTimezone: true, mode: 'string' }),
     current_period_end: timestamp({ withTimezone: true, mode: 'string' }),
+    credit_renewal_at: timestamp({ withTimezone: true, mode: 'string' }),
     commit_ends_at: timestamp({ withTimezone: true, mode: 'string' }),
     past_due_since: timestamp({ withTimezone: true, mode: 'string' }),
     suspended_at: timestamp({ withTimezone: true, mode: 'string' }),
     destruction_deadline: timestamp({ withTimezone: true, mode: 'string' }),
+    auto_top_up_triggered_for_period: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -3511,6 +3522,14 @@ export const kiloclaw_subscriptions = pgTable(
     ),
     enumCheck('kiloclaw_subscriptions_scheduled_by_check', table.scheduled_by, KiloClawScheduledBy),
     enumCheck('kiloclaw_subscriptions_status_check', table.status, KiloClawSubscriptionStatus),
+    uniqueIndex('UQ_kiloclaw_subscriptions_instance')
+      .on(table.instance_id)
+      .where(isNotNull(table.instance_id)),
+    enumCheck(
+      'kiloclaw_subscriptions_payment_source_check',
+      table.payment_source,
+      KiloClawPaymentSource
+    ),
   ]
 );
 
@@ -3592,4 +3611,16 @@ export const bot_requests = pgTable(
 );
 
 export type BotRequest = typeof bot_requests.$inferSelect;
+
+export const app_min_versions = pgTable('app_min_versions', {
+  id: uuid()
+    .default(sql`pg_catalog.gen_random_uuid()`)
+    .primaryKey()
+    .notNull(),
+  ios_min_version: text().notNull().default('1.0.0'),
+  android_min_version: text().notNull().default('1.0.0'),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+});
+
+export type AppMinVersions = typeof app_min_versions.$inferSelect;
 export type NewBotRequest = typeof bot_requests.$inferInsert;

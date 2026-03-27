@@ -13,8 +13,10 @@ import {
   credit_transactions,
   auto_top_up_configs,
   user_auth_provider,
+  kiloclaw_instances,
+  kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, sql, gte } from 'drizzle-orm';
+import { eq, and, isNull, inArray, sql, gte } from 'drizzle-orm';
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
@@ -80,12 +82,169 @@ const CreditBlockSchema = z.object({
 
 const GetCreditBlocksInputSchema = z.object({});
 
+const CreditDeductionSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  description: z.string(),
+  amount_mUsd: z.number(),
+});
+
 const GetCreditBlocksOutputSchema = z.object({
   creditBlocks: z.array(CreditBlockSchema),
+  deductions: z.array(CreditDeductionSchema),
   totalBalance_mUsd: z.number(),
   isFirstPurchase: z.boolean(),
   autoTopUpEnabled: z.boolean(),
 });
+
+type RawDeduction = {
+  id: string;
+  date: string;
+  description: string;
+  credit_category: string | null;
+  amount_mUsd: number;
+};
+
+/**
+ * Parse a KiloClaw instance ID from a credit_category string.
+ *
+ * Pure-credit categories:  `kiloclaw-subscription:{instanceId}:YYYY-MM`
+ *                          `kiloclaw-subscription-commit:{instanceId}:YYYY-MM`
+ * Settlement categories:   `kiloclaw-settlement:{stripeSubId}:YYYY-MM-DD`
+ *
+ * Returns the instance UUID for pure-credit categories, or null for
+ * settlement categories (which embed the Stripe subscription ID instead).
+ */
+function parseInstanceIdFromCategory(category: string): string | null {
+  const match = category.match(/^kiloclaw-subscription(?:-commit)?:([^:]+):/);
+  if (!match) return null;
+  // Validate it looks like a UUID to avoid false matches
+  const candidate = match[1];
+  if (!/^[0-9a-f-]{36}$/i.test(candidate)) return null;
+  return candidate;
+}
+
+/**
+ * Reformat a stored KiloClaw deduction description into the display format:
+ *   "KiloClaw Hosting - Standard: Enrollment (Instance Name)"
+ *
+ * Stored descriptions follow these patterns:
+ *   "KiloClaw standard enrollment"
+ *   "KiloClaw commit renewal"
+ *   "KiloClaw standard period deduction"
+ */
+function formatKiloClawDeductionDescription(
+  storedDescription: string,
+  instanceName: string | null
+): string {
+  const match = storedDescription.match(/^KiloClaw\s+(standard|commit)\s+(.+)$/i);
+  if (!match) {
+    // Unrecognized format — append instance name if available
+    return instanceName ? `${storedDescription} (${instanceName})` : storedDescription;
+  }
+  const plan = match[1].toLowerCase() === 'commit' ? 'Commit' : 'Standard';
+  const action = capitalizeFirst(match[2]);
+  const suffix = instanceName ? ` (${instanceName})` : '';
+  return `KiloClaw Hosting - ${plan}: ${action}${suffix}`;
+}
+
+function capitalizeFirst(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * Enrich KiloClaw deduction descriptions with instance names so users
+ * can distinguish charges across multiple instances.
+ */
+async function enrichDeductionsWithInstanceNames(
+  userId: string,
+  deductions: RawDeduction[]
+): Promise<{ id: string; date: string; description: string; amount_mUsd: number }[]> {
+  // Collect unique instance IDs from pure-credit deduction categories.
+  const instanceIds = new Set<string>();
+  // Collect Stripe subscription IDs from settlement categories for lookup.
+  const stripeSubIds = new Set<string>();
+
+  for (const d of deductions) {
+    if (!d.credit_category?.startsWith('kiloclaw-')) continue;
+    const instanceId = parseInstanceIdFromCategory(d.credit_category);
+    if (instanceId) {
+      instanceIds.add(instanceId);
+    } else {
+      // Settlement category: kiloclaw-settlement:{stripeSubId}:...
+      const settlementMatch = d.credit_category.match(/^kiloclaw-settlement:([^:]+):/);
+      if (settlementMatch) stripeSubIds.add(settlementMatch[1]);
+    }
+  }
+
+  // Batch-fetch instance names.
+  const nameById = new Map<string, string | null>();
+
+  if (instanceIds.size > 0) {
+    const rows = await db
+      .select({ id: kiloclaw_instances.id, name: kiloclaw_instances.name })
+      .from(kiloclaw_instances)
+      .where(inArray(kiloclaw_instances.id, [...instanceIds]));
+    for (const r of rows) nameById.set(r.id, r.name);
+  }
+
+  // For settlement deductions, resolve Stripe subscription ID → instance ID → name.
+  if (stripeSubIds.size > 0) {
+    const subRows = await db
+      .select({
+        stripe_subscription_id: kiloclaw_subscriptions.stripe_subscription_id,
+        instance_id: kiloclaw_subscriptions.instance_id,
+      })
+      .from(kiloclaw_subscriptions)
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, userId),
+          inArray(kiloclaw_subscriptions.stripe_subscription_id, [...stripeSubIds])
+        )
+      );
+
+    const missingInstanceIds = new Set<string>();
+    const stripeToInstance = new Map<string, string>();
+    for (const r of subRows) {
+      if (r.stripe_subscription_id && r.instance_id) {
+        stripeToInstance.set(r.stripe_subscription_id, r.instance_id);
+        if (!nameById.has(r.instance_id)) missingInstanceIds.add(r.instance_id);
+      }
+    }
+
+    if (missingInstanceIds.size > 0) {
+      const rows = await db
+        .select({ id: kiloclaw_instances.id, name: kiloclaw_instances.name })
+        .from(kiloclaw_instances)
+        .where(inArray(kiloclaw_instances.id, [...missingInstanceIds]));
+      for (const r of rows) nameById.set(r.id, r.name);
+    }
+
+    // Map stripe sub IDs → instance names
+    for (const [stripeSub, instId] of stripeToInstance) {
+      // Store under the stripe sub key too for easy lookup
+      nameById.set(`stripe:${stripeSub}`, nameById.get(instId) ?? null);
+    }
+  }
+
+  return deductions.map(d => {
+    let description = d.description;
+    if (d.credit_category?.startsWith('kiloclaw-')) {
+      const instanceId = parseInstanceIdFromCategory(d.credit_category);
+      let instanceName: string | null = null;
+      if (instanceId) {
+        instanceName = nameById.get(instanceId) ?? null;
+      } else {
+        const settlementMatch = d.credit_category.match(/^kiloclaw-settlement:([^:]+):/);
+        if (settlementMatch) {
+          instanceName = nameById.get(`stripe:${settlementMatch[1]}`) ?? null;
+        }
+      }
+      description = formatKiloClawDeductionDescription(description, instanceName);
+    }
+    return { id: d.id, date: d.date, description, amount_mUsd: d.amount_mUsd };
+  });
+}
 
 export const userRouter = createTRPCRouter({
   // Account linking routes
@@ -148,8 +307,17 @@ export const userRouter = createTRPCRouter({
         ),
       });
 
+      const result = getCreditBlocks(transactions, now, ctx.user, ctx.user.id);
+
+      // Enrich KiloClaw deduction descriptions with instance names.
+      const enrichedDeductions = await enrichDeductionsWithInstanceNames(
+        ctx.user.id,
+        result.deductions
+      );
+
       return {
-        ...getCreditBlocks(transactions, now, ctx.user, ctx.user.id),
+        ...result,
+        deductions: enrichedDeductions,
         autoTopUpEnabled: ctx.user.auto_top_up_enabled,
       };
     }),

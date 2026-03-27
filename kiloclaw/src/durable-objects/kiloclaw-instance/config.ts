@@ -146,12 +146,25 @@ export async function buildUserEnvVars(
       instanceFeatures: state.instanceFeatures,
       execSecurity: state.execSecurity ?? undefined,
       execAsk: state.execAsk ?? undefined,
+      orgId: state.orgId,
+      customSecretMeta: state.customSecretMeta ?? undefined,
     }
   );
 
   // Inject latest Gmail historyId for controller to patch gog state on startup.
   if (state.gmailLastHistoryId) {
     plainEnv.KILOCLAW_GMAIL_LAST_HISTORY_ID = state.gmailLastHistoryId;
+  }
+
+  // Stream Chat default channel (auto-provisioned at first provision).
+  // API key and bot user ID are plaintext; bot user token is sensitive.
+  if (state.streamChatApiKey && state.streamChatBotUserId && state.streamChatBotUserToken) {
+    plainEnv.STREAM_CHAT_API_KEY = state.streamChatApiKey;
+    plainEnv.STREAM_CHAT_BOT_USER_ID = state.streamChatBotUserId;
+    sensitive.STREAM_CHAT_BOT_USER_TOKEN = state.streamChatBotUserToken;
+    if (state.streamChatChannelId) {
+      plainEnv.STREAM_CHAT_DEFAULT_CHANNEL_ID = state.streamChatChannelId;
+    }
   }
 
   // Get the env encryption key from the App DO, creating it if needed.

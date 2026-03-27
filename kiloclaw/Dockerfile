@@ -54,9 +54,11 @@ RUN npm install -g mcporter@0.7.3
 # Install summarize (web page summarization CLI)
 RUN npm install -g @steipete/summarize@0.12.0
 
+# Install Stream Chat channel plugin for OpenClaw (installed from GitHub, not npm)
+RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#catrielmuller/attach-support
+
 # Install Kilo CLI (agentic coding assistant for the terminal)
 RUN npm install -g @kilocode/cli@7.0.46
-
 
 # Install Go (available at runtime for users to `go install` additional tools)
 ENV GO_VERSION=1.26.0

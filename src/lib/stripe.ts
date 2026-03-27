@@ -629,9 +629,8 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
-      // KiloClaw subscription invoice — fire claw_transaction for revenue tracking.
       if (invoiceLooksLikeKiloClawByPriceId(invoice) && invoice.amount_paid > 0) {
-        handleKiloClawInvoicePaid({ eventId: event.id, invoice });
+        await handleKiloClawInvoicePaid({ eventId: event.id, invoice });
         break;
       }
 

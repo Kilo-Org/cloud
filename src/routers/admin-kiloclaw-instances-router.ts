@@ -561,7 +561,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const fallbackMessage = 'Failed to start machine';
     try {
       const client = new KiloClawInternalClient();
-      return await client.start(input.userId, { skipCooldown: true });
+      return await client.start(input.userId, undefined, { skipCooldown: true });
     } catch (err) {
       console.error('Failed to start machine for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
@@ -626,6 +626,72 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         );
       } catch (err) {
         console.error('Failed to restart machine for user:', row.user.id, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
+
+  destroyFlyMachine: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        appName: z
+          .string()
+          .min(1)
+          .max(63)
+          .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Invalid Fly app name'),
+        machineId: z
+          .string()
+          .min(1)
+          .regex(/^[a-z0-9]+$/, 'Invalid Fly machine ID'),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      console.log(
+        `[admin-kiloclaw] destroyFlyMachine triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) app=${input.appName} machine=${input.machineId}`
+      );
+      const client = new KiloClawInternalClient();
+
+      // Verify the appName/machineId match the DO's actual state
+      let status: Awaited<ReturnType<KiloClawInternalClient['getDebugStatus']>>;
+      try {
+        status = await client.getDebugStatus(input.userId);
+      } catch (err) {
+        throwKiloclawAdminError(err, 'Failed to verify machine state before destroy');
+      }
+      if (status.flyAppName !== input.appName || status.flyMachineId !== input.machineId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Fly resource mismatch: expected app=${status.flyAppName} machine=${status.flyMachineId}, got app=${input.appName} machine=${input.machineId}`,
+        });
+      }
+
+      const fallbackMessage = 'Failed to destroy Fly machine';
+      try {
+        const result = await client.destroyFlyMachine(input.userId, input.appName, input.machineId);
+
+        try {
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.machine.destroy_fly',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `Fly machine force-destroyed: app=${input.appName} machine=${input.machineId}`,
+            metadata: {
+              appName: input.appName,
+              machineId: input.machineId,
+            },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for destroyFlyMachine:', auditErr);
+        }
+
+        return result;
+      } catch (err) {
+        console.error(
+          `Failed to destroy Fly machine app=${input.appName} machine=${input.machineId}:`,
+          err
+        );
         throwKiloclawAdminError(err, fallbackMessage);
       }
     }),

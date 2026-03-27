@@ -6,6 +6,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { isRunningInExpoGo } from 'expo';
 import { Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -13,6 +14,7 @@ import { Toaster } from 'sonner-native';
 
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { ContextProvider, useAppContext } from '@/lib/context/context-context';
+import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
@@ -54,15 +56,32 @@ void SplashScreen.preventAutoHideAsync();
 function RootLayoutNav() {
   const { token, isLoading: authLoading } = useAuth();
   const { context, isLoading: contextLoading } = useAppContext();
+  const { updateRequired, isChecking: updateChecking } = useForceUpdate();
   const segments = useSegments();
   const router = useRouter();
 
-  const isLoading = authLoading || contextLoading;
+  const isLoading = authLoading || contextLoading || updateChecking;
   const inAuthGroup = segments[0] === '(auth)';
   const inContextGroup = segments[0] === '(context)';
+  const inForceUpdate = segments[0] === 'force-update';
 
   useEffect(() => {
     if (isLoading) {
+      return;
+    }
+
+    if (updateRequired) {
+      if (!inForceUpdate) {
+        router.replace('/force-update');
+      } else {
+        void SplashScreen.hideAsync();
+      }
+      return;
+    }
+
+    if (inForceUpdate) {
+      // Version is now acceptable, leave the force-update screen
+      router.replace('/(app)');
       return;
     }
 
@@ -83,13 +102,27 @@ function RootLayoutNav() {
     } else {
       void SplashScreen.hideAsync();
     }
-  }, [token, context, isLoading, inAuthGroup, inContextGroup, router]);
+  }, [
+    token,
+    context,
+    isLoading,
+    updateRequired,
+    inAuthGroup,
+    inContextGroup,
+    inForceUpdate,
+    router,
+  ]);
+
+  const needsForceUpdate = updateRequired && !inForceUpdate;
+  const showingForceUpdate = updateRequired && inForceUpdate;
+  const needsAuth = !token && !inAuthGroup;
+  const needsContext = token != null && !context && !inContextGroup;
+  const needsAppRedirect =
+    (token != null && context != null && (inAuthGroup || inContextGroup)) || inForceUpdate;
 
   const needsRedirect =
     !isLoading &&
-    ((!token && !inAuthGroup) ||
-      (token != null && !context && !inContextGroup) ||
-      (token != null && context != null && (inAuthGroup || inContextGroup)));
+    (needsForceUpdate || (!showingForceUpdate && (needsAuth || needsContext || needsAppRedirect)));
 
   if (isLoading || needsRedirect) {
     return null;
@@ -113,6 +146,7 @@ function RootLayout() {
 
   return (
     <GestureHandlerRootView className="flex-1">
+      <StatusBar style="auto" />
       <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>

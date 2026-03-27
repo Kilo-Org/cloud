@@ -35,6 +35,8 @@ import { getVercelInferenceProviderConfigForUserByok } from '@/lib/providers/ver
 import { decryptByokRow } from '@/lib/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
+import CODING_PLANS from '@/lib/providers/coding-plans/coding-plan-definitions';
+import { createAiSdkProvider, formatCodingPlanModelId } from '@/lib/providers/coding-plans';
 
 const fetchSupportedModels = unstable_cache(
   async (): Promise<Record<string, string[]>> => {
@@ -75,10 +77,10 @@ const fetchSupportedModels = unstable_cache(
 
     const result: Record<string, string[]> = {};
 
-    result['codestral'] = ['Mistral AI: Codestral'];
+    result['codestral'] = ['Codestral (mistralai/codestral-2508)'];
 
-    for (const model of Object.values(openRouterModelMetadata.data)) {
-      const vercelModel = vercelModelMetadata.data[mapModelIdToVercel(model.id)];
+    for (const openRouterModel of Object.values(openRouterModelMetadata.data)) {
+      const vercelModel = vercelModelMetadata.data[mapModelIdToVercel(openRouterModel.id)];
       if (!vercelModel) continue;
       if (vercelModel.id.includes('codestral')) continue;
       if (vercelModel.type !== 'language') continue;
@@ -87,7 +89,16 @@ const fetchSupportedModels = unstable_cache(
         if (!providerParsed.success) continue;
         const providerId = providerParsed.data;
         if (!result[providerId]) result[providerId] = [];
-        result[providerId].push(model.name);
+        result[providerId].push(openRouterModel.name + ' (' + openRouterModel.id + ')');
+      }
+    }
+
+    for (const provider of CODING_PLANS) {
+      for (const model of provider.models) {
+        if (!result[provider.id]) result[provider.id] = [];
+        result[provider.id].push(
+          model.name + ' (' + formatCodingPlanModelId(provider, model) + ')'
+        );
       }
     }
 
@@ -395,29 +406,46 @@ export const byokRouter = createTRPCRouter({
         }
       }
 
-      const gateway = createGateway({
-        apiKey: PROVIDERS.VERCEL_AI_GATEWAY.apiKey,
-      });
+      const decryptedKey = decryptByokRow(existingKey);
 
-      const [provider, byokList] = getVercelInferenceProviderConfigForUserByok(
-        decryptByokRow(existingKey)
-      );
+      function setup() {
+        const provider = UserByokProviderIdSchema.parse(decryptedKey.providerId);
+        const model = UserByokTestModels[provider];
+
+        const codingPlanProvider = CODING_PLANS.find(plan => plan.id === provider);
+        if (codingPlanProvider) {
+          if (codingPlanProvider.ai_sdk_provider === 'openai-compatible') {
+            return {
+              finalProvider: provider,
+              model: createAiSdkProvider(codingPlanProvider, decryptedKey.decryptedAPIKey)(model),
+            };
+          } else {
+            throw new Error('Unrecognized AI SDK provider: ' + codingPlanProvider.ai_sdk_provider);
+          }
+        }
+
+        const [finalProvider, byokList] = getVercelInferenceProviderConfigForUserByok(decryptedKey);
+        return {
+          finalProvider,
+          model: createGateway({
+            apiKey: PROVIDERS.VERCEL_AI_GATEWAY.apiKey,
+          })(model),
+          providerOptions: {
+            gateway: {
+              only: [finalProvider],
+              byok: { [finalProvider]: byokList },
+            } satisfies GatewayProviderOptions,
+          },
+        };
+      }
 
       try {
-        const model = gateway(
-          UserByokTestModels[UserByokProviderIdSchema.parse(existingKey.provider_id)]
-        );
-
+        const { finalProvider, model, providerOptions } = setup();
         const output = await generateText({
           model,
           prompt: 'Say hi',
           maxOutputTokens: 100,
-          providerOptions: {
-            gateway: {
-              only: [provider],
-              byok: { [provider]: byokList },
-            } satisfies GatewayProviderOptions,
-          },
+          providerOptions,
         });
 
         const metadata = output.providerMetadata?.gateway?.routing as
@@ -426,13 +454,13 @@ export const byokRouter = createTRPCRouter({
 
         return {
           success: true,
-          message: `API key test success. Provider: ${metadata?.finalProvider ?? 'unknown'}. Model: ${metadata?.originalModelId ?? 'unknown'}. Completion: ${output.text}`,
+          message: `API key test success. Provider: ${metadata?.finalProvider ?? finalProvider}. Model: ${metadata?.originalModelId ?? model.modelId}. Model output: ${output.text}`,
         };
       } catch (e) {
         console.error(e);
         return {
           success: false,
-          message: `API key (${provider}) test failed with: ${e instanceof Error ? e.message : e}`,
+          message: `API key (${decryptedKey.providerId}) test failed with: ${e instanceof Error ? e.message : e}`,
         };
       }
     }),

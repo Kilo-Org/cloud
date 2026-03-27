@@ -89,12 +89,25 @@ vi.mock('../utils/env-encryption', () => ({
   encryptEnvValue: vi.fn((_key: string, value: string) => `enc:v1:fake_${value}`),
 }));
 
+// -- Mock stream-chat client --
+vi.mock('../stream-chat/client', () => ({
+  setupDefaultStreamChatChannel: vi.fn().mockResolvedValue({
+    apiKey: 'sc-api-key',
+    botUserId: 'bot-sandbox-1',
+    botUserToken: 'sc-bot-token',
+    channelId: 'default-sandbox-1',
+  }),
+  createShortLivedUserToken: vi.fn().mockResolvedValue('short-lived-token'),
+  deactivateStreamChatUsers: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { KiloClawInstance } from './kiloclaw-instance';
 import * as flyClient from '../fly/client';
 import { FlyApiError } from '../fly/client';
 import * as db from '../db';
 import * as gatewayEnv from '../gateway/env';
 import { resolveLatestVersion } from '../lib/image-version';
+import { setupDefaultStreamChatChannel } from '../stream-chat/client';
 import { verifyKiloToken } from '@kilocode/worker-utils';
 import {
   ALARM_INTERVAL_RUNNING_MS,
@@ -2103,6 +2116,136 @@ describe('updateSecrets', () => {
     await expect(instance.updateSecrets({ slackBotToken: null })).rejects.toThrow(
       'Invalid secret patch: Slack requires all fields to be set together'
     );
+  });
+
+  // ─── Custom (non-catalog) secrets ─────────────────────────────────
+
+  it('stores custom secrets by env var name in encryptedSecrets', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+
+    await instance.updateSecrets({ MY_CUSTOM_KEY: customEnvelope });
+
+    const secrets = storage._store.get('encryptedSecrets') as Record<string, unknown>;
+    expect(secrets.MY_CUSTOM_KEY).toEqual(customEnvelope);
+  });
+
+  it('removes custom secrets when null is passed', async () => {
+    const { instance, storage } = createInstance();
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { MY_CUSTOM_KEY: customEnvelope },
+    });
+
+    await instance.updateSecrets({ MY_CUSTOM_KEY: null });
+
+    const secrets = storage._store.get('encryptedSecrets');
+    expect(secrets).toBeNull();
+  });
+
+  it('preserves catalog secrets when adding custom secrets', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      channels: { telegramBotToken: fakeEnvelope },
+      encryptedSecrets: { TELEGRAM_BOT_TOKEN: fakeEnvelope },
+    });
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+
+    await instance.updateSecrets({ MY_CUSTOM_KEY: customEnvelope });
+
+    const secrets = storage._store.get('encryptedSecrets') as Record<string, unknown>;
+    expect(secrets.TELEGRAM_BOT_TOKEN).toEqual(fakeEnvelope);
+    expect(secrets.MY_CUSTOM_KEY).toEqual(customEnvelope);
+  });
+
+  it('preserves custom secrets when updating catalog secrets', async () => {
+    const { instance, storage } = createInstance();
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { MY_CUSTOM_KEY: customEnvelope },
+    });
+
+    await instance.updateSecrets({ telegramBotToken: fakeEnvelope });
+
+    const secrets = storage._store.get('encryptedSecrets') as Record<string, unknown>;
+    expect(secrets.MY_CUSTOM_KEY).toEqual(customEnvelope);
+    expect(secrets.TELEGRAM_BOT_TOKEN).toEqual(fakeEnvelope);
+  });
+
+  it('enforces custom secret count limit', async () => {
+    const { instance, storage } = createInstance();
+    // Seed 50 custom secrets (the max)
+    const existingSecrets: Record<string, unknown> = {};
+    for (let i = 0; i < 50; i++) {
+      existingSecrets[`SECRET_${i}`] = { ...fakeEnvelope, encryptedData: `val-${i}` };
+    }
+    await seedProvisioned(storage, { encryptedSecrets: existingSecrets });
+
+    // Adding one more should fail
+    await expect(
+      instance.updateSecrets({ SECRET_OVERFLOW: { ...fakeEnvelope, encryptedData: 'overflow' } })
+    ).rejects.toThrow('Custom secret limit exceeded');
+  });
+
+  it('stores config path metadata alongside secrets', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+
+    await instance.updateSecrets(
+      { MY_KEY: customEnvelope },
+      { MY_KEY: { configPath: 'models.providers.openai.apiKey' } }
+    );
+
+    const meta = storage._store.get('customSecretMeta') as Record<string, unknown>;
+    expect(meta).toEqual({ MY_KEY: { configPath: 'models.providers.openai.apiKey' } });
+  });
+
+  it('removes config path metadata when secret is deleted', async () => {
+    const { instance, storage } = createInstance();
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { MY_KEY: customEnvelope },
+      customSecretMeta: { MY_KEY: { configPath: 'talk.apiKey' } },
+    });
+
+    await instance.updateSecrets({ MY_KEY: null });
+
+    const meta = storage._store.get('customSecretMeta');
+    expect(meta).toBeNull();
+  });
+
+  it('updates config path metadata without changing value', async () => {
+    const { instance, storage } = createInstance();
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { MY_KEY: customEnvelope },
+      customSecretMeta: { MY_KEY: { configPath: 'talk.apiKey' } },
+    });
+
+    // Empty secrets patch, only meta update
+    await instance.updateSecrets({}, { MY_KEY: { configPath: 'cron.webhookToken' } });
+
+    const meta = storage._store.get('customSecretMeta') as Record<string, unknown>;
+    expect(meta).toEqual({ MY_KEY: { configPath: 'cron.webhookToken' } });
+    // Secret value unchanged
+    const secrets = storage._store.get('encryptedSecrets') as Record<string, unknown>;
+    expect(secrets.MY_KEY).toEqual(customEnvelope);
+  });
+
+  it('rejects duplicate config paths', async () => {
+    const { instance, storage } = createInstance();
+    const envelope1 = { ...fakeEnvelope, encryptedData: 'val-1' };
+    const envelope2 = { ...fakeEnvelope, encryptedData: 'val-2' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { KEY_A: envelope1 },
+      customSecretMeta: { KEY_A: { configPath: 'talk.apiKey' } },
+    });
+
+    await expect(
+      instance.updateSecrets({ KEY_B: envelope2 }, { KEY_B: { configPath: 'talk.apiKey' } })
+    ).rejects.toThrow('Config path "talk.apiKey" is already used by secret "KEY_A"');
   });
 });
 
@@ -5109,6 +5252,40 @@ describe("syncStatusWithFly: backfill lastStartedAt on 'starting' → 'running'"
   });
 });
 
+describe("syncStatusWithFly: 'destroyed' Fly state clears flyMachineId", () => {
+  it("clears flyMachineId and sets status to 'stopped' when Fly reports destroyed", async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'destroyed',
+      config: { mounts: [] },
+    });
+
+    await instance.alarm();
+
+    expect(storage._store.get('flyMachineId')).toBeNull();
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(storage._store.get('lastStoppedAt')).toBeGreaterThan(0);
+    expect(storage._store.get('healthCheckFailCount')).toBe(0);
+  });
+
+  it("clears flyMachineId from 'stopped' status when Fly reports destroyed", async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'stopped', lastStoppedAt: Date.now() - 60_000 });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'destroyed',
+      config: { mounts: [] },
+    });
+
+    await instance.alarm();
+
+    expect(storage._store.get('flyMachineId')).toBeNull();
+    expect(storage._store.get('status')).toBe('stopped');
+  });
+});
+
 describe('reconcileStarting: transient Fly API errors respect starting timeout', () => {
   it("stays 'starting' on transient error when NOT timed out", async () => {
     const { instance, storage } = createInstance();
@@ -5816,5 +5993,217 @@ describe('tryMarkInstanceReady', () => {
 
     expect(result).toEqual({ shouldNotify: true, userId: 'user-1' });
     expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
+  });
+});
+
+// ============================================================================
+// Stream Chat backfill
+// ============================================================================
+
+describe('Stream Chat backfill on provision', () => {
+  beforeEach(() => {
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (setupDefaultStreamChatChannel as Mock).mockClear();
+  });
+
+  it('provisions Stream Chat on first provision when env vars are present', async () => {
+    const env = createFakeEnv();
+    Object.assign(env, {
+      STREAM_CHAT_API_KEY: 'sc-key',
+      STREAM_CHAT_API_SECRET: 'sc-secret',
+    });
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+
+    await instance.provision('user-1', {});
+    await Promise.all(waitUntilPromises);
+
+    expect(setupDefaultStreamChatChannel).toHaveBeenCalledOnce();
+    expect(storage._store.get('streamChatApiKey')).toBe('sc-api-key');
+    expect(storage._store.get('streamChatBotUserId')).toBe('bot-sandbox-1');
+    expect(storage._store.get('streamChatBotUserToken')).toBe('sc-bot-token');
+    expect(storage._store.get('streamChatChannelId')).toBe('default-sandbox-1');
+  });
+
+  it('backfills Stream Chat on re-provision when DO state has no credentials', async () => {
+    const env = createFakeEnv();
+    Object.assign(env, {
+      STREAM_CHAT_API_KEY: 'sc-key',
+      STREAM_CHAT_API_SECRET: 'sc-secret',
+    });
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage);
+
+    (setupDefaultStreamChatChannel as Mock).mockClear();
+    await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
+
+    expect(setupDefaultStreamChatChannel).toHaveBeenCalledOnce();
+    expect(storage._store.get('streamChatApiKey')).toBe('sc-api-key');
+    expect(storage._store.get('streamChatBotUserId')).toBe('bot-sandbox-1');
+    expect(storage._store.get('streamChatBotUserToken')).toBe('sc-bot-token');
+    expect(storage._store.get('streamChatChannelId')).toBe('default-sandbox-1');
+  });
+
+  it('skips Stream Chat setup on re-provision when credentials already exist', async () => {
+    const env = createFakeEnv();
+    Object.assign(env, {
+      STREAM_CHAT_API_KEY: 'sc-key',
+      STREAM_CHAT_API_SECRET: 'sc-secret',
+    });
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      streamChatApiKey: 'existing-key',
+      streamChatBotUserId: 'existing-bot',
+      streamChatBotUserToken: 'existing-token',
+      streamChatChannelId: 'existing-channel',
+    });
+
+    (setupDefaultStreamChatChannel as Mock).mockClear();
+    await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
+
+    expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
+    expect(storage._store.get('streamChatApiKey')).toBe('existing-key');
+  });
+
+  it('skips Stream Chat when worker env vars are missing', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    // Default env does not have STREAM_CHAT_API_KEY / STREAM_CHAT_API_SECRET
+
+    await instance.provision('user-1', {});
+    await Promise.all(waitUntilPromises);
+
+    expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
+    expect(storage._store.get('streamChatApiKey')).toBeUndefined();
+  });
+
+  it('continues provisioning when Stream Chat setup fails (non-fatal)', async () => {
+    const env = createFakeEnv();
+    Object.assign(env, {
+      STREAM_CHAT_API_KEY: 'sc-key',
+      STREAM_CHAT_API_SECRET: 'sc-secret',
+    });
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+
+    (setupDefaultStreamChatChannel as Mock).mockRejectedValueOnce(
+      new Error('Stream Chat API down')
+    );
+
+    await instance.provision('user-1', {});
+    await Promise.all(waitUntilPromises);
+
+    // Provision succeeded despite Stream Chat failure
+    expect(storage._store.get('status')).toBeTruthy();
+    expect(storage._store.get('streamChatApiKey')).toBeUndefined();
+  });
+});
+
+describe('Stream Chat backfill on restartMachine', () => {
+  beforeEach(() => {
+    (flyClient.updateMachine as Mock).mockResolvedValue({ instance_id: 'inst-1' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+    (setupDefaultStreamChatChannel as Mock).mockClear();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (typeof url === 'string' && url.includes('/_kilo/gateway/status')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ state: 'running' }),
+          });
+        }
+        return Promise.resolve({ ok: true, status: 200 });
+      })
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('backfills Stream Chat on restart when DO state has no credentials', async () => {
+    const env = createFakeEnv();
+    Object.assign(env, {
+      STREAM_CHAT_API_KEY: 'sc-key',
+      STREAM_CHAT_API_SECRET: 'sc-secret',
+    });
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedRunning(storage);
+
+    const result = await instance.restartMachine();
+    expect(result.success).toBe(true);
+    await Promise.all(waitUntilPromises);
+
+    expect(setupDefaultStreamChatChannel).toHaveBeenCalledOnce();
+    expect(storage._store.get('streamChatApiKey')).toBe('sc-api-key');
+    expect(storage._store.get('streamChatBotUserId')).toBe('bot-sandbox-1');
+    expect(storage._store.get('streamChatBotUserToken')).toBe('sc-bot-token');
+    expect(storage._store.get('streamChatChannelId')).toBe('default-sandbox-1');
+  });
+
+  it('skips Stream Chat backfill on restart when credentials already exist', async () => {
+    const env = createFakeEnv();
+    Object.assign(env, {
+      STREAM_CHAT_API_KEY: 'sc-key',
+      STREAM_CHAT_API_SECRET: 'sc-secret',
+    });
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      streamChatApiKey: 'existing-key',
+      streamChatBotUserId: 'existing-bot',
+      streamChatBotUserToken: 'existing-token',
+      streamChatChannelId: 'existing-channel',
+    });
+
+    const result = await instance.restartMachine();
+    expect(result.success).toBe(true);
+    await Promise.all(waitUntilPromises);
+
+    expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
+    expect(storage._store.get('streamChatApiKey')).toBe('existing-key');
+  });
+
+  it('continues restart when Stream Chat backfill fails (non-fatal)', async () => {
+    const env = createFakeEnv();
+    Object.assign(env, {
+      STREAM_CHAT_API_KEY: 'sc-key',
+      STREAM_CHAT_API_SECRET: 'sc-secret',
+    });
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedRunning(storage);
+
+    (setupDefaultStreamChatChannel as Mock).mockRejectedValueOnce(
+      new Error('Stream Chat API down')
+    );
+
+    const result = await instance.restartMachine();
+    expect(result.success).toBe(true);
+    await Promise.all(waitUntilPromises);
+
+    // Restart still completes — Stream Chat failure is non-fatal
+    expect(storage._store.get('streamChatApiKey')).toBeUndefined();
+    // Machine was still updated
+    expect(flyClient.updateMachine).toHaveBeenCalled();
+  });
+
+  it('skips Stream Chat backfill when worker env vars are missing', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage);
+
+    const result = await instance.restartMachine();
+    expect(result.success).toBe(true);
+    await Promise.all(waitUntilPromises);
+
+    expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
   });
 });

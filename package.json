@@ -137,6 +137,8 @@
     "server-only": "^0.0.1",
     "sonner": "^2.0.7",
     "stripe": "catalog:",
+    "stream-chat": "^9.38.0",
+    "stream-chat-react": "^13.14.2",
     "stytch": "^12.43.1",
     "tailwind-merge": "^3.5.0",
     "uuid": "11.1.0",

@@ -5,6 +5,7 @@ export type ProviderId =
   | 'openrouter'
   | 'alibaba'
   | 'bytedance'
+  | 'coding-plan'
   | 'corethink'
   | 'martian'
   | 'mistral'
@@ -25,9 +26,12 @@ export type TransformRequestContext = {
   userByok: BYOKResult[] | null;
 };
 
+export type GatewayChatApiKind = GatewayRequest['kind'];
+
 export type Provider = {
   id: ProviderId;
   apiUrl: string;
   apiKey: string;
+  supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
   transformRequest(context: TransformRequestContext): void;
 };

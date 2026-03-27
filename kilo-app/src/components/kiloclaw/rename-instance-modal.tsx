@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { Modal, Pressable, TextInput, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Modal, Platform, Pressable, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -18,6 +18,20 @@ export function RenameInstanceModal({
 }: Readonly<RenameInstanceModalProps>) {
   const colors = useThemeColors();
   const nameRef = useRef(defaultName);
+  const inputRef = useRef<TextInput>(null);
+
+  // autoFocus doesn't reliably raise the keyboard inside Modal on Android
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, []);
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -31,6 +45,7 @@ export function RenameInstanceModal({
         >
           <Text className="text-base font-semibold">Rename Instance</Text>
           <TextInput
+            ref={inputRef}
             className="rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-5 text-foreground"
             placeholder="Enter a new name (max 50 characters)"
             placeholderTextColor={colors.mutedForeground}
@@ -38,7 +53,7 @@ export function RenameInstanceModal({
             onChangeText={val => {
               nameRef.current = val;
             }}
-            autoFocus
+            autoFocus={Platform.OS !== 'android'}
             maxLength={50}
           />
           <View className="flex-row justify-end gap-3">

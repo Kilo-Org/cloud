@@ -168,6 +168,12 @@
       "rules": {
         "import/no-default-export": "off"
       }
+    },
+    {
+      "files": ["src/app/_layout.tsx"],
+      "rules": {
+        "react/style-prop-object": "off"
+      }
     }
   ]
 }

@@ -324,7 +324,24 @@ export function configureGitHub(env: EnvLike, deps: BootstrapDeps = defaultDeps)
   }
 }
 
-// ---- Step 6: Onboard / doctor + config patching ----
+// ---- Step 6: Linear config ----
+
+/**
+ * Configure or clean up Linear MCP access.
+ * Linear access is provided via the Linear MCP server configured in mcporter.
+ * When LINEAR_API_KEY is present, mcporter uses it to authenticate.
+ * When absent, we just clean up the env var. No on-disk artifacts to clean.
+ */
+export function configureLinear(env: EnvLike): void {
+  if (env.LINEAR_API_KEY) {
+    console.log('Linear MCP configured via LINEAR_API_KEY');
+  } else {
+    delete env.LINEAR_API_KEY;
+    console.log('Linear: not configured');
+  }
+}
+
+// ---- Step 7: Onboard / doctor + config patching ----
 
 /**
  * Run openclaw onboard (first boot) or openclaw doctor (subsequent boots),
@@ -386,7 +403,7 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
   }
 }
 
-// ---- Step 7: TOOLS.md Google Workspace section ----
+// ---- Step 8: TOOLS.md Google Workspace section ----
 
 const GOG_MARKER_BEGIN = '<!-- BEGIN:google-workspace -->';
 const GOG_MARKER_END = '<!-- END:google-workspace -->';
@@ -539,7 +556,60 @@ export function updateToolsMd1PasswordSection(env: EnvLike, deps: BootstrapDeps)
   }
 }
 
-// ---- Step 10: Gateway args ----
+// ---- Step 10: TOOLS.md Linear section ----
+
+const LINEAR_MARKER_BEGIN = '<!-- BEGIN:linear -->';
+const LINEAR_MARKER_END = '<!-- END:linear -->';
+
+const LINEAR_TOOLS_SECTION = `
+${LINEAR_MARKER_BEGIN}
+## Linear
+
+Linear is configured as your project management tool. Use it  to track issues, plan projects, and manage product roadmaps.
+You can interact with the \`Linear\` MCP server using your \`mcporter\` skill.
+
+  ${LINEAR_MARKER_END}`;
+
+/**
+ * Manage the Linear section in TOOLS.md.
+ *
+ * When LINEAR_API_KEY is present, append a bounded section so the agent
+ * knows Linear MCP is available. When absent, remove any stale section.
+ * Idempotent: skips if the marker is already present.
+ */
+export function updateToolsMdLinearSection(env: EnvLike, deps: BootstrapDeps): void {
+  if (!deps.existsSync(TOOLS_MD_DEST)) return;
+
+  const content = deps.readFileSync(TOOLS_MD_DEST, 'utf8');
+
+  if (env.LINEAR_API_KEY) {
+    // Linear configured — add section if not already present
+    if (!content.includes(LINEAR_MARKER_BEGIN)) {
+      deps.writeFileSync(TOOLS_MD_DEST, content + LINEAR_TOOLS_SECTION);
+      console.log('TOOLS.md: added Linear section');
+    } else {
+      console.log('TOOLS.md: Linear section already present');
+    }
+  } else {
+    // Linear not configured — remove stale section if present
+    if (content.includes(LINEAR_MARKER_BEGIN)) {
+      const beginIdx = content.indexOf(LINEAR_MARKER_BEGIN);
+      const endIdx = content.indexOf(LINEAR_MARKER_END);
+      if (beginIdx !== -1 && endIdx !== -1) {
+        const before = content.slice(0, beginIdx).replace(/\n+$/, '\n');
+        const after = content.slice(endIdx + LINEAR_MARKER_END.length).replace(/^\n+/, '');
+        deps.writeFileSync(TOOLS_MD_DEST, before + after);
+        console.log('TOOLS.md: removed stale Linear section');
+      } else {
+        console.warn(
+          'TOOLS.md: Linear BEGIN marker found but END marker missing, skipping removal'
+        );
+      }
+    }
+  }
+}
+
+// ---- Step 11: Gateway args ----
 
 /**
  * Build the gateway CLI arguments array.
@@ -588,6 +658,10 @@ export async function bootstrap(
   configureGitHub(env, deps);
   await yieldToEventLoop();
 
+  setPhase('linear');
+  configureLinear(env);
+  await yieldToEventLoop();
+
   const configExists = deps.existsSync(CONFIG_PATH);
   setPhase(configExists ? 'doctor' : 'onboard');
   runOnboardOrDoctor(env, deps);
@@ -596,6 +670,7 @@ export async function bootstrap(
   updateToolsMdKiloCliSection(env, deps);
   updateToolsMdGoogleSection(env, deps);
   updateToolsMd1PasswordSection(env, deps);
+  updateToolsMdLinearSection(env, deps);
 
   // Write mcporter config for MCP servers (AgentCard, etc.)
   writeMcporterConfig(env);

@@ -17,6 +17,7 @@ import type {
   OpenRouterChatCompletionRequest,
   OpenRouterReasoningConfig,
 } from '@/lib/providers/openrouter/types';
+import { requestContainsImages } from '@/lib/providers/openrouter/request-helpers';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 import type OpenAI from 'openai';
 
@@ -34,6 +35,8 @@ type AutoModel = {
   max_completion_tokens: number;
   prompt_price: string;
   completion_price: string;
+  input_cache_read_price: string | undefined;
+  input_cache_write_price: string | undefined;
   supports_images: boolean;
   roocode_settings: ModelSettings | undefined;
   opencode_settings: OpenCodeSettings | undefined;
@@ -72,6 +75,11 @@ const FRONTIER_CODE_MODEL: ResolvedAutoModel = {
 };
 
 const FRONTIER_MODE_TO_MODEL: Record<string, ResolvedAutoModel> = {
+  KiloClaw: {
+    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
+    reasoning: { enabled: true },
+    verbosity: 'high',
+  },
   plan: { model: CLAUDE_OPUS_CURRENT_MODEL_ID, reasoning: { enabled: true }, verbosity: 'high' },
   general: {
     model: CLAUDE_OPUS_CURRENT_MODEL_ID,
@@ -107,7 +115,13 @@ const BALANCED_CODE_MODEL: ResolvedAutoModel = {
   model: MINIMAX_CURRENT_MODEL_ID,
 };
 
+const BALANCED_IMAGE_MODEL: ResolvedAutoModel = {
+  model: KIMI_CURRENT_MODEL_ID,
+  reasoning: { enabled: true },
+};
+
 const BALANCED_MODE_TO_MODEL: Record<string, ResolvedAutoModel> = {
+  KiloClaw: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   plan: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   general: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   architect: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
@@ -127,6 +141,8 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
   max_completion_tokens: 128_000,
   prompt_price: '0.000005',
   completion_price: '0.000025',
+  input_cache_read_price: '0.0000005',
+  input_cache_write_price: '0.00000625',
   supports_images: true,
   roocode_settings: undefined,
   opencode_settings: {
@@ -143,6 +159,8 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   max_completion_tokens: minimax_m25_free_model.max_completion_tokens,
   prompt_price: '0',
   completion_price: '0',
+  input_cache_read_price: '0',
+  input_cache_write_price: '0',
   supports_images: false,
   roocode_settings: {
     included_tools: ['search_and_replace'],
@@ -159,7 +177,9 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   max_completion_tokens: 131072,
   prompt_price: '0.0000006',
   completion_price: '0.000003',
-  supports_images: false,
+  input_cache_read_price: '0.000000225',
+  input_cache_write_price: undefined,
+  supports_images: true,
   roocode_settings: {
     included_tools: ['edit_file'],
     excluded_tools: ['apply_diff'],
@@ -175,6 +195,8 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   max_completion_tokens: 32768,
   prompt_price: '0.00000005',
   completion_price: '0.0000004',
+  input_cache_read_price: '0.000000005',
+  input_cache_write_price: undefined,
   supports_images: false,
   roocode_settings: undefined,
   opencode_settings: undefined,
@@ -205,7 +227,8 @@ const legacyMapping: Record<string, AutoModel | undefined> = {
 export async function resolveAutoModel(
   model: string,
   modeHeader: string | null,
-  balancePromise: Promise<number>
+  balancePromise: Promise<number>,
+  hasImages: boolean
 ): Promise<ResolvedAutoModel> {
   const mappedModel =
     (Object.hasOwn(legacyMapping, model) ? legacyMapping[model] : null)?.id ?? model;
@@ -217,8 +240,11 @@ export async function resolveAutoModel(
       model: (await balancePromise) > 0 ? GPT_5_NANO_ID : gpt_oss_20b_free_model.public_id,
     };
   }
-  const mode = modeHeader?.trim().toLowerCase() ?? '';
+  const mode = modeHeader?.trim() ?? '';
   if (mappedModel === KILO_AUTO_BALANCED_MODEL.id) {
+    if (hasImages) {
+      return BALANCED_IMAGE_MODEL;
+    }
     return (
       (Object.hasOwn(BALANCED_MODE_TO_MODEL, mode) ? BALANCED_MODE_TO_MODEL[mode] : null) ??
       BALANCED_CODE_MODEL
@@ -237,10 +263,12 @@ export async function applyResolvedAutoModel(
   featureHeader: FeatureValue | null,
   balancePromise: Promise<number>
 ) {
+  const hasImages = requestContainsImages(request);
   const resolved = await resolveAutoModel(
     model,
-    featureHeader === 'kiloclaw' ? 'plan' : modeHeader,
-    balancePromise
+    featureHeader === 'kiloclaw' ? 'KiloClaw' : modeHeader,
+    balancePromise,
+    hasImages
   );
   request.body.model = resolved.model;
   if (resolved.reasoning) {

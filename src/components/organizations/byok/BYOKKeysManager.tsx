@@ -47,14 +47,23 @@ import * as z from 'zod';
 
 // Hardcoded BYOK providers list
 const VERCEL_BYOK_PROVIDERS = [
+  { id: VercelUserByokInferenceProviderIdSchema.enum.alibaba, name: 'Alibaba' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.anthropic, name: 'Anthropic' },
+  { id: VercelUserByokInferenceProviderIdSchema.enum['arcee-ai'], name: 'Arcee AI' },
+  { id: VercelUserByokInferenceProviderIdSchema.enum.baseten, name: 'BaseTen' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.bedrock, name: 'AWS Bedrock' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.openai, name: 'OpenAI' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.inception, name: 'Inception' },
+  { id: VercelUserByokInferenceProviderIdSchema.enum.bytedance, name: 'ByteDance' },
+  { id: VercelUserByokInferenceProviderIdSchema.enum.fireworks, name: 'Fireworks' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.google, name: 'Google AI Studio' },
+  { id: VercelUserByokInferenceProviderIdSchema.enum.inception, name: 'Inception' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.minimax, name: 'MiniMax' },
   { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Mistral AI (Codestral)' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.mistral, name: 'Mistral AI (other models)' },
+  { id: VercelUserByokInferenceProviderIdSchema.enum.moonshotai, name: 'Moonshot AI' },
+  { id: VercelUserByokInferenceProviderIdSchema.enum.novita, name: 'Novita' },
+  { id: VercelUserByokInferenceProviderIdSchema.enum.openai, name: 'OpenAI' },
+  { id: VercelUserByokInferenceProviderIdSchema.enum.parasail, name: 'Parasail' },
+  { id: VercelUserByokInferenceProviderIdSchema.enum.streamlake, name: 'StreamLake (Kwaipilot)' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.xai, name: 'xAI' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.zai, name: 'Z.ai (pay as you go)' },
 ] as const;

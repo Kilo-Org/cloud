@@ -118,11 +118,7 @@ function BannerButton({
   return (
     <Button
       asChild
-      className={cn(
-        'w-full shrink-0 sm:w-auto [&>*]:h-4 [&>*]:w-4',
-        colors?.button,
-        className
-      )}
+      className={cn('w-full shrink-0 sm:w-auto [&>*]:h-4 [&>*]:w-4', colors?.button, className)}
     >
       <Link href={href}>{children}</Link>
     </Button>

@@ -102,14 +102,6 @@ function IdentifyUser() {
       if (currentAnonymousId && currentAnonymousId !== session.user.email) {
         posthog.alias(session.user.email, currentAnonymousId);
       }
-      // Stamp which product the user signed up for. Uses $set_once so only the
-      // first call wins — safe to re-run on subsequent session refreshes.
-      // The effect deps don't include pathname, so this only fires on auth
-      // state changes, not on in-app navigation.
-      if (session.isNewUser && window.location.pathname.startsWith('/claw')) {
-        posthog.setPersonProperties(undefined, { first_product_signup: 'kiloclaw' });
-      }
-
       // Re-fetch feature flags now that the user is identified.
       // Without this, flags evaluated for the anonymous ID remain cached,
       // so user-targeted flags would stay false until the next natural reload.

@@ -421,6 +421,13 @@
       "when": 1774426403576,
       "tag": "0059_calm_gressill",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1774625781044,
+      "tag": "0060_add_kiloclaw_cli_runs",
+      "breakpoints": true
     }
   ]
 }

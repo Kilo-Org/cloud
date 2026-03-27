@@ -125,19 +125,19 @@ describe('writeKiloCliConfig', () => {
     expect(written).toHaveLength(0);
   });
 
-  it('patches base URL on existing config using provider.kilo, stripping path to origin', () => {
-    const existing = JSON.stringify({ permission: { edit: 'allow', bash: 'allow' } });
-    const { deps, written } = fakeDeps(existing);
-    const env = baseEnv({
-      KILOCLAW_FRESH_INSTALL: 'false',
-      KILOCODE_API_BASE_URL: 'https://tunnel.example.com/api/gateway',
+  it('removes stale provider.kilo.options.baseURL from existing config', () => {
+    const existing = JSON.stringify({
+      permission: { edit: 'allow', bash: 'allow' },
+      provider: { kilo: { options: { baseURL: 'https://stale.example.com' } } },
     });
+    const { deps, written } = fakeDeps(existing);
+    const env = baseEnv({ KILOCLAW_FRESH_INSTALL: 'false' });
 
     writeKiloCliConfig(env, '/tmp/kilo', deps);
 
     expect(written).toHaveLength(1);
     const config = JSON.parse(written[0].data);
-    expect(config.provider.kilo.options.baseURL).toBe('https://tunnel.example.com');
+    expect(config.provider.kilo.options.baseURL).toBeUndefined();
   });
 
   it('patches model from KILOCODE_DEFAULT_MODEL on existing config', () => {
@@ -155,13 +155,15 @@ describe('writeKiloCliConfig', () => {
     expect(config.model).toBe('kilo/openai/gpt-5');
   });
 
-  it('patches both model and base URL when both are set', () => {
-    const existing = JSON.stringify({ permission: { edit: 'allow', bash: 'allow' } });
+  it('patches model and scrubs stale baseURL together', () => {
+    const existing = JSON.stringify({
+      permission: { edit: 'allow', bash: 'allow' },
+      provider: { kilo: { options: { baseURL: 'https://stale.example.com' } } },
+    });
     const { deps, written } = fakeDeps(existing);
     const env = baseEnv({
       KILOCLAW_FRESH_INSTALL: 'false',
       KILOCODE_DEFAULT_MODEL: 'kilocode/openai/gpt-5',
-      KILOCODE_API_BASE_URL: 'https://tunnel.example.com/api/gateway',
     });
 
     writeKiloCliConfig(env, '/tmp/kilo', deps);
@@ -169,54 +171,40 @@ describe('writeKiloCliConfig', () => {
     expect(written).toHaveLength(1);
     const config = JSON.parse(written[0].data);
     expect(config.model).toBe('kilo/openai/gpt-5');
+    expect(config.provider.kilo.options.baseURL).toBeUndefined();
   });
 
   it('does not set model when KILOCODE_DEFAULT_MODEL is absent', () => {
-    const existing = JSON.stringify({ permission: { edit: 'allow', bash: 'allow' } });
-    const { deps, written } = fakeDeps(existing);
-    const env = baseEnv({
-      KILOCLAW_FRESH_INSTALL: 'false',
-      KILOCODE_API_BASE_URL: 'https://tunnel.example.com/api/gateway',
+    const existing = JSON.stringify({
+      permission: { edit: 'allow', bash: 'allow' },
+      provider: { kilo: { options: { baseURL: 'https://stale.example.com' } } },
     });
+    const { deps, written } = fakeDeps(existing);
+    const env = baseEnv({ KILOCLAW_FRESH_INSTALL: 'false' });
 
     writeKiloCliConfig(env, '/tmp/kilo', deps);
 
     expect(written).toHaveLength(1);
     const config = JSON.parse(written[0].data);
     expect(config.model).toBeUndefined();
+    // baseURL scrubbed as side effect
+    expect(config.provider.kilo.options.baseURL).toBeUndefined();
   });
 
-  it('creates provider structure when patching base URL on minimal config', () => {
-    const existing = JSON.stringify({});
-    const { deps, written } = fakeDeps(existing);
-    const env = baseEnv({
-      KILOCLAW_FRESH_INSTALL: 'false',
-      KILOCODE_API_BASE_URL: 'https://tunnel.example.com/api/gateway',
-    });
-
-    writeKiloCliConfig(env, '/tmp/kilo', deps);
-
-    const config = JSON.parse(written[0].data);
-    expect(config.provider.kilo.options.baseURL).toBe('https://tunnel.example.com');
-  });
-
-  it('does not write when no env overrides set', () => {
+  it('does not write when config has no stale baseURL and no model override', () => {
     const existing = JSON.stringify({ permission: { edit: 'allow' } });
     const { deps, written } = fakeDeps(existing);
     const env = baseEnv({ KILOCLAW_FRESH_INSTALL: 'false' });
 
     writeKiloCliConfig(env, '/tmp/kilo', deps);
 
-    // No KILOCODE_API_BASE_URL → no patch needed, no write
+    // Nothing to scrub or patch — no write
     expect(written).toHaveLength(0);
   });
 
   it('skips patch gracefully when config file contains corrupt JSON', () => {
     const { deps, written } = fakeDeps('not valid json {{{');
-    const env = baseEnv({
-      KILOCLAW_FRESH_INSTALL: 'false',
-      KILOCODE_API_BASE_URL: 'https://tunnel.example.com/api/gateway',
-    });
+    const env = baseEnv({ KILOCLAW_FRESH_INSTALL: 'false' });
 
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const result = writeKiloCliConfig(env, '/tmp/kilo', deps);
@@ -230,7 +218,7 @@ describe('writeKiloCliConfig', () => {
     consoleSpy.mockRestore();
   });
 
-  it('seeds config and then patches base URL on fresh install', () => {
+  it('seeds config on fresh install without adding baseURL', () => {
     const { deps, written } = fakeDeps();
 
     let seeded = false;
@@ -256,11 +244,12 @@ describe('writeKiloCliConfig', () => {
     const result = writeKiloCliConfig(env, '/tmp/kilo', deps);
 
     expect(result).toBe(true);
-    expect(written).toHaveLength(2); // seed + patch
+    // Only the seed write — no baseURL patch (seeded config has no stale baseURL to scrub)
+    expect(written).toHaveLength(1);
 
-    const finalConfig = JSON.parse(written[1].data);
+    const finalConfig = JSON.parse(written[0].data);
     expect(finalConfig.$schema).toBe('https://app.kilo.ai/config.json');
-    expect(finalConfig.provider.kilo.options.baseURL).toBe('https://tunnel.example.com');
+    expect(finalConfig.provider).toBeUndefined();
     expect(finalConfig.model).toBeUndefined();
   });
 });

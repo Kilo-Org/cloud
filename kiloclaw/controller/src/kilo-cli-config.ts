@@ -70,25 +70,22 @@ export function writeKiloCliConfig(
   }
 
   // Patch config on every boot (if it exists).
-  // Only writes when a change is actually made to avoid silent no-op writes.
-  const needsBaseUrlPatch = !!env.KILOCODE_API_BASE_URL;
-  const needsModelPatch = !!env.KILOCODE_DEFAULT_MODEL;
-
-  if (deps.existsSync(configPath) && (needsBaseUrlPatch || needsModelPatch)) {
+  if (deps.existsSync(configPath)) {
     try {
       // JSON structure is open-ended (user may add arbitrary keys), so we use `any`
       // rather than a strict schema.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const config: any = JSON.parse(deps.readFileSync(configPath, 'utf8'));
+      let dirty = false;
 
-      // Override the kilo provider's base URL for local dev (e.g., ngrok tunnel).
-      // In production this env var is not set and the built-in default is used.
-      if (needsBaseUrlPatch) {
-        const origin = new URL(env.KILOCODE_API_BASE_URL!).origin;
-        config.provider = config.provider || {};
-        config.provider.kilo = config.provider.kilo || {};
-        config.provider.kilo.options = config.provider.kilo.options || {};
-        config.provider.kilo.options.baseURL = origin;
+      // Remove any stale provider.kilo.options.baseURL from the config file.
+      // Setting baseURL in opencode.json is broken (the Kilo CLI ignores it
+      // in certain code paths). The correct mechanism is the KILO_API_URL env
+      // var, which bootstrap sets from KILOCODE_API_BASE_URL. Early deployments
+      // may still have the broken field, so we scrub it on every boot.
+      if (config.provider?.kilo?.options?.baseURL) {
+        delete config.provider.kilo.options.baseURL;
+        dirty = true;
       }
 
       // Sync Kilo CLI's model with the user's KiloClaw default model.
@@ -96,9 +93,12 @@ export function writeKiloCliConfig(
       const defaultModel = env.KILOCODE_DEFAULT_MODEL;
       if (defaultModel) {
         config.model = toKiloModelId(defaultModel);
+        dirty = true;
       }
 
-      deps.writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
+      if (dirty) {
+        deps.writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
+      }
     } catch (err) {
       console.error('[kilo-cli] Failed to patch config (corrupt JSON?), skipping:', err);
     }

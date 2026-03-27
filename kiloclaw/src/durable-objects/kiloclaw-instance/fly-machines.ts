@@ -210,7 +210,14 @@ export async function startExistingMachine(
       console.log('[DO] Machine destroyed, creating new one');
       state.flyMachineId = null;
       await ctx.storage.put(storageUpdate({ flyMachineId: null }));
-      await createNewMachine(flyConfig, ctx, state, initialMachineConfig, minSecretsVersion, envFlyRegion);
+      await createNewMachine(
+        flyConfig,
+        ctx,
+        state,
+        initialMachineConfig,
+        minSecretsVersion,
+        envFlyRegion
+      );
       return;
     }
 

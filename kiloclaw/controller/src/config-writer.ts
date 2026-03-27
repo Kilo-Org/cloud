@@ -328,12 +328,16 @@ const DEFAULT_MCPORTER_CONFIG_PATH = '/root/.openclaw/workspace/config/mcporter.
 /**
  * Write mcporter.json with MCP server definitions derived from environment variables.
  * MCPorter is the middleware layer that lets OpenClaw agents call MCP server tools
- * via `mcporter call <server>.<tool>`. This bypasses openclaw.json's strict schema
- * validation, which does not yet support `mcp.servers` (requires OpenClaw >= 2026.3.14).
+ * via `mcporter call <server>.<tool>`.
  *
- * TODO: When the Dockerfile pins OpenClaw >= 2026.3.14, migrate MCP server config
- * into generateBaseConfig() using `config.mcp.servers` in openclaw.json instead.
- * The mcporter approach can then be removed. See PR #48611 in openclaw/openclaw.
+ * The `config.mcp.servers` schema exists in openclaw.json (since v2026.3.14), but
+ * OpenClaw's embedded Pi MCP runtime only supports StdioClientTransport — it has no
+ * HTTP/SSE transport. Since our MCP servers (AgentCard, Linear) are remote HTTP
+ * endpoints, mcporter must stay until OpenClaw adds HTTP transport support.
+ *
+ * TODO: When OpenClaw's Pi MCP bridge gains HTTP/SSE transport, migrate these
+ * definitions into generateBaseConfig() using `config.mcp.servers` and remove
+ * mcporter. See PR #48611 in openclaw/openclaw.
  */
 export function writeMcporterConfig(
   env: EnvLike,

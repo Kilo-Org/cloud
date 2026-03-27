@@ -1014,6 +1014,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [destroyDialogOpen, setDestroyDialogOpen] = useState(false);
   const [doctorDialogOpen, setDoctorDialogOpen] = useState(false);
   const [restoreConfigDialogOpen, setRestoreConfigDialogOpen] = useState(false);
+  const [destroyMachineDialogOpen, setDestroyMachineDialogOpen] = useState(false);
   const [awaitingRestartCompletion, setAwaitingRestartCompletion] = useState(false);
   const [restoreSnapshotDialogOpen, setRestoreSnapshotDialogOpen] = useState(false);
   const [restoreSnapshotId, setRestoreSnapshotId] = useState<string | null>(null);
@@ -1242,6 +1243,30 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     })
   );
 
+  const {
+    mutateAsync: destroyFlyMachine,
+    isPending: isDestroyingFlyMachine,
+    isSuccess: isFlyMachineDestroyed,
+    reset: resetDestroyFlyMachine,
+  } = useMutation(
+    trpc.admin.kiloclawInstances.destroyFlyMachine.mutationOptions({
+      onSuccess: () => {
+        toast.success('Fly machine destroyed');
+        invalidateMachineQueries();
+        setDestroyMachineDialogOpen(false);
+      },
+      onError: err => {
+        toast.error(`Failed to destroy Fly machine: ${err.message}`);
+      },
+    })
+  );
+
+  // Reset the destroyed success state when the machine ID changes (e.g. new machine created)
+  const flyMachineId = data?.workerStatus?.flyMachineId;
+  useEffect(() => {
+    resetDestroyFlyMachine();
+  }, [flyMachineId, resetDestroyFlyMachine]);
+
   const { mutateAsync: forceRetryRecovery, isPending: isRetryingRecovery } = useMutation(
     trpc.admin.kiloclawInstances.forceRetryRecovery.mutationOptions({
       onSuccess: () => {
@@ -1365,7 +1390,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     isMachineStopping ||
     isMachineRedeploying ||
     isMachineUpgrading ||
-    isRetryingRecovery;
+    isRetryingRecovery ||
+    isDestroyingFlyMachine;
   const gatewayActionPending =
     isGatewayStarting ||
     isGatewayStopping ||
@@ -1755,10 +1781,83 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   )}
                   Upgrade to Latest
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={
+                    isFlyMachineDestroyed
+                      ? 'border-green-500 text-green-500'
+                      : 'border-orange-500 text-orange-500 hover:bg-orange-500/10'
+                  }
+                  disabled={machineActionPending || !hasMachine || isFlyMachineDestroyed}
+                  onClick={() => setDestroyMachineDialogOpen(true)}
+                >
+                  {isDestroyingFlyMachine ? (
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                  ) : isFlyMachineDestroyed ? (
+                    <CheckCircle2 className="mr-1 h-4 w-4" />
+                  ) : (
+                    <Trash2 className="mr-1 h-4 w-4" />
+                  )}
+                  {isFlyMachineDestroyed ? 'Machine Destroyed' : 'Destroy Machine'}
+                </Button>
               </div>
             </CardContent>
           </Card>
         )}
+
+        {/* Destroy Fly Machine Confirmation Dialog */}
+        <Dialog
+          open={destroyMachineDialogOpen}
+          onOpenChange={isDestroyingFlyMachine ? () => {} : setDestroyMachineDialogOpen}
+        >
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="text-destructive flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Destroy Fly Machine
+              </DialogTitle>
+              <DialogDescription className="pt-3">
+                This will force-destroy the Fly machine via the Machines API. Only the Fly machine
+                is deleted — the KiloClaw instance and Fly volume will remain intact.
+                <span className="text-foreground mt-2 block font-medium">
+                  User: {data?.user_email ?? data?.user_id}
+                </span>
+                <span className="mt-2 block">
+                  Machine ID: <code className="text-xs">{data?.workerStatus?.flyMachineId}</code>
+                </span>
+                <span className="block">
+                  App: <code className="text-xs">{data?.workerStatus?.flyAppName}</code>
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <DialogClose asChild>
+                <Button variant="secondary" disabled={isDestroyingFlyMachine}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                variant="destructive"
+                disabled={isDestroyingFlyMachine}
+                onClick={() => {
+                  if (data?.workerStatus?.flyMachineId && data?.workerStatus?.flyAppName) {
+                    void destroyFlyMachine({
+                      userId: data.user_id,
+                      appName: data.workerStatus.flyAppName,
+                      machineId: data.workerStatus.flyMachineId,
+                    });
+                  } else {
+                    toast.error('Missing machine ID or app name');
+                  }
+                }}
+              >
+                {isDestroyingFlyMachine && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                Destroy Machine
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Gateway Process (controller) */}
         {isActive && (

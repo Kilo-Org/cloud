@@ -5122,6 +5122,40 @@ describe("syncStatusWithFly: backfill lastStartedAt on 'starting' → 'running'"
   });
 });
 
+describe("syncStatusWithFly: 'destroyed' Fly state clears flyMachineId", () => {
+  it("clears flyMachineId and sets status to 'stopped' when Fly reports destroyed", async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'destroyed',
+      config: { mounts: [] },
+    });
+
+    await instance.alarm();
+
+    expect(storage._store.get('flyMachineId')).toBeNull();
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(storage._store.get('lastStoppedAt')).toBeGreaterThan(0);
+    expect(storage._store.get('healthCheckFailCount')).toBe(0);
+  });
+
+  it("clears flyMachineId from 'stopped' status when Fly reports destroyed", async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'stopped', lastStoppedAt: Date.now() - 60_000 });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'destroyed',
+      config: { mounts: [] },
+    });
+
+    await instance.alarm();
+
+    expect(storage._store.get('flyMachineId')).toBeNull();
+    expect(storage._store.get('status')).toBe('stopped');
+  });
+});
+
 describe('reconcileStarting: transient Fly API errors respect starting timeout', () => {
   it("stays 'starting' on transient error when NOT timed out", async () => {
     const { instance, storage } = createInstance();

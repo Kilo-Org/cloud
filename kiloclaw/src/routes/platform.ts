@@ -1378,4 +1378,70 @@ platform.put('/regions', async c => {
   return c.json({ ok: true, regions: result.data.regions, raw });
 });
 
+// POST /api/platform/destroy-fly-machine
+// This is for admin cleanup only.
+// It directly destroys a Fly machine via the Machines API (force=true).
+// It does not destroy the Fly app or volume.
+const DestroyFlyMachineSchema = z.object({
+  userId: z.string().min(1),
+  appName: z
+    .string()
+    .min(1)
+    .max(63)
+    .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Invalid Fly app name'),
+  machineId: z
+    .string()
+    .min(1)
+    .regex(/^[a-z0-9]+$/, 'Invalid Fly machine ID'),
+});
+
+platform.post('/destroy-fly-machine', async c => {
+  const result = await parseBody(c, DestroyFlyMachineSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, appName, machineId } = result.data;
+  const apiToken = c.env.FLY_API_TOKEN;
+  if (!apiToken) {
+    return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
+  }
+
+  const url = `https://api.machines.dev/v1/apps/${appName}/machines/${machineId}?force=true`;
+  try {
+    const resp = await fetch(url, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${apiToken}` },
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text();
+      console.error(
+        `[platform] destroy-fly-machine failed (${resp.status}) app=${appName} machine=${machineId}:`,
+        body
+      );
+      return jsonError(`Fly API error (${resp.status}): ${body}`, resp.status);
+    }
+
+    console.log(`[platform] destroy-fly-machine ok: app=${appName} machine=${machineId}`);
+
+    // Trigger immediate reconcile so the DO discovers the machine is gone.
+    try {
+      await withDORetry(
+        instanceStubFactory(c.env, userId),
+        stub => stub.forceRetryRecovery(),
+        'forceRetryRecovery'
+      );
+    } catch (err) {
+      console.warn(
+        `[platform] destroy-fly-machine: forceRetryRecovery failed for user=${userId}:`,
+        err
+      );
+    }
+
+    return c.json({ ok: true });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'destroy-fly-machine');
+    return jsonError(message, status);
+  }
+});
+
 export { platform };

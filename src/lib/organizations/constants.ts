@@ -19,4 +19,26 @@ export const ENTERPRISE_SEAT_PRICE_YEARLY_BILLED_ANNUALLY_USD =
 export const TEAM_SEAT_PRICE_MONTHLY_USD = TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD;
 export const ENTERPRISE_SEAT_PRICE_MONTHLY_USD = ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD;
 
+/**
+ * Infer the plan tier from a Stripe unit_amount (in cents).
+ * Teams prices: $18/mo (1800) or $180/yr (18000).
+ * Enterprise prices: $72/mo (7200) or $720/yr (72000).
+ * Returns null for unrecognized amounts.
+ */
+export function inferPlanFromUnitAmount(unitAmountCents: number): 'teams' | 'enterprise' | null {
+  if (
+    unitAmountCents === TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD * 100 ||
+    unitAmountCents === TEAM_SEAT_PRICE_YEARLY_BILLED_ANNUALLY_USD * 100
+  ) {
+    return 'teams';
+  }
+  if (
+    unitAmountCents === ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD * 100 ||
+    unitAmountCents === ENTERPRISE_SEAT_PRICE_YEARLY_BILLED_ANNUALLY_USD * 100
+  ) {
+    return 'enterprise';
+  }
+  return null;
+}
+
 export const KILO_ORGANIZATION_ID = '9d278969-5453-4ae3-a51f-a8d2274a7b56';

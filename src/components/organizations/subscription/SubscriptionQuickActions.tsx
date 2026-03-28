@@ -19,6 +19,7 @@ import {
   TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD,
   ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
   ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD,
+  inferPlanFromUnitAmount,
 } from '@/lib/organizations/constants';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
 import { formatDate } from './utils';
@@ -86,8 +87,11 @@ export function SubscriptionQuickActions({
   const canCancelSubscription =
     canManageBilling && subscription.status === 'active' && !willCancelAtPeriodEnd;
   const canChangeSeatCount = canManageBilling && subscription.status === 'active';
-  const currentSeatCount = subscription.items.data[0]?.quantity || 0;
-  const currentInterval = subscription.items.data[0]?.price?.recurring?.interval;
+  // Derive seat count and interval from the paid seat item (unit_amount > 0),
+  // not items[0] which could be a free-seat price in mixed subscriptions.
+  const paidSeatItem = subscription.items.data.find(item => (item.price?.unit_amount ?? 0) > 0);
+  const currentSeatCount = paidSeatItem?.quantity || 0;
+  const currentInterval = paidSeatItem?.price?.recurring?.interval;
   const isMonthly = currentInterval === 'month';
   const hasPendingSchedule = (() => {
     const schedule = subscription.schedule;
@@ -199,7 +203,7 @@ export function SubscriptionQuickActions({
           targetCycle={isMonthly ? 'annual' : 'monthly'}
           currentCycle={isMonthly ? 'monthly' : 'annual'}
           seatCount={currentSeatCount}
-          plan={org.data.plan}
+          plan={inferPlanFromUnitAmount(paidSeatItem?.price?.unit_amount ?? 0) ?? org.data.plan}
           effectiveDate={(() => {
             const periodEnd = (subscription as SubscriptionWithPeriod).current_period_end;
             return periodEnd ? formatDate(periodEnd) : 'end of current period';

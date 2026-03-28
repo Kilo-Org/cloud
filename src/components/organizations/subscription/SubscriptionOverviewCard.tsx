@@ -151,9 +151,12 @@ export function SubscriptionOverviewCard({
     setResubscribeError(null);
 
     try {
-      // Sum quantities across all line items (handles mixed paid/free seat prices)
+      // Only count paid seat items (unit_amount > 0). Free-seat items have
+      // unit_amount === 0 and must not be included because checkout creates a
+      // single paid line item — including free seats would overcharge.
+      const paidItems = subscription.items.data.filter(item => (item.price?.unit_amount ?? 0) > 0);
       const currentSeatCount =
-        subscription.items.data.reduce((total, item) => total + (item.quantity ?? 0), 0) || 1;
+        paidItems.reduce((total, item) => total + (item.quantity ?? 0), 0) || 1;
 
       // Preserve the billing cycle the org was on before cancellation
       const billingCycle = currentBillingInterval === 'month' ? 'monthly' : 'annual';

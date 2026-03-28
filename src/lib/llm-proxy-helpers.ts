@@ -378,7 +378,7 @@ export function extractFimPromptInfo(body: { prompt: string; suffix?: string | n
 // FIM-Specific Code
 // ============================================================================
 
-export type MistralFimUsage = {
+export type FimUsage = {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
@@ -388,7 +388,7 @@ export type MistralFimCompletion = {
   id: string;
   object: 'fim.completion';
   model: string;
-  usage: MistralFimUsage;
+  usage: FimUsage;
   created: number;
   choices: Array<{
     index: number;
@@ -409,23 +409,35 @@ export type MistralFimStreamChunk = {
     };
     finish_reason: string | null;
   }>;
-  usage?: MistralFimUsage; // Only present in final chunk
+  usage?: FimUsage; // Only present in final chunk
 };
 
-function computeMistralFimMicrodollarCost(usage: MistralFimUsage): number {
-  return Math.round(usage.prompt_tokens * 0.3 + usage.completion_tokens * 0.9);
+function computeInceptionFimMicrodollarCost(usage: FimUsage): number {
+  return Math.round(usage.prompt_tokens * 0.25 + usage.completion_tokens * 0.75);
 }
 
-function parseMistralFimUsageFromString(response: string): MicrodollarUsageStats {
+function computeFimMicrodollarCost(usage: FimUsage, provider: 'mistral' | 'inception'): number {
+  switch (provider) {
+    case 'mistral':
+      return Math.round(usage.prompt_tokens * 0.3 + usage.completion_tokens * 0.9);
+    case 'inception':
+      return computeInceptionFimMicrodollarCost(usage);
+  }
+}
+
+function parseMistralFimUsageFromString(
+  response: string,
+  provider: 'mistral' | 'inception'
+): MicrodollarUsageStats {
   const json: MistralFimCompletion = JSON.parse(response);
-  const cost_mUsd = computeMistralFimMicrodollarCost(json.usage);
+  const cost_mUsd = computeFimMicrodollarCost(json.usage, provider);
 
   return {
     messageId: json.id,
     model: json.model,
     responseContent: json.choices[0]?.text || '',
     hasError: !json.model,
-    inference_provider: 'mistral',
+    inference_provider: provider,
     inputTokens: json.usage.prompt_tokens,
     outputTokens: json.usage.completion_tokens,
     cacheHitTokens: 0,
@@ -444,11 +456,12 @@ function parseMistralFimUsageFromString(response: string): MicrodollarUsageStats
 
 async function parseMistralFimUsageFromStream(
   stream: ReadableStream,
-  requestSpan: Span | undefined
+  requestSpan: Span | undefined,
+  provider: 'mistral' | 'inception'
 ): Promise<MicrodollarUsageStats> {
   requestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
-    name: 'mistral-fim-stream-processing',
+    name: 'fim-stream-processing',
     op: 'performance',
   });
   const timeToFirstTokenSpan = startInactiveSpan({
@@ -462,7 +475,7 @@ async function parseMistralFimUsageFromStream(
   let reportedError = false;
   const startedAt = performance.now();
   let firstTokenReceived = false;
-  let usage: MistralFimUsage | undefined;
+  let usage: FimUsage | undefined;
 
   const reader = stream.getReader();
   const decoder = new TextDecoder();
@@ -471,7 +484,7 @@ async function parseMistralFimUsageFromStream(
     onEvent(event: EventSourceMessage) {
       if (!firstTokenReceived) {
         sentryRootSpan()?.setAttribute(
-          'mistral.time_to_first_token_ms',
+          'fim.time_to_first_token_ms',
           performance.now() - startedAt
         );
         firstTokenReceived = true;
@@ -525,12 +538,12 @@ async function parseMistralFimUsageFromStream(
     model,
     responseContent,
     hasError: reportedError,
-    inference_provider: 'mistral',
+    inference_provider: provider,
     inputTokens: usage?.prompt_tokens ?? 0,
     outputTokens: usage?.completion_tokens ?? 0,
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
-    cost_mUsd: usage ? computeMistralFimMicrodollarCost(usage) : 0,
+    cost_mUsd: usage ? computeFimMicrodollarCost(usage, provider) : 0,
     is_byok: null,
     upstream_id: null,
     finish_reason: null,
@@ -550,11 +563,13 @@ export function countAndStoreFimUsage(
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedResponse, logFileExtension);
 
+  const provider = usageContext.provider as 'mistral' | 'inception';
+
   const usageStatsPromise = !clonedResponse.body
     ? Promise.resolve(null)
     : usageContext.isStreaming
-      ? parseMistralFimUsageFromStream(clonedResponse.body, requestSpan)
-      : clonedResponse.text().then(content => parseMistralFimUsageFromString(content));
+      ? parseMistralFimUsageFromStream(clonedResponse.body, requestSpan, provider)
+      : clonedResponse.text().then(content => parseMistralFimUsageFromString(content, provider));
 
   after(
     usageStatsPromise.then(usageStats => {

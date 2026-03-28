@@ -7,6 +7,7 @@ export type ProviderId =
   | 'bytedance'
   | 'coding-plan'
   | 'corethink'
+  | 'inception'
   | 'martian'
   | 'mistral'
   | 'morph'

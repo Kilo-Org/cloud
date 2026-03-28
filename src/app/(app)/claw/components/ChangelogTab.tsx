@@ -33,21 +33,28 @@ function ChangelogRow({ entry }: { entry: ChangelogEntry }) {
   const deployHint = entry.deployHint ? DEPLOY_HINT_STYLES[entry.deployHint] : null;
 
   return (
-    <div className="flex items-start justify-between gap-4 py-3">
+    <div className="flex flex-col gap-1 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="flex min-w-0 flex-1 items-start gap-2">
         {entry.category === 'feature' ? (
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
         ) : (
           <Bug className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
         )}
-        <div className="min-w-0">
-          <p className="text-muted-foreground text-xs">
-            {format(parseISO(entry.date), 'MMM d, yyyy')}
-          </p>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-y-1 sm:block sm:justify-start">
+            <p className="text-muted-foreground text-xs">
+              {format(parseISO(entry.date), 'MMM d, yyyy')}
+            </p>
+            {deployHint && (
+              <Badge variant="outline" className={`sm:hidden ${deployHint.className}`}>
+                {deployHint.label}
+              </Badge>
+            )}
+          </div>
           <p className="mt-0.5 text-sm">{entry.description}</p>
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="hidden shrink-0 items-center gap-2 sm:flex">
         <Badge variant="outline" className={CATEGORY_STYLES[entry.category]}>
           {entry.category}
         </Badge>

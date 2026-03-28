@@ -685,86 +685,75 @@ export function SettingsTab({
 
       {/* ── OpenClaw Instance card ── */}
       <div className="rounded-lg border px-4 py-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
             <Settings className="text-muted-foreground h-5 w-5 shrink-0" />
-            <div className="min-w-0">
+            <div>
               <p className="text-sm font-medium">OpenClaw Instance</p>
               {hasVersionInfo && (
-                <div className="text-muted-foreground text-xs">
-                  <div className="flex flex-wrap items-center gap-x-2">
-                    <span>
-                      Version:{' '}
-                      <strong className="text-foreground">
-                        {runningVersion ?? trackedVersion}
-                      </strong>
-                    </span>
-                    <span className="text-muted-foreground/40">|</span>
-                    {isPinned ? (
-                      <span className="text-amber-400">Pinned</span>
-                    ) : (
-                      <span className="text-green-400">Following latest</span>
-                    )}
-                    {needsImageUpgrade && (
-                      <Badge
-                        variant="outline"
-                        className="border-blue-500/30 bg-blue-500/15 text-blue-400"
-                      >
-                        Upgrade required
-                      </Badge>
-                    )}
-                    {updateAvailable && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={onRequestUpgrade}
-                            className="cursor-pointer"
-                          >
-                            <Badge
-                              variant="outline"
-                              className="border-orange-500/30 bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
-                            >
-                              Update available
-                            </Badge>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>
-                            {catalogNewerThanImage
-                              ? `A newer OpenClaw version (${latestAvailableVersion}) is available — click to upgrade`
-                              : `A newer image (${latestVersion?.imageTag ?? 'unknown'}) is available — click to upgrade`}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                    {isModified && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
+                <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
+                  <span>
+                    Version:{' '}
+                    <strong className="text-foreground">{runningVersion ?? trackedVersion}</strong>
+                  </span>
+                  <span className="text-muted-foreground/40">|</span>
+                  {isPinned ? (
+                    <span className="text-amber-400">Pinned</span>
+                  ) : (
+                    <span className="text-green-400">Following latest</span>
+                  )}
+                  {needsImageUpgrade && (
+                    <Badge
+                      variant="outline"
+                      className="border-blue-500/30 bg-blue-500/15 text-blue-400"
+                    >
+                      Upgrade required
+                    </Badge>
+                  )}
+                  {updateAvailable && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button type="button" onClick={onRequestUpgrade} className="cursor-pointer">
                           <Badge
                             variant="outline"
-                            className="border-zinc-500/30 bg-zinc-500/15 text-zinc-400"
+                            className="border-orange-500/30 bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
                           >
-                            Modified
+                            Update available
                           </Badge>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>
-                            OpenClaw was self-updated on this machine — redeploying will revert to
-                            the image version ({trackedVersion})
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-2">
-                    <span>
-                      Variant:{' '}
-                      <strong className="text-foreground">
-                        {status.imageVariant || 'default'}
-                      </strong>
-                    </span>
-                  </div>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          {catalogNewerThanImage
+                            ? `A newer OpenClaw version (${latestAvailableVersion}) is available — click to upgrade`
+                            : `A newer image (${latestVersion?.imageTag ?? 'unknown'}) is available — click to upgrade`}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  {isModified && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge
+                          variant="outline"
+                          className="border-zinc-500/30 bg-zinc-500/15 text-zinc-400"
+                        >
+                          Modified
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>
+                          OpenClaw was self-updated on this machine — redeploying will revert to the
+                          image version ({trackedVersion})
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  <span className="hidden sm:inline text-muted-foreground/40">|</span>
+                  <span className="basis-full sm:basis-auto">
+                    Variant:{' '}
+                    <strong className="text-foreground">{status.imageVariant || 'default'}</strong>
+                  </span>
                 </div>
               )}
             </div>

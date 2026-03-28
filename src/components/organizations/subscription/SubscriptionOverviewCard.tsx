@@ -79,45 +79,50 @@ export function SubscriptionOverviewCard({
   const currentPeriodEnd =
     firstItem?.current_period_end || subscriptionWithPeriod.current_period_end;
 
+  // Find the billing interval from the paid seat item (the first item with
+  // a recurring interval), not blindly from items[0] which could be free seats.
+  const currentBillingInterval = (
+    subscription.items.data.find(item => item.price?.recurring?.interval) ??
+    subscription.items.data[0]
+  )?.price?.recurring?.interval;
+
   const stopCancellation = useStopOrganizationSubscriptionCancellation();
   const subscriptionLink = useOrganizationSubscriptionLink();
   const cancelBillingCycleChange = useCancelBillingCycleChange();
   const isKiloAdmin = useIsKiloAdmin();
   const [resubscribeError, setResubscribeError] = useState<string | null>(null);
 
-  // Detect pending cycle change from expanded schedule
+  // Detect pending cycle change from expanded schedule.
+  // Compare ALL phase2 items against current subscription items, not just
+  // index 0, because the paid seat item may not be first (e.g., free-seat
+  // items can sort before paid ones).
   const pendingCycleChange = (() => {
     const schedule = subscription.schedule;
     if (!schedule || typeof schedule === 'string') return null;
     if (schedule.status !== 'active' && schedule.status !== 'not_started') return null;
 
     const phase2 = schedule.phases?.[1];
-    if (!phase2) return null;
+    if (!phase2?.items?.length) return null;
 
-    const phase2PriceItem = phase2.items?.[0];
-    if (!phase2PriceItem) return null;
+    const currentPriceIds = new Set(subscription.items.data.map(item => item.price?.id));
+    const phase2PriceIds = phase2.items.map(item =>
+      typeof item.price === 'string' ? item.price : item.price?.id
+    );
 
-    const phase2Price =
-      typeof phase2PriceItem.price === 'string' ? phase2PriceItem.price : phase2PriceItem.price?.id;
-    const currentPrice = subscription.items.data[0]?.price?.id;
+    // Check if any phase2 item has a price not in the current subscription
+    const hasChangedPrice = phase2PriceIds.some(id => id && !currentPriceIds.has(id));
+    if (!hasChangedPrice) return null;
 
-    if (phase2Price === currentPrice) return null;
-
-    // The schedule expand does NOT deeply expand phase price objects, so
-    // phase2PriceItem.price is typically a string ID. Since we only schedule
-    // cycle flips (monthly↔annual) and already verified the price changed,
-    // infer the target cycle as the opposite of the current interval.
-    const currentInterval = subscription.items.data[0]?.price?.recurring?.interval;
-    const targetCycleName = currentInterval === 'month' ? 'Annual' : 'Monthly';
+    const targetCycleName = currentBillingInterval === 'month' ? 'Annual' : 'Monthly';
     const effectiveDate = formatDate(phase2.start_date);
 
-    const isUpgradeToAnnual = currentInterval === 'month';
+    const isUpgradeToAnnual = currentBillingInterval === 'month';
 
     const description = isUpgradeToAnnual
       ? 'No charges or proration until the switch takes effect.'
       : 'No refunds or immediate changes.';
 
-    const targetInterval = currentInterval === 'month' ? 'year' : 'month';
+    const targetInterval = currentBillingInterval === 'month' ? 'year' : 'month';
 
     return { targetCycleName, effectiveDate, description, targetInterval };
   })();
@@ -151,8 +156,7 @@ export function SubscriptionOverviewCard({
         subscription.items.data.reduce((total, item) => total + (item.quantity ?? 0), 0) || 1;
 
       // Preserve the billing cycle the org was on before cancellation
-      const previousInterval = subscription.items.data[0]?.price?.recurring?.interval;
-      const billingCycle = previousInterval === 'month' ? 'monthly' : 'annual';
+      const billingCycle = currentBillingInterval === 'month' ? 'monthly' : 'annual';
 
       const result = await subscriptionLink.mutateAsync({
         organizationId,
@@ -269,8 +273,8 @@ export function SubscriptionOverviewCard({
               </div>
               <div className="text-xl font-bold">
                 {pendingCycleChange
-                  ? `${formatBillingInterval(subscription.items.data[0]?.price?.recurring?.interval)} \u2192 ${formatBillingInterval(pendingCycleChange.targetInterval)}`
-                  : formatBillingInterval(subscription.items.data[0]?.price?.recurring?.interval)}
+                  ? `${formatBillingInterval(currentBillingInterval)} \u2192 ${formatBillingInterval(pendingCycleChange.targetInterval)}`
+                  : formatBillingInterval(currentBillingInterval)}
               </div>
               <div className="text-muted-foreground text-sm">
                 Collection:{' '}

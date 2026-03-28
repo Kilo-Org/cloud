@@ -7,6 +7,7 @@ import {
   handleCancelSubscription,
   getPriceIdForPlanAndCycle,
   KNOWN_SEAT_PRICE_IDS,
+  getPlanForPriceId,
 } from '@/lib/stripe';
 import {
   getMostRecentSeatPurchase,
@@ -335,16 +336,17 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         }
       }
 
-      const org = await getOrganizationById(organizationId);
-      if (!org) {
+      // Derive the plan tier from the live Stripe price, not from org.plan,
+      // because admins can update the org plan independently.
+      const currentPriceId = paidSeatItem.price.id;
+      const stripePlan = getPlanForPriceId(currentPriceId);
+      if (!stripePlan) {
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Organization not found',
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Cannot determine plan tier from subscription price',
         });
       }
-
-      const currentPriceId = paidSeatItem.price.id;
-      const newPriceId = getPriceIdForPlanAndCycle(org.plan, targetCycle);
+      const newPriceId = getPriceIdForPlanAndCycle(stripePlan, targetCycle);
 
       // Preserve ALL subscription items (handles mixed paid/free seat prices).
       // Only swap the price on the paid seat item; leave other items untouched.

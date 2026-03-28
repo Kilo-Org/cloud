@@ -233,20 +233,17 @@ export function SubscriptionOverviewCard({
                 <div className="text-xl font-bold">
                   {(() => {
                     if (pendingCycleChange) {
-                      // Sum unit_amount * quantity across all items for the current total,
-                      // since that's what Stripe will charge at renewal on the new phase
-                      const totalAmount = subscription.items.data.reduce(
-                        (sum, item) => sum + (item.price?.unit_amount ?? 0) * (item.quantity ?? 0),
-                        0
-                      );
-                      return totalAmount > 0 ? `${formatCurrency(totalAmount)} (changing)` : 'N/A';
+                      // Phase 2 prices aren't expanded so we can't read
+                      // unit_amount. Show a qualitative indicator instead of
+                      // a stale dollar figure from the current phase.
+                      return 'Changes at renewal';
                     }
-                    const firstItemPrice = subscription.items.data[0]?.price;
-                    return firstItemPrice?.unit_amount && subscription.items.data[0]?.quantity
-                      ? formatCurrency(
-                          firstItemPrice.unit_amount * subscription.items.data[0].quantity
-                        )
-                      : 'N/A';
+                    // Sum unit_amount * quantity across all items
+                    const totalAmount = subscription.items.data.reduce(
+                      (sum, item) => sum + (item.price?.unit_amount ?? 0) * (item.quantity ?? 0),
+                      0
+                    );
+                    return totalAmount > 0 ? formatCurrency(totalAmount) : 'N/A';
                   })()}
                 </div>
                 <div className="text-muted-foreground text-sm">

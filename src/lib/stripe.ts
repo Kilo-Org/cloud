@@ -1128,6 +1128,20 @@ export const KNOWN_SEAT_PRICE_IDS = new Set([
   STRIPE_ENTERPRISE_ANNUAL_PRICE_ID,
 ]);
 
+/** Derive the plan tier from a Stripe price ID. Returns null for unknown prices. */
+export function getPlanForPriceId(priceId: string): OrganizationPlan | null {
+  if (priceId === STRIPE_TEAMS_MONTHLY_PRICE_ID || priceId === STRIPE_TEAMS_ANNUAL_PRICE_ID) {
+    return 'teams';
+  }
+  if (
+    priceId === STRIPE_ENTERPRISE_MONTHLY_PRICE_ID ||
+    priceId === STRIPE_ENTERPRISE_ANNUAL_PRICE_ID
+  ) {
+    return 'enterprise';
+  }
+  return null;
+}
+
 export async function getStripeSeatsCheckoutUrl(
   props: GetStripeCheckoutUrlProps
 ): Promise<string | null> {

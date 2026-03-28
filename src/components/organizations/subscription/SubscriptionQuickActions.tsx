@@ -15,8 +15,10 @@ import { SeatChangeModal } from './SeatChangeModal';
 import { BillingCycleChangeDialog } from './BillingCycleChangeDialog';
 import Link from 'next/link';
 import {
-  TEAM_SEAT_PRICE_MONTHLY_USD,
-  ENTERPRISE_SEAT_PRICE_MONTHLY_USD,
+  TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
+  TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD,
+  ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
+  ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD,
 } from '@/lib/organizations/constants';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
 import { formatDate } from './utils';
@@ -178,8 +180,12 @@ export function SubscriptionQuickActions({
           organizationId={organizationId}
           price={
             org.data.plan === 'teams'
-              ? TEAM_SEAT_PRICE_MONTHLY_USD
-              : ENTERPRISE_SEAT_PRICE_MONTHLY_USD
+              ? isMonthly
+                ? TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD
+                : TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD
+              : isMonthly
+                ? ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD
+                : ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD
           }
         />
       )}

@@ -339,8 +339,17 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       }
 
       const currentPriceId = firstItem.price.id;
-      const currentQuantity = firstItem.quantity ?? 1;
       const newPriceId = getPriceIdForPlanAndCycle(org.plan, targetCycle);
+
+      // Preserve ALL subscription items (handles mixed paid/free seat prices)
+      const currentItems = subscription.items.data.map(item => ({
+        price: item.price.id,
+        quantity: item.quantity ?? 1,
+      }));
+      const phase2Items = subscription.items.data.map(item => ({
+        price: item.price.id === currentPriceId ? newPriceId : item.price.id,
+        quantity: item.quantity ?? 1,
+      }));
 
       const schedule = await client.subscriptionSchedules.create({
         from_subscription: subscription.id,
@@ -354,26 +363,36 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         });
       }
 
-      await client.subscriptionSchedules.update(schedule.id, {
-        end_behavior: 'release',
-        phases: [
-          {
-            items: [{ price: currentPriceId, quantity: currentQuantity }],
-            start_date: firstPhase.start_date,
-            end_date: firstPhase.end_date,
-            proration_behavior: 'none',
-          },
-          {
-            items: [{ price: newPriceId, quantity: currentQuantity }],
-            proration_behavior: 'none',
-            billing_cycle_anchor: 'phase_start',
-            duration: {
-              interval: targetCycle === 'annual' ? 'year' : 'month',
-              interval_count: 1,
+      try {
+        await client.subscriptionSchedules.update(schedule.id, {
+          end_behavior: 'release',
+          phases: [
+            {
+              items: currentItems,
+              start_date: firstPhase.start_date,
+              end_date: firstPhase.end_date,
+              proration_behavior: 'none',
             },
-          },
-        ],
-      });
+            {
+              items: phase2Items,
+              proration_behavior: 'none',
+              billing_cycle_anchor: 'phase_start',
+              duration: {
+                interval: targetCycle === 'annual' ? 'year' : 'month',
+                interval_count: 1,
+              },
+            },
+          ],
+        });
+      } catch (error) {
+        // Release the orphaned schedule so the org isn't permanently stuck
+        try {
+          await client.subscriptionSchedules.release(schedule.id);
+        } catch (releaseError) {
+          console.error('Failed to release orphaned subscription schedule:', releaseError);
+        }
+        throw error;
+      }
 
       return successResult({
         message: `Billing cycle will change to ${targetCycle} at the end of the current period.`,

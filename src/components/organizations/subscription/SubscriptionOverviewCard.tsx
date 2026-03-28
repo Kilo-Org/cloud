@@ -103,17 +103,15 @@ export function SubscriptionOverviewCard({
 
     if (phase2Price === currentPrice) return null;
 
-    const phase2PriceObj = typeof phase2PriceItem.price === 'object' ? phase2PriceItem.price : null;
-    const phase2Interval =
-      phase2PriceObj && 'recurring' in phase2PriceObj
-        ? (phase2PriceObj.recurring?.interval ?? null)
-        : null;
-
-    const targetCycleName = phase2Interval === 'year' ? 'Annual' : 'Monthly';
+    // The schedule expand does NOT deeply expand phase price objects, so
+    // phase2PriceItem.price is typically a string ID. Since we only schedule
+    // cycle flips (monthly↔annual) and already verified the price changed,
+    // infer the target cycle as the opposite of the current interval.
+    const currentInterval = subscription.items.data[0]?.price?.recurring?.interval;
+    const targetCycleName = currentInterval === 'month' ? 'Annual' : 'Monthly';
     const effectiveDate = formatDate(phase2.start_date);
 
-    const currentInterval = subscription.items.data[0]?.price?.recurring?.interval;
-    const isUpgradeToAnnual = currentInterval === 'month' && phase2Interval === 'year';
+    const isUpgradeToAnnual = currentInterval === 'month';
 
     const description = isUpgradeToAnnual
       ? 'No charges or proration until the switch takes effect.'
@@ -149,10 +147,15 @@ export function SubscriptionOverviewCard({
       // Get the current seat count from the subscription
       const currentSeatCount = subscription.items.data[0]?.quantity || 1;
 
+      // Preserve the billing cycle the org was on before cancellation
+      const previousInterval = subscription.items.data[0]?.price?.recurring?.interval;
+      const billingCycle = previousInterval === 'month' ? 'monthly' : 'annual';
+
       const result = await subscriptionLink.mutateAsync({
         organizationId,
         seats: currentSeatCount,
         cancelUrl: window.location.href, // Return to current page if cancelled
+        billingCycle,
       });
 
       // Redirect to Stripe checkout

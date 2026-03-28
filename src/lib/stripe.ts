@@ -1120,6 +1120,14 @@ export function getPriceIdForPlanAndCycle(
   }
 }
 
+/** All known paid seat price IDs across plans and billing cycles. */
+export const KNOWN_SEAT_PRICE_IDS = new Set([
+  STRIPE_TEAMS_MONTHLY_PRICE_ID,
+  STRIPE_TEAMS_ANNUAL_PRICE_ID,
+  STRIPE_ENTERPRISE_MONTHLY_PRICE_ID,
+  STRIPE_ENTERPRISE_ANNUAL_PRICE_ID,
+]);
+
 export async function getStripeSeatsCheckoutUrl(
   props: GetStripeCheckoutUrlProps
 ): Promise<string | null> {

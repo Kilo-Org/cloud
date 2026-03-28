@@ -117,7 +117,9 @@ export function SubscriptionOverviewCard({
       ? 'No charges or proration until the switch takes effect.'
       : 'No refunds or immediate changes.';
 
-    return { targetCycleName, effectiveDate, description };
+    const targetInterval = currentInterval === 'month' ? 'year' : 'month';
+
+    return { targetCycleName, effectiveDate, description, targetInterval };
   })();
 
   const handleCancelBillingCycleChange = async () => {
@@ -144,8 +146,9 @@ export function SubscriptionOverviewCard({
     setResubscribeError(null);
 
     try {
-      // Get the current seat count from the subscription
-      const currentSeatCount = subscription.items.data[0]?.quantity || 1;
+      // Sum quantities across all line items (handles mixed paid/free seat prices)
+      const currentSeatCount =
+        subscription.items.data.reduce((total, item) => total + (item.quantity ?? 0), 0) || 1;
 
       // Preserve the billing cycle the org was on before cancellation
       const previousInterval = subscription.items.data[0]?.price?.recurring?.interval;
@@ -177,8 +180,10 @@ export function SubscriptionOverviewCard({
 
   const ended = Boolean(subscription.ended_at);
 
+  const canManageBilling = userRole === 'owner' || userRole === 'billing_manager';
+
   const canStopCancellation =
-    userRole === 'owner' && subscription.status === 'active' && willCancelAtPeriodEnd;
+    canManageBilling && subscription.status === 'active' && willCancelAtPeriodEnd;
 
   const statusConfig = getSubscriptionStatusConfig(subscription.status);
 
@@ -222,13 +227,23 @@ export function SubscriptionOverviewCard({
                   Next Payment
                 </div>
                 <div className="text-xl font-bold">
-                  {subscription.items.data[0]?.price?.unit_amount &&
-                  subscription.items.data[0]?.quantity
-                    ? formatCurrency(
-                        subscription.items.data[0].price.unit_amount *
-                          subscription.items.data[0].quantity
-                      )
-                    : 'N/A'}
+                  {(() => {
+                    if (pendingCycleChange) {
+                      // Sum unit_amount * quantity across all items for the current total,
+                      // since that's what Stripe will charge at renewal on the new phase
+                      const totalAmount = subscription.items.data.reduce(
+                        (sum, item) => sum + (item.price?.unit_amount ?? 0) * (item.quantity ?? 0),
+                        0
+                      );
+                      return totalAmount > 0 ? `${formatCurrency(totalAmount)} (changing)` : 'N/A';
+                    }
+                    const firstItemPrice = subscription.items.data[0]?.price;
+                    return firstItemPrice?.unit_amount && subscription.items.data[0]?.quantity
+                      ? formatCurrency(
+                          firstItemPrice.unit_amount * subscription.items.data[0].quantity
+                        )
+                      : 'N/A';
+                  })()}
                 </div>
                 <div className="text-muted-foreground text-sm">
                   {currentPeriodEnd ? formatDate(currentPeriodEnd) : 'N/A'}
@@ -253,7 +268,9 @@ export function SubscriptionOverviewCard({
                 Billing Cycle
               </div>
               <div className="text-xl font-bold">
-                {formatBillingInterval(subscription.items.data[0]?.price?.recurring?.interval)}
+                {pendingCycleChange
+                  ? `${formatBillingInterval(subscription.items.data[0]?.price?.recurring?.interval)} \u2192 ${formatBillingInterval(pendingCycleChange.targetInterval)}`
+                  : formatBillingInterval(subscription.items.data[0]?.price?.recurring?.interval)}
               </div>
               <div className="text-muted-foreground text-sm">
                 Collection:{' '}
@@ -383,7 +400,7 @@ export function SubscriptionOverviewCard({
                   {stopCancellation.isPending ? 'Stopping...' : 'Stop Pending Cancellation'}
                 </Button>
               )}
-              {ended && userRole === 'owner' && (
+              {ended && canManageBilling && (
                 <div className="flex flex-col items-end gap-2">
                   <Button
                     variant="outline"

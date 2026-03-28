@@ -6,6 +6,7 @@ import {
   getStripeSeatsCheckoutUrl,
   handleCancelSubscription,
   getPriceIdForPlanAndCycle,
+  KNOWN_SEAT_PRICE_IDS,
 } from '@/lib/stripe';
 import {
   getMostRecentSeatPurchase,
@@ -296,15 +297,19 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
 
       const subscription = await retrieveSubscription(latestPurchase.subscription_stripe_id);
 
-      const firstItem = subscription.items.data[0];
-      if (!firstItem) {
+      // Find the paid seat item by matching against known seat price IDs,
+      // not blindly using items[0] which could be a free-seat price.
+      const paidSeatItem = subscription.items.data.find(item =>
+        KNOWN_SEAT_PRICE_IDS.has(item.price.id)
+      );
+      if (!paidSeatItem) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Subscription has no items',
+          message: 'Subscription has no recognized paid seat item',
         });
       }
 
-      const currentInterval = firstItem.price.recurring?.interval;
+      const currentInterval = paidSeatItem.price.recurring?.interval;
       const currentCycle = currentInterval === 'year' ? 'annual' : 'monthly';
 
       if (currentCycle === targetCycle) {
@@ -338,10 +343,11 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         });
       }
 
-      const currentPriceId = firstItem.price.id;
+      const currentPriceId = paidSeatItem.price.id;
       const newPriceId = getPriceIdForPlanAndCycle(org.plan, targetCycle);
 
-      // Preserve ALL subscription items (handles mixed paid/free seat prices)
+      // Preserve ALL subscription items (handles mixed paid/free seat prices).
+      // Only swap the price on the paid seat item; leave other items untouched.
       const currentItems = subscription.items.data.map(item => ({
         price: item.price.id,
         quantity: item.quantity ?? 1,
@@ -350,6 +356,14 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         price: item.price.id === currentPriceId ? newPriceId : item.price.id,
         quantity: item.quantity ?? 1,
       }));
+
+      // Preserve subscription-level discounts (promotion codes, coupons).
+      // Stripe schedule phases only inherit customer-level discounts by default.
+      const discountIds = subscription.discounts
+        .map(d => (typeof d === 'string' ? d : d.id))
+        .filter((id): id is string => id != null);
+      const phaseDiscounts =
+        discountIds.length > 0 ? discountIds.map(id => ({ discount: id })) : undefined;
 
       const schedule = await client.subscriptionSchedules.create({
         from_subscription: subscription.id,
@@ -372,6 +386,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
               start_date: firstPhase.start_date,
               end_date: firstPhase.end_date,
               proration_behavior: 'none',
+              discounts: phaseDiscounts,
             },
             {
               items: phase2Items,
@@ -381,6 +396,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
                 interval: targetCycle === 'annual' ? 'year' : 'month',
                 interval_count: 1,
               },
+              discounts: phaseDiscounts,
             },
           ],
         });
@@ -429,6 +445,15 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
           : cancelScheduleRef;
 
       if (resolvedSchedule.status !== 'active' && resolvedSchedule.status !== 'not_started') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No pending billing cycle change to cancel',
+        });
+      }
+
+      // Verify this looks like a billing-cycle-change schedule (2 phases)
+      // to avoid releasing unrelated schedules.
+      if (resolvedSchedule.phases.length !== 2) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'No pending billing cycle change to cancel',

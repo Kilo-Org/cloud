@@ -685,10 +685,10 @@ export function SettingsTab({
 
       {/* ── OpenClaw Instance card ── */}
       <div className="rounded-lg border px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="flex items-center gap-3 min-w-0">
             <Settings className="text-muted-foreground h-5 w-5 shrink-0" />
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium">OpenClaw Instance</p>
               {hasVersionInfo && (
                 <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">

@@ -100,7 +100,7 @@ export function VersionPinCard({
         <Pin className="size-4" />
         Version Pinning
       </h3>
-      <div className="grid grid-cols-2 items-start gap-6">
+      <div className="grid grid-cols-1 items-start gap-6 sm:grid-cols-2">
         {/* Left: Description + Pinning Controls */}
         <div className="space-y-3">
           <div className="space-y-2">

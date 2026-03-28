@@ -253,9 +253,9 @@ async function generateMiniMaxNoLongerFreeNotification(
     return [
       {
         id: 'minimax-no-longer-free-mar-23',
-        title: 'MiniMax M2.5 Free ending soon',
+        title: 'MiniMax M2.5 Free has ended',
         message:
-          'The MiniMax M2.5 free promotion ends soon. Please switch to Kilo Auto Free or another free model.',
+          'The MiniMax M2.5 free promotion has ended. Please switch to Kilo Auto Free or another free model.',
         action: {
           actionText: 'Learn more',
           actionURL: 'https://kilo.ai/docs/contributing/architecture/auto-model-tiers',

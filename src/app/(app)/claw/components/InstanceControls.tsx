@@ -169,7 +169,7 @@ export function InstanceControls({
           </Badge>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <Button
           size="sm"
           variant="outline"

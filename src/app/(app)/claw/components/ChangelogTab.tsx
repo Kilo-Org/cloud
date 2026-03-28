@@ -40,8 +40,8 @@ function ChangelogRow({ entry }: { entry: ChangelogEntry }) {
         ) : (
           <Bug className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
         )}
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:block">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-y-1 sm:block sm:justify-start">
             <p className="text-muted-foreground text-xs">
               {format(parseISO(entry.date), 'MMM d, yyyy')}
             </p>

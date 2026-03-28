@@ -3189,6 +3189,136 @@ describe('start: 412 insufficient resources recovery', () => {
 });
 
 // ============================================================================
+// start: region eviction on machine-creation capacity errors
+// ============================================================================
+
+describe('start: evicts region from KV on machine-creation capacity error', () => {
+  beforeEach(() => {
+    (flyClient.listMachines as Mock).mockResolvedValue([]);
+  });
+
+  it('evicts flyRegion from KV when createMachine returns 403 quota exceeded', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
+    await seedProvisioned(storage, { flyMachineId: null, lastStartedAt: null, flyRegion: 'lhr' });
+    const evictSpy = vi.spyOn(regions, 'evictCapacityRegionFromKV').mockResolvedValue(undefined);
+
+    (flyClient.createMachine as Mock)
+      .mockRejectedValueOnce(
+        new FlyApiError(
+          'Fly API createMachine failed (403)',
+          403,
+          '{"error":"organization \\"Kilo\\" is using 3194880 MB of memory in lhr which is over the allowed quota. please consider other regions"}'
+        )
+      )
+      .mockResolvedValueOnce({ id: 'machine-retry', region: 'cdg' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'lhr' });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'cdg',
+    });
+
+    await instance.start('user-1');
+
+    expect(evictSpy).toHaveBeenCalledWith(env.KV_CLAW_CACHE, env, 'lhr');
+    expect(storage._store.get('flyRegion')).toBe('cdg');
+    expect(storage._store.get('status')).toBe('running');
+    evictSpy.mockRestore();
+  });
+
+  it('does NOT evict flyRegion from KV on 409 insufficient memory (transient)', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
+    await seedProvisioned(storage, { flyMachineId: null, lastStartedAt: null, flyRegion: 'dfw' });
+    const evictSpy = vi.spyOn(regions, 'evictCapacityRegionFromKV').mockResolvedValue(undefined);
+
+    (flyClient.createMachine as Mock)
+      .mockRejectedValueOnce(
+        new FlyApiError(
+          'insufficient memory',
+          409,
+          '{"error":"aborted: insufficient resources available to fulfill request: could not reserve resource for machine: insufficient memory available to fulfill request"}'
+        )
+      )
+      .mockResolvedValueOnce({ id: 'machine-retry', region: 'sjc' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'dfw' });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'sjc',
+    });
+
+    await instance.start('user-1');
+
+    expect(evictSpy).not.toHaveBeenCalled();
+    evictSpy.mockRestore();
+  });
+
+  it('evicts flyRegion from KV when updateMachine returns 403 during startExistingMachine', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      status: 'stopped',
+      lastStartedAt: Date.now() - 60_000,
+      flyRegion: 'lhr',
+    });
+    const evictSpy = vi.spyOn(regions, 'evictCapacityRegionFromKV').mockResolvedValue(undefined);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopped' });
+    (flyClient.updateMachine as Mock).mockRejectedValue(
+      new FlyApiError(
+        'Fly API updateMachine failed (403)',
+        403,
+        '{"error":"organization \\"Kilo\\" is using 3194880 MB of memory in lhr which is over the allowed quota. please consider other regions"}'
+      )
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'lhr' });
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'cdg',
+    });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'cdg' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(evictSpy).toHaveBeenCalledWith(env.KV_CLAW_CACHE, env, 'lhr');
+    expect(storage._store.get('flyRegion')).toBe('cdg');
+    evictSpy.mockRestore();
+  });
+
+  it('does not evict when flyRegion is null', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
+    await seedProvisioned(storage, { flyMachineId: null, lastStartedAt: null, flyRegion: null });
+    const evictSpy = vi.spyOn(regions, 'evictCapacityRegionFromKV').mockResolvedValue(undefined);
+
+    (flyClient.createMachine as Mock)
+      .mockRejectedValueOnce(
+        new FlyApiError('insufficient resources', 412, '{"error":"insufficient resources"}')
+      )
+      .mockResolvedValueOnce({ id: 'machine-retry', region: 'cdg' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'cdg',
+    });
+
+    await instance.start('user-1');
+
+    expect(evictSpy).not.toHaveBeenCalled();
+    evictSpy.mockRestore();
+  });
+});
+
+// ============================================================================
 // stop() error handling
 // ============================================================================
 

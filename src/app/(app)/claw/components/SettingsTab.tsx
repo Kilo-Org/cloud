@@ -695,7 +695,9 @@ export function SettingsTab({
                   <div className="flex flex-wrap items-center gap-x-2">
                     <span>
                       Version:{' '}
-                      <strong className="text-foreground">{runningVersion ?? trackedVersion}</strong>
+                      <strong className="text-foreground">
+                        {runningVersion ?? trackedVersion}
+                      </strong>
                     </span>
                     <span className="text-muted-foreground/40">|</span>
                     {isPinned ? (
@@ -714,7 +716,11 @@ export function SettingsTab({
                     {updateAvailable && (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button type="button" onClick={onRequestUpgrade} className="cursor-pointer">
+                          <button
+                            type="button"
+                            onClick={onRequestUpgrade}
+                            className="cursor-pointer"
+                          >
                             <Badge
                               variant="outline"
                               className="border-orange-500/30 bg-orange-500/15 text-orange-400 hover:bg-orange-500/25"
@@ -744,8 +750,8 @@ export function SettingsTab({
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>
-                            OpenClaw was self-updated on this machine — redeploying will revert to the
-                            image version ({trackedVersion})
+                            OpenClaw was self-updated on this machine — redeploying will revert to
+                            the image version ({trackedVersion})
                           </p>
                         </TooltipContent>
                       </Tooltip>
@@ -754,7 +760,9 @@ export function SettingsTab({
                   <div className="flex flex-wrap items-center gap-x-2">
                     <span>
                       Variant:{' '}
-                      <strong className="text-foreground">{status.imageVariant || 'default'}</strong>
+                      <strong className="text-foreground">
+                        {status.imageVariant || 'default'}
+                      </strong>
                     </span>
                   </div>
                 </div>

@@ -76,7 +76,6 @@ import { handleRequestLogging } from '@/lib/handleRequestLogging';
 import { grokCodeFastOptimizedRequest } from '@/lib/custom-llm/customLlmRequest';
 import { normalizeModelId } from '@/lib/model-utils';
 import { isForbiddenFreeModel } from '@/lib/forbidden-free-models';
-import { isActiveReviewPromo } from '@/lib/code-reviews/core/constants';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import { applyResolvedAutoModel, isKiloAutoModel } from '@/lib/kilo-auto-model';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/providers/fixOpenCodeDuplicateReasoning';
@@ -421,12 +420,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user) && !bypassAccessCheck) {
     const { balance, settings, plan } = await balanceAndSettingsPromise;
 
-    if (
-      balance <= 0 &&
-      !isFreeModel(originalModelIdLowerCased) &&
-      !userByok &&
-      !isActiveReviewPromo(botId, originalModelIdLowerCased)
-    ) {
+    if (balance <= 0 && !isFreeModel(originalModelIdLowerCased) && !userByok) {
       return await usageLimitExceededResponse(user, balance);
     }
 
@@ -610,8 +604,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const isFreeModelRequiringCostRemoval =
     (provider.id === 'openrouter' || provider.id === 'vercel') &&
-    (isKiloFreeModel(originalModelIdLowerCased) ||
-      isActiveReviewPromo(botId, originalModelIdLowerCased));
+    isKiloFreeModel(originalModelIdLowerCased);
   const isStealthModelRequiringNameRemoval = isKiloStealthModel(originalModelIdLowerCased);
   const isProviderRequiringResponseFixes = provider.id === 'corethink';
 

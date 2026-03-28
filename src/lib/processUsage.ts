@@ -28,7 +28,6 @@ import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
 import { reportAbuseCost } from '@/lib/abuse-service';
-import { isActiveReviewPromo } from '@/lib/code-reviews/core/constants';
 import type {
   BalanceUpdateResult,
   ChatCompletionChunk,
@@ -839,14 +838,10 @@ async function processTokenData(
     console.error('[Abuse] Failed to report cost:', error);
   });
 
-  // Preserve the real cost before zeroing for free/BYOK/promo
+  // Preserve the real cost before zeroing for free/BYOK
   usageStats.market_cost = usageStats.cost_mUsd;
 
-  if (
-    isFreeModel(usageContext.requested_model) ||
-    usageContext.user_byok ||
-    isActiveReviewPromo(usageContext.botId, usageContext.requested_model)
-  ) {
+  if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }

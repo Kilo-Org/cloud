@@ -571,7 +571,7 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
             <CadenceToggle cadence={cadence} onChange={handleCadenceChange} />
 
             {/* Tier cards */}
-            <div className="mb-3.5 grid grid-cols-3 gap-2.5">
+            <div className="mb-3.5 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-2.5">
               {TIERS.map(tier => (
                 <TierCard
                   key={tier}

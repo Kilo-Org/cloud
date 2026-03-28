@@ -14,14 +14,14 @@ type DefaultsResponse = {
 export async function GET(): Promise<NextResponse<DefaultsResponse>> {
   if (isRooCodeBasedClient(getFraudDetectionHeaders(await headers()))) {
     const { user, organizationId } = await getUserFromAuth({ adminOnly: false });
-    if (user) {
-      const { balance } = await getBalanceAndOrgSettings(organizationId, user, readDb);
-      if (balance <= 0) {
-        return NextResponse.json({
-          defaultModel: KILO_AUTO_FREE_MODEL.id,
-          defaultFreeModel: KILO_AUTO_FREE_MODEL.id,
-        });
-      }
+    const balance = user
+      ? (await getBalanceAndOrgSettings(organizationId, user, readDb)).balance
+      : 0;
+    if (balance <= 0) {
+      return NextResponse.json({
+        defaultModel: KILO_AUTO_FREE_MODEL.id,
+        defaultFreeModel: KILO_AUTO_FREE_MODEL.id,
+      });
     }
   }
   return NextResponse.json({

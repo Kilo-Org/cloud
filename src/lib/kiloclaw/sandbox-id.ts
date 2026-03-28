@@ -25,3 +25,28 @@ export function sandboxIdFromUserId(userId: string): string {
   }
   return encoded;
 }
+
+// ─── Instance-scoped identity ───────────────────────────────────────
+// Canonical implementation lives in @kilocode/worker-utils/instance-id.
+// Inlined here because Next.js moduleResolution can't resolve the
+// worker-utils subpath export. Keep in sync with worker-utils/src/instance-id.ts.
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+export function isValidInstanceId(id: string): boolean {
+  return UUID_RE.test(id);
+}
+
+export function sandboxIdFromInstanceId(instanceId: string): string {
+  if (!isValidInstanceId(instanceId)) {
+    throw new Error('Invalid instanceId: must be a UUID');
+  }
+  const hex = instanceId.replace(/-/g, '');
+  const prefixed = `ki_${hex}`;
+  if (prefixed.length > MAX_SANDBOX_ID_LENGTH) {
+    throw new Error(
+      `instanceId too long: prefixed sandboxId would be ${prefixed.length} chars (max ${MAX_SANDBOX_ID_LENGTH})`
+    );
+  }
+  return prefixed;
+}

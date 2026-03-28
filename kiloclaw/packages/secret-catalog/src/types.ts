@@ -10,6 +10,7 @@ export const SecretIconKeySchema = z.enum([
   'slack',
   'key',
   'github',
+  'linear',
   'credit-card',
   'lock',
   'brave',

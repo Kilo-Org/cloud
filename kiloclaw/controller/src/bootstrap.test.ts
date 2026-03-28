@@ -6,6 +6,8 @@ import {
   applyFeatureFlags,
   generateHooksToken,
   configureGitHub,
+  configureLinear,
+  updateToolsMdLinearSection,
   runOnboardOrDoctor,
   updateToolsMdKiloCliSection,
   updateToolsMd1PasswordSection,
@@ -487,6 +489,47 @@ describe('configureGitHub', () => {
   });
 });
 
+// ---- configureLinear ----
+
+describe('configureLinear', () => {
+  it('logs configured when LINEAR_API_KEY is set', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const env: Record<string, string | undefined> = {
+      LINEAR_API_KEY: 'lin_api_test123',
+    };
+
+    configureLinear(env);
+
+    expect(env.LINEAR_API_KEY).toBe('lin_api_test123');
+    expect(logSpy).toHaveBeenCalledWith('Linear MCP configured via LINEAR_API_KEY');
+    logSpy.mockRestore();
+  });
+
+  it('cleans up empty LINEAR_API_KEY and logs not configured', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const env: Record<string, string | undefined> = {
+      LINEAR_API_KEY: '',
+    };
+
+    configureLinear(env);
+
+    expect(env.LINEAR_API_KEY).toBeUndefined();
+    expect(logSpy).toHaveBeenCalledWith('Linear: not configured');
+    logSpy.mockRestore();
+  });
+
+  it('logs not configured when LINEAR_API_KEY is absent', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const env: Record<string, string | undefined> = {};
+
+    configureLinear(env);
+
+    expect(env.LINEAR_API_KEY).toBeUndefined();
+    expect(logSpy).toHaveBeenCalledWith('Linear: not configured');
+    logSpy.mockRestore();
+  });
+});
+
 // ---- runOnboardOrDoctor ----
 
 describe('runOnboardOrDoctor', () => {
@@ -684,6 +727,79 @@ describe('updateToolsMd1PasswordSection', () => {
   });
 });
 
+// ---- updateToolsMdLinearSection ----
+
+describe('updateToolsMdLinearSection', () => {
+  it('adds Linear section when LINEAR_API_KEY is set', () => {
+    const harness = fakeDeps();
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('# TOOLS\n');
+
+    const env: Record<string, string | undefined> = {
+      LINEAR_API_KEY: 'lin_api_test123',
+    };
+
+    updateToolsMdLinearSection(env, harness.deps);
+
+    expect(harness.writeCalls).toHaveLength(1);
+    expect(harness.writeCalls[0]!.data).toContain('<!-- BEGIN:linear -->');
+    expect(harness.writeCalls[0]!.data).toContain('## Linear');
+    expect(harness.writeCalls[0]!.data).toContain('<!-- END:linear -->');
+  });
+
+  it('skips adding when section already present', () => {
+    const harness = fakeDeps();
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      '# TOOLS\n<!-- BEGIN:linear -->\nexisting\n<!-- END:linear -->'
+    );
+
+    const env: Record<string, string | undefined> = {
+      LINEAR_API_KEY: 'lin_api_test123',
+    };
+
+    updateToolsMdLinearSection(env, harness.deps);
+
+    expect(harness.writeCalls).toHaveLength(0);
+  });
+
+  it('removes stale section when key is absent', () => {
+    const harness = fakeDeps();
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      '# TOOLS\n<!-- BEGIN:linear -->\nold section\n<!-- END:linear -->\n'
+    );
+
+    const env: Record<string, string | undefined> = {};
+
+    updateToolsMdLinearSection(env, harness.deps);
+
+    expect(harness.writeCalls).toHaveLength(1);
+    expect(harness.writeCalls[0]!.data).not.toContain('<!-- BEGIN:linear -->');
+  });
+
+  it('no-ops when TOOLS.md does not exist', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+    const env: Record<string, string | undefined> = {
+      LINEAR_API_KEY: 'lin_api_test123',
+    };
+
+    updateToolsMdLinearSection(env, harness.deps);
+
+    expect(harness.writeCalls).toHaveLength(0);
+  });
+
+  it('no-ops when key absent and no stale section exists', () => {
+    const harness = fakeDeps();
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('# TOOLS\n');
+
+    const env: Record<string, string | undefined> = {};
+
+    updateToolsMdLinearSection(env, harness.deps);
+
+    expect(harness.writeCalls).toHaveLength(0);
+  });
+});
+
 // ---- buildGatewayArgs ----
 
 describe('buildGatewayArgs', () => {
@@ -743,7 +859,14 @@ describe('bootstrap', () => {
 
     await bootstrap(env, phase => phases.push(phase), harness.deps);
 
-    expect(phases).toEqual(['decrypting', 'directories', 'feature-flags', 'github', 'onboard']);
+    expect(phases).toEqual([
+      'decrypting',
+      'directories',
+      'feature-flags',
+      'github',
+      'linear',
+      'onboard',
+    ]);
   });
 
   it('reports doctor phase when config exists', async () => {

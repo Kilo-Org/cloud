@@ -21,6 +21,7 @@ import { handleSnapshotRestoreQueue } from './queue/snapshot-restore';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
+import { InstanceIdParam } from './schemas/instance-config';
 import { registerVersionIfNeeded } from './lib/image-version';
 import { startingUpPage } from './pages/starting-up';
 import { buildForwardHeaders } from './utils/proxy-headers';
@@ -164,6 +165,149 @@ app.route('/api/kiloclaw', kiloclaw);
 // Platform routes (backend-to-backend, x-internal-api-key)
 app.use('/api/platform/*', internalApiMiddleware);
 app.route('/api/platform', platform);
+
+// =============================================================================
+// INSTANCE-ROUTED PROXY: /i/:instanceId/*
+// =============================================================================
+
+/**
+ * Proxy route for instance-keyed requests.
+ * Uses instanceId as the DO key. sandboxId is read from the DO status,
+ * NOT derived in middleware — new instances use sandboxIdFromInstanceId.
+ *
+ * Access check: status.userId === authenticated userId (Option A).
+ */
+app.all('/i/:instanceId/*', async c => {
+  const userId = c.get('userId');
+  if (!userId) {
+    return c.json({ error: 'Authentication required' }, 401);
+  }
+
+  const rawInstanceId = c.req.param('instanceId');
+  const parsed = InstanceIdParam.safeParse(rawInstanceId);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid instance ID' }, 400);
+  }
+  const instanceId = parsed.data;
+
+  if (!c.env.GATEWAY_TOKEN_SECRET) {
+    return c.json({ error: 'Configuration error' }, 503);
+  }
+
+  const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(instanceId));
+  const status = await stub.getStatus();
+
+  // Non-existent instance (no userId stored) — return 404 to avoid
+  // leaking existence info via 403 vs 404 distinction.
+  if (!status.userId) {
+    return c.json({ error: 'Instance not found' }, 404);
+  }
+
+  // Access check: only the assigned user can proxy to this instance
+  if (status.userId !== userId) {
+    return c.json({ error: 'Access denied' }, 403);
+  }
+
+  if (status.status === 'destroying') {
+    return c.json({ error: 'Instance is being destroyed' }, 409);
+  }
+  if (!status.flyMachineId) {
+    return c.json({ error: 'Instance not provisioned' }, 404);
+  }
+  if (!status.sandboxId) {
+    return c.json({ error: 'Instance has no sandboxId' }, 500);
+  }
+
+  const appName = status.flyAppName ?? c.env.FLY_APP_NAME;
+  if (!appName) {
+    return c.json({ error: 'No Fly app name for this instance' }, 503);
+  }
+
+  // Strip the /i/{instanceId} prefix to get the real path
+  const url = new URL(c.req.raw.url);
+  const prefix = `/i/${instanceId}`;
+  const strippedPath = url.pathname.slice(prefix.length) || '/';
+  const targetUrl = `https://${appName}.fly.dev${strippedPath}${url.search}`;
+
+  const forwardHeaders = await buildForwardHeaders({
+    requestHeaders: c.req.raw.headers,
+    machineId: status.flyMachineId,
+    sandboxId: status.sandboxId,
+    gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+  });
+
+  console.log(
+    '[PROXY /i] Handling request:',
+    strippedPath,
+    'instance:',
+    instanceId,
+    'machine:',
+    status.flyMachineId
+  );
+
+  const isWebSocketRequest = c.req.raw.headers.get('Upgrade')?.toLowerCase() === 'websocket';
+
+  if (isWebSocketRequest) {
+    let containerResponse: Response;
+    try {
+      containerResponse = await fetch(targetUrl, { headers: forwardHeaders });
+    } catch (err) {
+      console.error('[PROXY /i] Fly Proxy fetch failed:', err);
+      return c.json({ error: 'Instance not reachable' }, 503);
+    }
+
+    if (containerResponse.status === 502) {
+      return c.json({ error: 'Instance is starting up' }, 503);
+    }
+
+    const containerWs = containerResponse.webSocket;
+    if (!containerWs) {
+      return containerResponse;
+    }
+
+    const [clientWs, serverWs] = Object.values(new WebSocketPair());
+    serverWs.accept();
+    containerWs.accept();
+
+    serverWs.addEventListener('message', event => {
+      if (containerWs.readyState === WebSocket.OPEN) {
+        containerWs.send(event.data as string | ArrayBuffer);
+      }
+    });
+    containerWs.addEventListener('message', event => {
+      if (serverWs.readyState === WebSocket.OPEN) {
+        serverWs.send(event.data as string | ArrayBuffer);
+      }
+    });
+    serverWs.addEventListener('close', event => {
+      containerWs.close(event.code, event.reason);
+    });
+    containerWs.addEventListener('close', event => {
+      serverWs.close(event.code, event.reason);
+    });
+    serverWs.addEventListener('error', () => containerWs.close(1011, 'Client error'));
+    containerWs.addEventListener('error', () => serverWs.close(1011, 'Container error'));
+
+    return new Response(null, { status: 101, webSocket: clientWs });
+  }
+
+  // HTTP proxy
+  const requestBody = c.req.raw.body ? await c.req.raw.arrayBuffer() : null;
+  try {
+    const httpResponse = await fetch(targetUrl, {
+      method: c.req.raw.method,
+      headers: forwardHeaders,
+      body: requestBody,
+    });
+    if (httpResponse.status === 502) {
+      return startingUpPage();
+    }
+    return httpResponse;
+  } catch (err) {
+    console.error('[PROXY /i] HTTP fetch failed:', err);
+    return c.json({ error: 'Instance not reachable' }, 503);
+  }
+});
 
 // =============================================================================
 // CATCH-ALL: Proxy to per-user OpenClaw gateway via Fly Proxy

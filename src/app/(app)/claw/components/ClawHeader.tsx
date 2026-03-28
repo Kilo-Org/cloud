@@ -35,9 +35,9 @@ export function ClawHeader({
           </Badge>
         )}
       </SetPageTitle>
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         {!isSetupWizard && region && (
-          <p className="text-muted-foreground font-mono text-sm">
+          <p className="text-muted-foreground min-w-0 truncate font-mono text-sm">
             {region.toUpperCase()} {sandboxId ? `- ${sandboxId}` : ''}
           </p>
         )}

@@ -106,6 +106,7 @@ import * as flyClient from '../fly/client';
 import { FlyApiError } from '../fly/client';
 import * as db from '../db';
 import * as gatewayEnv from '../gateway/env';
+import * as regions from './regions';
 import { resolveLatestVersion } from '../lib/image-version';
 import { setupDefaultStreamChatChannel } from '../stream-chat/client';
 import { verifyKiloToken } from '@kilocode/worker-utils';
@@ -2117,6 +2118,136 @@ describe('updateSecrets', () => {
       'Invalid secret patch: Slack requires all fields to be set together'
     );
   });
+
+  // ─── Custom (non-catalog) secrets ─────────────────────────────────
+
+  it('stores custom secrets by env var name in encryptedSecrets', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+
+    await instance.updateSecrets({ MY_CUSTOM_KEY: customEnvelope });
+
+    const secrets = storage._store.get('encryptedSecrets') as Record<string, unknown>;
+    expect(secrets.MY_CUSTOM_KEY).toEqual(customEnvelope);
+  });
+
+  it('removes custom secrets when null is passed', async () => {
+    const { instance, storage } = createInstance();
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { MY_CUSTOM_KEY: customEnvelope },
+    });
+
+    await instance.updateSecrets({ MY_CUSTOM_KEY: null });
+
+    const secrets = storage._store.get('encryptedSecrets');
+    expect(secrets).toBeNull();
+  });
+
+  it('preserves catalog secrets when adding custom secrets', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      channels: { telegramBotToken: fakeEnvelope },
+      encryptedSecrets: { TELEGRAM_BOT_TOKEN: fakeEnvelope },
+    });
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+
+    await instance.updateSecrets({ MY_CUSTOM_KEY: customEnvelope });
+
+    const secrets = storage._store.get('encryptedSecrets') as Record<string, unknown>;
+    expect(secrets.TELEGRAM_BOT_TOKEN).toEqual(fakeEnvelope);
+    expect(secrets.MY_CUSTOM_KEY).toEqual(customEnvelope);
+  });
+
+  it('preserves custom secrets when updating catalog secrets', async () => {
+    const { instance, storage } = createInstance();
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { MY_CUSTOM_KEY: customEnvelope },
+    });
+
+    await instance.updateSecrets({ telegramBotToken: fakeEnvelope });
+
+    const secrets = storage._store.get('encryptedSecrets') as Record<string, unknown>;
+    expect(secrets.MY_CUSTOM_KEY).toEqual(customEnvelope);
+    expect(secrets.TELEGRAM_BOT_TOKEN).toEqual(fakeEnvelope);
+  });
+
+  it('enforces custom secret count limit', async () => {
+    const { instance, storage } = createInstance();
+    // Seed 50 custom secrets (the max)
+    const existingSecrets: Record<string, unknown> = {};
+    for (let i = 0; i < 50; i++) {
+      existingSecrets[`SECRET_${i}`] = { ...fakeEnvelope, encryptedData: `val-${i}` };
+    }
+    await seedProvisioned(storage, { encryptedSecrets: existingSecrets });
+
+    // Adding one more should fail
+    await expect(
+      instance.updateSecrets({ SECRET_OVERFLOW: { ...fakeEnvelope, encryptedData: 'overflow' } })
+    ).rejects.toThrow('Custom secret limit exceeded');
+  });
+
+  it('stores config path metadata alongside secrets', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+
+    await instance.updateSecrets(
+      { MY_KEY: customEnvelope },
+      { MY_KEY: { configPath: 'models.providers.openai.apiKey' } }
+    );
+
+    const meta = storage._store.get('customSecretMeta') as Record<string, unknown>;
+    expect(meta).toEqual({ MY_KEY: { configPath: 'models.providers.openai.apiKey' } });
+  });
+
+  it('removes config path metadata when secret is deleted', async () => {
+    const { instance, storage } = createInstance();
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { MY_KEY: customEnvelope },
+      customSecretMeta: { MY_KEY: { configPath: 'talk.apiKey' } },
+    });
+
+    await instance.updateSecrets({ MY_KEY: null });
+
+    const meta = storage._store.get('customSecretMeta');
+    expect(meta).toBeNull();
+  });
+
+  it('updates config path metadata without changing value', async () => {
+    const { instance, storage } = createInstance();
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { MY_KEY: customEnvelope },
+      customSecretMeta: { MY_KEY: { configPath: 'talk.apiKey' } },
+    });
+
+    // Empty secrets patch, only meta update
+    await instance.updateSecrets({}, { MY_KEY: { configPath: 'cron.webhookToken' } });
+
+    const meta = storage._store.get('customSecretMeta') as Record<string, unknown>;
+    expect(meta).toEqual({ MY_KEY: { configPath: 'cron.webhookToken' } });
+    // Secret value unchanged
+    const secrets = storage._store.get('encryptedSecrets') as Record<string, unknown>;
+    expect(secrets.MY_KEY).toEqual(customEnvelope);
+  });
+
+  it('rejects duplicate config paths', async () => {
+    const { instance, storage } = createInstance();
+    const envelope1 = { ...fakeEnvelope, encryptedData: 'val-1' };
+    const envelope2 = { ...fakeEnvelope, encryptedData: 'val-2' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { KEY_A: envelope1 },
+      customSecretMeta: { KEY_A: { configPath: 'talk.apiKey' } },
+    });
+
+    await expect(
+      instance.updateSecrets({ KEY_B: envelope2 }, { KEY_B: { configPath: 'talk.apiKey' } })
+    ).rejects.toThrow('Config path "talk.apiKey" is already used by secret "KEY_A"');
+  });
 });
 
 // ============================================================================
@@ -4043,6 +4174,33 @@ describe('provision: auto-start after fresh provision', () => {
     expect(flyClient.createMachine).toHaveBeenCalled();
     expect(storage._store.get('status')).toBe('running');
     expect(storage._store.get('flyMachineId')).toBe('machine-1');
+  });
+
+  it('wires capacity eviction callback during initial volume provisioning', async () => {
+    const env = createFakeEnv();
+    const { instance, waitUntilPromises } = createInstance(undefined, env);
+    const evictSpy = vi.spyOn(regions, 'evictCapacityRegionFromKV').mockResolvedValue(undefined);
+
+    (flyClient.createVolumeWithFallback as Mock).mockImplementation(
+      async (
+        _config: unknown,
+        _request: unknown,
+        _regions: string[],
+        options?: { onCapacityError?: (failedRegion: string) => void | Promise<void> }
+      ) => {
+        await options?.onCapacityError?.('arn');
+        return { id: 'vol-1', region: 'yyz' };
+      }
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'yyz' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'yyz' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', {});
+    await Promise.all(waitUntilPromises);
+
+    expect(evictSpy).toHaveBeenCalledWith(env.KV_CLAW_CACHE, env, 'arn');
+    evictSpy.mockRestore();
   });
 
   it('skips auto-start on re-provision of existing instance', async () => {

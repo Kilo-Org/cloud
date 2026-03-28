@@ -62,6 +62,8 @@ export type KiloClawEventName =
   | 'reconcile.recover_bound_machine_for_destroy'
   | 'reconcile.restart_self_healed'
   | 'reconcile.destroy_complete'
+  // Region capacity management
+  | 'region.capacity_eviction'
   // HTTP-derived (open string) and additional reconcile.* events
   | (string & {});
 

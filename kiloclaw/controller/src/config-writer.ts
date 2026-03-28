@@ -320,7 +320,54 @@ export function generateBaseConfig(
     console.log('Hooks enabled with gmail preset (dedicated token)');
   }
 
+  // Custom secret config path patching — set decrypted secret values at
+  // user-specified JSON dot-notation paths in openclaw.json.
+  if (env.KILOCLAW_SECRET_CONFIG_PATHS) {
+    try {
+      const pathMap: Record<string, string> = JSON.parse(env.KILOCLAW_SECRET_CONFIG_PATHS);
+      for (const [envVar, configPath] of Object.entries(pathMap)) {
+        const value = env[envVar];
+        if (value) {
+          setNestedValue(config, configPath, value);
+          console.log(`Patched custom secret ${envVar} → ${configPath}`);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to parse KILOCLAW_SECRET_CONFIG_PATHS:', err);
+    }
+  }
+
   return config;
+}
+
+/**
+ * Set a value at a dot-notation path in a nested object, creating
+ * intermediate objects as needed.
+ * e.g. setNestedValue(obj, "models.providers.openai.apiKey", "sk-...")
+ */
+const BANNED_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
+
+export function setNestedValue(obj: ConfigObject, path: string, value: string): void {
+  const segments = path.split('.');
+  for (const seg of segments) {
+    if (BANNED_SEGMENTS.has(seg)) {
+      console.warn(`Refusing to patch ${path}: "${seg}" is a banned path segment`);
+      return;
+    }
+  }
+  let current = obj;
+  for (let i = 0; i < segments.length - 1; i++) {
+    const existing = current[segments[i]];
+    if (existing != null && (typeof existing !== 'object' || Array.isArray(existing))) {
+      console.warn(
+        `Cannot patch ${path}: "${segments.slice(0, i + 1).join('.')}" is not an object`
+      );
+      return;
+    }
+    current[segments[i]] = existing ?? {};
+    current = current[segments[i]] as ConfigObject;
+  }
+  current[segments[segments.length - 1]] = value;
 }
 
 const DEFAULT_MCPORTER_CONFIG_PATH = '/root/.openclaw/workspace/config/mcporter.json';
@@ -370,6 +417,19 @@ export function writeMcporterConfig(
     if ('agentcard' in existingServers) {
       delete existingServers['agentcard'];
       console.log('AgentCard MCP server removed from mcporter config');
+    }
+  }
+
+  if (env.LINEAR_API_KEY) {
+    existingServers['linear'] = {
+      url: 'https://mcp.linear.app/mcp',
+      headers: { Authorization: 'Bearer ${LINEAR_API_KEY}' },
+    };
+    console.log('Linear MCP server configured (via mcporter)');
+  } else {
+    if ('linear' in existingServers) {
+      delete existingServers['linear'];
+      console.log('Linear MCP server removed from mcporter config');
     }
   }
 

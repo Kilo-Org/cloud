@@ -1,0 +1,138 @@
+name: kilo-app CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'kilo-app/**'
+      - 'packages/trpc/**'
+      - 'src/routers/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/kilo-app-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'kilo-app/**'
+      - 'packages/trpc/**'
+      - 'src/routers/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/kilo-app-ci.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  typecheck:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    steps:
+      - uses: useblacksmith/checkout@v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build trpc types
+        run: pnpm --filter @kilocode/trpc run build
+
+      - name: Typecheck
+        run: pnpm --filter kilo-app run typecheck
+
+  lint:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    steps:
+      - uses: useblacksmith/checkout@v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build trpc types
+        run: pnpm --filter @kilocode/trpc run build
+
+      - name: Lint
+        run: pnpm --filter kilo-app run lint
+
+  format-check:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    steps:
+      - uses: useblacksmith/checkout@v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        run: |
+          pnpm --filter kilo-app run format:check || {
+            echo "::error::oxfmt formatting check failed. Run 'cd kilo-app && pnpm format' locally and commit the changes."
+            exit 1
+          }
+
+  check-unused:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    steps:
+      - uses: useblacksmith/checkout@v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check unused exports
+        run: pnpm --filter kilo-app run check:unused

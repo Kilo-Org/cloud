@@ -152,12 +152,12 @@ export function InstanceControls({
           </>
         )}
       </div>
-      <div className="mb-4 flex items-start justify-between gap-4">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
           <h3 className="text-foreground mb-1 text-sm font-medium">Instance Controls</h3>
           <p className="text-muted-foreground text-xs">Manage power state and gateway lifecycle.</p>
         </div>
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex w-full justify-around gap-2 sm:w-auto sm:justify-end">
           <Badge variant="outline" className="text-muted-foreground gap-1.5 font-normal">
             <Cpu className="h-3.5 w-3.5" />
             {status.machineSize?.cpus ?? DEFAULT_CPUS} vCPU,{' '}
@@ -169,7 +169,7 @@ export function InstanceControls({
           </Badge>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <Button
           size="sm"
           variant="outline"

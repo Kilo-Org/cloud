@@ -58,12 +58,13 @@ export type ChannelsPatchResponse = {
 
 /** Input to PATCH /api/platform/secrets */
 export type SecretsPatchInput = {
-  secrets: Partial<Record<SecretFieldKey, EncryptedEnvelope | null>>;
+  secrets: Record<string, EncryptedEnvelope | null>;
+  meta?: Record<string, { configPath?: string }>;
 };
 
 /** Response from PATCH /api/platform/secrets */
 export type SecretsPatchResponse = {
-  /** Field keys that have a value set after the patch */
+  /** Catalog field keys that have a value set after the patch */
   configured: SecretFieldKey[];
 };
 
@@ -200,6 +201,10 @@ export type UserConfigResponse = {
   kilocodeApiKeyExpiresAt?: string | null;
   /** Per catalog entry ID → whether all fields for that entry are configured. */
   configuredSecrets: Record<string, boolean>;
+  /** Env var names of user-defined custom (non-catalog) secrets. */
+  customSecretKeys: string[];
+  /** Metadata for custom secrets (config paths, etc.). */
+  customSecretMeta: Record<string, { configPath?: string }>;
 };
 
 /** Response from POST /api/platform/doctor */

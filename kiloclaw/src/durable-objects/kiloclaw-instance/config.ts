@@ -146,6 +146,8 @@ export async function buildUserEnvVars(
       instanceFeatures: state.instanceFeatures,
       execSecurity: state.execSecurity ?? undefined,
       execAsk: state.execAsk ?? undefined,
+      orgId: state.orgId,
+      customSecretMeta: state.customSecretMeta ?? undefined,
     }
   );
 

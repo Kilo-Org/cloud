@@ -157,7 +157,7 @@ export function InstanceControls({
           <h3 className="text-foreground mb-1 text-sm font-medium">Instance Controls</h3>
           <p className="text-muted-foreground text-xs">Manage power state and gateway lifecycle.</p>
         </div>
-        <div className="flex w-full justify-between gap-2 sm:w-auto sm:justify-end">
+        <div className="flex w-full justify-around gap-2 sm:w-auto sm:justify-end">
           <Badge variant="outline" className="text-muted-foreground gap-1.5 font-normal">
             <Cpu className="h-3.5 w-3.5" />
             {status.machineSize?.cpus ?? DEFAULT_CPUS} vCPU,{' '}

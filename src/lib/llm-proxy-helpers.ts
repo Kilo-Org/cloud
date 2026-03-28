@@ -483,10 +483,7 @@ async function parseMistralFimUsageFromStream(
   const sseStreamParser = createParser({
     onEvent(event: EventSourceMessage) {
       if (!firstTokenReceived) {
-        sentryRootSpan()?.setAttribute(
-          'fim.time_to_first_token_ms',
-          performance.now() - startedAt
-        );
+        sentryRootSpan()?.setAttribute('fim.time_to_first_token_ms', performance.now() - startedAt);
         firstTokenReceived = true;
         timeToFirstTokenSpan.end();
       }

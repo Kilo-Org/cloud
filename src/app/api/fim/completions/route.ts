@@ -202,7 +202,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  sentryRootSpan()?.setAttribute('fim.time_to_request_start_ms', performance.now() - requestStartedAt);
+  sentryRootSpan()?.setAttribute(
+    'fim.time_to_request_start_ms',
+    performance.now() - requestStartedAt
+  );
 
   const fimRequestSpan = startInactiveSpan({
     name: 'fim-request-start',

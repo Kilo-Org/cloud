@@ -1,1 +1,0 @@
-ALTER TABLE "organizations" ALTER COLUMN "require_seats" SET DEFAULT true;

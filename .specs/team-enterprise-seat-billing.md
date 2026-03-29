@@ -17,9 +17,7 @@ Active.
 - Reverse-engineered from existing code on 2026-03-26.
 - Updated 2026-03-26 to add monthly billing cycle option.
 - Updated 2026-03-28 to document billing cycle change hardening.
-- Updated 2026-03-28 to add definitions and rules from spec audit.
-- Updated 2026-03-28 to apply comprehensive spec audit (all severities).
-- Updated 2026-03-28 to apply second spec audit (all severities).
+- Updated 2026-03-28/29 with spec audit fixes, definitions, and billing compliance implementation.
 
 ## Conventions
 
@@ -561,54 +559,20 @@ in the current codebase:
 
 ## Changelog
 
-### 2026-03-29 -- Billing compliance round 2
+### 2026-03-28/29 -- Spec audit and billing compliance
 
-- Implemented: Subscription metadata users who were previously removed
-  from an organization are no longer re-added during webhook processing
-  (Subscription Lifecycle 2). An `organization_membership_removals`
-  table now tracks removal tombstones.
-- Implemented: Idempotency keys for webhook-originated seat subscription
-  events now fall back to the stable Stripe event ID instead of generating
-  random UUIDs (Idempotency 1-4).
-- Implemented: Centralized hard-expired trial enforcement for all
-  organization-scoped mutations via mutation-specific tRPC procedures
-  (Free Trial 7-8).
-- Implemented: Duplicate seat subscription prevention at webhook completion
-  time; rejects creation events for orgs with existing non-ended
-  subscriptions (Seat Purchase 6).
-- Implemented: Stripe customer creation race serialized with
-  pg_advisory_xact_lock per organization (Payment Processor 1-3).
-- Implemented: Seat count modifications serialized with pg_advisory_lock
-  per subscription (Seat Count Modification 8).
-- Implemented: Resubscribe path returns correct paid-seat quantity and
-  billing cycle from the most recently ended subscription (Seat Purchase 8,
-  Subscription Lifecycle 6).
-- Implemented: Enterprise-only model/provider deny lists gated behind plan
-  check in all enforcement paths (Organization Plans 8-9).
-- Implemented: isOrganizationHardLocked now accepts subscription state,
-  preventing false positives for subscribed orgs during login redirect
-  (Require-Seats 1).
-- Implemented: Billing cycle change schedule creation catches duplicate
-  Stripe errors cleanly (Billing Cycle Changes 1).
-- Implemented: New checkout sessions use canonical metadata type 'seats';
-  legacy types remain accepted (Subscription Lifecycle 9).
-- Fixed: SubscriptionOverviewCard seat-drop warning now sums paid items
-  only (Seat Usage Counting 8).
-- Fixed: SeatChangeModal enforces minimum of 1 seat matching backend
-  validation (Seat Count Modification 6).
-- Removed NYI item 2 (removed-user tombstone) — now implemented.
-- Removed NYI item 3 (org deletion guard) — verified fixed in prior audit.
-
-### 2026-03-28 -- Second spec audit (all severities)
-
+- Added Definitions: non-ended subscription, active subscription,
+  active subscription purchase, free-seat line item, active member,
+  self-service creation flow, known paid seat prices, seat metadata,
+  subscription event, subscription metadata user, subscription
+  metadata type, bot user, OSS sponsorship program, suppressed trial
+  messaging, trial stages (with numeric boundaries).
 - Fixed CRITICAL: Free Trial rule 3 contradicted itself — said
   "flooring" and "(i.e., truncating toward zero)" which differ for
   negative values. Clarified to "floor semantics (rounding toward
   negative infinity)." Rewrote trial stage definitions to use
   `daysRemaining` integer values instead of ambiguous "N days past
   expiration" prose.
-- Added Definitions: active member, self-service creation flow,
-  known paid seat prices, seat metadata.
 - Fixed Subscription Lifecycle rules 1-2: merged with explicit
   precedence so rule 2 (don't re-add removed users) clearly
   overrides rule 1 (add as owner if no membership).
@@ -616,30 +580,17 @@ in the current codebase:
   membership step silently fails but purchase proceeds (Lifecycle
   rule 1). Documented that membership-ensure step MAY execute
   outside the purchase-recording transaction.
+- Upgraded Subscription Lifecycle rule 2 from SHOULD to MUST and
+  clarified rule 1 to resolve the conflict between ensuring user
+  ownership and not re-adding removed users.
+- Added Subscription Lifecycle rule 4: release pending billing cycle
+  change schedule before cancellation.
+- Added Subscription Lifecycle rule 10: block organization deletion
+  while a non-ended subscription exists.
+- Added Seat Usage Counting rule 5: bot user exclusion.
 - Added Seat Usage Counting rule 11: over-quota members after a
   period-boundary downgrade MUST NOT be removed; system SHOULD warn
   owners.
-- Clarified Seat Count Updates rule 9: added note that seat
-  subscriptions currently contain only seat-type line items; if
-  non-seat items are introduced, counting logic must filter.
-- Rewrote Seat Count Updates rule 2 as a business invariant instead
-  of an algorithm description.
-- Made Free Trial rule 4 styling requirements explicit (replaced
-  "e.g." with MUST for each trial stage styling level).
-- Fixed Subscription Lifecycle rule 7: replaced "immediately" and
-  "local database" with precise temporal semantics ("synchronously,
-  before returning a response") and "system's persistent state."
-- Clarified Require-Seats rule 3: "administrators" → "platform
-  administrators (users with the site-wide admin role)."
-- Clarified Error Handling rule 8: replaced "descriptive error" with
-  specific required fields (current usage count, requested count).
-
-### 2026-03-28 -- Comprehensive spec audit (all severities)
-
-- Added Definitions: subscription event, subscription metadata user,
-  subscription metadata type, bot user, OSS sponsorship program,
-  suppressed trial messaging, trial stages (with numeric boundaries).
-- Added Seat Usage Counting rule 5: bot user exclusion.
 - Added Seat Count Modification rule 8: concurrent modification
   serialization.
 - Added Seat Count Updates rule 12: unrecognized billing cycle
@@ -649,46 +600,20 @@ in the current codebase:
 - Added Error Handling rule 9: reject events for deleted orgs.
 - Added Invoices rule 1 SHOULD for misclassification alerting.
 - Added Billing Cycle Changes rule 1 concurrent-request guard.
-- Clarified Organization Plans rule 2: scoped to data-layer default.
-- Clarified Organization Plans rule 5: trigger specified (any
-  subscription event).
-- Clarified Organization Plans rule 8: defined "not apply" as exclude
-  from enforcement + hide from UI.
-- Clarified Seat Purchase rule 6: cross-refs Seat Count Modification.
-- Clarified Seat Purchase rule 8: "most recently ended subscription."
-- Clarified Seat Count Updates rule 3: "within the same transaction."
-- Clarified Subscription Lifecycle rule 2: must distinguish
-  never-added from removed users.
-- Clarified Subscription Lifecycle rule 9: unrecognized type handling.
-- Clarified Billing Cycle Changes rule 11: removed "two-phase"
-  implementation detail.
-- Clarified Free Trial rule 2: default trial duration is 14 days.
-- Clarified Free Trial rule 3: references Definitions for trial stages.
-- Clarified Free Trial rule 4: replaced "escalating visual urgency"
-  with concrete styling guidance.
-- Clarified Free Trial rule 8: evaluated on every mutation request.
-- Clarified Free Trial rules 9-10: cross-ref Definitions.
-- Clarified Require-Seats rule 3: administrator discretion.
-- Clarified Seat Count Modification rule 7: explains 100-seat
-  asymmetry with initial checkout.
-- Clarified Seat Count Updates rule 11 SHOULD justification.
+- Clarified Organization Plans rules 2, 5, 8; Seat Purchase rules 6, 8;
+  Seat Count Updates rules 3, 9, 11; Subscription Lifecycle rules 2, 7, 9;
+  Billing Cycle Changes rule 11; Free Trial rules 2-4, 8-10;
+  Require-Seats rule 3; Seat Count Modification rule 7;
+  Error Handling rule 8.
+- Rewrote Seat Count Updates rule 2 as a business invariant instead
+  of an algorithm description.
+- Made Free Trial rule 4 styling requirements explicit (replaced
+  "e.g." with MUST for each trial stage styling level).
 - Added USD-only currency convention.
 - Updated purchase record definition: removed "database row" wording.
 
-### 2026-03-28 -- Spec audit fixes
-
-- Added Definitions: non-ended subscription, active subscription,
-  active subscription purchase, free-seat line item.
-- Documented Math.floor rounding for trial day computation in Free
-  Trial rule 3.
-- Added Subscription Lifecycle rule 4: release pending billing cycle
-  change schedule before cancellation.
-- Added Subscription Lifecycle rule 10: block organization deletion
-  while a non-ended subscription exists.
-- Upgraded Subscription Lifecycle rule 2 from SHOULD to MUST and
-  clarified rule 1 to resolve the conflict between ensuring user
-  ownership and not re-adding removed users.
-- Added Not Yet Implemented item 3 for organization deletion guard.
+- Removed NYI item 2 (removed-user tombstone) — now implemented.
+- Removed NYI item 3 (org deletion guard) — verified fixed in prior audit.
 
 ### 2026-03-28 -- Billing cycle change hardening
 

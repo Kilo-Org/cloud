@@ -8,7 +8,7 @@
 import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
 import {
   organizationMemberProcedure,
-  organizationBillingProcedure,
+  organizationBillingMutationProcedure,
   ensureOrganizationAccess,
 } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
@@ -352,11 +352,11 @@ export const autoFixRouter = createTRPCRouter({
    * Save auto-fix configuration for an organization
    * Requires organization owner role
    */
-  saveConfig: organizationBillingProcedure
+  saveConfig: organizationBillingMutationProcedure
     .input(SaveAutoFixConfigSchema.omit({ organizationId: true }))
     .mutation(async ({ input, ctx }) => {
       try {
-        // organizationId comes from organizationBillingProcedure's input
+        // organizationId comes from organizationBillingMutationProcedure's input
         const fullInput = input as typeof input & { organizationId: string };
 
         const owner: Owner = {
@@ -406,11 +406,11 @@ export const autoFixRouter = createTRPCRouter({
    * Toggle auto-fix agent on/off
    * Requires organization owner role
    */
-  toggleAgent: organizationBillingProcedure
+  toggleAgent: organizationBillingMutationProcedure
     .input(ToggleAutoFixAgentInputSchema.omit({ organizationId: true }))
     .mutation(async ({ input, ctx }) => {
       try {
-        // organizationId comes from organizationBillingProcedure's input
+        // organizationId comes from organizationBillingMutationProcedure's input
         const fullInput = input as typeof input & { organizationId: string };
 
         const owner: Owner = {

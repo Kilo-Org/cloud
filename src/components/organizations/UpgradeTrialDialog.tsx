@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { PlanCard } from './subscription/PlanCard';
 import { Button } from '@/components/Button';
@@ -9,6 +9,7 @@ import { seatPrice } from '@/lib/organizations/constants';
 import {
   useOrganizationSubscriptionLink,
   useOrganizationSeatUsage,
+  useResubscribeDefaults,
 } from '@/app/api/organizations/hooks';
 import { usePostHog } from 'posthog-js/react';
 
@@ -58,6 +59,17 @@ export function UpgradeTrialDialog({
   const enterprisePrice = seatPrice('enterprise', billingCycle);
 
   const { data: seatUsage } = useOrganizationSeatUsage(organizationId);
+  const { data: resubscribeDefaults } = useResubscribeDefaults(organizationId);
+
+  // Seed billing cycle and seat count from the last ended subscription once loaded.
+  // This ensures orgs returning after a monthly subscription see the correct defaults
+  // instead of always defaulting to annual billing.
+  useEffect(() => {
+    if (resubscribeDefaults) {
+      setBillingCycle(resubscribeDefaults.billingCycle);
+      setSeatCount(prev => prev ?? resubscribeDefaults.defaultSeatCount);
+    }
+  }, [resubscribeDefaults]);
   // Default to current seat usage (excludes billing managers) clamped to 1-100
   const defaultSeatCount = Math.max(1, Math.min(100, seatUsage?.usedSeats ?? 1));
   const effectiveSeatCount = seatCount ?? defaultSeatCount;

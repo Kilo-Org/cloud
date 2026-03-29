@@ -8,7 +8,7 @@
 import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
 import {
   organizationMemberProcedure,
-  organizationBillingProcedure,
+  organizationBillingMutationProcedure,
   ensureOrganizationAccess,
 } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
@@ -270,11 +270,11 @@ export const autoTriageRouter = createTRPCRouter({
    * Save auto-triage configuration for an organization
    * Requires organization owner role
    */
-  saveConfig: organizationBillingProcedure
+  saveConfig: organizationBillingMutationProcedure
     .input(SaveAutoTriageConfigSchema.omit({ organizationId: true }))
     .mutation(async ({ input, ctx }) => {
       try {
-        // organizationId comes from organizationBillingProcedure's input
+        // organizationId comes from organizationBillingMutationProcedure's input
         const fullInput = input as typeof input & { organizationId: string };
 
         // Build config object with defaults for optional fields

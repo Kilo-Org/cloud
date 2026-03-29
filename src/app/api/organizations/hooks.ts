@@ -364,6 +364,18 @@ export function useOrganizationSubscription(organizationId: string) {
   );
 }
 
+export function useResubscribeDefaults(organizationId: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.subscription.getResubscribeDefaults.queryOptions(
+      { organizationId },
+      {
+        enabled: !!organizationId,
+      }
+    )
+  );
+}
+
 export function useOrganizationSubscriptionLink() {
   const trpc = useTRPC();
   return useMutation(trpc.organizations.subscription.getSubscriptionStripeUrl.mutationOptions());

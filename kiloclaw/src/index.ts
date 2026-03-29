@@ -340,8 +340,12 @@ async function resolveRegistryEntry(c: Context<AppEnv>) {
     const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(entry.doKey));
     return { stub, entry };
   } catch (err) {
-    // Registry DO failed — fall back to legacy direct userId-keyed lookup.
-    // This preserves proxy access during registry outages / migration errors.
+    // Registry DO failed. Fall back to the legacy userId-keyed DO.
+    // Only preserves access for legacy instances (doKey = userId).
+    // For instance-keyed DOs (doKey = instanceId), this hits the wrong
+    // (empty) DO — the user sees "not provisioned" until the registry
+    // recovers. Acceptable: a broken registry is transient, and silently
+    // routing to the wrong DO would be worse.
     console.error('[PROXY] Registry lookup failed, falling back to legacy DO:', err);
     const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
     const fallbackEntry: RegistryEntry = {

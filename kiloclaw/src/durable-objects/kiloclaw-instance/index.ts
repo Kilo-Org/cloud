@@ -22,6 +22,10 @@ import { DEFAULT_INSTANCE_FEATURES } from '../../schemas/instance-config';
 import type { FlyVolume, FlyVolumeSnapshot } from '../../fly/types';
 import * as fly from '../../fly/client';
 import { sandboxIdFromUserId, sandboxIdFromInstanceId } from '../../auth/sandbox-id';
+import {
+  isInstanceKeyedSandboxId,
+  instanceIdFromSandboxId,
+} from '@kilocode/worker-utils/instance-id';
 import { resolveLatestVersion, resolveVersionByTag } from '../../lib/image-version';
 import { lookupCatalogVersion } from '../../lib/catalog-registration';
 import { ImageVariantSchema } from '../../schemas/image-version';
@@ -1709,6 +1713,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         snapshotId,
         previousVolumeId,
         region: this.s.flyRegion,
+        instanceId:
+          this.s.sandboxId && isInstanceKeyedSandboxId(this.s.sandboxId)
+            ? instanceIdFromSandboxId(this.s.sandboxId)
+            : undefined,
       });
     } catch (err) {
       this.s.status = previousStatus;

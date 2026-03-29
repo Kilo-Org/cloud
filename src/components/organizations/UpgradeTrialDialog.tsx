@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { PlanCard } from './subscription/PlanCard';
 import { Button } from '@/components/Button';
@@ -54,6 +54,7 @@ export function UpgradeTrialDialog({
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [seatCount, setSeatCount] = useState<number | null>(null);
+  const seededFromDefaults = useRef(false);
 
   const teamPrice = seatPrice('teams', billingCycle);
   const enterprisePrice = seatPrice('enterprise', billingCycle);
@@ -61,14 +62,15 @@ export function UpgradeTrialDialog({
   const { data: seatUsage } = useOrganizationSeatUsage(organizationId);
   const { data: resubscribeDefaults } = useResubscribeDefaults(organizationId);
 
-  // Seed billing cycle and seat count from the last ended subscription once loaded.
-  // Wait for both queries so the clamp against current usage is always accurate.
+  // Seed billing cycle and seat count once from the last ended subscription.
+  // Runs only once (guarded by ref) so later seatUsage refetches don't reset
+  // the user's billing-cycle choice.
   useEffect(() => {
+    if (seededFromDefaults.current) return;
     if (resubscribeDefaults && seatUsage) {
+      seededFromDefaults.current = true;
       setBillingCycle(resubscribeDefaults.billingCycle);
-      setSeatCount(prev =>
-        prev != null ? prev : Math.max(resubscribeDefaults.defaultSeatCount, seatUsage.usedSeats)
-      );
+      setSeatCount(Math.max(resubscribeDefaults.defaultSeatCount, seatUsage.usedSeats));
     }
   }, [resubscribeDefaults, seatUsage]);
   // Default to current seat usage (excludes billing managers) clamped to 1-100

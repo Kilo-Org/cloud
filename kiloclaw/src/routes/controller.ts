@@ -109,21 +109,15 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
 
   // For instance-keyed sandboxIds (ki_ prefix), the DO key is the instanceId.
   // For legacy sandboxIds (base64url), the DO key is the userId.
-  let userId: string;
   let doKey: string;
   if (isInstanceKeyedSandboxId(data.sandboxId)) {
-    const instanceId = instanceIdFromSandboxId(data.sandboxId);
-    doKey = instanceId;
-    // We don't know the userId from the sandboxId alone for instance-keyed DOs.
-    // The DO will validate auth via the API key check below.
-    userId = instanceId; // placeholder — not used for auth, only for logging
+    doKey = instanceIdFromSandboxId(data.sandboxId);
   } else {
     try {
-      userId = userIdFromSandboxId(data.sandboxId);
+      doKey = userIdFromSandboxId(data.sandboxId);
     } catch {
       return c.json({ error: 'Invalid sandboxId' }, 400);
     }
-    doKey = userId;
   }
 
   const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
@@ -131,6 +125,12 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
   if (!config?.kilocodeApiKey || !timingSafeEqual(apiKey, config.kilocodeApiKey)) {
     return c.json({ error: 'Forbidden' }, 403);
   }
+
+  // Resolve the real userId from the DO — needed for PostHog attribution and
+  // instance-ready emails. For legacy DOs, doKey IS the userId. For instance-keyed
+  // DOs, doKey is the instanceId and the DO stores the actual userId.
+  const status = await stub.getStatus();
+  const userId = status.userId ?? doKey;
 
   try {
     const flyRegion = c.req.header('fly-region') ?? '';

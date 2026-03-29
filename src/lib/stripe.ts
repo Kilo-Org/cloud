@@ -1275,13 +1275,27 @@ export async function handleStopCancellation(
 }
 
 export async function handleCancelSubscription(subscriptionStripeId: string) {
-  // Release any pending billing-cycle-change schedule before cancelling
-  // (Subscription Lifecycle 4). If the release fails, abort the cancellation
-  // to avoid leaving an orphaned schedule that blocks future cycle changes.
-  const currentSub = await client.subscriptions.retrieve(subscriptionStripeId, {
-    expand: ['schedule'],
-  });
-  if (currentSub.schedule) {
+  // Try cancelling directly first. If the subscription has an attached schedule
+  // Stripe may reject the update, in which case we release the schedule and
+  // retry. This avoids silently dropping a pending billing-cycle change when
+  // the cancel itself is the step that fails (Subscription Lifecycle 4).
+  let idempotencyKey = `sub-cancel-${randomUUID()}`;
+  let sub: Stripe.Subscription;
+  try {
+    sub = await client.subscriptions.update(
+      subscriptionStripeId,
+      { cancel_at_period_end: true },
+      { idempotencyKey }
+    );
+  } catch (directCancelError) {
+    // Release the schedule and retry. If there is no schedule the cancel
+    // failed for an unrelated reason — rethrow immediately.
+    const currentSub = await client.subscriptions.retrieve(subscriptionStripeId, {
+      expand: ['schedule'],
+    });
+    if (!currentSub.schedule) {
+      throw directCancelError;
+    }
     const schedule =
       typeof currentSub.schedule === 'string'
         ? await client.subscriptionSchedules.retrieve(currentSub.schedule)
@@ -1289,18 +1303,25 @@ export async function handleCancelSubscription(subscriptionStripeId: string) {
     if (schedule.status === 'active' || schedule.status === 'not_started') {
       await client.subscriptionSchedules.release(schedule.id);
     }
+    idempotencyKey = `sub-cancel-${randomUUID()}`;
+    sub = await client.subscriptions.update(
+      subscriptionStripeId,
+      { cancel_at_period_end: true },
+      { idempotencyKey }
+    );
   }
 
-  const idempotencyKey = `sub-cancel-${randomUUID()}`;
-  const sub = await client.subscriptions.update(
-    subscriptionStripeId,
-    {
-      cancel_at_period_end: true,
-    },
-    {
-      idempotencyKey,
+  // Cancel succeeded — release any remaining schedule so its phases
+  // don't interfere with the pending cancellation.
+  if (sub.schedule) {
+    try {
+      const scheduleId = typeof sub.schedule === 'string' ? sub.schedule : sub.schedule.id;
+      await client.subscriptionSchedules.release(scheduleId);
+    } catch {
+      // Non-critical: the subscription is already set to cancel at period end
     }
-  );
+  }
+
   // Eagerly update our database here and not wait for webhook
   await handleSubscriptionEvent(sub, idempotencyKey);
 }

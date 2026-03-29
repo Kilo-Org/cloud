@@ -144,10 +144,21 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         .orderBy(desc(organization_seats_purchases.created_at))
         .limit(1);
 
-      // seat_count includes all line items (paid + free). Decomposing to
-      // paid-only requires querying Stripe for items that may no longer exist.
-      // The total is a reasonable default; the user can adjust during checkout.
-      const defaultSeatCount = Math.max(1, lastActive?.seat_count ?? 1);
+      // Try to derive paid-only seat count from the ended Stripe subscription.
+      // seat_count in the DB includes all line items (paid + free); for resubscribe
+      // we only want paid seats to avoid overcharging.
+      let defaultSeatCount = Math.max(1, lastActive?.seat_count ?? 1);
+      try {
+        const sub = await retrieveSubscription(endedPurchase.subscription_stripe_id);
+        const paidOnly = sub.items.data
+          .filter(item => KNOWN_SEAT_PRICE_IDS.has(item.price.id))
+          .reduce((total, item) => total + (item.quantity ?? 0), 0);
+        if (paidOnly > 0) {
+          defaultSeatCount = paidOnly;
+        }
+      } catch {
+        // Stripe retrieval failed; fall back to total seat_count from DB
+      }
       const dbCycle = lastActive?.billing_cycle ?? endedPurchase.billing_cycle;
       const billingCycle = dbCycle === 'yearly' ? ('annual' as const) : ('monthly' as const);
 

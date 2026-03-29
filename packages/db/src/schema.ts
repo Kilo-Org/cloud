@@ -1254,7 +1254,17 @@ export const organization_user_usage = pgTable(
 
 export type OrganizationUserDailyUsage = typeof organization_user_usage.$inferSelect;
 
-type SubscriptionStatus = 'active' | 'pending_cancel' | 'ended';
+type SubscriptionStatus =
+  | 'active'
+  | 'pending_cancel'
+  | 'ended'
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'trialing'
+  | 'past_due'
+  | 'canceled'
+  | 'unpaid'
+  | 'paused';
 export type BillingCycle = 'monthly' | 'yearly';
 
 export const organization_seats_purchases = pgTable(

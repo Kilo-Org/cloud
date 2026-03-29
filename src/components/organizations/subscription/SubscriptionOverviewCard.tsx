@@ -339,12 +339,12 @@ export function SubscriptionOverviewCard({
                 <p className="text-muted-foreground text-sm">{formatDate(subscription.ended_at)}</p>
               </div>
             ) : (
-              (subscription as SubscriptionWithPeriod).cancel_at && (
+              subscriptionWithPeriod.cancel_at && (
                 <div>
                   <p className="text-sm font-medium">Scheduled Cancellation</p>
                   <p className="text-muted-foreground text-sm">
-                    {(subscription as SubscriptionWithPeriod).cancel_at
-                      ? formatDate((subscription as SubscriptionWithPeriod).cancel_at)
+                    {subscriptionWithPeriod.cancel_at
+                      ? formatDate(subscriptionWithPeriod.cancel_at)
                       : 'N/A'}
                   </p>
                 </div>

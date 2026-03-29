@@ -74,7 +74,7 @@ export async function getMostRecentSeatPurchase(
   return purchase || null;
 }
 
-/** Returns the most recently ended seat purchase by creation timestamp. Used for resubscribe flow. */
+/** Returns the most recently ended seat purchase by period end. Used for resubscribe flow. */
 export async function getMostRecentEndedSeatPurchase(
   organizationId: Organization['id']
 ): Promise<OrganizationSeatsPurchase | null> {
@@ -87,7 +87,7 @@ export async function getMostRecentEndedSeatPurchase(
         eq(organization_seats_purchases.subscription_status, 'ended')
       )
     )
-    .orderBy(desc(organization_seats_purchases.created_at))
+    .orderBy(desc(organization_seats_purchases.expires_at))
     .limit(1);
 
   return purchase || null;
@@ -228,8 +228,12 @@ async function handleSubscriptionEventInternal(
   const startDate = new Date(firstLineItem.current_period_start * 1000);
   const endDate = new Date(firstLineItem.current_period_end * 1000);
 
-  // Extract billing cycle from the Stripe subscription's recurring interval
-  const stripeInterval = firstLineItem.price?.recurring?.interval;
+  // Extract billing cycle from the paid seat item's recurring interval.
+  // In mixed subscriptions, items[0] can be a free promotional item with a
+  // different cadence, so we prefer the first item with unit_amount > 0.
+  const paidLineItem = lineItems.find(item => (item.price?.unit_amount ?? 0) > 0);
+  const billingCycleItem = paidLineItem ?? firstLineItem;
+  const stripeInterval = billingCycleItem.price?.recurring?.interval;
   let billingCycleDb: 'monthly' | 'yearly';
   if (stripeInterval === 'month' || stripeInterval === 'year') {
     billingCycleDb = billingCycleToDb(billingCycleFromStripeInterval(stripeInterval));
@@ -290,7 +294,7 @@ async function handleSubscriptionEventInternal(
         starts_at: startDate.toISOString(),
         // set undefined to autogen a key in the database if one is not supplied
         idempotency_key: idempotencyKey || undefined,
-        subscription_status: isSubscriptionEnded ? 'ended' : 'active',
+        subscription_status: isSubscriptionEnded ? 'ended' : subscription.status,
         billing_cycle: billingCycleDb,
       })
       .onConflictDoNothing({ target: [organization_seats_purchases.idempotency_key] });

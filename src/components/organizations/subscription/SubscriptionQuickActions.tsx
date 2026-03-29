@@ -93,6 +93,8 @@ export function SubscriptionQuickActions({
     typeof schedule !== 'string' &&
     (schedule.status === 'active' || schedule.status === 'not_started');
   const canChangeBillingCycle = canCancelSubscription && !hasPendingSchedule;
+  const periodEnd = (subscription as SubscriptionWithPeriod).current_period_end;
+  const effectiveDateLabel = periodEnd ? formatDate(periodEnd) : 'end of current period';
 
   return (
     <>
@@ -190,10 +192,7 @@ export function SubscriptionQuickActions({
           currentCycle={isMonthly ? 'monthly' : 'annual'}
           seatCount={currentSeatCount}
           plan={org.data.plan}
-          effectiveDate={(() => {
-            const periodEnd = (subscription as SubscriptionWithPeriod).current_period_end;
-            return periodEnd ? formatDate(periodEnd) : 'end of current period';
-          })()}
+          effectiveDate={effectiveDateLabel}
         />
       )}
     </>

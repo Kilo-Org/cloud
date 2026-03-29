@@ -1,10 +1,6 @@
 import { APP_URL } from '@/lib/constants';
 import { getEnvVariable } from '@/lib/dotenvx';
 import 'server-only';
-// centralized place to normalize and export environment variables
-// this file only works on the sever and is meant to be an easier
-// way to see what environment variables are used vs searching the full
-// codebase for process.env.*
 
 export const IS_IN_AUTOMATED_TEST = !!getEnvVariable('IS_IN_AUTOMATED_TEST');
 export const NEXTAUTH_URL = APP_URL;

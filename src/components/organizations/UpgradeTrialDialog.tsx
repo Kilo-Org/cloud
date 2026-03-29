@@ -62,18 +62,15 @@ export function UpgradeTrialDialog({
   const { data: resubscribeDefaults } = useResubscribeDefaults(organizationId);
 
   // Seed billing cycle and seat count from the last ended subscription once loaded.
-  // This ensures orgs returning after a monthly subscription see the correct defaults
-  // instead of always defaulting to annual billing.
+  // Wait for both queries so the clamp against current usage is always accurate.
   useEffect(() => {
-    if (resubscribeDefaults) {
+    if (resubscribeDefaults && seatUsage) {
       setBillingCycle(resubscribeDefaults.billingCycle);
-      setSeatCount(prev => {
-        if (prev != null) return prev;
-        const minSeats = seatUsage?.usedSeats ?? 1;
-        return Math.max(resubscribeDefaults.defaultSeatCount, minSeats);
-      });
+      setSeatCount(prev =>
+        prev != null ? prev : Math.max(resubscribeDefaults.defaultSeatCount, seatUsage.usedSeats)
+      );
     }
-  }, [resubscribeDefaults, seatUsage?.usedSeats]);
+  }, [resubscribeDefaults, seatUsage]);
   // Default to current seat usage (excludes billing managers) clamped to 1-100
   const defaultSeatCount = Math.max(1, Math.min(100, seatUsage?.usedSeats ?? 1));
   const effectiveSeatCount = seatCount ?? defaultSeatCount;

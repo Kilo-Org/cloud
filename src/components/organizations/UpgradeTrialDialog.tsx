@@ -56,6 +56,17 @@ export function UpgradeTrialDialog({
   const [seatCount, setSeatCount] = useState<number | null>(null);
   const seededFromDefaults = useRef(false);
 
+  // Mark the form as touched when the user manually changes controls so the
+  // seeding effect doesn't overwrite their choices if queries resolve late.
+  const userSetBillingCycle = (cycle: BillingCycle) => {
+    seededFromDefaults.current = true;
+    setBillingCycle(cycle);
+  };
+  const userSetSeatCount = (count: number) => {
+    seededFromDefaults.current = true;
+    setSeatCount(count);
+  };
+
   const teamPrice = seatPrice('teams', billingCycle);
   const enterprisePrice = seatPrice('enterprise', billingCycle);
 
@@ -133,7 +144,7 @@ export function UpgradeTrialDialog({
             <div className="inline-flex rounded-lg bg-muted p-1">
               <button
                 type="button"
-                onClick={() => setBillingCycle('monthly')}
+                onClick={() => userSetBillingCycle('monthly')}
                 className={`rounded-md px-5 py-1.5 text-sm font-medium transition-all ${
                   billingCycle === 'monthly'
                     ? 'bg-blue-600 text-white'
@@ -144,7 +155,7 @@ export function UpgradeTrialDialog({
               </button>
               <button
                 type="button"
-                onClick={() => setBillingCycle('annual')}
+                onClick={() => userSetBillingCycle('annual')}
                 className={`rounded-md px-5 py-1.5 text-sm font-medium transition-all ${
                   billingCycle === 'annual'
                     ? 'bg-blue-600 text-white'
@@ -194,7 +205,7 @@ export function UpgradeTrialDialog({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setSeatCount(Math.max(1, effectiveSeatCount - 1))}
+                onClick={() => userSetSeatCount(Math.max(1, effectiveSeatCount - 1))}
                 disabled={effectiveSeatCount <= 1}
                 className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-600 text-gray-300 hover:bg-gray-700 disabled:opacity-30"
               >
@@ -208,13 +219,13 @@ export function UpgradeTrialDialog({
                 value={effectiveSeatCount}
                 onChange={e => {
                   const val = parseInt(e.target.value, 10);
-                  if (!isNaN(val)) setSeatCount(Math.max(1, Math.min(100, val)));
+                  if (!isNaN(val)) userSetSeatCount(Math.max(1, Math.min(100, val)));
                 }}
                 className="h-8 w-16 rounded-md border border-gray-600 bg-gray-800 text-center text-sm text-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
               <button
                 type="button"
-                onClick={() => setSeatCount(Math.min(100, effectiveSeatCount + 1))}
+                onClick={() => userSetSeatCount(Math.min(100, effectiveSeatCount + 1))}
                 disabled={effectiveSeatCount >= 100}
                 className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-600 text-gray-300 hover:bg-gray-700 disabled:opacity-30"
               >

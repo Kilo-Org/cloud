@@ -59,6 +59,7 @@ across redeliveries. Add replay tests for `created`, `updated`, and
 **Carried from audit 1:** Yes (finding #2, not yet fixed)
 
 The three shared procedures in `utils.ts` are:
+
 - `organizationMemberProcedure` -- no trial check
 - `organizationBillingProcedure` -- no trial check
 - `organizationBillingMutationProcedure` -- has trial check but is
@@ -69,19 +70,19 @@ Only ~15 of ~75 org-scoped mutation endpoints call
 procedure that includes it. The remaining ~60 endpoints rely solely on
 membership/role checks. Confirmed unguarded routers include:
 
-| Router | Unguarded mutations |
-|--------|---------------------|
-| `organization-app-builder-router` | 12 (all) |
-| `organization-deployments-router` | 10 (all) |
-| `organization-cloud-agent-router` | 6 (all) |
-| `organization-cloud-agent-next-router` | 7 (all) |
-| `organization-security-agent-router` | 6 (all) |
-| `organization-auto-top-up-router` | 4 (all) |
-| `organization-auto-fix-router` | 4 (all) |
-| `organization-auto-triage-router` | 4 (all) |
-| `organization-code-reviews-router` | 2 (all) |
-| `slack-router` | 4 (all) |
-| API routes (`user-tokens`, `cloud-agent/prepare`) | 2 |
+| Router                                            | Unguarded mutations |
+| ------------------------------------------------- | ------------------- |
+| `organization-app-builder-router`                 | 12 (all)            |
+| `organization-deployments-router`                 | 10 (all)            |
+| `organization-cloud-agent-router`                 | 6 (all)             |
+| `organization-cloud-agent-next-router`            | 7 (all)             |
+| `organization-security-agent-router`              | 6 (all)             |
+| `organization-auto-top-up-router`                 | 4 (all)             |
+| `organization-auto-fix-router`                    | 4 (all)             |
+| `organization-auto-triage-router`                 | 4 (all)             |
+| `organization-code-reviews-router`                | 2 (all)             |
+| `slack-router`                                    | 4 (all)             |
+| API routes (`user-tokens`, `cloud-agent/prepare`) | 2                   |
 
 Additionally, subscription-router endpoints `getCustomerPortalUrl`
 and `cancelBillingCycleChange` are unguarded, though
@@ -114,6 +115,7 @@ the Stripe subscription check, and both completions would be accepted
 customer, with separate local purchase records.
 
 **Action:** Add a completion-time guard. Options include:
+
 - Reject or auto-cancel duplicate seat subscriptions in the
   `customer.subscription.created` webhook handler by checking for
   existing non-ended subscriptions for the org.
@@ -198,6 +200,7 @@ the ended subscription's paid-seat quantity and billing cycle.
 `getMostRecentEndedSeatPurchase` is dead code with zero callers.
 
 **Action:** Add a backend resubscribe path that:
+
 1. Looks up the most recently ended subscription by termination
    timestamp (fix ordering from `created_at` to ended timestamp).
 2. Derives paid-seat quantity (excluding free-seat line items) and
@@ -220,12 +223,12 @@ The settings router correctly gates deny-list enforcement behind
 `model_deny_list` / `provider_deny_list` without checking the org
 plan:
 
-| File | Line | Context |
-|------|------|---------|
-| `api/organizations/[id]/defaults/route.ts` | 30 | Org defaults API |
-| `lib/integrations/slack-service.ts` | 477 | Slack model selection |
-| `lib/slack-bot/model-allow-list.ts` | 18 | Slack bot allow-list |
-| `lib/integrations/discord-service.ts` | 363 | Discord model selection |
+| File                                       | Line | Context                 |
+| ------------------------------------------ | ---- | ----------------------- |
+| `api/organizations/[id]/defaults/route.ts` | 30   | Org defaults API        |
+| `lib/integrations/slack-service.ts`        | 477  | Slack model selection   |
+| `lib/slack-bot/model-allow-list.ts`        | 18   | Slack bot allow-list    |
+| `lib/integrations/discord-service.ts`      | 363  | Discord model selection |
 
 When an org is downgraded from Enterprise to Teams, the deny lists
 remain in settings (correct per spec) but continue to be enforced by
@@ -259,6 +262,7 @@ ordering (subscribe before trial expires), which breaks for
 admin-created late conversions.
 
 **Action:** Either:
+
 - Make `isOrganizationHardLocked` query subscription state (accepting
   the extra DB read), or
 - Stop using it for redirect decisions and instead use the same
@@ -305,6 +309,7 @@ invoice is classified as `topup` for an org with an active seat
 subscription (a SHOULD in the spec).
 
 **Action:**
+
 1. Normalize new seat subscriptions to a canonical `type: 'seats'`,
    keeping `'stripe-checkout-seats'` and `'organization_seats'` as
    backward-compatible aliases in the webhook handler.
@@ -344,6 +349,7 @@ available, add a `net_amount_usd` column alongside `amount_usd`.
    `z.number().int().min(1)`.
 
 **Action:**
+
 1. Derive the warning quantity from the paid seat item identified by
    `KNOWN_SEAT_PRICE_IDS`, consistent with the backend.
 2. Clamp the UI minimum to 1 in the `SeatChangeModal` validation.
@@ -390,18 +396,18 @@ needed break-glass actions through explicit admin-only routes.
 The following findings from `plans/billing-compliance.md` have been
 verified as fixed in the current codebase:
 
-| Audit 1 # | Description | Status |
-|------------|-------------|--------|
-| 1 | Self-service org creation plan not atomic | Fixed: `createOrganization` now accepts `plan` param; router hardcodes `'enterprise'` |
-| 3 | `requireActiveSubscriptionOrTrial` ignores OSS/suppress flags | Fixed: now checks `oss_sponsorship_tier` and `suppress_trial_messaging` |
-| 7 | Unrecognized subscription metadata types not logged/discarded | Fixed: explicit type matching with `warnExceptInTest` for unknown types |
-| 8 | Invalid `planType` rejects the entire event | Fixed: `planType` is now `z.string().optional()`, validated via `safeParse` separately |
-| 9 | Checkout `billingCycle` optional with default annual | Fixed: `billingCycle` is now required in `SubscriptionRequestSchema` |
-| 11 | Teams invitation zero-seat bypass, billing_manager blocked | Fixed: zero-seat special case removed; billing_manager bypass works correctly |
-| 12 | `getUserOrganizationsWithSeats` counts bot users | Fixed: query now joins `kilocode_users` with `is_bot = false` filter |
-| 13 | Org deletion allowed with active subscription | Fixed: admin delete checks `subscription_status !== 'ended'` |
-| 15 | Email sends not wrapped in try/catch | Fixed: per-email try/catch with `captureException`; owner targeting filters to active members |
-| 16 | Unrecognized recurring interval not logged | Fixed: `sentryError` call with subscription ID and raw interval |
+| Audit 1 # | Description                                                   | Status                                                                                        |
+| --------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 1         | Self-service org creation plan not atomic                     | Fixed: `createOrganization` now accepts `plan` param; router hardcodes `'enterprise'`         |
+| 3         | `requireActiveSubscriptionOrTrial` ignores OSS/suppress flags | Fixed: now checks `oss_sponsorship_tier` and `suppress_trial_messaging`                       |
+| 7         | Unrecognized subscription metadata types not logged/discarded | Fixed: explicit type matching with `warnExceptInTest` for unknown types                       |
+| 8         | Invalid `planType` rejects the entire event                   | Fixed: `planType` is now `z.string().optional()`, validated via `safeParse` separately        |
+| 9         | Checkout `billingCycle` optional with default annual          | Fixed: `billingCycle` is now required in `SubscriptionRequestSchema`                          |
+| 11        | Teams invitation zero-seat bypass, billing_manager blocked    | Fixed: zero-seat special case removed; billing_manager bypass works correctly                 |
+| 12        | `getUserOrganizationsWithSeats` counts bot users              | Fixed: query now joins `kilocode_users` with `is_bot = false` filter                          |
+| 13        | Org deletion allowed with active subscription                 | Fixed: admin delete checks `subscription_status !== 'ended'`                                  |
+| 15        | Email sends not wrapped in try/catch                          | Fixed: per-email try/catch with `captureException`; owner targeting filters to active members |
+| 16        | Unrecognized recurring interval not logged                    | Fixed: `sentryError` call with subscription ID and raw interval                               |
 
 ---
 
@@ -410,31 +416,31 @@ verified as fixed in the current codebase:
 These audit-1 findings were not independently confirmed by the second
 audit and are not carried forward:
 
-| Audit 1 # | Description | Reason |
-|------------|-------------|---------|
-| 5 (mixed paid/free items in seat update) | `handleUpdateSeatCount` reads `items.data[0]` | The current `items.data[0]` approach works for subscriptions with a single paid item (the common case). The review did not flag this as a separate finding; the broader serialization issue is captured in H4. |
-| 14 (invoice classification) | Classifier uses line-item metadata only | Subsumed into M2 which captures the same gap more precisely. |
-| 17 (gross-only purchase amount) | SHOULD rule, acknowledged NYI | Carried forward as L1. |
-| 18 (`require_seats` schema default is `false`) | Latent hardening risk | Still present but low priority. The `createOrganization` function explicitly sets `true`. |
+| Audit 1 #                                      | Description                                   | Reason                                                                                                                                                                                                         |
+| ---------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 5 (mixed paid/free items in seat update)       | `handleUpdateSeatCount` reads `items.data[0]` | The current `items.data[0]` approach works for subscriptions with a single paid item (the common case). The review did not flag this as a separate finding; the broader serialization issue is captured in H4. |
+| 14 (invoice classification)                    | Classifier uses line-item metadata only       | Subsumed into M2 which captures the same gap more precisely.                                                                                                                                                   |
+| 17 (gross-only purchase amount)                | SHOULD rule, acknowledged NYI                 | Carried forward as L1.                                                                                                                                                                                         |
+| 18 (`require_seats` schema default is `false`) | Latent hardening risk                         | Still present but low priority. The `createOrganization` function explicitly sets `true`.                                                                                                                      |
 
 ---
 
 ## Priority Summary
 
-| Priority | # | Action |
-|----------|---|--------|
-| Critical | C1 | Stable idempotency key for webhook events |
-| Critical | C2 | Centralized hard-expired trial enforcement |
-| High | H1 | Duplicate subscription prevention at completion time |
-| High | H2 | Removed-user tombstone for membership |
-| High | H3 | Serialize or clean up Stripe customer creation |
-| High | H4 | Advisory lock for seat modifications |
-| High | H5 | Backend resubscribe path with correct defaults |
-| High | H6 | Shared enterprise-restriction helper |
-| High | H7 | Subscription-aware redirect logic |
-| Medium | M1 | Billing-cycle change serialization |
-| Medium | M2 | Canonical seat type and invoice classification |
-| Low | L1 | Net amount column (deferred) |
-| Low | L2 | UI quantity and validation fixes |
-| Low | L3 | Plan transition integration test |
-| Info | I1 | Admin bypass design discussion |
+| Priority | #   | Action                                               |
+| -------- | --- | ---------------------------------------------------- |
+| Critical | C1  | Stable idempotency key for webhook events            |
+| Critical | C2  | Centralized hard-expired trial enforcement           |
+| High     | H1  | Duplicate subscription prevention at completion time |
+| High     | H2  | Removed-user tombstone for membership                |
+| High     | H3  | Serialize or clean up Stripe customer creation       |
+| High     | H4  | Advisory lock for seat modifications                 |
+| High     | H5  | Backend resubscribe path with correct defaults       |
+| High     | H6  | Shared enterprise-restriction helper                 |
+| High     | H7  | Subscription-aware redirect logic                    |
+| Medium   | M1  | Billing-cycle change serialization                   |
+| Medium   | M2  | Canonical seat type and invoice classification       |
+| Low      | L1  | Net amount column (deferred)                         |
+| Low      | L2  | UI quantity and validation fixes                     |
+| Low      | L3  | Plan transition integration test                     |
+| Info     | I1  | Admin bypass design discussion                       |

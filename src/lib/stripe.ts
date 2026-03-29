@@ -1333,9 +1333,7 @@ export async function handleUpdateSeatCount(
       KNOWN_SEAT_PRICE_IDS.has(item.price.id)
     );
     if (!paidSeatItem) {
-      throw new Error(
-        `No recognized paid seat item found in subscription ${subscriptionStripeId}`
-      );
+      throw new Error(`No recognized paid seat item found in subscription ${subscriptionStripeId}`);
     }
 
     // Calculate the free seat count from non-paid items to preserve them

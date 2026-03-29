@@ -1,5 +1,9 @@
 import type { Organization, OrganizationSeatsPurchase } from '@kilocode/db/schema';
-import { organization_seats_purchases, organization_membership_removals, organizations } from '@kilocode/db/schema';
+import {
+  organization_seats_purchases,
+  organization_membership_removals,
+  organizations,
+} from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { eq, desc, and, sql } from 'drizzle-orm';
 import * as z from 'zod';
@@ -300,10 +304,7 @@ async function handleSubscriptionEventInternal(
     // Update organization plan from subscription metadata for ALL events (Org Plans 5)
     const plan = getPlanTypeFromSubscription(subscription);
     if (plan !== null) {
-      await tx
-        .update(organizations)
-        .set({ plan })
-        .where(eq(organizations.id, meta.organizationId));
+      await tx.update(organizations).set({ plan }).where(eq(organizations.id, meta.organizationId));
     }
 
     // if the subscription is ended, set seat count to 0 and do nothing else

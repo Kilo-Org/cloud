@@ -89,9 +89,10 @@ export function SeatChangeModal({
     if (count < minimumSeats) {
       return {
         isValid: false,
-        error: activeSeatCount > 0
-          ? `Seat count must be at least ${activeSeatCount} (current active members and invites)`
-          : 'Seat count must be at least 1',
+        error:
+          activeSeatCount > 0
+            ? `Seat count must be at least ${activeSeatCount} (current active members and invites)`
+            : 'Seat count must be at least 1',
         count: null,
       };
     }

@@ -13,7 +13,13 @@ import type {
   SubscriptionItemWithPeriod,
   SubscriptionWithPeriod,
 } from '@/components/organizations/subscription/types';
-import { formatDate, formatCurrency, canManageBilling, findPaidSeatItem, paidSeatQuantity } from './utils';
+import {
+  formatDate,
+  formatCurrency,
+  canManageBilling,
+  findPaidSeatItem,
+  paidSeatQuantity,
+} from './utils';
 import { useIsKiloAdmin } from '@/components/organizations/OrganizationContext';
 import { getSubscriptionStatusConfig, formatBillingInterval } from './subscriptionStatusConfig';
 import { useState } from 'react';

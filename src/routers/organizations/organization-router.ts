@@ -225,18 +225,20 @@ export const organizationsRouter = createTRPCRouter({
     };
   }),
 
-  update: organizationBillingMutationProcedure.input(OrganizationUpdateSchema).mutation(async opts => {
-    await db
-      .update(organizations)
-      .set({ name: opts.input.name })
-      .where(eq(organizations.id, opts.input.organizationId));
-    return {
-      organization: {
-        id: opts.input.organizationId,
-        name: opts.input.name,
-      },
-    };
-  }),
+  update: organizationBillingMutationProcedure
+    .input(OrganizationUpdateSchema)
+    .mutation(async opts => {
+      await db
+        .update(organizations)
+        .set({ name: opts.input.name })
+        .where(eq(organizations.id, opts.input.organizationId));
+      return {
+        organization: {
+          id: opts.input.organizationId,
+          name: opts.input.name,
+        },
+      };
+    }),
 
   // this is an admin only proceedure until we do https://github.com/Kilo-Org/kilocode-backend/issues/2846
   updatePlan: adminProcedure
@@ -351,23 +353,25 @@ export const organizationsRouter = createTRPCRouter({
     return { seatPurchases };
   }),
 
-  invoices: organizationBillingProcedure.input(OrganizationInvoicesInputSchema).query(async opts => {
-    const organization = await getOrganizationById(opts.input.organizationId);
-    if (!organization) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Organization not found',
-      });
-    }
+  invoices: organizationBillingProcedure
+    .input(OrganizationInvoicesInputSchema)
+    .query(async opts => {
+      const organization = await getOrganizationById(opts.input.organizationId);
+      if (!organization) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
 
-    const dateThreshold = getDateThreshold(opts.input.period);
+      const dateThreshold = getDateThreshold(opts.input.period);
 
-    let stripeId = organization.stripe_customer_id;
-    if (!stripeId) {
-      stripeId = await getOrCreateStripeCustomerIdForOrganization(opts.input.organizationId);
-    }
+      let stripeId = organization.stripe_customer_id;
+      if (!stripeId) {
+        stripeId = await getOrCreateStripeCustomerIdForOrganization(opts.input.organizationId);
+      }
 
-    const invoices = await getStripeInvoices(stripeId, dateThreshold);
-    return invoices;
-  }),
+      const invoices = await getStripeInvoices(stripeId, dateThreshold);
+      return invoices;
+    }),
 });

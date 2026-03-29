@@ -34,9 +34,7 @@ export async function getOrCreateStripeCustomerIdForOrganization(
   // Serialize customer creation per organization using an advisory lock
   // to prevent concurrent requests from creating duplicate Stripe customers.
   return await db.transaction(async tx => {
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtext(${organizationId}))`
-    );
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${organizationId}))`);
 
     // Re-check after acquiring lock — another process may have set it
     const [freshOrg] = await tx

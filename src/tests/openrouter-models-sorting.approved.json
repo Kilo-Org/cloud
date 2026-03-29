@@ -770,20 +770,7 @@
       "default_parameters": {},
       "isFree": true,
       "opencode": {
-        "variants": {
-          "instant": {
-            "reasoning": {
-              "enabled": false,
-              "effort": "none"
-            }
-          },
-          "thinking": {
-            "reasoning": {
-              "enabled": true,
-              "effort": "medium"
-            }
-          }
-        }
+        "ai_sdk_provider": "openai-compatible"
       }
     },
     {

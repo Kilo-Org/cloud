@@ -300,8 +300,9 @@ platform.post('/provision', async c => {
     pinnedImageTag,
   } = result.data;
 
+  let provision;
   try {
-    const provision = await withDORetry(
+    provision = await withDORetry(
       instanceStubFactory(c.env, userId, instanceId),
       stub =>
         stub.provision(
@@ -321,7 +322,6 @@ platform.post('/provision', async c => {
         ),
       'provision'
     );
-    return c.json(provision, 201);
   } catch (err) {
     const raw = err instanceof Error ? err.message : 'Unknown error';
     if (raw.includes('duplicate key') || raw.includes('unique constraint')) {
@@ -331,6 +331,24 @@ platform.post('/provision', async c => {
     const { message, status } = sanitizeError(err, 'provision');
     return jsonError(message, status);
   }
+
+  // Record the instance in the appropriate registry (best-effort).
+  // instanceId is always provided by Next.js (the Postgres row UUID).
+  if (instanceId) {
+    try {
+      const registryKey = orgId ? `org:${orgId}` : `user:${userId}`;
+      const registryStub = c.env.KILOCLAW_REGISTRY.get(
+        c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+      );
+      // doKey = instanceId: all new provisions create DOs keyed by instanceId.
+      // For lazy-migrated legacy instances, doKey = userId (set in lazyMigrate).
+      await registryStub.createInstance(registryKey, userId, instanceId, instanceId);
+    } catch (registryErr) {
+      console.error('[platform] Registry create failed (non-fatal):', registryErr);
+    }
+  }
+
+  return c.json(provision, 201);
 });
 
 // PATCH /api/platform/kilocode-config
@@ -1138,12 +1156,40 @@ platform.post('/destroy', async c => {
   if ('error' in iidResult) return iidResult.error;
   const { instanceId } = iidResult;
 
+  const { userId } = result.data;
+
+  // Read the instance's orgId before destroying so we can update the correct registry.
+  let orgId: string | null = null;
+  if (instanceId) {
+    try {
+      const statusStub = instanceStubFactory(c.env, userId, instanceId)();
+      const status = await statusStub.getStatus();
+      orgId = status.orgId;
+    } catch {
+      // If we can't read status, proceed with destroy — registry cleanup is best-effort.
+    }
+  }
+
   try {
     await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, instanceId),
+      instanceStubFactory(c.env, userId, instanceId),
       stub => stub.destroy(),
       'destroy'
     );
+
+    // Remove the instance from the registry (best-effort).
+    if (instanceId) {
+      try {
+        const registryKey = orgId ? `org:${orgId}` : `user:${userId}`;
+        const registryStub = c.env.KILOCLAW_REGISTRY.get(
+          c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+        );
+        await registryStub.destroyInstance(registryKey, instanceId);
+      } catch (registryErr) {
+        console.error('[platform] Registry destroy failed (non-fatal):', registryErr);
+      }
+    }
+
     return c.json({ ok: true });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'destroy');

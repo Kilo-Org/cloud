@@ -927,7 +927,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (!this.s.userId || !this.s.sandboxId) {
       const restoreUserId = userId ?? this.s.userId;
       if (restoreUserId) {
-        await restoreFromPostgres(this.env, this.ctx, this.s, restoreUserId);
+        await restoreFromPostgres(this.env, this.ctx, this.s, restoreUserId, {
+          sandboxId: this.s.sandboxId,
+        });
       }
     }
 

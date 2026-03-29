@@ -336,15 +336,19 @@ async function provisionInstance(
 
   const client = new KiloClawInternalClient();
   try {
-    return await client.provision(user.id, {
-      envVars: input.envVars,
-      encryptedSecrets,
-      channels: buildWorkerChannels(input.channels),
-      kilocodeApiKey,
-      kilocodeApiKeyExpiresAt,
-      kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-      pinnedImageTag,
-    });
+    return await client.provision(
+      user.id,
+      {
+        envVars: input.envVars,
+        encryptedSecrets,
+        channels: buildWorkerChannels(input.channels),
+        kilocodeApiKey,
+        kilocodeApiKeyExpiresAt,
+        kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+        pinnedImageTag,
+      },
+      { instanceId: instanceRow.id }
+    );
   } catch (error) {
     // Only clean up the exact row this attempt created. Target by primary
     // key so a concurrent request's row is never affected.
@@ -698,7 +702,7 @@ export const kiloclawRouter = createTRPCRouter({
     const client = new KiloClawInternalClient();
     let result;
     try {
-      result = await client.destroy(ctx.user.id);
+      result = await client.destroy(ctx.user.id, destroyedRow?.id);
     } catch (error) {
       if (destroyedRow) {
         await restoreDestroyedInstance(destroyedRow.id);

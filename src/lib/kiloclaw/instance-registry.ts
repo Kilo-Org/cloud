@@ -3,7 +3,7 @@ import 'server-only';
 import { and, eq, isNull } from 'drizzle-orm';
 import { kiloclaw_instances } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { sandboxIdFromUserId } from '@/lib/kiloclaw/sandbox-id';
+import { sandboxIdFromUserId, sandboxIdFromInstanceId } from '@/lib/kiloclaw/sandbox-id';
 
 export type ActiveKiloClawInstance = {
   id: string;
@@ -23,30 +23,58 @@ type EnsureActiveInstanceOpts = {
  * This is idempotent and safe under concurrent calls.
  *
  * The returned `id` (DB row UUID) serves as the instanceId for multi-instance
- * routing. For legacy personal flow, sandboxId is derived from userId.
- * For new multi-instance flows (PR 2+), callers use the returned `id` as the
- * DO key and derive sandboxId from it via `sandboxIdFromInstanceId(id)`.
+ * routing.
+ *
+ * For legacy personal flow (no opts.orgId): sandboxId is derived from userId,
+ * DO key = userId. Idempotent via onConflictDoNothing on the unique index.
+ *
+ * For org instances (opts.orgId present): sandboxId is derived from a freshly
+ * generated UUID (the row's id), DO key = instanceId. Not idempotent — each
+ * call creates a new instance row.
  */
 export async function ensureActiveInstance(
   userId: string,
   opts?: EnsureActiveInstanceOpts
 ): Promise<ActiveKiloClawInstance> {
-  const sandboxId = sandboxIdFromUserId(userId);
-
-  const values: {
-    user_id: string;
-    sandbox_id: string;
-    organization_id?: string;
-  } = {
-    user_id: userId,
-    sandbox_id: sandboxId,
-  };
-
   if (opts?.orgId) {
-    values.organization_id = opts.orgId;
+    // Org instance: generate UUID, derive sandboxId from it.
+    // Each call creates a new row (no idempotency — callers gate on existing rows).
+    const instanceId = crypto.randomUUID();
+    const sandboxId = sandboxIdFromInstanceId(instanceId);
+
+    const [row] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: instanceId,
+        user_id: userId,
+        sandbox_id: sandboxId,
+        organization_id: opts.orgId,
+      })
+      .returning({
+        id: kiloclaw_instances.id,
+        userId: kiloclaw_instances.user_id,
+        sandboxId: kiloclaw_instances.sandbox_id,
+        organizationId: kiloclaw_instances.organization_id,
+        name: kiloclaw_instances.name,
+      });
+
+    if (!row) {
+      throw new Error('Failed to create org instance row');
+    }
+
+    return row;
   }
 
-  await db.insert(kiloclaw_instances).values(values).onConflictDoNothing();
+  // Legacy personal flow: derive sandboxId from userId. Idempotent.
+  const sandboxId = sandboxIdFromUserId(userId);
+
+  await db
+    .insert(kiloclaw_instances)
+    .values({
+      user_id: userId,
+      sandbox_id: sandboxId,
+    })
+    .onConflictDoNothing();
 
   const [row] = await db
     .select({

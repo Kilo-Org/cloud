@@ -26,6 +26,7 @@ import {
   billingCycleFromStripeInterval,
   billingCycleToDb,
 } from '@/lib/organizations/organization-types';
+import { client as stripeClient } from '@/lib/stripe-client';
 
 const sentryError = sentryLogger('organization_seats', 'error');
 
@@ -178,8 +179,9 @@ async function handleSubscriptionEventInternal(
       // Local state may lag behind Stripe (e.g., the delete webhook for the old
       // subscription hasn't arrived yet). Check live Stripe state before rejecting.
       try {
-        const { retrieveSubscription } = await import('@/lib/stripe');
-        const existingSub = await retrieveSubscription(existingActive[0].subscription_stripe_id);
+        const existingSub = await stripeClient.subscriptions.retrieve(
+          existingActive[0].subscription_stripe_id
+        );
         if (!existingSub.ended_at) {
           // Genuinely still active in Stripe — reject the duplicate
           sentryError(

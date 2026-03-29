@@ -27,11 +27,16 @@ if (STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID?.trim() === '') {
   );
 }
 
-// Mock the Stripe module so the duplicate-subscription guard (H1) in organization-seats.ts
-// can call retrieveSubscription without hitting the real Stripe API.
-// Returns a subscription with ended_at: null (i.e. still active) so the guard correctly rejects duplicates.
-jest.mock('@/lib/stripe', () => ({
-  retrieveSubscription: jest.fn().mockResolvedValue({ ended_at: null }),
+// Mock the low-level Stripe client so the duplicate-subscription guard (H1) in
+// organization-seats.ts can verify the existing subscription without hitting
+// the real Stripe API. Return ended_at: null so the guard treats the existing
+// subscription as still active and rejects the duplicate.
+jest.mock('@/lib/stripe-client', () => ({
+  client: {
+    subscriptions: {
+      retrieve: jest.fn().mockResolvedValue({ ended_at: null }),
+    },
+  },
 }));
 
 // Helper function to create a mock Stripe subscription

@@ -67,9 +67,13 @@ export function UpgradeTrialDialog({
   useEffect(() => {
     if (resubscribeDefaults) {
       setBillingCycle(resubscribeDefaults.billingCycle);
-      setSeatCount(prev => prev ?? resubscribeDefaults.defaultSeatCount);
+      setSeatCount(prev => {
+        if (prev != null) return prev;
+        const minSeats = seatUsage?.usedSeats ?? 1;
+        return Math.max(resubscribeDefaults.defaultSeatCount, minSeats);
+      });
     }
-  }, [resubscribeDefaults]);
+  }, [resubscribeDefaults, seatUsage?.usedSeats]);
   // Default to current seat usage (excludes billing managers) clamped to 1-100
   const defaultSeatCount = Math.max(1, Math.min(100, seatUsage?.usedSeats ?? 1));
   const effectiveSeatCount = seatCount ?? defaultSeatCount;

@@ -2,7 +2,7 @@ import * as z from 'zod';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
-  organizationOwnerProcedure,
+  organizationBillingProcedure,
 } from '@/routers/organizations/utils';
 import { organization_audit_logs } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
@@ -40,7 +40,7 @@ type AuditLogsResponse = {
 };
 
 export const organizationAuditLogRouter = createTRPCRouter({
-  list: organizationOwnerProcedure.input(ListAuditLogsInputSchema).query(async ({ input, ctx }) => {
+  list: organizationBillingProcedure.input(ListAuditLogsInputSchema).query(async ({ input, ctx }) => {
     const { organizationId, before, after, action, actorEmail, fuzzySearch, startTime, endTime } =
       input;
 
@@ -138,13 +138,13 @@ export const organizationAuditLogRouter = createTRPCRouter({
   }),
 
   // Get all possible action types from the AuditLogAction enum
-  getActionTypes: organizationOwnerProcedure.input(OrganizationIdInputSchema).query(async () => {
+  getActionTypes: organizationBillingProcedure.input(OrganizationIdInputSchema).query(async () => {
     // Return all possible action types from the enum
     return AuditLogAction.options;
   }),
 
   // Get audit log summary statistics
-  getSummary: organizationOwnerProcedure
+  getSummary: organizationBillingProcedure
     .input(OrganizationIdInputSchema)
     .query(async ({ input }) => {
       const { organizationId } = input;

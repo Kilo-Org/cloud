@@ -11,13 +11,18 @@ import {
 } from '@/lib/stripe';
 import {
   getMostRecentSeatPurchase,
+  getMostRecentEndedSeatPurchase,
   getOrganizationSeatUsage,
 } from '@/lib/organizations/organization-seats';
+import { organization_seats_purchases } from '@kilocode/db/schema';
+import { db } from '@/lib/drizzle';
+import { and, eq, desc, ne } from 'drizzle-orm';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
-  organizationOwnerProcedure,
+  organizationBillingProcedure,
+  organizationBillingMutationProcedure,
   organizationMemberProcedure,
 } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
@@ -26,14 +31,13 @@ import type Stripe from 'stripe';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { BillingCycleSchema } from '@/lib/organizations/organization-types';
 import { successResult } from '@/lib/maybe-result';
-import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { client } from '@/lib/stripe-client';
 
 const SubscriptionRequestSchema = OrganizationIdInputSchema.extend({
   seats: z.number().int().min(1).max(100),
   cancelUrl: z.url(),
   plan: z.enum(['teams', 'enterprise']).optional(),
-  billingCycle: BillingCycleSchema.optional().default('annual'),
+  billingCycle: BillingCycleSchema,
 });
 
 const UpdateSeatCountInputSchema = OrganizationIdInputSchema.extend({
@@ -67,6 +71,11 @@ const ChangeBillingCycleInputSchema = OrganizationIdInputSchema.extend({
 const BillingCycleChangeResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),
+});
+
+const ResubscribeDefaultsResponseSchema = z.object({
+  defaultSeatCount: z.number(),
+  billingCycle: BillingCycleSchema,
 });
 
 export const organizationsSubscriptionRouter = createTRPCRouter({
@@ -104,6 +113,47 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       return { subscription, seatsUsed: usages.used, totalSeats: usages.total };
     }),
 
+  getResubscribeDefaults: organizationMemberProcedure
+    .input(OrganizationIdInputSchema)
+    .output(ResubscribeDefaultsResponseSchema)
+    .query(async ({ input }) => {
+      const { organizationId } = input;
+
+      const endedPurchase = await getMostRecentEndedSeatPurchase(organizationId);
+      if (!endedPurchase) {
+        return { defaultSeatCount: 1, billingCycle: 'annual' as const };
+      }
+
+      // The ended row has seat_count=0. Recover the paid quantity from the
+      // last active purchase for the same Stripe subscription.
+      const [lastActive] = await db
+        .select({
+          seat_count: organization_seats_purchases.seat_count,
+          billing_cycle: organization_seats_purchases.billing_cycle,
+        })
+        .from(organization_seats_purchases)
+        .where(
+          and(
+            eq(
+              organization_seats_purchases.subscription_stripe_id,
+              endedPurchase.subscription_stripe_id
+            ),
+            ne(organization_seats_purchases.subscription_status, 'ended')
+          )
+        )
+        .orderBy(desc(organization_seats_purchases.created_at))
+        .limit(1);
+
+      // seat_count includes all line items (paid + free). Decomposing to
+      // paid-only requires querying Stripe for items that may no longer exist.
+      // The total is a reasonable default; the user can adjust during checkout.
+      const defaultSeatCount = Math.max(1, lastActive?.seat_count ?? 1);
+      const dbCycle = lastActive?.billing_cycle ?? endedPurchase.billing_cycle;
+      const billingCycle = dbCycle === 'yearly' ? ('annual' as const) : ('monthly' as const);
+
+      return { defaultSeatCount, billingCycle };
+    }),
+
   getByStripeSessionId: baseProcedure
     .input(z.object({ sessionId: z.string().min(1) }))
     .query(async ({ input }) => {
@@ -130,7 +180,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       return { status: paymentStatus };
     }),
 
-  getSubscriptionStripeUrl: organizationOwnerProcedure
+  getSubscriptionStripeUrl: organizationBillingProcedure
     .input(SubscriptionRequestSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
@@ -164,13 +214,11 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       return { url: result };
     }),
 
-  cancel: organizationOwnerProcedure
+  cancel: organizationBillingMutationProcedure
     .input(OrganizationIdInputSchema)
     .output(SubscriptionActionResponseSchema.extend({ message: z.string() }))
     .mutation(async ({ input }) => {
       const { organizationId } = input;
-
-      await requireActiveSubscriptionOrTrial(organizationId);
 
       // Get the most recent subscription from the organization_seats_purchases table
       const latestPurchase = await getMostRecentSeatPurchase(organizationId);
@@ -190,13 +238,11 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       });
     }),
 
-  stopCancellation: organizationOwnerProcedure
+  stopCancellation: organizationBillingMutationProcedure
     .input(OrganizationIdInputSchema)
     .output(SubscriptionActionResponseSchema)
     .mutation(async ({ input }) => {
       const { organizationId } = input;
-
-      await requireActiveSubscriptionOrTrial(organizationId);
 
       // Get the most recent subscription from the organization_seats_purchases table
       const latestPurchase = await getMostRecentSeatPurchase(organizationId);
@@ -213,13 +259,12 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       return result;
     }),
 
-  updateSeatCount: organizationOwnerProcedure
+  updateSeatCount: organizationBillingMutationProcedure
     .input(UpdateSeatCountInputSchema)
     .output(UpdateSeatCountResponseSchema)
     .mutation(async ({ input }) => {
       const { organizationId, newSeatCount } = input;
 
-      await requireActiveSubscriptionOrTrial(organizationId);
       const { used, total } = await getOrganizationSeatUsage(organizationId);
 
       if (used > newSeatCount) {
@@ -244,7 +289,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       return await handleUpdateSeatCount(purchase.subscription_stripe_id, newSeatCount, total);
     }),
 
-  getCustomerPortalUrl: organizationOwnerProcedure
+  getCustomerPortalUrl: organizationBillingProcedure
     .input(
       z.object({
         organizationId: z.uuid(),
@@ -280,13 +325,11 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       return { url: session.url };
     }),
 
-  changeBillingCycle: organizationOwnerProcedure
+  changeBillingCycle: organizationBillingMutationProcedure
     .input(ChangeBillingCycleInputSchema)
     .output(BillingCycleChangeResponseSchema)
     .mutation(async ({ input }) => {
       const { organizationId, targetCycle } = input;
-
-      await requireActiveSubscriptionOrTrial(organizationId);
 
       const latestPurchase = await getMostRecentSeatPurchase(organizationId);
       if (!latestPurchase) {
@@ -361,15 +404,35 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
 
       // Preserve subscription-level discounts (promotion codes, coupons).
       // Stripe schedule phases only inherit customer-level discounts by default.
-      const discountIds = subscription.discounts
+      const discountIds = (subscription.discounts ?? [])
         .map(d => (typeof d === 'string' ? d : d.id))
         .filter((id): id is string => id != null);
       const phaseDiscounts =
         discountIds.length > 0 ? discountIds.map(id => ({ discount: id })) : undefined;
 
-      const schedule = await client.subscriptionSchedules.create({
-        from_subscription: subscription.id,
-      });
+      let schedule: Stripe.SubscriptionSchedule;
+      try {
+        schedule = await client.subscriptionSchedules.create({
+          from_subscription: subscription.id,
+          metadata: { origin: 'billing-cycle-change' },
+        });
+      } catch (error) {
+        // Concurrent requests may both pass the existing-schedule check above
+        // but only one can create a schedule. Catch the Stripe rejection for the
+        // second and return a clean client error instead of a 500.
+        if (
+          error instanceof Error &&
+          'type' in error &&
+          (error as { code?: string }).code === 'resource_already_exists'
+        ) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message:
+              'A billing cycle change is already scheduled. Cancel the existing change before scheduling a new one.',
+          });
+        }
+        throw error;
+      }
 
       const firstPhase = schedule.phases[0];
       if (!firstPhase) {
@@ -417,7 +480,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       });
     }),
 
-  cancelBillingCycleChange: organizationOwnerProcedure
+  cancelBillingCycleChange: organizationBillingMutationProcedure
     .input(OrganizationIdInputSchema)
     .output(BillingCycleChangeResponseSchema)
     .mutation(async ({ input }) => {
@@ -453,9 +516,12 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         });
       }
 
-      // Verify this looks like a billing-cycle-change schedule (2 phases)
-      // to avoid releasing unrelated schedules.
-      if (resolvedSchedule.phases.length !== 2) {
+      // Verify the schedule was created by the billing-cycle-change flow
+      // (Billing Cycle Changes 11) to avoid releasing unrelated schedules.
+      if (
+        resolvedSchedule.metadata?.origin !== 'billing-cycle-change' ||
+        resolvedSchedule.phases.length !== 2
+      ) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'No pending billing cycle change to cancel',

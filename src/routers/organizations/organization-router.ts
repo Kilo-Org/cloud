@@ -29,7 +29,8 @@ import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
   organizationMemberProcedure,
-  organizationOwnerProcedure,
+  organizationBillingProcedure,
+  organizationBillingMutationProcedure,
 } from '@/routers/organizations/utils';
 import { organizationsMembersRouter } from '@/routers/organizations/organization-members-router';
 import { organizationsSubscriptionRouter } from '@/routers/organizations/organization-subscription-router';
@@ -144,7 +145,8 @@ export const organizationsRouter = createTRPCRouter({
       opts.input.name,
       user.id,
       opts.input.autoAddCreator,
-      opts.input.company_domain ?? undefined
+      opts.input.company_domain ?? undefined,
+      'enterprise'
     );
     await getOrCreateStripeCustomerIdForOrganization(org.id);
 
@@ -154,7 +156,7 @@ export const organizationsRouter = createTRPCRouter({
       distinctId: user.google_user_email,
       properties: {
         organizationId: org.id,
-        product: opts.input.plan,
+        product: 'enterprise',
       },
     });
 
@@ -167,17 +169,10 @@ export const organizationsRouter = createTRPCRouter({
       message: `Organization ${org.name} created`,
     });
 
-    if (opts.input.plan === 'enterprise') {
-      await db
-        .update(organizations)
-        .set({ plan: 'enterprise' })
-        .where(eq(organizations.id, org.id));
-    }
-
     return { organization: org };
   }),
 
-  updateCompanyDomain: organizationOwnerProcedure
+  updateCompanyDomain: organizationBillingMutationProcedure
     .input(
       OrganizationIdInputSchema.extend({
         company_domain: CompanyDomainSchema.nullable(),
@@ -230,7 +225,7 @@ export const organizationsRouter = createTRPCRouter({
     };
   }),
 
-  update: organizationOwnerProcedure.input(OrganizationUpdateSchema).mutation(async opts => {
+  update: organizationBillingMutationProcedure.input(OrganizationUpdateSchema).mutation(async opts => {
     await db
       .update(organizations)
       .set({ name: opts.input.name })
@@ -356,7 +351,7 @@ export const organizationsRouter = createTRPCRouter({
     return { seatPurchases };
   }),
 
-  invoices: organizationOwnerProcedure.input(OrganizationInvoicesInputSchema).query(async opts => {
+  invoices: organizationBillingProcedure.input(OrganizationInvoicesInputSchema).query(async opts => {
     const organization = await getOrganizationById(opts.input.organizationId);
     if (!organization) {
       throw new TRPCError({

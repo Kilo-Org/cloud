@@ -11,14 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Calendar, Repeat } from 'lucide-react';
 import type { BillingCycle, OrganizationPlan } from '@/lib/organizations/organization-types';
-import {
-  TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
-  TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD,
-  TEAM_SEAT_PRICE_YEARLY_BILLED_ANNUALLY_USD,
-  ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
-  ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD,
-  ENTERPRISE_SEAT_PRICE_YEARLY_BILLED_ANNUALLY_USD,
-} from '@/lib/organizations/constants';
+import { seatPrice } from '@/lib/organizations/constants';
 
 type BillingCycleChangeDialogProps = {
   isOpen: boolean;
@@ -33,32 +26,11 @@ type BillingCycleChangeDialogProps = {
 };
 
 function getPricing(plan: OrganizationPlan, cycle: BillingCycle) {
-  if (plan === 'teams') {
-    if (cycle === 'monthly') {
-      return {
-        monthlyRate: TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
-        billingAmount: TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
-        billingLabel: '/seat/month',
-      };
-    }
-    return {
-      monthlyRate: TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD,
-      billingAmount: TEAM_SEAT_PRICE_YEARLY_BILLED_ANNUALLY_USD,
-      billingLabel: '/seat/year',
-    };
-  }
-  // enterprise
-  if (cycle === 'monthly') {
-    return {
-      monthlyRate: ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
-      billingAmount: ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
-      billingLabel: '/seat/month',
-    };
-  }
+  const monthlyRate = seatPrice(plan, cycle);
   return {
-    monthlyRate: ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD,
-    billingAmount: ENTERPRISE_SEAT_PRICE_YEARLY_BILLED_ANNUALLY_USD,
-    billingLabel: '/seat/year',
+    monthlyRate,
+    billingAmount: cycle === 'annual' ? monthlyRate * 12 : monthlyRate,
+    billingLabel: cycle === 'annual' ? '/seat/year' : '/seat/month',
   };
 }
 

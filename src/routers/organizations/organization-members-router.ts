@@ -15,7 +15,7 @@ import { db, sql } from '@/lib/drizzle';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
-  organizationOwnerProcedure,
+  organizationBillingMutationProcedure,
 } from '@/routers/organizations/utils';
 import { sendOrganizationInviteEmail } from '@/lib/email';
 import { TRPCError } from '@trpc/server';
@@ -24,8 +24,6 @@ import * as z from 'zod';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { findUserById } from '@/lib/user';
 import { successResult } from '@/lib/maybe-result';
-import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
-
 const MAX_DAILY_LIMIT_USD = 2000;
 
 const UpdateMemberSchema = OrganizationIdInputSchema.extend({
@@ -48,13 +46,13 @@ const DeleteInviteSchema = OrganizationIdInputSchema.extend({
 });
 
 export const organizationsMembersRouter = createTRPCRouter({
-  update: organizationOwnerProcedure.input(UpdateMemberSchema).mutation(async ({ input, ctx }) => {
-    const { user } = ctx;
-    const { organizationId, memberId, role, dailyUsageLimitUsd } = input;
+  update: organizationBillingMutationProcedure
+    .input(UpdateMemberSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { user } = ctx;
+      const { organizationId, memberId, role, dailyUsageLimitUsd } = input;
 
-    await requireActiveSubscriptionOrTrial(organizationId);
-
-    // Get the target user's role if we need to check permissions for role or limit changes
+      // Get the target user's role if we need to check permissions for role or limit changes
     let targetMember: { role: string } | undefined;
     if (role !== undefined || dailyUsageLimitUsd !== undefined) {
       const [member] = await db
@@ -116,13 +114,13 @@ export const organizationsMembersRouter = createTRPCRouter({
       updated: role !== undefined ? 'role and limit' : 'limit',
     });
   }),
-  remove: organizationOwnerProcedure.input(RemoveMemberSchema).mutation(async ({ input, ctx }) => {
-    const { user } = ctx;
-    const { organizationId, memberId } = input;
+  remove: organizationBillingMutationProcedure
+    .input(RemoveMemberSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { user } = ctx;
+      const { organizationId, memberId } = input;
 
-    await requireActiveSubscriptionOrTrial(organizationId);
-
-    // Prevent users from removing themselves (unless they are kilo admin users)
+      // Prevent users from removing themselves (unless they are kilo admin users)
     if (user.id === memberId && !user.is_admin) {
       throw new TRPCError({
         code: 'FORBIDDEN',
@@ -160,7 +158,7 @@ export const organizationsMembersRouter = createTRPCRouter({
       });
     }
 
-    const result = await removeUserFromOrganization(organizationId, memberId);
+    const result = await removeUserFromOrganization(organizationId, memberId, user.id);
     const removedUser = await findUserById(memberId);
     await createAuditLog({
       action: 'organization.member.remove',
@@ -180,13 +178,13 @@ export const organizationsMembersRouter = createTRPCRouter({
 
     return successResult({ updated: memberId });
   }),
-  invite: organizationOwnerProcedure.input(InviteMemberSchema).mutation(async ({ input, ctx }) => {
-    const { user } = ctx;
-    const { organizationId, email, role } = input;
+  invite: organizationBillingMutationProcedure
+    .input(InviteMemberSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { user } = ctx;
+      const { organizationId, email, role } = input;
 
-    await requireActiveSubscriptionOrTrial(organizationId);
-
-    // Get organization details
+      // Get organization details
     const organization = await getOrganizationById(organizationId);
     if (!organization) {
       throw new TRPCError({
@@ -251,12 +249,10 @@ export const organizationsMembersRouter = createTRPCRouter({
       acceptInviteUrl,
     };
   }),
-  deleteInvite: organizationOwnerProcedure
+  deleteInvite: organizationBillingMutationProcedure
     .input(DeleteInviteSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, inviteId } = input;
-
-      await requireActiveSubscriptionOrTrial(organizationId);
 
       // Find the invitation
       const [invitation] = await db

@@ -5,15 +5,10 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { PlanCard } from './subscription/PlanCard';
 import { Button } from '@/components/Button';
 import type { BillingCycle, OrganizationPlan } from '@/lib/organizations/organization-types';
-import {
-  TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
-  TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD,
-  ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
-  ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD,
-} from '@/lib/organizations/constants';
+import { seatPrice } from '@/lib/organizations/constants';
 import {
   useOrganizationSubscriptionLink,
-  useOrganizationWithMembers,
+  useOrganizationSeatUsage,
 } from '@/app/api/organizations/hooks';
 import { usePostHog } from 'posthog-js/react';
 
@@ -57,17 +52,15 @@ export function UpgradeTrialDialog({
   const [selectedPlan, setSelectedPlan] = useState<OrganizationPlan>(currentPlan);
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('annual');
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [seatCount, setSeatCount] = useState<number | null>(null);
 
-  const teamPrice =
-    billingCycle === 'monthly'
-      ? TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD
-      : TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD;
-  const enterprisePrice =
-    billingCycle === 'monthly'
-      ? ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD
-      : ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD;
+  const teamPrice = seatPrice('teams', billingCycle);
+  const enterprisePrice = seatPrice('enterprise', billingCycle);
 
-  const { data: orgData } = useOrganizationWithMembers(organizationId);
+  const { data: seatUsage } = useOrganizationSeatUsage(organizationId);
+  // Default to current seat usage (excludes billing managers) clamped to 1-100
+  const defaultSeatCount = Math.max(1, Math.min(100, seatUsage?.usedSeats ?? 1));
+  const effectiveSeatCount = seatCount ?? defaultSeatCount;
   const subscriptionLink = useOrganizationSubscriptionLink();
   const hog = usePostHog();
 
@@ -76,20 +69,20 @@ export function UpgradeTrialDialog({
   };
 
   const handlePurchase = async () => {
-    if (!orgData) return;
+    if (!seatUsage) return;
 
     setIsPurchasing(true);
     hog?.capture('trial_upgrade_purchase_clicked', {
       organizationId,
       selectedPlan,
       billingCycle,
-      seatCount: orgData.members.length,
+      seatCount: effectiveSeatCount,
     });
 
     try {
       const result = await subscriptionLink.mutateAsync({
         organizationId,
-        seats: orgData.members.length,
+        seats: effectiveSeatCount,
         cancelUrl: window.location.href,
         plan: selectedPlan,
         billingCycle,
@@ -178,11 +171,53 @@ export function UpgradeTrialDialog({
             />
           </div>
 
+          {/* Seat Count */}
+          <div className="flex items-center justify-center gap-4">
+            <label htmlFor="seat-count" className="text-sm font-medium text-gray-300">
+              Number of seats
+            </label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSeatCount(Math.max(1, effectiveSeatCount - 1))}
+                disabled={effectiveSeatCount <= 1}
+                className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-600 text-gray-300 hover:bg-gray-700 disabled:opacity-30"
+              >
+                −
+              </button>
+              <input
+                id="seat-count"
+                type="number"
+                min={1}
+                max={100}
+                value={effectiveSeatCount}
+                onChange={e => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val)) setSeatCount(Math.max(1, Math.min(100, val)));
+                }}
+                className="h-8 w-16 rounded-md border border-gray-600 bg-gray-800 text-center text-sm text-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <button
+                type="button"
+                onClick={() => setSeatCount(Math.min(100, effectiveSeatCount + 1))}
+                disabled={effectiveSeatCount >= 100}
+                className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-600 text-gray-300 hover:bg-gray-700 disabled:opacity-30"
+              >
+                +
+              </button>
+            </div>
+            {seatUsage && (
+              <span className="text-xs text-gray-500">
+                ({seatUsage.usedSeats} currently in use)
+              </span>
+            )}
+          </div>
+
           {/* Purchase Button */}
           <div className="flex flex-col items-center gap-3">
             <Button
               onClick={handlePurchase}
-              disabled={isPurchasing || !orgData}
+              disabled={isPurchasing || !seatUsage}
               className="w-full max-w-md bg-blue-600 py-4 text-lg font-semibold text-white hover:bg-blue-700"
             >
               {isPurchasing ? 'Processing...' : `Purchase ${planName} Plan`}

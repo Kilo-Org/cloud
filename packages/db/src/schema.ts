@@ -1109,7 +1109,7 @@ export const organizations = pgTable(
     auto_top_up_enabled: boolean().default(false).notNull(),
     settings: jsonb().default({}).$type<OrganizationSettings>().notNull(),
     seat_count: integer().default(0).notNull(),
-    require_seats: boolean().default(false).notNull(),
+    require_seats: boolean().default(true).notNull(),
     created_by_kilo_user_id: text(),
     deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
     sso_domain: text(),
@@ -1148,6 +1148,25 @@ export const organization_memberships = pgTable(
 );
 
 export type OrganizationMembership = typeof organization_memberships.$inferSelect;
+
+export const organization_membership_removals = pgTable(
+  'organization_membership_removals',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid().notNull(),
+    kilo_user_id: text().notNull(),
+    removed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    removed_by: text(),
+    previous_role: text().$type<OrganizationRole>().notNull(),
+  },
+  table => [
+    unique('UQ_org_membership_removals_org_user').on(table.organization_id, table.kilo_user_id),
+    index('IDX_org_membership_removals_org_id').on(table.organization_id),
+    index('IDX_org_membership_removals_user_id').on(table.kilo_user_id),
+  ]
+);
+
+export type OrganizationMembershipRemoval = typeof organization_membership_removals.$inferSelect;
 
 export const organization_invitations = pgTable(
   'organization_invitations',

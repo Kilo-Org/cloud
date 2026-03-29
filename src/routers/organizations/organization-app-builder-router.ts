@@ -1,7 +1,10 @@
 import 'server-only';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import { generateApiToken } from '@/lib/tokens';
-import { organizationMemberProcedure } from '@/routers/organizations/utils';
+import {
+  organizationMemberProcedure,
+  organizationMemberMutationProcedure,
+} from '@/routers/organizations/utils';
 import * as appBuilderService from '@/lib/app-builder/app-builder-service';
 import {
   createProjectBaseSchema,
@@ -30,7 +33,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
    * Create a new project without starting streaming
    * Returns projectId for the client to navigate to before streaming
    */
-  createProject: organizationMemberProcedure
+  createProject: organizationMemberMutationProcedure
     .input(createProjectSchema)
     .mutation(async ({ ctx, input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };
@@ -62,7 +65,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
   /**
    * Triggers a build for the specified project
    */
-  triggerBuild: organizationMemberProcedure
+  triggerBuild: organizationMemberMutationProcedure
     .input(projectWithOrgIdSchema)
     .mutation(async ({ input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };
@@ -99,7 +102,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
   /**
    * Deploy an App Builder project to production
    */
-  deployProject: organizationMemberProcedure
+  deployProject: organizationMemberMutationProcedure
     .input(deployProjectSchema)
     .mutation(async ({ ctx, input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };
@@ -138,7 +141,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
    * Generate a read-only clone token for a project
    * Returns the token, git URL, and expiration time
    */
-  generateCloneToken: organizationMemberProcedure
+  generateCloneToken: organizationMemberMutationProcedure
     .input(projectWithOrgIdSchema)
     .mutation(async ({ input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };
@@ -148,7 +151,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
   /**
    * Delete a project and all associated resources
    */
-  deleteProject: organizationMemberProcedure
+  deleteProject: organizationMemberMutationProcedure
     .input(projectWithOrgIdSchema)
     .mutation(async ({ input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };
@@ -160,7 +163,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
    * Interrupt a running App Builder session
    * Stops any ongoing Claude agent execution for the project
    */
-  interruptSession: organizationMemberProcedure
+  interruptSession: organizationMemberMutationProcedure
     .input(projectWithOrgIdSchema)
     .mutation(async ({ ctx, input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };
@@ -173,7 +176,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
    * Generate a presigned URL for uploading an image attachment
    * Note: Uses ctx.user.id for the folder path since images are user-created content
    */
-  getImageUploadUrl: organizationMemberProcedure
+  getImageUploadUrl: organizationMemberMutationProcedure
     .input(imageUploadUrlWithOrgIdSchema)
     .mutation(async ({ ctx, input }) => {
       return generateImageUploadUrl({
@@ -199,7 +202,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
    * 1. Fetch a stream ticket from /api/cloud-agent/sessions/stream-ticket
    * 2. Connect to the WebSocket URL with the ticket
    */
-  startSession: organizationMemberProcedure
+  startSession: organizationMemberMutationProcedure
     .input(projectWithOrgIdSchema)
     .mutation(async ({ ctx, input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };
@@ -223,7 +226,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
    * 1. Fetch a stream ticket from /api/cloud-agent/sessions/stream-ticket
    * 2. Connect to the WebSocket URL with the ticket
    */
-  sendMessage: organizationMemberProcedure
+  sendMessage: organizationMemberMutationProcedure
     .input(sendMessageSchema)
     .mutation(async ({ ctx, input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };
@@ -255,7 +258,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
    * Returns the cloudAgentSessionId for WebSocket connection.
    * The client should connect to the WebSocket to receive the response.
    */
-  prepareLegacySession: organizationMemberProcedure
+  prepareLegacySession: organizationMemberMutationProcedure
     .input(prepareLegacySessionSchema)
     .mutation(async ({ ctx, input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };
@@ -289,7 +292,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
   /**
    * Migrate an App Builder project to GitHub.
    */
-  migrateToGitHub: organizationMemberProcedure
+  migrateToGitHub: organizationMemberMutationProcedure
     .input(migrateToGitHubWithOrgIdSchema)
     .mutation(async ({ ctx, input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };

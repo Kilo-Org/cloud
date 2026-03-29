@@ -4,13 +4,20 @@ import type { User, Organization } from '@kilocode/db/schema';
 import {
   organization_seats_purchases,
   organization_memberships,
+  organization_membership_removals,
   organizations,
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { eq, and } from 'drizzle-orm';
 import type Stripe from 'stripe';
-import { createOrganization } from '@/lib/organizations/organizations';
+import {
+  createOrganization,
+  removeUserFromOrganization,
+  inviteUserToOrganization,
+  acceptOrganizationInvite,
+  addUserToOrganization,
+} from '@/lib/organizations/organizations';
 import { STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID } from '@/lib/config.server';
 
 // Validate required environment variables at module load time
@@ -19,6 +26,13 @@ if (STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID?.trim() === '') {
     'STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID must be set in test environment (.env.test)'
   );
 }
+
+// Mock the Stripe module so the duplicate-subscription guard (H1) in organization-seats.ts
+// can call retrieveSubscription without hitting the real Stripe API.
+// Returns a subscription with ended_at: null (i.e. still active) so the guard correctly rejects duplicates.
+jest.mock('@/lib/stripe', () => ({
+  retrieveSubscription: jest.fn().mockResolvedValue({ ended_at: null }),
+}));
 
 // Helper function to create a mock Stripe subscription
 function createMockSubscription(overrides: Partial<Stripe.Subscription> = {}): Stripe.Subscription {
@@ -325,6 +339,12 @@ describe('handleSubscriptionEvent', () => {
 
   test('should throw error when no line items exist', async () => {
     const subscription = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: testUser.id,
+        organizationId: testOrganization.id,
+        seats: '5',
+      },
       items: {
         object: 'list',
         data: [],
@@ -340,6 +360,12 @@ describe('handleSubscriptionEvent', () => {
 
   test('should throw error when line item has no current_period_end', async () => {
     const subscription = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: testUser.id,
+        organizationId: testOrganization.id,
+        seats: '5',
+      },
       items: {
         object: 'list',
         data: [
@@ -1442,5 +1468,341 @@ describe('Organization plan type updates from subscription', () => {
 
     expect(updatedOrg.plan).toBe('teams');
     expect(updatedOrg.seat_count).toBe(5);
+  });
+});
+
+describe('L3: Enterprise-to-Teams plan transition preserves deny lists', () => {
+  let testUser: User;
+  let testOrganization: Organization;
+
+  beforeEach(async () => {
+    testUser = await insertTestUser();
+    testOrganization = await createOrganization('Test Organization', testUser.id);
+  });
+
+  test('should preserve model deny lists when transitioning enterprise → teams → enterprise', async () => {
+    const baseTime = Math.floor(Date.now() / 1000);
+
+    // Set org to enterprise plan with model/provider deny lists
+    await db
+      .update(organizations)
+      .set({
+        plan: 'enterprise',
+        settings: {
+          model_deny_list: ['gpt-4', 'claude-3-opus'],
+          provider_deny_list: ['openai'],
+        },
+      })
+      .where(eq(organizations.id, testOrganization.id));
+
+    const base = createMockSubscription();
+    const baseItem = base.items.data[0];
+
+    // Process a subscription event that transitions to 'teams'
+    const teamsSubscription = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: testUser.id,
+        organizationId: testOrganization.id,
+        seats: '5',
+        planType: 'teams',
+      },
+      items: {
+        ...base.items,
+        data: [
+          {
+            ...baseItem,
+            quantity: 5,
+            current_period_start: baseTime,
+            current_period_end: baseTime + 2592000,
+            price: {
+              ...baseItem.price,
+              product: STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID,
+            },
+            plan: {
+              ...baseItem.plan,
+              product: STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID,
+            },
+          },
+        ],
+      },
+    });
+
+    await handleSubscriptionEvent(teamsSubscription, 'test-l3-to-teams');
+
+    // Verify plan is teams AND deny lists are preserved
+    let updatedOrg = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, testOrganization.id))
+      .then(rows => rows[0]);
+
+    expect(updatedOrg.plan).toBe('teams');
+    expect(updatedOrg.settings.model_deny_list).toEqual(['gpt-4', 'claude-3-opus']);
+    expect(updatedOrg.settings.provider_deny_list).toEqual(['openai']);
+
+    // Process a subscription event that transitions back to 'enterprise'
+    const enterpriseSubscription = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: testUser.id,
+        organizationId: testOrganization.id,
+        seats: '10',
+        planType: 'enterprise',
+      },
+      items: {
+        ...base.items,
+        data: [
+          {
+            ...baseItem,
+            quantity: 10,
+            current_period_start: baseTime + 1000,
+            current_period_end: baseTime + 2592000 + 1000,
+          },
+        ],
+      },
+    });
+
+    await handleSubscriptionEvent(enterpriseSubscription, 'test-l3-back-to-enterprise');
+
+    // Verify plan is enterprise AND deny lists are still preserved
+    updatedOrg = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, testOrganization.id))
+      .then(rows => rows[0]);
+
+    expect(updatedOrg.plan).toBe('enterprise');
+    expect(updatedOrg.settings.model_deny_list).toEqual(['gpt-4', 'claude-3-opus']);
+    expect(updatedOrg.settings.provider_deny_list).toEqual(['openai']);
+  });
+});
+
+describe('C1: Webhook event replay deduplication', () => {
+  let testUser: User;
+  let testOrganization: Organization;
+
+  beforeEach(async () => {
+    testUser = await insertTestUser();
+    testOrganization = await createOrganization('Test Organization', testUser.id);
+  });
+
+  test('should produce exactly one purchase record when same event ID is replayed', async () => {
+    const mockSubscription = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: testUser.id,
+        organizationId: testOrganization.id,
+        seats: '5',
+      },
+    });
+
+    const idempotencyKey = 'evt_test_replay';
+
+    // Call twice with the same idempotency key (simulating webhook replay)
+    await handleSubscriptionEvent(mockSubscription, idempotencyKey);
+    await handleSubscriptionEvent(mockSubscription, idempotencyKey);
+
+    const purchases = await db
+      .select()
+      .from(organization_seats_purchases)
+      .where(eq(organization_seats_purchases.idempotency_key, idempotencyKey));
+
+    expect(purchases).toHaveLength(1);
+  });
+});
+
+describe('H2: Membership removal tombstone', () => {
+  let testUser: User;
+  let removedUser: User;
+  let testOrganization: Organization;
+
+  beforeEach(async () => {
+    testUser = await insertTestUser();
+    removedUser = await insertTestUser();
+    testOrganization = await createOrganization('Test Organization', testUser.id);
+  });
+
+  test('should not re-add a removed user on subscription event, but re-add after invite acceptance clears tombstone', async () => {
+    const baseTime = Math.floor(Date.now() / 1000);
+    const base = createMockSubscription();
+    const baseItem = base.items.data[0];
+
+    // Add the user as a member first
+    await addUserToOrganization(testOrganization.id, removedUser.id, 'member');
+
+    // Step 1: Remove the user from the org → creates a removal tombstone
+    await removeUserFromOrganization(testOrganization.id, removedUser.id, testUser.id);
+
+    // Verify the removal record exists
+    const removals = await db
+      .select()
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+    expect(removals).toHaveLength(1);
+
+    // Step 2: Process a subscription event with the removed user as metadata user
+    // The removed user should NOT be re-added
+    const subscriptionForRemovedUser = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: removedUser.id,
+        organizationId: testOrganization.id,
+        seats: '5',
+      },
+      items: {
+        ...base.items,
+        data: [
+          {
+            ...baseItem,
+            quantity: 5,
+            current_period_start: baseTime,
+            current_period_end: baseTime + 2592000,
+          },
+        ],
+      },
+    });
+
+    await handleSubscriptionEvent(subscriptionForRemovedUser, 'test-h2-after-removal');
+
+    // Verify removed user is NOT a member
+    const membershipsAfterEvent = await db
+      .select()
+      .from(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, testOrganization.id),
+          eq(organization_memberships.kilo_user_id, removedUser.id)
+        )
+      );
+    expect(membershipsAfterEvent).toHaveLength(0);
+
+    // Step 3: User accepts a new invite → removal tombstone is cleared
+    const invitation = await inviteUserToOrganization(
+      testOrganization.id,
+      testUser.id,
+      removedUser.google_user_email,
+      'member'
+    );
+    await acceptOrganizationInvite(removedUser.id, invitation.token);
+
+    // Verify tombstone was cleared
+    const removalsAfterAccept = await db
+      .select()
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, testOrganization.id),
+          eq(organization_membership_removals.kilo_user_id, removedUser.id)
+        )
+      );
+    expect(removalsAfterAccept).toHaveLength(0);
+
+    // Step 4: Process subscription event again → user IS added back (tombstone cleared)
+    const subscriptionAfterRejoin = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: removedUser.id,
+        organizationId: testOrganization.id,
+        seats: '5',
+      },
+      items: {
+        ...base.items,
+        data: [
+          {
+            ...baseItem,
+            quantity: 5,
+            current_period_start: baseTime + 1000,
+            current_period_end: baseTime + 2592000 + 1000,
+          },
+        ],
+      },
+    });
+
+    await handleSubscriptionEvent(subscriptionAfterRejoin, 'test-h2-after-rejoin');
+
+    // Verify user IS now a member (addUserToOrganization is a no-op if already member,
+    // which is fine — the point is the tombstone no longer blocks it)
+    const membershipsAfterRejoin = await db
+      .select()
+      .from(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, testOrganization.id),
+          eq(organization_memberships.kilo_user_id, removedUser.id)
+        )
+      );
+    expect(membershipsAfterRejoin.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('H1: Duplicate subscription guard', () => {
+  let testUser: User;
+  let testOrganization: Organization;
+
+  beforeEach(async () => {
+    testUser = await insertTestUser();
+    testOrganization = await createOrganization('Test Organization', testUser.id);
+  });
+
+  test('should reject a second subscription creation for an org that already has a non-ended subscription', async () => {
+    const baseTime = Math.floor(Date.now() / 1000);
+    const base = createMockSubscription();
+    const baseItem = base.items.data[0];
+
+    // First subscription creation succeeds
+    const firstSubscription = createMockSubscription({
+      id: 'sub_first_active',
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: testUser.id,
+        organizationId: testOrganization.id,
+        seats: '5',
+      },
+      items: {
+        ...base.items,
+        data: [
+          {
+            ...baseItem,
+            quantity: 5,
+            current_period_start: baseTime,
+            current_period_end: baseTime + 2592000,
+          },
+        ],
+      },
+    });
+
+    await handleSubscriptionEvent(firstSubscription, 'test-h1-first-sub', true);
+
+    // Second subscription creation (different subscription ID) should throw
+    const secondSubscription = createMockSubscription({
+      id: 'sub_second_attempt',
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: testUser.id,
+        organizationId: testOrganization.id,
+        seats: '3',
+      },
+      items: {
+        ...base.items,
+        data: [
+          {
+            ...baseItem,
+            quantity: 3,
+            current_period_start: baseTime,
+            current_period_end: baseTime + 2592000,
+          },
+        ],
+      },
+    });
+
+    await expect(
+      handleSubscriptionEvent(secondSubscription, 'test-h1-second-sub', true)
+    ).rejects.toThrow('already has a non-ended seat subscription');
   });
 });

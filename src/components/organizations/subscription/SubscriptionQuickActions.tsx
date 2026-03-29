@@ -14,15 +14,9 @@ import { CancelSubscriptionModal } from './CancelSubscriptionModal';
 import { SeatChangeModal } from './SeatChangeModal';
 import { BillingCycleChangeDialog } from './BillingCycleChangeDialog';
 import Link from 'next/link';
-import {
-  TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
-  TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD,
-  ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD,
-  ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD,
-  inferPlanFromUnitAmount,
-} from '@/lib/organizations/constants';
+import { seatPrice } from '@/lib/organizations/constants';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
-import { formatDate } from './utils';
+import { formatDate, canManageBilling, findPaidSeatItem } from './utils';
 import type { SubscriptionWithPeriod } from './types';
 
 export function SubscriptionQuickActions({
@@ -83,21 +77,21 @@ export function SubscriptionQuickActions({
   };
 
   const willCancelAtPeriodEnd = subscription.cancel_at_period_end;
-  const canManageBilling = userRole === 'owner' || userRole === 'billing_manager';
+  const billingAccess = canManageBilling(userRole);
   const canCancelSubscription =
-    canManageBilling && subscription.status === 'active' && !willCancelAtPeriodEnd;
-  const canChangeSeatCount = canManageBilling && subscription.status === 'active';
+    billingAccess && subscription.status === 'active' && !willCancelAtPeriodEnd;
+  const canChangeSeatCount = billingAccess && subscription.status === 'active';
   // Derive seat count and interval from the paid seat item (unit_amount > 0),
   // not items[0] which could be a free-seat price in mixed subscriptions.
-  const paidSeatItem = subscription.items.data.find(item => (item.price?.unit_amount ?? 0) > 0);
+  const paidSeatItem = findPaidSeatItem(subscription.items.data);
   const currentSeatCount = paidSeatItem?.quantity || 0;
   const currentInterval = paidSeatItem?.price?.recurring?.interval;
   const isMonthly = currentInterval === 'month';
-  const hasPendingSchedule = (() => {
-    const schedule = subscription.schedule;
-    if (!schedule || typeof schedule === 'string') return schedule != null;
-    return schedule.status === 'active' || schedule.status === 'not_started';
-  })();
+  const schedule = subscription.schedule;
+  const hasPendingSchedule =
+    schedule != null &&
+    typeof schedule !== 'string' &&
+    (schedule.status === 'active' || schedule.status === 'not_started');
   const canChangeBillingCycle = canCancelSubscription && !hasPendingSchedule;
 
   return (
@@ -182,15 +176,7 @@ export function SubscriptionQuickActions({
           onClose={() => setShowSeatChangeModal(false)}
           currentSeatCount={currentSeatCount}
           organizationId={organizationId}
-          price={
-            org.data.plan === 'teams'
-              ? isMonthly
-                ? TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD
-                : TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD
-              : isMonthly
-                ? ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD
-                : ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD
-          }
+          price={seatPrice(org.data.plan, isMonthly ? 'monthly' : 'annual')}
         />
       )}
 
@@ -203,7 +189,7 @@ export function SubscriptionQuickActions({
           targetCycle={isMonthly ? 'annual' : 'monthly'}
           currentCycle={isMonthly ? 'monthly' : 'annual'}
           seatCount={currentSeatCount}
-          plan={inferPlanFromUnitAmount(paidSeatItem?.price?.unit_amount ?? 0) ?? org.data.plan}
+          plan={org.data.plan}
           effectiveDate={(() => {
             const periodEnd = (subscription as SubscriptionWithPeriod).current_period_end;
             return periodEnd ? formatDate(periodEnd) : 'end of current period';

@@ -6,6 +6,7 @@ import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
 import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
 import { getModelIdToProviderSlugsIndex } from '@/lib/providers/openrouter/models-by-provider-index.server';
 import { KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto-model';
+import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
 type DefaultsResponse = {
   defaultModel: string;
@@ -27,8 +28,7 @@ export async function GET(
   // Get organization's default model setting
   let defaultModel = organization.settings?.default_model;
 
-  const modelDenyList = organization.settings?.model_deny_list;
-  const providerDenyList = organization.settings?.provider_deny_list;
+  const { modelDenyList, providerDenyList } = getEffectiveModelRestrictions(organization);
 
   const isAllowed = createAllowPredicateFromDenyList(modelDenyList, providerDenyList);
 
@@ -72,7 +72,7 @@ export async function GET(
 
   // Fallback to global default if no organization default is set or it's not allowed
   if (!defaultModel) {
-    if (!modelDenyList?.length && !providerDenyList?.length) {
+    if (modelDenyList.length === 0 && providerDenyList.length === 0) {
       // No restrictions - use PRIMARY_DEFAULT_MODEL directly
       defaultModel = PRIMARY_DEFAULT_MODEL;
     } else {

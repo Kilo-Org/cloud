@@ -1,7 +1,7 @@
 import type { Organization, OrganizationSeatsPurchase } from '@kilocode/db/schema';
-import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
+import { organization_seats_purchases, organization_membership_removals, organizations } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import type Stripe from 'stripe';
 import {
@@ -43,22 +43,50 @@ const SubscriptionMetadataSchema = z.object({
       return parsed;
     })
     .pipe(z.number().int().positive()),
-  planType: OrganizationPlanSchema.optional(),
+  // Accept any string for planType — validated separately via getPlanTypeFromSubscription()
+  // to avoid rejecting the entire event on invalid values (Org Plans 7).
+  planType: z.string().optional(),
 });
 
 export type SubscriptionMetadata = z.infer<typeof SubscriptionMetadataSchema>;
 
+/**
+ * Returns the most recently created seat purchase for an organization.
+ *
+ * organization_seats_purchases is append-only: every subscription event
+ * (creation, renewal, cancellation) inserts a new row.  The most recently
+ * created row therefore always reflects the current subscription state.
+ */
 export async function getMostRecentSeatPurchase(
   organizationId: Organization['id']
 ): Promise<OrganizationSeatsPurchase | null> {
-  const purchases = await db
+  const [purchase] = await db
     .select()
     .from(organization_seats_purchases)
     .where(eq(organization_seats_purchases.organization_id, organizationId))
     .orderBy(desc(organization_seats_purchases.created_at))
     .limit(1);
 
-  return purchases[0] || null;
+  return purchase || null;
+}
+
+/** Returns the most recently ended seat purchase by creation timestamp. Used for resubscribe flow. */
+export async function getMostRecentEndedSeatPurchase(
+  organizationId: Organization['id']
+): Promise<OrganizationSeatsPurchase | null> {
+  const [purchase] = await db
+    .select()
+    .from(organization_seats_purchases)
+    .where(
+      and(
+        eq(organization_seats_purchases.organization_id, organizationId),
+        eq(organization_seats_purchases.subscription_status, 'ended')
+      )
+    )
+    .orderBy(desc(organization_seats_purchases.created_at))
+    .limit(1);
+
+  return purchase || null;
 }
 
 export async function getOrganizationSeatUsage(
@@ -112,6 +140,68 @@ async function handleSubscriptionEventInternal(
     `handling subscription event for ${subscription.id} for org ${meta.organizationId}`
   );
 
+  // Reject events for deleted organizations (Error Handling 9)
+  const organization = await getOrganizationById(meta.organizationId);
+  if (!organization) {
+    sentryError(
+      `Subscription event ${subscription.id} references deleted/missing organization ${meta.organizationId}`
+    );
+    throw new Error(
+      `Organization ${meta.organizationId} not found (deleted or missing) for subscription ${subscription.id}`
+    );
+  }
+
+  // Guard against duplicate seat subscriptions (Seat Purchase 6, H1).
+  // When processing a subscription creation event, verify the org doesn't
+  // already have a non-ended subscription for a different Stripe subscription.
+  if (isCreation) {
+    const existingActive = await db
+      .select({
+        id: organization_seats_purchases.id,
+        subscription_stripe_id: organization_seats_purchases.subscription_stripe_id,
+      })
+      .from(organization_seats_purchases)
+      .where(
+        and(
+          eq(organization_seats_purchases.organization_id, meta.organizationId),
+          sql`${organization_seats_purchases.subscription_status} != 'ended'`,
+          sql`${organization_seats_purchases.subscription_stripe_id} != ${subscription.id}`
+        )
+      )
+      .limit(1);
+
+    if (existingActive.length > 0) {
+      // Local state may lag behind Stripe (e.g., the delete webhook for the old
+      // subscription hasn't arrived yet). Check live Stripe state before rejecting.
+      try {
+        const { retrieveSubscription } = await import('@/lib/stripe');
+        const existingSub = await retrieveSubscription(existingActive[0].subscription_stripe_id);
+        if (!existingSub.ended_at) {
+          // Genuinely still active in Stripe — reject the duplicate
+          sentryError(
+            `Duplicate seat subscription detected: org ${meta.organizationId} already has a non-ended subscription ${existingActive[0].subscription_stripe_id}. Rejecting subscription ${subscription.id}.`
+          );
+          throw new Error(
+            `Organization ${meta.organizationId} already has a non-ended seat subscription`
+          );
+        }
+        // Stripe says the old subscription has ended; local state is stale. Allow the new one.
+        logExceptInTest(
+          `Existing subscription ${existingActive[0].subscription_stripe_id} for org ${meta.organizationId} is ended in Stripe but stale locally; allowing new subscription ${subscription.id}`
+        );
+      } catch (error) {
+        // If we can't verify with Stripe (e.g., network error), fail open to avoid
+        // blocking valid subscriptions. The idempotency key still prevents true duplicates.
+        if (error instanceof Error && error.message.includes('already has a non-ended')) {
+          throw error; // Re-throw our own rejection
+        }
+        logExceptInTest(
+          `Could not verify existing subscription ${existingActive[0].subscription_stripe_id} in Stripe; allowing new subscription ${subscription.id}`
+        );
+      }
+    }
+  }
+
   const lineItems = subscription.items.data ?? [];
   const firstLineItem = lineItems[0];
   if (!firstLineItem?.current_period_end) {
@@ -136,13 +226,45 @@ async function handleSubscriptionEventInternal(
 
   // Extract billing cycle from the Stripe subscription's recurring interval
   const stripeInterval = firstLineItem.price?.recurring?.interval;
-  const billingCycleDb =
-    stripeInterval === 'month' || stripeInterval === 'year'
-      ? billingCycleToDb(billingCycleFromStripeInterval(stripeInterval))
-      : 'monthly'; // Default for subscriptions without a recognizable interval
+  let billingCycleDb: 'monthly' | 'yearly';
+  if (stripeInterval === 'month' || stripeInterval === 'year') {
+    billingCycleDb = billingCycleToDb(billingCycleFromStripeInterval(stripeInterval));
+  } else {
+    billingCycleDb = 'monthly';
+    sentryError(
+      `Unrecognized recurring interval "${stripeInterval}" for subscription ${subscription.id}, defaulting to monthly`,
+      { subscription_id: subscription.id, interval: stripeInterval }
+    );
+  }
 
-  // ensure user is owner of org...we have an on-conflict do nothing here so this is idempontent-ish
-  await addUserToOrganization(meta.organizationId, meta.kiloUserId, 'owner');
+  // Ensure metadata user is a member (Subscription Lifecycle 1-2).
+  // If the user doesn't resolve, silently skip membership but continue processing.
+  // If the user was previously removed (tombstone exists), do NOT re-add them.
+  const metadataUser = await findUserById(meta.kiloUserId);
+  if (metadataUser) {
+    const [removal] = await db
+      .select({ id: organization_membership_removals.id })
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, meta.organizationId),
+          eq(organization_membership_removals.kilo_user_id, meta.kiloUserId)
+        )
+      )
+      .limit(1);
+
+    if (removal) {
+      logExceptInTest(
+        `Skipping membership for removed user ${meta.kiloUserId} in org ${meta.organizationId} (Subscription Lifecycle 2)`
+      );
+    } else {
+      await addUserToOrganization(meta.organizationId, meta.kiloUserId, 'owner');
+    }
+  } else {
+    sentryError(
+      `Metadata user ${meta.kiloUserId} not found for subscription ${subscription.id}, skipping membership`
+    );
+  }
 
   // handle subscription deletion
   const isSubscriptionEnded = subscription.ended_at;
@@ -173,6 +295,15 @@ async function handleSubscriptionEventInternal(
     if (rowCount === 0) {
       logExceptInTest(`Skipping update for ${idempotencyKey} - already exists`);
       return;
+    }
+
+    // Update organization plan from subscription metadata for ALL events (Org Plans 5)
+    const plan = getPlanTypeFromSubscription(subscription);
+    if (plan !== null) {
+      await tx
+        .update(organizations)
+        .set({ plan })
+        .where(eq(organizations.id, meta.organizationId));
     }
 
     // if the subscription is ended, set seat count to 0 and do nothing else
@@ -233,14 +364,10 @@ async function handleSubscriptionEventInternal(
       handleSubscriptionUpdatedNonEssential(meta, maxSeatsForSubPeriod);
     }
 
-    const plan = getPlanTypeFromSubscription(subscription);
-    const updateData: { seat_count: number; plan?: OrganizationPlan } = {
-      seat_count: maxSeatsForSubPeriod,
-    };
-    if (plan !== null) {
-      updateData.plan = plan;
-    }
-    await tx.update(organizations).set(updateData).where(eq(organizations.id, meta.organizationId));
+    await tx
+      .update(organizations)
+      .set({ seat_count: maxSeatsForSubPeriod })
+      .where(eq(organizations.id, meta.organizationId));
   });
 
   if (isCreation) {
@@ -270,8 +397,9 @@ export async function handleSubscriptionEvent(
 
 async function getOwnerEmailsForOrg(organizationId: string): Promise<string[]> {
   const members = await getOrganizationMembers(organizationId);
-  const owners = members.filter(m => m.role === 'owner');
-  return owners.map(o => o.email);
+  // Only active (non-invitation) owners — exclude pending invited owners
+  const activeOwners = members.filter(m => m.role === 'owner' && m.status === 'active');
+  return activeOwners.map(o => o.email);
 }
 
 function handleSubscriptionUpdatedNonEssential(meta: SubscriptionMetadata, seats: number) {
@@ -294,10 +422,17 @@ function handleSubscriptionUpdatedNonEssential(meta: SubscriptionMetadata, seats
     }
 
     for (const email of emails) {
-      await sendOrgRenewedEmail(email, {
-        seatCount: seats,
-        organizationId: meta.organizationId,
-      });
+      try {
+        await sendOrgRenewedEmail(email, {
+          seatCount: seats,
+          organizationId: meta.organizationId,
+        });
+      } catch (emailError) {
+        captureException(emailError, {
+          tags: { source: 'subscription_renewed_email' },
+          extra: { email, organizationId: meta.organizationId },
+        });
+      }
     }
   });
 }
@@ -321,9 +456,16 @@ function handleSubscriptionEndedNonEssential(meta: SubscriptionMetadata) {
       return;
     }
     for (const email of emails) {
-      await sendOrgCancelledEmail(email, {
-        organizationId: meta.organizationId,
-      });
+      try {
+        await sendOrgCancelledEmail(email, {
+          organizationId: meta.organizationId,
+        });
+      } catch (emailError) {
+        captureException(emailError, {
+          tags: { source: 'subscription_cancelled_email' },
+          extra: { email, organizationId: meta.organizationId },
+        });
+      }
     }
   });
 }
@@ -346,9 +488,16 @@ function handleSubscriptionCreatedNonEssential(meta: SubscriptionMetadata) {
       properties: { organizationId: meta.organizationId, seatCount: meta.seats },
     });
 
-    await sendOrgSubscriptionEmail(user.google_user_email, {
-      seatCount: meta.seats,
-      organizationId: meta.organizationId,
-    });
+    try {
+      await sendOrgSubscriptionEmail(user.google_user_email, {
+        seatCount: meta.seats,
+        organizationId: meta.organizationId,
+      });
+    } catch (emailError) {
+      captureException(emailError, {
+        tags: { source: 'subscription_created_email' },
+        extra: { email: user.google_user_email, organizationId: meta.organizationId },
+      });
+    }
   });
 }

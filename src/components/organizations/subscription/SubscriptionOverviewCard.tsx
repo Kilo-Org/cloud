@@ -13,7 +13,7 @@ import type {
   SubscriptionItemWithPeriod,
   SubscriptionWithPeriod,
 } from '@/components/organizations/subscription/types';
-import { formatDate, formatCurrency } from './utils';
+import { formatDate, formatCurrency, canManageBilling, findPaidSeatItem, paidSeatQuantity } from './utils';
 import { useIsKiloAdmin } from '@/components/organizations/OrganizationContext';
 import { getSubscriptionStatusConfig, formatBillingInterval } from './subscriptionStatusConfig';
 import { useState } from 'react';
@@ -56,6 +56,43 @@ function SeatCountChangeNotification({
   );
 }
 
+type PendingCycleChange = {
+  targetCycleName: string;
+  effectiveDate: string;
+  description: string;
+  targetInterval: string;
+};
+
+function detectPendingCycleChange(
+  subscription: Stripe.Subscription,
+  currentBillingInterval: string | undefined
+): PendingCycleChange | null {
+  const schedule = subscription.schedule;
+  if (!schedule || typeof schedule === 'string') return null;
+  if (schedule.status !== 'active' && schedule.status !== 'not_started') return null;
+
+  const phase2 = schedule.phases?.[1];
+  if (!phase2?.items?.length) return null;
+
+  const currentPriceIds = new Set(subscription.items.data.map(item => item.price?.id));
+  const phase2PriceIds = phase2.items.map(item =>
+    typeof item.price === 'string' ? item.price : item.price?.id
+  );
+
+  const hasChangedPrice = phase2PriceIds.some(id => id && !currentPriceIds.has(id));
+  if (!hasChangedPrice) return null;
+
+  const targetCycleName = currentBillingInterval === 'month' ? 'Annual' : 'Monthly';
+  const effectiveDate = formatDate(phase2.start_date);
+  const isUpgradeToAnnual = currentBillingInterval === 'month';
+  const description = isUpgradeToAnnual
+    ? 'No charges or proration until the switch takes effect.'
+    : 'No refunds or immediate changes.';
+  const targetInterval = currentBillingInterval === 'month' ? 'year' : 'month';
+
+  return { targetCycleName, effectiveDate, description, targetInterval };
+}
+
 export function SubscriptionOverviewCard({
   subscription,
   organizationId,
@@ -79,11 +116,10 @@ export function SubscriptionOverviewCard({
   const currentPeriodEnd =
     firstItem?.current_period_end || subscriptionWithPeriod.current_period_end;
 
-  // Find the billing interval from the paid seat item (the first item with
-  // a recurring interval), not blindly from items[0] which could be free seats.
+  // Derive billing interval from the paid seat item (unit_amount > 0),
+  // not free promotional items which may have a different cadence.
   const currentBillingInterval = (
-    subscription.items.data.find(item => item.price?.recurring?.interval) ??
-    subscription.items.data[0]
+    findPaidSeatItem(subscription.items.data) ?? subscription.items.data[0]
   )?.price?.recurring?.interval;
 
   const stopCancellation = useStopOrganizationSubscriptionCancellation();
@@ -92,40 +128,7 @@ export function SubscriptionOverviewCard({
   const isKiloAdmin = useIsKiloAdmin();
   const [resubscribeError, setResubscribeError] = useState<string | null>(null);
 
-  // Detect pending cycle change from expanded schedule.
-  // Compare ALL phase2 items against current subscription items, not just
-  // index 0, because the paid seat item may not be first (e.g., free-seat
-  // items can sort before paid ones).
-  const pendingCycleChange = (() => {
-    const schedule = subscription.schedule;
-    if (!schedule || typeof schedule === 'string') return null;
-    if (schedule.status !== 'active' && schedule.status !== 'not_started') return null;
-
-    const phase2 = schedule.phases?.[1];
-    if (!phase2?.items?.length) return null;
-
-    const currentPriceIds = new Set(subscription.items.data.map(item => item.price?.id));
-    const phase2PriceIds = phase2.items.map(item =>
-      typeof item.price === 'string' ? item.price : item.price?.id
-    );
-
-    // Check if any phase2 item has a price not in the current subscription
-    const hasChangedPrice = phase2PriceIds.some(id => id && !currentPriceIds.has(id));
-    if (!hasChangedPrice) return null;
-
-    const targetCycleName = currentBillingInterval === 'month' ? 'Annual' : 'Monthly';
-    const effectiveDate = formatDate(phase2.start_date);
-
-    const isUpgradeToAnnual = currentBillingInterval === 'month';
-
-    const description = isUpgradeToAnnual
-      ? 'No charges or proration until the switch takes effect.'
-      : 'No refunds or immediate changes.';
-
-    const targetInterval = currentBillingInterval === 'month' ? 'year' : 'month';
-
-    return { targetCycleName, effectiveDate, description, targetInterval };
-  })();
+  const pendingCycleChange = detectPendingCycleChange(subscription, currentBillingInterval);
 
   const handleCancelBillingCycleChange = async () => {
     try {
@@ -154,9 +157,7 @@ export function SubscriptionOverviewCard({
       // Only count paid seat items (unit_amount > 0). Free-seat items have
       // unit_amount === 0 and must not be included because checkout creates a
       // single paid line item — including free seats would overcharge.
-      const paidItems = subscription.items.data.filter(item => (item.price?.unit_amount ?? 0) > 0);
-      const currentSeatCount =
-        paidItems.reduce((total, item) => total + (item.quantity ?? 0), 0) || 1;
+      const currentSeatCount = paidSeatQuantity(subscription.items.data) || 1;
 
       // Preserve the billing cycle the org was on before cancellation
       const billingCycle = currentBillingInterval === 'month' ? 'monthly' : 'annual';
@@ -187,15 +188,14 @@ export function SubscriptionOverviewCard({
 
   const ended = Boolean(subscription.ended_at);
 
-  const canManageBilling = userRole === 'owner' || userRole === 'billing_manager';
+  const billingAccess = canManageBilling(userRole);
 
   const canStopCancellation =
-    canManageBilling && subscription.status === 'active' && willCancelAtPeriodEnd;
+    billingAccess && subscription.status === 'active' && willCancelAtPeriodEnd;
 
   const statusConfig = getSubscriptionStatusConfig(subscription.status);
 
-  // Check if seats will drop in next billing cycle
-  const subscriptionQuantity = subscription.items.data[0]?.quantity || 0;
+  const subscriptionQuantity = paidSeatQuantity(subscription.items.data);
   const willSeatsDropNextCycle =
     totalSeats > subscriptionQuantity && !ended && !willCancelAtPeriodEnd;
 
@@ -309,7 +309,7 @@ export function SubscriptionOverviewCard({
                   </span>{' '}
                   {pendingCycleChange.description}
                 </p>
-                {(userRole === 'owner' || userRole === 'billing_manager') && (
+                {billingAccess && (
                   <div className="mt-2">
                     <Button
                       variant="outline"
@@ -404,7 +404,7 @@ export function SubscriptionOverviewCard({
                   {stopCancellation.isPending ? 'Stopping...' : 'Stop Pending Cancellation'}
                 </Button>
               )}
-              {ended && canManageBilling && (
+              {ended && billingAccess && (
                 <div className="flex flex-col items-end gap-2">
                   <Button
                     variant="outline"

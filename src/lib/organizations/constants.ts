@@ -3,42 +3,31 @@ export const TOPUP_CANCELED_QUERY_STRING_KEY = 'topup-canceled';
 // Default daily usage limit for members when accepting invitations
 export const DEFAULT_MEMBER_DAILY_LIMIT_USD = 25.0;
 export const STRIPE_SUB_QUERY_STRING_KEY = 'subscription_session_id';
-// Monthly-billed rates (no annual commitment)
-export const TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD = 18;
-export const ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD = 72;
 
-// Annually-billed rates ("12 months for the price of 10")
-export const TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD = 15;
-export const TEAM_SEAT_PRICE_YEARLY_BILLED_ANNUALLY_USD =
-  TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD * 12;
-export const ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD = 60;
-export const ENTERPRISE_SEAT_PRICE_YEARLY_BILLED_ANNUALLY_USD =
-  ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD * 12;
+import type { BillingCycle, OrganizationPlan } from './organization-types';
 
-// Display prices used by UI components (annual billing rate)
-export const TEAM_SEAT_PRICE_MONTHLY_USD = TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD;
-export const ENTERPRISE_SEAT_PRICE_MONTHLY_USD = ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD;
+// Per-seat monthly rate indexed by plan and billing cycle
+export const SEAT_PRICING = {
+  teams: { monthly: 18, annual: 15 },
+  enterprise: { monthly: 72, annual: 60 },
+} as const;
 
-/**
- * Infer the plan tier from a Stripe unit_amount (in cents).
- * Teams prices: $18/mo (1800) or $180/yr (18000).
- * Enterprise prices: $72/mo (7200) or $720/yr (72000).
- * Returns null for unrecognized amounts.
- */
-export function inferPlanFromUnitAmount(unitAmountCents: number): 'teams' | 'enterprise' | null {
-  if (
-    unitAmountCents === TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD * 100 ||
-    unitAmountCents === TEAM_SEAT_PRICE_YEARLY_BILLED_ANNUALLY_USD * 100
-  ) {
-    return 'teams';
-  }
-  if (
-    unitAmountCents === ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD * 100 ||
-    unitAmountCents === ENTERPRISE_SEAT_PRICE_YEARLY_BILLED_ANNUALLY_USD * 100
-  ) {
-    return 'enterprise';
-  }
-  return null;
+export function seatPrice(plan: OrganizationPlan, cycle: BillingCycle): number {
+  return SEAT_PRICING[plan][cycle];
 }
+
+export function annualTotal(plan: OrganizationPlan): number {
+  return SEAT_PRICING[plan].annual * 12;
+}
+
+// Legacy aliases — prefer seatPrice(plan, cycle) in new code
+export const TEAM_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD = SEAT_PRICING.teams.monthly;
+export const TEAM_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD = SEAT_PRICING.teams.annual;
+export const TEAM_SEAT_PRICE_YEARLY_BILLED_ANNUALLY_USD = SEAT_PRICING.teams.annual * 12;
+export const ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_MONTHLY_USD = SEAT_PRICING.enterprise.monthly;
+export const ENTERPRISE_SEAT_PRICE_MONTHLY_BILLED_ANNUALLY_USD = SEAT_PRICING.enterprise.annual;
+export const ENTERPRISE_SEAT_PRICE_YEARLY_BILLED_ANNUALLY_USD = SEAT_PRICING.enterprise.annual * 12;
+export const TEAM_SEAT_PRICE_MONTHLY_USD = SEAT_PRICING.teams.annual;
+export const ENTERPRISE_SEAT_PRICE_MONTHLY_USD = SEAT_PRICING.enterprise.annual;
 
 export const KILO_ORGANIZATION_ID = '9d278969-5453-4ae3-a51f-a8d2274a7b56';

@@ -37,7 +37,6 @@ export function WorkspaceSelector({ onSelect }: WorkspaceSelectorProps) {
       const result = await createOrganizationMutation.mutateAsync({
         name: newOrgName.trim(),
         autoAddCreator: true,
-        plan: 'teams',
       });
 
       onSelect({

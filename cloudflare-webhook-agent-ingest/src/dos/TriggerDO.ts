@@ -443,7 +443,12 @@ export class TriggerDO extends DurableObject<Env> {
         method: request.method,
         path: request.path,
         query_string: request.queryString,
-        headers: JSON.stringify(redactSensitiveHeaders(request.headers)),
+        headers: JSON.stringify(
+          redactSensitiveHeaders(
+            request.headers,
+            storedWebhookAuth ? [storedWebhookAuth.header] : undefined
+          )
+        ),
         body: request.body,
         content_type: request.contentType,
         source_ip: request.sourceIp,

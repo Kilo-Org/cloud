@@ -58,4 +58,25 @@ describe('redactSensitiveHeaders', () => {
     expect(input.authorization).toBe('Bearer secret');
     expect(result.authorization).toBe('[REDACTED]');
   });
+
+  it('redacts extra headers passed by caller', () => {
+    const input = {
+      'x-webhook-secret': 'my-secret',
+      'x-custom-auth': 'token-123',
+      'content-type': 'application/json',
+    };
+
+    const result = redactSensitiveHeaders(input, ['x-webhook-secret', 'X-Custom-Auth']);
+
+    expect(result['x-webhook-secret']).toBe('[REDACTED]');
+    expect(result['x-custom-auth']).toBe('[REDACTED]');
+    expect(result['content-type']).toBe('application/json');
+  });
+
+  it('works with empty extraHeaders array', () => {
+    const input = { authorization: 'Bearer token', 'x-foo': 'bar' };
+    const result = redactSensitiveHeaders(input, []);
+    expect(result.authorization).toBe('[REDACTED]');
+    expect(result['x-foo']).toBe('bar');
+  });
 });

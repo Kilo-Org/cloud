@@ -120,8 +120,10 @@ export type RunSessionResult = {
   response: string;
   /** The cloud-agent session ID (available even on failure). */
   sessionId?: string;
-  /** Whether the session encountered an error. */
+  /** Whether the session encountered a fatal error (stream/WS/session-level). */
   hasError: boolean;
+  /** Whether stderr output was observed (informational; does NOT imply failure). */
+  hasStderr: boolean;
   /** Collected status/error messages for diagnostics. */
   statusMessages: string[];
 };
@@ -157,6 +159,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   let sessionId: string | undefined;
   let kiloSessionId: string | undefined;
   let hasError = false;
+  let hasStderr = false;
   let errorMessage: string | undefined;
 
   // 1. Prepare
@@ -171,6 +174,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
       response: `Error preparing Cloud Agent: ${msg}`,
       sessionId,
       hasError: true,
+      hasStderr: false,
       statusMessages,
     };
   }
@@ -178,7 +182,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   if (!sessionId || !kiloSessionId) {
     const msg = 'Session preparation did not return session IDs.';
     console.error(`${logPrefix} ${msg}`);
-    return { response: msg, sessionId, hasError: true, statusMessages };
+    return { response: msg, sessionId, hasError: true, hasStderr: false, statusMessages };
   }
 
   // 2. Initiate
@@ -196,6 +200,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
       response: `Error initiating Cloud Agent: ${msg}`,
       sessionId,
       hasError: true,
+      hasStderr: false,
       statusMessages,
     };
   }
@@ -218,6 +223,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
       response: `Error resolving stream URL: ${msg}`,
       sessionId,
       hasError: true,
+      hasStderr: false,
       statusMessages,
     };
   }
@@ -315,7 +321,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
           const data = event.data as { source?: string; content?: string };
           if (data?.source === 'stderr') {
             statusMessages.push(`[stderr] ${data.content ?? ''}`.trim());
-            hasError = true;
+            hasStderr = true;
           }
           break;
         }
@@ -365,12 +371,20 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   );
 
   // 7. Build result
+  //
+  // When the assistant produced a completionResult (e.g. containing a PR/MR
+  // URL), prefer returning it even if a fatal error also occurred — losing the
+  // PR link is the worse outcome for users.
   if (hasError) {
     const details = [errorMessage, ...statusMessages].filter(Boolean).join('\n');
+    const errorSummary = `Cloud Agent session ${sessionId} encountered errors:\n${details}`;
     return {
-      response: `Cloud Agent session ${sessionId} encountered errors:\n${details}`,
+      response: completionResult
+        ? `${errorSummary}\n\nHowever, the agent produced this output:\n\n${completionResult}`
+        : errorSummary,
       sessionId,
       hasError: true,
+      hasStderr,
       statusMessages,
     };
   }
@@ -380,6 +394,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
       response: `Cloud Agent session ${sessionId} completed:\n\n${completionResult}`,
       sessionId,
       hasError: false,
+      hasStderr,
       statusMessages,
     };
   }
@@ -388,6 +403,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
     response: `Cloud Agent session ${sessionId} completed successfully.\n\nStatus:\n${statusMessages.slice(-5).join('\n')}`,
     sessionId,
     hasError: false,
+    hasStderr,
     statusMessages,
   };
 }

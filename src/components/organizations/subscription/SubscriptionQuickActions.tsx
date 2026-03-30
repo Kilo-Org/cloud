@@ -94,7 +94,7 @@ export function SubscriptionQuickActions({
     (schedule.status === 'active' || schedule.status === 'not_started');
   const canChangeBillingCycle = canCancelSubscription && !hasPendingSchedule;
   const periodEnd = (subscription as SubscriptionWithPeriod).current_period_end;
-  const effectiveDateLabel = periodEnd ? formatDate(periodEnd) : 'end of current period';
+  const effectiveDateLabel = periodEnd ? formatDate(periodEnd) : null;
 
   return (
     <>

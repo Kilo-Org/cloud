@@ -90,7 +90,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       // Get the most recent subscription from the organization_seats_purchases table
       const latestPurchase = await getMostRecentSeatPurchase(organizationId);
 
-      if (!latestPurchase || latestPurchase.subscription_status === 'ended') {
+      if (!latestPurchase) {
         return {
           subscription: null,
           seatsUsed: usages.used,
@@ -98,7 +98,8 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         };
       }
 
-      // Fetch the subscription information from Stripe
+      // Fetch the subscription information from Stripe — including ended
+      // subscriptions so the overview card can show the resubscribe UI.
       let subscription = null;
       try {
         subscription = await retrieveSubscription(latestPurchase.subscription_stripe_id);
@@ -425,7 +426,6 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       try {
         schedule = await client.subscriptionSchedules.create({
           from_subscription: subscription.id,
-          metadata: { origin: 'billing-cycle-change' },
         });
       } catch (error) {
         // Concurrent requests may both pass the existing-schedule check above
@@ -455,6 +455,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
 
       try {
         await client.subscriptionSchedules.update(schedule.id, {
+          metadata: { origin: 'billing-cycle-change' },
           end_behavior: 'release',
           phases: [
             {
@@ -528,7 +529,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       }
 
       // Verify the schedule was created by the billing-cycle-change flow
-      // (Billing Cycle Changes 11) to avoid releasing unrelated schedules.
+      // to avoid releasing unrelated schedules.
       if (
         resolvedSchedule.metadata?.origin !== 'billing-cycle-change' ||
         resolvedSchedule.phases.length !== 2

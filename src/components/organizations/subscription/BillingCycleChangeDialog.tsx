@@ -22,7 +22,7 @@ type BillingCycleChangeDialogProps = {
   currentCycle: BillingCycle;
   seatCount: number;
   plan: OrganizationPlan;
-  effectiveDate: string;
+  effectiveDate: string | null;
 };
 
 function getPricing(plan: OrganizationPlan, cycle: BillingCycle) {
@@ -116,8 +116,16 @@ export function BillingCycleChangeDialog({
           <div className="flex items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/[0.08] p-3">
             <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
             <p className="text-sm text-blue-300">
-              Takes effect on <span className="font-semibold">{effectiveDate}</span>, at the end of
-              the current billing period.
+              {effectiveDate ? (
+                <>
+                  Takes effect on <span className="font-semibold">{effectiveDate}</span>.
+                </>
+              ) : (
+                <>
+                  Takes effect at the{' '}
+                  <span className="font-semibold">end of the current billing period</span>.
+                </>
+              )}
             </p>
           </div>
 

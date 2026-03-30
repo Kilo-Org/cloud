@@ -65,7 +65,7 @@ function SeatCountChangeNotification({
 type PendingCycleChange = {
   targetCycleName: string;
   effectiveDate: string;
-  description: string;
+  description: string | null;
   targetInterval: string;
 };
 
@@ -93,7 +93,7 @@ function detectPendingCycleChange(
   const isUpgradeToAnnual = currentBillingInterval === 'month';
   const description = isUpgradeToAnnual
     ? 'No charges or proration until the switch takes effect.'
-    : 'No refunds or immediate changes.';
+    : null;
   const targetInterval = currentBillingInterval === 'month' ? 'year' : 'month';
 
   return { targetCycleName, effectiveDate, description, targetInterval };
@@ -405,7 +405,7 @@ export function SubscriptionOverviewCard({
                   size="sm"
                   onClick={handleStopCancellation}
                   disabled={stopCancellation.isPending}
-                  className="border-amber-300 bg-white text-amber-800 hover:bg-amber-100"
+                  className="border-amber-300 bg-white text-amber-800 hover:bg-amber-100 hover:text-amber-900"
                 >
                   {stopCancellation.isPending ? 'Stopping...' : 'Stop Pending Cancellation'}
                 </Button>
@@ -415,7 +415,7 @@ export function SubscriptionOverviewCard({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="border-green-300 bg-white text-green-800 hover:bg-green-100"
+                    className="border-green-700 bg-green-700 text-white hover:bg-green-800"
                     onClick={handleResubscribe}
                     disabled={subscriptionLink.isPending}
                   >

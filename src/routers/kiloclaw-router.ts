@@ -10,10 +10,11 @@ import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import {
   ALL_SECRET_FIELD_KEYS,
   FIELD_KEY_TO_ENTRY,
-  MAX_SECRET_FIELD_LENGTH,
+  MAX_CUSTOM_SECRET_VALUE_LENGTH,
   validateFieldValue,
   getEntriesByCategory,
-  type SecretFieldKey,
+  isValidCustomSecretKey,
+  isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
 import {
   KILOCLAW_API_URL,
@@ -29,6 +30,7 @@ import {
   kiloclaw_subscriptions,
   kiloclaw_instances,
   kiloclaw_email_log,
+  kiloclaw_cli_runs,
 } from '@kilocode/db/schema';
 import { and, eq, ne, desc, isNotNull, isNull, inArray, sql } from 'drizzle-orm';
 import { sentryLogger } from '@/lib/utils.server';
@@ -42,6 +44,7 @@ import {
   restoreDestroyedInstance,
   type ActiveKiloClawInstance,
 } from '@/lib/kiloclaw/instance-registry';
+import { sandboxIdFromUserId } from '@/lib/kiloclaw/sandbox-id';
 import { client as stripe } from '@/lib/stripe-client';
 import { APP_URL } from '@/lib/constants';
 import { getRewardfulReferral } from '@/lib/rewardful';
@@ -72,6 +75,60 @@ import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
  * paths) and should NOT be forwarded to the client.
  */
 const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed']);
+
+/**
+ * Return the user's active instance, creating a new registry row if none
+ * exists (e.g. trial expired and personal instance was destroyed).
+ *
+ * When a new row is created, the subscription row linked to the user's
+ * destroyed personal instance (identified by sandboxIdFromUserId) is
+ * reassigned to the new instance_id. The update is scoped to that exact
+ * destroyed instance row so that subscriptions on other (org or multi-)
+ * instances are never touched and UQ_kiloclaw_subscriptions_instance is not
+ * violated.
+ *
+ * This mirrors the reassignment already performed in ensureProvisionAccess
+ * (lines 485–497) for the Stripe hosting-only checkout path.
+ */
+async function getOrCreateInstanceForBilling(userId: string): Promise<ActiveKiloClawInstance> {
+  const active = await getActiveInstance(userId);
+  if (active) return active;
+
+  // Find the destroyed personal instance row. ensureActiveInstance always
+  // keys personal instances on sandboxIdFromUserId(userId), so this is the
+  // exact row that needs repairing.
+  const sandboxId = sandboxIdFromUserId(userId);
+  const [destroyedInstance] = await db
+    .select({ id: kiloclaw_instances.id })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNotNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .limit(1);
+
+  const newInstance = await ensureActiveInstance(userId);
+
+  // Reassign the subscription row that was linked to the destroyed personal
+  // instance onto the new instance. Scoped to that specific instance_id so
+  // subscriptions on other instances (org, multi-instance) are not disturbed.
+  if (destroyedInstance) {
+    await db
+      .update(kiloclaw_subscriptions)
+      .set({ instance_id: newInstance.id })
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, userId),
+          eq(kiloclaw_subscriptions.instance_id, destroyedInstance.id)
+        )
+      );
+  }
+
+  return newInstance;
+}
 
 /**
  * Map KiloClawApiError responses to TRPCErrors for file operations.
@@ -673,62 +730,90 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   /**
-   * Generic secret patch — catalog-driven replacement for patchChannels.
-   * Validates keys against the secret catalog, enforces allFieldsRequired,
-   * validates values against catalog patterns, encrypts, and forwards to worker.
+   * Generic secret patch — supports both catalog secrets and custom user secrets.
+   *
+   * Catalog keys (in ALL_SECRET_FIELD_KEYS) are validated against catalog patterns.
+   * Custom keys (valid env var names not in catalog) skip pattern validation but
+   * enforce a generous max value length. All values are RSA-encrypted before
+   * forwarding to the worker.
    */
   patchSecrets: clawAccessProcedure
     .input(
       z.object({
         secrets: z
-          .record(z.string(), z.string().max(MAX_SECRET_FIELD_LENGTH).nullable())
-          .refine(obj => Object.keys(obj).every(k => ALL_SECRET_FIELD_KEYS.has(k)), {
-            message: 'Unknown secret field key',
-          }),
+          .record(z.string(), z.string().max(MAX_CUSTOM_SECRET_VALUE_LENGTH).nullable())
+          .refine(
+            obj =>
+              Object.keys(obj).every(
+                k => ALL_SECRET_FIELD_KEYS.has(k) || isValidCustomSecretKey(k)
+              ),
+            {
+              message:
+                'Invalid secret key: must be a catalog field key or valid env var name (A-Z, 0-9, _, no KILOCLAW_ prefix)',
+            }
+          ),
+        meta: z
+          .record(
+            z.string(),
+            z.object({
+              configPath: z
+                .string()
+                .refine(isValidConfigPath, {
+                  message:
+                    'Not a supported credential path. See https://docs.openclaw.ai/reference/secretref-credential-surface',
+                })
+                .optional(),
+            })
+          )
+          .optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const secrets = input.secrets as Partial<Record<SecretFieldKey, string | null>>;
+      const secrets = input.secrets;
 
       // 1. allFieldsRequired is enforced by the DO on post-merge state (not here),
       //    so single-field rotations work when the other field is already stored.
 
-      // 2. Validate non-null values against catalog patterns + enforce per-field maxLength
+      // 2. Validate non-null values: catalog keys get pattern + maxLength checks,
+      //    custom keys only get the blanket max from the zod schema above.
       for (const [key, value] of Object.entries(secrets)) {
         if (value === null) continue;
 
-        const entry = FIELD_KEY_TO_ENTRY.get(key);
-        const field = entry?.fields.find(f => f.key === key);
+        if (ALL_SECRET_FIELD_KEYS.has(key)) {
+          // Catalog key — validate against catalog patterns and per-field maxLength
+          const entry = FIELD_KEY_TO_ENTRY.get(key);
+          const field = entry?.fields.find(f => f.key === key);
 
-        // Enforce per-field maxLength from catalog (falls back to 500 from zod schema above)
-        if (field?.maxLength != null && value.length > field.maxLength) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `${field.label} exceeds maximum length of ${field.maxLength} characters`,
-          });
-        }
+          if (field?.maxLength != null && value.length > field.maxLength) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: `${field.label} exceeds maximum length of ${field.maxLength} characters`,
+            });
+          }
 
-        if (!validateFieldValue(value, field?.validationPattern)) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: field?.validationMessage ?? `Invalid value for ${key}`,
-          });
+          if (!validateFieldValue(value, field?.validationPattern)) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: field?.validationMessage ?? `Invalid value for ${key}`,
+            });
+          }
         }
+        // Custom keys: no pattern validation — the blanket zod .max() is sufficient
       }
 
       // 3. Encrypt non-null values
-      const encryptedPatch: Partial<
-        Record<SecretFieldKey, ReturnType<typeof encryptKiloClawSecret> | null>
-      > = {};
+      const encryptedPatch: Record<string, ReturnType<typeof encryptKiloClawSecret> | null> = {};
       for (const [key, value] of Object.entries(secrets)) {
-        encryptedPatch[key as SecretFieldKey] =
-          value === null ? null : encryptKiloClawSecret(value);
+        encryptedPatch[key] = value === null ? null : encryptKiloClawSecret(value);
       }
 
       // 4. Forward to worker — translate 4xx responses into TRPCErrors
       const client = new KiloClawInternalClient();
       try {
-        return await client.patchSecrets(ctx.user.id, { secrets: encryptedPatch });
+        return await client.patchSecrets(ctx.user.id, {
+          secrets: encryptedPatch,
+          meta: input.meta,
+        });
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
           // Extract message from worker response body (JSON or plain text)
@@ -908,6 +993,141 @@ export const kiloclawRouter = createTRPCRouter({
     const client = new KiloClawInternalClient();
     return client.runDoctor(ctx.user.id);
   }),
+
+  // ── Kilo CLI Run ──────────────────────────────────────────────────
+
+  startKiloCliRun: clawAccessProcedure
+    .input(z.object({ prompt: z.string().min(1).max(10_000) }))
+    .mutation(async ({ ctx, input }) => {
+      const client = new KiloClawInternalClient();
+      const result = await client.startKiloCliRun(ctx.user.id, input.prompt);
+
+      // Persist the run in the database and return its ID
+      const [row] = await db
+        .insert(kiloclaw_cli_runs)
+        .values({
+          user_id: ctx.user.id,
+          prompt: input.prompt,
+          status: 'running',
+          started_at: result.startedAt,
+        })
+        .returning({ id: kiloclaw_cli_runs.id });
+
+      return { ...result, id: row.id };
+    }),
+
+  getKiloCliRunStatus: clawAccessProcedure
+    .input(z.object({ runId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // Load the requested run from the DB to avoid cross-run data leaks.
+      // The controller only tracks the *current* run, so polling it for an
+      // older run would return the wrong output.
+      const [row] = await db
+        .select()
+        .from(kiloclaw_cli_runs)
+        .where(
+          and(eq(kiloclaw_cli_runs.id, input.runId), eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+        )
+        .limit(1);
+
+      if (!row) {
+        return {
+          hasRun: false,
+          status: null,
+          output: null,
+          exitCode: null,
+          startedAt: null,
+          completedAt: null,
+          prompt: null,
+        };
+      }
+
+      // If the DB row is already terminal, return it directly — no need to
+      // poll the controller (which may be running a different job).
+      if (row.status !== 'running') {
+        return {
+          hasRun: true,
+          status: row.status as 'completed' | 'failed' | 'cancelled',
+          output: row.output,
+          exitCode: row.exit_code,
+          startedAt: row.started_at,
+          completedAt: row.completed_at ?? null,
+          prompt: row.prompt,
+        };
+      }
+
+      // Run is still active — poll the controller for live output.
+      const client = new KiloClawInternalClient();
+      const controllerStatus = await client.getKiloCliRunStatus(ctx.user.id);
+
+      // If controller reports the run finished, persist to the DB row.
+      if (
+        controllerStatus.hasRun &&
+        controllerStatus.status !== 'running' &&
+        controllerStatus.startedAt
+      ) {
+        await db
+          .update(kiloclaw_cli_runs)
+          .set({
+            status: controllerStatus.status ?? 'failed',
+            exit_code: controllerStatus.exitCode,
+            output: controllerStatus.output,
+            completed_at: controllerStatus.completedAt ?? new Date().toISOString(),
+          })
+          .where(
+            and(
+              eq(kiloclaw_cli_runs.id, input.runId),
+              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              eq(kiloclaw_cli_runs.status, 'running')
+            )
+          );
+      }
+
+      return {
+        ...controllerStatus,
+        prompt: row.prompt,
+      };
+    }),
+
+  cancelKiloCliRun: clawAccessProcedure
+    .input(z.object({ runId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const client = new KiloClawInternalClient();
+      const result = await client.cancelKiloCliRun(ctx.user.id);
+
+      // Mark the specific run as cancelled in DB
+      if (result.ok) {
+        await db
+          .update(kiloclaw_cli_runs)
+          .set({
+            status: 'cancelled',
+            completed_at: new Date().toISOString(),
+          })
+          .where(
+            and(
+              eq(kiloclaw_cli_runs.id, input.runId),
+              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              eq(kiloclaw_cli_runs.status, 'running')
+            )
+          );
+      }
+
+      return result;
+    }),
+
+  listKiloCliRuns: clawAccessProcedure
+    .input(z.object({ limit: z.number().min(1).max(50).default(10) }).optional())
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 10;
+      const runs = await db
+        .select()
+        .from(kiloclaw_cli_runs)
+        .where(eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+        .orderBy(desc(kiloclaw_cli_runs.started_at))
+        .limit(limit);
+
+      return { runs };
+    }),
 
   restoreConfig: clawAccessProcedure.mutation(async ({ ctx }) => {
     const client = new KiloClawInternalClient();
@@ -1553,6 +1773,7 @@ export const kiloclawRouter = createTRPCRouter({
             id: kiloclaw_instances.id,
             userId: kiloclaw_instances.user_id,
             sandboxId: kiloclaw_instances.sandbox_id,
+            organizationId: kiloclaw_instances.organization_id,
             name: kiloclaw_instances.name,
           })
           .from(kiloclaw_instances)
@@ -1573,25 +1794,31 @@ export const kiloclawRouter = createTRPCRouter({
         }
         instance = row;
       } else {
-        const active = await getActiveInstance(ctx.user.id);
-        if (!active) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'No active instance found. Provision an instance first.',
-          });
-        }
-        instance = active;
+        instance = await getOrCreateInstanceForBilling(ctx.user.id);
       }
 
       // Intro pricing eligibility (spec Credit Enrollment rule 3).
       const hadPaidSubscription = await hadPriorPaidSubscription(ctx.user.id);
 
-      await enrollWithCreditsImpl({
-        userId: ctx.user.id,
-        instanceId: instance.id,
-        plan: input.plan,
-        hadPaidSubscription,
-      });
+      try {
+        await enrollWithCreditsImpl({
+          userId: ctx.user.id,
+          instanceId: instance.id,
+          plan: input.plan,
+          hadPaidSubscription,
+        });
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        const message = error instanceof Error ? error.message : 'Credit enrollment failed';
+        const code = message.includes('not found')
+          ? 'NOT_FOUND'
+          : message.includes('already exists') || message.includes('already processed')
+            ? 'CONFLICT'
+            : message.includes('Insufficient credit balance')
+              ? 'BAD_REQUEST'
+              : 'INTERNAL_SERVER_ERROR';
+        throw new TRPCError({ code, message, cause: error });
+      }
 
       return { success: true };
     }),
@@ -1610,14 +1837,10 @@ export const kiloclawRouter = createTRPCRouter({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
       }
 
-      // Get the user's active instance first — needed for both the guard and callback URL
-      const instance = await getActiveInstance(ctx.user.id);
-      if (!instance) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'No active instance found. Provision an instance first.',
-        });
-      }
+      // Get the user's active instance — needed for both the guard and callback URL.
+      // If none exists (e.g. trial expired and instance was destroyed) create a new
+      // registry row and reassign any existing subscription to it.
+      const instance = await getOrCreateInstanceForBilling(ctx.user.id);
 
       // Reject if this instance already has a non-ended KiloClaw subscription
       const [existing] = await db

@@ -1,0 +1,2 @@
+ALTER TABLE "kiloclaw_instances" ADD COLUMN "organization_id" uuid;--> statement-breakpoint
+ALTER TABLE "kiloclaw_instances" ADD CONSTRAINT "kiloclaw_instances_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;

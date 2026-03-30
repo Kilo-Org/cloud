@@ -41,6 +41,7 @@ export type InstanceMutableState = {
   loaded: boolean;
   userId: string | null;
   sandboxId: string | null;
+  orgId: string | null;
   status: InstanceStatus | null;
   envVars: PersistedState['envVars'];
   encryptedSecrets: PersistedState['encryptedSecrets'];
@@ -90,6 +91,7 @@ export type InstanceMutableState = {
   preRestoreStatus: InstanceStatus | null;
   pendingRestoreVolumeId: string | null;
   instanceReadyEmailSent: boolean;
+  customSecretMeta: PersistedState['customSecretMeta'];
   // Stream Chat default channel (auto-provisioned)
   streamChatApiKey: string | null;
   streamChatBotUserId: string | null;

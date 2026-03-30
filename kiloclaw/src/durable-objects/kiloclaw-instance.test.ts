@@ -106,6 +106,7 @@ import * as flyClient from '../fly/client';
 import { FlyApiError } from '../fly/client';
 import * as db from '../db';
 import * as gatewayEnv from '../gateway/env';
+import * as regions from './regions';
 import { resolveLatestVersion } from '../lib/image-version';
 import { setupDefaultStreamChatChannel } from '../stream-chat/client';
 import { verifyKiloToken } from '@kilocode/worker-utils';
@@ -2117,6 +2118,136 @@ describe('updateSecrets', () => {
       'Invalid secret patch: Slack requires all fields to be set together'
     );
   });
+
+  // ─── Custom (non-catalog) secrets ─────────────────────────────────
+
+  it('stores custom secrets by env var name in encryptedSecrets', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+
+    await instance.updateSecrets({ MY_CUSTOM_KEY: customEnvelope });
+
+    const secrets = storage._store.get('encryptedSecrets') as Record<string, unknown>;
+    expect(secrets.MY_CUSTOM_KEY).toEqual(customEnvelope);
+  });
+
+  it('removes custom secrets when null is passed', async () => {
+    const { instance, storage } = createInstance();
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { MY_CUSTOM_KEY: customEnvelope },
+    });
+
+    await instance.updateSecrets({ MY_CUSTOM_KEY: null });
+
+    const secrets = storage._store.get('encryptedSecrets');
+    expect(secrets).toBeNull();
+  });
+
+  it('preserves catalog secrets when adding custom secrets', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      channels: { telegramBotToken: fakeEnvelope },
+      encryptedSecrets: { TELEGRAM_BOT_TOKEN: fakeEnvelope },
+    });
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+
+    await instance.updateSecrets({ MY_CUSTOM_KEY: customEnvelope });
+
+    const secrets = storage._store.get('encryptedSecrets') as Record<string, unknown>;
+    expect(secrets.TELEGRAM_BOT_TOKEN).toEqual(fakeEnvelope);
+    expect(secrets.MY_CUSTOM_KEY).toEqual(customEnvelope);
+  });
+
+  it('preserves custom secrets when updating catalog secrets', async () => {
+    const { instance, storage } = createInstance();
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { MY_CUSTOM_KEY: customEnvelope },
+    });
+
+    await instance.updateSecrets({ telegramBotToken: fakeEnvelope });
+
+    const secrets = storage._store.get('encryptedSecrets') as Record<string, unknown>;
+    expect(secrets.MY_CUSTOM_KEY).toEqual(customEnvelope);
+    expect(secrets.TELEGRAM_BOT_TOKEN).toEqual(fakeEnvelope);
+  });
+
+  it('enforces custom secret count limit', async () => {
+    const { instance, storage } = createInstance();
+    // Seed 50 custom secrets (the max)
+    const existingSecrets: Record<string, unknown> = {};
+    for (let i = 0; i < 50; i++) {
+      existingSecrets[`SECRET_${i}`] = { ...fakeEnvelope, encryptedData: `val-${i}` };
+    }
+    await seedProvisioned(storage, { encryptedSecrets: existingSecrets });
+
+    // Adding one more should fail
+    await expect(
+      instance.updateSecrets({ SECRET_OVERFLOW: { ...fakeEnvelope, encryptedData: 'overflow' } })
+    ).rejects.toThrow('Custom secret limit exceeded');
+  });
+
+  it('stores config path metadata alongside secrets', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+
+    await instance.updateSecrets(
+      { MY_KEY: customEnvelope },
+      { MY_KEY: { configPath: 'models.providers.openai.apiKey' } }
+    );
+
+    const meta = storage._store.get('customSecretMeta') as Record<string, unknown>;
+    expect(meta).toEqual({ MY_KEY: { configPath: 'models.providers.openai.apiKey' } });
+  });
+
+  it('removes config path metadata when secret is deleted', async () => {
+    const { instance, storage } = createInstance();
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { MY_KEY: customEnvelope },
+      customSecretMeta: { MY_KEY: { configPath: 'talk.apiKey' } },
+    });
+
+    await instance.updateSecrets({ MY_KEY: null });
+
+    const meta = storage._store.get('customSecretMeta');
+    expect(meta).toBeNull();
+  });
+
+  it('updates config path metadata without changing value', async () => {
+    const { instance, storage } = createInstance();
+    const customEnvelope = { ...fakeEnvelope, encryptedData: 'custom-value' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { MY_KEY: customEnvelope },
+      customSecretMeta: { MY_KEY: { configPath: 'talk.apiKey' } },
+    });
+
+    // Empty secrets patch, only meta update
+    await instance.updateSecrets({}, { MY_KEY: { configPath: 'cron.webhookToken' } });
+
+    const meta = storage._store.get('customSecretMeta') as Record<string, unknown>;
+    expect(meta).toEqual({ MY_KEY: { configPath: 'cron.webhookToken' } });
+    // Secret value unchanged
+    const secrets = storage._store.get('encryptedSecrets') as Record<string, unknown>;
+    expect(secrets.MY_KEY).toEqual(customEnvelope);
+  });
+
+  it('rejects duplicate config paths', async () => {
+    const { instance, storage } = createInstance();
+    const envelope1 = { ...fakeEnvelope, encryptedData: 'val-1' };
+    const envelope2 = { ...fakeEnvelope, encryptedData: 'val-2' };
+    await seedProvisioned(storage, {
+      encryptedSecrets: { KEY_A: envelope1 },
+      customSecretMeta: { KEY_A: { configPath: 'talk.apiKey' } },
+    });
+
+    await expect(
+      instance.updateSecrets({ KEY_B: envelope2 }, { KEY_B: { configPath: 'talk.apiKey' } })
+    ).rejects.toThrow('Config path "talk.apiKey" is already used by secret "KEY_A"');
+  });
 });
 
 // ============================================================================
@@ -3054,6 +3185,136 @@ describe('start: 412 insufficient resources recovery', () => {
     expect(storage._store.get('flyVolumeId')).toBe('vol-new');
     // But machine was NOT created (retry failed)
     expect(storage._store.get('flyMachineId')).toBeNull();
+  });
+});
+
+// ============================================================================
+// start: region eviction on machine-creation capacity errors
+// ============================================================================
+
+describe('start: evicts region from KV on machine-creation capacity error', () => {
+  beforeEach(() => {
+    (flyClient.listMachines as Mock).mockResolvedValue([]);
+  });
+
+  it('evicts flyRegion from KV when createMachine returns 403 quota exceeded', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
+    await seedProvisioned(storage, { flyMachineId: null, lastStartedAt: null, flyRegion: 'lhr' });
+    const evictSpy = vi.spyOn(regions, 'evictCapacityRegionFromKV').mockResolvedValue(undefined);
+
+    (flyClient.createMachine as Mock)
+      .mockRejectedValueOnce(
+        new FlyApiError(
+          'Fly API createMachine failed (403)',
+          403,
+          '{"error":"organization \\"Kilo\\" is using 3194880 MB of memory in lhr which is over the allowed quota. please consider other regions"}'
+        )
+      )
+      .mockResolvedValueOnce({ id: 'machine-retry', region: 'cdg' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'lhr' });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'cdg',
+    });
+
+    await instance.start('user-1');
+
+    expect(evictSpy).toHaveBeenCalledWith(env.KV_CLAW_CACHE, env, 'lhr');
+    expect(storage._store.get('flyRegion')).toBe('cdg');
+    expect(storage._store.get('status')).toBe('running');
+    evictSpy.mockRestore();
+  });
+
+  it('does NOT evict flyRegion from KV on 409 insufficient memory (transient)', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
+    await seedProvisioned(storage, { flyMachineId: null, lastStartedAt: null, flyRegion: 'dfw' });
+    const evictSpy = vi.spyOn(regions, 'evictCapacityRegionFromKV').mockResolvedValue(undefined);
+
+    (flyClient.createMachine as Mock)
+      .mockRejectedValueOnce(
+        new FlyApiError(
+          'insufficient memory',
+          409,
+          '{"error":"aborted: insufficient resources available to fulfill request: could not reserve resource for machine: insufficient memory available to fulfill request"}'
+        )
+      )
+      .mockResolvedValueOnce({ id: 'machine-retry', region: 'sjc' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'dfw' });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'sjc',
+    });
+
+    await instance.start('user-1');
+
+    expect(evictSpy).not.toHaveBeenCalled();
+    evictSpy.mockRestore();
+  });
+
+  it('evicts flyRegion from KV when updateMachine returns 403 during startExistingMachine', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
+    await seedRunning(storage, {
+      status: 'stopped',
+      lastStartedAt: Date.now() - 60_000,
+      flyRegion: 'lhr',
+    });
+    const evictSpy = vi.spyOn(regions, 'evictCapacityRegionFromKV').mockResolvedValue(undefined);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopped' });
+    (flyClient.updateMachine as Mock).mockRejectedValue(
+      new FlyApiError(
+        'Fly API updateMachine failed (403)',
+        403,
+        '{"error":"organization \\"Kilo\\" is using 3194880 MB of memory in lhr which is over the allowed quota. please consider other regions"}'
+      )
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'lhr' });
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'cdg',
+    });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'cdg' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(evictSpy).toHaveBeenCalledWith(env.KV_CLAW_CACHE, env, 'lhr');
+    expect(storage._store.get('flyRegion')).toBe('cdg');
+    evictSpy.mockRestore();
+  });
+
+  it('does not evict when flyRegion is null', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(undefined, env);
+    await seedProvisioned(storage, { flyMachineId: null, lastStartedAt: null, flyRegion: null });
+    const evictSpy = vi.spyOn(regions, 'evictCapacityRegionFromKV').mockResolvedValue(undefined);
+
+    (flyClient.createMachine as Mock)
+      .mockRejectedValueOnce(
+        new FlyApiError('insufficient resources', 412, '{"error":"insufficient resources"}')
+      )
+      .mockResolvedValueOnce({ id: 'machine-retry', region: 'cdg' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'cdg',
+    });
+
+    await instance.start('user-1');
+
+    expect(evictSpy).not.toHaveBeenCalled();
+    evictSpy.mockRestore();
   });
 });
 
@@ -4043,6 +4304,33 @@ describe('provision: auto-start after fresh provision', () => {
     expect(flyClient.createMachine).toHaveBeenCalled();
     expect(storage._store.get('status')).toBe('running');
     expect(storage._store.get('flyMachineId')).toBe('machine-1');
+  });
+
+  it('wires capacity eviction callback during initial volume provisioning', async () => {
+    const env = createFakeEnv();
+    const { instance, waitUntilPromises } = createInstance(undefined, env);
+    const evictSpy = vi.spyOn(regions, 'evictCapacityRegionFromKV').mockResolvedValue(undefined);
+
+    (flyClient.createVolumeWithFallback as Mock).mockImplementation(
+      async (
+        _config: unknown,
+        _request: unknown,
+        _regions: string[],
+        options?: { onCapacityError?: (failedRegion: string) => void | Promise<void> }
+      ) => {
+        await options?.onCapacityError?.('arn');
+        return { id: 'vol-1', region: 'yyz' };
+      }
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'yyz' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'yyz' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', {});
+    await Promise.all(waitUntilPromises);
+
+    expect(evictSpy).toHaveBeenCalledWith(env.KV_CLAW_CACHE, env, 'arn');
+    evictSpy.mockRestore();
   });
 
   it('skips auto-start on re-provision of existing instance', async () => {

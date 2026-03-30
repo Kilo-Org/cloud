@@ -56,6 +56,7 @@ import { PairingSection } from './PairingSection';
 import { VersionPinCard } from './VersionPinCard';
 import { WorkspaceFileEditor } from './WorkspaceFileEditor';
 import { PermissionPresetCards } from './PermissionPresetCards';
+import { CustomSecretsSection } from './CustomSecretsSection';
 import { type ExecPreset, configToExecPreset, execPresetToConfig } from './claw.types';
 
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
@@ -684,7 +685,7 @@ export function SettingsTab({
 
       {/* ── OpenClaw Instance card ── */}
       <div className="rounded-lg border px-4 py-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Settings className="text-muted-foreground h-5 w-5 shrink-0" />
             <div>
@@ -694,11 +695,6 @@ export function SettingsTab({
                   <span>
                     Version:{' '}
                     <strong className="text-foreground">{runningVersion ?? trackedVersion}</strong>
-                  </span>
-                  <span className="text-muted-foreground/40">|</span>
-                  <span>
-                    Variant:{' '}
-                    <strong className="text-foreground">{status.imageVariant || 'default'}</strong>
                   </span>
                   <span className="text-muted-foreground/40">|</span>
                   {isPinned ? (
@@ -753,6 +749,11 @@ export function SettingsTab({
                       </TooltipContent>
                     </Tooltip>
                   )}
+                  <span className="hidden sm:inline text-muted-foreground/40">|</span>
+                  <span className="basis-full sm:basis-auto">
+                    Variant:{' '}
+                    <strong className="text-foreground">{status.imageVariant || 'default'}</strong>
+                  </span>
                 </div>
               )}
             </div>
@@ -857,7 +858,7 @@ export function SettingsTab({
       )}
 
       {/* ── Developer Tools ── */}
-      {toolEntries.some(e => e.id === 'github') && (
+      {toolEntries.some(e => e.id === 'github' || e.id === 'linear') && (
         <div>
           <h2 className="text-foreground mb-3 text-base font-semibold">Developer Tools</h2>
           <div className="space-y-3">
@@ -896,6 +897,19 @@ export function SettingsTab({
                       minimally scoped to specific repos and permissions.
                     </span>
                   }
+                />
+              ))}
+            {toolEntries
+              .filter(e => e.id === 'linear')
+              .map(entry => (
+                <SecretEntrySection
+                  key={entry.id}
+                  entry={entry}
+                  configured={configuredSecrets[entry.id] ?? false}
+                  mutations={mutations}
+                  onSecretsChanged={onSecretsChanged}
+                  isDirty={dirtySecrets.has(entry.id)}
+                  onRedeploy={onRedeploy}
                 />
               ))}
           </div>
@@ -960,6 +974,14 @@ export function SettingsTab({
           />
         </div>
       </div>
+
+      {/* ── Additional Secrets ── */}
+      <CustomSecretsSection
+        customSecretKeys={config?.customSecretKeys ?? []}
+        customSecretMeta={config?.customSecretMeta ?? {}}
+        mutations={mutations}
+        onRedeploy={onRedeploy}
+      />
 
       {/* ── Danger Zone ── */}
       <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-5">

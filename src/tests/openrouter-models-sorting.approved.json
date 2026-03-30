@@ -4,7 +4,7 @@
       "id": "kilo-auto/frontier",
       "name": "Kilo Auto Frontier",
       "created": 0,
-      "description": "Highest performance and capability for any task. Uses Claude Opus 4.6 for plan, general, architect, orchestrator, ask, debug; Claude Sonnet 4.6 for build, explore, code.",
+      "description": "Highest performance and capability for any task. Uses Claude Opus 4.6 for KiloClaw, plan, general, architect, orchestrator, ask, debug; Claude Sonnet 4.6 for build, explore, code.",
       "architecture": {
         "input_modalities": [
           "text",
@@ -49,7 +49,7 @@
       "id": "kilo-auto/balanced",
       "name": "Kilo Auto Balanced",
       "created": 0,
-      "description": "Great balance of price and capability. Uses Kimi K2.5 for plan, general, architect, orchestrator, ask, debug; MiniMax M2.7 for build, explore, code.",
+      "description": "Great balance of price and capability. Uses Kimi K2.5 for KiloClaw, plan, general, architect, orchestrator, ask, debug; MiniMax M2.7 for build, explore, code.",
       "architecture": {
         "input_modalities": [
           "text",

@@ -18,6 +18,7 @@ import { createPairingCache } from './pairing-cache';
 import { registerEnvRoutes } from './routes/env';
 import { registerGmailPushRoute } from './routes/gmail-push';
 import { registerFileRoutes } from './routes/files';
+import { registerKiloCliRunRoutes } from './routes/kilo-cli-run';
 import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
 import { writeKiloCliConfig } from './kilo-cli-config';
 import { writeGogCredentials } from './gog-credentials';
@@ -362,6 +363,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   registerEnvRoutes(honoApp, supervisor, config.expectedToken);
   registerGmailPushRoute(honoApp, gmailWatchSupervisor ?? null, config.expectedToken);
   registerFileRoutes(honoApp, config.expectedToken, '/root/.openclaw');
+  registerKiloCliRunRoutes(honoApp, config.expectedToken);
   honoApp.all(
     '*',
     createHttpProxy({

@@ -74,7 +74,7 @@ FROM kiloclaw_events
 WHERE
   (${orClauses.join(' OR ')})
   AND blob3 IN ('http', 'do', 'reconcile', 'queue')
-  AND blob1 != 'platform.gateway.status.get'
+  AND blob1 NOT IN ('platform.gateway.status.get', 'platform.controller-version.get', 'platform.volume-snapshots.get', 'platform.debug-status.get', 'platform.status.get', 'platform.gateway.ready.get')
 ORDER BY timestamp DESC
 LIMIT 100
 OFFSET ${p.offset}

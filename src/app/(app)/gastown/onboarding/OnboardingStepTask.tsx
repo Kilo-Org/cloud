@@ -18,7 +18,7 @@ export function OnboardingStepTask() {
     backgroundTownId,
     isProvisioning,
     waitForProvisionedTown,
-    finalStepHandlersRef,
+    setFinalStepHandlers,
   } = useOnboarding();
   const router = useRouter();
   const trpc = useGastownTRPC();
@@ -144,12 +144,19 @@ export function OnboardingStepTask() {
 
   const canCreate = state.townName.trim().length > 0 && !isSubmitting;
 
-  // Register handler so the wizard nav button can trigger creation
-  finalStepHandlersRef.current = {
-    submit: () => void handleCreateTown(),
-    canSubmit: canCreate,
-    isSubmitting,
-  };
+  // Store handleCreateTown in a ref so the effect doesn't need it as a dependency
+  const handleCreateTownRef = useRef(handleCreateTown);
+  handleCreateTownRef.current = handleCreateTown;
+
+  // Register handlers so the wizard nav button can trigger creation.
+  useEffect(() => {
+    setFinalStepHandlers({
+      submit: () => void handleCreateTownRef.current(),
+      canSubmit: canCreate,
+      isSubmitting,
+    });
+    return () => setFinalStepHandlers(null);
+  }, [canCreate, isSubmitting, setFinalStepHandlers]);
 
   return (
     <div className="flex flex-col items-center justify-center py-12">

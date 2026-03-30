@@ -238,8 +238,7 @@ function WizardContent() {
 
 /** Create Town button shown in the bottom nav on the final (task) step. */
 function FinalStepNav() {
-  const { finalStepHandlersRef } = useOnboarding();
-  const handlers = finalStepHandlersRef.current;
+  const { finalStepHandlers: handlers } = useOnboarding();
 
   if (!handlers) return null;
 

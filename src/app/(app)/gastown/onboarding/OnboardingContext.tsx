@@ -63,8 +63,9 @@ type OnboardingContextValue = {
    * the town ID, or null if provisioning failed / was never started.
    */
   waitForProvisionedTown: () => Promise<string | null>;
-  /** Ref for the task step to register its submit/skip handlers. */
-  finalStepHandlersRef: React.RefObject<FinalStepHandlers | null>;
+  /** Current final step handlers (set by the task step, read by wizard nav). */
+  finalStepHandlers: FinalStepHandlers | null;
+  setFinalStepHandlers: (handlers: FinalStepHandlers | null) => void;
   /** Delete the background-provisioned town (cleanup on abandon). */
   deleteBackgroundTown: (opts?: { keepalive?: boolean }) => void;
 };
@@ -104,8 +105,7 @@ export function OnboardingProvider({
   const provisioningInFlightRef = useRef(false);
   /** Resolves with the town ID on success, or null on failure. */
   const provisioningPromiseRef = useRef<Promise<string | null> | null>(null);
-  /** Ref for the task step to register its submit/skip handlers with the wizard nav. */
-  const finalStepHandlersRef = useRef<FinalStepHandlers | null>(null);
+  const [finalStepHandlers, setFinalStepHandlers] = useState<FinalStepHandlers | null>(null);
 
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
@@ -331,7 +331,8 @@ export function OnboardingProvider({
         backgroundTownId: backgroundTown?.townId ?? null,
         isProvisioning,
         waitForProvisionedTown,
-        finalStepHandlersRef,
+        finalStepHandlers,
+        setFinalStepHandlers,
         deleteBackgroundTown,
       }}
     >

@@ -32,7 +32,7 @@ import type {
 } from '@/lib/processUsage.types';
 import { getMaxTokens } from '@/lib/providers/openrouter/request-helpers';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto-model';
-import type { GatewayChatApiKind } from '@/lib/providers/types';
+import type { GatewayChatApiKind, ProviderId } from '@/lib/providers/types';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
 // This allows FIM requests to be tracked consistently with chat requests
@@ -416,18 +416,21 @@ function computeInceptionFimMicrodollarCost(usage: FimUsage): number {
   return Math.round(usage.prompt_tokens * 0.25 + usage.completion_tokens * 0.75);
 }
 
-function computeFimMicrodollarCost(usage: FimUsage, provider: 'mistral' | 'inception'): number {
+function computeFimMicrodollarCost(usage: FimUsage, provider: ProviderId): number {
   switch (provider) {
     case 'mistral':
       return Math.round(usage.prompt_tokens * 0.3 + usage.completion_tokens * 0.9);
     case 'inception':
       return computeInceptionFimMicrodollarCost(usage);
+    default:
+      console.error('Unknown provider for FIM cost calculation', provider);
+      return 0;
   }
 }
 
 function parseMistralFimUsageFromString(
   response: string,
-  provider: 'mistral' | 'inception'
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const json: MistralFimCompletion = JSON.parse(response);
   const cost_mUsd = computeFimMicrodollarCost(json.usage, provider);
@@ -457,7 +460,7 @@ function parseMistralFimUsageFromString(
 async function parseMistralFimUsageFromStream(
   stream: ReadableStream,
   requestSpan: Span | undefined,
-  provider: 'mistral' | 'inception'
+  provider: ProviderId
 ): Promise<MicrodollarUsageStats> {
   requestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -560,13 +563,13 @@ export function countAndStoreFimUsage(
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedResponse, logFileExtension);
 
-  const provider = usageContext.provider as 'mistral' | 'inception';
-
   const usageStatsPromise = !clonedResponse.body
     ? Promise.resolve(null)
     : usageContext.isStreaming
-      ? parseMistralFimUsageFromStream(clonedResponse.body, requestSpan, provider)
-      : clonedResponse.text().then(content => parseMistralFimUsageFromString(content, provider));
+      ? parseMistralFimUsageFromStream(clonedResponse.body, requestSpan, usageContext.provider)
+      : clonedResponse
+          .text()
+          .then(content => parseMistralFimUsageFromString(content, usageContext.provider));
 
   after(
     usageStatsPromise.then(usageStats => {

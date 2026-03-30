@@ -59,7 +59,7 @@ const config = {
         imageWidth: 100,
       },
     ],
-    'react-native-share',
+    ['react-native-share', {}],
     'react-native-video',
   ],
   experiments: {

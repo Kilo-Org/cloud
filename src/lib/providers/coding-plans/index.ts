@@ -109,10 +109,9 @@ export function createAiSdkProvider(codingPlanProvider: CodingPlanProvider, apiK
       apiKey,
       name: 'openaiCompatible',
       fetch: (url, init) => {
-        if (init) {
-          init.headers = { ...init.headers, 'user-agent': COMPATIBLE_USER_AGENT };
-        }
-        return fetch(url, init);
+        const headers = new Headers(init?.headers);
+        headers.set('user-agent', COMPATIBLE_USER_AGENT);
+        return fetch(url, init ? { ...init, headers } : { headers });
       },
     });
   } else {

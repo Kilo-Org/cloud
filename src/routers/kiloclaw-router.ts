@@ -1681,7 +1681,7 @@ export const kiloclawRouter = createTRPCRouter({
             : message.includes('Insufficient credit balance')
               ? 'BAD_REQUEST'
               : 'INTERNAL_SERVER_ERROR';
-        throw new TRPCError({ code, message });
+        throw new TRPCError({ code, message, cause: error });
       }
 
       return { success: true };

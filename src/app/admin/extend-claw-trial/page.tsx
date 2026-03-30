@@ -260,9 +260,7 @@ export default function ExtendClawTrialPage() {
       const data = parseCsvToTable(text);
       setCsvData(data);
       const guessed = guessEmailColumn(data.headers, data.rows);
-      if (guessed) {
-        setSelectedColumn(guessed);
-      }
+      setSelectedColumn(guessed ?? '');
     };
     reader.readAsText(file);
   }, []);

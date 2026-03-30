@@ -370,7 +370,7 @@ export function setNestedValue(obj: ConfigObject, path: string, value: string): 
   current[segments[segments.length - 1]] = value;
 }
 
-const DEFAULT_MCPORTER_CONFIG_PATH = '/root/.openclaw/workspace/config/mcporter.json';
+export const DEFAULT_MCPORTER_CONFIG_PATH = '/root/.openclaw/workspace/config/mcporter.json';
 
 /**
  * Write mcporter.json with MCP server definitions derived from environment variables.

@@ -15,8 +15,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const KILO_CONFIG_DIR = '/root/.config/kilo';
-const CONFIG_FILE = 'opencode.json';
+export const KILO_CONFIG_DIR = '/root/.config/kilo';
+export const CONFIG_FILE = 'opencode.json';
+
+/** The Kilo CLI uses `kilo/` as the provider prefix, but KiloClaw uses `kilocode/`. */
+export function toKiloModelId(kilocodeModelId: string): string {
+  if (kilocodeModelId.startsWith('kilocode/')) {
+    return 'kilo/' + kilocodeModelId.slice('kilocode/'.length);
+  }
+  return kilocodeModelId;
+}
 
 export type KiloCliConfigDeps = {
   mkdirSync: (dir: string, opts: { recursive: boolean }) => void;
@@ -49,33 +57,48 @@ export function writeKiloCliConfig(
   // No provider block needed — the KiloAuthPlugin auto-registers the "kilo"
   // provider when KILO_API_KEY is in the environment (set by bootstrap).
   if (isFreshInstall && !deps.existsSync(configPath)) {
-    const config = {
+    const config: Record<string, unknown> = {
       $schema: 'https://app.kilo.ai/config.json',
       permission: { edit: 'allow', bash: 'allow' },
     };
+    if (env.KILOCODE_DEFAULT_MODEL) {
+      config.model = toKiloModelId(env.KILOCODE_DEFAULT_MODEL);
+    }
     deps.mkdirSync(configDir, { recursive: true });
     deps.writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
     console.log('[kilo-cli] Seeded config at ' + configPath);
   }
 
   // Patch config on every boot (if it exists).
-  // Only writes when a change is actually made to avoid silent no-op writes.
-  if (deps.existsSync(configPath) && env.KILOCODE_API_BASE_URL) {
+  if (deps.existsSync(configPath)) {
     try {
       // JSON structure is open-ended (user may add arbitrary keys), so we use `any`
-      // rather than a strict schema. The patch only touches provider.kilo.options.baseURL.
+      // rather than a strict schema.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const config: any = JSON.parse(deps.readFileSync(configPath, 'utf8'));
+      let dirty = false;
 
-      // Override the kilo provider's base URL for local dev (e.g., ngrok tunnel).
-      // In production this env var is not set and the built-in default is used.
-      config.provider = config.provider || {};
-      config.provider.kilo = config.provider.kilo || {};
-      config.provider.kilo.options = config.provider.kilo.options || {};
-      config.provider.kilo.options.baseURL = env.KILOCODE_API_BASE_URL;
-      console.log('[kilo-cli] Patched base URL: ' + env.KILOCODE_API_BASE_URL);
+      // Remove any stale provider.kilo.options.baseURL from the config file.
+      // Setting baseURL in opencode.json is broken (the Kilo CLI ignores it
+      // in certain code paths). The correct mechanism is the KILO_API_URL env
+      // var, which bootstrap sets from KILOCODE_API_BASE_URL. Early deployments
+      // may still have the broken field, so we scrub it on every boot.
+      if (config.provider?.kilo?.options?.baseURL) {
+        delete config.provider.kilo.options.baseURL;
+        dirty = true;
+      }
 
-      deps.writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
+      // Sync Kilo CLI's model with the user's KiloClaw default model.
+      // Updated on every boot so model changes in KiloClaw settings take effect.
+      const defaultModel = env.KILOCODE_DEFAULT_MODEL;
+      if (defaultModel) {
+        config.model = toKiloModelId(defaultModel);
+        dirty = true;
+      }
+
+      if (dirty) {
+        deps.writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
+      }
     } catch (err) {
       console.error('[kilo-cli] Failed to patch config (corrupt JSON?), skipping:', err);
     }

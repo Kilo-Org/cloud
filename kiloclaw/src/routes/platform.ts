@@ -964,6 +964,67 @@ platform.post('/doctor', async c => {
   }
 });
 
+// ── Kilo CLI Run ──────────────────────────────────────────────────────
+
+const KiloCliRunStartSchema = z.object({
+  userId: z.string().min(1),
+  prompt: z.string().min(1).max(10_000),
+});
+
+// POST /api/platform/kilo-cli-run/start
+platform.post('/kilo-cli-run/start', async c => {
+  const result = await parseBody(c, KiloCliRunStartSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.startKiloCliRun(result.data.prompt),
+      'startKiloCliRun'
+    );
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'kilo-cli-run start');
+    return jsonError(message, status);
+  }
+});
+
+// GET /api/platform/kilo-cli-run/status?userId=...
+platform.get('/kilo-cli-run/status', async c => {
+  const userId = c.req.query('userId');
+  if (!userId) return jsonError('Missing userId', 400);
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.getKiloCliRunStatus(),
+      'getKiloCliRunStatus'
+    );
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'kilo-cli-run status');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/kilo-cli-run/cancel
+platform.post('/kilo-cli-run/cancel', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.cancelKiloCliRun(),
+      'cancelKiloCliRun'
+    );
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'kilo-cli-run cancel');
+    return jsonError(message, status);
+  }
+});
+
 // POST /api/platform/start
 const StartRequestSchema = UserIdRequestSchema.extend({
   skipCooldown: z.boolean().optional(),

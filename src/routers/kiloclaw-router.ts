@@ -30,6 +30,7 @@ import {
   kiloclaw_subscriptions,
   kiloclaw_instances,
   kiloclaw_email_log,
+  kiloclaw_cli_runs,
 } from '@kilocode/db/schema';
 import { and, eq, ne, desc, isNotNull, isNull, inArray, sql } from 'drizzle-orm';
 import { sentryLogger } from '@/lib/utils.server';
@@ -992,6 +993,141 @@ export const kiloclawRouter = createTRPCRouter({
     const client = new KiloClawInternalClient();
     return client.runDoctor(ctx.user.id);
   }),
+
+  // ── Kilo CLI Run ──────────────────────────────────────────────────
+
+  startKiloCliRun: clawAccessProcedure
+    .input(z.object({ prompt: z.string().min(1).max(10_000) }))
+    .mutation(async ({ ctx, input }) => {
+      const client = new KiloClawInternalClient();
+      const result = await client.startKiloCliRun(ctx.user.id, input.prompt);
+
+      // Persist the run in the database and return its ID
+      const [row] = await db
+        .insert(kiloclaw_cli_runs)
+        .values({
+          user_id: ctx.user.id,
+          prompt: input.prompt,
+          status: 'running',
+          started_at: result.startedAt,
+        })
+        .returning({ id: kiloclaw_cli_runs.id });
+
+      return { ...result, id: row.id };
+    }),
+
+  getKiloCliRunStatus: clawAccessProcedure
+    .input(z.object({ runId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // Load the requested run from the DB to avoid cross-run data leaks.
+      // The controller only tracks the *current* run, so polling it for an
+      // older run would return the wrong output.
+      const [row] = await db
+        .select()
+        .from(kiloclaw_cli_runs)
+        .where(
+          and(eq(kiloclaw_cli_runs.id, input.runId), eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+        )
+        .limit(1);
+
+      if (!row) {
+        return {
+          hasRun: false,
+          status: null,
+          output: null,
+          exitCode: null,
+          startedAt: null,
+          completedAt: null,
+          prompt: null,
+        };
+      }
+
+      // If the DB row is already terminal, return it directly — no need to
+      // poll the controller (which may be running a different job).
+      if (row.status !== 'running') {
+        return {
+          hasRun: true,
+          status: row.status as 'completed' | 'failed' | 'cancelled',
+          output: row.output,
+          exitCode: row.exit_code,
+          startedAt: row.started_at,
+          completedAt: row.completed_at ?? null,
+          prompt: row.prompt,
+        };
+      }
+
+      // Run is still active — poll the controller for live output.
+      const client = new KiloClawInternalClient();
+      const controllerStatus = await client.getKiloCliRunStatus(ctx.user.id);
+
+      // If controller reports the run finished, persist to the DB row.
+      if (
+        controllerStatus.hasRun &&
+        controllerStatus.status !== 'running' &&
+        controllerStatus.startedAt
+      ) {
+        await db
+          .update(kiloclaw_cli_runs)
+          .set({
+            status: controllerStatus.status ?? 'failed',
+            exit_code: controllerStatus.exitCode,
+            output: controllerStatus.output,
+            completed_at: controllerStatus.completedAt ?? new Date().toISOString(),
+          })
+          .where(
+            and(
+              eq(kiloclaw_cli_runs.id, input.runId),
+              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              eq(kiloclaw_cli_runs.status, 'running')
+            )
+          );
+      }
+
+      return {
+        ...controllerStatus,
+        prompt: row.prompt,
+      };
+    }),
+
+  cancelKiloCliRun: clawAccessProcedure
+    .input(z.object({ runId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const client = new KiloClawInternalClient();
+      const result = await client.cancelKiloCliRun(ctx.user.id);
+
+      // Mark the specific run as cancelled in DB
+      if (result.ok) {
+        await db
+          .update(kiloclaw_cli_runs)
+          .set({
+            status: 'cancelled',
+            completed_at: new Date().toISOString(),
+          })
+          .where(
+            and(
+              eq(kiloclaw_cli_runs.id, input.runId),
+              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              eq(kiloclaw_cli_runs.status, 'running')
+            )
+          );
+      }
+
+      return result;
+    }),
+
+  listKiloCliRuns: clawAccessProcedure
+    .input(z.object({ limit: z.number().min(1).max(50).default(10) }).optional())
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 10;
+      const runs = await db
+        .select()
+        .from(kiloclaw_cli_runs)
+        .where(eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+        .orderBy(desc(kiloclaw_cli_runs.started_at))
+        .limit(limit);
+
+      return { runs };
+    }),
 
   restoreConfig: clawAccessProcedure.mutation(async ({ ctx }) => {
     const client = new KiloClawInternalClient();

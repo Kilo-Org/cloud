@@ -279,6 +279,26 @@ describe('setupDirectories', () => {
     expect(env.INVOCATION_ID).toBe('1');
     expect(env.GOG_KEYRING_PASSWORD).toBe('kiloclaw');
   });
+
+  it('derives KILO_API_URL from KILOCODE_API_BASE_URL origin', () => {
+    const { deps } = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      KILOCODE_API_BASE_URL: 'https://api.example.com/v1',
+    };
+
+    setupDirectories(env, deps);
+
+    expect(env.KILO_API_URL).toBe('https://api.example.com');
+  });
+
+  it('does not set KILO_API_URL when KILOCODE_API_BASE_URL is absent', () => {
+    const { deps } = fakeDeps();
+    const env: Record<string, string | undefined> = {};
+
+    setupDirectories(env, deps);
+
+    expect(env.KILO_API_URL).toBeUndefined();
+  });
 });
 
 // ---- applyFeatureFlags ----

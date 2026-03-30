@@ -57,6 +57,7 @@ import { attemptMetadataRecovery } from './reconcile';
 import { resolveImageTag, getRegistryApp, buildUserEnvVars } from './config';
 import * as gateway from './gateway';
 import * as pairing from './pairing';
+import * as kiloCliRun from './kilo-cli-run';
 import * as flyMachines from './fly-machines';
 import {
   reconcileWithFly,
@@ -840,6 +841,23 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return pairing.runDoctor(this.s, this.env);
   }
 
+  // ── Kilo CLI Run ────────────────────────────────────────────────────
+
+  async startKiloCliRun(prompt: string) {
+    await this.loadState();
+    return kiloCliRun.startKiloCliRun(this.s, this.env, prompt);
+  }
+
+  async getKiloCliRunStatus() {
+    await this.loadState();
+    return kiloCliRun.getKiloCliRunStatus(this.s, this.env);
+  }
+
+  async cancelKiloCliRun() {
+    await this.loadState();
+    return kiloCliRun.cancelKiloCliRun(this.s, this.env);
+  }
+
   // ── Lifecycle ───────────────────────────────────────────────────────
 
   async forceRetryRecovery(): Promise<{ ok: true }> {
@@ -1046,6 +1064,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         statusCode: code,
         region: this.s.flyRegion ?? 'unknown',
       });
+
+      // Evict the current region from KV so future provisions avoid it.
+      // Only on 403 (org quota exceeded) — 409 (host memory) is transient.
+      // createVolumeWithFallback already evicts on volume-creation failures,
+      // but machine-creation 403s bypass that path.
+      if (code === 403 && this.s.flyRegion) {
+        await evictCapacityRegionFromKV(this.env.KV_CLAW_CACHE, this.env, this.s.flyRegion);
+      }
+
       await flyMachines.replaceStrandedVolume(
         flyConfig,
         this.ctx,

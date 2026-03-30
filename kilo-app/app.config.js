@@ -44,7 +44,7 @@ const config = {
     'expo-secure-store',
     'expo-web-browser',
     [
-      '@sentry/react-native',
+      '@sentry/react-native/expo',
       {
         url: 'https://sentry.io/',
         project: 'kilo-app',

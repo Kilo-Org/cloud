@@ -39,6 +39,8 @@ npx expo install <package-name>
 npx expo install --dev <package-name>   # devDependencies
 ```
 
+After installing or upgrading dependencies, run `pnpx expo-doctor` and fix any issues it reports (version mismatches, duplicate deps, etc.).
+
 ## Data Fetching
 
 - When you need data from the backend, **always add a new tRPC procedure** rather than copying data or inventing client-side alternatives. The app uses tRPC with React Query — adding a procedure is cheap and keeps the source of truth on the server.

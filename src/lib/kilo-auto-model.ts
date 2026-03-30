@@ -218,7 +218,6 @@ export const KILO_AUTO_FREE_MODEL_DEPRECATED = 'kilo/auto-free';
 const legacyMapping: Record<string, AutoModel | undefined> = {
   'kilo/auto': KILO_AUTO_FRONTIER_MODEL,
   [KILO_AUTO_FREE_MODEL_DEPRECATED]: KILO_AUTO_FREE_MODEL,
-  'kilo/auto-small': KILO_AUTO_SMALL_MODEL,
 };
 
 export async function resolveAutoModel(
@@ -263,7 +262,7 @@ export async function applyResolvedAutoModel(
   const hasImages = requestContainsImages(request);
   const resolved = await resolveAutoModel(
     model,
-    featureHeader === 'kiloclaw' ? 'KiloClaw' : modeHeader,
+    featureHeader === 'kiloclaw' || featureHeader === 'openclaw' ? 'KiloClaw' : modeHeader,
     balancePromise,
     hasImages
   );

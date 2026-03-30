@@ -327,7 +327,7 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
  * These are decrypted at runtime to build the actual selfServicePromos array.
  *
  * To add a new promo code:
- * 1. Run: pnpm promo encrypt PROMO_CODE
+ * 1. Run: vercel env run -e production -- pnpm promo encrypt PROMO_CODE
  * 2. Copy the encrypted value and use in encrypted_credit_category
  */
 const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCategoryConfig[] = [

@@ -113,7 +113,6 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateMiniMaxNoLongerFreeNotification,
     generateFirstDayWelcomeNotification,
     generateKiloPassNotification,
-    generateLiteLLMSecurityNotification,
   ];
 
   const resolvedConditionalNotifications = (
@@ -355,36 +354,6 @@ async function generateFirstDayWelcomeNotification(
       showIn: ['cli', 'extension'],
     },
   ];
-}
-
-async function generateLiteLLMSecurityNotification(
-  user: User,
-  _ctx: NotificationContext
-): Promise<KiloNotification[]> {
-  try {
-    const litellmUsers = await cachedPosthogQuery(
-      z.array(z.tuple([z.string()]).transform(([userId]) => userId))
-    )('litellm-security-incident-users', 'select id from notification_litellm_mar_24 limit 5e5');
-
-    if (!litellmUsers.includes(user.id)) {
-      console.debug('[generateLiteLLMSecurityNotification] user is not using LiteLLM provider');
-      return [];
-    }
-
-    console.debug('[generateLiteLLMSecurityNotification] user is using LiteLLM provider');
-    return [
-      {
-        id: 'litellm-security-mar-24',
-        title: 'LiteLLM Security Advisory',
-        message:
-          'Following a recent security incident with LiteLLM, we recommend reviewing your configuration and rotating credentials; if helpful, our gateway offers a more secure, managed alternative.',
-        showIn: ['extension'],
-      },
-    ];
-  } catch (e) {
-    console.error('[generateLiteLLMSecurityNotification]', e);
-    return [];
-  }
 }
 
 async function generateKiloPassNotification(

@@ -127,3 +127,22 @@ export const ControllerPairingApproveResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),
 });
+
+// ──────────────────────────────────────────────────────────────────────
+// Kilo CLI run
+// ──────────────────────────────────────────────────────────────────────
+
+export const KiloCliRunStartResponseSchema = z.object({
+  ok: z.boolean(),
+  startedAt: z.string(),
+});
+
+export const KiloCliRunStatusResponseSchema = z.object({
+  hasRun: z.boolean(),
+  status: z.enum(['running', 'completed', 'failed', 'cancelled']).nullable(),
+  output: z.string().nullable(),
+  exitCode: z.number().int().nullable(),
+  startedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  prompt: z.string().nullable(),
+});

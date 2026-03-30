@@ -18,6 +18,8 @@ import type {
   DevicePairingApproveResponse,
   VolumeSnapshotsResponse,
   DoctorResponse,
+  KiloCliRunStartResponse,
+  KiloCliRunStatusResponse,
   GatewayProcessStatusResponse,
   GatewayProcessActionResponse,
   ConfigRestoreResponse,
@@ -310,6 +312,36 @@ export class KiloClawInternalClient {
   async runDoctor(userId: string): Promise<DoctorResponse> {
     return this.request(
       '/api/platform/doctor',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async startKiloCliRun(userId: string, prompt: string): Promise<KiloCliRunStartResponse> {
+    return this.request(
+      '/api/platform/kilo-cli-run/start',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, prompt }),
+      },
+      { userId }
+    );
+  }
+
+  async getKiloCliRunStatus(userId: string): Promise<KiloCliRunStatusResponse> {
+    return this.request(
+      `/api/platform/kilo-cli-run/status?userId=${encodeURIComponent(userId)}`,
+      undefined,
+      { userId }
+    );
+  }
+
+  async cancelKiloCliRun(userId: string): Promise<{ ok: boolean }> {
+    return this.request(
+      '/api/platform/kilo-cli-run/cancel',
       {
         method: 'POST',
         body: JSON.stringify({ userId }),

@@ -2,10 +2,10 @@
  * Script to encrypt or decrypt promo codes.
  *
  * Run with:
- *   pnpm promo encrypt <plaintext>
- *   pnpm promo decrypt <encrypted>
+ *   vercel env run -e production -- pnpm promo encrypt <plaintext>
+ *   vercel env run -e production -- pnpm promo decrypt <encrypted>
  *
- * Requires CREDIT_CATEGORIES_ENCRYPTION_KEY environment variable to be set.
+ * Requires CREDIT_CATEGORIES_ENCRYPTION_KEY environment variable (injected via `vercel env run`).
  */
 
 import { getEnvVariable } from '@/lib/dotenvx';
@@ -21,7 +21,7 @@ if (!CREDIT_CATEGORIES_ENCRYPTION_KEY) {
 const [operation, value] = process.argv.slice(2);
 
 if (!operation || !value) {
-  console.error('Usage: pnpm promo <encrypt|decrypt> <value>');
+  console.error('Usage: vercel env run -e production -- pnpm promo <encrypt|decrypt> <value>');
   process.exit(1);
 }
 

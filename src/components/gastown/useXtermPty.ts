@@ -7,14 +7,17 @@ import type { Terminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
 
 /**
- * xterm.js 6.0.0 doesn't support the Kitty keyboard protocol — all Enter
- * variants are encoded as bare \r.  This handler intercepts modified Enter
- * keys and injects the correct CSI u escape sequences so downstream
- * consumers (e.g. the Kilo TUI) see the expected keycodes.
+ * xterm.js doesn't distinguish modifier+Enter from plain Enter — both
+ * produce bare `\r`. This handler intercepts modified Enter keys and
+ * sends the appropriate sequences to the remote TUI:
  *
- * Accepts an optional `wsRef` — when provided, the CSI sequence is written
- * directly to the WebSocket (bypassing xterm's input pipeline) which is
- * more reliable than `term.input()` in some xterm.js builds.
+ * - Shift+Enter → `\n` (literal newline, interpreted as "insert line" by
+ *   most TUIs, vs `\r` which means "submit")
+ * - Alt+Enter / Ctrl+Enter → Kitty CSI u escape sequences so the TUI can
+ *   bind them to custom actions
+ *
+ * Writes directly to the WebSocket when available to bypass xterm's
+ * input pipeline.
  */
 export function attachKittyEnterHandler(
   term: Terminal,
@@ -31,7 +34,8 @@ export function attachKittyEnterHandler(
   term.attachCustomKeyEventHandler(ev => {
     if (ev.type !== 'keydown') return true;
     if (ev.key === 'Enter' && ev.shiftKey && !ev.ctrlKey && !ev.altKey && !ev.metaKey) {
-      send('\x1b[13;2u');
+      // Shift+Enter → literal newline (insert line, don't submit)
+      send('\n');
       return false;
     }
     if (ev.key === 'Enter' && ev.altKey && !ev.ctrlKey && !ev.shiftKey && !ev.metaKey) {

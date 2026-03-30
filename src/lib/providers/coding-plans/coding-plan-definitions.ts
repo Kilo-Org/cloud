@@ -93,33 +93,25 @@ export default [
   },
   {
     id: 'kimi-coding',
-    name: 'Kimi Coding Plan',
+    name: 'Kimi for Coding',
     base_url: 'https://api.kimi.com/coding/v1',
     ai_sdk_provider: 'openai-compatible',
     transformRequest(context) {
       context.request.body.thinking = {
         type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
       };
+      context.extraHeaders['User-Agent'] = 'Kilo-Code/5.12';
     },
     models: [
       {
-        id: 'k2p5',
-        name: 'Kimi-K2.5',
+        id: 'kimi-for-coding',
+        name: 'Kimi for Coding',
         flags: ['recommended'],
         context_length: 262144,
         max_completion_tokens: 32768,
         description:
           'Kimi K2.5 optimized for code generation and agentic coding. Up to 100 tokens/s.',
-        variants: REASONING_VARIANTS_BINARY,
-      },
-      {
-        id: 'kimi-k2-thinking',
-        name: 'Kimi-K2 Thinking',
-        flags: [],
-        context_length: 262144,
-        max_completion_tokens: 32768,
-        description: 'Kimi K2 with extended thinking for complex multi-step reasoning.',
-        variants: null,
+        variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
       },
     ],
   },

@@ -75,7 +75,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
   const isSearchActive = searchQuery.length > 0;
 
   // --- List query (default, non-search) ---
-  const listInput = { limit: 10, organizationId, createdOnPlatform, gitUrl };
+  const listInput = { recentDays: 5, organizationId, createdOnPlatform, gitUrl };
   const listQueryKey = trpc.unifiedSessions.list.queryKey(listInput);
 
   const { data: listData, isLoading: isListLoading } = useQuery({

@@ -143,12 +143,14 @@ export async function makeErrorReadable({
   response,
   isUserByok,
   feature,
+  balance,
 }: {
   requestedModel: string;
   request: GatewayRequest;
   response: Response;
   isUserByok: boolean;
   feature: FeatureValue | null;
+  balance: number;
 }) {
   if (response.status < 400) {
     return undefined;
@@ -167,10 +169,11 @@ export async function makeErrorReadable({
   }
 
   if (response.status === 404) {
+    const recommendedModel = balance <= 0 ? KILO_AUTO_FREE_MODEL : KILO_AUTO_BALANCED_MODEL;
     const recommendation =
       feature === 'kiloclaw' || feature === 'openclaw'
-        ? `The model "${requestedModel}" does not exist or is no longer available. We recommend switching to kilo-auto/balanced: /model kilocode/${KILO_AUTO_BALANCED_MODEL.id}`
-        : `The model "${requestedModel}" does not exist or is no longer available. We recommend switching to kilocode/${KILO_AUTO_BALANCED_MODEL.id}.`;
+        ? `The model "${requestedModel}" does not exist or is no longer available. We recommend switching to ${recommendedModel.name}: /model kilocode/${recommendedModel.id}`
+        : `The model "${requestedModel}" does not exist or is no longer available. We recommend switching to kilocode/${recommendedModel.id}.`;
     warnExceptInTest(`Responding with 404 ${recommendation}`);
     return NextResponse.json({ error: recommendation, message: recommendation }, { status: 404 });
   }

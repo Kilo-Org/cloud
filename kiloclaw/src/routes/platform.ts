@@ -1280,21 +1280,30 @@ platform.post('/destroy', async c => {
     );
 
     // Remove the instance from the registry (best-effort).
-    if (instanceId) {
-      // Always try the user registry. If the instance was org-owned and we
-      // know the orgId, also clean up the org registry.
+    // When instanceId is provided, destroy by instanceId directly.
+    // When absent (legacy destroy), find the entry with doKey=userId
+    // and destroy it by its instanceId from the registry.
+    try {
       const registryKeys = [`user:${userId}`];
       if (orgId) registryKeys.push(`org:${orgId}`);
       for (const registryKey of registryKeys) {
-        try {
-          const registryStub = c.env.KILOCLAW_REGISTRY.get(
-            c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
-          );
+        const registryStub = c.env.KILOCLAW_REGISTRY.get(
+          c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+        );
+        if (instanceId) {
           await registryStub.destroyInstance(registryKey, instanceId);
-        } catch (registryErr) {
-          console.error('[platform] Registry destroy failed (non-fatal):', registryErr);
+        } else {
+          // Legacy destroy (no instanceId): the DO was keyed by userId,
+          // so find the registry entry with doKey=userId.
+          const entries = await registryStub.listInstances(registryKey);
+          const legacyEntry = entries.find(e => e.doKey === userId);
+          if (legacyEntry) {
+            await registryStub.destroyInstance(registryKey, legacyEntry.instanceId);
+          }
         }
       }
+    } catch (registryErr) {
+      console.error('[platform] Registry destroy failed (non-fatal):', registryErr);
     }
 
     return c.json({ ok: true });

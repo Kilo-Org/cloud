@@ -1263,7 +1263,12 @@ platform.post('/destroy', async c => {
       const status = await statusStub.getStatus();
       orgId = status.orgId;
     } catch {
-      // If we can't read status, proceed with destroy — registry cleanup is best-effort.
+      // Can't determine orgId. We'll clean up the user registry below; if the
+      // instance was org-owned, its org registry entry becomes stale but harmless
+      // (points to a destroyed DO that returns no machineId).
+      console.warn(
+        '[platform] Could not read orgId before destroy, org registry entry may be stale'
+      );
     }
   }
 
@@ -1276,14 +1281,19 @@ platform.post('/destroy', async c => {
 
     // Remove the instance from the registry (best-effort).
     if (instanceId) {
-      try {
-        const registryKey = orgId ? `org:${orgId}` : `user:${userId}`;
-        const registryStub = c.env.KILOCLAW_REGISTRY.get(
-          c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
-        );
-        await registryStub.destroyInstance(registryKey, instanceId);
-      } catch (registryErr) {
-        console.error('[platform] Registry destroy failed (non-fatal):', registryErr);
+      // Always try the user registry. If the instance was org-owned and we
+      // know the orgId, also clean up the org registry.
+      const registryKeys = [`user:${userId}`];
+      if (orgId) registryKeys.push(`org:${orgId}`);
+      for (const registryKey of registryKeys) {
+        try {
+          const registryStub = c.env.KILOCLAW_REGISTRY.get(
+            c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+          );
+          await registryStub.destroyInstance(registryKey, instanceId);
+        } catch (registryErr) {
+          console.error('[platform] Registry destroy failed (non-fatal):', registryErr);
+        }
       }
     }
 

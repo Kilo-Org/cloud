@@ -236,6 +236,9 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   let completeGraceTimeoutId: ReturnType<typeof setTimeout> | undefined;
   let streamCompleted = false;
   const streamTimeoutRef: { id?: ReturnType<typeof setTimeout> } = {};
+  // Track the root session so we can ignore subagent (child) events that
+  // should not affect the top-level result or prematurely resolve the stream.
+  let rootSessionId: string | undefined;
 
   const resolveOnce = () => {
     if (streamCompleted) return;
@@ -247,8 +250,18 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
 
   const processor = createEventProcessor({
     callbacks: {
-      onMessageCompleted: (_sid, _mid, message) => {
+      onSessionCreated: info => {
+        // The first session without a parent is the root session.
+        if (!rootSessionId && !info.parentID) {
+          rootSessionId = info.id;
+        }
+      },
+      onMessageCompleted: (_sid, _mid, message, parentSessionId) => {
         if (message.info.role !== 'assistant') return;
+        // Only capture text from the root session. Subagent (child) messages
+        // would overwrite completionResult and mark hasError from transient
+        // subagent failures the root session may handle gracefully.
+        if (parentSessionId !== null) return;
         const text = extractTextFromMessage(message);
         if (text) completionResult = text;
 
@@ -261,7 +274,11 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
       onSessionStatusChanged: status => {
         if (status.type === 'idle') resolveOnce();
       },
-      onError: error => {
+      onError: (error, errorSessionId) => {
+        // Ignore errors from child/subagent sessions — the root session may
+        // handle them gracefully. Root session errors and errors without a
+        // session ID (global) are still treated as fatal.
+        if (rootSessionId && errorSessionId && errorSessionId !== rootSessionId) return;
         hasError = true;
         errorMessage = error;
         resolveOnce();

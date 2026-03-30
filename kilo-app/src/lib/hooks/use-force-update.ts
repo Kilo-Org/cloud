@@ -48,7 +48,9 @@ export function useForceUpdate() {
         }
 
         const data = (await response.json()) as MinVersionResponse;
-        const nativeVersion = Application.nativeApplicationVersion;
+        const nativeVersion =
+          (Application as { nativeApplicationVersion: string | null }).nativeApplicationVersion ??
+          null;
 
         if (!nativeVersion) {
           setState({ updateRequired: false, isChecking: false });

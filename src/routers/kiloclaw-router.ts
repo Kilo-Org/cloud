@@ -1664,12 +1664,22 @@ export const kiloclawRouter = createTRPCRouter({
       // Intro pricing eligibility (spec Credit Enrollment rule 3).
       const hadPaidSubscription = await hadPriorPaidSubscription(ctx.user.id);
 
-      await enrollWithCreditsImpl({
-        userId: ctx.user.id,
-        instanceId: instance.id,
-        plan: input.plan,
-        hadPaidSubscription,
-      });
+      try {
+        await enrollWithCreditsImpl({
+          userId: ctx.user.id,
+          instanceId: instance.id,
+          plan: input.plan,
+          hadPaidSubscription,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Credit enrollment failed';
+        const code = message.includes('not found')
+          ? 'NOT_FOUND'
+          : message.includes('already exists') || message.includes('already processed')
+            ? 'CONFLICT'
+            : 'BAD_REQUEST';
+        throw new TRPCError({ code, message });
+      }
 
       return { success: true };
     }),

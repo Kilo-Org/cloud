@@ -30,6 +30,7 @@ import {
   kiloclaw_subscriptions,
   kiloclaw_instances,
   kiloclaw_email_log,
+  kiloclaw_cli_runs,
 } from '@kilocode/db/schema';
 import { and, eq, ne, desc, isNotNull, isNull, inArray, sql } from 'drizzle-orm';
 import { sentryLogger } from '@/lib/utils.server';
@@ -43,6 +44,7 @@ import {
   restoreDestroyedInstance,
   type ActiveKiloClawInstance,
 } from '@/lib/kiloclaw/instance-registry';
+import { sandboxIdFromUserId } from '@/lib/kiloclaw/sandbox-id';
 import { client as stripe } from '@/lib/stripe-client';
 import { APP_URL } from '@/lib/constants';
 import { getRewardfulReferral } from '@/lib/rewardful';
@@ -73,6 +75,60 @@ import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
  * paths) and should NOT be forwarded to the client.
  */
 const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed']);
+
+/**
+ * Return the user's active instance, creating a new registry row if none
+ * exists (e.g. trial expired and personal instance was destroyed).
+ *
+ * When a new row is created, the subscription row linked to the user's
+ * destroyed personal instance (identified by sandboxIdFromUserId) is
+ * reassigned to the new instance_id. The update is scoped to that exact
+ * destroyed instance row so that subscriptions on other (org or multi-)
+ * instances are never touched and UQ_kiloclaw_subscriptions_instance is not
+ * violated.
+ *
+ * This mirrors the reassignment already performed in ensureProvisionAccess
+ * (lines 485–497) for the Stripe hosting-only checkout path.
+ */
+async function getOrCreateInstanceForBilling(userId: string): Promise<ActiveKiloClawInstance> {
+  const active = await getActiveInstance(userId);
+  if (active) return active;
+
+  // Find the destroyed personal instance row. ensureActiveInstance always
+  // keys personal instances on sandboxIdFromUserId(userId), so this is the
+  // exact row that needs repairing.
+  const sandboxId = sandboxIdFromUserId(userId);
+  const [destroyedInstance] = await db
+    .select({ id: kiloclaw_instances.id })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNotNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .limit(1);
+
+  const newInstance = await ensureActiveInstance(userId);
+
+  // Reassign the subscription row that was linked to the destroyed personal
+  // instance onto the new instance. Scoped to that specific instance_id so
+  // subscriptions on other instances (org, multi-instance) are not disturbed.
+  if (destroyedInstance) {
+    await db
+      .update(kiloclaw_subscriptions)
+      .set({ instance_id: newInstance.id })
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, userId),
+          eq(kiloclaw_subscriptions.instance_id, destroyedInstance.id)
+        )
+      );
+  }
+
+  return newInstance;
+}
 
 /**
  * Map KiloClawApiError responses to TRPCErrors for file operations.
@@ -938,6 +994,141 @@ export const kiloclawRouter = createTRPCRouter({
     return client.runDoctor(ctx.user.id);
   }),
 
+  // ── Kilo CLI Run ──────────────────────────────────────────────────
+
+  startKiloCliRun: clawAccessProcedure
+    .input(z.object({ prompt: z.string().min(1).max(10_000) }))
+    .mutation(async ({ ctx, input }) => {
+      const client = new KiloClawInternalClient();
+      const result = await client.startKiloCliRun(ctx.user.id, input.prompt);
+
+      // Persist the run in the database and return its ID
+      const [row] = await db
+        .insert(kiloclaw_cli_runs)
+        .values({
+          user_id: ctx.user.id,
+          prompt: input.prompt,
+          status: 'running',
+          started_at: result.startedAt,
+        })
+        .returning({ id: kiloclaw_cli_runs.id });
+
+      return { ...result, id: row.id };
+    }),
+
+  getKiloCliRunStatus: clawAccessProcedure
+    .input(z.object({ runId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // Load the requested run from the DB to avoid cross-run data leaks.
+      // The controller only tracks the *current* run, so polling it for an
+      // older run would return the wrong output.
+      const [row] = await db
+        .select()
+        .from(kiloclaw_cli_runs)
+        .where(
+          and(eq(kiloclaw_cli_runs.id, input.runId), eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+        )
+        .limit(1);
+
+      if (!row) {
+        return {
+          hasRun: false,
+          status: null,
+          output: null,
+          exitCode: null,
+          startedAt: null,
+          completedAt: null,
+          prompt: null,
+        };
+      }
+
+      // If the DB row is already terminal, return it directly — no need to
+      // poll the controller (which may be running a different job).
+      if (row.status !== 'running') {
+        return {
+          hasRun: true,
+          status: row.status as 'completed' | 'failed' | 'cancelled',
+          output: row.output,
+          exitCode: row.exit_code,
+          startedAt: row.started_at,
+          completedAt: row.completed_at ?? null,
+          prompt: row.prompt,
+        };
+      }
+
+      // Run is still active — poll the controller for live output.
+      const client = new KiloClawInternalClient();
+      const controllerStatus = await client.getKiloCliRunStatus(ctx.user.id);
+
+      // If controller reports the run finished, persist to the DB row.
+      if (
+        controllerStatus.hasRun &&
+        controllerStatus.status !== 'running' &&
+        controllerStatus.startedAt
+      ) {
+        await db
+          .update(kiloclaw_cli_runs)
+          .set({
+            status: controllerStatus.status ?? 'failed',
+            exit_code: controllerStatus.exitCode,
+            output: controllerStatus.output,
+            completed_at: controllerStatus.completedAt ?? new Date().toISOString(),
+          })
+          .where(
+            and(
+              eq(kiloclaw_cli_runs.id, input.runId),
+              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              eq(kiloclaw_cli_runs.status, 'running')
+            )
+          );
+      }
+
+      return {
+        ...controllerStatus,
+        prompt: row.prompt,
+      };
+    }),
+
+  cancelKiloCliRun: clawAccessProcedure
+    .input(z.object({ runId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const client = new KiloClawInternalClient();
+      const result = await client.cancelKiloCliRun(ctx.user.id);
+
+      // Mark the specific run as cancelled in DB
+      if (result.ok) {
+        await db
+          .update(kiloclaw_cli_runs)
+          .set({
+            status: 'cancelled',
+            completed_at: new Date().toISOString(),
+          })
+          .where(
+            and(
+              eq(kiloclaw_cli_runs.id, input.runId),
+              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              eq(kiloclaw_cli_runs.status, 'running')
+            )
+          );
+      }
+
+      return result;
+    }),
+
+  listKiloCliRuns: clawAccessProcedure
+    .input(z.object({ limit: z.number().min(1).max(50).default(10) }).optional())
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 10;
+      const runs = await db
+        .select()
+        .from(kiloclaw_cli_runs)
+        .where(eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+        .orderBy(desc(kiloclaw_cli_runs.started_at))
+        .limit(limit);
+
+      return { runs };
+    }),
+
   restoreConfig: clawAccessProcedure.mutation(async ({ ctx }) => {
     const client = new KiloClawInternalClient();
     return client.restoreConfig(ctx.user.id);
@@ -1603,14 +1794,7 @@ export const kiloclawRouter = createTRPCRouter({
         }
         instance = row;
       } else {
-        const active = await getActiveInstance(ctx.user.id);
-        if (!active) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'No active instance found. Provision an instance first.',
-          });
-        }
-        instance = active;
+        instance = await getOrCreateInstanceForBilling(ctx.user.id);
       }
 
       // Intro pricing eligibility (spec Credit Enrollment rule 3).
@@ -1640,14 +1824,10 @@ export const kiloclawRouter = createTRPCRouter({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
       }
 
-      // Get the user's active instance first — needed for both the guard and callback URL
-      const instance = await getActiveInstance(ctx.user.id);
-      if (!instance) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'No active instance found. Provision an instance first.',
-        });
-      }
+      // Get the user's active instance — needed for both the guard and callback URL.
+      // If none exists (e.g. trial expired and instance was destroyed) create a new
+      // registry row and reassign any existing subscription to it.
+      const instance = await getOrCreateInstanceForBilling(ctx.user.id);
 
       // Reject if this instance already has a non-ended KiloClaw subscription
       const [existing] = await db

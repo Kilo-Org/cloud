@@ -342,7 +342,7 @@ export function ClawDashboard({
             </CardContent>
             <Tabs value={activeTab} onValueChange={handleTabChange}>
               <div className="px-5">
-                <TabsList className="mt-4 h-auto w-full justify-start gap-2 rounded-none border-b bg-transparent p-0 pb-3">
+                <TabsList className="mt-4 h-auto w-full justify-start gap-2 overflow-x-auto rounded-none border-b bg-transparent p-0 pb-3">
                   <TabsTrigger value="instance" className={tabTriggerClass}>
                     Gateway Process
                   </TabsTrigger>

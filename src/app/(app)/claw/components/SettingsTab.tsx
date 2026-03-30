@@ -685,7 +685,7 @@ export function SettingsTab({
 
       {/* ── OpenClaw Instance card ── */}
       <div className="rounded-lg border px-4 py-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Settings className="text-muted-foreground h-5 w-5 shrink-0" />
             <div>
@@ -695,11 +695,6 @@ export function SettingsTab({
                   <span>
                     Version:{' '}
                     <strong className="text-foreground">{runningVersion ?? trackedVersion}</strong>
-                  </span>
-                  <span className="text-muted-foreground/40">|</span>
-                  <span>
-                    Variant:{' '}
-                    <strong className="text-foreground">{status.imageVariant || 'default'}</strong>
                   </span>
                   <span className="text-muted-foreground/40">|</span>
                   {isPinned ? (
@@ -754,6 +749,11 @@ export function SettingsTab({
                       </TooltipContent>
                     </Tooltip>
                   )}
+                  <span className="hidden sm:inline text-muted-foreground/40">|</span>
+                  <span className="basis-full sm:basis-auto">
+                    Variant:{' '}
+                    <strong className="text-foreground">{status.imageVariant || 'default'}</strong>
+                  </span>
                 </div>
               )}
             </div>

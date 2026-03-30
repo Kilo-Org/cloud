@@ -10,6 +10,7 @@ import {
   RefreshCw,
   RotateCw,
   Stethoscope,
+  Terminal,
   X,
 } from 'lucide-react';
 import { usePostHog } from 'posthog-js/react';
@@ -31,6 +32,7 @@ import { Label } from '@/components/ui/label';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { RunDoctorDialog } from './RunDoctorDialog';
+import { StartKiloCliRunDialog } from './StartKiloCliRunDialog';
 import { AnimatedDots } from './AnimatedDots';
 
 const VOLUME_SIZE_GB = 10;
@@ -70,6 +72,7 @@ export function InstanceControls({
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameValue, setNameValue] = useState('');
   const [doctorOpen, setDoctorOpen] = useState(false);
+  const [kiloRunOpen, setKiloRunOpen] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [confirmRedeploy, setConfirmRedeploy] = useState(false);
   const [redeployMode, setRedeployMode] = useState<'redeploy' | 'upgrade'>('redeploy');
@@ -152,12 +155,12 @@ export function InstanceControls({
           </>
         )}
       </div>
-      <div className="mb-4 flex items-start justify-between gap-4">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div>
           <h3 className="text-foreground mb-1 text-sm font-medium">Instance Controls</h3>
           <p className="text-muted-foreground text-xs">Manage power state and gateway lifecycle.</p>
         </div>
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex w-full justify-around gap-2 sm:w-auto sm:justify-end">
           <Badge variant="outline" className="text-muted-foreground gap-1.5 font-normal">
             <Cpu className="h-3.5 w-3.5" />
             {status.machineSize?.cpus ?? DEFAULT_CPUS} vCPU,{' '}
@@ -169,7 +172,7 @@ export function InstanceControls({
           </Badge>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <Button
           size="sm"
           variant="outline"
@@ -259,6 +262,19 @@ export function InstanceControls({
         >
           <Stethoscope className="h-4 w-4" />
           OpenClaw Doctor
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+          disabled={!isRunning || isDestroying || isStarting || isRestarting}
+          onClick={() => {
+            posthog?.capture('claw_kilo_run_clicked', { instance_status: status.status });
+            setKiloRunOpen(true);
+          }}
+        >
+          <Terminal className="h-4 w-4" />
+          Recover with Kilo
         </Button>
       </div>
       <ConfirmActionDialog
@@ -384,6 +400,7 @@ export function InstanceControls({
         onOpenChange={setDoctorOpen}
         mutation={mutations.runDoctor}
       />
+      <StartKiloCliRunDialog open={kiloRunOpen} onOpenChange={setKiloRunOpen} />
     </div>
   );
 }

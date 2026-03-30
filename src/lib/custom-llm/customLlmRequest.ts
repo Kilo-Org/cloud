@@ -886,10 +886,6 @@ export function grokCodeFastOptimizedRequest(
       api_key: provider.apiKey,
       supports_image_input: model.flags.includes('vision'),
       force_reasoning: true,
-      opencode_settings: null,
-      extra_body: null,
-      extra_headers: null,
-      interleaved_format: null,
     },
     request,
     isLegacyExtension

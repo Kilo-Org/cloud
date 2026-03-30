@@ -18,7 +18,7 @@ import {
   isHaikuModel,
 } from '@/lib/providers/anthropic';
 import { getBYOKforOrganization, getBYOKforUser, getModelUserByokProviders } from '@/lib/byok';
-import { custom_llm, type User } from '@kilocode/db/schema';
+import { custom_llm2, parseCustomLlm2Row, type User } from '@kilocode/db/schema';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/providers/openrouter/inference-provider-id';
 import { hasAttemptCompletionTool } from '@/lib/tool-calling';
 import { applyGoogleModelSettings, isGeminiModel } from '@/lib/providers/google';
@@ -110,28 +110,31 @@ export async function getProvider(
   }
 
   if (requestedModel.startsWith('kilo-internal/') && organizationId) {
-    const [customLlm] = await db
+    const [row] = await db
       .select()
-      .from(custom_llm)
-      .where(eq(custom_llm.public_id, requestedModel));
-    if (customLlm && customLlm.organization_ids.includes(organizationId)) {
-      return {
-        provider: {
-          id: 'custom',
-          apiUrl: customLlm.base_url,
-          apiKey: customLlm.api_key,
-          supportedChatApis: inferSupportedChatApis(customLlm.provider),
-          transformRequest(context) {
-            Object.assign(context.request.body, customLlm?.extra_body ?? {});
-            for (const [key, value] of Object.entries(customLlm.extra_headers ?? {})) {
-              context.extraHeaders[key] = value;
-            }
-            context.request.body.model = customLlm.internal_id;
+      .from(custom_llm2)
+      .where(eq(custom_llm2.public_id, requestedModel));
+    if (row) {
+      const customLlm = parseCustomLlm2Row(row);
+      if (customLlm.organization_ids.includes(organizationId)) {
+        return {
+          provider: {
+            id: 'custom',
+            apiUrl: customLlm.base_url,
+            apiKey: customLlm.api_key,
+            supportedChatApis: inferSupportedChatApis(customLlm.provider),
+            transformRequest(context) {
+              Object.assign(context.request.body, customLlm?.extra_body ?? {});
+              for (const [key, value] of Object.entries(customLlm.extra_headers ?? {})) {
+                context.extraHeaders[key] = value;
+              }
+              context.request.body.model = customLlm.internal_id;
+            },
           },
-        },
-        userByok: null,
-        bypassAccessCheck: true,
-      };
+          userByok: null,
+          bypassAccessCheck: true,
+        };
+      }
     }
   }
 

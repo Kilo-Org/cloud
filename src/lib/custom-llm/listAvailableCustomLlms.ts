@@ -1,21 +1,8 @@
-import { custom_llm } from '@kilocode/db/schema';
+import { custom_llm2, parseCustomLlm2Row, type CustomLlm } from '@kilocode/db/schema';
 import { readDb } from '@/lib/drizzle';
 import { OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
 
-const listColumns = {
-  public_id: custom_llm.public_id,
-  display_name: custom_llm.display_name,
-  context_length: custom_llm.context_length,
-  max_completion_tokens: custom_llm.max_completion_tokens,
-  provider: custom_llm.provider,
-  organization_ids: custom_llm.organization_ids,
-  supports_image_input: custom_llm.supports_image_input,
-  opencode_settings: custom_llm.opencode_settings,
-};
-
-type ListRow = { [K in keyof typeof listColumns]: (typeof custom_llm.$inferSelect)[K] };
-
-export function convert(model: ListRow) {
+export function convert(model: CustomLlm) {
   return {
     id: model.public_id,
     canonical_slug: model.public_id,
@@ -56,6 +43,7 @@ export function convert(model: ListRow) {
 }
 
 export async function listAvailableCustomLlms(organizationId: string) {
-  const rows = await readDb.select(listColumns).from(custom_llm);
-  return rows.filter(row => row.organization_ids.includes(organizationId)).map(convert);
+  const rows = await readDb.select().from(custom_llm2);
+  const models = rows.map(parseCustomLlm2Row);
+  return models.filter(m => m.organization_ids.includes(organizationId)).map(convert);
 }

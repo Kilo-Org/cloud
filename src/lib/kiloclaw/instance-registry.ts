@@ -13,6 +13,35 @@ export type ActiveKiloClawInstance = {
   name: string | null;
 };
 
+/**
+ * Returns true if this instance row uses the instance-keyed identity scheme
+ * (ki_ sandboxId prefix, DO keyed by instanceId). Legacy rows have
+ * userId-derived base64url sandboxIds and DOs keyed by userId.
+ */
+export function isInstanceKeyed(instance: ActiveKiloClawInstance): boolean {
+  return instance.sandboxId.startsWith('ki_');
+}
+
+/**
+ * Returns the instanceId to pass to the worker for DO routing, or undefined
+ * for legacy instances (where the DO is keyed by userId, not instanceId).
+ *
+ * This is the bridge between the Postgres row identity and the worker's
+ * instanceStubFactory. Legacy rows must NOT pass instanceId because
+ * their DO lives at idFromName(userId), not idFromName(instanceId).
+ *
+ * Accepts either an ActiveKiloClawInstance (camelCase) or a raw DB row
+ * with snake_case fields — checks for both `sandboxId` and `sandbox_id`.
+ */
+export function workerInstanceId(
+  instance: { id: string; sandboxId?: string; sandbox_id?: string } | null | undefined
+): string | undefined {
+  if (!instance) return undefined;
+  const sandboxId = instance.sandboxId ?? instance.sandbox_id;
+  if (!sandboxId) return undefined;
+  return sandboxId.startsWith('ki_') ? instance.id : undefined;
+}
+
 type EnsureActiveInstanceOpts = {
   /** Organization ID. When provided, creates an org-owned instance. */
   orgId?: string;

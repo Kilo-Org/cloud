@@ -13,6 +13,7 @@ import {
   getActiveInstance,
   markActiveInstanceDestroyed,
   restoreDestroyedInstance,
+  workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
 import { flyAppNameFromUserId } from '@/lib/kiloclaw/fly-app-name';
 import {
@@ -194,7 +195,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
     try {
       const client = new KiloClawInternalClient();
-      workerStatus = await client.getDebugStatus(instance.user_id, instance.id);
+      workerStatus = await client.getDebugStatus(instance.user_id, workerInstanceId(instance));
     } catch (err) {
       workerStatusError =
         err instanceof KiloClawApiError
@@ -418,7 +419,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       try {
         const instance = await getActiveInstance(input.userId);
         const client = new KiloClawInternalClient();
-        return await client.listVolumeSnapshots(input.userId, instance?.id);
+        return await client.listVolumeSnapshots(input.userId, workerInstanceId(instance));
       } catch (err) {
         console.error('Failed to fetch volume snapshots for user:', input.userId, err);
         throwKiloclawAdminError(err, fallbackMessage);
@@ -430,7 +431,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     try {
       const instance = await getActiveInstance(input.userId);
       const client = new KiloClawInternalClient();
-      return await client.getControllerVersion(input.userId, instance?.id);
+      return await client.getControllerVersion(input.userId, workerInstanceId(instance));
     } catch (err) {
       console.error('Failed to fetch controller version for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
@@ -442,7 +443,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     try {
       const instance = await getActiveInstance(input.userId);
       const client = new KiloClawInternalClient();
-      return await client.getGatewayStatus(input.userId, instance?.id);
+      return await client.getGatewayStatus(input.userId, workerInstanceId(instance));
     } catch (err) {
       console.error('Failed to fetch gateway status for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage, {
@@ -460,7 +461,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     try {
       const instance = await getActiveInstance(input.userId);
       const client = new KiloClawInternalClient();
-      return await client.startGateway(input.userId, instance?.id);
+      return await client.startGateway(input.userId, workerInstanceId(instance));
     } catch (err) {
       console.error('Failed to start gateway for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
@@ -472,7 +473,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     try {
       const instance = await getActiveInstance(input.userId);
       const client = new KiloClawInternalClient();
-      return await client.stopGateway(input.userId, instance?.id);
+      return await client.stopGateway(input.userId, workerInstanceId(instance));
     } catch (err) {
       console.error('Failed to stop gateway for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
@@ -484,7 +485,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     try {
       const instance = await getActiveInstance(input.userId);
       const client = new KiloClawInternalClient();
-      return await client.restartGatewayProcess(input.userId, instance?.id);
+      return await client.restartGatewayProcess(input.userId, workerInstanceId(instance));
     } catch (err) {
       console.error('Failed to restart gateway for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
@@ -496,7 +497,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     try {
       const instance = await getActiveInstance(input.userId);
       const client = new KiloClawInternalClient();
-      return await client.runDoctor(input.userId, instance?.id);
+      return await client.runDoctor(input.userId, workerInstanceId(instance));
     } catch (err) {
       console.error('Failed to run doctor for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
@@ -620,7 +621,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     try {
       const instance = await getActiveInstance(input.userId);
       const client = new KiloClawInternalClient();
-      return await client.restoreConfig(input.userId, undefined, instance?.id);
+      return await client.restoreConfig(input.userId, undefined, workerInstanceId(instance));
     } catch (err) {
       console.error('Failed to restore config for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
@@ -633,7 +634,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       try {
         const instance = await getActiveInstance(input.userId);
         const client = new KiloClawInternalClient();
-        const result = await client.getFileTree(input.userId, instance?.id);
+        const result = await client.getFileTree(input.userId, workerInstanceId(instance));
         return result.tree;
       } catch (err) {
         throwKiloclawAdminError(err, 'Failed to fetch file tree');
@@ -646,7 +647,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       try {
         const instance = await getActiveInstance(input.userId);
         const client = new KiloClawInternalClient();
-        return await client.readFile(input.userId, input.path, instance?.id);
+        return await client.readFile(input.userId, input.path, workerInstanceId(instance));
       } catch (err) {
         throwKiloclawAdminError(err, 'Failed to read file');
       }
@@ -670,7 +671,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           input.path,
           input.content,
           input.etag,
-          instance?.id
+          workerInstanceId(instance)
         );
       } catch (err) {
         // Propagate file_etag_conflict with UpstreamApiError so the UI can detect it
@@ -693,7 +694,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     try {
       const instance = await getActiveInstance(input.userId);
       const client = new KiloClawInternalClient();
-      return await client.start(input.userId, instance?.id, { skipCooldown: true });
+      return await client.start(input.userId, workerInstanceId(instance), { skipCooldown: true });
     } catch (err) {
       console.error('Failed to start machine for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
@@ -705,7 +706,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     try {
       const instance = await getActiveInstance(input.userId);
       const client = new KiloClawInternalClient();
-      return await client.forceRetryRecovery(input.userId, instance?.id);
+      return await client.forceRetryRecovery(input.userId, workerInstanceId(instance));
     } catch (err) {
       console.error('Failed to retry recovery for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
@@ -717,7 +718,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     try {
       const instance = await getActiveInstance(input.userId);
       const client = new KiloClawInternalClient();
-      return await client.stop(input.userId, instance?.id);
+      return await client.stop(input.userId, workerInstanceId(instance));
     } catch (err) {
       console.error('Failed to stop machine for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
@@ -789,7 +790,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       // Verify the appName/machineId match the DO's actual state
       let status: Awaited<ReturnType<KiloClawInternalClient['getDebugStatus']>>;
       try {
-        status = await client.getDebugStatus(input.userId, instance?.id);
+        status = await client.getDebugStatus(input.userId, workerInstanceId(instance));
       } catch (err) {
         throwKiloclawAdminError(err, 'Failed to verify machine state before destroy');
       }
@@ -806,7 +807,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           input.userId,
           input.appName,
           input.machineId,
-          instance?.id
+          workerInstanceId(instance)
         );
 
         try {
@@ -862,7 +863,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const destroyedRow = await markActiveInstanceDestroyed(instance.user_id, instance.id);
     const client = new KiloClawInternalClient();
     try {
-      await client.destroy(instance.user_id, instance.id);
+      await client.destroy(instance.user_id, workerInstanceId(instance));
     } catch (error) {
       if (destroyedRow) {
         await restoreDestroyedInstance(destroyedRow.id);
@@ -927,7 +928,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       try {
         const instance = await getActiveInstance(input.userId);
         const client = new KiloClawInternalClient();
-        return await client.listCandidateVolumes(input.userId, instance?.id);
+        return await client.listCandidateVolumes(input.userId, workerInstanceId(instance));
       } catch (err) {
         throwKiloclawAdminError(err, 'Failed to list candidate volumes');
       }
@@ -960,7 +961,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     for (const instance of activeInstances) {
       const destroyedRow = await markActiveInstanceDestroyed(instance.user_id, instance.id);
       try {
-        await client.destroy(instance.user_id, instance.id);
+        await client.destroy(instance.user_id, workerInstanceId(instance));
         destroyed++;
       } catch (err) {
         if (destroyedRow) {
@@ -997,7 +998,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           input.userId,
           input.newVolumeId,
           input.reason,
-          instance?.id
+          workerInstanceId(instance)
         );
 
         try {
@@ -1044,7 +1045,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         const result = await client.restoreVolumeFromSnapshot(
           input.userId,
           input.snapshotId,
-          instance?.id
+          workerInstanceId(instance)
         );
 
         try {

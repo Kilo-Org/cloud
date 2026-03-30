@@ -150,7 +150,7 @@ export default [
         id: 'glm-4.7',
         name: 'GLM-4.7',
         description:
-          "Z.AI's latest flagship model, enhanced programming capabilities and more stable multi-step reasoning/execution.",
+          "Z.ai's latest flagship model, enhanced programming capabilities and more stable multi-step reasoning/execution.",
         flags: ['recommended'],
         context_length: 204800,
         max_completion_tokens: 131072,

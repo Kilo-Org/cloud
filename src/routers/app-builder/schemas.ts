@@ -27,6 +27,8 @@ export const sendMessageBaseSchema = z.object({
   images: imagesSchema,
   /** Optional model override - if provided, updates the project's model_id */
   model: z.string().min(1).optional(),
+  /** When true, forces creation of a new cloud agent session (user-initiated new chat) */
+  forceNewSession: z.boolean().optional(),
 });
 
 // Common extension for organizationId

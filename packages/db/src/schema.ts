@@ -2336,6 +2336,7 @@ export const AppBuilderSessionReason = {
   GitHubMigration: 'github_migration', // New session after migrating to GitHub
   Upgrade: 'upgrade', // New session after worker version upgrade (v1→v2)
   ModelVisionChange: 'model_vision_change', // New session after switching between vision and text-only models
+  UserInitiated: 'user_initiated', // New session explicitly started by the user via "New Chat"
 } satisfies Record<string, string>;
 
 export const app_builder_project_sessions = pgTable(

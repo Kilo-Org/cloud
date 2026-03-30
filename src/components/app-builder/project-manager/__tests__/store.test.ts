@@ -60,6 +60,7 @@ describe('createProjectStore', () => {
     currentIframeUrl: null,
     gitRepoFullName: null,
     sessions: [],
+    pendingNewSession: false,
   };
 
   describe('getState', () => {

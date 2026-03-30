@@ -5,7 +5,12 @@ import { NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 
 import type { CreateOrUpdateUserArgs } from './user';
-import { findUserById, createOrUpdateUser, findAndSyncExistingUser, rotateApiTokenPepper } from './user';
+import {
+  findUserById,
+  createOrUpdateUser,
+  findAndSyncExistingUser,
+  rotateApiTokenPepper,
+} from './user';
 import { db, readDb } from '@/lib/drizzle';
 import type {
   NextAuthOptions,

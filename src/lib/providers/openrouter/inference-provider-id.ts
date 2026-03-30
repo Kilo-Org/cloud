@@ -73,7 +73,7 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum['alibaba-coding']]: 'qwen3-coder-next',
   [DirectUserByokInferenceProviderIdSchema.enum['byteplus-coding']]: 'bytedance-seed-code',
   [DirectUserByokInferenceProviderIdSchema.enum.codestral]: 'mistral/codestral',
-  [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'k2p5',
+  [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'kimi-for-coding',
   [DirectUserByokInferenceProviderIdSchema.enum['zai-coding']]: 'glm-4.7',
 } satisfies Record<UserByokProviderId, string>;
 

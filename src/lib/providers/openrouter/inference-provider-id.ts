@@ -43,7 +43,6 @@ export type VercelUserByokInferenceProviderId = z.infer<
 >;
 
 export const DirectUserByokInferenceProviderIdSchema = z.enum([
-  'alibaba-coding',
   'byteplus-coding',
   'codestral',
   'kimi-coding',
@@ -70,7 +69,6 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.openai]: 'openai/gpt-5-nano',
   [VercelUserByokInferenceProviderIdSchema.enum.xai]: 'xai/grok-4.1-fast-non-reasoning',
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
-  [DirectUserByokInferenceProviderIdSchema.enum['alibaba-coding']]: 'qwen3-coder-next',
   [DirectUserByokInferenceProviderIdSchema.enum['byteplus-coding']]: 'bytedance-seed-code',
   [DirectUserByokInferenceProviderIdSchema.enum.codestral]: 'mistral/codestral',
   [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'kimi-for-coding',

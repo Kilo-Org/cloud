@@ -33,7 +33,6 @@ import {
   Clock,
   Play,
   RotateCcw,
-  Gift,
   Download,
 } from 'lucide-react';
 import AdminPage from '@/app/admin/components/AdminPage';
@@ -50,6 +49,7 @@ type MatchedUser = {
   email: string;
   userId: string;
   userName: string | null;
+  subscriptionStatus: string | null;
 };
 
 type UnmatchedEmail = {
@@ -60,7 +60,7 @@ type TrialResult = {
   email: string;
   userId: string;
   success: boolean;
-  action?: 'extended' | 'restarted' | 'granted';
+  action?: 'extended' | 'restarted';
   newTrialEndsAt?: string;
   trialDays?: number;
   error?: string;
@@ -135,11 +135,9 @@ function extractEmails(rows: Record<string, string>[], column: string): string[]
 }
 
 function guessEmailColumn(headers: string[], rows: Record<string, string>[]): string | null {
-  // First, look for a column explicitly named "email"
   const emailHeader = headers.find(h => h.toLowerCase().trim() === 'email');
   if (emailHeader) return emailHeader;
 
-  // Otherwise, find the column with the most valid emails
   let bestCol: string | null = null;
   let bestCount = 0;
   for (const h of headers) {
@@ -168,6 +166,17 @@ function downloadCsv(content: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+function subscriptionStatusBadge(status: string | null) {
+  if (status === null) return <Badge variant="outline">no subscription</Badge>;
+  if (status === 'trialing') return <Badge variant="default">trialing</Badge>;
+  if (status === 'canceled') return <Badge variant="secondary">canceled</Badge>;
+  return (
+    <Badge variant="destructive" title="Cannot modify — active paid subscription">
+      {status}
+    </Badge>
+  );
+}
+
 // --- Component ---
 
 const breadcrumbs = (
@@ -181,7 +190,6 @@ const breadcrumbs = (
 const ACTION_CONFIG = {
   extended: { label: 'Extended', icon: Clock, variant: 'default' as const },
   restarted: { label: 'Restarted', icon: RotateCcw, variant: 'secondary' as const },
-  granted: { label: 'Granted', icon: Gift, variant: 'outline' as const },
 };
 
 export default function ExtendClawTrialPage() {
@@ -224,10 +232,10 @@ export default function ExtendClawTrialPage() {
 
   const extendTrialsMutation = useMutation(
     trpc.admin.extendClawTrial.extendTrials.mutationOptions({
-      onSuccess: results => {
-        setResults(results);
-        const successCount = results.filter(r => r.success).length;
-        const failCount = results.length - successCount;
+      onSuccess: trialResults => {
+        setResults(trialResults);
+        const successCount = trialResults.filter(r => r.success).length;
+        const failCount = trialResults.length - successCount;
         if (failCount === 0) {
           toast.success(`Successfully processed ${successCount} users`);
         } else {
@@ -339,14 +347,22 @@ export default function ExtendClawTrialPage() {
     csvData && selectedColumn ? extractEmails(csvData.rows, selectedColumn) : [];
   const parsedEmailCount = extractedEmails.length;
 
+  // Users that cannot have their trial modified (active paid plans)
+  const ineligibleCount = matchedUsers.filter(
+    u =>
+      u.subscriptionStatus !== null &&
+      u.subscriptionStatus !== 'trialing' &&
+      u.subscriptionStatus !== 'canceled'
+  ).length;
+
   return (
     <AdminPage breadcrumbs={breadcrumbs}>
       <div className="flex w-full flex-col gap-y-6">
         <div>
           <h2 className="text-2xl font-bold">Extend KiloClaw Trial</h2>
           <p className="text-muted-foreground">
-            Import a CSV of email addresses to extend, restart, or grant KiloClaw free trials in
-            bulk.
+            Import a CSV of email addresses to extend or restart KiloClaw trials in bulk. Users with
+            active paid subscriptions are skipped automatically.
           </p>
         </div>
 
@@ -499,11 +515,15 @@ export default function ExtendClawTrialPage() {
                     {unmatchedEmails.length} not found
                   </Badge>
                 )}
+                {ineligibleCount > 0 && (
+                  <Badge variant="outline" className="ml-1">
+                    {ineligibleCount} ineligible
+                  </Badge>
+                )}
               </CardTitle>
               <CardDescription>
-                {trialDays}-day trial will be{' '}
-                {matchedUsers.length > 0 ? 'extended, restarted, or granted' : 'processed'} for each
-                matched user.
+                {trialDays}-day trial will be extended or restarted for trialing/canceled users.
+                Users with no subscription or an active paid plan are skipped.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -515,6 +535,7 @@ export default function ExtendClawTrialPage() {
                         <TableRow>
                           <TableHead>Email</TableHead>
                           <TableHead>User Name</TableHead>
+                          <TableHead>Subscription</TableHead>
                           <TableHead>User ID</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -523,6 +544,7 @@ export default function ExtendClawTrialPage() {
                           <TableRow key={user.userId}>
                             <TableCell className="font-mono text-sm">{user.email}</TableCell>
                             <TableCell>{user.userName ?? '—'}</TableCell>
+                            <TableCell>{subscriptionStatusBadge(user.subscriptionStatus)}</TableCell>
                             <TableCell className="font-mono text-xs text-muted-foreground">
                               {user.userId}
                             </TableCell>
@@ -604,8 +626,8 @@ export default function ExtendClawTrialPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Summary stats */}
-              <div className="grid grid-cols-3 gap-4">
-                {(['extended', 'restarted', 'granted'] as const).map(action => {
+              <div className="grid grid-cols-2 gap-4">
+                {(['extended', 'restarted'] as const).map(action => {
                   const count = results.filter(r => r.action === action).length;
                   const config = ACTION_CONFIG[action];
                   const Icon = config.icon;

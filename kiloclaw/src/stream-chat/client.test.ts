@@ -445,6 +445,22 @@ describe('sendMessage', () => {
     );
   });
 
+  it('preserves HTTP status on the thrown error for upstream handling', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: async () => 'Channel not found',
+    });
+
+    try {
+      await sendMessage('key', 'secret', 'chan-1', 'user-1', 'test');
+      expect.unreachable('should have thrown');
+    } catch (err) {
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error & { status: number }).status).toBe(404);
+    }
+  });
+
   it('handles unreadable error body gracefully', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,

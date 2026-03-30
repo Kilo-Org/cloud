@@ -292,6 +292,8 @@ export async function sendMessage(
 
   if (!res.ok) {
     const body = await res.text().catch(() => '(unreadable)');
-    throw new Error(`Stream Chat sendMessage failed (${res.status}): ${body}`);
+    throw Object.assign(new Error(`Stream Chat sendMessage failed (${res.status}): ${body}`), {
+      status: res.status,
+    });
   }
 }

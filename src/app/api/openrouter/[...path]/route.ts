@@ -71,7 +71,6 @@ import {
   getToolsAvailable,
   getToolsUsed,
 } from '@/lib/o11y/api-metrics.server';
-import { handleRequestLogging } from '@/lib/handleRequestLogging';
 import { grokCodeFastOptimizedRequest } from '@/lib/custom-llm/customLlmRequest';
 import { normalizeModelId } from '@/lib/model-utils';
 import { isForbiddenFreeModel } from '@/lib/forbidden-free-models';
@@ -576,6 +575,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
+  /* disabled pending migration
   handleRequestLogging({
     clonedResponse: response.clone(),
     user: maybeUser,
@@ -587,6 +587,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     api_kind: requestBodyParsed.kind,
     session_id: taskId ?? null,
   });
+  */
 
   {
     const errorResponse = await makeErrorReadable({

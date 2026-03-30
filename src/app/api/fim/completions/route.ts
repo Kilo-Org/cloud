@@ -181,14 +181,25 @@ export async function POST(request: NextRequest) {
   }
 
   // Use shared helper for organization model restrictions
-  // Model allow list only applies to Enterprise plans
-  // Provider allow list applies to Enterprise plans; data collection applies to all plans (but FIM doesn't use provider config)
-  const { error: modelRestrictionError } = checkOrganizationModelRestrictions({
+  // Model deny list only applies to Enterprise plans
+  const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
     modelId: requestBody.model,
     settings,
     organizationPlan: plan,
   });
   if (modelRestrictionError) return modelRestrictionError;
+
+  // FIM routes directly to providers (not via OpenRouter), so enforce
+  // the provider denylist by checking the resolved provider name.
+  if (providerConfig?.ignore?.includes(fimProvider)) {
+    return NextResponse.json(
+      {
+        error: 'Provider not allowed for your team.',
+        message: `The provider "${fimProvider}" is not allowed for your team.`,
+      },
+      { status: 403 }
+    );
+  }
 
   const systemKey = getSystemApiKey(fimProvider);
   const apiKey = userByok?.at(0)?.decryptedAPIKey ?? systemKey;

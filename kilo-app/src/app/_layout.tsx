@@ -1,5 +1,13 @@
 import '../global.css';
 
+import { LogBox } from 'react-native';
+
+LogBox.ignoreLogs([
+  'i18next is made possible', // stream-chat i18next promo
+  'unstable_getBoundingClientRect', // stream-chat OverlayProvider web-only API
+  'No recorder instance', // stream-chat audio recorder not installed
+]);
+
 import { PortalHost } from '@rn-primitives/portal';
 import * as Sentry from '@sentry/react-native';
 import { QueryClientProvider } from '@tanstack/react-query';

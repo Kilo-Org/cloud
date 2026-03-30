@@ -8,9 +8,7 @@
     "postcss",
     "eslint-plugin-sonarjs",
     "@sentry/cli",
-    "@react-native-community/netinfo",
-    "@gorhom/bottom-sheet",
-    "react-native-nitro-modules"
+    "@react-native-community/netinfo"
   ],
   "ignoreBinaries": ["oxfmt", "oxlint"],
   "ignore": ["src/components/ui/**"],

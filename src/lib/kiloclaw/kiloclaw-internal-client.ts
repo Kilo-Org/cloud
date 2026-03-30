@@ -377,7 +377,10 @@ export class KiloClawInternalClient {
     );
   }
 
-  async getKiloCliRunStatus(userId: string, instanceId?: string): Promise<KiloCliRunStatusResponse> {
+  async getKiloCliRunStatus(
+    userId: string,
+    instanceId?: string
+  ): Promise<KiloCliRunStatusResponse> {
     const params = new URLSearchParams({ userId });
     if (instanceId) params.set('instanceId', instanceId);
     return this.request(`/api/platform/kilo-cli-run/status?${params.toString()}`, undefined, {

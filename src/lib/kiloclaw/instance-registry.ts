@@ -68,6 +68,11 @@ export async function ensureActiveInstance(
   }
 
   // Personal flow: return existing active row if present.
+  // Race note: two concurrent callers can both see no row and both insert.
+  // This is benign — getActiveInstance uses ORDER BY created_at ASC so all
+  // subsequent reads converge on the oldest row. The second row is an inert
+  // orphan (no DO created for it). The window is milliseconds on a user-
+  // initiated action already deduplicated by the frontend's useMutation.
   const existing = await getActiveInstance(userId);
   if (existing) return existing;
 
@@ -178,6 +183,7 @@ export async function getActiveInstance(userId: string): Promise<ActiveKiloClawI
         isNull(kiloclaw_instances.destroyed_at)
       )
     )
+    .orderBy(kiloclaw_instances.created_at)
     .limit(1);
 
   return row ?? null;

@@ -6,6 +6,7 @@ import { getWorkerDb, validateAndRedeemAccessCode, findPepperByUserId } from '..
 import { signKiloToken, validateKiloToken } from '../auth/jwt';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
+import { sandboxIdFromInstanceId, isValidInstanceId } from '@kilocode/worker-utils/instance-id';
 import type { KiloClawEnv } from '../types';
 
 /**
@@ -51,12 +52,23 @@ async function resolveSandboxId(userId: string, env: KiloClawEnv): Promise<strin
     const registryStub = env.KILOCLAW_REGISTRY.get(env.KILOCLAW_REGISTRY.idFromName(registryKey));
     const entries = await registryStub.listInstances(registryKey);
     if (entries.length > 0) {
-      const stub = env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(entries[0].doKey));
-      const status = await stub.getStatus();
-      if (status.sandboxId) return status.sandboxId;
+      const entry = entries[0];
+      // Try the DO's authoritative sandboxId first.
+      try {
+        const stub = env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(entry.doKey));
+        const status = await stub.getStatus();
+        if (status.sandboxId) return status.sandboxId;
+      } catch {
+        // DO unreachable — derive from the registry entry's doKey.
+        // If doKey is a UUID (instance-keyed), derive ki_ sandboxId from it.
+        // If doKey is a userId (legacy), fall through to sandboxIdFromUserId.
+        if (isValidInstanceId(entry.doKey)) {
+          return sandboxIdFromInstanceId(entry.doKey);
+        }
+      }
     }
   } catch {
-    // Fall back to legacy derivation if registry/DO is unreachable
+    // Registry unreachable — fall back to legacy derivation
   }
   return sandboxIdFromUserId(userId);
 }

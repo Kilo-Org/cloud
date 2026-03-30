@@ -842,6 +842,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .select({
         id: kiloclaw_instances.id,
         user_id: kiloclaw_instances.user_id,
+        sandbox_id: kiloclaw_instances.sandbox_id,
         destroyed_at: kiloclaw_instances.destroyed_at,
       })
       .from(kiloclaw_instances)
@@ -946,6 +947,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .select({
         id: kiloclaw_instances.id,
         user_id: kiloclaw_instances.user_id,
+        sandbox_id: kiloclaw_instances.sandbox_id,
       })
       .from(kiloclaw_instances)
       .where(isNull(kiloclaw_instances.destroyed_at));

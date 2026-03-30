@@ -16,6 +16,8 @@ export function renderPromptTemplate(template: string, request: WebhookRequest):
     '{{bodyJson}}': tryPrettyJson(request.body),
     '{{method}}': request.method,
     '{{path}}': request.path,
+    // Headers are already redacted by TriggerDO.captureRequest before DB storage.
+    // No extraHeaders needed here — this function only receives pre-redacted records.
     '{{headers}}': JSON.stringify(redactSensitiveHeaders(request.headers), null, 2),
     '{{query}}': request.queryString ?? '',
     '{{sourceIp}}': request.sourceIp ?? 'unknown',

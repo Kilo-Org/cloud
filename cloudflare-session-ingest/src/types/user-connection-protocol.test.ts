@@ -139,6 +139,12 @@ describe('CLIInboundMessageSchema', () => {
     const result = CLIInboundMessageSchema.safeParse(msg);
     expect(result.success).toBe(false);
   });
+
+  it('parses valid heartbeat_ack', () => {
+    const msg = { type: 'heartbeat_ack' };
+    const result = CLIInboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+  });
 });
 
 describe('WebOutboundMessageSchema', () => {

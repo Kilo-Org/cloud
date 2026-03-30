@@ -314,6 +314,8 @@ export class UserConnectionDO extends DurableObject<Env> {
         this.sendToWeb(ws2, msg);
       }
     }
+
+    this.sendToCli(ws, { type: 'heartbeat_ack' });
   }
 
   private handleCliEvent(

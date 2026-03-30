@@ -57,6 +57,9 @@ export const CLIInboundMessageSchema = z.discriminatedUnion('type', [
     event: z.string(),
     data: z.unknown(),
   }),
+  z.object({
+    type: z.literal('heartbeat_ack'),
+  }),
 ]);
 
 // -- Web UI → DO (WebOutbound) ------------------------------------------------

@@ -1,13 +1,5 @@
 import '../global.css';
 
-import { LogBox } from 'react-native';
-
-LogBox.ignoreLogs([
-  'i18next is made possible', // stream-chat i18next promo
-  'unstable_getBoundingClientRect', // stream-chat OverlayProvider web-only API
-  'No recorder instance', // stream-chat audio recorder not installed
-]);
-
 import { PortalHost } from '@rn-primitives/portal';
 import * as Sentry from '@sentry/react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -20,11 +12,16 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Toaster } from 'sonner-native';
 
+import { LogBox } from 'react-native';
+
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { ContextProvider, useAppContext } from '@/lib/context/context-context';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
+
+// stream-chat i18next promo spam
+LogBox.ignoreLogs(['i18next is made possible']);
 
 const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),

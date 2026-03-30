@@ -9,6 +9,7 @@
     "eslint-plugin-sonarjs",
     "@sentry/cli",
     "@react-native-community/netinfo",
+    "@gorhom/bottom-sheet",
     "react-native-nitro-modules"
   ],
   "ignoreBinaries": ["oxfmt", "oxlint"],

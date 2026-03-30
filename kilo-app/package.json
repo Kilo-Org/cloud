@@ -19,6 +19,7 @@
     "check:unused": "knip"
   },
   "dependencies": {
+    "@gorhom/bottom-sheet": "^5.2.8",
     "@kilocode/trpc": "workspace:*",
     "@react-native-camera-roll/camera-roll": "^7.10.2",
     "@react-native-clipboard/clipboard": "^1.16.3",

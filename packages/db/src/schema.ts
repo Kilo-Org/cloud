@@ -43,11 +43,7 @@ import {
   KiloClawSubscriptionStatus,
   KiloClawPaymentSource,
 } from './schema-types';
-import {
-  CustomLlmDefinitionSchema,
-  type CustomLlmDefinition,
-  type KiloClawAdminAuditAction,
-} from './schema-types';
+import type { CustomLlmDefinition, KiloClawAdminAuditAction } from './schema-types';
 import type {
   OrganizationModeConfig,
   OrganizationPlan,
@@ -939,18 +935,10 @@ export const custom_llm = pgTable('custom_llm', {
 
 export const custom_llm2 = pgTable('custom_llm2', {
   public_id: text().notNull().primaryKey(),
-  definition: text().$type<CustomLlmDefinition>().notNull(),
+  definition: jsonb().notNull().$type<CustomLlmDefinition>(),
 });
 
-export type CustomLlm = { public_id: string } & CustomLlmDefinition;
-
-export function parseCustomLlm2Row(row: typeof custom_llm2.$inferSelect): CustomLlm {
-  const raw = row.definition;
-  const definition = CustomLlmDefinitionSchema.parse(
-    typeof raw === 'string' ? JSON.parse(raw) : raw
-  );
-  return { public_id: row.public_id, ...definition };
-}
+export type CustomLlm = typeof custom_llm.$inferSelect;
 
 export const user_admin_notes = pgTable(
   'user_admin_notes',

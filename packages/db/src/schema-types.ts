@@ -879,16 +879,13 @@ export const CustomLlmDefinitionSchema = z.object({
   display_name: z.string(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
-  provider: CustomLlmProviderSchema,
   base_url: z.string(),
   api_key: z.string(),
   organization_ids: z.array(z.string()),
   supports_image_input: z.boolean().optional(),
-  force_reasoning: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
   opencode_settings: OpenCodeSettingsSchema.optional(),
-  interleaved_format: InterleavedFormatSchema.optional(),
 });
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;

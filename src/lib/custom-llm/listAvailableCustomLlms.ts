@@ -1,19 +1,19 @@
-import { custom_llm2, parseCustomLlm2Row, type CustomLlm } from '@kilocode/db/schema';
+import { custom_llm2 } from '@kilocode/db/schema';
 import { readDb } from '@/lib/drizzle';
-import { OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
+import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
 
-export function convert(model: CustomLlm) {
+function convert(publicId: string, def: CustomLlmDefinition) {
   return {
-    id: model.public_id,
-    canonical_slug: model.public_id,
+    id: publicId,
+    canonical_slug: publicId,
     hugging_face_id: '',
-    name: model.display_name,
+    name: def.display_name,
     created: 1756238927,
-    description: model.display_name,
-    context_length: model.context_length,
+    description: def.display_name,
+    context_length: def.context_length,
     architecture: {
-      modality: model.supports_image_input ? 'text+image-\u003Etext' : 'text-\u003Etext',
-      input_modalities: model.supports_image_input ? ['text', 'image'] : ['text'],
+      modality: def.supports_image_input ? 'text+image-\u003Etext' : 'text-\u003Etext',
+      input_modalities: def.supports_image_input ? ['text', 'image'] : ['text'],
       output_modalities: ['text'],
       tokenizer: 'Other',
       instruct_type: null,
@@ -28,22 +28,20 @@ export function convert(model: CustomLlm) {
       input_cache_read: '0.00000000',
     },
     top_provider: {
-      context_length: model.context_length,
-      max_completion_tokens: model.max_completion_tokens,
+      context_length: def.context_length,
+      max_completion_tokens: def.max_completion_tokens,
       is_moderated: false,
     },
     per_request_limits: null,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
-    opencode: {
-      ...OpenCodeSettingsSchema.safeParse(model.opencode_settings).data,
-      ai_sdk_provider: model.provider,
-    },
+    opencode: def.opencode_settings,
   };
 }
 
 export async function listAvailableCustomLlms(organizationId: string) {
   const rows = await readDb.select().from(custom_llm2);
-  const models = rows.map(parseCustomLlm2Row);
-  return models.filter(m => m.organization_ids.includes(organizationId)).map(convert);
+  return rows
+    .filter(row => row.definition.organization_ids.includes(organizationId))
+    .map(row => convert(row.public_id, row.definition));
 }

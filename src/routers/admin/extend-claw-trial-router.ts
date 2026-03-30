@@ -1,10 +1,6 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import {
-  kilocode_users,
-  kiloclaw_subscriptions,
-  kiloclaw_email_log,
-} from '@kilocode/db/schema';
+import { kilocode_users, kiloclaw_subscriptions, kiloclaw_email_log } from '@kilocode/db/schema';
 import * as z from 'zod';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';

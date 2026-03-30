@@ -541,7 +541,9 @@ export default function ExtendClawTrialPage() {
                           <TableRow key={user.userId}>
                             <TableCell className="font-mono text-sm">{user.email}</TableCell>
                             <TableCell>{user.userName ?? '—'}</TableCell>
-                            <TableCell>{subscriptionStatusBadge(user.subscriptionStatus)}</TableCell>
+                            <TableCell>
+                              {subscriptionStatusBadge(user.subscriptionStatus)}
+                            </TableCell>
                             <TableCell className="font-mono text-xs text-muted-foreground">
                               {user.userId}
                             </TableCell>

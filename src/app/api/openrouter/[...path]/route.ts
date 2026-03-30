@@ -85,6 +85,7 @@ import {
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@/lib/providers/openrouter/request-helpers';
+import { handleRequestLogging } from '@/lib/handleRequestLogging';
 
 export const maxDuration = 800;
 
@@ -575,7 +576,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
-  /* disabled pending migration
   handleRequestLogging({
     clonedResponse: response.clone(),
     user: maybeUser,
@@ -583,8 +583,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     provider: provider.id,
     model: originalModelIdLowerCased,
     request: requestBodyParsed,
+    feature: feature ?? null,
+    api_kind: requestBodyParsed.kind,
+    session_id: taskId ?? null,
   });
-  */
 
   {
     const errorResponse = await makeErrorReadable({

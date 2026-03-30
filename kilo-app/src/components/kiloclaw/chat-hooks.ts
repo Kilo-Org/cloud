@@ -8,10 +8,10 @@ export function useKeyboardAwareBottomInset() {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
-    const showSub = Keyboard.addListener('keyboardWillShow', () => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => {
       setKeyboardVisible(true);
     });
-    const hideSub = Keyboard.addListener('keyboardWillHide', () => {
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
       setKeyboardVisible(false);
     });
     return () => {

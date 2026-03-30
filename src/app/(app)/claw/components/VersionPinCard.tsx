@@ -100,7 +100,7 @@ export function VersionPinCard({
         <Pin className="size-4" />
         Version Pinning
       </h3>
-      <div className="grid grid-cols-2 items-start gap-6">
+      <div className="grid grid-cols-1 items-start gap-6 sm:grid-cols-2">
         {/* Left: Description + Pinning Controls */}
         <div className="space-y-3">
           <div className="space-y-2">
@@ -124,8 +124,8 @@ export function VersionPinCard({
                 </Label>
                 <div className="flex items-center gap-2">
                   <Select value={selectedImageTag} onValueChange={setSelectedImageTag}>
-                    <SelectTrigger id="version-select">
-                      <SelectValue placeholder="Choose a version to pin..." />
+                    <SelectTrigger id="version-select" className="min-w-0 flex-1 h-10">
+                      <SelectValue placeholder="Choose version..." />
                     </SelectTrigger>
                     <SelectContent>
                       {versions?.items.map(version => (
@@ -149,9 +149,9 @@ export function VersionPinCard({
                     onClick={handlePin}
                     disabled={!selectedImageTag || isPinning}
                     size="sm"
-                    className="shrink-0"
+                    className="ml-auto shrink-0"
                   >
-                    {isPinning ? 'Pinning...' : 'Pin to this version'}
+                    {isPinning ? 'Pinning...' : 'Pin'}
                   </Button>
                 </div>
               </div>
@@ -232,7 +232,7 @@ export function VersionPinCard({
           ) : (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-100">
+                <span className="rounded-full bg-green-100 px-3 py-0.5 text-center text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-100">
                   Following latest
                 </span>
                 <span className="text-muted-foreground text-xs">

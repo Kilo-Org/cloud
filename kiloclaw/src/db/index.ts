@@ -76,6 +76,56 @@ export async function getActiveInstance(db: WorkerDb, userId: string) {
   return { id: row.id, sandboxId: row.sandbox_id };
 }
 
+/**
+ * Look up an active instance by its sandboxId.
+ * Used for DO restore when the DO has a stored sandboxId but lost other state.
+ */
+export async function getInstanceBySandboxId(db: WorkerDb, sandboxId: string) {
+  const row = await db
+    .select({
+      id: kiloclaw_instances.id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
+      user_id: kiloclaw_instances.user_id,
+    })
+    .from(kiloclaw_instances)
+    .where(
+      and(eq(kiloclaw_instances.sandbox_id, sandboxId), isNull(kiloclaw_instances.destroyed_at))
+    )
+    .limit(1)
+    .then(rows => rows[0] ?? null);
+
+  if (!row) return null;
+  return {
+    id: row.id,
+    sandboxId: row.sandbox_id,
+    userId: row.user_id,
+  };
+}
+
+/**
+ * Look up an active instance by its primary key UUID.
+ * Used for DO restore when the caller knows the instanceId (= DB row id).
+ */
+export async function getInstanceById(db: WorkerDb, instanceId: string) {
+  const row = await db
+    .select({
+      id: kiloclaw_instances.id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
+      user_id: kiloclaw_instances.user_id,
+    })
+    .from(kiloclaw_instances)
+    .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)))
+    .limit(1)
+    .then(rows => rows[0] ?? null);
+
+  if (!row) return null;
+  return {
+    id: row.id,
+    sandboxId: row.sandbox_id,
+    userId: row.user_id,
+  };
+}
+
 export async function markInstanceDestroyed(db: WorkerDb, userId: string, sandboxId: string) {
   await db
     .update(kiloclaw_instances)

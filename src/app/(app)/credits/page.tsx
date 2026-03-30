@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Coins } from 'lucide-react';
+import { Coins, CreditCard } from 'lucide-react';
 import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { formatMicrodollars } from '@/lib/admin-utils';
 import { useRouter } from 'next/navigation';
@@ -221,6 +221,50 @@ export default function CreditsPage() {
           )}
         </CardContent>
       </Card>
+
+      {creditData.deductions.length > 0 && (
+        <Card className="w-full overflow-hidden">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <CreditCard className="text-muted-foreground h-6 w-6" />
+              <CardTitle className="text-xl">Credit Subscription Transactions</CardTitle>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-muted border-b">
+                    <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                      Date
+                    </th>
+                    <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                      Description
+                    </th>
+                    <th className="text-muted-foreground px-6 py-3 text-right text-xs font-medium tracking-wider uppercase">
+                      Amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-border divide-y">
+                  {creditData.deductions.map(deduction => (
+                    <tr key={deduction.id} className="even:bg-muted text-foreground">
+                      <td className="px-6 py-4 text-sm whitespace-nowrap">
+                        {formatIsoDateString_UsaDateOnlyFormat(deduction.date)}
+                      </td>
+                      <td className="px-6 py-4 text-sm">{deduction.description}</td>
+                      <td className="px-6 py-4 text-sm whitespace-nowrap text-right">
+                        -{formatMicrodollars(Math.abs(deduction.amount_mUsd))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </PageLayout>
   );
 }

@@ -7,7 +7,12 @@ import {
   STARTUP_TIMEOUT_SECONDS,
   STALE_PROVISION_THRESHOLD_MS,
 } from '../../config';
-import { parseRegions, deprioritizeRegion, resolveRegions } from '../regions';
+import {
+  parseRegions,
+  deprioritizeRegion,
+  resolveRegions,
+  evictCapacityRegionFromKV,
+} from '../regions';
 import { guestFromSize, volumeNameFromSandboxId } from '../machine-config';
 import type { InstanceMutableState } from './types';
 import { storageUpdate } from './state';
@@ -36,7 +41,12 @@ export async function ensureVolume(
       size_gb: DEFAULT_VOLUME_SIZE_GB,
       compute: guestFromSize(state.machineSize),
     },
-    regions
+    regions,
+    {
+      onCapacityError: failedRegion => {
+        void evictCapacityRegionFromKV(env.KV_CLAW_CACHE, env, failedRegion);
+      },
+    }
   );
 
   state.flyVolumeId = volume.id;
@@ -94,6 +104,12 @@ export async function replaceStrandedVolume(
     }
   }
 
+  const capacityErrorCallback = {
+    onCapacityError: (failedRegion: string) => {
+      void evictCapacityRegionFromKV(env.KV_CLAW_CACHE, env, failedRegion);
+    },
+  };
+
   if (hasUserData) {
     const forkedVolume = await fly.createVolumeWithFallback(
       flyConfig,
@@ -102,7 +118,8 @@ export async function replaceStrandedVolume(
         source_volume_id: oldVolumeId,
         compute,
       },
-      regions
+      regions,
+      capacityErrorCallback
     );
     state.flyVolumeId = forkedVolume.id;
     state.flyRegion = forkedVolume.region;
@@ -125,7 +142,8 @@ export async function replaceStrandedVolume(
         size_gb: DEFAULT_VOLUME_SIZE_GB,
         compute,
       },
-      regions
+      regions,
+      capacityErrorCallback
     );
     state.flyVolumeId = freshVolume.id;
     state.flyRegion = freshVolume.region;

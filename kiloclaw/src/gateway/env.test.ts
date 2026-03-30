@@ -484,4 +484,51 @@ describe('buildEnvVars', () => {
     expect(result.env.KILOCLAW_EXEC_SECURITY).toBeUndefined();
     expect(result.env.KILOCLAW_EXEC_ASK).toBeUndefined();
   });
+
+  // ─── Custom secrets (non-catalog) ──────────────────────────────────
+
+  it('routes custom encrypted secrets to the sensitive bucket', async () => {
+    const env = createMockEnv({ AGENT_ENV_VARS_PRIVATE_KEY: testPrivateKey });
+    const customEnvelope = encryptForTest('my-secret-value', testPublicKey);
+
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      encryptedSecrets: { MY_CUSTOM_KEY: customEnvelope },
+    });
+
+    expect(result.sensitive.MY_CUSTOM_KEY).toBe('my-secret-value');
+    expect(result.env.MY_CUSTOM_KEY).toBeUndefined();
+  });
+
+  it('serializes customSecretMeta config paths as KILOCLAW_SECRET_CONFIG_PATHS', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      customSecretMeta: {
+        MY_KEY: { configPath: 'models.providers.openai.apiKey' },
+        OTHER_KEY: { configPath: 'talk.apiKey' },
+      },
+    });
+
+    expect(JSON.parse(result.env.KILOCLAW_SECRET_CONFIG_PATHS) as unknown).toEqual({
+      MY_KEY: 'models.providers.openai.apiKey',
+      OTHER_KEY: 'talk.apiKey',
+    });
+  });
+
+  it('omits KILOCLAW_SECRET_CONFIG_PATHS when no config paths exist', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      customSecretMeta: { MY_KEY: {} },
+    });
+
+    expect(result.env.KILOCLAW_SECRET_CONFIG_PATHS).toBeUndefined();
+  });
+
+  it('omits KILOCLAW_SECRET_CONFIG_PATHS when customSecretMeta is null', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET, {
+      customSecretMeta: null,
+    });
+
+    expect(result.env.KILOCLAW_SECRET_CONFIG_PATHS).toBeUndefined();
+  });
 });

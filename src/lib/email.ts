@@ -30,6 +30,7 @@ export const subjects = {
   clawEarlybirdEndingSoon: 'Your KiloClaw Earlybird Access Ends Soon',
   clawEarlybirdExpiresTomorrow: 'Your KiloClaw Earlybird Access Expires Tomorrow',
   clawInstanceReady: 'Your KiloClaw Instance Is Ready',
+  clawCreditRenewalFailed: 'Action Required: KiloClaw Hosting Renewal Failed',
 } as const;
 
 export type TemplateName = keyof typeof subjects;

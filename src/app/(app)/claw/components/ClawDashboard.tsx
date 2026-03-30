@@ -22,6 +22,7 @@ import { InstanceTab } from './InstanceTab';
 import { OpenClawButton } from './OpenClawButton';
 import { SettingsTab } from './SettingsTab';
 import { ChangelogTab } from './ChangelogTab';
+import { SubscriptionTab } from './SubscriptionTab';
 import { ChannelPairingStep } from './ChannelPairingStep';
 import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { PermissionStep } from './PermissionStep';
@@ -77,7 +78,29 @@ export function ClawDashboard({
     Date.now() - instanceStatus.provisionedAt < SEVEN_DAYS_MS;
   const configServiceNudgeVisible = !instanceStatus || instanceYoung;
 
-  const [activeTab, setActiveTab] = useState('instance');
+  const VALID_TABS = ['instance', 'chat', 'settings', 'subscription', 'changelog'] as const;
+  type TabValue = (typeof VALID_TABS)[number];
+
+  function tabFromHash(): TabValue {
+    if (typeof window === 'undefined') return 'instance';
+    const hash = window.location.hash.slice(1);
+    return VALID_TABS.includes(hash as TabValue) ? (hash as TabValue) : 'instance';
+  }
+
+  const [activeTab, setActiveTab] = useState<TabValue>(tabFromHash);
+
+  function handleTabChange(value: string) {
+    setActiveTab(value as TabValue);
+    window.history.replaceState(null, '', value === 'instance' ? '/claw' : `#${value}`);
+  }
+
+  useEffect(() => {
+    function onHashChange() {
+      setActiveTab(tabFromHash());
+    }
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   const [onboardingStep, setOnboardingStep] = useState<
     'permissions' | 'channels' | 'provisioning' | 'pairing' | 'done'
@@ -317,9 +340,9 @@ export function ClawDashboard({
                 onUpgradeHandled={onUpgradeHandled}
               />
             </CardContent>
-            <Tabs defaultValue="instance" onValueChange={setActiveTab}>
+            <Tabs value={activeTab} onValueChange={handleTabChange}>
               <div className="px-5">
-                <TabsList className="mt-4 h-auto w-full justify-start gap-2 rounded-none border-b bg-transparent p-0 pb-3">
+                <TabsList className="mt-4 h-auto w-full justify-start gap-2 overflow-x-auto rounded-none border-b bg-transparent p-0 pb-3">
                   <TabsTrigger value="instance" className={tabTriggerClass}>
                     Gateway Process
                   </TabsTrigger>
@@ -329,6 +352,9 @@ export function ClawDashboard({
                   </TabsTrigger>
                   <TabsTrigger value="settings" className={tabTriggerClass}>
                     Settings
+                  </TabsTrigger>
+                  <TabsTrigger value="subscription" className={tabTriggerClass}>
+                    Subscription
                   </TabsTrigger>
                   <TabsTrigger value="changelog" className={tabTriggerClass}>
                     What&apos;s New <Sparkles className="ml-1 inline h-3 w-3 text-amber-400" />
@@ -357,6 +383,9 @@ export function ClawDashboard({
                     onUpgrade={onUpgrade}
                     onRequestUpgrade={onRequestUpgrade}
                   />
+                </TabsContent>
+                <TabsContent value="subscription" className="mt-0">
+                  <SubscriptionTab />
                 </TabsContent>
                 <TabsContent value="changelog" className="mt-0">
                   <ChangelogTab />

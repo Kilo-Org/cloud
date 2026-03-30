@@ -3,14 +3,27 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getEnvVariable } from '@/lib/dotenvx';
 
-type QueryType = 'instance-events';
+type QueryType = 'instance-events' | 'all-events';
 
-const validQueryTypes = new Set<QueryType>(['instance-events']);
+const validQueryTypes = new Set<QueryType>(['instance-events', 'all-events']);
 
-function buildQuery(queryType: QueryType, sandboxId: string): string {
-  // sandboxId is validated as base64url [A-Za-z0-9_-]+ before reaching here
+// Validates that a value is safe to interpolate into SQL (alphanumeric, hyphens, underscores only)
+function isSafeIdentifier(value: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(value);
+}
+
+type AllEventsParams = {
+  sandboxId: string;
+  userId: string;
+  flyAppName: string | null;
+  flyMachineId: string | null;
+  offset: number;
+};
+
+function buildQuery(queryType: QueryType, sandboxId: string, params?: AllEventsParams): string {
   switch (queryType) {
     case 'instance-events':
+      // sandboxId is validated as base64url [A-Za-z0-9_-]+ before reaching here
       return `SELECT
   timestamp,
   blob1 AS event,
@@ -33,6 +46,40 @@ WHERE
 ORDER BY timestamp DESC
 LIMIT 20
 FORMAT JSON`;
+
+    case 'all-events': {
+      // All identifiers are validated before reaching here
+      const p = params as AllEventsParams;
+      const orClauses = [`blob2 = '${p.userId}'`, `blob8 = '${p.sandboxId}'`];
+      if (p.flyMachineId) orClauses.push(`blob7 = '${p.flyMachineId}'`);
+      if (p.flyAppName) orClauses.push(`blob6 = '${p.flyAppName}'`);
+      return `SELECT
+  timestamp,
+  blob1 AS event,
+  blob2 AS user_id,
+  blob3 AS delivery,
+  blob4 AS route,
+  blob5 AS error,
+  blob6 AS fly_app_name,
+  blob7 AS fly_machine_id,
+  blob8 AS sandbox_id,
+  blob9 AS status,
+  blob10 AS openclaw_version,
+  blob11 AS image_tag,
+  blob12 AS fly_region,
+  blob13 AS label,
+  double1 AS duration_ms,
+  double2 AS value
+FROM kiloclaw_events
+WHERE
+  (${orClauses.join(' OR ')})
+  AND blob3 IN ('http', 'do', 'reconcile', 'queue')
+  AND blob1 != 'platform.gateway.status.get'
+ORDER BY timestamp DESC
+LIMIT 100
+OFFSET ${p.offset}
+FORMAT JSON`;
+    }
   }
 }
 
@@ -61,7 +108,7 @@ export async function GET(
     );
   }
 
-  if (!sandboxId || !/^[A-Za-z0-9_-]+$/.test(sandboxId)) {
+  if (!sandboxId || !isSafeIdentifier(sandboxId)) {
     return NextResponse.json({ error: 'Invalid or missing sandboxId' }, { status: 400 });
   }
 
@@ -75,7 +122,38 @@ export async function GET(
     );
   }
 
-  const sqlQuery = buildQuery(queryType as QueryType, sandboxId);
+  let sqlQuery: string;
+
+  if (queryType === 'all-events') {
+    const userId = searchParams.get('userId');
+    const flyAppName = searchParams.get('flyAppName');
+    const flyMachineId = searchParams.get('flyMachineId');
+    const offsetParam = searchParams.get('offset');
+    const offset = offsetParam ? parseInt(offsetParam, 10) : 0;
+
+    if (!userId || !isSafeIdentifier(userId)) {
+      return NextResponse.json({ error: 'Invalid or missing userId' }, { status: 400 });
+    }
+    if (flyAppName && !isSafeIdentifier(flyAppName)) {
+      return NextResponse.json({ error: 'Invalid flyAppName' }, { status: 400 });
+    }
+    if (flyMachineId && !isSafeIdentifier(flyMachineId)) {
+      return NextResponse.json({ error: 'Invalid flyMachineId' }, { status: 400 });
+    }
+    if (isNaN(offset) || offset < 0) {
+      return NextResponse.json({ error: 'Invalid offset' }, { status: 400 });
+    }
+
+    sqlQuery = buildQuery('all-events', sandboxId, {
+      sandboxId,
+      userId,
+      flyAppName: flyAppName ?? null,
+      flyMachineId: flyMachineId ?? null,
+      offset,
+    });
+  } else {
+    sqlQuery = buildQuery(queryType as QueryType, sandboxId);
+  }
 
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${accountId}/analytics_engine/sql`,

@@ -69,7 +69,7 @@ export function getCreditBlocks(
   const nonExpiringBalance_mUsd = totalBalance_mUsd - expiringBalance_mUsd;
   let prefixSumMusd = 0;
   const nonExpiring = transactions
-    .filter(tx => tx.expiry_date == null)
+    .filter(tx => tx.expiry_date == null && tx.amount_microdollars > 0)
     .sort((a, b) => {
       // Sort by effective_date (newest first)
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -94,8 +94,22 @@ export function getCreditBlocks(
 
   const creditBlocks = [...expiredWithBalance, ...nonExpiring];
 
+  // Extract deduction transactions (negative amounts) for display.
+  // These include KiloClaw subscription charges and settlement deductions.
+  const deductions = transactions
+    .filter(tx => tx.amount_microdollars < 0)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .map(tx => ({
+      id: tx.id,
+      date: tx.created_at,
+      description: tx.description ?? tx.credit_category ?? 'Credit deduction',
+      credit_category: tx.credit_category,
+      amount_mUsd: tx.amount_microdollars, // negative
+    }));
+
   return {
     creditBlocks,
+    deductions,
     totalBalance_mUsd,
     isFirstPurchase,
   };

@@ -1,4 +1,5 @@
 import { DEFAULT_FLY_REGION } from '../config';
+import { writeEvent } from '../utils/analytics';
 
 /** KV key used to store the runtime region configuration. */
 export const FLY_REGIONS_KV_KEY = 'fly-regions';
@@ -91,6 +92,74 @@ export function isMetaRegion(region: string): boolean {
 export function prepareRegions(regions: string[]): string[] {
   const hasSpecific = regions.some(r => !isMetaRegion(r));
   return hasSpecific ? shuffleRegions([...regions]) : regions;
+}
+
+/**
+ * Evict a capacity-exhausted region from the KV region list.
+ *
+ * If the region is not present, or the list is all meta-regions, this is a no-op.
+ * When eviction leaves ≤1 distinct named region, a meta-region fallback is written
+ * so provisioning continues to work globally.
+ */
+export async function evictCapacityRegionFromKV(
+  kv: KVNamespace,
+  env: { KILOCLAW_AE?: AnalyticsEngineDataset },
+  failedRegion: string
+): Promise<void> {
+  let raw: string | null;
+  try {
+    raw = await kv.get(FLY_REGIONS_KV_KEY);
+  } catch {
+    return;
+  }
+
+  if (!raw) return;
+
+  const regions = parseRegions(raw);
+  if (regions.every(r => isMetaRegion(r))) return;
+
+  const wasPresent = regions.some(r => r === failedRegion);
+  if (!wasPresent) return;
+
+  const remaining = regions.filter(r => r !== failedRegion);
+  const namedRemaining = remaining.filter(r => !isMetaRegion(r));
+  const distinctNamedCount = new Set(namedRemaining).size;
+
+  let newKvValue: string;
+  let revertedToMeta: boolean;
+
+  if (distinctNamedCount > 1) {
+    newKvValue = remaining.join(',');
+    revertedToMeta = false;
+  } else {
+    const lastRegion = namedRemaining[0];
+    newKvValue = lastRegion ? `${lastRegion},eu,us` : 'eu,us';
+    revertedToMeta = true;
+  }
+
+  try {
+    await kv.put(FLY_REGIONS_KV_KEY, newKvValue);
+  } catch {
+    console.warn(`[regions] capacity eviction: failed to write updated region list to KV`);
+    return;
+  }
+
+  if (revertedToMeta) {
+    console.warn(
+      `[regions] capacity eviction: ${failedRegion} was last named region, reverting to meta-regions → "${newKvValue}"`
+    );
+  } else {
+    console.warn(
+      `[regions] capacity eviction: removed ${failedRegion} from KV region list → "${newKvValue}"`
+    );
+  }
+
+  writeEvent(env, {
+    event: 'region.capacity_eviction',
+    delivery: 'do',
+    flyRegion: failedRegion,
+    label: revertedToMeta ? 'reverted_to_meta' : 'evicted',
+  });
 }
 
 /**

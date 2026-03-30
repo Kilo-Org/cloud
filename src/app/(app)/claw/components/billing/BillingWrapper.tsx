@@ -8,8 +8,7 @@ import { Button } from '@/components/ui/button';
 import { BillingBanner } from './BillingBanner';
 import { AccessLockedDialog } from './AccessLockedDialog';
 import { PlanSelectionDialog } from './PlanSelectionDialog';
-import { SubscriptionCard } from './SubscriptionCard';
-import { CancelDialog } from './CancelDialog';
+
 import { deriveBannerState, deriveLockReason, formatBillingDate } from './billing-types';
 
 function EarlybirdActiveCard({
@@ -48,7 +47,6 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
   const { data: billing } = useQuery(trpc.kiloclaw.getBillingStatus.queryOptions());
 
   const [showPlanDialog, setShowPlanDialog] = useState(false);
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   const reactivate = useMutation(trpc.kiloclaw.reactivateSubscription.mutationOptions());
   const billingPortal = useMutation(trpc.kiloclaw.createBillingPortalSession.mutationOptions());
@@ -113,6 +111,7 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
       {/* Lock dialog — blocks interaction when access is revoked */}
       <AccessLockedDialog
         reason={lockReason}
+        billing={billing}
         onSubscribeClick={handleSubscribe}
         onUpdatePaymentClick={handleUpdatePayment}
         onDestroyClick={() =>
@@ -127,14 +126,8 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
       {/* Dashboard content */}
       {children}
 
-      {/* Subscription card — shown below the main dashboard card */}
-      <SubscriptionCard billing={billing} onCancelClick={() => setShowCancelDialog(true)} />
-
       {/* Plan selection dialog */}
       <PlanSelectionDialog open={showPlanDialog} onOpenChange={setShowPlanDialog} />
-
-      {/* Cancel confirmation dialog */}
-      <CancelDialog open={showCancelDialog} onOpenChange={setShowCancelDialog} billing={billing} />
     </>
   );
 }

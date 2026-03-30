@@ -1,0 +1,3571 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Iteration 3: Dual-Subscription Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #171717;
+        --bg-card: #262626;
+        --bg-elevated: #2a2a2a;
+        --fg: #fafafa;
+        --fg-muted: #a3a3a3;
+        --fg-dim: #737373;
+        --border: #333;
+        --border-muted: #2a2a2a;
+        --blue-500: #2b6ad2;
+        --blue-400: #3b82f6;
+        --blue-bg: rgba(43, 106, 210, 0.1);
+        --blue-border: rgba(43, 106, 210, 0.3);
+        --emerald-400: #34d399;
+        --emerald-300: #6ee7b7;
+        --emerald-bg: rgba(52, 211, 153, 0.1);
+        --emerald-border: rgba(52, 211, 153, 0.3);
+        --amber-400: #fbbf24;
+        --amber-300: #fcd34d;
+        --amber-bg: rgba(251, 191, 36, 0.1);
+        --amber-border: rgba(251, 191, 36, 0.3);
+        --red-400: #f87171;
+        --red-bg: rgba(248, 113, 113, 0.1);
+        --red-border: rgba(248, 113, 113, 0.3);
+        --radius: 10px;
+        --radius-lg: 12px;
+      }
+
+      body {
+        font-family:
+          'Inter',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page-title {
+        text-align: center;
+        padding: 24px 16px 8px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--fg-dim);
+      }
+
+      .scene {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 24px 16px 64px;
+      }
+      .scene + .scene {
+        border-top: 1px solid var(--border);
+      }
+      .scene-label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--fg-dim);
+        margin-bottom: 4px;
+      }
+      .scene-context {
+        font-size: 12px;
+        color: var(--fg-dim);
+        line-height: 1.5;
+        margin-bottom: 16px;
+        font-style: italic;
+      }
+
+      /* ── Buttons ──────────────────────────────────── */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        border: none;
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition:
+          background 200ms,
+          opacity 200ms,
+          transform 150ms;
+        padding: 10px 20px;
+        line-height: 1.4;
+      }
+      .btn:active {
+        transform: scale(0.98);
+      }
+      .btn-primary {
+        background: var(--blue-500);
+        color: #fff;
+      }
+      .btn-primary:hover {
+        background: #225eb9;
+      }
+      .btn-outline {
+        background: transparent;
+        color: var(--fg-muted);
+        border: 1px solid var(--border);
+        padding: 8px 16px;
+      }
+      .btn-outline:hover {
+        border-color: var(--fg-dim);
+        color: var(--fg);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--fg-muted);
+        padding: 8px 12px;
+      }
+      .btn-ghost:hover {
+        color: var(--fg);
+      }
+      .btn-sm {
+        font-size: 13px;
+        padding: 6px 12px;
+      }
+      .btn-full {
+        width: 100%;
+      }
+      .btn-lg {
+        padding: 14px 24px;
+        font-size: 16px;
+      }
+      .btn-destructive {
+        background: var(--red-400);
+        color: #171717;
+      }
+      .btn-destructive:hover {
+        background: #ef4444;
+      }
+      .btn-disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        pointer-events: none;
+      }
+
+      /* ── Badge ─────────────────────────────────────── */
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 10px;
+        border-radius: 100px;
+        letter-spacing: 0.03em;
+      }
+      .badge-emerald {
+        background: rgba(52, 211, 153, 0.15);
+        color: var(--emerald-300);
+        border: 1px solid rgba(52, 211, 153, 0.3);
+      }
+      .badge-blue {
+        background: rgba(59, 130, 246, 0.15);
+        color: #93c5fd;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+      }
+      .badge-dim {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--fg-muted);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      /* ── Dialog ────────────────────────────────────── */
+      .dialog-backdrop {
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: var(--radius-lg);
+        padding: 32px 24px;
+      }
+      .dialog {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 28px 24px;
+        max-width: 640px;
+        margin: 0 auto;
+      }
+      .dialog-title {
+        font-size: 22px;
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 4px;
+      }
+      .dialog-sub {
+        font-size: 14px;
+        color: var(--fg-muted);
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .footer-text {
+        font-size: 12px;
+        color: var(--fg-dim);
+        text-align: center;
+        margin-top: 8px;
+      }
+
+      /* ── Dual subscription panel ─────────────────── */
+      .dual-panel {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+      }
+      .dual-panel-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+      }
+      .dual-panel-title {
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 2px;
+      }
+      .dual-panel-subtitle {
+        font-size: 13px;
+        color: var(--fg-muted);
+      }
+      .dual-panel-body {
+        padding: 16px 20px;
+      }
+
+      /* ── Instance group ──────────────────────────── */
+      .instance-group {
+        margin-bottom: 12px;
+      }
+      .instance-group-label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--fg-dim);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .sub-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px;
+        border-radius: var(--radius);
+        margin-bottom: 10px;
+      }
+      .sub-row-indicator {
+        width: 4px;
+        border-radius: 4px;
+        align-self: stretch;
+        flex-shrink: 0;
+      }
+      .sub-row-indicator-emerald {
+        background: var(--emerald-400);
+      }
+      .sub-row-indicator-blue {
+        background: var(--blue-400);
+      }
+      .sub-row-indicator-amber {
+        background: var(--amber-400);
+      }
+
+      .sub-row-emerald {
+        background: rgba(52, 211, 153, 0.04);
+        border: 1px solid rgba(52, 211, 153, 0.12);
+      }
+      .sub-row-blue {
+        background: rgba(59, 130, 246, 0.04);
+        border: 1px solid rgba(59, 130, 246, 0.12);
+      }
+      .sub-row-amber {
+        background: rgba(251, 191, 36, 0.04);
+        border: 1px solid rgba(251, 191, 36, 0.12);
+      }
+
+      .sub-row-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .sub-row-icon-emerald {
+        background: var(--emerald-bg);
+      }
+      .sub-row-icon-blue {
+        background: var(--blue-bg);
+      }
+      .sub-row-icon-amber {
+        background: var(--amber-bg);
+      }
+
+      .sub-row-content {
+        flex: 1;
+        min-width: 0;
+      }
+      .sub-row-top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .sub-row-name {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .sub-row-meta {
+        font-size: 12px;
+        color: var(--fg-muted);
+        line-height: 1.5;
+      }
+      .sub-row-meta .val {
+        color: var(--fg);
+      }
+      .sub-row-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 10px;
+      }
+
+      .dual-panel-footer {
+        padding: 12px 20px;
+        border-top: 1px dashed var(--border-muted);
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .dual-panel-footer p {
+        font-size: 12px;
+        color: var(--fg-dim);
+        line-height: 1.5;
+      }
+      .dual-panel-footer strong {
+        color: var(--fg-muted);
+      }
+
+      /* ── Checkout sections ───────────────────────── */
+      .checkout-section {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 24px 20px;
+        margin-bottom: 16px;
+        position: relative;
+        transition:
+          border-color 200ms,
+          opacity 200ms;
+      }
+      .checkout-section-recommended {
+        border-color: var(--blue-border);
+        background: linear-gradient(to bottom, rgba(43, 106, 210, 0.04), transparent);
+        box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.08);
+      }
+      .checkout-section-secondary {
+        border-color: var(--border-muted);
+        opacity: 0.7;
+      }
+      .checkout-section-secondary:hover {
+        opacity: 0.9;
+        border-color: var(--border);
+      }
+      .checkout-section-secondary.has-selection {
+        opacity: 1;
+        border-color: var(--border);
+      }
+
+      .checkout-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .checkout-header h3 {
+        font-size: 16px;
+        font-weight: 600;
+        flex: 1;
+      }
+
+      .checkout-features {
+        list-style: none;
+        margin-bottom: 16px;
+      }
+      .checkout-features li {
+        font-size: 13px;
+        color: var(--fg-muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 0;
+      }
+      .checkout-features li svg {
+        color: var(--emerald-400);
+        flex-shrink: 0;
+      }
+
+      .inline-warning {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: var(--radius);
+        background: var(--amber-bg);
+        border: 1px solid var(--amber-border);
+        margin-bottom: 16px;
+      }
+      .inline-warning svg {
+        flex-shrink: 0;
+        color: var(--amber-400);
+        margin-top: 1px;
+      }
+      .inline-warning p {
+        font-size: 12px;
+        color: var(--amber-300);
+        line-height: 1.5;
+      }
+      .inline-warning strong {
+        color: var(--amber-300);
+        font-weight: 400;
+      }
+
+      /* ── Cadence toggle ──────────────────────────── */
+      .cadence-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 12px;
+        background: var(--bg-elevated);
+        border-radius: var(--radius);
+        margin-bottom: 12px;
+      }
+      .cadence-bar-label {
+        font-size: 12px;
+        color: var(--fg-muted);
+      }
+      .cadence-pills {
+        display: flex;
+        gap: 4px;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 8px;
+        padding: 3px;
+      }
+      .cadence-pill {
+        padding: 5px 14px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        border: none;
+        background: transparent;
+        color: var(--fg-muted);
+        cursor: pointer;
+        transition: all 200ms;
+      }
+      .cadence-pill:hover {
+        color: var(--fg);
+      }
+      .cadence-pill.active {
+        background: var(--blue-500);
+        color: #fff;
+      }
+
+      /* ── Tier grid ────────────────────────────────── */
+      .tier-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+      .tier-card {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 16px;
+        text-align: left;
+        cursor: pointer;
+        transition: all 200ms;
+        position: relative;
+        background: var(--bg-card);
+      }
+      .tier-card:hover {
+        border-color: var(--blue-border);
+        box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.15);
+      }
+      .tier-card.selected {
+        border-color: var(--blue-400);
+        background: var(--blue-bg);
+        box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25);
+      }
+      .tier-card-badge {
+        position: absolute;
+        top: -9px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      .tier-card-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+      .tier-card-name {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .tier-card-cadence {
+        font-size: 11px;
+        color: var(--fg-dim);
+      }
+
+      .tier-card-price {
+        font-size: 24px;
+        font-weight: 700;
+      }
+      .tier-card-price span {
+        font-size: 13px;
+        font-weight: 400;
+        color: var(--fg-muted);
+      }
+
+      .tier-card-details {
+        margin-top: 12px;
+      }
+      .tier-card-detail {
+        font-size: 12px;
+        color: var(--fg-muted);
+        line-height: 1.7;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 4px;
+      }
+      .tier-card-detail .amt-amber {
+        color: var(--amber-300);
+      }
+      .tier-card-detail .amt-emerald {
+        color: var(--emerald-300);
+      }
+      .tier-card-promo {
+        font-size: 12px;
+        color: var(--emerald-300);
+        line-height: 1.7;
+      }
+
+      .tier-card-select {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        margin-top: 14px;
+      }
+      .tier-card-select-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 16px;
+        border-radius: 100px;
+        font-size: 13px;
+        font-weight: 600;
+        border: 1px solid var(--blue-border);
+        background: var(--blue-bg);
+        color: #93c5fd;
+        cursor: pointer;
+        transition: all 200ms;
+      }
+      .tier-card-select-btn:hover {
+        border-color: var(--blue-400);
+        background: rgba(59, 130, 246, 0.2);
+        color: #fff;
+      }
+      .tier-card.selected .tier-card-select-btn {
+        background: var(--blue-500);
+        border-color: var(--blue-500);
+        color: #fff;
+      }
+
+      /* ── Hosting plan selector (radios) ──────────── */
+      .hosting-radio-group {
+        margin-bottom: 16px;
+      }
+      .hosting-radio-group-label {
+        font-size: 12px;
+        color: var(--fg-muted);
+        margin-bottom: 8px;
+        font-weight: 500;
+      }
+      .hosting-radio {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-bottom: 6px;
+        cursor: pointer;
+        transition: all 200ms;
+      }
+      .hosting-radio:hover {
+        border-color: var(--fg-dim);
+      }
+      .hosting-radio.selected {
+        border-color: var(--blue-400);
+        background: var(--blue-bg);
+      }
+      .hosting-radio.disabled-option {
+        opacity: 0.35;
+        cursor: not-allowed;
+        pointer-events: none;
+      }
+      .hosting-radio-dot {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid var(--fg-dim);
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .hosting-radio.selected .hosting-radio-dot {
+        border-color: var(--blue-400);
+      }
+      .hosting-radio.selected .hosting-radio-dot::after {
+        content: '';
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--blue-400);
+      }
+      .hosting-radio-label {
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .hosting-radio-detail {
+        font-size: 12px;
+        color: var(--fg-muted);
+        margin-left: auto;
+      }
+      .hosting-radio-note {
+        font-size: 11px;
+        color: var(--fg-dim);
+      }
+
+      /* ── Hosting Only plan cards ──────────────────── */
+      .plan-grid-sm {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .plan-sm {
+        position: relative;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 14px;
+        cursor: pointer;
+        transition: all 200ms;
+        text-align: center;
+      }
+      .plan-sm:hover {
+        border-color: var(--fg-dim);
+      }
+      .plan-sm.selected {
+        border-color: var(--blue-400);
+        background: var(--blue-bg);
+      }
+      .plan-sm-name {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .plan-sm-price {
+        font-size: 22px;
+        font-weight: 700;
+        margin-top: 4px;
+      }
+      .plan-sm-price span {
+        font-size: 12px;
+        font-weight: 400;
+        color: var(--fg-muted);
+      }
+      .plan-sm-detail {
+        font-size: 11px;
+        color: var(--fg-muted);
+        margin-top: 2px;
+      }
+      .plan-sm-promo {
+        font-size: 11px;
+        color: var(--emerald-400);
+        margin-top: 2px;
+        font-weight: 500;
+      }
+
+      /* ── Subscribe button area ────────────────────── */
+      .subscribe-area {
+        margin-top: 20px;
+      }
+
+      /* ── Or divider ──────────────────────────────── */
+      .or-divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 16px 0;
+        font-size: 12px;
+        color: var(--fg-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .or-divider::before,
+      .or-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+
+      /* ── Cancel flow ─────────────────────────────── */
+      .cancel-checkbox-list {
+        margin: 16px 0;
+      }
+      .cancel-checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 200ms;
+      }
+      .cancel-checkbox-item:hover {
+        border-color: var(--fg-dim);
+      }
+      .cancel-checkbox-item.checked {
+        border-color: var(--red-400);
+        background: var(--red-bg);
+      }
+      .cancel-checkbox {
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+        border: 2px solid var(--fg-dim);
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .cancel-checkbox-item.checked .cancel-checkbox {
+        border-color: var(--red-400);
+        background: var(--red-400);
+      }
+      .cancel-checkbox-icon {
+        display: none;
+      }
+      .cancel-checkbox-item.checked .cancel-checkbox-icon {
+        display: block;
+      }
+      .cancel-checkbox-label {
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .cancel-checkbox-meta {
+        font-size: 12px;
+        color: var(--fg-muted);
+      }
+
+      .confirm-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px;
+        border-radius: var(--radius);
+        margin-bottom: 8px;
+        font-size: 13px;
+      }
+      .confirm-row-cancel {
+        background: var(--red-bg);
+        border: 1px solid var(--red-border);
+      }
+      .confirm-row-keep {
+        background: var(--emerald-bg);
+        border: 1px solid var(--emerald-border);
+      }
+      .confirm-row svg {
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+
+      .acknowledge-checkbox {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px 14px;
+        border-radius: var(--radius);
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border);
+        margin: 16px 0;
+        cursor: pointer;
+      }
+      .ack-box {
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        border: 2px solid var(--fg-dim);
+        flex-shrink: 0;
+        margin-top: 1px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .acknowledge-checkbox.checked .ack-box {
+        border-color: var(--blue-400);
+        background: var(--blue-400);
+      }
+      .ack-check {
+        display: none;
+      }
+      .acknowledge-checkbox.checked .ack-check {
+        display: block;
+      }
+      .acknowledge-checkbox p {
+        font-size: 13px;
+        color: var(--fg-muted);
+        line-height: 1.5;
+      }
+      .acknowledge-checkbox strong {
+        color: var(--fg);
+      }
+
+      .cancel-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 16px;
+      }
+
+      /* ── Step indicator ───────────────────────────── */
+      .step-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-bottom: 20px;
+      }
+      .step-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--border);
+        transition: background 200ms;
+      }
+      .step-dot.active {
+        background: var(--blue-400);
+      }
+      .step-label {
+        font-size: 11px;
+        color: var(--fg-dim);
+        margin-left: 4px;
+      }
+
+      /* ── Instance name chip ───────────────────────── */
+      .instance-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--fg-muted);
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+        padding: 1px 6px;
+      }
+
+      /* ── Modal overlay ────────────────────────────── */
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        animation: fadeIn 150ms ease-out;
+      }
+      .modal-overlay.open {
+        display: flex;
+      }
+      .modal-overlay .dialog {
+        animation: scaleIn 200ms ease-out;
+        max-height: 90vh;
+        overflow-y: auto;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes scaleIn {
+        from {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      /* ── Cancelling state on sub-row ──────────────── */
+      .sub-row-cancelling {
+        opacity: 0.5;
+      }
+      .sub-row-cancelling .sub-row-actions {
+        display: none;
+      }
+
+      /* ── Switch plan radio in modal ──────────────── */
+      .switch-plan-option {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px;
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 200ms;
+      }
+      .switch-plan-option:hover {
+        border-color: var(--fg-dim);
+      }
+      .switch-plan-option.selected {
+        border-color: var(--blue-400);
+        background: var(--blue-bg);
+      }
+      .switch-plan-option.current {
+        border-color: var(--emerald-border);
+        background: var(--emerald-bg);
+        cursor: default;
+      }
+      .switch-plan-dot {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 2px solid var(--fg-dim);
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .switch-plan-option.selected .switch-plan-dot {
+        border-color: var(--blue-400);
+      }
+      .switch-plan-option.selected .switch-plan-dot::after {
+        content: '';
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--blue-400);
+      }
+      .switch-plan-option.current .switch-plan-dot {
+        border-color: var(--emerald-400);
+      }
+      .switch-plan-option.current .switch-plan-dot::after {
+        content: '';
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--emerald-400);
+      }
+      .switch-plan-info {
+        flex: 1;
+      }
+      .switch-plan-name {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .switch-plan-detail {
+        font-size: 12px;
+        color: var(--fg-muted);
+      }
+      .switch-plan-current-tag {
+        font-size: 11px;
+        color: var(--emerald-400);
+        font-weight: 600;
+      }
+
+      /* ── Toast notification ───────────────────────── */
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--bg-card);
+        border: 1px solid var(--emerald-border);
+        color: var(--emerald-300);
+        padding: 12px 20px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 500;
+        z-index: 2000;
+        display: none;
+        animation: slideUp 200ms ease-out;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      }
+      .toast.show {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+      }
+
+      /* ── Reactivate button ────────────────────────── */
+      .sub-row-cancel-meta {
+        font-size: 12px;
+        color: var(--amber-300);
+        margin-top: 4px;
+      }
+
+      /* ── Sub-row variants: red (past-due / suspended) ── */
+      .sub-row-red {
+        background: rgba(248, 113, 113, 0.04);
+        border: 1px solid rgba(248, 113, 113, 0.12);
+      }
+      .sub-row-indicator-red {
+        background: var(--red-400);
+      }
+      .sub-row-icon-red {
+        background: var(--red-bg);
+      }
+
+      /* ── Badge variants ───────────────────────────── */
+      .badge-red {
+        background: rgba(248, 113, 113, 0.15);
+        color: var(--red-400);
+        border: 1px solid rgba(248, 113, 113, 0.3);
+      }
+      .badge-amber {
+        background: rgba(251, 191, 36, 0.15);
+        color: var(--amber-300);
+        border: 1px solid rgba(251, 191, 36, 0.3);
+      }
+
+      /* ── Conversion banner ────────────────────────── */
+      .conversion-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px 16px;
+        border-radius: var(--radius);
+        background: var(--blue-bg);
+        border: 1px solid var(--blue-border);
+        margin-bottom: 12px;
+      }
+      .conversion-banner p {
+        font-size: 13px;
+        color: var(--fg-muted);
+        line-height: 1.5;
+      }
+      .conversion-banner strong {
+        color: var(--fg);
+      }
+      .conversion-banner-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      /* ── Spinner ──────────────────────────────────── */
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border);
+        border-top-color: var(--blue-400);
+        border-radius: 50%;
+        animation: spin 800ms linear infinite;
+        margin: 0 auto;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ── Progress steps ──────────────────────────── */
+      .progress-steps {
+        margin: 20px 0;
+      }
+      .progress-step {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 0;
+        font-size: 14px;
+      }
+      .progress-step-done {
+        color: var(--emerald-400);
+      }
+      .progress-step-active {
+        color: var(--fg);
+        font-weight: 500;
+      }
+      .progress-step-pending {
+        color: var(--fg-dim);
+      }
+      .progress-step-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 13px;
+      }
+      .progress-step-done .progress-step-icon {
+        background: var(--emerald-bg);
+        border: 1px solid var(--emerald-border);
+      }
+      .progress-step-active .progress-step-icon {
+        background: var(--blue-bg);
+        border: 1px solid var(--blue-border);
+      }
+      .progress-step-pending .progress-step-icon {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--border);
+      }
+
+      /* ── Access locked ────────────────────────────── */
+      .access-locked {
+        text-align: center;
+        padding: 40px 24px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: var(--bg-card);
+      }
+      .access-locked-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 16px;
+      }
+      .access-locked-icon-red {
+        background: var(--red-bg);
+        border: 1px solid var(--red-border);
+      }
+      .access-locked-icon-amber {
+        background: var(--amber-bg);
+        border: 1px solid var(--amber-border);
+      }
+
+      /* ── Balance shortfall ────────────────────────── */
+      .balance-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 16px;
+        border-radius: var(--radius);
+        background: var(--bg-elevated);
+        margin-bottom: 8px;
+      }
+      .balance-row-label {
+        font-size: 13px;
+        color: var(--fg-muted);
+      }
+      .balance-row-amount {
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .balance-row-amount-red {
+        color: var(--red-400);
+      }
+      .balance-row-amount-emerald {
+        color: var(--emerald-400);
+      }
+
+      /* ── Checkout success card ────────────────────── */
+      .success-card {
+        border: 1px solid var(--emerald-border);
+        border-radius: var(--radius-lg);
+        background: var(--bg-card);
+        padding: 32px 24px;
+        text-align: center;
+      }
+      .success-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--emerald-bg);
+        border: 1px solid var(--emerald-border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 16px;
+      }
+
+      /* ── Tier card detail fix for yearly ──────────── */
+      .tier-card-detail-flow {
+        font-size: 12px;
+        color: var(--fg-muted);
+        line-height: 1.7;
+      }
+
+      /* ── Key-value metadata ──────────────────────── */
+      .meta-kv {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 2px 12px;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+      .meta-kv-label {
+        color: var(--fg-dim);
+        white-space: nowrap;
+      }
+      .meta-kv-value {
+        color: var(--fg);
+      }
+
+      /* ── Disclosure toggle ───────────────────────── */
+      .disclosure {
+        border: 1px solid var(--border-muted);
+        border-radius: var(--radius);
+        overflow: hidden;
+        margin-bottom: 14px;
+      }
+      .disclosure-trigger {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 10px 14px;
+        background: transparent;
+        border: none;
+        color: var(--fg-muted);
+        font-size: 13px;
+        font-weight: 500;
+        font-family: inherit;
+        cursor: pointer;
+        transition: color 200ms;
+      }
+      .disclosure-trigger:hover {
+        color: var(--fg);
+      }
+      .disclosure-trigger svg {
+        transition: transform 200ms;
+        flex-shrink: 0;
+      }
+      .disclosure-trigger.open svg {
+        transform: rotate(90deg);
+      }
+      .disclosure-body {
+        display: none;
+        padding: 0 14px 12px;
+      }
+      .disclosure-body.open {
+        display: block;
+      }
+
+      /* ── Elevated alert bar (destruction warning) ── */
+      .alert-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 600;
+        margin-top: 8px;
+      }
+      .alert-bar-red {
+        background: var(--red-bg);
+        border: 1px solid var(--red-border);
+        color: var(--red-400);
+      }
+      .alert-bar svg {
+        flex-shrink: 0;
+      }
+
+      /* ── Two-panel dialog layout ─────────────────── */
+      .dialog-two-panel {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-top: 16px;
+      }
+      .dialog-panel {
+        min-width: 0;
+      }
+      .dialog-panel-title {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--fg-dim);
+        margin-bottom: 12px;
+      }
+
+      /* ── Cancel step 2 section headers ───────────── */
+      .cancel-section-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+        margin-top: 4px;
+      }
+      .cancel-section-header-red {
+        color: var(--red-400);
+      }
+      .cancel-section-header-green {
+        color: var(--emerald-400);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ═══════════════════════════════════════════════════
+     SCENE 1: Welcome Page (Checkout)
+     Kilo Pass monthly/yearly toggle, hosting adapts,
+     Hosting Only is secondary with mutual exclusion
+     ═══════════════════════════════════════════════════ -->
+    <div class="scene">
+      <p class="scene-label">Scene 1 — Welcome Page / Plan Selection</p>
+      <p class="scene-context">
+        First-time checkout flow. Shown when a user creates a new KiloClaw instance and needs to
+        choose a hosting plan. This is the primary conversion surface — users arrive here after the
+        trial ends or when setting up a new instance.
+      </p>
+
+      <div style="text-align: center; margin-bottom: 24px">
+        <h1 style="font-size: 28px; font-weight: 700">Choose your KiloClaw Subscription</h1>
+        <p style="font-size: 15px; color: var(--fg-muted); margin-top: 6px">
+          Choose how to activate hosting for this instance
+        </p>
+      </div>
+
+      <!-- Track 1: Kilo Pass (recommended) -->
+      <div class="checkout-section checkout-section-recommended" id="kilo-pass-section">
+        <div class="checkout-header">
+          <i data-lucide="crown" style="width: 20px; height: 20px; color: #fbbf24"></i>
+          <h3>Activate with Kilo Pass</h3>
+          <span class="badge badge-blue">Recommended</span>
+        </div>
+
+        <p style="font-size: 13px; color: var(--fg-muted); margin-bottom: 16px">
+          Credits for KiloClaw hosting + AI inference. Earn up to
+          <span style="color: var(--emerald-300)">50% free bonus credits</span>.
+        </p>
+
+        <!-- Cadence toggle -->
+        <div class="cadence-bar">
+          <span class="cadence-bar-label">Billing cadence</span>
+          <div class="cadence-pills">
+            <button type="button" class="cadence-pill active" data-cadence="monthly">
+              Monthly
+            </button>
+            <button type="button" class="cadence-pill" data-cadence="yearly">Yearly</button>
+          </div>
+        </div>
+
+        <!-- Tier cards -->
+        <div class="tier-grid" id="tier-grid">
+          <div
+            class="tier-card"
+            data-tier="starter"
+            data-monthly-price="19"
+            data-yearly-price="228"
+            data-monthly-credits="19"
+            data-yearly-bonus="9.50"
+          >
+            <div class="tier-card-top">
+              <span class="tier-card-name">Starter</span>
+              <span class="tier-card-cadence" data-cadence-label>Monthly</span>
+            </div>
+            <div class="tier-card-price" data-tier-price>$19<span> /month</span></div>
+            <div class="tier-card-details" data-tier-details>
+              <div class="tier-card-detail-flow">
+                <span class="amt-amber">$19/month</span> paid credits
+              </div>
+              <div class="tier-card-detail-flow">
+                Up to <span class="amt-emerald">40%</span> free bonus credits
+              </div>
+              <div class="tier-card-promo">First 2 months: +50% free bonus credits</div>
+            </div>
+            <div class="tier-card-select">
+              <span class="tier-card-select-btn" data-select-label>Select &rarr;</span>
+            </div>
+          </div>
+
+          <div
+            class="tier-card"
+            data-tier="pro"
+            data-monthly-price="49"
+            data-yearly-price="588"
+            data-monthly-credits="49"
+            data-yearly-bonus="24.50"
+          >
+            <div class="tier-card-top">
+              <span class="tier-card-name">Pro</span>
+              <span class="tier-card-cadence" data-cadence-label>Monthly</span>
+            </div>
+            <div class="tier-card-price" data-tier-price>$49<span> /month</span></div>
+            <div class="tier-card-details" data-tier-details>
+              <div class="tier-card-detail-flow">
+                <span class="amt-amber">$49/month</span> paid credits
+              </div>
+              <div class="tier-card-detail-flow">
+                Up to <span class="amt-emerald">40%</span> free bonus credits
+              </div>
+              <div class="tier-card-promo">First 2 months: +50% free bonus credits</div>
+            </div>
+            <div class="tier-card-select">
+              <span class="tier-card-select-btn" data-select-label>Select &rarr;</span>
+            </div>
+          </div>
+
+          <div
+            class="tier-card"
+            data-tier="expert"
+            data-monthly-price="199"
+            data-yearly-price="2388"
+            data-monthly-credits="199"
+            data-yearly-bonus="99.50"
+          >
+            <div class="tier-card-top">
+              <span class="tier-card-name">Expert</span>
+              <span class="tier-card-cadence" data-cadence-label>Monthly</span>
+            </div>
+            <div class="tier-card-price" data-tier-price>$199<span> /month</span></div>
+            <div class="tier-card-details" data-tier-details>
+              <div class="tier-card-detail-flow">
+                <span class="amt-amber">$199/month</span> paid credits
+              </div>
+              <div class="tier-card-detail-flow">
+                Up to <span class="amt-emerald">40%</span> free bonus credits
+              </div>
+              <div class="tier-card-promo">First 2 months: +50% free bonus credits</div>
+            </div>
+            <div class="tier-card-select">
+              <span class="tier-card-select-btn" data-select-label>Select &rarr;</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="disclosure" id="tier-footnotes">
+          <button
+            type="button"
+            class="disclosure-trigger"
+            onclick="
+              this.classList.toggle('open');
+              this.nextElementSibling.classList.toggle('open');
+            "
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+            How credits work
+          </button>
+          <div class="disclosure-body">
+            <div
+              style="
+                display: flex;
+                align-items: flex-start;
+                gap: 8px;
+                font-size: 12px;
+                color: var(--fg-muted);
+                padding: 3px 0;
+              "
+            >
+              <i
+                data-lucide="check"
+                style="
+                  width: 14px;
+                  height: 14px;
+                  color: var(--emerald-400);
+                  flex-shrink: 0;
+                  margin-top: 1px;
+                "
+              ></i>
+              Your payment converts 1:1 into paid credits that never expire
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: flex-start;
+                gap: 8px;
+                font-size: 12px;
+                color: var(--fg-muted);
+                padding: 3px 0;
+              "
+            >
+              <i
+                data-lucide="check"
+                style="
+                  width: 14px;
+                  height: 14px;
+                  color: var(--emerald-400);
+                  flex-shrink: 0;
+                  margin-top: 1px;
+                "
+              ></i>
+              Earn free bonus credits after using your paid credits each month. Unused bonus credits
+              expire monthly.
+            </div>
+            <div
+              style="
+                display: flex;
+                align-items: flex-start;
+                gap: 8px;
+                font-size: 12px;
+                color: var(--fg-muted);
+                padding: 3px 0;
+              "
+              data-promo-footnote
+            >
+              <i
+                data-lucide="check"
+                style="
+                  width: 14px;
+                  height: 14px;
+                  color: var(--emerald-400);
+                  flex-shrink: 0;
+                  margin-top: 1px;
+                "
+              ></i>
+              First-time subscribers receive <span style="color: var(--emerald-300)">50%</span> free
+              bonus credits for the first two months.
+            </div>
+          </div>
+        </div>
+
+        <div class="inline-warning">
+          <i data-lucide="triangle-alert" style="width: 16px; height: 16px"></i>
+          <p>
+            Kilo Pass is a <strong>credits subscription</strong>. Hosting is charged as a credit
+            deduction from your balance. Cancelling Kilo Pass does <strong>not</strong> cancel
+            KiloClaw hosting.
+          </p>
+        </div>
+
+        <!-- Hosting plan radios (adapts based on tier) -->
+        <div class="hosting-radio-group" id="kp-hosting-group">
+          <div class="hosting-radio-group-label">Hosting plan for this KiloClaw instance:</div>
+          <div class="hosting-radio" data-plan="commit" id="kp-commit-radio">
+            <div class="hosting-radio-dot"></div>
+            <span class="hosting-radio-label">Commit Plan</span>
+            <span class="hosting-radio-detail">$8/mo (6 months)</span>
+          </div>
+          <div class="hosting-radio" data-plan="standard" id="kp-standard-radio">
+            <div class="hosting-radio-dot"></div>
+            <span class="hosting-radio-label">Standard Plan</span>
+            <span class="hosting-radio-detail">$9/mo (monthly)</span>
+          </div>
+          <p
+            id="commit-unavailable-note"
+            style="
+              display: none;
+              font-size: 11px;
+              color: var(--fg-dim);
+              margin-top: 4px;
+              padding-left: 2px;
+            "
+          >
+            Commit plan requires $48 in credits. Available with Pro, Expert, or any yearly tier.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-primary btn-full btn-lg btn-disabled"
+          id="kp-subscribe-btn"
+        >
+          Select a tier and hosting plan
+        </button>
+        <p class="footer-text" id="kp-footer-text">
+          You'll be redirected to Stripe to pay for Kilo Pass
+        </p>
+      </div>
+
+      <!-- Divider -->
+      <div class="or-divider">or pay for KiloClaw hosting only</div>
+
+      <!-- Track 2: Hosting Only (secondary, no recommended badge, no pre-selection) -->
+      <div class="checkout-section checkout-section-secondary" id="hosting-only-section">
+        <div class="checkout-header">
+          <i data-lucide="server" style="width: 18px; height: 18px; color: var(--fg-muted)"></i>
+          <h3>Hosting Only</h3>
+        </div>
+        <p style="font-size: 13px; color: var(--fg-muted); margin-bottom: 14px">
+          Pay for hosting directly via Stripe. You can buy credits separately for AI inference.
+        </p>
+
+        <div class="plan-grid-sm" id="hosting-only-grid">
+          <div class="plan-sm" data-plan="commit">
+            <div class="plan-sm-name">Commit</div>
+            <div class="plan-sm-price">$8<span>/mo</span></div>
+            <div class="plan-sm-detail">$48 billed every 6 months</div>
+          </div>
+          <div class="plan-sm" data-plan="standard">
+            <div class="plan-sm-name">Standard</div>
+            <div class="plan-sm-price">$9<span>/mo</span></div>
+            <div class="plan-sm-promo">$4 first month</div>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-outline btn-full btn-disabled" id="hosting-only-btn">
+          Select a plan above
+        </button>
+        <p class="footer-text">You'll be redirected to Stripe to pay</p>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+     SCENE 2: Your Subscriptions Panel (Dashboard)
+     Shows per-instance hosting subs + shared Kilo Pass
+     ═══════════════════════════════════════════════════ -->
+    <div class="scene">
+      <p class="scene-label">Scene 2 — Your Subscriptions Panel (multi-instance)</p>
+      <p class="scene-context">
+        A new "Subscriptions" tab on the /claw page, between Settings and What's New. Shows the
+        user's active subscriptions used with their KiloClaw instances. In this scenario, all
+        KiloClaw instances are funded via credits from the user's Kilo Pass subscription.
+      </p>
+
+      <div class="dual-panel">
+        <div class="dual-panel-header">
+          <div class="dual-panel-title">Your Subscriptions used with KiloClaw</div>
+        </div>
+
+        <div class="dual-panel-body">
+          <!-- Per-instance hosting subscriptions -->
+          <div class="instance-group">
+            <div class="instance-group-label">
+              <svg
+                style="width: 12px; height: 12px"
+                viewBox="0 0 32 32"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.33"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M13.66,14.7h4.65c2.61,0,4.73,2.12,4.73,4.73v.77c0,3.12-2.54,5.66-5.66,5.66h-2.79c-3.12,0-5.66-2.54-5.66-5.66v-.77c0-2.61,2.12-4.73,4.73-4.73Z"
+                />
+                <circle cx="11.42" cy="11.39" r="1.22" />
+                <path d="M11.42,12.61s-.13,1.7.85,2.29" />
+                <path d="M9.87,23.3c-1.91.34-3.59,2.17-3.59,4.22" />
+                <path d="M8.9,19.95h0c-2.65,0-4.85,1.98-5.7,4.8" />
+                <path d="M12.6,25.49c-1.27,0-2.29,1.09-2.29,2.35v.17" />
+                <path d="M22.06,23.3c1.91.34,3.59,2.17,3.59,4.22" />
+                <path d="M23.03,19.95h0c2.65,0,4.85,1.98,5.7,4.8" />
+                <path d="M19.33,25.49c1.27,0,2.29,1.09,2.29,2.35v.17" />
+                <path
+                  d="M30.73,6.82v1.47c0,1.57-1.27,2.84-2.83,2.84h-.39c-1.45,0-2.62-1.17-2.62-2.62h2.62V3.99h.39c1.56,0,2.83,1.27,2.83,2.83Z"
+                />
+                <path d="M27.51,11.13c0,2.83-.13,3.53-2.53,4.8l-2.47,1.36" />
+                <path
+                  d="M1.18,6.82v1.47c0,1.57,1.27,2.84,2.83,2.84h.39c1.45,0,2.62-1.17,2.62-2.62h-2.62V3.99s-.39,0-.39,0c-1.56,0-2.83,1.27-2.83,2.83Z"
+                />
+                <path d="M4.41,11.13c0,2.83.13,3.53,2.53,4.8l2.47,1.36" />
+                <circle cx="20.56" cy="11.39" r="1.22" />
+                <path d="M20.56,12.61s.13,1.7-.85,2.29" />
+                <path d="M19.1,17.56l-.85.9c-.54.57-.83,1.33-.83,2.11v2.72" />
+                <path d="M12.87,17.56l.85.9c.54.57.83,1.33.83,2.11v2.72" />
+              </svg>
+              KiloClaw
+            </div>
+
+            <!-- Instance 1 -->
+            <div
+              class="sub-row sub-row-emerald"
+              id="instance-chad"
+              data-instance="chad"
+              data-plan="standard"
+              data-name="Chad"
+            >
+              <div class="sub-row-indicator sub-row-indicator-emerald"></div>
+              <div class="sub-row-icon sub-row-icon-emerald">
+                <svg
+                  style="width: 18px; height: 18px"
+                  viewBox="0 0 32 32"
+                  fill="none"
+                  stroke="var(--emerald-400)"
+                  stroke-width="1.33"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M13.66,14.7h4.65c2.61,0,4.73,2.12,4.73,4.73v.77c0,3.12-2.54,5.66-5.66,5.66h-2.79c-3.12,0-5.66-2.54-5.66-5.66v-.77c0-2.61,2.12-4.73,4.73-4.73Z"
+                  />
+                  <circle cx="11.42" cy="11.39" r="1.22" />
+                  <path d="M11.42,12.61s-.13,1.7.85,2.29" />
+                  <path d="M9.87,23.3c-1.91.34-3.59,2.17-3.59,4.22" />
+                  <path d="M8.9,19.95h0c-2.65,0-4.85,1.98-5.7,4.8" />
+                  <path d="M12.6,25.49c-1.27,0-2.29,1.09-2.29,2.35v.17" />
+                  <path d="M22.06,23.3c1.91.34,3.59,2.17,3.59,4.22" />
+                  <path d="M23.03,19.95h0c2.65,0,4.85,1.98,5.7,4.8" />
+                  <path d="M19.33,25.49c1.27,0,2.29,1.09,2.29,2.35v.17" />
+                  <path
+                    d="M30.73,6.82v1.47c0,1.57-1.27,2.84-2.83,2.84h-.39c-1.45,0-2.62-1.17-2.62-2.62h2.62V3.99h.39c1.56,0,2.83,1.27,2.83,2.83Z"
+                  />
+                  <path d="M27.51,11.13c0,2.83-.13,3.53-2.53,4.8l-2.47,1.36" />
+                  <path
+                    d="M1.18,6.82v1.47c0,1.57,1.27,2.84,2.83,2.84h.39c1.45,0,2.62-1.17,2.62-2.62h-2.62V3.99s-.39,0-.39,0c-1.56,0-2.83,1.27-2.83,2.83Z"
+                  />
+                  <path d="M4.41,11.13c0,2.83.13,3.53,2.53,4.8l2.47,1.36" />
+                  <circle cx="20.56" cy="11.39" r="1.22" />
+                  <path d="M20.56,12.61s.13,1.7-.85,2.29" />
+                  <path d="M19.1,17.56l-.85.9c-.54.57-.83,1.33-.83,2.11v2.72" />
+                  <path d="M12.87,17.56l.85.9c.54.57.83,1.33.83,2.11v2.72" />
+                </svg>
+              </div>
+              <div class="sub-row-content">
+                <div class="sub-row-top">
+                  <span class="sub-row-name">KiloClaw — Chad</span>
+                  <span class="badge badge-dim" data-badge style="margin-left: auto"
+                    >Standard &middot; $9/mo</span
+                  >
+                </div>
+                <div class="meta-kv" data-meta>
+                  <span class="meta-kv-label">Renews</span>
+                  <span class="meta-kv-value">April 24, 2026</span>
+                </div>
+                <div class="sub-row-actions" data-actions>
+                  <button type="button" class="btn btn-outline btn-sm" data-action="switch">
+                    Switch Plan
+                  </button>
+                  <button type="button" class="btn btn-outline btn-sm" data-action="cancel">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Instance 2 -->
+            <div
+              class="sub-row sub-row-emerald"
+              id="instance-discord"
+              data-instance="discord"
+              data-plan="commit"
+              data-name="Discord Support Agent"
+            >
+              <div class="sub-row-indicator sub-row-indicator-emerald"></div>
+              <div class="sub-row-icon sub-row-icon-emerald">
+                <svg
+                  style="width: 18px; height: 18px"
+                  viewBox="0 0 32 32"
+                  fill="none"
+                  stroke="var(--emerald-400)"
+                  stroke-width="1.33"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M13.66,14.7h4.65c2.61,0,4.73,2.12,4.73,4.73v.77c0,3.12-2.54,5.66-5.66,5.66h-2.79c-3.12,0-5.66-2.54-5.66-5.66v-.77c0-2.61,2.12-4.73,4.73-4.73Z"
+                  />
+                  <circle cx="11.42" cy="11.39" r="1.22" />
+                  <path d="M11.42,12.61s-.13,1.7.85,2.29" />
+                  <path d="M9.87,23.3c-1.91.34-3.59,2.17-3.59,4.22" />
+                  <path d="M8.9,19.95h0c-2.65,0-4.85,1.98-5.7,4.8" />
+                  <path d="M12.6,25.49c-1.27,0-2.29,1.09-2.29,2.35v.17" />
+                  <path d="M22.06,23.3c1.91.34,3.59,2.17,3.59,4.22" />
+                  <path d="M23.03,19.95h0c2.65,0,4.85,1.98,5.7,4.8" />
+                  <path d="M19.33,25.49c1.27,0,2.29,1.09,2.29,2.35v.17" />
+                  <path
+                    d="M30.73,6.82v1.47c0,1.57-1.27,2.84-2.83,2.84h-.39c-1.45,0-2.62-1.17-2.62-2.62h2.62V3.99h.39c1.56,0,2.83,1.27,2.83,2.83Z"
+                  />
+                  <path d="M27.51,11.13c0,2.83-.13,3.53-2.53,4.8l-2.47,1.36" />
+                  <path
+                    d="M1.18,6.82v1.47c0,1.57,1.27,2.84,2.83,2.84h.39c1.45,0,2.62-1.17,2.62-2.62h-2.62V3.99s-.39,0-.39,0c-1.56,0-2.83,1.27-2.83,2.83Z"
+                  />
+                  <path d="M4.41,11.13c0,2.83.13,3.53,2.53,4.8l2.47,1.36" />
+                  <circle cx="20.56" cy="11.39" r="1.22" />
+                  <path d="M20.56,12.61s.13,1.7-.85,2.29" />
+                  <path d="M19.1,17.56l-.85.9c-.54.57-.83,1.33-.83,2.11v2.72" />
+                  <path d="M12.87,17.56l.85.9c.54.57.83,1.33.83,2.11v2.72" />
+                </svg>
+              </div>
+              <div class="sub-row-content">
+                <div class="sub-row-top">
+                  <span class="sub-row-name">KiloClaw — Discord Support Agent</span>
+                  <span class="badge badge-dim" data-badge style="margin-left: auto"
+                    >Commit &middot; $8/mo</span
+                  >
+                </div>
+                <div class="meta-kv" data-meta>
+                  <span class="meta-kv-label">Commit ends</span>
+                  <span class="meta-kv-value">September 12, 2026</span>
+                </div>
+                <div class="sub-row-actions" data-actions>
+                  <button type="button" class="btn btn-outline btn-sm" data-action="switch">
+                    Switch Plan
+                  </button>
+                  <button type="button" class="btn btn-outline btn-sm" data-action="cancel">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Kilo Pass (shared across instances) -->
+          <div class="instance-group">
+            <div class="instance-group-label">
+              <i data-lucide="crown" style="width: 12px; height: 12px"></i>
+              Kilo Pass
+            </div>
+
+            <div class="sub-row sub-row-blue">
+              <div class="sub-row-indicator sub-row-indicator-blue"></div>
+              <div class="sub-row-icon sub-row-icon-blue">
+                <i data-lucide="crown" style="width: 18px; height: 18px; color: #fbbf24"></i>
+              </div>
+              <div class="sub-row-content">
+                <div class="sub-row-top">
+                  <span class="sub-row-name">Kilo Pass</span>
+                  <span class="badge badge-dim" style="margin-left: auto">Pro &middot; $49/mo</span>
+                </div>
+                <div class="meta-kv">
+                  <span class="meta-kv-label">Renews</span>
+                  <span class="meta-kv-value">April 24, 2026</span>
+                  <span class="meta-kv-label">Balance</span>
+                  <span class="meta-kv-value" style="color: var(--emerald-400)">$34.20</span>
+                </div>
+                <div class="sub-row-actions">
+                  <button type="button" class="btn btn-outline btn-sm">
+                    Manage on Profile
+                    <i data-lucide="external-link" style="width: 12px; height: 12px"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dual-panel-footer">
+          <i
+            data-lucide="info"
+            style="width: 14px; height: 14px; color: var(--fg-dim); flex-shrink: 0; margin-top: 1px"
+          ></i>
+          <p>
+            Kilo Pass funds your credit balance for hosting and AI inference.<br />
+            <strong>To stop all charges, cancel all subscriptions.</strong>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+     SCENE 3: Dashboard — Stripe-Funded, Scheduled Switch, Conversion Prompt
+     Shows states not covered in Scene 1
+     ═══════════════════════════════════════════════════ -->
+    <div class="scene">
+      <p class="scene-label">
+        Scene 3 — Stripe-Funded Instance, Scheduled Switch, Conversion Prompt
+      </p>
+      <p class="scene-context">
+        Billing dashboard for a user who has a mix of Stripe-funded and credit-funded instances,
+        plus a pending plan switch. The conversion banner appears when the system detects a
+        Stripe-funded instance that could be switched to credits (because the user already has Kilo
+        Pass).
+      </p>
+
+      <div class="dual-panel">
+        <div class="dual-panel-header">
+          <div class="dual-panel-title">Your Subscriptions used with KiloClaw</div>
+        </div>
+
+        <div class="dual-panel-body">
+          <div class="instance-group">
+            <div class="instance-group-label">
+              <svg
+                style="width: 12px; height: 12px"
+                viewBox="0 0 32 32"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.33"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M13.66,14.7h4.65c2.61,0,4.73,2.12,4.73,4.73v.77c0,3.12-2.54,5.66-5.66,5.66h-2.79c-3.12,0-5.66-2.54-5.66-5.66v-.77c0-2.61,2.12-4.73,4.73-4.73Z"
+                />
+                <circle cx="11.42" cy="11.39" r="1.22" />
+                <path d="M11.42,12.61s-.13,1.7.85,2.29" />
+                <path d="M9.87,23.3c-1.91.34-3.59,2.17-3.59,4.22" />
+                <path d="M8.9,19.95h0c-2.65,0-4.85,1.98-5.7,4.8" />
+                <path d="M12.6,25.49c-1.27,0-2.29,1.09-2.29,2.35v.17" />
+                <path d="M22.06,23.3c1.91.34,3.59,2.17,3.59,4.22" />
+                <path d="M23.03,19.95h0c2.65,0,4.85,1.98,5.7,4.8" />
+                <path d="M19.33,25.49c1.27,0,2.29,1.09,2.29,2.35v.17" />
+                <path
+                  d="M30.73,6.82v1.47c0,1.57-1.27,2.84-2.83,2.84h-.39c-1.45,0-2.62-1.17-2.62-2.62h2.62V3.99h.39c1.56,0,2.83,1.27,2.83,2.83Z"
+                />
+                <path d="M27.51,11.13c0,2.83-.13,3.53-2.53,4.8l-2.47,1.36" />
+                <path
+                  d="M1.18,6.82v1.47c0,1.57,1.27,2.84,2.83,2.84h.39c1.45,0,2.62-1.17,2.62-2.62h-2.62V3.99s-.39,0-.39,0c-1.56,0-2.83,1.27-2.83,2.83Z"
+                />
+                <path d="M4.41,11.13c0,2.83.13,3.53,2.53,4.8l2.47,1.36" />
+                <circle cx="20.56" cy="11.39" r="1.22" />
+                <path d="M20.56,12.61s.13,1.7-.85,2.29" />
+                <path d="M19.1,17.56l-.85.9c-.54.57-.83,1.33-.83,2.11v2.72" />
+                <path d="M12.87,17.56l.85.9c.54.57.83,1.33.83,2.11v2.72" />
+              </svg>
+              KiloClaw
+            </div>
+
+            <!-- Stripe-funded instance (has Manage Payment button) -->
+            <div
+              class="sub-row sub-row-emerald"
+              id="instance-staging"
+              data-instance="staging"
+              data-plan="standard"
+              data-name="Staging Server"
+            >
+              <div class="sub-row-indicator sub-row-indicator-emerald"></div>
+              <div class="sub-row-icon sub-row-icon-emerald">
+                <svg
+                  style="width: 18px; height: 18px"
+                  viewBox="0 0 32 32"
+                  fill="none"
+                  stroke="var(--emerald-400)"
+                  stroke-width="1.33"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M13.66,14.7h4.65c2.61,0,4.73,2.12,4.73,4.73v.77c0,3.12-2.54,5.66-5.66,5.66h-2.79c-3.12,0-5.66-2.54-5.66-5.66v-.77c0-2.61,2.12-4.73,4.73-4.73Z"
+                  />
+                  <circle cx="11.42" cy="11.39" r="1.22" />
+                  <path d="M11.42,12.61s-.13,1.7.85,2.29" />
+                  <path d="M9.87,23.3c-1.91.34-3.59,2.17-3.59,4.22" />
+                  <path d="M8.9,19.95h0c-2.65,0-4.85,1.98-5.7,4.8" />
+                  <path d="M12.6,25.49c-1.27,0-2.29,1.09-2.29,2.35v.17" />
+                  <path d="M22.06,23.3c1.91.34,3.59,2.17,3.59,4.22" />
+                  <path d="M23.03,19.95h0c2.65,0,4.85,1.98,5.7,4.8" />
+                  <path d="M19.33,25.49c1.27,0,2.29,1.09,2.29,2.35v.17" />
+                  <path
+                    d="M30.73,6.82v1.47c0,1.57-1.27,2.84-2.83,2.84h-.39c-1.45,0-2.62-1.17-2.62-2.62h2.62V3.99h.39c1.56,0,2.83,1.27,2.83,2.83Z"
+                  />
+                  <path d="M27.51,11.13c0,2.83-.13,3.53-2.53,4.8l-2.47,1.36" />
+                  <path
+                    d="M1.18,6.82v1.47c0,1.57,1.27,2.84,2.83,2.84h.39c1.45,0,2.62-1.17,2.62-2.62h-2.62V3.99s-.39,0-.39,0c-1.56,0-2.83,1.27-2.83,2.83Z"
+                  />
+                  <path d="M4.41,11.13c0,2.83.13,3.53,2.53,4.8l2.47,1.36" />
+                  <circle cx="20.56" cy="11.39" r="1.22" />
+                  <path d="M20.56,12.61s.13,1.7-.85,2.29" />
+                  <path d="M19.1,17.56l-.85.9c-.54.57-.83,1.33-.83,2.11v2.72" />
+                  <path d="M12.87,17.56l.85.9c.54.57.83,1.33.83,2.11v2.72" />
+                </svg>
+              </div>
+              <div class="sub-row-content">
+                <div class="sub-row-top">
+                  <span class="sub-row-name">KiloClaw — Staging Server</span>
+                  <span class="badge badge-blue">Stripe</span>
+                  <span class="badge badge-dim" data-badge style="margin-left: auto"
+                    >Standard &middot; $9/mo</span
+                  >
+                </div>
+                <div class="meta-kv" data-meta>
+                  <span class="meta-kv-label">Renews</span>
+                  <span class="meta-kv-value">April 24, 2026</span>
+                </div>
+                <div class="sub-row-actions" data-actions>
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm"
+                    onclick="openSwitchPlan('staging')"
+                  >
+                    Switch Plan
+                  </button>
+                  <button type="button" class="btn btn-outline btn-sm">
+                    Manage Payment
+                    <i data-lucide="external-link" style="width: 11px; height: 11px"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm"
+                    onclick="openCancelFlow('staging')"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Instance with scheduled plan switch -->
+            <div
+              class="sub-row sub-row-emerald"
+              id="instance-apiserver"
+              data-instance="apiserver"
+              data-plan="standard"
+              data-name="API Server"
+            >
+              <div class="sub-row-indicator sub-row-indicator-emerald"></div>
+              <div class="sub-row-icon sub-row-icon-emerald">
+                <svg
+                  style="width: 18px; height: 18px"
+                  viewBox="0 0 32 32"
+                  fill="none"
+                  stroke="var(--emerald-400)"
+                  stroke-width="1.33"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M13.66,14.7h4.65c2.61,0,4.73,2.12,4.73,4.73v.77c0,3.12-2.54,5.66-5.66,5.66h-2.79c-3.12,0-5.66-2.54-5.66-5.66v-.77c0-2.61,2.12-4.73,4.73-4.73Z"
+                  />
+                  <circle cx="11.42" cy="11.39" r="1.22" />
+                  <path d="M11.42,12.61s-.13,1.7.85,2.29" />
+                  <path d="M9.87,23.3c-1.91.34-3.59,2.17-3.59,4.22" />
+                  <path d="M8.9,19.95h0c-2.65,0-4.85,1.98-5.7,4.8" />
+                  <path d="M12.6,25.49c-1.27,0-2.29,1.09-2.29,2.35v.17" />
+                  <path d="M22.06,23.3c1.91.34,3.59,2.17,3.59,4.22" />
+                  <path d="M23.03,19.95h0c2.65,0,4.85,1.98,5.7,4.8" />
+                  <path d="M19.33,25.49c1.27,0,2.29,1.09,2.29,2.35v.17" />
+                  <path
+                    d="M30.73,6.82v1.47c0,1.57-1.27,2.84-2.83,2.84h-.39c-1.45,0-2.62-1.17-2.62-2.62h2.62V3.99h.39c1.56,0,2.83,1.27,2.83,2.83Z"
+                  />
+                  <path d="M27.51,11.13c0,2.83-.13,3.53-2.53,4.8l-2.47,1.36" />
+                  <path
+                    d="M1.18,6.82v1.47c0,1.57,1.27,2.84,2.83,2.84h.39c1.45,0,2.62-1.17,2.62-2.62h-2.62V3.99s-.39,0-.39,0c-1.56,0-2.83,1.27-2.83,2.83Z"
+                  />
+                  <path d="M4.41,11.13c0,2.83.13,3.53,2.53,4.8l2.47,1.36" />
+                  <circle cx="20.56" cy="11.39" r="1.22" />
+                  <path d="M20.56,12.61s.13,1.7-.85,2.29" />
+                  <path d="M19.1,17.56l-.85.9c-.54.57-.83,1.33-.83,2.11v2.72" />
+                  <path d="M12.87,17.56l.85.9c.54.57.83,1.33.83,2.11v2.72" />
+                </svg>
+              </div>
+              <div class="sub-row-content">
+                <div class="sub-row-top">
+                  <span class="sub-row-name">KiloClaw — API Server</span>
+                  <span class="badge badge-amber">&rarr; Commit at next cycle</span>
+                  <span class="badge badge-dim" data-badge style="margin-left: auto"
+                    >Standard &middot; $9/mo</span
+                  >
+                </div>
+                <div class="meta-kv" data-meta>
+                  <span class="meta-kv-label">Renews</span>
+                  <span class="meta-kv-value">May 1, 2026</span>
+                  <span class="meta-kv-label">Switching to</span>
+                  <span class="meta-kv-value">Commit ($8/mo)</span>
+                </div>
+                <div class="sub-row-actions" data-actions>
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm"
+                    onclick="openSwitchPlan('apiserver')"
+                  >
+                    Switch Plan
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline btn-sm"
+                    onclick="openCancelFlow('apiserver')"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Conversion prompt: Stripe-funded + Kilo Pass detected (F5: shortened) -->
+          <div class="conversion-banner">
+            <i
+              data-lucide="arrow-right-left"
+              style="
+                width: 20px;
+                height: 20px;
+                color: var(--blue-400);
+                flex-shrink: 0;
+                margin-top: 2px;
+              "
+            ></i>
+            <div>
+              <p><strong>Switch Staging Server to be paid using credits?</strong></p>
+              <p>Eliminates the separate Stripe charge. Takes effect at next renewal.</p>
+              <div class="conversion-banner-actions">
+                <button type="button" class="btn btn-primary btn-sm">Switch to Credits</button>
+                <button type="button" class="btn btn-ghost btn-sm">Not now</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Kilo Pass -->
+          <div class="instance-group">
+            <div class="instance-group-label">
+              <i data-lucide="crown" style="width: 12px; height: 12px"></i>
+              Kilo Pass
+            </div>
+            <div class="sub-row sub-row-blue">
+              <div class="sub-row-indicator sub-row-indicator-blue"></div>
+              <div class="sub-row-icon sub-row-icon-blue">
+                <i data-lucide="crown" style="width: 18px; height: 18px; color: #fbbf24"></i>
+              </div>
+              <div class="sub-row-content">
+                <div class="sub-row-top">
+                  <span class="sub-row-name">Kilo Pass</span>
+                  <span class="badge badge-dim" style="margin-left: auto">Pro &middot; $49/mo</span>
+                </div>
+                <div class="meta-kv">
+                  <span class="meta-kv-label">Renews</span>
+                  <span class="meta-kv-value">April 24, 2026</span>
+                  <span class="meta-kv-label">Balance</span>
+                  <span class="meta-kv-value" style="color: var(--emerald-400)">$34.20</span>
+                </div>
+                <div class="sub-row-actions">
+                  <button type="button" class="btn btn-outline btn-sm">
+                    Manage on Profile
+                    <i data-lucide="external-link" style="width: 12px; height: 12px"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+     SCENE 4: Dashboard — Problem States (Past-Due, Suspended)
+     ═══════════════════════════════════════════════════ -->
+    <div class="scene">
+      <p class="scene-label">Scene 4 — Past-Due and Suspended Instance States</p>
+      <p class="scene-context">
+        Billing dashboard when payment has failed. Shows the 14-day grace period (past-due) and
+        post-suspension destruction countdown. Users see this when they return to the dashboard
+        after a failed credit deduction or Stripe charge. The urgency escalates from past-due to
+        suspended to destruction.
+      </p>
+
+      <div class="dual-panel">
+        <div class="dual-panel-header">
+          <div class="dual-panel-title">Your Subscriptions used with KiloClaw</div>
+        </div>
+
+        <div class="dual-panel-body">
+          <div class="instance-group">
+            <div class="instance-group-label">
+              <svg
+                style="width: 12px; height: 12px"
+                viewBox="0 0 32 32"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.33"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M13.66,14.7h4.65c2.61,0,4.73,2.12,4.73,4.73v.77c0,3.12-2.54,5.66-5.66,5.66h-2.79c-3.12,0-5.66-2.54-5.66-5.66v-.77c0-2.61,2.12-4.73,4.73-4.73Z"
+                />
+                <circle cx="11.42" cy="11.39" r="1.22" />
+                <path d="M11.42,12.61s-.13,1.7.85,2.29" />
+                <path d="M9.87,23.3c-1.91.34-3.59,2.17-3.59,4.22" />
+                <path d="M8.9,19.95h0c-2.65,0-4.85,1.98-5.7,4.8" />
+                <path d="M12.6,25.49c-1.27,0-2.29,1.09-2.29,2.35v.17" />
+                <path d="M22.06,23.3c1.91.34,3.59,2.17,3.59,4.22" />
+                <path d="M23.03,19.95h0c2.65,0,4.85,1.98,5.7,4.8" />
+                <path d="M19.33,25.49c1.27,0,2.29,1.09,2.29,2.35v.17" />
+                <path
+                  d="M30.73,6.82v1.47c0,1.57-1.27,2.84-2.83,2.84h-.39c-1.45,0-2.62-1.17-2.62-2.62h2.62V3.99h.39c1.56,0,2.83,1.27,2.83,2.83Z"
+                />
+                <path d="M27.51,11.13c0,2.83-.13,3.53-2.53,4.8l-2.47,1.36" />
+                <path
+                  d="M1.18,6.82v1.47c0,1.57,1.27,2.84,2.83,2.84h.39c1.45,0,2.62-1.17,2.62-2.62h-2.62V3.99s-.39,0-.39,0c-1.56,0-2.83,1.27-2.83,2.83Z"
+                />
+                <path d="M4.41,11.13c0,2.83.13,3.53,2.53,4.8l2.47,1.36" />
+                <circle cx="20.56" cy="11.39" r="1.22" />
+                <path d="M20.56,12.61s.13,1.7-.85,2.29" />
+                <path d="M19.1,17.56l-.85.9c-.54.57-.83,1.33-.83,2.11v2.72" />
+                <path d="M12.87,17.56l.85.9c.54.57.83,1.33.83,2.11v2.72" />
+              </svg>
+              KiloClaw
+            </div>
+
+            <!-- Past-due credit-funded instance (grace period, not yet suspended) -->
+            <div class="sub-row sub-row-red">
+              <div class="sub-row-indicator sub-row-indicator-red"></div>
+              <div class="sub-row-icon sub-row-icon-red">
+                <svg
+                  style="width: 18px; height: 18px"
+                  viewBox="0 0 32 32"
+                  fill="none"
+                  stroke="var(--red-400)"
+                  stroke-width="1.33"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M13.66,14.7h4.65c2.61,0,4.73,2.12,4.73,4.73v.77c0,3.12-2.54,5.66-5.66,5.66h-2.79c-3.12,0-5.66-2.54-5.66-5.66v-.77c0-2.61,2.12-4.73,4.73-4.73Z"
+                  />
+                  <circle cx="11.42" cy="11.39" r="1.22" />
+                  <path d="M11.42,12.61s-.13,1.7.85,2.29" />
+                  <path d="M9.87,23.3c-1.91.34-3.59,2.17-3.59,4.22" />
+                  <path d="M8.9,19.95h0c-2.65,0-4.85,1.98-5.7,4.8" />
+                  <path d="M12.6,25.49c-1.27,0-2.29,1.09-2.29,2.35v.17" />
+                  <path d="M22.06,23.3c1.91.34,3.59,2.17,3.59,4.22" />
+                  <path d="M23.03,19.95h0c2.65,0,4.85,1.98,5.7,4.8" />
+                  <path d="M19.33,25.49c1.27,0,2.29,1.09,2.29,2.35v.17" />
+                  <path
+                    d="M30.73,6.82v1.47c0,1.57-1.27,2.84-2.83,2.84h-.39c-1.45,0-2.62-1.17-2.62-2.62h2.62V3.99h.39c1.56,0,2.83,1.27,2.83,2.83Z"
+                  />
+                  <path d="M27.51,11.13c0,2.83-.13,3.53-2.53,4.8l-2.47,1.36" />
+                  <path
+                    d="M1.18,6.82v1.47c0,1.57,1.27,2.84,2.83,2.84h.39c1.45,0,2.62-1.17,2.62-2.62h-2.62V3.99s-.39,0-.39,0c-1.56,0-2.83,1.27-2.83,2.83Z"
+                  />
+                  <path d="M4.41,11.13c0,2.83.13,3.53,2.53,4.8l2.47,1.36" />
+                  <circle cx="20.56" cy="11.39" r="1.22" />
+                  <path d="M20.56,12.61s.13,1.7-.85,2.29" />
+                  <path d="M19.1,17.56l-.85.9c-.54.57-.83,1.33-.83,2.11v2.72" />
+                  <path d="M12.87,17.56l.85.9c.54.57.83,1.33.83,2.11v2.72" />
+                </svg>
+              </div>
+              <div class="sub-row-content">
+                <div class="sub-row-top">
+                  <span class="sub-row-name">KiloClaw — Dev Instance</span>
+                  <span class="badge badge-red">Past Due</span>
+                  <span class="badge badge-dim" style="margin-left: auto"
+                    >Standard &middot; $9/mo</span
+                  >
+                </div>
+                <div class="meta-kv">
+                  <span class="meta-kv-label">Failed</span>
+                  <span class="meta-kv-value" style="color: var(--red-400)"
+                    >March 16, 2026 (8 days overdue)</span
+                  >
+                  <span class="meta-kv-label">Suspends in</span>
+                  <span class="meta-kv-value" style="color: var(--red-400)">6 days</span>
+                </div>
+                <div class="sub-row-actions">
+                  <button type="button" class="btn btn-primary btn-sm">Add Credits</button>
+                  <button type="button" class="btn btn-outline btn-sm">Top Up Balance</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Past-due Stripe-funded instance (F7: Stripe badge) -->
+            <div class="sub-row sub-row-red">
+              <div class="sub-row-indicator sub-row-indicator-red"></div>
+              <div class="sub-row-icon sub-row-icon-red">
+                <svg
+                  style="width: 18px; height: 18px"
+                  viewBox="0 0 32 32"
+                  fill="none"
+                  stroke="var(--red-400)"
+                  stroke-width="1.33"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M13.66,14.7h4.65c2.61,0,4.73,2.12,4.73,4.73v.77c0,3.12-2.54,5.66-5.66,5.66h-2.79c-3.12,0-5.66-2.54-5.66-5.66v-.77c0-2.61,2.12-4.73,4.73-4.73Z"
+                  />
+                  <circle cx="11.42" cy="11.39" r="1.22" />
+                  <path d="M11.42,12.61s-.13,1.7.85,2.29" />
+                  <path d="M9.87,23.3c-1.91.34-3.59,2.17-3.59,4.22" />
+                  <path d="M8.9,19.95h0c-2.65,0-4.85,1.98-5.7,4.8" />
+                  <path d="M12.6,25.49c-1.27,0-2.29,1.09-2.29,2.35v.17" />
+                  <path d="M22.06,23.3c1.91.34,3.59,2.17,3.59,4.22" />
+                  <path d="M23.03,19.95h0c2.65,0,4.85,1.98,5.7,4.8" />
+                  <path d="M19.33,25.49c1.27,0,2.29,1.09,2.29,2.35v.17" />
+                  <path
+                    d="M30.73,6.82v1.47c0,1.57-1.27,2.84-2.83,2.84h-.39c-1.45,0-2.62-1.17-2.62-2.62h2.62V3.99h.39c1.56,0,2.83,1.27,2.83,2.83Z"
+                  />
+                  <path d="M27.51,11.13c0,2.83-.13,3.53-2.53,4.8l-2.47,1.36" />
+                  <path
+                    d="M1.18,6.82v1.47c0,1.57,1.27,2.84,2.83,2.84h.39c1.45,0,2.62-1.17,2.62-2.62h-2.62V3.99s-.39,0-.39,0c-1.56,0-2.83,1.27-2.83,2.83Z"
+                  />
+                  <path d="M4.41,11.13c0,2.83.13,3.53,2.53,4.8l2.47,1.36" />
+                  <circle cx="20.56" cy="11.39" r="1.22" />
+                  <path d="M20.56,12.61s.13,1.7-.85,2.29" />
+                  <path d="M19.1,17.56l-.85.9c-.54.57-.83,1.33-.83,2.11v2.72" />
+                  <path d="M12.87,17.56l.85.9c.54.57.83,1.33.83,2.11v2.72" />
+                </svg>
+              </div>
+              <div class="sub-row-content">
+                <div class="sub-row-top">
+                  <span class="sub-row-name">KiloClaw — Staging Server</span>
+                  <span class="badge badge-blue">Stripe</span>
+                  <span class="badge badge-red">Past Due</span>
+                  <span class="badge badge-dim" style="margin-left: auto"
+                    >Standard &middot; $9/mo</span
+                  >
+                </div>
+                <div class="meta-kv">
+                  <span class="meta-kv-label">Failed</span>
+                  <span class="meta-kv-value" style="color: var(--red-400)"
+                    >March 20, 2026 (4 days overdue)</span
+                  >
+                  <span class="meta-kv-label">Suspends in</span>
+                  <span class="meta-kv-value" style="color: var(--red-400)">10 days</span>
+                </div>
+                <div class="sub-row-actions">
+                  <button type="button" class="btn btn-primary btn-sm">
+                    Update Payment Method
+                    <i data-lucide="external-link" style="width: 11px; height: 11px"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Suspended instance with destruction countdown (F6: full opacity + alert bar) -->
+            <div class="sub-row sub-row-red">
+              <div class="sub-row-indicator sub-row-indicator-red"></div>
+              <div class="sub-row-icon sub-row-icon-red">
+                <svg
+                  style="width: 18px; height: 18px"
+                  viewBox="0 0 32 32"
+                  fill="none"
+                  stroke="var(--red-400)"
+                  stroke-width="1.33"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M13.66,14.7h4.65c2.61,0,4.73,2.12,4.73,4.73v.77c0,3.12-2.54,5.66-5.66,5.66h-2.79c-3.12,0-5.66-2.54-5.66-5.66v-.77c0-2.61,2.12-4.73,4.73-4.73Z"
+                  />
+                  <circle cx="11.42" cy="11.39" r="1.22" />
+                  <path d="M11.42,12.61s-.13,1.7.85,2.29" />
+                  <path d="M9.87,23.3c-1.91.34-3.59,2.17-3.59,4.22" />
+                  <path d="M8.9,19.95h0c-2.65,0-4.85,1.98-5.7,4.8" />
+                  <path d="M12.6,25.49c-1.27,0-2.29,1.09-2.29,2.35v.17" />
+                  <path d="M22.06,23.3c1.91.34,3.59,2.17,3.59,4.22" />
+                  <path d="M23.03,19.95h0c2.65,0,4.85,1.98,5.7,4.8" />
+                  <path d="M19.33,25.49c1.27,0,2.29,1.09,2.29,2.35v.17" />
+                  <path
+                    d="M30.73,6.82v1.47c0,1.57-1.27,2.84-2.83,2.84h-.39c-1.45,0-2.62-1.17-2.62-2.62h2.62V3.99h.39c1.56,0,2.83,1.27,2.83,2.83Z"
+                  />
+                  <path d="M27.51,11.13c0,2.83-.13,3.53-2.53,4.8l-2.47,1.36" />
+                  <path
+                    d="M1.18,6.82v1.47c0,1.57,1.27,2.84,2.83,2.84h.39c1.45,0,2.62-1.17,2.62-2.62h-2.62V3.99s-.39,0-.39,0c-1.56,0-2.83,1.27-2.83,2.83Z"
+                  />
+                  <path d="M4.41,11.13c0,2.83.13,3.53,2.53,4.8l2.47,1.36" />
+                  <circle cx="20.56" cy="11.39" r="1.22" />
+                  <path d="M20.56,12.61s.13,1.7-.85,2.29" />
+                  <path d="M19.1,17.56l-.85.9c-.54.57-.83,1.33-.83,2.11v2.72" />
+                  <path d="M12.87,17.56l.85.9c.54.57.83,1.33.83,2.11v2.72" />
+                </svg>
+              </div>
+              <div class="sub-row-content">
+                <div class="sub-row-top">
+                  <span class="sub-row-name">KiloClaw — Old Project</span>
+                  <span class="badge badge-red">Suspended</span>
+                  <span class="badge badge-dim" style="margin-left: auto"
+                    >Standard &middot; $9/mo</span
+                  >
+                </div>
+                <div class="meta-kv">
+                  <span class="meta-kv-label">Stopped</span>
+                  <span class="meta-kv-value">March 22, 2026</span>
+                </div>
+                <div class="alert-bar alert-bar-red">
+                  <i data-lucide="alert-triangle" style="width: 16px; height: 16px"></i>
+                  Permanently destroyed in 5 days (March 29, 2026)
+                </div>
+                <div class="sub-row-actions">
+                  <button type="button" class="btn btn-primary btn-sm">
+                    Add Credits to Restore
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Kilo Pass still active -->
+          <div class="instance-group">
+            <div class="instance-group-label">
+              <i data-lucide="crown" style="width: 12px; height: 12px"></i>
+              Kilo Pass
+            </div>
+            <div class="sub-row sub-row-blue">
+              <div class="sub-row-indicator sub-row-indicator-blue"></div>
+              <div class="sub-row-icon sub-row-icon-blue">
+                <i data-lucide="crown" style="width: 18px; height: 18px; color: #fbbf24"></i>
+              </div>
+              <div class="sub-row-content">
+                <div class="sub-row-top">
+                  <span class="sub-row-name">Kilo Pass</span>
+                  <span class="badge badge-dim" style="margin-left: auto">Pro &middot; $49/mo</span>
+                </div>
+                <div class="meta-kv">
+                  <span class="meta-kv-label">Balance</span>
+                  <span class="meta-kv-value" style="color: var(--red-400)">$0.00</span>
+                </div>
+                <div class="sub-row-actions">
+                  <button type="button" class="btn btn-outline btn-sm">
+                    Manage on Profile
+                    <i data-lucide="external-link" style="width: 12px; height: 12px"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dual-panel-footer">
+          <i
+            data-lucide="info"
+            style="
+              width: 14px;
+              height: 14px;
+              color: var(--red-400);
+              flex-shrink: 0;
+              margin-top: 1px;
+            "
+          ></i>
+          <p style="color: var(--red-400)">
+            <strong>Action required:</strong> Add credits to restore suspended instances before they
+            are permanently destroyed.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+     SCENE 5: Access Locked Dialog
+     Shown when user's access is denied (trial ended, subscription expired)
+     ═══════════════════════════════════════════════════ -->
+    <div class="scene">
+      <p class="scene-label">Scene 5 — Access Locked Dialog (Trial Ended)</p>
+      <p class="scene-context">
+        Blocking overlay shown when the user tries to access a KiloClaw instance whose 7-day trial
+        has expired. This replaces the normal instance UI. The user must subscribe to continue —
+        data is preserved for 7 days after expiry.
+      </p>
+
+      <div class="access-locked">
+        <div class="access-locked-icon access-locked-icon-amber">
+          <i data-lucide="lock" style="width: 28px; height: 28px; color: var(--amber-400)"></i>
+        </div>
+        <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 6px">Your trial has ended</h2>
+        <p style="font-size: 14px; color: var(--fg-muted); margin-bottom: 4px">
+          Your 7-day trial for <strong>KiloClaw &mdash; Chad</strong> expired on March 20, 2026.
+        </p>
+        <p style="font-size: 13px; color: var(--fg-dim); margin-bottom: 24px">
+          Subscribe to keep your instance running. Your data is preserved for 7 days.
+        </p>
+
+        <div style="max-width: 400px; margin: 0 auto">
+          <button type="button" class="btn btn-primary btn-full btn-lg" style="margin-bottom: 10px">
+            <i data-lucide="crown" style="width: 18px; height: 18px"></i>
+            Activate with Kilo Pass
+          </button>
+          <button type="button" class="btn btn-outline btn-full">Subscribe to Hosting Only</button>
+        </div>
+
+        <p style="font-size: 11px; color: var(--fg-dim); margin-top: 16px">
+          <i
+            data-lucide="clock"
+            style="
+              width: 12px;
+              height: 12px;
+              display: inline;
+              vertical-align: middle;
+              margin-right: 2px;
+            "
+          ></i>
+          Instance will be permanently destroyed in 5 days if not reactivated.
+        </p>
+      </div>
+
+      <div style="height: 24px"></div>
+
+      <p class="scene-label">Scene 5b — Access Locked Dialog (Subscription Expired)</p>
+      <p class="scene-context">
+        Blocking overlay for a cancelled subscription. Similar to 5a but the user previously had an
+        active subscription that ended. They can reactivate with their existing credit balance if
+        sufficient.
+      </p>
+
+      <div class="access-locked">
+        <div class="access-locked-icon access-locked-icon-red">
+          <i data-lucide="shield-off" style="width: 28px; height: 28px; color: var(--red-400)"></i>
+        </div>
+        <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 6px">
+          Hosting subscription expired
+        </h2>
+        <p style="font-size: 14px; color: var(--fg-muted); margin-bottom: 4px">
+          Your subscription for <strong>KiloClaw &mdash; Dev Instance</strong> was cancelled.
+        </p>
+        <p style="font-size: 13px; color: var(--fg-dim); margin-bottom: 24px">
+          Reactivate to restore access. Your instance and data are preserved until March 30, 2026.
+        </p>
+
+        <div style="max-width: 400px; margin: 0 auto">
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              padding: 14px;
+              border: 1px solid var(--emerald-border);
+              border-radius: var(--radius);
+              background: var(--emerald-bg);
+              margin-bottom: 14px;
+              text-align: left;
+            "
+          >
+            <div style="flex: 1">
+              <div style="font-size: 13px; font-weight: 600; color: var(--emerald-300)">
+                Reactivate with existing credits
+              </div>
+              <div style="font-size: 12px; color: var(--fg-muted)">
+                Balance: <span style="color: var(--emerald-400)">$34.20</span> — sufficient for
+                Standard ($9/mo)
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm">Reactivate</button>
+          </div>
+          <button type="button" class="btn btn-outline btn-full" style="margin-bottom: 8px">
+            Reactivate with Hosting Only (Stripe)
+          </button>
+          <p style="font-size: 12px; color: var(--fg-dim); margin-top: 4px">
+            Don't have Kilo Pass?
+            <a href="#" style="color: var(--blue-400); text-decoration: none"
+              >Subscribe to Kilo Pass</a
+            >
+            for credits + AI inference.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+     SCENE 6: Checkout Success — Polling / Activation
+     Shows the post-checkout experience while waiting for webhooks
+     ═══════════════════════════════════════════════════ -->
+    <div class="scene">
+      <p class="scene-label">Scene 6a — Checkout Success: Polling State</p>
+      <p class="scene-context">
+        Shown immediately after the user returns from Stripe checkout. The system is waiting for the
+        payment webhook and provisioning hosting. Users see this for a few seconds while the backend
+        activates their instance.
+      </p>
+
+      <div
+        style="
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          background: var(--bg-card);
+          padding: 40px 24px;
+          text-align: center;
+          max-width: 480px;
+          margin: 0 auto;
+        "
+      >
+        <div class="spinner" style="margin-bottom: 20px"></div>
+        <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 6px">
+          Setting up your hosting&hellip;
+        </h2>
+        <p style="font-size: 14px; color: var(--fg-muted); margin-bottom: 24px">
+          This usually takes a few seconds.
+        </p>
+
+        <div class="progress-steps" style="text-align: left; max-width: 320px; margin: 0 auto">
+          <div class="progress-step progress-step-done">
+            <div class="progress-step-icon">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--emerald-400)"
+                stroke-width="2.5"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            Payment received
+          </div>
+          <div class="progress-step progress-step-done">
+            <div class="progress-step-icon">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--emerald-400)"
+                stroke-width="2.5"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            Credits added to balance
+          </div>
+          <div class="progress-step progress-step-active">
+            <div class="progress-step-icon">
+              <div class="spinner" style="width: 18px; height: 18px; border-width: 2px"></div>
+            </div>
+            Activating hosting&hellip;
+          </div>
+        </div>
+      </div>
+
+      <div style="height: 32px"></div>
+      <p class="scene-label">Scene 6b — Checkout Success: Completed</p>
+      <p class="scene-context">
+        Final confirmation after hosting is provisioned. Summarises what was purchased and the
+        resulting credit balance. The user clicks through to their dashboard from here.
+      </p>
+
+      <div class="success-card" style="max-width: 480px; margin: 0 auto">
+        <div class="success-icon">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--emerald-400)"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+          </svg>
+        </div>
+        <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 6px">You're all set!</h2>
+        <p style="font-size: 14px; color: var(--fg-muted); margin-bottom: 20px">
+          <strong>KiloClaw &mdash; Chad</strong> is now active on the Standard plan.
+        </p>
+
+        <div
+          style="
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-width: 320px;
+            margin: 0 auto 20px;
+            text-align: left;
+          "
+        >
+          <div style="display: flex; justify-content: space-between; font-size: 13px">
+            <span style="color: var(--fg-muted)">Kilo Pass</span>
+            <span>Pro &middot; $49/mo</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 13px">
+            <span style="color: var(--fg-muted)">Hosting plan</span>
+            <span>Standard &middot; $9/mo from credits</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 13px">
+            <span style="color: var(--fg-muted)">Credit balance</span>
+            <span style="color: var(--emerald-400)">$40.00</span>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-primary btn-full btn-lg">Go to Dashboard</button>
+        <p class="footer-text" style="margin-top: 12px">
+          Kilo Pass and hosting are billed as separate subscriptions.
+        </p>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+     SCENE 7: Credit Enrollment — Insufficient Balance
+     When user tries to pay with credits but doesn't have enough
+     ═══════════════════════════════════════════════════ -->
+    <div class="scene">
+      <p class="scene-label">Scene 7 — Credit Enrollment: Insufficient Balance</p>
+      <p class="scene-context">
+        Shown when a user with an existing credit balance tries to activate a hosting plan they
+        can't afford (e.g. Commit at $48 with only $12.50 in credits). This dialog appears inline on
+        the checkout page or as a modal from the dashboard when attempting to switch plans.
+      </p>
+
+      <div class="dialog" style="max-width: 640px; margin: 0 auto">
+        <h2 class="dialog-title" style="font-size: 20px">Insufficient Credit Balance</h2>
+        <p class="dialog-sub">You need more credits to activate the Commit plan.</p>
+
+        <div class="dialog-two-panel">
+          <!-- Left: The Problem -->
+          <div class="dialog-panel">
+            <div class="dialog-panel-title">Balance summary</div>
+            <div class="balance-row">
+              <span class="balance-row-label">Current balance</span>
+              <span class="balance-row-amount">$12.50</span>
+            </div>
+            <div class="balance-row">
+              <span class="balance-row-label">Commit plan cost</span>
+              <span class="balance-row-amount">$48.00</span>
+            </div>
+            <div
+              class="balance-row"
+              style="background: var(--red-bg); border: 1px solid var(--red-border)"
+            >
+              <span class="balance-row-label" style="color: var(--red-400); font-weight: 600"
+                >Shortfall</span
+              >
+              <span class="balance-row-amount balance-row-amount-red">$35.50</span>
+            </div>
+
+            <div
+              style="
+                margin-top: 16px;
+                padding-top: 12px;
+                border-top: 1px dashed var(--border-muted);
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  padding: 12px;
+                  border: 1px solid var(--emerald-border);
+                  border-radius: var(--radius);
+                  background: var(--emerald-bg);
+                "
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--emerald-400)"
+                  stroke-width="2"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <div style="flex: 1">
+                  <div style="font-size: 13px; font-weight: 600; color: var(--emerald-300)">
+                    Standard plan &mdash; $9/mo
+                  </div>
+                  <div style="font-size: 11px; color: var(--fg-muted)">Balance is sufficient</div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm">Activate</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: The Solution -->
+          <div class="dialog-panel">
+            <div class="dialog-panel-title">Get more credits</div>
+
+            <button type="button" class="btn btn-primary btn-full" style="margin-bottom: 6px">
+              <i data-lucide="crown" style="width: 16px; height: 16px"></i>
+              Subscribe to Kilo Pass ($49/mo)
+            </button>
+            <p style="font-size: 11px; color: var(--fg-dim); margin-bottom: 16px">
+              Covers hosting + inference. Auto-activates.
+            </p>
+
+            <button type="button" class="btn btn-outline btn-full" style="margin-bottom: 6px">
+              Buy $40 in Credits
+            </button>
+            <p style="font-size: 11px; color: var(--fg-dim)">One-time purchase via Stripe.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+     MODAL: Switch Plan
+     ═══════════════════════════════════════════════════ -->
+    <div class="modal-overlay" id="switch-modal">
+      <div class="dialog" style="max-width: 440px">
+        <h2 class="dialog-title" style="font-size: 20px" id="switch-title">Switch Plan</h2>
+        <p class="dialog-sub" id="switch-sub">Choose a new plan for this instance.</p>
+
+        <div id="switch-options"></div>
+
+        <p
+          style="font-size: 12px; color: var(--fg-dim); text-align: center; margin: 12px 0 0"
+          id="switch-note"
+        >
+          The new plan takes effect at the next billing cycle.
+        </p>
+
+        <div class="cancel-actions">
+          <button type="button" class="btn btn-outline" onclick="closeModal('switch-modal')">
+            Cancel
+          </button>
+          <button type="button" class="btn btn-primary btn-disabled" id="switch-confirm-btn">
+            Switch Plan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+     MODAL: Cancel Flow — Step 1
+     ═══════════════════════════════════════════════════ -->
+    <div class="modal-overlay" id="cancel-step1-modal">
+      <div class="dialog" style="max-width: 480px">
+        <div class="step-indicator">
+          <div class="step-dot active"></div>
+          <div class="step-dot"></div>
+          <span class="step-label">Step 1 of 2</span>
+        </div>
+
+        <h2 class="dialog-title" style="font-size: 20px">What do you want to cancel?</h2>
+        <p class="dialog-sub" id="cancel-step1-sub">You have active subscriptions:</p>
+
+        <div class="cancel-checkbox-list" id="cancel-checkbox-list"></div>
+
+        <p style="font-size: 12px; color: var(--fg-dim); text-align: center">
+          Each hosting subscription is per instance. Select which to cancel.
+        </p>
+
+        <div class="cancel-actions">
+          <button type="button" class="btn btn-outline" onclick="closeModal('cancel-step1-modal')">
+            Back
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            id="cancel-step1-continue"
+            onclick="goToCancelStep2()"
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+     MODAL: Cancel Flow — Step 2
+     ═══════════════════════════════════════════════════ -->
+    <div class="modal-overlay" id="cancel-step2-modal">
+      <div class="dialog" style="max-width: 480px">
+        <div class="step-indicator">
+          <div class="step-dot"></div>
+          <div class="step-dot active"></div>
+          <span class="step-label">Step 2 of 2</span>
+        </div>
+
+        <h2 class="dialog-title" style="font-size: 20px" id="cancel-step2-title">Cancel?</h2>
+        <p class="dialog-sub" style="margin-bottom: 16px">Review what will happen:</p>
+
+        <div id="cancel-step2-rows"></div>
+
+        <div class="acknowledge-checkbox" id="ack-checkbox">
+          <div class="ack-box">
+            <svg
+              class="ack-check"
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#171717"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <p id="ack-text">
+            I understand
+            <strong
+              >Kilo Pass and my other hosting subscriptions will continue billing separately</strong
+            >.
+          </p>
+        </div>
+
+        <div class="cancel-actions">
+          <button
+            type="button"
+            class="btn btn-outline"
+            onclick="
+              closeModal('cancel-step2-modal');
+              openModal('cancel-step1-modal');
+            "
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            class="btn btn-destructive"
+            id="cancel-confirm-btn"
+            style="opacity: 0.5; cursor: not-allowed"
+            onclick="confirmCancel()"
+          >
+            Confirm Cancellation
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+      lucide.createIcons();
+
+      // ══════════════════════════════════════════════════════
+      // Instance state (mutable)
+      // ══════════════════════════════════════════════════════
+      var instances = {
+        chad: {
+          id: 'chad',
+          name: 'Chad',
+          plan: 'standard',
+          status: 'active',
+          renewLabel: 'Renews April 24, 2026',
+        },
+        discord: {
+          id: 'discord',
+          name: 'Discord Support Agent',
+          plan: 'commit',
+          status: 'active',
+          renewLabel: 'Commit period ends September 12, 2026',
+        },
+        staging: {
+          id: 'staging',
+          name: 'Staging Server',
+          plan: 'standard',
+          status: 'active',
+          renewLabel: 'Renews April 24, 2026',
+        },
+        apiserver: {
+          id: 'apiserver',
+          name: 'API Server',
+          plan: 'standard',
+          status: 'active',
+          renewLabel: 'Renews May 1, 2026',
+        },
+      };
+
+      var planMeta = {
+        standard: { label: 'Standard', price: '$9/mo' },
+        commit: { label: 'Commit', price: '$8/mo' },
+      };
+
+      // ── Modal helpers ──────────────────────────────────
+      function openModal(id) {
+        document.getElementById(id).classList.add('open');
+      }
+      function closeModal(id) {
+        document.getElementById(id).classList.remove('open');
+      }
+      function showToast(msg) {
+        var t = document.getElementById('toast');
+        t.innerHTML =
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' +
+          msg;
+        t.classList.add('show');
+        setTimeout(function () {
+          t.classList.remove('show');
+        }, 3000);
+      }
+
+      // Close modals on overlay click
+      document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
+        overlay.addEventListener('click', function (e) {
+          if (e.target === overlay) closeModal(overlay.id);
+        });
+      });
+
+      // ── Render instance cards ──────────────────────────
+      function renderInstances() {
+        Object.keys(instances).forEach(function (key) {
+          var inst = instances[key];
+          var el = document.getElementById('instance-' + key);
+          if (!el) return;
+          el.dataset.plan = inst.plan;
+
+          var badge = el.querySelector('[data-badge]');
+          badge.textContent = planMeta[inst.plan].label + ' \u00B7 ' + planMeta[inst.plan].price;
+          badge.style.marginLeft = 'auto';
+
+          var meta = el.querySelector('[data-meta]');
+          if (inst.status === 'cancelling') {
+            meta.className = 'meta-kv';
+            meta.innerHTML =
+              '<span class="meta-kv-label">Status</span><span class="meta-kv-value" style="color:var(--amber-300);">Cancels at end of billing period</span>';
+            var actionsEl = el.querySelector('[data-actions]');
+            actionsEl.innerHTML =
+              '<button type="button" class="btn btn-outline btn-sm" onclick="reactivateInstance(\'' +
+              key +
+              '\')">Reactivate</button>';
+            el.style.opacity = '0.6';
+          } else {
+            el.style.opacity = '1';
+            meta.className = 'meta-kv';
+            var renewLabelKey = inst.plan === 'commit' ? 'Commit ends' : 'Renews';
+            meta.innerHTML =
+              '<span class="meta-kv-label">' +
+              renewLabelKey +
+              '</span><span class="meta-kv-value">' +
+              inst.renewLabel.replace(/^(Renews |Commit period ends )/, '') +
+              '</span>';
+            var actionsEl2 = el.querySelector('[data-actions]');
+            actionsEl2.innerHTML =
+              '<button type="button" class="btn btn-outline btn-sm" data-action="switch" onclick="openSwitchPlan(\'' +
+              key +
+              '\')">Switch Plan</button>' +
+              '<button type="button" class="btn btn-outline btn-sm" data-action="cancel" onclick="openCancelFlow(\'' +
+              key +
+              '\')">Cancel</button>';
+          }
+        });
+      }
+
+      // ══════════════════════════════════════════════════════
+      // SWITCH PLAN
+      // ══════════════════════════════════════════════════════
+      var switchTarget = null;
+      var switchSelection = null;
+
+      function openSwitchPlan(instanceKey) {
+        switchTarget = instanceKey;
+        switchSelection = null;
+        var inst = instances[instanceKey];
+        var otherPlan = inst.plan === 'standard' ? 'commit' : 'standard';
+
+        document.getElementById('switch-title').textContent = 'Switch Plan — KiloClaw ' + inst.name;
+        document.getElementById('switch-sub').textContent =
+          'Choose a new hosting plan for this instance.';
+
+        // Render options
+        var html = '';
+        ['commit', 'standard'].forEach(function (plan) {
+          var isCurrent = plan === inst.plan;
+          var cls = isCurrent ? 'switch-plan-option current' : 'switch-plan-option';
+          html +=
+            '<div class="' +
+            cls +
+            '" data-switch-plan="' +
+            plan +
+            '">' +
+            '<div class="switch-plan-dot"></div>' +
+            '<div class="switch-plan-info">' +
+            '<div class="switch-plan-name">' +
+            planMeta[plan].label +
+            ' Plan</div>' +
+            '<div class="switch-plan-detail">' +
+            planMeta[plan].price +
+            (plan === 'commit' ? ' (6 months)' : ' (monthly)') +
+            '</div>' +
+            (isCurrent ? '<div class="switch-plan-current-tag">Current plan</div>' : '') +
+            '</div>' +
+            '</div>';
+        });
+        document.getElementById('switch-options').innerHTML = html;
+
+        // Bind clicks
+        document.querySelectorAll('[data-switch-plan]').forEach(function (opt) {
+          opt.addEventListener('click', function () {
+            if (opt.classList.contains('current')) return;
+            document.querySelectorAll('[data-switch-plan]').forEach(function (o) {
+              if (!o.classList.contains('current')) o.classList.remove('selected');
+            });
+            opt.classList.add('selected');
+            switchSelection = opt.dataset.switchPlan;
+            var btn = document.getElementById('switch-confirm-btn');
+            btn.classList.remove('btn-disabled');
+            btn.textContent = 'Switch to ' + planMeta[switchSelection].label;
+            btn.onclick = confirmSwitch;
+          });
+        });
+
+        // Reset confirm button
+        var confirmBtn = document.getElementById('switch-confirm-btn');
+        confirmBtn.classList.add('btn-disabled');
+        confirmBtn.textContent = 'Switch Plan';
+        confirmBtn.onclick = null;
+
+        openModal('switch-modal');
+      }
+
+      function confirmSwitch() {
+        if (!switchTarget || !switchSelection) return;
+        instances[switchTarget].plan = switchSelection;
+        if (switchSelection === 'commit') {
+          instances[switchTarget].renewLabel = 'Commit period ends October 24, 2026';
+        } else {
+          instances[switchTarget].renewLabel = 'Renews April 24, 2026';
+        }
+        renderInstances();
+        closeModal('switch-modal');
+        showToast(
+          'KiloClaw ' +
+            instances[switchTarget].name +
+            ' switched to ' +
+            planMeta[switchSelection].label
+        );
+      }
+
+      // ══════════════════════════════════════════════════════
+      // CANCEL FLOW
+      // ══════════════════════════════════════════════════════
+      var cancelOrigin = null; // which instance button was clicked
+      var cancelSelections = {}; // { chad: true, discord: false, kilopass: false }
+
+      function openCancelFlow(instanceKey) {
+        cancelOrigin = instanceKey;
+        cancelSelections = {};
+
+        // Build checkbox list: all active instances + Kilo Pass
+        var html = '';
+        Object.keys(instances).forEach(function (key) {
+          var inst = instances[key];
+          if (inst.status !== 'active') return;
+          var isOrigin = key === instanceKey;
+          cancelSelections[key] = isOrigin;
+          html +=
+            '<div class="cancel-checkbox-item' +
+            (isOrigin ? ' checked' : '') +
+            '" data-cancel-key="' +
+            key +
+            '">' +
+            '<div class="cancel-checkbox">' +
+            '<svg class="cancel-checkbox-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' +
+            '</div>' +
+            '<div>' +
+            '<div class="cancel-checkbox-label">' +
+            '<svg style="width:14px;height:14px;display:inline;vertical-align:middle;margin-right:4px;color:var(--emerald-400);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>' +
+            'KiloClaw \u2014 ' +
+            inst.name +
+            '</div>' +
+            '<div class="cancel-checkbox-meta">' +
+            planMeta[inst.plan].label +
+            ', ' +
+            planMeta[inst.plan].price +
+            '</div>' +
+            '</div>' +
+            '</div>';
+        });
+
+        // Kilo Pass row
+        cancelSelections['kilopass'] = false;
+        html +=
+          '<div class="cancel-checkbox-item" data-cancel-key="kilopass">' +
+          '<div class="cancel-checkbox">' +
+          '<svg class="cancel-checkbox-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#171717" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' +
+          '</div>' +
+          '<div>' +
+          '<div class="cancel-checkbox-label">' +
+          '<svg style="width:14px;height:14px;display:inline;vertical-align:middle;margin-right:4px;color:#fbbf24;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>' +
+          'Kilo Pass' +
+          '</div>' +
+          '<div class="cancel-checkbox-meta">Pro, $49/mo</div>' +
+          '</div>' +
+          '</div>';
+
+        document.getElementById('cancel-checkbox-list').innerHTML = html;
+
+        // Count active subs
+        var count =
+          Object.keys(instances).filter(function (k) {
+            return instances[k].status === 'active';
+          }).length + 1;
+        document.getElementById('cancel-step1-sub').textContent =
+          'You have ' + count + ' active subscriptions:';
+
+        // Bind checkbox clicks
+        document.querySelectorAll('[data-cancel-key]').forEach(function (item) {
+          item.addEventListener('click', function () {
+            item.classList.toggle('checked');
+            cancelSelections[item.dataset.cancelKey] = item.classList.contains('checked');
+          });
+        });
+
+        openModal('cancel-step1-modal');
+      }
+
+      function goToCancelStep2() {
+        // Collect what's being cancelled
+        var cancelling = Object.keys(cancelSelections).filter(function (k) {
+          return cancelSelections[k];
+        });
+        if (cancelling.length === 0) return;
+
+        closeModal('cancel-step1-modal');
+
+        // Build step 2 content
+        var html = '';
+
+        // Section header: Will be cancelled
+        html +=
+          '<div class="cancel-section-header cancel-section-header-red">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>' +
+          'Will be cancelled</div>';
+
+        // Items being cancelled (red)
+        var hasKiloPassCancel = false;
+        cancelling.forEach(function (key) {
+          var label =
+            key === 'kilopass'
+              ? 'Kilo Pass (Pro, $49/mo)'
+              : 'KiloClaw \u2014 ' + instances[key].name;
+          var detail =
+            key === 'kilopass'
+              ? 'Will stop billing at period end'
+              : planMeta[instances[key].plan].label + ' plan \u2014 will end at period end';
+          if (key === 'kilopass') hasKiloPassCancel = true;
+          html +=
+            '<div class="confirm-row confirm-row-cancel">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red-400)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>' +
+            '<div><div style="font-weight:600;color:var(--red-400);">' +
+            label +
+            '</div>' +
+            '<div style="font-size:12px;color:var(--fg-muted);">' +
+            detail +
+            '</div></div></div>';
+        });
+
+        // Kilo Pass redirect note
+        if (hasKiloPassCancel) {
+          html +=
+            '<div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:8px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);margin-bottom:8px;">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" style="flex-shrink:0;margin-top:2px;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>' +
+            '<div style="font-size:12px;color:var(--fg-muted);line-height:1.5;">Kilo Pass is managed on your profile. You\u2019ll be redirected to your <strong style="color:var(--fg);">Kilo Pass settings</strong> to complete the cancellation.</div></div>';
+        }
+
+        // Items staying (green)
+        var keeping = Object.keys(cancelSelections).filter(function (k) {
+          return !cancelSelections[k];
+        });
+        if (keeping.length > 0) {
+          html +=
+            '<div class="cancel-section-header cancel-section-header-green" style="margin-top:12px;">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+            'Will continue billing</div>';
+        }
+        keeping.forEach(function (key) {
+          var label =
+            key === 'kilopass'
+              ? 'Kilo Pass (Pro, $49/mo)'
+              : 'KiloClaw \u2014 ' + instances[key].name;
+          var detail =
+            key === 'kilopass'
+              ? 'Will continue billing every month'
+              : planMeta[instances[key].plan].label + ' plan \u2014 still active';
+          html +=
+            '<div class="confirm-row confirm-row-keep">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--emerald-400)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+            '<div><div style="font-weight:600;color:var(--emerald-400);">' +
+            label +
+            '</div>' +
+            '<div style="font-size:12px;color:var(--fg-muted);">' +
+            detail +
+            '</div></div></div>';
+        });
+
+        document.getElementById('cancel-step2-rows').innerHTML = html;
+
+        // Title
+        if (cancelling.length === 1 && cancelling[0] !== 'kilopass') {
+          document.getElementById('cancel-step2-title').textContent =
+            'Cancel KiloClaw \u2014 ' + instances[cancelling[0]].name + '?';
+        } else {
+          document.getElementById('cancel-step2-title').textContent =
+            'Cancel ' +
+            cancelling.length +
+            ' subscription' +
+            (cancelling.length > 1 ? 's' : '') +
+            '?';
+        }
+
+        // Ack text
+        if (keeping.length > 0) {
+          var keepingNames = keeping.map(function (k) {
+            return k === 'kilopass' ? 'Kilo Pass' : 'KiloClaw ' + instances[k].name;
+          });
+          document.getElementById('ack-text').innerHTML =
+            'I understand <strong>' +
+            keepingNames.join(' and ') +
+            ' will continue billing separately</strong>.';
+        } else {
+          document.getElementById('ack-text').innerHTML =
+            'I understand <strong>all selected subscriptions will be cancelled</strong>.';
+        }
+
+        // Reset ack checkbox
+        document.getElementById('ack-checkbox').classList.remove('checked');
+        var confirmBtn = document.getElementById('cancel-confirm-btn');
+        confirmBtn.style.opacity = '0.5';
+        confirmBtn.style.cursor = 'not-allowed';
+        confirmBtn.disabled = true;
+
+        openModal('cancel-step2-modal');
+      }
+
+      // Ack checkbox toggle
+      document.getElementById('ack-checkbox').addEventListener('click', function () {
+        this.classList.toggle('checked');
+        var checked = this.classList.contains('checked');
+        var btn = document.getElementById('cancel-confirm-btn');
+        btn.style.opacity = checked ? '1' : '0.5';
+        btn.style.cursor = checked ? 'pointer' : 'not-allowed';
+        btn.disabled = !checked;
+      });
+
+      function confirmCancel() {
+        var cancelling = Object.keys(cancelSelections).filter(function (k) {
+          return cancelSelections[k];
+        });
+        cancelling.forEach(function (key) {
+          if (key === 'kilopass') return; // Kilo Pass cancel would go to profile — just toast
+          if (instances[key]) {
+            instances[key].status = 'cancelling';
+          }
+        });
+        renderInstances();
+        closeModal('cancel-step2-modal');
+        var names = cancelling.map(function (k) {
+          return k === 'kilopass' ? 'Kilo Pass' : 'KiloClaw ' + instances[k].name;
+        });
+        showToast('Cancelled: ' + names.join(', '));
+      }
+
+      function reactivateInstance(key) {
+        instances[key].status = 'active';
+        renderInstances();
+        showToast('KiloClaw ' + instances[key].name + ' reactivated');
+      }
+
+      // ══════════════════════════════════════════════════════
+      // CHECKOUT (Scene 2) — same as before
+      // ══════════════════════════════════════════════════════
+      var cadence = 'monthly';
+      var selectedTier = null;
+      var selectedKpHosting = null;
+      var selectedHostingOnly = null;
+
+      function canOfferCommit(tier, cad) {
+        if (cad === 'yearly') return true;
+        return tier === 'pro' || tier === 'expert';
+      }
+
+      document.querySelectorAll('.cadence-pill').forEach(function (pill) {
+        pill.addEventListener('click', function () {
+          document.querySelectorAll('.cadence-pill').forEach(function (p) {
+            p.classList.remove('active');
+          });
+          pill.classList.add('active');
+          cadence = pill.dataset.cadence;
+          updateTierPrices();
+          updateHostingOptions();
+          updateSubscribeButton();
+        });
+      });
+
+      function updateTierPrices() {
+        document.querySelectorAll('.tier-card').forEach(function (card) {
+          var priceEl = card.querySelector('[data-tier-price]');
+          var detailsEl = card.querySelector('[data-tier-details]');
+          var cadenceLabel = card.querySelector('[data-cadence-label]');
+          var selectLabel = card.querySelector('[data-select-label]');
+          var mp = card.dataset.monthlyPrice;
+          var yp = card.dataset.yearlyPrice;
+          var mc = card.dataset.monthlyCredits;
+          var yb = card.dataset.yearlyBonus;
+
+          if (cadence === 'monthly') {
+            cadenceLabel.textContent = 'Monthly';
+            priceEl.innerHTML = '$' + mp + '<span> /month</span>';
+            detailsEl.innerHTML =
+              '<div class="tier-card-detail-flow"><span class="amt-amber">$' +
+              mc +
+              '/month</span> paid credits</div>' +
+              '<div class="tier-card-detail-flow">Up to <span class="amt-emerald">40%</span> free bonus credits</div>' +
+              '<div class="tier-card-promo">First 2 months: +50% free bonus credits</div>';
+          } else {
+            cadenceLabel.textContent = 'Yearly';
+            priceEl.innerHTML = '$' + yp + '<span> /year</span>';
+            detailsEl.innerHTML =
+              '<div class="tier-card-detail-flow"><span class="amt-amber">$' +
+              mc +
+              '/month</span> pass credits</div>' +
+              '<div class="tier-card-detail-flow"><span class="amt-emerald">$' +
+              yb +
+              '/month</span> bonus credits</div>';
+          }
+
+          // Update select button text
+          if (card.classList.contains('selected')) {
+            selectLabel.innerHTML = 'Selected &#10003;';
+          } else {
+            selectLabel.innerHTML = 'Select &rarr;';
+          }
+        });
+
+        // Show/hide promo footnote (monthly only)
+        var promoNote = document.querySelector('[data-promo-footnote]');
+        if (promoNote) promoNote.style.display = cadence === 'monthly' ? 'flex' : 'none';
+      }
+
+      document.querySelectorAll('.tier-card').forEach(function (card) {
+        card.addEventListener('click', function () {
+          clearHostingOnly();
+          document.querySelectorAll('.tier-card').forEach(function (c) {
+            c.classList.remove('selected');
+            var sl = c.querySelector('[data-select-label]');
+            if (sl) sl.innerHTML = 'Select &rarr;';
+          });
+          card.classList.add('selected');
+          var sl = card.querySelector('[data-select-label]');
+          if (sl) sl.innerHTML = 'Selected &#10003;';
+          selectedTier = card.dataset.tier;
+          updateHostingOptions();
+          updateSubscribeButton();
+        });
+      });
+
+      function updateHostingOptions() {
+        var commitRadio = document.getElementById('kp-commit-radio');
+        var note = document.getElementById('commit-unavailable-note');
+        if (!selectedTier) {
+          commitRadio.classList.remove('disabled-option', 'selected');
+          document.getElementById('kp-standard-radio').classList.remove('selected');
+          selectedKpHosting = null;
+          note.style.display = 'none';
+          return;
+        }
+        if (canOfferCommit(selectedTier, cadence)) {
+          commitRadio.classList.remove('disabled-option');
+          note.style.display = 'none';
+        } else {
+          commitRadio.classList.add('disabled-option');
+          commitRadio.classList.remove('selected');
+          note.style.display = 'block';
+          if (selectedKpHosting === 'commit') selectedKpHosting = null;
+        }
+      }
+
+      document.querySelectorAll('#kp-hosting-group .hosting-radio').forEach(function (radio) {
+        radio.addEventListener('click', function () {
+          if (radio.classList.contains('disabled-option')) return;
+          clearHostingOnly();
+          document.querySelectorAll('#kp-hosting-group .hosting-radio').forEach(function (r) {
+            r.classList.remove('selected');
+          });
+          radio.classList.add('selected');
+          selectedKpHosting = radio.dataset.plan;
+          updateSubscribeButton();
+        });
+      });
+
+      function updateSubscribeButton() {
+        var btn = document.getElementById('kp-subscribe-btn');
+        var footer = document.getElementById('kp-footer-text');
+        if (selectedTier && selectedKpHosting) {
+          btn.classList.remove('btn-disabled');
+          var tierLabel = selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1);
+          var tierCard = document.querySelector('.tier-card[data-tier="' + selectedTier + '"]');
+          var price =
+            cadence === 'monthly'
+              ? '$' + tierCard.dataset.monthlyPrice + '/mo'
+              : '$' + tierCard.dataset.yearlyPrice + '/yr';
+          btn.textContent =
+            'Get Kilo Pass (' +
+            tierLabel +
+            ') + ' +
+            (selectedKpHosting === 'commit' ? 'Commit' : 'Standard') +
+            ' Hosting';
+          footer.textContent =
+            "You'll be redirected to Stripe to pay for Kilo Pass (" + price + ')';
+        } else {
+          btn.classList.add('btn-disabled');
+          btn.textContent = !selectedTier
+            ? 'Select a Kilo Pass tier and hosting plan'
+            : 'Select a hosting plan above';
+          footer.textContent = "You'll be redirected to Stripe to pay for Kilo Pass";
+        }
+      }
+
+      document.querySelectorAll('#hosting-only-grid .plan-sm').forEach(function (card) {
+        card.addEventListener('click', function () {
+          clearKiloPass();
+          document.querySelectorAll('#hosting-only-grid .plan-sm').forEach(function (c) {
+            c.classList.remove('selected');
+          });
+          card.classList.add('selected');
+          selectedHostingOnly = card.dataset.plan;
+          document.getElementById('hosting-only-section').classList.add('has-selection');
+          var btn = document.getElementById('hosting-only-btn');
+          btn.classList.remove('btn-disabled');
+          btn.textContent =
+            'Subscribe \u2014 ' +
+            (selectedHostingOnly === 'commit' ? 'Commit' : 'Standard') +
+            ' Plan (' +
+            (selectedHostingOnly === 'commit' ? '$48' : '$9') +
+            ')';
+        });
+      });
+
+      function clearKiloPass() {
+        document.querySelectorAll('.tier-card').forEach(function (c) {
+          c.classList.remove('selected');
+          var sl = c.querySelector('[data-select-label]');
+          if (sl) sl.innerHTML = 'Select &rarr;';
+        });
+        document.querySelectorAll('#kp-hosting-group .hosting-radio').forEach(function (r) {
+          r.classList.remove('selected');
+        });
+        selectedTier = null;
+        selectedKpHosting = null;
+        updateHostingOptions();
+        updateSubscribeButton();
+      }
+
+      function clearHostingOnly() {
+        document.querySelectorAll('#hosting-only-grid .plan-sm').forEach(function (c) {
+          c.classList.remove('selected');
+        });
+        selectedHostingOnly = null;
+        document.getElementById('hosting-only-section').classList.remove('has-selection');
+        var btn = document.getElementById('hosting-only-btn');
+        btn.classList.add('btn-disabled');
+        btn.textContent = 'Select a plan above';
+      }
+
+      // Initial render with onclick handlers
+      renderInstances();
+
+      // Re-initialize icons for dynamically added content and new scenes
+      lucide.createIcons();
+    </script>
+  </body>
+</html>

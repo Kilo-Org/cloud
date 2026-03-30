@@ -148,6 +148,14 @@ export const KiloClawSubscriptionStatus = {
 export type KiloClawSubscriptionStatus =
   (typeof KiloClawSubscriptionStatus)[keyof typeof KiloClawSubscriptionStatus];
 
+export const KiloClawPaymentSource = {
+  Stripe: 'stripe',
+  Credits: 'credits',
+} as const;
+
+export type KiloClawPaymentSource =
+  (typeof KiloClawPaymentSource)[keyof typeof KiloClawPaymentSource];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.reassociate',

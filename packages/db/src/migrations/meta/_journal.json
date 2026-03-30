@@ -428,6 +428,27 @@
       "when": 1774562517649,
       "tag": "0060_lush_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1774626802624,
+      "tag": "0061_aromatic_loa",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1774632195418,
+      "tag": "0062_charming_pet_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1774637928851,
+      "tag": "0063_orange_hellcat",
+      "breakpoints": true
     }
   ]
 }

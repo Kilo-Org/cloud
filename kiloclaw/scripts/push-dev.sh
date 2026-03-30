@@ -43,12 +43,18 @@ else
   DOCKERFILE="$KILOCLAW_DIR/Dockerfile"
 fi
 
-# Read app name from argument, .dev.vars, or default
+# Read registry app name from argument, .dev.vars, or default.
+# FLY_REGISTRY_APP is the shared app that hosts Docker images in the Fly
+# registry.  FLY_APP_NAME is a legacy fallback (in production these differ:
+# FLY_REGISTRY_APP=kiloclaw-machines vs per-user apps for routing).
 APP_NAME="${1:-}"
+if [ -z "$APP_NAME" ] && [ -f "$KILOCLAW_DIR/.dev.vars" ]; then
+  APP_NAME=$(grep '^FLY_REGISTRY_APP=' "$KILOCLAW_DIR/.dev.vars" | cut -d= -f2)
+fi
 if [ -z "$APP_NAME" ] && [ -f "$KILOCLAW_DIR/.dev.vars" ]; then
   APP_NAME=$(grep '^FLY_APP_NAME=' "$KILOCLAW_DIR/.dev.vars" | cut -d= -f2)
 fi
-APP_NAME="${APP_NAME:-kiloclaw-dev}"
+APP_NAME="${APP_NAME:-kiloclaw-registry-dev}"
 
 TAG="dev-$(date +%s)"
 IMAGE="registry.fly.io/$APP_NAME:$TAG"
@@ -116,6 +122,38 @@ else
   echo "No .dev.vars found — set FLY_IMAGE_TAG=$TAG manually"
 fi
 
+# ---------- Store content hash of image sources ----------
+# Mirrors the find list used in deploy-kiloclaw.yml and dev-start.sh.
+
+# Resolve sha command once (xargs can't invoke shell functions).
+if command -v sha256sum >/dev/null 2>&1; then
+  _SHA="sha256sum"
+else
+  _SHA="shasum -a 256"
+fi
+
+CONTENT_HASH=$(
+  cd "$KILOCLAW_DIR" \
+  && find Dockerfile controller/ container/ skills/ \
+       openclaw-pairing-list.js openclaw-device-pairing-list.js \
+       -type f 2>/dev/null \
+  | sort \
+  | xargs $_SHA \
+  | $_SHA \
+  | cut -d' ' -f1 \
+  | cut -c1-12
+)
+
+if [ -f "$KILOCLAW_DIR/.dev.vars" ] && [ -n "$CONTENT_HASH" ]; then
+  if grep -q '^FLY_IMAGE_CONTENT_HASH=' "$KILOCLAW_DIR/.dev.vars"; then
+    sed "s/^FLY_IMAGE_CONTENT_HASH=.*/FLY_IMAGE_CONTENT_HASH=$CONTENT_HASH/" \
+      "$KILOCLAW_DIR/.dev.vars" > "$KILOCLAW_DIR/.dev.vars.tmp"
+    mv "$KILOCLAW_DIR/.dev.vars.tmp" "$KILOCLAW_DIR/.dev.vars"
+  else
+    echo "FLY_IMAGE_CONTENT_HASH=$CONTENT_HASH" >> "$KILOCLAW_DIR/.dev.vars"
+  fi
+fi
+
 echo ""
 echo "FLY_IMAGE_TAG=$TAG"
 if [ -n "$DIGEST" ]; then
@@ -123,6 +161,9 @@ if [ -n "$DIGEST" ]; then
 fi
 if [ -n "$OPENCLAW_VERSION" ]; then
   echo "OPENCLAW_VERSION=$OPENCLAW_VERSION"
+fi
+if [ -n "$CONTENT_HASH" ]; then
+  echo "FLY_IMAGE_CONTENT_HASH=$CONTENT_HASH"
 fi
 echo ""
 echo "Done. Restart wrangler dev to pick up the new tag."

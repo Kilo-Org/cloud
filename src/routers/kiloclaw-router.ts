@@ -10,10 +10,11 @@ import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import {
   ALL_SECRET_FIELD_KEYS,
   FIELD_KEY_TO_ENTRY,
-  MAX_SECRET_FIELD_LENGTH,
+  MAX_CUSTOM_SECRET_VALUE_LENGTH,
   validateFieldValue,
   getEntriesByCategory,
-  type SecretFieldKey,
+  isValidCustomSecretKey,
+  isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
 import {
   KILOCLAW_API_URL,
@@ -31,7 +32,7 @@ import {
   kiloclaw_email_log,
   kiloclaw_cli_runs,
 } from '@kilocode/db/schema';
-import { and, eq, desc, isNull, inArray, sql } from 'drizzle-orm';
+import { and, eq, ne, desc, isNotNull, isNull, inArray, sql } from 'drizzle-orm';
 import { sentryLogger } from '@/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import {
@@ -41,7 +42,9 @@ import {
   markInstanceDestroyedById,
   renameInstance,
   restoreDestroyedInstance,
+  type ActiveKiloClawInstance,
 } from '@/lib/kiloclaw/instance-registry';
+import { sandboxIdFromUserId } from '@/lib/kiloclaw/sandbox-id';
 import { client as stripe } from '@/lib/stripe-client';
 import { APP_URL } from '@/lib/constants';
 import { getRewardfulReferral } from '@/lib/rewardful';
@@ -50,11 +53,19 @@ import {
   getStripePriceIdForClawPlan,
   getStripePriceIdForClawPlanIntro,
 } from '@/lib/kiloclaw/stripe-price-ids.server';
+import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
+import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { ensureAutoIntroSchedule, resolvePhasePrice } from '@/lib/kiloclaw/stripe-handlers';
 import {
   KILOCLAW_EARLYBIRD_EXPIRY_DATE,
   KILOCLAW_TRIAL_DURATION_DAYS,
 } from '@/lib/kiloclaw/constants';
+import {
+  enrollWithCredits as enrollWithCreditsImpl,
+  KILOCLAW_PLAN_COST_MICRODOLLARS,
+} from '@/lib/kiloclaw/credit-billing';
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
 import PostHogClient from '@/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
@@ -64,6 +75,60 @@ import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
  * paths) and should NOT be forwarded to the client.
  */
 const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed']);
+
+/**
+ * Return the user's active instance, creating a new registry row if none
+ * exists (e.g. trial expired and personal instance was destroyed).
+ *
+ * When a new row is created, the subscription row linked to the user's
+ * destroyed personal instance (identified by sandboxIdFromUserId) is
+ * reassigned to the new instance_id. The update is scoped to that exact
+ * destroyed instance row so that subscriptions on other (org or multi-)
+ * instances are never touched and UQ_kiloclaw_subscriptions_instance is not
+ * violated.
+ *
+ * This mirrors the reassignment already performed in ensureProvisionAccess
+ * (lines 485–497) for the Stripe hosting-only checkout path.
+ */
+async function getOrCreateInstanceForBilling(userId: string): Promise<ActiveKiloClawInstance> {
+  const active = await getActiveInstance(userId);
+  if (active) return active;
+
+  // Find the destroyed personal instance row. ensureActiveInstance always
+  // keys personal instances on sandboxIdFromUserId(userId), so this is the
+  // exact row that needs repairing.
+  const sandboxId = sandboxIdFromUserId(userId);
+  const [destroyedInstance] = await db
+    .select({ id: kiloclaw_instances.id })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNotNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .limit(1);
+
+  const newInstance = await ensureActiveInstance(userId);
+
+  // Reassign the subscription row that was linked to the destroyed personal
+  // instance onto the new instance. Scoped to that specific instance_id so
+  // subscriptions on other instances (org, multi-instance) are not disturbed.
+  if (destroyedInstance) {
+    await db
+      .update(kiloclaw_subscriptions)
+      .set({ instance_id: newInstance.id })
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, userId),
+          eq(kiloclaw_subscriptions.instance_id, destroyedInstance.id)
+        )
+      );
+  }
+
+  return newInstance;
+}
 
 /**
  * Map KiloClawApiError responses to TRPCErrors for file operations.
@@ -130,6 +195,25 @@ function getKiloClawApiErrorPayload(err: KiloClawApiError): { message?: string; 
   } catch {
     return {};
   }
+}
+
+/**
+ * True when the user has ever had a paid (non-trial) subscription that is now
+ * canceled. Used to gate intro pricing eligibility (spec Credit Enrollment rule 3).
+ */
+async function hadPriorPaidSubscription(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: kiloclaw_subscriptions.id })
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        eq(kiloclaw_subscriptions.status, 'canceled'),
+        ne(kiloclaw_subscriptions.plan, 'trial')
+      )
+    )
+    .limit(1);
+  return !!row;
 }
 
 const kilocodeDefaultModelSchema = z
@@ -385,6 +469,7 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
       status: kiloclaw_subscriptions.status,
       trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
       suspended_at: kiloclaw_subscriptions.suspended_at,
+      instance_id: kiloclaw_subscriptions.instance_id,
     })
     .from(kiloclaw_subscriptions)
     .where(eq(kiloclaw_subscriptions.user_id, userId))
@@ -392,20 +477,28 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
 
   if (!existing && !earlybird) {
     // New user with no earlybird purchase — start trial.
-    // Use onConflictDoNothing so concurrent requests (e.g. double-submit)
-    // don't fail on the unique user_id constraint.
+    // Ensure the instance row exists first so we can link the subscription to it.
+    // ensureActiveInstance is idempotent, so the subsequent call in provisionInstance
+    // is a no-op.
+    const instance = await ensureActiveInstance(userId);
     const now = new Date();
     const trialEndsAt = new Date(now.getTime() + KILOCLAW_TRIAL_DURATION_DAYS * 86_400_000);
+    // Use onConflictDoNothing so concurrent requests (e.g. double-submit)
+    // don't fail on the per-instance unique constraint.
     const [inserted] = await db
       .insert(kiloclaw_subscriptions)
       .values({
         user_id: userId,
+        instance_id: instance.id,
         plan: 'trial',
         status: 'trialing',
         trial_started_at: now.toISOString(),
         trial_ends_at: trialEndsAt.toISOString(),
       })
-      .onConflictDoNothing({ target: kiloclaw_subscriptions.user_id })
+      .onConflictDoNothing({
+        target: kiloclaw_subscriptions.instance_id,
+        where: isNotNull(kiloclaw_subscriptions.instance_id),
+      })
       .returning({ id: kiloclaw_subscriptions.id });
 
     if (inserted) {
@@ -425,13 +518,41 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
   if (existing) {
     // Mirror requireKiloClawAccess: active always passes; past_due passes only
     // until the billing lifecycle cron sets suspended_at.
-    if (existing.status === 'active') return;
-    if (existing.status === 'past_due' && !existing.suspended_at) return;
-    if (
-      existing.status === 'trialing' &&
-      existing.trial_ends_at &&
-      new Date(existing.trial_ends_at) > new Date()
-    ) {
+    const hasAccess =
+      existing.status === 'active' ||
+      (existing.status === 'past_due' && !existing.suspended_at) ||
+      (existing.status === 'trialing' &&
+        !!existing.trial_ends_at &&
+        new Date(existing.trial_ends_at) > new Date());
+
+    if (hasAccess) {
+      // If the subscription references a destroyed instance, reassign it to
+      // the new instance being provisioned. This covers the case where a user
+      // destroyed their instance and re-provisioned while the subscription
+      // (e.g. a trial) is still valid.  See billing spec: Trial Eligibility
+      // and Creation rule 5.
+      if (existing.instance_id) {
+        const [linkedInstance] = await db
+          .select({ destroyed_at: kiloclaw_instances.destroyed_at })
+          .from(kiloclaw_instances)
+          .where(eq(kiloclaw_instances.id, existing.instance_id))
+          .limit(1);
+
+        if (linkedInstance?.destroyed_at) {
+          // ensureActiveInstance is idempotent; the subsequent call in
+          // provisionInstance will be a no-op.
+          const newInstance = await ensureActiveInstance(userId);
+          await db
+            .update(kiloclaw_subscriptions)
+            .set({ instance_id: newInstance.id })
+            .where(
+              and(
+                eq(kiloclaw_subscriptions.user_id, userId),
+                eq(kiloclaw_subscriptions.instance_id, existing.instance_id)
+              )
+            );
+        }
+      }
       return;
     }
   }
@@ -609,62 +730,90 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   /**
-   * Generic secret patch — catalog-driven replacement for patchChannels.
-   * Validates keys against the secret catalog, enforces allFieldsRequired,
-   * validates values against catalog patterns, encrypts, and forwards to worker.
+   * Generic secret patch — supports both catalog secrets and custom user secrets.
+   *
+   * Catalog keys (in ALL_SECRET_FIELD_KEYS) are validated against catalog patterns.
+   * Custom keys (valid env var names not in catalog) skip pattern validation but
+   * enforce a generous max value length. All values are RSA-encrypted before
+   * forwarding to the worker.
    */
   patchSecrets: clawAccessProcedure
     .input(
       z.object({
         secrets: z
-          .record(z.string(), z.string().max(MAX_SECRET_FIELD_LENGTH).nullable())
-          .refine(obj => Object.keys(obj).every(k => ALL_SECRET_FIELD_KEYS.has(k)), {
-            message: 'Unknown secret field key',
-          }),
+          .record(z.string(), z.string().max(MAX_CUSTOM_SECRET_VALUE_LENGTH).nullable())
+          .refine(
+            obj =>
+              Object.keys(obj).every(
+                k => ALL_SECRET_FIELD_KEYS.has(k) || isValidCustomSecretKey(k)
+              ),
+            {
+              message:
+                'Invalid secret key: must be a catalog field key or valid env var name (A-Z, 0-9, _, no KILOCLAW_ prefix)',
+            }
+          ),
+        meta: z
+          .record(
+            z.string(),
+            z.object({
+              configPath: z
+                .string()
+                .refine(isValidConfigPath, {
+                  message:
+                    'Not a supported credential path. See https://docs.openclaw.ai/reference/secretref-credential-surface',
+                })
+                .optional(),
+            })
+          )
+          .optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const secrets = input.secrets as Partial<Record<SecretFieldKey, string | null>>;
+      const secrets = input.secrets;
 
       // 1. allFieldsRequired is enforced by the DO on post-merge state (not here),
       //    so single-field rotations work when the other field is already stored.
 
-      // 2. Validate non-null values against catalog patterns + enforce per-field maxLength
+      // 2. Validate non-null values: catalog keys get pattern + maxLength checks,
+      //    custom keys only get the blanket max from the zod schema above.
       for (const [key, value] of Object.entries(secrets)) {
         if (value === null) continue;
 
-        const entry = FIELD_KEY_TO_ENTRY.get(key);
-        const field = entry?.fields.find(f => f.key === key);
+        if (ALL_SECRET_FIELD_KEYS.has(key)) {
+          // Catalog key — validate against catalog patterns and per-field maxLength
+          const entry = FIELD_KEY_TO_ENTRY.get(key);
+          const field = entry?.fields.find(f => f.key === key);
 
-        // Enforce per-field maxLength from catalog (falls back to 500 from zod schema above)
-        if (field?.maxLength != null && value.length > field.maxLength) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `${field.label} exceeds maximum length of ${field.maxLength} characters`,
-          });
-        }
+          if (field?.maxLength != null && value.length > field.maxLength) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: `${field.label} exceeds maximum length of ${field.maxLength} characters`,
+            });
+          }
 
-        if (!validateFieldValue(value, field?.validationPattern)) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: field?.validationMessage ?? `Invalid value for ${key}`,
-          });
+          if (!validateFieldValue(value, field?.validationPattern)) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: field?.validationMessage ?? `Invalid value for ${key}`,
+            });
+          }
         }
+        // Custom keys: no pattern validation — the blanket zod .max() is sufficient
       }
 
       // 3. Encrypt non-null values
-      const encryptedPatch: Partial<
-        Record<SecretFieldKey, ReturnType<typeof encryptKiloClawSecret> | null>
-      > = {};
+      const encryptedPatch: Record<string, ReturnType<typeof encryptKiloClawSecret> | null> = {};
       for (const [key, value] of Object.entries(secrets)) {
-        encryptedPatch[key as SecretFieldKey] =
-          value === null ? null : encryptKiloClawSecret(value);
+        encryptedPatch[key] = value === null ? null : encryptKiloClawSecret(value);
       }
 
       // 4. Forward to worker — translate 4xx responses into TRPCErrors
       const client = new KiloClawInternalClient();
       try {
-        return await client.patchSecrets(ctx.user.id, { secrets: encryptedPatch });
+        return await client.patchSecrets(ctx.user.id, {
+          secrets: encryptedPatch,
+          meta: input.meta,
+        });
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
           // Extract message from worker response body (JSON or plain text)
@@ -1444,18 +1593,50 @@ export const kiloclawRouter = createTRPCRouter({
           }
         : null;
 
-    const subscriptionData =
-      sub && sub.plan !== 'trial' && sub.status !== 'trialing' && sub.stripe_subscription_id
-        ? {
-            plan: sub.plan,
-            status: sub.status,
-            cancelAtPeriodEnd: sub.cancel_at_period_end,
-            currentPeriodEnd: sub.current_period_end ?? '',
-            commitEndsAt: sub.commit_ends_at,
-            scheduledPlan: sub.scheduled_plan,
-            scheduledBy: sub.scheduled_by,
-          }
+    // Include subscription data when a paid subscription exists — either Stripe-funded
+    // (stripe_subscription_id present) or credit-funded (payment_source = 'credits').
+    // See Billing Status Reporting rule 4.
+    const hasPaidSubscription =
+      sub &&
+      sub.plan !== 'trial' &&
+      sub.status !== 'trialing' &&
+      (sub.stripe_subscription_id || sub.payment_source === 'credits');
+
+    // Compute Stripe-funding indicator and conversion prompt.
+    // See Billing Status Reporting rules 6-7.
+    const hasStripeFunding = hasPaidSubscription ? !!sub.stripe_subscription_id : false;
+
+    let showConversionPrompt = false;
+    if (hasStripeFunding) {
+      const kiloPassState = await getKiloPassStateForUser(db, ctx.user.id);
+      showConversionPrompt = !!kiloPassState && !isStripeSubscriptionEnded(kiloPassState.status);
+    }
+
+    // Renewal cost for the next billing period.
+    // For hybrid subscriptions the actual amount is Stripe-determined; report
+    // the plan-based approximation per Billing Status Reporting rule 5.
+    const renewalCostMicrodollars =
+      hasPaidSubscription && (sub.plan === 'standard' || sub.plan === 'commit')
+        ? KILOCLAW_PLAN_COST_MICRODOLLARS[sub.plan]
         : null;
+
+    const subscriptionData = hasPaidSubscription
+      ? {
+          plan: sub.plan as 'commit' | 'standard',
+          status: sub.status as 'active' | 'past_due' | 'canceled' | 'unpaid',
+          cancelAtPeriodEnd: sub.cancel_at_period_end,
+          currentPeriodEnd: sub.current_period_end ?? '',
+          commitEndsAt: sub.commit_ends_at,
+          scheduledPlan: sub.scheduled_plan,
+          scheduledBy: sub.scheduled_by,
+          hasStripeFunding,
+          paymentSource: sub.payment_source ?? null,
+          creditRenewalAt: sub.credit_renewal_at ?? null,
+          renewalCostMicrodollars,
+          showConversionPrompt,
+          pendingConversion: sub.pending_conversion ?? false,
+        }
+      : null;
 
     const earlybirdData = earlybird
       ? {
@@ -1478,10 +1659,19 @@ export const kiloclawRouter = createTRPCRouter({
       };
     }
 
+    // Credit balance: microdollars available for credit enrollment
+    const creditBalanceMicrodollars =
+      ctx.user.total_microdollars_acquired - ctx.user.microdollars_used;
+
+    // First-month credit discount eligibility (spec Credit Enrollment rule 3).
+    const creditIntroEligible = !(await hadPriorPaidSubscription(ctx.user.id));
+
     return {
       hasAccess,
       accessReason,
       trialEligible: !activeInstance && !sub && !earlybird,
+      creditBalanceMicrodollars,
+      creditIntroEligible,
       trial: trialData,
       subscription: subscriptionData,
       earlybird: earlybirdData,
@@ -1536,10 +1726,8 @@ export const kiloclawRouter = createTRPCRouter({
         staleKiloClawSessions.map(s => stripe.checkout.sessions.expire(s.id).catch(() => {}))
       );
 
-      // New standard subscribers get the intro price; returning subscribers who
-      // previously had a paid subscription get the regular price. A canceled trial
-      // (plan === 'trial') does not count as a prior paid subscription.
-      const hadPaidSubscription = existing?.status === 'canceled' && existing.plan !== 'trial';
+      // Intro pricing eligibility (spec Credit Enrollment rule 3).
+      const hadPaidSubscription = await hadPriorPaidSubscription(ctx.user.id);
       const priceId =
         input.plan === 'standard' && !hadPaidSubscription
           ? getStripePriceIdForClawPlanIntro('standard')
@@ -1567,6 +1755,159 @@ export const kiloclawRouter = createTRPCRouter({
       return { url: typeof session.url === 'string' ? session.url : null };
     }),
 
+  enrollWithCredits: baseProcedure
+    .input(
+      z.object({
+        plan: z.enum(['commit', 'standard']),
+        instanceId: z.string().uuid().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // When a specific instanceId is provided (e.g. from the Kilo Pass upsell
+      // callback URL), look up that instance directly so enrollment targets the
+      // correct one even if the user reprovisioned since checkout started.
+      let instance: ActiveKiloClawInstance;
+      if (input.instanceId) {
+        const [row] = await db
+          .select({
+            id: kiloclaw_instances.id,
+            userId: kiloclaw_instances.user_id,
+            sandboxId: kiloclaw_instances.sandbox_id,
+            organizationId: kiloclaw_instances.organization_id,
+            name: kiloclaw_instances.name,
+          })
+          .from(kiloclaw_instances)
+          .where(
+            and(
+              eq(kiloclaw_instances.id, input.instanceId),
+              eq(kiloclaw_instances.user_id, ctx.user.id),
+              isNull(kiloclaw_instances.destroyed_at)
+            )
+          )
+          .limit(1);
+
+        if (!row) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Instance not found or does not belong to you.',
+          });
+        }
+        instance = row;
+      } else {
+        instance = await getOrCreateInstanceForBilling(ctx.user.id);
+      }
+
+      // Intro pricing eligibility (spec Credit Enrollment rule 3).
+      const hadPaidSubscription = await hadPriorPaidSubscription(ctx.user.id);
+
+      await enrollWithCreditsImpl({
+        userId: ctx.user.id,
+        instanceId: instance.id,
+        plan: input.plan,
+        hadPaidSubscription,
+      });
+
+      return { success: true };
+    }),
+
+  createKiloPassUpsellCheckout: baseProcedure
+    .input(
+      z.object({
+        tier: z.enum(['19', '49', '199']),
+        cadence: z.enum(['monthly', 'yearly']),
+        hostingPlan: z.enum(['commit', 'standard']),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const stripeCustomerId = ctx.user.stripe_customer_id;
+      if (!stripeCustomerId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
+      }
+
+      // Get the user's active instance — needed for both the guard and callback URL.
+      // If none exists (e.g. trial expired and instance was destroyed) create a new
+      // registry row and reassign any existing subscription to it.
+      const instance = await getOrCreateInstanceForBilling(ctx.user.id);
+
+      // Reject if this instance already has a non-ended KiloClaw subscription
+      const [existing] = await db
+        .select({ status: kiloclaw_subscriptions.status })
+        .from(kiloclaw_subscriptions)
+        .where(eq(kiloclaw_subscriptions.instance_id, instance.id))
+        .limit(1);
+
+      if (existing && existing.status !== 'canceled' && existing.status !== 'trialing') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'You already have an active subscription.',
+        });
+      }
+
+      // Reject if user already has an active Kilo Pass subscription
+      const existingKiloPass = await getKiloPassStateForUser(db, ctx.user.id);
+      if (existingKiloPass && !isStripeSubscriptionEnded(existingKiloPass.status)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'You already have an active Kilo Pass subscription.',
+        });
+      }
+
+      const tierMap = {
+        '19': KiloPassTier.Tier19,
+        '49': KiloPassTier.Tier49,
+        '199': KiloPassTier.Tier199,
+      } as const;
+      const cadenceMap = {
+        monthly: KiloPassCadence.Monthly,
+        yearly: KiloPassCadence.Yearly,
+      } as const;
+
+      const kiloPassTier = tierMap[input.tier];
+      const kiloPassCadence = cadenceMap[input.cadence];
+      const priceId = getStripePriceIdForKiloPass({
+        tier: kiloPassTier,
+        cadence: kiloPassCadence,
+      });
+
+      const rewardfulReferral = await getRewardfulReferral();
+
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        customer: stripeCustomerId,
+        ...(rewardfulReferral && { client_reference_id: rewardfulReferral }),
+        allow_promotion_codes: true,
+        billing_address_collection: 'required',
+        line_items: [{ price: priceId, quantity: 1 }],
+        customer_update: {
+          name: 'auto',
+          address: 'auto',
+        },
+        tax_id_collection: {
+          enabled: true,
+          required: 'never',
+        },
+        success_url: `${APP_URL}/payments/kilo-pass/awarding?session_id={CHECKOUT_SESSION_ID}&clawHostingPlan=${input.hostingPlan}&clawInstanceId=${instance.id}`,
+        cancel_url: `${APP_URL}/claw?checkout=cancelled`,
+        subscription_data: {
+          metadata: {
+            type: 'kilo-pass',
+            kiloUserId: ctx.user.id,
+            tier: kiloPassTier,
+            cadence: kiloPassCadence,
+            rewardful: 'false',
+          },
+        },
+        metadata: {
+          type: 'kilo-pass',
+          kiloUserId: ctx.user.id,
+          tier: kiloPassTier,
+          cadence: kiloPassCadence,
+        },
+      });
+
+      return { url: typeof session.url === 'string' ? session.url : null };
+    }),
+
   cancelSubscription: baseProcedure.mutation(async ({ ctx }) => {
     const [sub] = await db
       .select()
@@ -1574,7 +1915,7 @@ export const kiloclawRouter = createTRPCRouter({
       .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
       .limit(1);
 
-    if (!sub?.stripe_subscription_id || sub.status !== 'active') {
+    if (!sub || sub.status !== 'active') {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'No active subscription to cancel.' });
     }
 
@@ -1585,36 +1926,214 @@ export const kiloclawRouter = createTRPCRouter({
       });
     }
 
-    // Reconcile hidden-schedule state: Stripe may have an attached schedule
-    // that the DB doesn't know about.
+    if (sub.stripe_subscription_id) {
+      // Stripe-funded path (legacy Stripe or hybrid)
+      // Reconcile hidden-schedule state: Stripe may have an attached schedule
+      // that the DB doesn't know about.
+      const liveSub = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
+      const scheduleIdToRelease = sub.stripe_schedule_id ?? resolveScheduleId(liveSub.schedule);
+
+      if (scheduleIdToRelease) {
+        const released = await releaseScheduleIfActive(scheduleIdToRelease);
+        if (!released) {
+          logBillingError('Failed to release subscription schedule — aborting cancellation', {
+            user_id: ctx.user.id,
+            schedule_id: scheduleIdToRelease,
+          });
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Unable to cancel: failed to release pending plan schedule. Please try again.',
+          });
+        }
+      }
+
+      await stripe.subscriptions.update(sub.stripe_subscription_id, {
+        cancel_at_period_end: true,
+      });
+
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({
+          cancel_at_period_end: true,
+          ...(scheduleIdToRelease
+            ? { stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null }
+            : {}),
+        })
+        .where(eq(kiloclaw_subscriptions.id, sub.id));
+    } else if (sub.payment_source === 'credits') {
+      // Pure credit path — local DB only, no Stripe API call
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({
+          cancel_at_period_end: true,
+          // Clear all schedule state — a pure credit row should not have a Stripe
+          // schedule, but clear defensively in case of stale data from a prior
+          // Stripe-funded period.
+          stripe_schedule_id: null,
+          scheduled_plan: null,
+          scheduled_by: null,
+        })
+        .where(eq(kiloclaw_subscriptions.id, sub.id));
+    } else {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message:
+          'Subscription is in an invalid state: no Stripe subscription and not credit-funded.',
+      });
+    }
+
+    return { success: true };
+  }),
+
+  acceptConversion: baseProcedure.mutation(async ({ ctx }) => {
+    // Resolve the active instance so we read the correct subscription row
+    const instance = await getActiveInstance(ctx.user.id);
+    if (!instance) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'No active instance found.' });
+    }
+
+    // Validate: user must have an active Stripe-funded subscription for this instance
+    const [sub] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, ctx.user.id),
+          eq(kiloclaw_subscriptions.instance_id, instance.id)
+        )
+      )
+      .limit(1);
+
+    if (!sub || sub.status !== 'active') {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'No active subscription to convert.' });
+    }
+
+    if (!sub.stripe_subscription_id) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Subscription is not Stripe-funded — nothing to convert.',
+      });
+    }
+
+    if (sub.cancel_at_period_end) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Subscription is already set to cancel.',
+      });
+    }
+
+    // Validate: user must have an active Kilo Pass
+    const kiloPassState = await getKiloPassStateForUser(db, ctx.user.id);
+    if (!kiloPassState || isStripeSubscriptionEnded(kiloPassState.status)) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Active Kilo Pass required to convert to credit-funded billing.',
+      });
+    }
+
+    // Same Stripe operations as cancelSubscription: release schedule + cancel at period end
     const liveSub = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
     const scheduleIdToRelease = sub.stripe_schedule_id ?? resolveScheduleId(liveSub.schedule);
 
     if (scheduleIdToRelease) {
       const released = await releaseScheduleIfActive(scheduleIdToRelease);
       if (!released) {
-        logBillingError('Failed to release subscription schedule — aborting cancellation', {
+        logBillingError('Failed to release subscription schedule — aborting conversion', {
           user_id: ctx.user.id,
           schedule_id: scheduleIdToRelease,
         });
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Unable to cancel: failed to release pending plan schedule. Please try again.',
+          message: 'Unable to convert: failed to release pending plan schedule. Please try again.',
         });
       }
     }
 
-    await stripe.subscriptions.update(sub.stripe_subscription_id, { cancel_at_period_end: true });
-
+    // Phase 1: Persist conversion intent and clear schedule fields before
+    // the Stripe API call. We intentionally do NOT set cancel_at_period_end
+    // here — that only happens after Stripe confirms (phase 2). This makes
+    // the operation retry-safe: on failure the guard (cancel_at_period_end
+    // === false) still allows re-entry, schedule release is idempotent, and
+    // pending_conversion is already durable so subscription.deleted converts
+    // correctly even if Stripe applied the change before the error was raised.
     await db
       .update(kiloclaw_subscriptions)
       .set({
-        cancel_at_period_end: true,
+        pending_conversion: true,
         ...(scheduleIdToRelease
           ? { stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null }
           : {}),
       })
-      .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id));
+      .where(eq(kiloclaw_subscriptions.id, sub.id));
+
+    // Phase 2: Tell Stripe to cancel at period end, then record locally.
+    // If the Stripe call fails we reconcile by re-fetching the subscription
+    // to check whether cancel_at_period_end was actually applied. This
+    // prevents leaving pending_conversion armed after a definite rejection
+    // while still handling timeout-after-commit safely.
+    try {
+      await stripe.subscriptions.update(sub.stripe_subscription_id, {
+        cancel_at_period_end: true,
+      });
+    } catch (stripeError) {
+      // Reconcile: did Stripe actually apply cancel_at_period_end?
+      let stripeApplied: boolean | undefined;
+      try {
+        const refreshed = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
+        stripeApplied = refreshed.cancel_at_period_end === true;
+      } catch {
+        // Re-fetch failed — ambiguous. Leave pending_conversion armed so
+        // subscription.deleted converts correctly if Stripe did commit.
+        stripeApplied = undefined;
+      }
+
+      if (stripeApplied === false) {
+        // Stripe definitively did NOT apply the change. Roll back the
+        // conversion intent so an unrelated subscription.deleted event
+        // won't incorrectly trigger the conversion path.
+        await db
+          .update(kiloclaw_subscriptions)
+          .set({ pending_conversion: false })
+          .where(eq(kiloclaw_subscriptions.id, sub.id));
+
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to schedule Stripe cancellation. Please try again.',
+          cause: stripeError,
+        });
+      }
+
+      if (stripeApplied === undefined) {
+        // Both calls failed — we cannot confirm Stripe's state. Leave
+        // pending_conversion armed (safe: if Stripe did commit, the
+        // subscription.deleted handler will convert correctly). But do
+        // NOT set cancel_at_period_end locally or return success —
+        // doing so would block retries and could permanently desync
+        // local state if Stripe never applied the change.
+        logBillingError(
+          'acceptConversion: Stripe update threw and re-fetch also failed — state ambiguous, will retry',
+          {
+            user_id: ctx.user.id,
+            stripe_subscription_id: sub.stripe_subscription_id,
+            error: stripeError instanceof Error ? stripeError.message : String(stripeError),
+          }
+        );
+
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Unable to confirm Stripe cancellation. Please try again.',
+          cause: stripeError,
+        });
+      }
+
+      // stripeApplied === true: timeout-after-commit case. Stripe
+      // confirmed cancel_at_period_end — fall through to persist locally.
+    }
+
+    await db
+      .update(kiloclaw_subscriptions)
+      .set({ cancel_at_period_end: true })
+      .where(eq(kiloclaw_subscriptions.id, sub.id));
 
     return { success: true };
   }),
@@ -1626,26 +2145,43 @@ export const kiloclawRouter = createTRPCRouter({
       .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
       .limit(1);
 
-    if (!sub?.stripe_subscription_id || !sub.cancel_at_period_end) {
+    if (!sub || sub.status !== 'active' || !sub.cancel_at_period_end) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
         message: 'No pending cancellation to reactivate.',
       });
     }
 
-    await stripe.subscriptions.update(sub.stripe_subscription_id, { cancel_at_period_end: false });
-    await db
-      .update(kiloclaw_subscriptions)
-      .set({ cancel_at_period_end: false })
-      .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id));
+    if (sub.stripe_subscription_id) {
+      // Stripe-funded path (legacy Stripe or hybrid)
+      await stripe.subscriptions.update(sub.stripe_subscription_id, {
+        cancel_at_period_end: false,
+      });
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ cancel_at_period_end: false, pending_conversion: false })
+        .where(eq(kiloclaw_subscriptions.id, sub.id));
 
-    // Best-effort: restore the auto intro→regular schedule if on an intro price
-    try {
-      await ensureAutoIntroSchedule(sub.stripe_subscription_id, ctx.user.id);
-    } catch (err) {
-      console.error('Failed to restore auto intro schedule after reactivation', {
-        userId: ctx.user.id,
-        error: err,
+      // Best-effort: restore the auto intro→regular schedule if on an intro price
+      try {
+        await ensureAutoIntroSchedule(sub.stripe_subscription_id, ctx.user.id);
+      } catch (err) {
+        logBillingError('Failed to restore auto intro schedule after reactivation', {
+          user_id: ctx.user.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    } else if (sub.payment_source === 'credits') {
+      // Pure credit path — local DB only, no Stripe API call
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ cancel_at_period_end: false, pending_conversion: false })
+        .where(eq(kiloclaw_subscriptions.id, sub.id));
+    } else {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message:
+          'Subscription is in an invalid state: no Stripe subscription and not credit-funded.',
       });
     }
 
@@ -1661,7 +2197,7 @@ export const kiloclawRouter = createTRPCRouter({
         .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
         .limit(1);
 
-      if (!sub?.stripe_subscription_id || sub.status !== 'active') {
+      if (!sub || sub.status !== 'active') {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'No active subscription to switch.' });
       }
 
@@ -1673,166 +2209,194 @@ export const kiloclawRouter = createTRPCRouter({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Cannot switch from a trial plan.' });
       }
 
-      // Reconcile hidden-schedule state: Stripe may have an attached schedule
-      // that the DB doesn't know about.
-      const liveSub = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
-      const effectiveScheduleId = sub.stripe_schedule_id ?? resolveScheduleId(liveSub.schedule);
+      if (sub.stripe_subscription_id) {
+        // Stripe-funded path (legacy Stripe or hybrid)
 
-      let effectiveScheduledBy = sub.scheduled_by;
-      if (!sub.stripe_schedule_id && effectiveScheduleId) {
-        const hiddenSchedule = await stripe.subscriptionSchedules.retrieve(effectiveScheduleId);
-        if (hiddenSchedule.metadata?.origin === 'auto-intro') {
-          effectiveScheduledBy = 'auto';
-        } else {
-          // Hidden non-auto schedule — must release before creating a fresh one,
-          // otherwise Stripe rejects the create because the subscription is still
-          // attached to the old schedule.
-          const released = await releaseScheduleIfActive(effectiveScheduleId);
-          if (!released) {
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message:
-                'Unable to switch plan: failed to release existing schedule. Please try again.',
-            });
+        // Reconcile hidden-schedule state: Stripe may have an attached schedule
+        // that the DB doesn't know about.
+        const liveSub = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
+        const effectiveScheduleId = sub.stripe_schedule_id ?? resolveScheduleId(liveSub.schedule);
+
+        let effectiveScheduledBy = sub.scheduled_by;
+        if (!sub.stripe_schedule_id && effectiveScheduleId) {
+          const hiddenSchedule = await stripe.subscriptionSchedules.retrieve(effectiveScheduleId);
+          if (hiddenSchedule.metadata?.origin === 'auto-intro') {
+            effectiveScheduledBy = 'auto';
+          } else {
+            // Hidden non-auto schedule — must release before creating a fresh one,
+            // otherwise Stripe rejects the create because the subscription is still
+            // attached to the old schedule.
+            const released = await releaseScheduleIfActive(effectiveScheduleId);
+            if (!released) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message:
+                  'Unable to switch plan: failed to release existing schedule. Please try again.',
+              });
+            }
+            effectiveScheduledBy = null;
           }
-          effectiveScheduledBy = null;
         }
-      }
 
-      if (effectiveScheduledBy === 'user') {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'A plan switch is already pending. Cancel it before requesting a new one.',
-        });
-      }
+        if (effectiveScheduledBy === 'user') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'A plan switch is already pending. Cancel it before requesting a new one.',
+          });
+        }
 
-      const targetPriceId = getStripePriceIdForClawPlan(input.toPlan);
+        const targetPriceId = getStripePriceIdForClawPlan(input.toPlan);
 
-      // If an auto schedule exists, update it in place for the user's plan switch.
-      if (effectiveScheduledBy === 'auto' && effectiveScheduleId) {
+        // If an auto schedule exists, update it in place for the user's plan switch.
+        if (effectiveScheduledBy === 'auto' && effectiveScheduleId) {
+          try {
+            const existingSchedule =
+              await stripe.subscriptionSchedules.retrieve(effectiveScheduleId);
+            const autoCurrentPhase = existingSchedule.phases[0];
+            const phase1Price = autoCurrentPhase ? resolvePhasePrice(autoCurrentPhase) : null;
+
+            if (!autoCurrentPhase || !phase1Price) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Cannot determine current phase price from schedule.',
+              });
+            }
+
+            await stripe.subscriptionSchedules.update(effectiveScheduleId, {
+              end_behavior: 'release',
+              phases: [
+                {
+                  items: [{ price: phase1Price }],
+                  start_date: autoCurrentPhase.start_date,
+                  end_date: autoCurrentPhase.end_date,
+                },
+                { items: [{ price: targetPriceId }] },
+              ],
+            });
+
+            await db
+              .update(kiloclaw_subscriptions)
+              .set({
+                stripe_schedule_id: effectiveScheduleId,
+                scheduled_plan: input.toPlan,
+                scheduled_by: 'user',
+              })
+              .where(eq(kiloclaw_subscriptions.id, sub.id));
+
+            return { success: true };
+          } catch (err) {
+            // Stale schedule — clear pointer and fall through to fresh creation
+            if (!isScheduleAlreadyInactive(err)) throw err;
+
+            await db
+              .update(kiloclaw_subscriptions)
+              .set({ stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null })
+              .where(eq(kiloclaw_subscriptions.id, sub.id));
+          }
+        }
+
+        // Fresh schedule creation: no existing schedule (or stale one was cleared above).
+        // from_subscription mirrors the subscription's current state at create-time,
+        // so the phase price reflects the actual current price even if a schedule
+        // released at a billing boundary since our earlier subscriptions.retrieve().
+        let stripeScheduleId: string | null = null;
         try {
-          const existingSchedule = await stripe.subscriptionSchedules.retrieve(effectiveScheduleId);
-          const autoCurrentPhase = existingSchedule.phases[0];
-          const phase1Price = autoCurrentPhase ? resolvePhasePrice(autoCurrentPhase) : null;
+          const schedule = await stripe.subscriptionSchedules.create({
+            from_subscription: sub.stripe_subscription_id,
+          });
+          stripeScheduleId = schedule.id;
 
-          if (!autoCurrentPhase || !phase1Price) {
+          const currentPhase = schedule.phases[0];
+          if (!currentPhase) {
             throw new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
-              message: 'Cannot determine current phase price from schedule.',
+              message: 'Stripe schedule has no current phase.',
             });
           }
 
-          await stripe.subscriptionSchedules.update(effectiveScheduleId, {
+          const freshPhase1Price = resolvePhasePrice(currentPhase);
+          if (!freshPhase1Price) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Cannot determine current subscription price from schedule.',
+            });
+          }
+
+          await stripe.subscriptionSchedules.update(schedule.id, {
+            metadata: { origin: 'user-switch' },
             end_behavior: 'release',
             phases: [
               {
-                items: [{ price: phase1Price }],
-                start_date: autoCurrentPhase.start_date,
-                end_date: autoCurrentPhase.end_date,
+                items: [{ price: freshPhase1Price }],
+                start_date: currentPhase.start_date,
+                end_date: currentPhase.end_date,
               },
               { items: [{ price: targetPriceId }] },
             ],
           });
 
-          await db
+          // Optimistic concurrency: only write if no other request wrote a schedule first.
+          const updated = await db
             .update(kiloclaw_subscriptions)
             .set({
-              stripe_schedule_id: effectiveScheduleId,
+              stripe_schedule_id: schedule.id,
               scheduled_plan: input.toPlan,
               scheduled_by: 'user',
             })
-            .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id));
+            .where(
+              and(
+                eq(kiloclaw_subscriptions.id, sub.id),
+                isNull(kiloclaw_subscriptions.stripe_schedule_id)
+              )
+            )
+            .returning({ id: kiloclaw_subscriptions.id });
+
+          if (updated.length === 0) {
+            // A concurrent request already wrote a schedule — release ours.
+            await stripe.subscriptionSchedules.release(schedule.id);
+            stripeScheduleId = null; // Already cleaned up; skip catch-block cleanup.
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'A plan switch is already pending. Cancel it before requesting a new one.',
+            });
+          }
 
           return { success: true };
-        } catch (err) {
-          // Stale schedule — clear pointer and fall through to fresh creation
-          if (!isScheduleAlreadyInactive(err)) throw err;
-
-          await db
-            .update(kiloclaw_subscriptions)
-            .set({ stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null })
-            .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id));
+        } catch (error) {
+          // Best-effort cleanup: if we created a schedule on Stripe but something
+          // failed afterward, release it so it doesn't become orphaned.
+          if (stripeScheduleId) {
+            try {
+              await stripe.subscriptionSchedules.release(stripeScheduleId);
+            } catch {
+              // Swallow cleanup errors — the original error is more important.
+            }
+          }
+          throw error;
         }
-      }
+      } else if (sub.payment_source === 'credits') {
+        // Pure credit path — record scheduled plan locally, applied at next
+        // period boundary by the credit renewal sweep (spec Plan Switching rule 9).
 
-      // Fresh schedule creation: no existing schedule (or stale one was cleared above).
-      // from_subscription mirrors the subscription's current state at create-time,
-      // so the phase price reflects the actual current price even if a schedule
-      // released at a billing boundary since our earlier subscriptions.retrieve().
-      let stripeScheduleId: string | null = null;
-      try {
-        const schedule = await stripe.subscriptionSchedules.create({
-          from_subscription: sub.stripe_subscription_id,
-        });
-        stripeScheduleId = schedule.id;
-
-        const currentPhase = schedule.phases[0];
-        if (!currentPhase) {
+        if (sub.scheduled_plan && sub.scheduled_by === 'user') {
           throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Stripe schedule has no current phase.',
-          });
-        }
-
-        const freshPhase1Price = resolvePhasePrice(currentPhase);
-        if (!freshPhase1Price) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Cannot determine current subscription price from schedule.',
-          });
-        }
-
-        await stripe.subscriptionSchedules.update(schedule.id, {
-          metadata: { origin: 'user-switch' },
-          end_behavior: 'release',
-          phases: [
-            {
-              items: [{ price: freshPhase1Price }],
-              start_date: currentPhase.start_date,
-              end_date: currentPhase.end_date,
-            },
-            { items: [{ price: targetPriceId }] },
-          ],
-        });
-
-        // Optimistic concurrency: only write if no other request wrote a schedule first.
-        const updated = await db
-          .update(kiloclaw_subscriptions)
-          .set({
-            stripe_schedule_id: schedule.id,
-            scheduled_plan: input.toPlan,
-            scheduled_by: 'user',
-          })
-          .where(
-            and(
-              eq(kiloclaw_subscriptions.user_id, ctx.user.id),
-              isNull(kiloclaw_subscriptions.stripe_schedule_id)
-            )
-          )
-          .returning({ id: kiloclaw_subscriptions.id });
-
-        if (updated.length === 0) {
-          // A concurrent request already wrote a schedule — release ours.
-          await stripe.subscriptionSchedules.release(schedule.id);
-          stripeScheduleId = null; // Already cleaned up; skip catch-block cleanup.
-          throw new TRPCError({
-            code: 'CONFLICT',
+            code: 'BAD_REQUEST',
             message: 'A plan switch is already pending. Cancel it before requesting a new one.',
           });
         }
 
+        await db
+          .update(kiloclaw_subscriptions)
+          .set({ scheduled_plan: input.toPlan, scheduled_by: 'user' })
+          .where(eq(kiloclaw_subscriptions.id, sub.id));
+
         return { success: true };
-      } catch (error) {
-        // Best-effort cleanup: if we created a schedule on Stripe but something
-        // failed afterward, release it so it doesn't become orphaned.
-        if (stripeScheduleId) {
-          try {
-            await stripe.subscriptionSchedules.release(stripeScheduleId);
-          } catch {
-            // Swallow cleanup errors — the original error is more important.
-          }
-        }
-        throw error;
+      } else {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message:
+            'Subscription is in an invalid state: no Stripe subscription and not credit-funded.',
+        });
       }
     }),
 
@@ -1843,11 +2407,10 @@ export const kiloclawRouter = createTRPCRouter({
       .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
       .limit(1);
 
-    if (!sub?.stripe_schedule_id) {
+    if (!sub?.scheduled_plan) {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'No pending plan switch to cancel.' });
     }
 
-    // Only user-initiated plan switches may be canceled.
     if (sub.scheduled_by !== 'user') {
       throw new TRPCError({
         code: 'BAD_REQUEST',
@@ -1855,29 +2418,38 @@ export const kiloclawRouter = createTRPCRouter({
       });
     }
 
-    const released = await releaseScheduleIfActive(sub.stripe_schedule_id);
-    if (!released) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to release pending plan schedule. Please try again.',
-      });
-    }
-
-    await db
-      .update(kiloclaw_subscriptions)
-      .set({ stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null })
-      .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id));
-
-    // Best-effort: restore the auto intro→regular schedule if on an intro price
-    try {
-      if (sub.stripe_subscription_id) {
-        await ensureAutoIntroSchedule(sub.stripe_subscription_id, ctx.user.id);
+    if (sub.stripe_schedule_id) {
+      // Stripe-funded path — release the Stripe schedule
+      const released = await releaseScheduleIfActive(sub.stripe_schedule_id);
+      if (!released) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to release pending plan schedule. Please try again.',
+        });
       }
-    } catch (err) {
-      console.error('Failed to restore auto intro schedule after cancel plan switch', {
-        userId: ctx.user.id,
-        error: err,
-      });
+
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ stripe_schedule_id: null, scheduled_plan: null, scheduled_by: null })
+        .where(eq(kiloclaw_subscriptions.id, sub.id));
+
+      // Best-effort: restore the auto intro→regular schedule if on an intro price
+      try {
+        if (sub.stripe_subscription_id) {
+          await ensureAutoIntroSchedule(sub.stripe_subscription_id, ctx.user.id);
+        }
+      } catch (err) {
+        logBillingError('Failed to restore auto intro schedule after cancel plan switch', {
+          user_id: ctx.user.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    } else {
+      // Pure credit path — clear locally recorded scheduled plan only
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ scheduled_plan: null, scheduled_by: null })
+        .where(eq(kiloclaw_subscriptions.id, sub.id));
     }
 
     return { success: true };

@@ -174,7 +174,7 @@ export async function makeErrorReadable({
     const recommendation =
       feature === 'kiloclaw' || feature === 'openclaw'
         ? `The model "${requestedModel}" does not exist or is no longer available. We recommend switching to ${recommendedModel.name}: /model kilocode/${recommendedModel.id}`
-        : `The model "${requestedModel}" does not exist or is no longer available. We recommend switching to kilocode/${recommendedModel.id}.`;
+        : `The model "${requestedModel}" does not exist or is no longer available. We recommend switching to ${recommendedModel.id}.`;
     warnExceptInTest(`Responding with 404 ${recommendation}`);
     return NextResponse.json({ error: recommendation, message: recommendation }, { status: 404 });
   }

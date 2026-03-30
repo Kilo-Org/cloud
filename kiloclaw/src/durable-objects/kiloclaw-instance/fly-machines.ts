@@ -207,7 +207,6 @@ export async function startExistingMachine(
     // This happens when a Fly machine was force-deleted (e.g. admin destroy)
     // but the API briefly returns the machine with state='destroyed' before 404.
     if (machine.state === 'destroyed') {
-      console.log('[DO] Machine destroyed, creating new one');
       state.flyMachineId = null;
       await ctx.storage.put(storageUpdate({ flyMachineId: null }));
       await createNewMachine(
@@ -218,6 +217,7 @@ export async function startExistingMachine(
         minSecretsVersion,
         envFlyRegion
       );
+      console.log('[DO] Machine was destroyed, created new one');
       return;
     }
 

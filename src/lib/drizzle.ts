@@ -47,8 +47,8 @@ export function isUSRegion(): boolean {
 /**
  * Get the read replica URL based on deployment region.
  * - US deployments use the US replica (POSTGRES_REPLICA_US_URL) for lower latency
- * - EU deployments use the EU replica (POSTGRES_REPLICA_EU_URL) to split read
- *   traffic off the primary's connection budget (98.8% of traffic is fra1)
+ * - EU deployments randomly select one of two EU replicas to split read traffic
+ *   across ~2,200 concurrent Vercel instances (~50/50 statistical distribution)
  * - Falls back to primary if no replica URL is configured for the region
  */
 function getReplicaUrl(): string {
@@ -56,8 +56,13 @@ function getReplicaUrl(): string {
     const usReplica = getEnvVariable('POSTGRES_REPLICA_US_URL');
     if (usReplica) return usReplica;
   } else {
-    const euReplica = getEnvVariable('POSTGRES_REPLICA_EU_URL');
-    if (euReplica) return euReplica;
+    const euReplicas = [
+      getEnvVariable('POSTGRES_REPLICA_EU_URL'),
+      getEnvVariable('POSTGRES_REPLICA_EU_URL_2'),
+    ].filter(Boolean) as string[];
+    if (euReplicas.length > 0) {
+      return euReplicas[Math.floor(Math.random() * euReplicas.length)];
+    }
   }
 
   return postgresUrl;

@@ -1672,12 +1672,15 @@ export const kiloclawRouter = createTRPCRouter({
           hadPaidSubscription,
         });
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         const message = error instanceof Error ? error.message : 'Credit enrollment failed';
         const code = message.includes('not found')
           ? 'NOT_FOUND'
           : message.includes('already exists') || message.includes('already processed')
             ? 'CONFLICT'
-            : 'BAD_REQUEST';
+            : message.includes('Insufficient credit balance')
+              ? 'BAD_REQUEST'
+              : 'INTERNAL_SERVER_ERROR';
         throw new TRPCError({ code, message });
       }
 

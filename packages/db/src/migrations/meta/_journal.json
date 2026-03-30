@@ -456,13 +456,6 @@
       "when": 1774861170821,
       "tag": "0064_add_kiloclaw_cli_runs",
       "breakpoints": true
-    },
-    {
-      "idx": 65,
-      "version": "7",
-      "when": 1774871677376,
-      "tag": "0065_sturdy_diamondback",
-      "breakpoints": true
     }
   ]
 }

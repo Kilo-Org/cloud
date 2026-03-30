@@ -125,7 +125,8 @@ function CancelButton() {
   const { deleteBackgroundTown, state } = useOnboarding();
 
   const handleCancel = useCallback(() => {
-    deleteBackgroundTown();
+    // Use keepalive fetch — router.push unmounts the provider which cancels tRPC mutations
+    deleteBackgroundTown({ keepalive: true });
     const destination = state.orgId ? `/organizations/${state.orgId}/gastown` : '/gastown';
     router.push(destination);
   }, [deleteBackgroundTown, state.orgId, router]);

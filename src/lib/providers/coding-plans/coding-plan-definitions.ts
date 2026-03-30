@@ -93,7 +93,7 @@ export default [
   },
   {
     id: 'kimi-coding',
-    name: 'Kimi for Coding',
+    name: 'Kimi Code',
     base_url: 'https://api.kimi.com/coding/v1',
     ai_sdk_provider: 'openai-compatible',
     transformRequest(context) {
@@ -106,11 +106,11 @@ export default [
       {
         id: 'kimi-for-coding',
         name: 'Kimi for Coding',
-        flags: ['recommended'],
+        flags: ['recommended', 'vision'],
         context_length: 262144,
         max_completion_tokens: 32768,
         description:
-          'Kimi K2.5 optimized for code generation and agentic coding. Up to 100 tokens/s.',
+          'Kimi Code is a premium subscription tier within the Kimi ecosystem, specifically engineered to empower developers with advanced AI capabilities for coding.',
         variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
       },
     ],

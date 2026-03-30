@@ -200,8 +200,8 @@ export const unifiedSessionsRouter = createTRPCRouter({
     if (recentDays) {
       // Use full-day boundaries: recentDays=1 means "from midnight yesterday"
       const cutoff = sql`date_trunc('day', NOW()) - make_interval(days => ${recentDays})`;
-      v1Where.push(sql`${cliSessions.created_at} >= ${cutoff}`);
-      v2Where.push(sql`${cli_sessions_v2.created_at} >= ${cutoff}`);
+      v1Where.push(sql`${cliSessions.updated_at} >= ${cutoff}`);
+      v2Where.push(sql`${cli_sessions_v2.updated_at} >= ${cutoff}`);
     }
 
     const effectiveLimit = recentDays ? RECENT_DAYS_LIMIT : limit;

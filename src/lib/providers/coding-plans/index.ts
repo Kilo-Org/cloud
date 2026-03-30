@@ -9,7 +9,7 @@ import type { OpenCodeSettings } from '@kilocode/db';
 import { BINARY_THINKING_VARIANTS } from '@/lib/providers/model-settings';
 
 export function formatCodingPlanModelId(provider: CodingPlanProvider, model: CodingPlanModel) {
-  return provider.id + '/' + model.id;
+  return (provider.id + '/' + model.id).toLowerCase();
 }
 
 function convertModel(

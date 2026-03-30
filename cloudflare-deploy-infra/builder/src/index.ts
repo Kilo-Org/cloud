@@ -19,7 +19,7 @@ export const DeploymentOrchestrator = Sentry.instrumentDurableObjectWithSentry(
   (env: Env) => ({
     dsn: env.SENTRY_DSN,
     release: env.CF_VERSION_METADATA.id,
-    sendDefaultPii: true,
+    sendDefaultPii: false,
     environment: env.ENVIRONMENT || 'production',
   }),
   DeploymentOrchestratorBase
@@ -29,7 +29,7 @@ export const EventsManager = Sentry.instrumentDurableObjectWithSentry(
   (env: Env) => ({
     dsn: env.SENTRY_DSN,
     release: env.CF_VERSION_METADATA.id,
-    sendDefaultPii: true,
+    sendDefaultPii: false,
     environment: env.ENVIRONMENT || 'production',
   }),
   EventsManagerBase
@@ -299,7 +299,7 @@ export default Sentry.withSentry((env: Env) => {
   return {
     dsn: env.SENTRY_DSN,
     release: versionId,
-    sendDefaultPii: true,
+    sendDefaultPii: false,
     environment: env.ENVIRONMENT || 'production',
   };
 }, app);

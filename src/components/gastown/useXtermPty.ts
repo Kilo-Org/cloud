@@ -6,6 +6,31 @@ import { useGastownTRPC, gastownWsUrl } from '@/lib/gastown/trpc';
 import type { Terminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
 
+/**
+ * xterm.js 6.0.0 doesn't support the Kitty keyboard protocol — all Enter
+ * variants are encoded as bare \r.  This handler intercepts modified Enter
+ * keys and injects the correct CSI u escape sequences so downstream
+ * consumers (e.g. the Kilo TUI) see the expected keycodes.
+ */
+export function attachKittyEnterHandler(term: Terminal) {
+  term.attachCustomKeyEventHandler(ev => {
+    if (ev.type !== 'keydown') return true;
+    if (ev.key === 'Enter' && ev.shiftKey && !ev.ctrlKey && !ev.altKey && !ev.metaKey) {
+      term.input('\x1b[13;2u');
+      return false;
+    }
+    if (ev.key === 'Enter' && ev.altKey && !ev.ctrlKey && !ev.shiftKey && !ev.metaKey) {
+      term.input('\x1b[13;3u');
+      return false;
+    }
+    if (ev.key === 'Enter' && ev.ctrlKey && !ev.shiftKey && !ev.altKey && !ev.metaKey) {
+      term.input('\x1b[13;5u');
+      return false;
+    }
+    return true;
+  });
+}
+
 type XtermPtyOptions = {
   townId: string;
   agentId: string | null;
@@ -279,6 +304,7 @@ export function useXtermPty({
       term.loadAddon(fitAddon);
       term.loadAddon(webLinksAddon);
       term.open(container);
+      attachKittyEnterHandler(term);
       fitAddon.fit();
 
       xtermRef.current = term;

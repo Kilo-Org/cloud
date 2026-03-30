@@ -4,7 +4,8 @@ import { createContext, useContext, useState, useCallback, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { ReactNode } from 'react';
-import { useGastownTRPC } from '@/lib/gastown/trpc';
+import { useGastownTRPC, getToken } from '@/lib/gastown/trpc';
+import { GASTOWN_URL } from '@/lib/constants';
 import type { ModelPreset, CustomModels } from './onboarding.domain';
 import { presetToConfig } from './onboarding.domain';
 
@@ -36,12 +37,10 @@ type BackgroundTown = {
   customModels: CustomModels;
 };
 
-/** Handlers the task step registers so the wizard nav can trigger submit/skip. */
+/** Handlers the task step registers so the wizard nav can trigger creation. */
 export type FinalStepHandlers = {
   submit: () => void;
-  skip: () => void;
   canSubmit: boolean;
-  canSkip: boolean;
   isSubmitting: boolean;
 };
 
@@ -67,7 +66,7 @@ type OnboardingContextValue = {
   /** Ref for the task step to register its submit/skip handlers. */
   finalStepHandlersRef: React.RefObject<FinalStepHandlers | null>;
   /** Delete the background-provisioned town (cleanup on abandon). */
-  deleteBackgroundTown: () => void;
+  deleteBackgroundTown: (opts?: { keepalive?: boolean }) => void;
 };
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
@@ -268,12 +267,29 @@ export function OnboardingProvider({
     return null;
   }, [backgroundTown]);
 
-  const deleteBackgroundTown = useCallback(() => {
-    const bg = backgroundTownRef.current;
-    if (!bg) return;
-    deleteTownRef.current.mutate({ townId: bg.townId });
-    setBackgroundTown(null);
-  }, []);
+  const deleteBackgroundTown = useCallback(
+    ({ keepalive = false }: { keepalive?: boolean } = {}) => {
+      const bg = backgroundTownRef.current;
+      if (!bg) return;
+      setBackgroundTown(null);
+
+      if (keepalive) {
+        // Use raw fetch with keepalive for beforeunload — tRPC mutations are
+        // cancelled when the page unloads, but keepalive requests survive.
+        void getToken().then(token => {
+          void fetch(`${GASTOWN_URL}/trpc/gastown.deleteTown`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ townId: bg.townId }),
+            keepalive: true,
+          });
+        });
+      } else {
+        deleteTownRef.current.mutate({ townId: bg.townId });
+      }
+    },
+    []
+  );
 
   const setTownName = useCallback(
     (townName: string, setByUser?: boolean) =>

@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { CheckCircle, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OnboardingProvider, useOnboarding } from './OnboardingContext';
 import { OnboardingStepName } from './OnboardingStepName';
@@ -102,7 +102,7 @@ function BackgroundProvisioner({ currentStepKey }: { currentStepKey: StepKey }) 
   return null;
 }
 
-/** Cleans up the background-provisioned town if the user leaves without finishing. */
+/** Best-effort cleanup of the background town if the user closes/navigates away. */
 function AbandonmentCleanup() {
   const { deleteBackgroundTown, backgroundTownId } = useOnboarding();
 
@@ -110,7 +110,7 @@ function AbandonmentCleanup() {
     if (!backgroundTownId) return;
 
     const handleBeforeUnload = () => {
-      deleteBackgroundTown();
+      deleteBackgroundTown({ keepalive: true });
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -118,6 +118,28 @@ function AbandonmentCleanup() {
   }, [backgroundTownId, deleteBackgroundTown]);
 
   return null;
+}
+
+function CancelButton() {
+  const router = useRouter();
+  const { deleteBackgroundTown, state } = useOnboarding();
+
+  const handleCancel = useCallback(() => {
+    deleteBackgroundTown();
+    const destination = state.orgId ? `/organizations/${state.orgId}/gastown` : '/gastown';
+    router.push(destination);
+  }, [deleteBackgroundTown, state.orgId, router]);
+
+  return (
+    <button
+      type="button"
+      onClick={handleCancel}
+      className="flex items-center gap-1.5 text-sm text-white/40 transition-colors hover:text-white/70"
+    >
+      <X className="size-4" />
+      Cancel
+    </button>
+  );
 }
 
 function WizardContent() {
@@ -149,6 +171,11 @@ function WizardContent() {
       <BackgroundProvisioner currentStepKey={currentStepKey} />
       <AbandonmentCleanup />
       <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center px-4 py-8">
+        {/* Top bar with cancel */}
+        <div className="mb-4 flex w-full max-w-xl justify-start">
+          <CancelButton />
+        </div>
+
         {/* Header */}
         <div className="mb-2 text-center">
           <h1 className="text-2xl font-bold text-white/95">Set up your town</h1>
@@ -209,7 +236,7 @@ function WizardContent() {
   );
 }
 
-/** Submit / Skip buttons shown in the bottom nav on the final (task) step. */
+/** Create Town button shown in the bottom nav on the final (task) step. */
 function FinalStepNav() {
   const { finalStepHandlersRef } = useOnboarding();
   const handlers = finalStepHandlersRef.current;
@@ -221,24 +248,14 @@ function FinalStepNav() {
   }
 
   return (
-    <div className="flex items-center gap-3">
-      <Button
-        variant="ghost"
-        onClick={handlers.skip}
-        disabled={!handlers.canSkip}
-        className="h-10 px-5 text-sm text-white/50 hover:text-white/80"
-      >
-        Skip
-      </Button>
-      <Button
-        onClick={handlers.submit}
-        disabled={!handlers.canSubmit}
-        className="h-10 gap-1.5 px-6 text-sm font-medium bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)] disabled:opacity-50"
-      >
-        Create Town & Start
-        <ChevronRight className="size-4" />
-      </Button>
-    </div>
+    <Button
+      onClick={handlers.submit}
+      disabled={!handlers.canSubmit}
+      className="h-10 gap-1.5 px-6 text-sm font-medium bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)] disabled:opacity-50"
+    >
+      Create Town & Start
+      <ChevronRight className="size-4" />
+    </Button>
   );
 }
 

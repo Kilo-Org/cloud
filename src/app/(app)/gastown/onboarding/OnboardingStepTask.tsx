@@ -128,25 +128,13 @@ export function OnboardingStepTask() {
     router.push(townPath);
   }
 
-  async function handleSubmit() {
-    if (!state.firstTask.trim() || !state.townName.trim()) return;
-    try {
-      setPhase('creating-town');
-      const townId = await resolveTownId();
-      await finalize(townId, state.firstTask.trim());
-    } catch (err) {
-      setPhase('idle');
-      const message = err instanceof Error ? err.message : 'Failed to create town';
-      toast.error(message);
-    }
-  }
-
-  async function handleSkip() {
+  async function handleCreateTown() {
     if (!state.townName.trim()) return;
     try {
       setPhase('creating-town');
       const townId = await resolveTownId();
-      await finalize(townId, null);
+      const firstTask = state.firstTask.trim() || null;
+      await finalize(townId, firstTask);
     } catch (err) {
       setPhase('idle');
       const message = err instanceof Error ? err.message : 'Failed to create town';
@@ -154,16 +142,12 @@ export function OnboardingStepTask() {
     }
   }
 
-  const canSubmit =
-    state.firstTask.trim().length > 0 && state.townName.trim().length > 0 && !isSubmitting;
-  const canSkip = state.townName.trim().length > 0 && !isSubmitting;
+  const canCreate = state.townName.trim().length > 0 && !isSubmitting;
 
-  // Register handlers so the wizard nav buttons can trigger submit/skip
+  // Register handler so the wizard nav button can trigger creation
   finalStepHandlersRef.current = {
-    submit: () => void handleSubmit(),
-    skip: () => void handleSkip(),
-    canSubmit,
-    canSkip,
+    submit: () => void handleCreateTown(),
+    canSubmit: canCreate,
     isSubmitting,
   };
 
@@ -171,7 +155,7 @@ export function OnboardingStepTask() {
     <div className="flex flex-col items-center justify-center py-12">
       <h2 className="text-xl font-semibold text-white/90">Give your first task</h2>
       <p className="mt-2 text-sm text-white/40">
-        Tell your Mayor what to work on, or skip to explore your town first.
+        Optionally tell your Mayor what to work on first.
       </p>
 
       <div className="mt-8 w-full max-w-lg">
@@ -183,8 +167,8 @@ export function OnboardingStepTask() {
           disabled={isSubmitting}
           className="min-h-[160px] resize-none border-white/[0.08] bg-white/[0.03] text-sm leading-relaxed text-white/85 placeholder:text-white/25 focus-visible:ring-[color:oklch(95%_0.15_108_/_0.4)]"
           onKeyDown={e => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canSubmit) {
-              void handleSubmit();
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canCreate) {
+              void handleCreateTown();
             }
           }}
         />

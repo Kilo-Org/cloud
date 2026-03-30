@@ -9,7 +9,7 @@ import { PLATFORM, GITLAB_EVENT, GITLAB_ACTION } from '@/lib/integrations/core/c
 import { logExceptInTest } from '@/lib/utils.server';
 import { logWebhookEvent, updateWebhookEvent } from '@/lib/integrations/db/webhook-events';
 import type { Owner } from '@/lib/integrations/core/types';
-import { redactSensitiveHeaders } from '@kilocode/worker-utils';
+import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
 
 /**
  * GitLab Webhook Handler

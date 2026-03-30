@@ -592,6 +592,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       request: requestBodyParsed,
       response,
       isUserByok: !!userByok,
+      feature,
     });
     if (errorResponse) {
       return errorResponse;

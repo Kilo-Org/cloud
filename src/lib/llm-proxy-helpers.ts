@@ -142,11 +142,13 @@ export async function makeErrorReadable({
   request,
   response,
   isUserByok,
+  feature,
 }: {
   requestedModel: string;
   request: GatewayRequest;
   response: Response;
   isUserByok: boolean;
+  feature: FeatureValue | null;
 }) {
   if (response.status < 400) {
     return undefined;
@@ -160,6 +162,15 @@ export async function makeErrorReadable({
         { error: byokMessage, message: byokMessage },
         { status: response.status }
       );
+    }
+
+    if (response.status === 404) {
+      const recommendation =
+        feature === 'kiloclaw' || feature === 'openclaw'
+          ? `[BYOK] The model "${requestedModel}" does not exist or is no longer available. We recommend switching to kilo-auto/balanced: /model kilocode/${KILO_AUTO_BALANCED_MODEL.id}`
+          : `[BYOK] The model "${requestedModel}" does not exist or is no longer available. We recommend switching to kilocode/${KILO_AUTO_BALANCED_MODEL.id}.`;
+      warnExceptInTest(`Responding with 404 ${recommendation}`);
+      return NextResponse.json({ error: recommendation, message: recommendation }, { status: 404 });
     }
   }
 

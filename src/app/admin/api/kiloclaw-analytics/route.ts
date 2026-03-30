@@ -84,7 +84,7 @@ FROM kiloclaw_events
 WHERE
   (${orClauses.join(' OR ')})
   AND blob3 IN ('http', 'do', 'reconcile', 'queue')
-  AND blob1 NOT IN (${NOISY_ALL_EVENTS_EXCLUDED.map((e) => `'${e}'`).join(', ')})
+  AND blob1 NOT IN (${NOISY_ALL_EVENTS_EXCLUDED.map(e => `'${e}'`).join(', ')})
 ORDER BY timestamp DESC
 LIMIT 100
 OFFSET ${p.offset}

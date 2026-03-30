@@ -318,7 +318,9 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               date: sql<string>`DATE(${microdollar_usage.created_at})`.as('date'),
               userName: kilocode_users.google_user_name,
               userEmail: kilocode_users.google_user_email,
-              ...(groupByModel && { model: microdollar_usage.model }),
+              ...(groupByModel && {
+                model: sql<string | null>`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
+              }),
               microdollarCost: sum(microdollar_usage.cost),
               tokenCount: sum(
                 sql`${microdollar_usage.input_tokens} + ${microdollar_usage.output_tokens} + ${microdollar_usage.cache_write_tokens} + ${microdollar_usage.cache_hit_tokens}`
@@ -334,7 +336,9 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               sql`DATE(${microdollar_usage.created_at})`,
               kilocode_users.google_user_name,
               kilocode_users.google_user_email,
-              ...(groupByModel ? [microdollar_usage.model] : [])
+              ...(groupByModel
+                ? [sql`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`]
+                : [])
             )
             .orderBy(sql`DATE(${microdollar_usage.created_at}) DESC`)
       );

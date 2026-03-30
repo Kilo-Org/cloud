@@ -126,7 +126,6 @@ const byokErrorMessages: Record<number, string> = {
   401: '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration.',
   402: '[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider.',
   403: '[BYOK] Your API key does not have permission to access this resource. Please check your API key permissions.',
-  404: '[BYOK] The requested model does not exist or is no longer available. Please check the model name and your API provider.',
   429: '[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.',
 };
 

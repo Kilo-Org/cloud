@@ -71,7 +71,6 @@ import {
   getToolsAvailable,
   getToolsUsed,
 } from '@/lib/o11y/api-metrics.server';
-import { handleRequestLogging } from '@/lib/handleRequestLogging';
 import { grokCodeFastOptimizedRequest } from '@/lib/custom-llm/customLlmRequest';
 import { normalizeModelId } from '@/lib/model-utils';
 import { isForbiddenFreeModel } from '@/lib/forbidden-free-models';
@@ -86,6 +85,7 @@ import {
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@/lib/providers/openrouter/request-helpers';
+import { handleRequestLogging } from '@/lib/handleRequestLogging';
 
 export const maxDuration = 800;
 

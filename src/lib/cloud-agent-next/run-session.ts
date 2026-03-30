@@ -158,6 +158,7 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
   let kiloSessionId: string | undefined;
   let hasError = false;
   let errorMessage: string | undefined;
+  let hasSeenBusy = false;
 
   // 1. Prepare
   try {
@@ -259,7 +260,12 @@ export async function runSessionToCompletion(input: RunSessionInput): Promise<Ru
         }
       },
       onSessionStatusChanged: status => {
-        if (status.type === 'idle') resolveOnce();
+        if (status.type === 'busy') {
+          hasSeenBusy = true;
+        }
+        if (status.type === 'idle' && hasSeenBusy) {
+          resolveOnce();
+        }
       },
       onError: error => {
         hasError = true;

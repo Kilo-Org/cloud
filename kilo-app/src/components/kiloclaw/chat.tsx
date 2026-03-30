@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { Settings } from 'lucide-react-native';
-import { type Event, type Channel as StreamChannel, StreamChat } from 'stream-chat';
+import { type Channel as StreamChannel, StreamChat } from 'stream-chat';
 import {
   Channel,
   Chat,
@@ -13,6 +12,7 @@ import {
   OverlayProvider,
 } from 'stream-chat-react-native';
 
+import { useBotOnlineStatus, useKeyboardAwareBottomInset } from '@/components/kiloclaw/chat-hooks';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw';
@@ -152,7 +152,8 @@ function StreamChatUI({
   userId: string;
   channelId: string;
 }) {
-  const { bottom: bottomInset } = useSafeAreaInsets();
+  const { bottomInset, keyboardVisible } = useKeyboardAwareBottomInset();
+  const colors = useThemeColors();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -218,6 +219,18 @@ function StreamChatUI({
   const botUserId = `bot-${sandboxId}`;
   const botOnline = useBotOnlineStatus(client, channel, botUserId);
 
+  const chatStyle = useMemo(
+    () => ({
+      messageInput: {
+        container: {
+          paddingHorizontal: 12,
+          borderColor: colors.border,
+        },
+      },
+    }),
+    [colors.border]
+  );
+
   if (connectError) {
     return (
       <ChatShell instanceId={instanceId} name={name}>
@@ -237,49 +250,23 @@ function StreamChatUI({
   }
 
   return (
-    <View className="flex-1 bg-background">
+    <KeyboardAvoidingView
+      className="flex-1 bg-background"
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ChatHeader instanceId={instanceId} title={name} botOnline={botOnline} />
-      <View className="flex-1 px-3 py-3">
+      <View className={`flex-1 ${keyboardVisible ? 'pb-1' : 'pb-3'}`}>
         <OverlayProvider>
-          <Chat client={client}>
-            <Channel channel={channel} keyboardVerticalOffset={0} bottomInset={bottomInset}>
+          <Chat client={client} style={chatStyle}>
+            <Channel channel={channel} disableKeyboardCompatibleView bottomInset={bottomInset}>
               <MessageList />
               <MessageInput />
             </Channel>
           </Chat>
         </OverlayProvider>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
-}
-
-function useBotOnlineStatus(
-  client: StreamChat | null,
-  channel: StreamChannel | null,
-  botUserId: string
-): boolean {
-  const [online, setOnline] = useState(false);
-
-  useEffect(() => {
-    const handlePresenceChange = (event: Event) => {
-      if (event.user?.id === botUserId) {
-        setOnline(Boolean(event.user.online));
-      }
-    };
-
-    if (client && channel) {
-      // Check initial state
-      const member = channel.state.members[botUserId];
-      setOnline(Boolean(member?.user?.online));
-      client.on('user.presence.changed', handlePresenceChange);
-    }
-
-    return () => {
-      client?.off('user.presence.changed', handlePresenceChange);
-    };
-  }, [client, channel, botUserId]);
-
-  return online;
 }
 
 function ChatPlaceholder({ message }: { message: string }) {

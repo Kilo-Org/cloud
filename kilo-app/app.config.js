@@ -13,6 +13,8 @@ const config = {
     bundleIdentifier: 'com.kilocode.kiloapp',
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      NSPhotoLibraryUsageDescription:
+        'KiloClaw needs access to your photo library to send images in chat.',
     },
   },
   splash: {

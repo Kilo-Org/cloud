@@ -614,7 +614,13 @@ export const kiloclawRouter = createTRPCRouter({
   // Instance lifecycle
   start: clawAccessProcedure.mutation(async ({ ctx }) => {
     const client = new KiloClawInternalClient();
-    return client.start(ctx.user.id);
+    const result = await client.start(ctx.user.id);
+    PostHogClient().capture({
+      distinctId: ctx.user.google_user_email,
+      event: 'claw_instance_started',
+      properties: { user_id: ctx.user.id },
+    });
+    return result;
   }),
 
   stop: clawAccessProcedure.mutation(async ({ ctx }) => {
@@ -908,9 +914,19 @@ export const kiloclawRouter = createTRPCRouter({
       const client = new KiloClawUserClient(
         generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
       );
-      return client.restartMachine(input?.imageTag ? { imageTag: input.imageTag } : undefined, {
-        userId: ctx.user.id,
+      const result = await client.restartMachine(
+        input?.imageTag ? { imageTag: input.imageTag } : undefined,
+        { userId: ctx.user.id }
+      );
+      PostHogClient().capture({
+        distinctId: ctx.user.google_user_email,
+        event: 'claw_instance_redeployed',
+        properties: {
+          user_id: ctx.user.id,
+          redeploy_mode: input?.imageTag === 'latest' ? 'upgrade' : 'redeploy',
+        },
       });
+      return result;
     }),
 
   listPairingRequests: clawAccessProcedure

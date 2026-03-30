@@ -7,23 +7,18 @@
 // Town name validation
 // ---------------------------------------------------------------------------
 export const TOWN_NAME_MAX_LENGTH = 48;
-export const TOWN_NAME_PATTERN = /^[a-zA-Z0-9-]*$/;
 
 export function deriveDefaultTownName(userName: string | null | undefined): string {
   if (!userName) return '';
   const firstName = userName.split(/\s+/)[0];
   if (!firstName) return '';
-  const slug = firstName.toLowerCase().replace(/[^a-z0-9-]/g, '');
-  return slug ? `${slug}-town` : '';
+  return `${firstName}'s Town`;
 }
 
 export function validateTownName(name: string): string | null {
   if (!name.trim()) return 'Town name is required';
   if (name.length > TOWN_NAME_MAX_LENGTH)
     return `Town name must be ${TOWN_NAME_MAX_LENGTH} characters or fewer`;
-  if (!TOWN_NAME_PATTERN.test(name)) return 'Only letters, numbers, and hyphens are allowed';
-  if (name.startsWith('-') || name.endsWith('-'))
-    return 'Town name cannot start or end with a hyphen';
   return null;
 }
 
@@ -72,9 +67,9 @@ export const PRESETS: PresetConfig[] = [
     description: 'Best quality across all roles',
     cost: '$$$',
     models: {
-      mayor: 'kilo/frontier',
-      refinery: 'kilo/frontier',
-      polecat: 'kilo/frontier',
+      mayor: 'kilo-auto/frontier',
+      refinery: 'kilo-auto/frontier',
+      polecat: 'kilo-auto/frontier',
     },
   },
   {
@@ -83,9 +78,9 @@ export const PRESETS: PresetConfig[] = [
     description: 'Smart defaults — frontier review, balanced elsewhere',
     cost: '$$',
     models: {
-      mayor: 'kilo/balanced',
-      refinery: 'kilo/frontier',
-      polecat: 'kilo/balanced',
+      mayor: 'kilo-auto/balanced',
+      refinery: 'kilo-auto/frontier',
+      polecat: 'kilo-auto/balanced',
     },
   },
   {
@@ -94,9 +89,9 @@ export const PRESETS: PresetConfig[] = [
     description: 'Balanced models everywhere for lower cost',
     cost: '$',
     models: {
-      mayor: 'kilo/balanced',
-      refinery: 'kilo/balanced',
-      polecat: 'kilo/balanced',
+      mayor: 'kilo-auto/balanced',
+      refinery: 'kilo-auto/balanced',
+      polecat: 'kilo-auto/balanced',
     },
   },
   {
@@ -105,9 +100,9 @@ export const PRESETS: PresetConfig[] = [
     description: 'Try it out at no cost',
     cost: 'free',
     models: {
-      mayor: 'kilo/free',
-      refinery: 'kilo/free',
-      polecat: 'kilo/free',
+      mayor: 'kilo-auto/free',
+      refinery: 'kilo-auto/free',
+      polecat: 'kilo-auto/free',
     },
   },
 ];
@@ -115,20 +110,20 @@ export const PRESETS: PresetConfig[] = [
 /** Derive the config shape stored in OnboardingState from a preset. */
 export function presetToConfig(preset: ModelPreset, customModels: CustomModels) {
   if (preset === 'custom') {
-    const mayorModel = customModels.mayor ?? 'kilo/balanced';
+    const mayorModel = customModels.mayor ?? 'kilo-auto/balanced';
     return {
       default_model: mayorModel,
       role_models: {
         mayor: mayorModel,
-        refinery: customModels.refinery ?? 'kilo/balanced',
-        polecat: customModels.polecat ?? 'kilo/balanced',
+        refinery: customModels.refinery ?? 'kilo-auto/balanced',
+        polecat: customModels.polecat ?? 'kilo-auto/balanced',
       },
     };
   }
 
   const presetConfig = PRESETS.find(p => p.key === preset);
   if (!presetConfig) {
-    return { default_model: 'kilo/balanced', role_models: {} };
+    return { default_model: 'kilo-auto/balanced', role_models: {} };
   }
 
   const { mayor, refinery, polecat } = presetConfig.models;

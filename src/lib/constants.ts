@@ -45,6 +45,7 @@ export const CLOUD_AGENT_NEXT_WS_URL = process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_
 
 // Gastown worker URL (client-side, inlined at build time)
 // The browser talks directly to the gastown Cloudflare Worker for tRPC + WS.
+// Must use NEXT_PUBLIC_ prefix so Next.js exposes it to the browser bundle.
 export const GASTOWN_URL = process.env.NEXT_PUBLIC_GASTOWN_URL ?? '';
 
 // Free model rate limits (applies to both anonymous and authenticated users)

@@ -4,7 +4,6 @@ import {
   validateTownName,
   deriveDefaultTownName,
   TOWN_NAME_MAX_LENGTH,
-  TOWN_NAME_PATTERN,
   resolveGitUrlFromRepo,
   presetToConfig,
   PRESETS,
@@ -26,16 +25,12 @@ describe('validateTownName', () => {
     expect(validateTownName('   ')).toBe('Town name is required');
   });
 
-  test('returns null for a valid alphanumeric name', () => {
+  test('returns null for a valid name', () => {
     expect(validateTownName('my-town')).toBeNull();
   });
 
   test('returns null for a single character name', () => {
     expect(validateTownName('a')).toBeNull();
-  });
-
-  test('returns null for a name with numbers', () => {
-    expect(validateTownName('town-42')).toBeNull();
   });
 
   test('returns null for name at exactly max length', () => {
@@ -50,68 +45,25 @@ describe('validateTownName', () => {
     );
   });
 
-  test('returns error for names with spaces', () => {
-    expect(validateTownName('my town')).toBe('Only letters, numbers, and hyphens are allowed');
+  test('allows spaces', () => {
+    expect(validateTownName('My Town')).toBeNull();
   });
 
-  test('returns error for names with underscores', () => {
-    expect(validateTownName('my_town')).toBe('Only letters, numbers, and hyphens are allowed');
+  test('allows special characters', () => {
+    expect(validateTownName("Alice's Town")).toBeNull();
   });
 
-  test('returns error for names with special characters', () => {
-    expect(validateTownName('my@town!')).toBe('Only letters, numbers, and hyphens are allowed');
-  });
-
-  test('returns error for names with dots', () => {
-    expect(validateTownName('my.town')).toBe('Only letters, numbers, and hyphens are allowed');
-  });
-
-  test('returns error for names starting with a hyphen', () => {
-    expect(validateTownName('-my-town')).toBe('Town name cannot start or end with a hyphen');
-  });
-
-  test('returns error for names ending with a hyphen', () => {
-    expect(validateTownName('my-town-')).toBe('Town name cannot start or end with a hyphen');
-  });
-
-  test('returns error for a name that is just a hyphen', () => {
-    expect(validateTownName('-')).toBe('Town name cannot start or end with a hyphen');
-  });
-
-  test('returns error for names starting and ending with hyphens', () => {
-    expect(validateTownName('-town-')).toBe('Town name cannot start or end with a hyphen');
-  });
-
-  test('allows consecutive hyphens in the middle', () => {
-    expect(validateTownName('my--town')).toBeNull();
-  });
-
-  test('allows uppercase letters', () => {
-    expect(validateTownName('MyTown')).toBeNull();
+  test('allows unicode characters', () => {
+    expect(validateTownName("José's Town")).toBeNull();
   });
 });
 
 // ---------------------------------------------------------------------------
-// TOWN_NAME_MAX_LENGTH & TOWN_NAME_PATTERN
+// TOWN_NAME_MAX_LENGTH
 // ---------------------------------------------------------------------------
 describe('TOWN_NAME_MAX_LENGTH', () => {
   test('is 48', () => {
     expect(TOWN_NAME_MAX_LENGTH).toBe(48);
-  });
-});
-
-describe('TOWN_NAME_PATTERN', () => {
-  test('matches alphanumeric and hyphens', () => {
-    expect(TOWN_NAME_PATTERN.test('abc-123')).toBe(true);
-    expect(TOWN_NAME_PATTERN.test('ABC')).toBe(true);
-    expect(TOWN_NAME_PATTERN.test('')).toBe(true); // empty matches the *-quantifier
-  });
-
-  test('rejects non-alphanumeric, non-hyphen characters', () => {
-    expect(TOWN_NAME_PATTERN.test('abc def')).toBe(false);
-    expect(TOWN_NAME_PATTERN.test('abc_def')).toBe(false);
-    expect(TOWN_NAME_PATTERN.test('abc.def')).toBe(false);
-    expect(TOWN_NAME_PATTERN.test('abc@def')).toBe(false);
   });
 });
 
@@ -131,37 +83,36 @@ describe('deriveDefaultTownName', () => {
     expect(deriveDefaultTownName('')).toBe('');
   });
 
-  test('derives slug-town from a simple first name', () => {
-    expect(deriveDefaultTownName('Alice')).toBe('alice-town');
+  test('derives possessive Town from a simple first name', () => {
+    expect(deriveDefaultTownName('Alice')).toBe("Alice's Town");
   });
 
   test('uses only the first name (splits on whitespace)', () => {
-    expect(deriveDefaultTownName('Bob Smith')).toBe('bob-town');
+    expect(deriveDefaultTownName('Bob Smith')).toBe("Bob's Town");
   });
 
-  test('strips non-alphanumeric, non-hyphen characters', () => {
-    expect(deriveDefaultTownName("O'Brien")).toBe('obrien-town');
+  test('preserves special characters in first name', () => {
+    expect(deriveDefaultTownName("O'Brien")).toBe("O'Brien's Town");
   });
 
-  test('handles names with accented characters by stripping them', () => {
-    // accented chars like é are stripped by the regex /[^a-z0-9-]/g
-    expect(deriveDefaultTownName('José')).toBe('jos-town');
+  test('preserves accented characters', () => {
+    expect(deriveDefaultTownName('José')).toBe("José's Town");
   });
 
-  test('returns empty string if first name reduces to empty after stripping', () => {
-    expect(deriveDefaultTownName('!!!!')).toBe('');
+  test('returns empty string for whitespace-only input', () => {
+    expect(deriveDefaultTownName('   ')).toBe('');
   });
 
   test('handles multiple spaces between names', () => {
-    expect(deriveDefaultTownName('Alice   Smith')).toBe('alice-town');
+    expect(deriveDefaultTownName('Alice   Smith')).toBe("Alice's Town");
   });
 
-  test('lowercases the result', () => {
-    expect(deriveDefaultTownName('ALICE')).toBe('alice-town');
+  test('preserves casing', () => {
+    expect(deriveDefaultTownName('ALICE')).toBe("ALICE's Town");
   });
 
   test('handles name with hyphens', () => {
-    expect(deriveDefaultTownName('Mary-Jane Watson')).toBe('mary-jane-town');
+    expect(deriveDefaultTownName('Mary-Jane Watson')).toBe("Mary-Jane's Town");
   });
 });
 
@@ -216,28 +167,28 @@ describe('resolveGitUrlFromRepo', () => {
 // presetToConfig
 // ---------------------------------------------------------------------------
 describe('presetToConfig', () => {
-  test('returns frontier config with all roles set to kilo/frontier', () => {
+  test('returns frontier config with all roles set to kilo-auto/frontier', () => {
     const config = presetToConfig('frontier', {});
-    expect(config.default_model).toBe('kilo/frontier');
+    expect(config.default_model).toBe('kilo-auto/frontier');
     // All roles are the same as default, so role_models should be empty
     expect(config.role_models).toEqual({});
   });
 
   test('returns balanced config with frontier for refinery only', () => {
     const config = presetToConfig('balanced', {});
-    expect(config.default_model).toBe('kilo/balanced');
-    expect(config.role_models).toEqual({ refinery: 'kilo/frontier' });
+    expect(config.default_model).toBe('kilo-auto/balanced');
+    expect(config.role_models).toEqual({ refinery: 'kilo-auto/frontier' });
   });
 
-  test('returns cost-effective config with all kilo/balanced', () => {
+  test('returns cost-effective config with all kilo-auto/balanced', () => {
     const config = presetToConfig('cost-effective', {});
-    expect(config.default_model).toBe('kilo/balanced');
+    expect(config.default_model).toBe('kilo-auto/balanced');
     expect(config.role_models).toEqual({});
   });
 
-  test('returns free config with all kilo/free', () => {
+  test('returns free config with all kilo-auto/free', () => {
     const config = presetToConfig('free', {});
-    expect(config.default_model).toBe('kilo/free');
+    expect(config.default_model).toBe('kilo-auto/free');
     expect(config.role_models).toEqual({});
   });
 
@@ -255,34 +206,34 @@ describe('presetToConfig', () => {
     });
   });
 
-  test('uses kilo/balanced as default for missing custom model values', () => {
+  test('uses kilo-auto/balanced as default for missing custom model values', () => {
     const config = presetToConfig('custom', {});
-    expect(config.default_model).toBe('kilo/balanced');
+    expect(config.default_model).toBe('kilo-auto/balanced');
     expect(config.role_models).toEqual({
-      mayor: 'kilo/balanced',
-      refinery: 'kilo/balanced',
-      polecat: 'kilo/balanced',
+      mayor: 'kilo-auto/balanced',
+      refinery: 'kilo-auto/balanced',
+      polecat: 'kilo-auto/balanced',
     });
   });
 
-  test('uses kilo/balanced for partially-specified custom models', () => {
+  test('uses kilo-auto/balanced for partially-specified custom models', () => {
     const config = presetToConfig('custom', { mayor: 'openai/gpt-4.1' });
     expect(config.default_model).toBe('openai/gpt-4.1');
     expect(config.role_models).toEqual({
       mayor: 'openai/gpt-4.1',
-      refinery: 'kilo/balanced',
-      polecat: 'kilo/balanced',
+      refinery: 'kilo-auto/balanced',
+      polecat: 'kilo-auto/balanced',
     });
   });
 
   test('returns fallback for unknown preset key', () => {
     const config = presetToConfig('nonexistent' as ModelPreset, {});
-    expect(config.default_model).toBe('kilo/balanced');
+    expect(config.default_model).toBe('kilo-auto/balanced');
     expect(config.role_models).toEqual({});
   });
 
   test('only includes role_models entries that differ from the default model', () => {
-    // balanced: mayor=kilo/balanced, refinery=kilo/frontier, polecat=kilo/balanced
+    // balanced: mayor=kilo-auto/balanced, refinery=kilo-auto/frontier, polecat=kilo-auto/balanced
     // refinery differs from default (mayor), so only refinery appears
     const config = presetToConfig('balanced', {});
     expect(Object.keys(config.role_models)).toEqual(['refinery']);
@@ -318,12 +269,12 @@ describe('PRESETS', () => {
     }
   });
 
-  test('free preset uses kilo/free for all roles', () => {
+  test('free preset uses kilo-auto/free for all roles', () => {
     const free = PRESETS.find(p => p.key === 'free');
     expect(free?.models).toEqual({
-      mayor: 'kilo/free',
-      refinery: 'kilo/free',
-      polecat: 'kilo/free',
+      mayor: 'kilo-auto/free',
+      refinery: 'kilo-auto/free',
+      polecat: 'kilo-auto/free',
     });
   });
 });

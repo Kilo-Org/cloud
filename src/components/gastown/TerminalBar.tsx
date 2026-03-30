@@ -1267,27 +1267,29 @@ function MayorTerminalPane({ townId, collapsed }: { townId: string; collapsed: b
 
   const mayorAgentId = statusQuery.data?.session?.agentId ?? null;
 
-  // Check for a queued first task from the onboarding wizard
-  const [queuedMessage] = useState(() => {
+  // Send a queued first task from the onboarding wizard via the sendMessage
+  // tRPC procedure (goes through the SDK's session.prompt API, not PTY stdin).
+  const sendMessage = useMutation(trpc.gastown.sendMessage.mutationOptions({}));
+  const firstTaskSentRef = useRef(false);
+  useEffect(() => {
+    if (firstTaskSentRef.current) return;
     const storageKey = `${FIRST_TASK_STORAGE_PREFIX}${townId}`;
     try {
       const msg = localStorage.getItem(storageKey);
-      if (msg) {
-        localStorage.removeItem(storageKey);
-        return msg;
-      }
+      if (!msg) return;
+      localStorage.removeItem(storageKey);
+      firstTaskSentRef.current = true;
+      sendMessage.mutate({ townId, message: msg });
     } catch {
       // localStorage unavailable
     }
-    return null;
-  });
+  }, [townId]);
 
   const { terminalRef, connectionStatus, status, fitAddonRef } = useXtermPty({
     townId,
     agentId: mayorAgentId,
     retries: 10,
     retryDelay: 3_000,
-    initialMessage: queuedMessage,
   });
 
   const { state: sidebarState } = useSidebar();

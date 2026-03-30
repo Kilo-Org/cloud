@@ -81,7 +81,7 @@ export function OnboardingStepRepo() {
   const handleInstallGithub = useCallback(() => {
     const installState = orgId ? `org_${orgId}` : `user_${user?.id}`;
     const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${installState}`;
-    window.location.href = installUrl;
+    window.open(installUrl, '_blank', 'noopener');
   }, [orgId, user?.id, githubAppName]);
 
   const handleRepoSelect = useCallback(

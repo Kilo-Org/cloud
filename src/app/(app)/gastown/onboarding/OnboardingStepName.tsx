@@ -4,12 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { useUser } from '@/hooks/useUser';
 import { useOnboarding } from './OnboardingContext';
-import {
-  TOWN_NAME_MAX_LENGTH,
-  TOWN_NAME_PATTERN,
-  deriveDefaultTownName,
-  validateTownName,
-} from './onboarding.domain';
+import { TOWN_NAME_MAX_LENGTH, deriveDefaultTownName, validateTownName } from './onboarding.domain';
 
 export function OnboardingStepName() {
   const { state, setTownName, goNext } = useOnboarding();
@@ -48,7 +43,7 @@ export function OnboardingStepName() {
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
-    if (value.length <= TOWN_NAME_MAX_LENGTH + 1 && TOWN_NAME_PATTERN.test(value)) {
+    if (value.length <= TOWN_NAME_MAX_LENGTH + 1) {
       setTownName(value, true);
     }
   }
@@ -66,7 +61,7 @@ export function OnboardingStepName() {
           value={state.townName}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder="my-town"
+          placeholder="My Town"
           aria-invalid={error ? true : undefined}
           className="h-12 text-center text-lg"
           autoComplete="off"

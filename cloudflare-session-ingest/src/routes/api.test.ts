@@ -399,6 +399,24 @@ describe('api routes', () => {
     expect(ingestStub.getAllStream).toHaveBeenCalled();
   });
 
+  it('DELETE /session/:sessionId returns 404 when session not found', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([]);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456', {
+        method: 'DELETE',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ error: 'session_not_found' });
+    expect(fns.transaction).not.toHaveBeenCalled();
+  });
+
   it('DELETE /session/:sessionId revokes cache, clears DO, and deletes row', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
@@ -435,6 +453,73 @@ describe('api routes', () => {
     expect(sessionCache.remove).toHaveBeenCalledWith('ses_12345678901234567890123456');
     expect(ingestStub.clear).toHaveBeenCalled();
     expect(fns.deleteResult).toHaveBeenCalled();
+  });
+
+  it('DELETE /session/:sessionId deletes children before parent and cleans up all DOs', async () => {
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    // Ownership check
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_parent00000000000000000000' }]);
+    // Recursive CTE returns parent + child + grandchild, deepest first
+    fns.executeResult.mockResolvedValueOnce({
+      rows: [
+        { session_id: 'ses_grandchild0000000000000000' },
+        { session_id: 'ses_child000000000000000000000' },
+        { session_id: 'ses_parent00000000000000000000' },
+      ],
+    });
+
+    const removedSessions: string[] = [];
+    const clearedSessions: string[] = [];
+
+    const sessionCache = {
+      remove: vi.fn(async (id: string) => {
+        removedSessions.push(id);
+      }),
+    };
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue(
+      sessionCache as unknown as ReturnType<typeof getSessionAccessCacheDO>
+    );
+
+    const ingestStub = {
+      clear: vi.fn(async () => undefined),
+    };
+    vi.mocked(getSessionIngestDO).mockImplementation((_env, opts) => {
+      const originalClear = ingestStub.clear;
+      return {
+        clear: vi.fn(async () => {
+          clearedSessions.push((opts as { sessionId: string }).sessionId);
+          return originalClear();
+        }),
+      } as unknown as ReturnType<typeof getSessionIngestDO>;
+    });
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_parent00000000000000000000', {
+        method: 'DELETE',
+      }),
+      makeTestEnv()
+    );
+
+    expect(res.status).toBe(200);
+
+    // Verify all sessions' caches were removed (deepest first)
+    expect(removedSessions).toEqual([
+      'ses_grandchild0000000000000000',
+      'ses_child000000000000000000000',
+      'ses_parent00000000000000000000',
+    ]);
+
+    // Verify all sessions' DOs were cleared (deepest first)
+    expect(clearedSessions).toEqual([
+      'ses_grandchild0000000000000000',
+      'ses_child000000000000000000000',
+      'ses_parent00000000000000000000',
+    ]);
+
+    // Verify the transaction was called (deleteSessionTree uses db.transaction)
+    expect(fns.transaction).toHaveBeenCalled();
   });
 
   it('POST /session/:sessionId/share returns existing public_id when already shared', async () => {

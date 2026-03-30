@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { sql, eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 
@@ -10,6 +10,7 @@ import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { getSessionExport } from '../services/session-export';
+import { deleteSessionTree } from '../services/delete-session-tree';
 import type { IngestQueueMessage } from '../queue-consumer';
 
 export type ApiContext = {
@@ -85,37 +86,7 @@ api.delete('/session/:sessionId', async c => {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  // Delete children first (FK is RESTRICT/NO ACTION).
-  // This only covers direct/indirect descendants (not arbitrary cycles).
-  const treeResult = await db.execute<{ session_id: string }>(sql`
-    WITH RECURSIVE tree AS (
-      SELECT session_id, parent_session_id, kilo_user_id, 0 AS depth, ARRAY[session_id] AS path
-      FROM ${cli_sessions_v2}
-      WHERE session_id = ${parsed.data} AND kilo_user_id = ${kiloUserId}
-      UNION ALL
-      SELECT c.session_id, c.parent_session_id, c.kilo_user_id, t.depth + 1, t.path || c.session_id
-      FROM ${cli_sessions_v2} c
-      INNER JOIN tree t ON c.parent_session_id = t.session_id AND c.kilo_user_id = t.kilo_user_id
-      WHERE NOT (c.session_id = ANY(t.path)) AND t.depth < 10
-    )
-    SELECT session_id FROM tree ORDER BY depth DESC
-  `);
-
-  const treeRows = treeResult.rows;
-  const orderedSessionIds = treeRows.length > 0 ? treeRows.map(r => r.session_id) : [parsed.data];
-
-  await db.transaction(async tx => {
-    for (const sessionId of orderedSessionIds) {
-      await tx
-        .delete(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, sessionId),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-          )
-        );
-    }
-  });
+  const orderedSessionIds = await deleteSessionTree(db, parsed.data, kiloUserId);
 
   for (const sessionId of orderedSessionIds) {
     await withDORetry(

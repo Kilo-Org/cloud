@@ -1,6 +1,5 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { z } from 'zod';
-import { eq, and } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 
@@ -9,6 +8,7 @@ import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { withDORetry } from '@kilocode/worker-utils';
 import { app } from './app';
+import { deleteSessionTree } from './services/delete-session-tree';
 
 const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
@@ -123,46 +123,42 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
     }
 
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
-
-    await db
-      .delete(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, parsed.sessionId),
-          eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
-        )
-      );
+    const deletedSessionIds = await deleteSessionTree(db, parsed.sessionId, parsed.kiloUserId);
 
     // Clear caches — best-effort; don't fail the delete if DOs are unavailable.
     const cacheErrors: string[] = [];
-    try {
-      await withDORetry(
-        () => getSessionAccessCacheDO(this.env, { kiloUserId: parsed.kiloUserId }),
-        sessionCache => sessionCache.remove(parsed.sessionId),
-        'SessionAccessCacheDO.remove'
-      );
-    } catch (error) {
-      cacheErrors.push(
-        `SessionAccessCacheDO.remove: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-
-    // When onlyIfEmpty was set, the DO was already cleared atomically above.
-    if (!parsed.onlyIfEmpty) {
+    for (const deletedId of deletedSessionIds) {
       try {
         await withDORetry(
-          () =>
-            getSessionIngestDO(this.env, {
-              kiloUserId: parsed.kiloUserId,
-              sessionId: parsed.sessionId,
-            }),
-          stub => stub.clear(),
-          'SessionIngestDO.clear'
+          () => getSessionAccessCacheDO(this.env, { kiloUserId: parsed.kiloUserId }),
+          sessionCache => sessionCache.remove(deletedId),
+          'SessionAccessCacheDO.remove'
         );
       } catch (error) {
         cacheErrors.push(
-          `SessionIngestDO.clear: ${error instanceof Error ? error.message : String(error)}`
+          `SessionAccessCacheDO.remove(${deletedId}): ${error instanceof Error ? error.message : String(error)}`
         );
+      }
+
+      // When onlyIfEmpty was set AND this is the original target session,
+      // the DO was already cleared atomically above.
+      const alreadyCleared = parsed.onlyIfEmpty && deletedId === parsed.sessionId;
+      if (!alreadyCleared) {
+        try {
+          await withDORetry(
+            () =>
+              getSessionIngestDO(this.env, {
+                kiloUserId: parsed.kiloUserId,
+                sessionId: deletedId,
+              }),
+            stub => stub.clear(),
+            'SessionIngestDO.clear'
+          );
+        } catch (error) {
+          cacheErrors.push(
+            `SessionIngestDO.clear(${deletedId}): ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
       }
     }
 
@@ -170,6 +166,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
       console.error('Failed to clear caches after delete (non-fatal)', {
         sessionId: parsed.sessionId,
         kiloUserId: parsed.kiloUserId,
+        deletedSessionIds,
         errors: cacheErrors,
       });
     }

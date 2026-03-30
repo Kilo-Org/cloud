@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 
 import type { CreateOrUpdateUserArgs } from './user';
-import { findUserById, createOrUpdateUser, findAndSyncExistingUser } from './user';
+import { findUserById, createOrUpdateUser, findAndSyncExistingUser, rotateApiTokenPepper } from './user';
 import { db, readDb } from '@/lib/drizzle';
 import type {
   NextAuthOptions,
@@ -33,10 +33,7 @@ import { secondsInDay } from 'date-fns/constants';
 import type { AdapterUser } from 'next-auth/adapters';
 import assert from 'node:assert';
 import type { Organization, User } from '@kilocode/db/schema';
-import { kilocode_users } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
-import { eq } from 'drizzle-orm';
-import crypto from 'node:crypto';
 import PostHogClient from '@/lib/posthog';
 import { captureException } from '@sentry/nextjs';
 import {
@@ -638,17 +635,20 @@ const authOptions: NextAuthOptions = {
       }
     },
     async jwt({ token, account, user, trigger, profile }) {
+      if (!trigger) {
+        const kiloUserId = token.kiloUserId as string | undefined;
+        const pepper = token.pepper as string | undefined;
+        if (kiloUserId && pepper) {
+          const currentUser = await findUserById(kiloUserId, readDb);
+          if (!currentUser || currentUser.api_token_pepper !== pepper) {
+            return { ...token, exp: 0 };
+          }
+        }
+        return token;
+      }
+
       let accountInfo: CreateOrUpdateUserArgs | undefined = undefined;
       try {
-        if (!trigger) {
-          if (token.kiloUserId && token.pepper) {
-            const currentUser = await findUserById(token.kiloUserId, readDb);
-            if (!currentUser || currentUser.api_token_pepper !== token.pepper) {
-              return null;
-            }
-          }
-          return token;
-        }
         if (!account) throw new Error(`TRAP: No account found: ${trigger}`);
 
         accountInfo = createAccountInfo(account, user, profile);
@@ -690,13 +690,10 @@ const authOptions: NextAuthOptions = {
   },
   events: {
     async signOut({ token }) {
-      const kiloUserId = token?.kiloUserId;
+      const kiloUserId = token?.kiloUserId as string | undefined;
       if (!kiloUserId) return;
       try {
-        await db
-          .update(kilocode_users)
-          .set({ api_token_pepper: crypto.randomUUID() })
-          .where(eq(kilocode_users.id, kiloUserId));
+        await rotateApiTokenPepper(kiloUserId);
       } catch (error) {
         captureException(error, {
           tags: { operation: 'session_pepper_rotation_on_signout' },

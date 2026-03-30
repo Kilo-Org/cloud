@@ -918,3 +918,10 @@ export async function unlinkAuthProviderFromUser(
 
   return successResult();
 }
+
+export async function rotateApiTokenPepper(kiloUserId: string): Promise<void> {
+  await db
+    .update(kilocode_users)
+    .set({ api_token_pepper: randomUUID() })
+    .where(eq(kilocode_users.id, kiloUserId));
+}

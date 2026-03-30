@@ -1,4 +1,4 @@
-import type { CodingPlanProvider } from '@/lib/providers/coding-plans/types';
+import { COMPATIBLE_USER_AGENT, type CodingPlanProvider } from '@/lib/providers/coding-plans/types';
 import {
   REASONING_VARIANTS_BINARY,
   REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
@@ -100,7 +100,7 @@ export default [
       context.request.body.thinking = {
         type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
       };
-      context.extraHeaders['User-Agent'] = 'Kilo-Code/5.12';
+      context.extraHeaders['user-agent'] = COMPATIBLE_USER_AGENT;
     },
     models: [
       {

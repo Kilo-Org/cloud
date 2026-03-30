@@ -1,5 +1,9 @@
 import { type UserByokProviderId } from '@/lib/providers/openrouter/inference-provider-id';
-import type { CodingPlanModel, CodingPlanProvider } from '@/lib/providers/coding-plans/types';
+import {
+  COMPATIBLE_USER_AGENT,
+  type CodingPlanModel,
+  type CodingPlanProvider,
+} from '@/lib/providers/coding-plans/types';
 import CODING_PLANS from './coding-plan-definitions';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/byok';
 import { readDb } from '@/lib/drizzle';
@@ -104,6 +108,12 @@ export function createAiSdkProvider(codingPlanProvider: CodingPlanProvider, apiK
       baseURL: codingPlanProvider.base_url,
       apiKey,
       name: 'openaiCompatible',
+      fetch: (url, init) => {
+        if (init) {
+          init.headers = { ...init.headers, 'user-agent': COMPATIBLE_USER_AGENT };
+        }
+        return fetch(url, init);
+      },
     });
   } else {
     throw new Error('Unrecognized AI SDK provider: ' + codingPlanProvider.ai_sdk_provider);

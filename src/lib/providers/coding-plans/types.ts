@@ -22,3 +22,5 @@ export type CodingPlanProvider = {
   ai_sdk_provider: CustomLlmProvider;
   transformRequest(context: TransformRequestContext): void;
 };
+
+export const COMPATIBLE_USER_AGENT = 'Kilo-Code/5.12';

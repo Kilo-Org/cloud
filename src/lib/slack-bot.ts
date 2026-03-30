@@ -113,6 +113,9 @@ Your prompt to the agent should usually include:
 - any constraints (keep changes minimal, follow existing patterns, etc.)
 - a request to open a PR (GitHub) or MR (GitLab) and return the URL
 
+### After the tool returns
+When the tool returns, check the result for a PR/MR URL and share it with the user — this is the most important output. Always include the full PR/MR URL in your response so the user can click it directly.
+
 ## Accuracy & safety
 - Don't claim you ran tools, changed code, or created a PR/MR unless the tool results confirm it.
 - Don't fabricate links (including PR/MR URLs).
@@ -126,7 +129,7 @@ const SPAWN_CLOUD_AGENT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
   function: {
     name: 'spawn_cloud_agent',
     description:
-      'Spawn a Cloud Agent session to perform coding tasks on a GitHub repository or GitLab project. Provide exactly one of githubRepo or gitlabProject.',
+      'Spawn a Cloud Agent session to perform coding tasks on a GitHub repository or GitLab project. Provide exactly one of githubRepo or gitlabProject. After the tool returns, if mode was "code", check the result for a PR/MR URL and share it with the user — this is the most important output.',
     parameters: {
       type: 'object',
       properties: {
@@ -281,10 +284,22 @@ async function spawnCloudAgentSession(
     kilocodeOrganizationId = owner.id;
   }
 
+  const mode = args.mode || 'code';
+  const isGitLab = !!args.gitlabProject;
+
+  // For "code" mode, explicitly instruct the agent to open a PR/MR and return the URL
+  const promptWithPrInstruction =
+    mode === 'code'
+      ? args.prompt +
+        (isGitLab
+          ? '\n\nOpen a merge request with your changes and return the MR URL.'
+          : '\n\nOpen a pull request with your changes and return the PR URL.')
+      : args.prompt;
+
   // Append PR/MR signature to the prompt if we have requester info
   const promptWithSignature = requesterInfo
-    ? args.prompt + buildPrSignature(requesterInfo)
-    : args.prompt;
+    ? promptWithPrInstruction + buildPrSignature(requesterInfo)
+    : promptWithPrInstruction;
 
   // Build platform-specific prepareInput and initiateInput
   let prepareInput: PrepareSessionInput;

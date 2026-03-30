@@ -90,6 +90,9 @@ ${formatGitLabRepositoriesForPrompt(gitlabContext)}
 
 Treat this context as authoritative. Prefer selecting a repo from the provided repository list. If the user requests work on a repo that isn't in the list, ask them to confirm the exact owner/repo (or group/project for GitLab) and ensure it's accessible to the integration. Never invent repository names.
 
+## Sharing results
+- After calling a tool in "code" mode, check the result for a PR/MR URL and share it with the user — this is the most important output. Always include the full PR/MR URL in your response so the user can click it directly.
+
 ## Accuracy & safety
 - Don't claim you ran tools, changed code, or created a PR/MR unless the tool results confirm it.
 - Don't fabricate links (including PR/MR URLs).

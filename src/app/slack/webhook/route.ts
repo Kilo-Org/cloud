@@ -37,6 +37,44 @@ const PROCESSING_REACTION = 'hourglass_flowing_sand';
 const COMPLETE_REACTION = 'white_check_mark';
 
 /**
+ * Split a mrkdwn string into Slack section blocks, each within the character limit.
+ * Splits on newline boundaries to avoid breaking mid-line/mid-URL.
+ */
+function toSectionBlocks(
+  text: string,
+  charLimit: number
+): Array<{ type: 'section'; text: { type: 'mrkdwn'; text: string } }> {
+  if (text.length <= charLimit) {
+    return [{ type: 'section', text: { type: 'mrkdwn', text } }];
+  }
+
+  const blocks: Array<{ type: 'section'; text: { type: 'mrkdwn'; text: string } }> = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= charLimit) {
+      blocks.push({ type: 'section', text: { type: 'mrkdwn', text: remaining } });
+      break;
+    }
+
+    // Find the last newline within the limit to avoid splitting mid-line
+    let splitAt = remaining.lastIndexOf('\n', charLimit);
+    if (splitAt <= 0) {
+      // No newline found; hard-split at the limit as a fallback
+      splitAt = charLimit;
+    }
+
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: remaining.slice(0, splitAt) },
+    });
+    remaining = remaining.slice(splitAt + 1);
+  }
+
+  return blocks;
+}
+
+/**
  * Post an ephemeral message to the user with a button to view the cloud agent session
  */
 async function postSessionLinkEphemeral({
@@ -215,20 +253,19 @@ async function processSlackMessage(event: AppMentionEvent | GenericMessageEvent,
   const responseWithDevInfo = result.response + getDevUserSuffix();
   const slackFormattedMessage = markdownToSlackMrkdwn(responseWithDevInfo);
 
+  // Slack section blocks have a 3000-character limit for the text field.
+  // When the response exceeds this (common for cloud agent results that include
+  // PR/MR URLs near the end), the block gets silently truncated, cutting off the URL.
+  // For long messages, split into multiple section blocks to preserve the full content.
+  const SLACK_SECTION_CHAR_LIMIT = 3000;
+  const blocks = toSectionBlocks(slackFormattedMessage, SLACK_SECTION_CHAR_LIMIT);
+
   // Post the response in the thread
   const slackResponse = await postSlackMessageByAccessToken(accessToken, {
     channel,
     text: slackFormattedMessage,
     thread_ts: replyThreadTs,
-    blocks: [
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: slackFormattedMessage,
-        },
-      },
-    ],
+    blocks,
   });
 
   console.log(

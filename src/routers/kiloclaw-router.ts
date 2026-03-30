@@ -611,6 +611,48 @@ export const kiloclawRouter = createTRPCRouter({
     return client.getStreamChatCredentials(ctx.user.id);
   }),
 
+  sendChatMessage: clawAccessProcedure
+    .input(
+      z.object({
+        instanceId: z.string().uuid().optional(),
+        message: z.string().min(1).max(32_000),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.instanceId) {
+        // Explicit instanceId: verify ownership and non-destroyed
+        const [row] = await db
+          .select({ id: kiloclaw_instances.id })
+          .from(kiloclaw_instances)
+          .where(
+            and(
+              eq(kiloclaw_instances.id, input.instanceId),
+              eq(kiloclaw_instances.user_id, ctx.user.id),
+              isNull(kiloclaw_instances.destroyed_at)
+            )
+          )
+          .limit(1);
+        if (!row) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'No active KiloClaw instance found',
+          });
+        }
+      } else {
+        // No instanceId: verify the user has any active instance
+        const instance = await getActiveInstance(ctx.user.id);
+        if (!instance) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'No active KiloClaw instance found',
+          });
+        }
+      }
+
+      const client = new KiloClawInternalClient();
+      return client.sendChatMessage(ctx.user.id, input.message, input.instanceId);
+    }),
+
   // Instance lifecycle
   start: clawAccessProcedure.mutation(async ({ ctx }) => {
     const client = new KiloClawInternalClient();

@@ -3,7 +3,7 @@ import 'server-only';
 import { and, eq, isNull } from 'drizzle-orm';
 import { kiloclaw_instances } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { sandboxIdFromUserId, sandboxIdFromInstanceId } from '@/lib/kiloclaw/sandbox-id';
+import { sandboxIdFromInstanceId } from '@/lib/kiloclaw/sandbox-id';
 
 export type ActiveKiloClawInstance = {
   id: string;
@@ -20,22 +20,30 @@ type EnsureActiveInstanceOpts = {
 
 /**
  * Ensure the user has an active KiloClaw registry row before worker provisioning.
- * This is idempotent and safe under concurrent calls.
  *
- * The returned `id` (DB row UUID) serves as the instanceId for multi-instance
- * routing.
+ * The returned `id` (DB row UUID) serves as the instanceId for DO keying.
+ * sandboxId is always derived from instanceId (`ki_` prefix) for consistency
+ * between DB and DO identity. Legacy rows with userId-derived sandboxIds are
+ * returned as-is if they already exist.
  *
- * For legacy personal flow (no opts.orgId): sandboxId is derived from userId,
- * DO key = userId. Idempotent via onConflictDoNothing on the unique index.
+ * Personal flow: returns existing active row if present, otherwise creates a
+ * new instance-keyed row. Idempotent under concurrent calls (second caller
+ * sees the first caller's row).
  *
- * For org instances (opts.orgId present): sandboxId is derived from a freshly
- * generated UUID (the row's id), DO key = instanceId. Not idempotent — each
- * call creates a new instance row.
+ * Org flow: always creates a new row. Callers must gate on existing rows.
  */
 export async function ensureActiveInstance(
   userId: string,
   opts?: EnsureActiveInstanceOpts
 ): Promise<ActiveKiloClawInstance> {
+  const selectFields = {
+    id: kiloclaw_instances.id,
+    userId: kiloclaw_instances.user_id,
+    sandboxId: kiloclaw_instances.sandbox_id,
+    organizationId: kiloclaw_instances.organization_id,
+    name: kiloclaw_instances.name,
+  };
+
   if (opts?.orgId) {
     // Org instance: generate UUID, derive sandboxId from it.
     // Each call creates a new row (no idempotency — callers gate on existing rows).
@@ -50,13 +58,7 @@ export async function ensureActiveInstance(
         sandbox_id: sandboxId,
         organization_id: opts.orgId,
       })
-      .returning({
-        id: kiloclaw_instances.id,
-        userId: kiloclaw_instances.user_id,
-        sandboxId: kiloclaw_instances.sandbox_id,
-        organizationId: kiloclaw_instances.organization_id,
-        name: kiloclaw_instances.name,
-      });
+      .returning(selectFields);
 
     if (!row) {
       throw new Error('Failed to create org instance row');
@@ -65,37 +67,26 @@ export async function ensureActiveInstance(
     return row;
   }
 
-  // Legacy personal flow: derive sandboxId from userId. Idempotent.
-  const sandboxId = sandboxIdFromUserId(userId);
+  // Personal flow: return existing active row if present.
+  const existing = await getActiveInstance(userId);
+  if (existing) return existing;
 
-  await db
+  // No active row — create a new instance-keyed row.
+  // sandboxId = sandboxIdFromInstanceId(uuid) ensures DB and DO identity match.
+  const instanceId = crypto.randomUUID();
+  const sandboxId = sandboxIdFromInstanceId(instanceId);
+
+  const [row] = await db
     .insert(kiloclaw_instances)
     .values({
+      id: instanceId,
       user_id: userId,
       sandbox_id: sandboxId,
     })
-    .onConflictDoNothing();
-
-  const [row] = await db
-    .select({
-      id: kiloclaw_instances.id,
-      userId: kiloclaw_instances.user_id,
-      sandboxId: kiloclaw_instances.sandbox_id,
-      organizationId: kiloclaw_instances.organization_id,
-      name: kiloclaw_instances.name,
-    })
-    .from(kiloclaw_instances)
-    .where(
-      and(
-        eq(kiloclaw_instances.user_id, userId),
-        eq(kiloclaw_instances.sandbox_id, sandboxId),
-        isNull(kiloclaw_instances.destroyed_at)
-      )
-    )
-    .limit(1);
+    .returning(selectFields);
 
   if (!row) {
-    throw new Error('Failed to ensure active KiloClaw instance row');
+    throw new Error('Failed to create personal instance row');
   }
 
   return row;
@@ -119,7 +110,7 @@ export async function markActiveInstanceDestroyed(
     ? and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at))
     : and(
         eq(kiloclaw_instances.user_id, userId),
-        eq(kiloclaw_instances.sandbox_id, sandboxIdFromUserId(userId)),
+        isNull(kiloclaw_instances.organization_id),
         isNull(kiloclaw_instances.destroyed_at)
       );
 
@@ -163,11 +154,14 @@ export async function restoreDestroyedInstance(instanceId: string): Promise<void
 }
 
 /**
- * Fetch the user's active KiloClaw instance (read-only, no upsert).
+ * Fetch the user's active personal KiloClaw instance (read-only, no upsert).
+ *
+ * Finds the active row for this user without filtering by sandboxId format.
+ * For personal instances there is at most one active row per user (enforced
+ * by ensureActiveInstance). For multi-instance (org), use instance-specific
+ * lookups instead.
  */
 export async function getActiveInstance(userId: string): Promise<ActiveKiloClawInstance | null> {
-  const sandboxId = sandboxIdFromUserId(userId);
-
   const [row] = await db
     .select({
       id: kiloclaw_instances.id,
@@ -180,7 +174,7 @@ export async function getActiveInstance(userId: string): Promise<ActiveKiloClawI
     .where(
       and(
         eq(kiloclaw_instances.user_id, userId),
-        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNull(kiloclaw_instances.organization_id),
         isNull(kiloclaw_instances.destroyed_at)
       )
     )
@@ -194,7 +188,6 @@ export async function getActiveInstance(userId: string): Promise<ActiveKiloClawI
  * Pass null to clear the name.
  */
 export async function renameInstance(userId: string, name: string | null): Promise<void> {
-  const sandboxId = sandboxIdFromUserId(userId);
   const trimmed = name?.trim() || null;
 
   if (trimmed !== null && trimmed.length > 50) {
@@ -207,7 +200,7 @@ export async function renameInstance(userId: string, name: string | null): Promi
     .where(
       and(
         eq(kiloclaw_instances.user_id, userId),
-        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNull(kiloclaw_instances.organization_id),
         isNull(kiloclaw_instances.destroyed_at)
       )
     );

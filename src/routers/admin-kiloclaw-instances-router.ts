@@ -859,7 +859,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       `[admin-kiloclaw] Destroy triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) for instance ${instance.id} (user: ${instance.user_id})`
     );
 
-    const destroyedRow = await markActiveInstanceDestroyed(instance.user_id);
+    const destroyedRow = await markActiveInstanceDestroyed(instance.user_id, instance.id);
     const client = new KiloClawInternalClient();
     try {
       await client.destroy(instance.user_id, instance.id);
@@ -958,7 +958,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const errors: Array<{ userId: string; error: string }> = [];
 
     for (const instance of activeInstances) {
-      const destroyedRow = await markActiveInstanceDestroyed(instance.user_id);
+      const destroyedRow = await markActiveInstanceDestroyed(instance.user_id, instance.id);
       try {
         await client.destroy(instance.user_id, instance.id);
         destroyed++;

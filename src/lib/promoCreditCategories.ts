@@ -684,6 +684,18 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     description: 'Creator promo',
     total_redemptions_allowed: 30,
   },
+  {
+    // TODO: Replace encrypted_credit_category with production-encrypted value.
+    // Run: vercel env run -e production -- pnpm promo encrypt CLAW_MIA
+    encrypted_credit_category: 'a1o0/So4YgGvB+ABnOOqAw==:qlVqBAHvDFjp4npGlFnwqg==:q+0OuXzZu6E=',
+    is_user_selfservicable: true,
+    is_idempotent: true,
+    amount_usd: 50,
+    description: 'KiloClaw Miami event promotion',
+    promotion_ends_at: new Date('2026-04-13T23:59:59Z'),
+    total_redemptions_allowed: 1050,
+    customer_requirement: has_holdOrPayment,
+  },
 ];
 
 const selfServicePromos: readonly SelfServicePromoCreditCategoryConfig[] =

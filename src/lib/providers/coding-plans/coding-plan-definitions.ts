@@ -7,115 +7,6 @@ import { isReasoningExplicitlyDisabled } from '@/lib/providers/openrouter/reques
 
 export default [
   {
-    id: 'alibaba-coding',
-    name: 'Alibaba Coding Plan',
-    base_url: 'https://coding-intl.dashscope.aliyuncs.com/v1',
-    ai_sdk_provider: 'openai-compatible',
-    transformRequest(context) {
-      context.request.body.enable_thinking = !isReasoningExplicitlyDisabled(context.request);
-    },
-    models: [
-      {
-        id: 'qwen3.5-plus',
-        name: 'Qwen3.5-Plus',
-        flags: ['recommended', 'vision'],
-        context_length: 1000000,
-        max_completion_tokens: 65536,
-        description:
-          "Alibaba's flagship multimodal model. Fast, cost-effective, text+image+video input.",
-        variants: REASONING_VARIANTS_BINARY,
-      },
-      {
-        id: 'kimi-k2.5',
-        name: 'Kimi-K2.5',
-        flags: ['recommended', 'vision'],
-        context_length: 262144,
-        max_completion_tokens: 32768,
-        description: 'Moonshot AI multimodal model with strong code/UI generation.',
-        variants: REASONING_VARIANTS_BINARY,
-      },
-      {
-        id: 'glm-5',
-        name: 'GLM-5',
-        flags: ['recommended'],
-        context_length: 202752,
-        max_completion_tokens: 16384,
-        description: "Z.ai's flagship for complex systems design and agent workflows.",
-        variants: REASONING_VARIANTS_BINARY,
-      },
-      {
-        id: 'MiniMax-M2.5',
-        name: 'MiniMax-M2.5',
-        flags: ['recommended'],
-        context_length: 196608,
-        max_completion_tokens: 24576,
-        description: 'MiniMax latest with strong reasoning and tool-use for agentic coding.',
-        variants: null,
-      },
-      {
-        id: 'qwen3-coder-plus',
-        name: 'Qwen3-Coder-Plus',
-        flags: [],
-        context_length: 1000000,
-        max_completion_tokens: 65536,
-        description: 'Top-quality code generation for complex tasks. Supports context cache.',
-        variants: null,
-      },
-      {
-        id: 'qwen3-coder-next',
-        name: 'Qwen3-Coder-Next',
-        flags: [],
-        context_length: 262144,
-        max_completion_tokens: 65536,
-        description: 'Best balance of quality, speed, cost. Optimized for multi-turn tool calling.',
-        variants: null,
-      },
-      {
-        id: 'qwen3-max-2026-01-23',
-        name: 'Qwen3-Max (2026-01-23)',
-        flags: [],
-        context_length: 262144,
-        max_completion_tokens: 32768,
-        description: 'Qwen3-Max snapshot for complex reasoning.',
-        variants: null,
-      },
-      {
-        id: 'glm-4.7',
-        name: 'GLM-4.7',
-        flags: [],
-        context_length: 202752,
-        max_completion_tokens: 16384,
-        description: "Z.ai's latest with enhanced programming and stable multi-step execution.",
-
-        variants: REASONING_VARIANTS_BINARY,
-      },
-    ],
-  },
-  {
-    id: 'kimi-coding',
-    name: 'Kimi Code',
-    base_url: 'https://api.kimi.com/coding/v1',
-    ai_sdk_provider: 'openai-compatible',
-    transformRequest(context) {
-      context.request.body.thinking = {
-        type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
-      };
-      context.extraHeaders['user-agent'] = COMPATIBLE_USER_AGENT;
-    },
-    models: [
-      {
-        id: 'kimi-for-coding',
-        name: 'Kimi for Coding',
-        flags: ['recommended', 'vision'],
-        context_length: 262144,
-        max_completion_tokens: 32768,
-        description:
-          'Kimi Code is a premium subscription tier within the Kimi ecosystem, specifically engineered to empower developers with advanced AI capabilities for coding.',
-        variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
-      },
-    ],
-  },
-  {
     id: 'byteplus-coding',
     name: 'BytePlus Coding Plan',
     base_url: 'https://ark.ap-southeast.bytepluses.com/api/coding/v3',
@@ -184,6 +75,30 @@ export default [
         flags: ['vision'],
         context_length: 262144,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
+      },
+    ],
+  },
+  {
+    id: 'kimi-coding',
+    name: 'Kimi Code',
+    base_url: 'https://api.kimi.com/coding/v1',
+    ai_sdk_provider: 'openai-compatible',
+    transformRequest(context) {
+      context.request.body.thinking = {
+        type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
+      };
+      context.extraHeaders['user-agent'] = COMPATIBLE_USER_AGENT;
+    },
+    models: [
+      {
+        id: 'kimi-for-coding',
+        name: 'Kimi for Coding',
+        flags: ['recommended', 'vision'],
+        context_length: 262144,
+        max_completion_tokens: 32768,
+        description:
+          'Kimi Code is a premium subscription tier within the Kimi ecosystem, specifically engineered to empower developers with advanced AI capabilities for coding.',
         variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
       },
     ],

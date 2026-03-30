@@ -170,8 +170,8 @@ function StreamChatUI({
         const ch = chatClient.channel('messaging', channelId);
         await ch.watch({ presence: true });
         // cancelled may change across awaits above
+        // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
         if (!cancelled) {
-          // eslint-disable-line typescript-eslint/no-unnecessary-condition
           setClient(chatClient);
           setChannel(ch);
         }
@@ -186,6 +186,7 @@ function StreamChatUI({
 
     return () => {
       cancelled = true;
+      void chatClient.disconnectUser();
       setClient(null);
       setChannel(null);
     };

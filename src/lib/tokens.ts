@@ -114,7 +114,6 @@ function tryJwtVerify(token: string) {
 
 export function validateAuthorizationHeader(headers: Headers) {
   const traceability_logging_id = crypto.randomUUID();
-
   const authHeader = headers.get('authorization');
   if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
     warnExceptInTest('Authorization header missing or invalid');

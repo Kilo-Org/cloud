@@ -11,20 +11,35 @@ import type { FitAddon } from '@xterm/addon-fit';
  * variants are encoded as bare \r.  This handler intercepts modified Enter
  * keys and injects the correct CSI u escape sequences so downstream
  * consumers (e.g. the Kilo TUI) see the expected keycodes.
+ *
+ * Accepts an optional `wsRef` — when provided, the CSI sequence is written
+ * directly to the WebSocket (bypassing xterm's input pipeline) which is
+ * more reliable than `term.input()` in some xterm.js builds.
  */
-export function attachKittyEnterHandler(term: Terminal) {
+export function attachKittyEnterHandler(
+  term: Terminal,
+  wsRef?: React.RefObject<WebSocket | null>,
+) {
+  function send(seq: string) {
+    if (wsRef?.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(seq);
+    } else {
+      term.input(seq);
+    }
+  }
+
   term.attachCustomKeyEventHandler(ev => {
     if (ev.type !== 'keydown') return true;
     if (ev.key === 'Enter' && ev.shiftKey && !ev.ctrlKey && !ev.altKey && !ev.metaKey) {
-      term.input('\x1b[13;2u');
+      send('\x1b[13;2u');
       return false;
     }
     if (ev.key === 'Enter' && ev.altKey && !ev.ctrlKey && !ev.shiftKey && !ev.metaKey) {
-      term.input('\x1b[13;3u');
+      send('\x1b[13;3u');
       return false;
     }
     if (ev.key === 'Enter' && ev.ctrlKey && !ev.shiftKey && !ev.altKey && !ev.metaKey) {
-      term.input('\x1b[13;5u');
+      send('\x1b[13;5u');
       return false;
     }
     return true;
@@ -304,7 +319,7 @@ export function useXtermPty({
       term.loadAddon(fitAddon);
       term.loadAddon(webLinksAddon);
       term.open(container);
-      attachKittyEnterHandler(term);
+      attachKittyEnterHandler(term, wsRef);
       fitAddon.fit();
 
       xtermRef.current = term;

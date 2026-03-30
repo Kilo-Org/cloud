@@ -7,22 +7,20 @@ import type { Terminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
 
 /**
- * xterm.js doesn't distinguish modifier+Enter from plain Enter — both
- * produce bare `\r`. This handler intercepts modified Enter keys and
- * sends the appropriate sequences to the remote TUI:
+ * xterm.js doesn't support the Kitty keyboard protocol — all Enter
+ * variants are encoded as bare `\r`. The remote TUI enables Kitty
+ * protocol (`\x1b[>5u`) but xterm.js ignores it.
  *
- * - Shift+Enter → `\n` (literal newline, interpreted as "insert line" by
- *   most TUIs, vs `\r` which means "submit")
- * - Alt+Enter / Ctrl+Enter → Kitty CSI u escape sequences so the TUI can
- *   bind them to custom actions
+ * This handler intercepts modified Enter keys and sends the correct
+ * Kitty CSI u escape sequences directly over the WebSocket:
+ * - Shift+Enter → `\x1b[13;2u`
+ * - Alt+Enter   → `\x1b[13;3u`
+ * - Ctrl+Enter  → `\x1b[13;5u`
  *
- * Writes directly to the WebSocket when available to bypass xterm's
- * input pipeline.
+ * Both keydown and keyup events are suppressed for modified Enter to
+ * prevent xterm from also sending its default `\r`.
  */
-export function attachKittyEnterHandler(
-  term: Terminal,
-  wsRef?: React.RefObject<WebSocket | null>,
-) {
+export function attachKittyEnterHandler(term: Terminal, wsRef?: React.RefObject<WebSocket | null>) {
   function send(seq: string) {
     if (wsRef?.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(seq);
@@ -32,21 +30,24 @@ export function attachKittyEnterHandler(
   }
 
   term.attachCustomKeyEventHandler(ev => {
-    if (ev.type !== 'keydown') return true;
-    if (ev.key === 'Enter' && ev.shiftKey && !ev.ctrlKey && !ev.altKey && !ev.metaKey) {
-      // Shift+Enter → literal newline (insert line, don't submit)
-      send('\n');
-      return false;
-    }
-    if (ev.key === 'Enter' && ev.altKey && !ev.ctrlKey && !ev.shiftKey && !ev.metaKey) {
+    // Block both keydown and keyup for modified Enter to prevent xterm
+    // from sending its default \r on either event phase.
+    const isModifiedEnter =
+      ev.key === 'Enter' && (ev.shiftKey || ev.altKey || ev.ctrlKey) && !ev.metaKey;
+
+    if (!isModifiedEnter) return true;
+
+    // Only send the sequence on keydown, but suppress keyup too
+    if (ev.type !== 'keydown') return false;
+
+    if (ev.shiftKey && !ev.ctrlKey && !ev.altKey) {
+      send('\x1b[13;2u');
+    } else if (ev.altKey && !ev.ctrlKey && !ev.shiftKey) {
       send('\x1b[13;3u');
-      return false;
-    }
-    if (ev.key === 'Enter' && ev.ctrlKey && !ev.shiftKey && !ev.altKey && !ev.metaKey) {
+    } else if (ev.ctrlKey && !ev.shiftKey && !ev.altKey) {
       send('\x1b[13;5u');
-      return false;
     }
-    return true;
+    return false;
   });
 }
 

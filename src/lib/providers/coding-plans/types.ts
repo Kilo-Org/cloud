@@ -1,6 +1,6 @@
 import type { DirectUserByokInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import type { TransformRequestContext } from '@/lib/providers/types';
-import type { CustomLlmProvider } from '@kilocode/db';
+import type { CustomLlmProvider, OpenCodeVariant } from '@kilocode/db';
 
 export type CodingPlanModelFlag = 'recommended' | 'vision';
 
@@ -11,6 +11,7 @@ export type CodingPlanModel = {
   description: string;
   context_length: number;
   max_completion_tokens: number;
+  variants: Record<string, OpenCodeVariant> | null;
 };
 
 export type CodingPlanProvider = {
@@ -21,3 +22,5 @@ export type CodingPlanProvider = {
   ai_sdk_provider: CustomLlmProvider;
   transformRequest(context: TransformRequestContext): void;
 };
+
+export const COMPATIBLE_USER_AGENT = 'Kilo-Code/5.12';

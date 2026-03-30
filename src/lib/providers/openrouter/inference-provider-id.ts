@@ -45,6 +45,7 @@ export type VercelUserByokInferenceProviderId = z.infer<
 export const DirectUserByokInferenceProviderIdSchema = z.enum([
   'byteplus-coding',
   'codestral',
+  'kimi-coding',
   'zai-coding',
 ]);
 
@@ -70,6 +71,7 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['byteplus-coding']]: 'bytedance-seed-code',
   [DirectUserByokInferenceProviderIdSchema.enum.codestral]: 'mistral/codestral',
+  [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'kimi-for-coding',
   [DirectUserByokInferenceProviderIdSchema.enum['zai-coding']]: 'glm-4.7',
 } satisfies Record<UserByokProviderId, string>;
 

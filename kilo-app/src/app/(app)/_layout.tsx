@@ -4,7 +4,7 @@ export default function AppLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="chat" />
+      <Stack.Screen name="chat/[instance-id]" />
       <Stack.Screen
         name="profile"
         options={{

@@ -8,6 +8,7 @@ import { Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-ro
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Toaster } from 'sonner-native';
@@ -17,6 +18,13 @@ import { ContextProvider, useAppContext } from '@/lib/context/context-context';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
+
+// Suppress noisy stream-chat warnings that don't affect functionality
+LogBox.ignoreLogs([
+  'i18next is made possible',
+  'unstable_getBoundingClientRect',
+  'No recorder instance',
+]);
 
 const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),

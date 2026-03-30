@@ -1,5 +1,6 @@
 const SENSITIVE_HEADERS = new Set([
   'authorization',
+  'proxy-authorization',
   'cookie',
   'set-cookie',
   'x-gitlab-token',

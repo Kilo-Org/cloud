@@ -155,13 +155,23 @@ function StreamChatUI({
     const chatClient = StreamChat.getInstance(apiKey);
 
     let cancelled = false;
+    setConnectError(null);
 
     const connect = async () => {
       try {
+        // Await disconnect to prevent tokenManager.reset() from racing with the new connection
+        if (chatClient.userID) {
+          await chatClient.disconnectUser();
+        }
+        if (cancelled) {
+          return;
+        }
         await chatClient.connectUser({ id: userId }, tokenProvider);
         const ch = chatClient.channel('messaging', channelId);
         await ch.watch({ presence: true });
+        // cancelled may change across awaits above
         if (!cancelled) {
+          // eslint-disable-line typescript-eslint/no-unnecessary-condition
           setClient(chatClient);
           setChannel(ch);
         }
@@ -176,7 +186,6 @@ function StreamChatUI({
 
     return () => {
       cancelled = true;
-      void chatClient.disconnectUser();
       setClient(null);
       setChannel(null);
     };

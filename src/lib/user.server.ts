@@ -33,7 +33,10 @@ import { secondsInDay } from 'date-fns/constants';
 import type { AdapterUser } from 'next-auth/adapters';
 import assert from 'node:assert';
 import type { Organization, User } from '@kilocode/db/schema';
+import { kilocode_users } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
+import { eq } from 'drizzle-orm';
+import crypto from 'node:crypto';
 import PostHogClient from '@/lib/posthog';
 import { captureException } from '@sentry/nextjs';
 import {
@@ -637,7 +640,20 @@ const authOptions: NextAuthOptions = {
     async jwt({ token, account, user, trigger, profile }) {
       let accountInfo: CreateOrUpdateUserArgs | undefined = undefined;
       try {
-        if (!trigger) return token;
+        if (!trigger) {
+          // SECURITY: Validate that the pepper baked into the JWT still matches the
+          // current pepper in the database. If the pepper was rotated (on logout or
+          // via "Reset API Key"), this rejects the now-stale token and forces
+          // re-authentication, closing the session-invalidation gap described in
+          // Pylon #6353.
+          if (token.kiloUserId && token.pepper) {
+            const currentUser = await findUserById(token.kiloUserId, readDb);
+            if (!currentUser || currentUser.api_token_pepper !== token.pepper) {
+              return null;
+            }
+          }
+          return token;
+        }
         if (!account) throw new Error(`TRAP: No account found: ${trigger}`);
 
         accountInfo = createAccountInfo(account, user, profile);
@@ -675,6 +691,31 @@ const authOptions: NextAuthOptions = {
       session.pepper = castToken.pepper;
       session.isNewUser = castToken.isNewUser || false; // Pass isNewUser to the session
       return session;
+    },
+  },
+  events: {
+    // SECURITY: Rotate the user's api_token_pepper on logout so that any JWT
+    // tokens issued before this logout are immediately rejected by the pepper
+    // check in the jwt callback above. Without this, a captured token would
+    // remain valid for up to 30 days after the user logs out (Pylon #6353).
+    //
+    // Trade-off: because the pepper is per-user (not per-session), this
+    // invalidates ALL of the user's active sessions across all devices.
+    // Logging out of one device is effectively a "log out everywhere" action.
+    async signOut({ token }) {
+      const kiloUserId = token?.kiloUserId;
+      if (!kiloUserId) return;
+      try {
+        await db
+          .update(kilocode_users)
+          .set({ api_token_pepper: crypto.randomUUID() })
+          .where(eq(kilocode_users.id, kiloUserId));
+      } catch (error) {
+        captureException(error, {
+          tags: { operation: 'session_pepper_rotation_on_signout' },
+          extra: { kiloUserId },
+        });
+      }
     },
   },
   pages: {

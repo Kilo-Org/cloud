@@ -227,7 +227,6 @@ async function generateTeamsTrialNotification(
   ];
 }
 
-
 async function generateByokProvidersNotification(
   user: User,
   _ctx: NotificationContext

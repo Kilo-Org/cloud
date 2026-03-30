@@ -65,6 +65,7 @@ import {
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
+import { handleRequestLogging } from '@/lib/handleRequestLogging';
 import { classifyAbuse } from '@/lib/abuse-service';
 import {
   emitApiMetricsForResponse,
@@ -575,7 +576,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
-  /* disabled pending migration
   handleRequestLogging({
     clonedResponse: response.clone(),
     user: maybeUser,
@@ -584,7 +584,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     model: originalModelIdLowerCased,
     request: requestBodyParsed,
   });
-  */
 
   {
     const errorResponse = await makeErrorReadable({

@@ -1,4 +1,8 @@
 import type { CodingPlanProvider } from '@/lib/providers/coding-plans/types';
+import {
+  REASONING_VARIANTS_BINARY,
+  REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
+} from '@/lib/providers/model-settings';
 import { isReasoningExplicitlyDisabled } from '@/lib/providers/openrouter/request-helpers';
 
 export default [
@@ -19,6 +23,7 @@ export default [
         max_completion_tokens: 65536,
         description:
           "Alibaba's flagship multimodal model. Fast, cost-effective, text+image+video input.",
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'kimi-k2.5',
@@ -26,8 +31,8 @@ export default [
         flags: ['recommended', 'vision'],
         context_length: 262144,
         max_completion_tokens: 32768,
-        description:
-          'Moonshot AI multimodal model with strong code/UI generation.',
+        description: 'Moonshot AI multimodal model with strong code/UI generation.',
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-5',
@@ -35,8 +40,8 @@ export default [
         flags: ['recommended'],
         context_length: 202752,
         max_completion_tokens: 16384,
-        description:
-          "Z.ai's flagship for complex systems design and agent workflows.",
+        description: "Z.ai's flagship for complex systems design and agent workflows.",
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'MiniMax-M2.5',
@@ -44,8 +49,8 @@ export default [
         flags: ['recommended'],
         context_length: 196608,
         max_completion_tokens: 24576,
-        description:
-          'MiniMax latest with strong reasoning and tool-use for agentic coding.',
+        description: 'MiniMax latest with strong reasoning and tool-use for agentic coding.',
+        variants: null,
       },
       {
         id: 'qwen3-coder-plus',
@@ -53,8 +58,8 @@ export default [
         flags: [],
         context_length: 1000000,
         max_completion_tokens: 65536,
-        description:
-          'Top-quality code generation for complex tasks. Supports context cache.',
+        description: 'Top-quality code generation for complex tasks. Supports context cache.',
+        variants: null,
       },
       {
         id: 'qwen3-coder-next',
@@ -62,8 +67,8 @@ export default [
         flags: [],
         context_length: 262144,
         max_completion_tokens: 65536,
-        description:
-          'Best balance of quality, speed, cost. Optimized for multi-turn tool calling.',
+        description: 'Best balance of quality, speed, cost. Optimized for multi-turn tool calling.',
+        variants: null,
       },
       {
         id: 'qwen3-max-2026-01-23',
@@ -72,6 +77,7 @@ export default [
         context_length: 262144,
         max_completion_tokens: 32768,
         description: 'Qwen3-Max snapshot for complex reasoning.',
+        variants: null,
       },
       {
         id: 'glm-4.7',
@@ -79,8 +85,9 @@ export default [
         flags: [],
         context_length: 202752,
         max_completion_tokens: 16384,
-        description:
-          "Z.ai's latest with enhanced programming and stable multi-step execution.",
+        description: "Z.ai's latest with enhanced programming and stable multi-step execution.",
+
+        variants: REASONING_VARIANTS_BINARY,
       },
     ],
   },
@@ -103,6 +110,7 @@ export default [
         max_completion_tokens: 32768,
         description:
           'Kimi K2.5 optimized for code generation and agentic coding. Up to 100 tokens/s.',
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'kimi-k2-thinking',
@@ -110,8 +118,8 @@ export default [
         flags: [],
         context_length: 262144,
         max_completion_tokens: 32768,
-        description:
-          'Kimi K2 with extended thinking for complex multi-step reasoning.',
+        description: 'Kimi K2 with extended thinking for complex multi-step reasoning.',
+        variants: null,
       },
     ],
   },
@@ -134,6 +142,7 @@ export default [
         flags: ['recommended', 'vision'],
         context_length: 262144,
         max_completion_tokens: 32768,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'kimi-k2.5',
@@ -143,6 +152,7 @@ export default [
         flags: ['recommended'],
         context_length: 262144,
         max_completion_tokens: 32768,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.7',
@@ -152,6 +162,7 @@ export default [
         flags: ['recommended'],
         context_length: 204800,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'gpt-oss-120b',
@@ -161,6 +172,7 @@ export default [
         flags: [],
         context_length: 131072,
         max_completion_tokens: 65536,
+        variants: null,
       },
       {
         id: 'dola-seed-2.0-pro',
@@ -170,6 +182,7 @@ export default [
         flags: ['vision'],
         context_length: 262144,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
       },
       {
         id: 'dola-seed-2.0-lite',
@@ -179,6 +192,7 @@ export default [
         flags: ['vision'],
         context_length: 262144,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
       },
     ],
   },
@@ -201,6 +215,7 @@ export default [
         flags: [],
         context_length: 202752,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-5.1',
@@ -210,6 +225,7 @@ export default [
         flags: ['recommended'],
         context_length: 204800,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-5',
@@ -219,6 +235,7 @@ export default [
         flags: [],
         context_length: 204800,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.7',
@@ -228,6 +245,7 @@ export default [
         flags: [],
         context_length: 204800,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.7-flash',
@@ -237,6 +255,7 @@ export default [
         flags: [],
         context_length: 200000,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.7-flashx',
@@ -246,6 +265,7 @@ export default [
         flags: [],
         context_length: 200000,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.6',
@@ -255,6 +275,7 @@ export default [
         flags: [],
         context_length: 204800,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.6v',
@@ -264,6 +285,7 @@ export default [
         flags: ['vision'],
         context_length: 128000,
         max_completion_tokens: 32768,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.5',
@@ -273,6 +295,7 @@ export default [
         flags: [],
         context_length: 131072,
         max_completion_tokens: 98304,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.5-air',
@@ -282,6 +305,7 @@ export default [
         flags: [],
         context_length: 131072,
         max_completion_tokens: 98304,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.5-flash',
@@ -291,6 +315,7 @@ export default [
         flags: [],
         context_length: 131072,
         max_completion_tokens: 98304,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.5v',
@@ -300,6 +325,7 @@ export default [
         flags: ['vision'],
         context_length: 64000,
         max_completion_tokens: 16384,
+        variants: REASONING_VARIANTS_BINARY,
       },
     ],
   },

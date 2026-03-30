@@ -24,6 +24,33 @@ describe('CLIOutboundMessageSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('parses heartbeat with parentSessionId on sessions', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [
+        { id: 'root-1', status: 'busy', title: 'Root' },
+        { id: 'child-1', status: 'busy', title: 'Child', parentSessionId: 'root-1' },
+      ],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions[1]).toHaveProperty('parentSessionId', 'root-1');
+    }
+  });
+
+  it('parses heartbeat without parentSessionId (backward compat)', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [{ id: 'ses_1', status: 'busy', title: 'Session' }],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions[0]).not.toHaveProperty('parentSessionId');
+    }
+  });
+
   it('rejects heartbeat with null title', () => {
     const msg = {
       type: 'heartbeat',

@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useSetAtom } from 'jotai';
@@ -21,7 +13,6 @@ import { useActiveSessions } from './hooks/useActiveSessions';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { deleteSessionFromStoreAtom } from './store/db-session-atoms';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { usePageTitle } from '@/contexts/PageTitleContext';
 
 // Context for children to toggle the mobile sidebar sheet
 type SidebarLayoutContextValue = {
@@ -50,13 +41,6 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
   const [platformFilter, setPlatformFilter] = useState<string | undefined>('cloud-agent');
   const [projectFilter, setProjectFilter] = useState<string | undefined>(undefined);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
-
-  // Hide the app-level topbar — cloud agent pages have their own ChatHeader
-  const { setHidden } = usePageTitle();
-  useEffect(() => {
-    setHidden(true);
-    return () => setHidden(false);
-  }, [setHidden]);
 
   const { sessions, refetchSessions, renameSessionLocally } = useSidebarSessions({
     organizationId: organizationId ?? null,
@@ -157,7 +141,7 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
     <SidebarLayoutContext.Provider
       value={{ toggleMobileSidebar: () => setMobileSheetOpen(prev => !prev) }}
     >
-      <div className="flex h-dvh w-full overflow-hidden">
+      <div className="flex h-[calc(100dvh-3.5rem)] w-full overflow-hidden">
         {/* Mobile Sheet */}
         <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
           <SheetContent side="left" className="w-80 p-0 lg:hidden">
@@ -204,7 +188,7 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-hidden">{children}</div>
+        <div className="h-full flex-1 overflow-hidden">{children}</div>
       </div>
     </SidebarLayoutContext.Provider>
   );

@@ -5,10 +5,11 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { ArrowDown } from 'lucide-react';
+import { ArrowDown, GitBranch } from 'lucide-react';
 
 import type { KiloSessionId } from '@/lib/cloud-agent-sdk';
 import { useManager } from './CloudAgentProvider';
+import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
 import { ChatInput } from './ChatInput';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
@@ -24,6 +25,7 @@ import { useOrganizationModels } from './hooks/useOrganizationModels';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { useCelebrationSound } from '@/hooks/useCelebrationSound';
 
+import { SetPageTitle } from '@/components/SetPageTitle';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import type { AgentMode } from './types';
 import type { StoredMessage } from '@/lib/cloud-agent-sdk';
@@ -90,7 +92,6 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
-
   // URL-driven session switching
   const sessionIdFromParams = searchParams?.get('sessionId');
   useEffect(() => {
@@ -143,27 +144,60 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const chatUI = useAtomValue(manager.atoms.chatUI);
   const setChatUI = useSetAtom(manager.atoms.chatUI);
 
+  // Flag to distinguish programmatic scrolls from user scrolls.
+  // Without this, auto-scroll's scrollTo fires handleScroll which re-enables
+  // shouldAutoScroll, making it impossible for the user to scroll away during streaming.
+  const isAutoScrollingRef = useRef(false);
+  const lastScrollTopRef = useRef(0);
+
+  const autoScrollFrameRef = useRef(0);
+
   useEffect(() => {
     if (!chatUI.shouldAutoScroll) return;
     const el = scrollContainerRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
+    // Coalesce rapid streaming updates into one scroll per animation frame
+    cancelAnimationFrame(autoScrollFrameRef.current);
+    autoScrollFrameRef.current = requestAnimationFrame(() => {
+      isAutoScrollingRef.current = true;
+      el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
+      requestAnimationFrame(() => {
+        isAutoScrollingRef.current = false;
+      });
+    });
+    return () => cancelAnimationFrame(autoScrollFrameRef.current);
   }, [dynamicMessages, chatUI.shouldAutoScroll]);
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    const isNearBottom = distanceFromBottom < 100;
-    setShowScrollButton(!isNearBottom);
-    setChatUI({ shouldAutoScroll: isNearBottom });
+    setShowScrollButton(distanceFromBottom > 20);
+
+    if (isAutoScrollingRef.current) {
+      lastScrollTopRef.current = el.scrollTop;
+      return;
+    }
+
+    const scrolledUp = el.scrollTop < lastScrollTopRef.current;
+    lastScrollTopRef.current = el.scrollTop;
+
+    if (scrolledUp) {
+      setChatUI({ shouldAutoScroll: false });
+    } else if (distanceFromBottom < 100) {
+      setChatUI({ shouldAutoScroll: true });
+    }
   }, [setChatUI]);
 
   const scrollToBottom = useCallback(() => {
     setChatUI({ shouldAutoScroll: true });
     const el = scrollContainerRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    isAutoScrollingRef.current = true;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
+    requestAnimationFrame(() => {
+      isAutoScrollingRef.current = false;
+    });
   }, [setChatUI]);
 
   // -- Handlers -------------------------------------------------------------
@@ -273,26 +307,39 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
         respondToPermission={handleRespondToPermission}
       >
         <div className="flex h-full w-full flex-col overflow-hidden">
+          <SetPageTitle
+            title={fetchedSessionData?.title || sessionConfig?.repository || 'Cloud Agent'}
+          >
+            {totalCost > 0 && (
+              <span className="text-muted-foreground text-sm">${totalCost.toFixed(4)}</span>
+            )}
+          </SetPageTitle>
           {showChatInterface ? (
             <>
-              <ChatHeader
-                cloudAgentSessionId={sessionId ?? 'Starting session…'}
-                kiloSessionId={sessionIdFromParams ?? undefined}
-                organizationId={organizationId}
-                repository={sessionConfig?.repository ?? ''}
-                model={sessionConfig?.model}
-                modelDisplayName={modelDisplayName}
-                totalCost={totalCost}
-                soundEnabled={soundEnabled}
-                onToggleSound={handleToggleSound}
-              />
-
               {showLoadingIndicator && <div className="bg-primary h-0.5 w-full animate-pulse" />}
 
               <div className="relative min-h-0 flex-1">
+                {/* Mobile sidebar toggle — floating top-left */}
+                <MobileSidebarToggle />
+
+                {/* Session action buttons — floating top-right */}
+                <div className="absolute right-3 top-2 z-10">
+                  <ChatHeader
+                    cloudAgentSessionId={sessionId ?? 'Starting session…'}
+                    kiloSessionId={sessionIdFromParams ?? undefined}
+                    organizationId={organizationId}
+                    repository={sessionConfig?.repository ?? ''}
+                    model={sessionConfig?.model}
+                    modelDisplayName={modelDisplayName}
+                    totalCost={totalCost}
+                    soundEnabled={soundEnabled}
+                    onToggleSound={handleToggleSound}
+                  />
+                </div>
+
                 <div
                   ref={scrollContainerRef}
-                  className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
+                  className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-12 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
                   onScroll={handleScroll}
                 >
                   <StaticMessages messages={staticMessages} getChildMessages={getChildMessages} />
@@ -344,6 +391,18 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                     </div>
                   )}
                   <div className={activeQuestion || activePermission ? 'hidden' : ''}>
+                    {sessionConfig?.repository && (
+                      <div className="text-muted-foreground flex items-center gap-1.5 px-[max(1rem,calc(50%_-_27rem))] pb-1 text-xs">
+                        <GitBranch className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{sessionConfig.repository}</span>
+                        {fetchedSessionData?.gitBranch && (
+                          <>
+                            <span>·</span>
+                            <span className="truncate">{fetchedSessionData.gitBranch}</span>
+                          </>
+                        )}
+                      </div>
+                    )}
                     <ChatInput
                       onSend={handleSendMessage}
                       onStop={handleStopExecution}
@@ -368,7 +427,8 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
               )}
             </>
           ) : (
-            <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-2">
+            <div className="text-muted-foreground relative flex h-full flex-col items-center justify-center gap-2">
+              <MobileSidebarToggle />
               <p className="text-sm">No active session</p>
               <p className="text-xs">Select a session from the sidebar or create a new one</p>
             </div>

@@ -16,6 +16,7 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
         title: z.string(),
         gitUrl: z.string().optional(),
         gitBranch: z.string().optional(),
+        parentSessionId: z.string().optional(),
       })
     ),
   }),

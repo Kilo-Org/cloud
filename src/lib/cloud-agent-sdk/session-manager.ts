@@ -338,6 +338,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(activePermissionAtom, null);
     store.set(failedPromptAtom, null);
     store.set(fetchedSessionDataAtom, null);
+    store.set(chatUIAtom, { shouldAutoScroll: true });
   }
 
   function subscribeToServiceState(

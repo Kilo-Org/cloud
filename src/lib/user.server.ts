@@ -406,7 +406,7 @@ const authOptions: NextAuthOptions = {
               email: { label: 'Email', type: 'email' },
             },
             async authorize(credentials) {
-              console.log('Fake login attempt', credentials);
+              console.log('Fake login attempt', credentials?.email);
               return !credentials?.email
                 ? null
                 : {

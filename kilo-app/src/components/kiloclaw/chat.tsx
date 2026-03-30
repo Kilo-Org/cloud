@@ -4,13 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { Settings } from 'lucide-react-native';
 import { type Channel as StreamChannel, StreamChat } from 'stream-chat';
-import {
-  Channel,
-  Chat,
-  MessageInput,
-  MessageList,
-  OverlayProvider,
-} from 'stream-chat-react-native';
+import { Channel, Chat, MessageInput, MessageList, OverlayProvider } from 'stream-chat-expo';
 
 import { useBotOnlineStatus, useKeyboardAwareBottomInset } from '@/components/kiloclaw/chat-hooks';
 import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';

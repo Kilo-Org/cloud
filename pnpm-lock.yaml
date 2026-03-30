@@ -1336,18 +1336,9 @@ importers:
       '@kilocode/trpc':
         specifier: workspace:*
         version: link:../packages/trpc
-      '@react-native-camera-roll/camera-roll':
-        specifier: ^7.10.2
-        version: 7.10.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))
-      '@react-native-clipboard/clipboard':
-        specifier: ^1.16.3
-        version: 1.16.3(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
       '@react-native-community/netinfo':
         specifier: 11.5.2
         version: 11.5.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
-      '@react-native-documents/picker':
-        specifier: ^12.0.1
-        version: 12.0.1(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
       '@rn-primitives/portal':
         specifier: ^1.3.0
         version: 1.3.0(@types/react@19.2.14)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
@@ -1399,6 +1390,9 @@ importers:
       expo-image:
         specifier: ~55.0.6
         version: 55.0.6(expo@55.0.9)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
+      expo-image-manipulator:
+        specifier: ~55.0.11
+        version: 55.0.11(expo@55.0.9)
       expo-insights:
         specifier: 55.0.12
         version: 55.0.12(expo@55.0.9)
@@ -1432,27 +1426,15 @@ importers:
       react-native:
         specifier: 0.83.4
         version: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
-      react-native-blob-util:
-        specifier: ^0.24.7
-        version: 0.24.7(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
       react-native-css:
         specifier: 3.0.6
         version: 3.0.6(@expo/metro-config@55.0.11(expo@55.0.9)(typescript@5.9.3))(lightningcss@1.30.1)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
       react-native-gesture-handler:
         specifier: ~2.30.0
         version: 2.30.0(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
-      react-native-haptic-feedback:
-        specifier: ^2.3.4
-        version: 2.3.4(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))
-      react-native-image-picker:
-        specifier: ^8.2.1
-        version: 8.2.1(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
       react-native-nitro-modules:
         specifier: ^0.35.2
         version: 0.35.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
-      react-native-nitro-sound:
-        specifier: ^0.2.12
-        version: 0.2.12(react-native-nitro-modules@0.35.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
       react-native-reanimated:
         specifier: 4.2.1
         version: 4.2.1(react-native-worklets@0.7.2(@babel/core@7.29.0)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
@@ -1480,9 +1462,9 @@ importers:
       stream-chat:
         specifier: ^9.38.0
         version: 9.38.0
-      stream-chat-react-native:
+      stream-chat-expo:
         specifier: ^8.13.7
-        version: 8.13.7(f4aa49e074fe8d5472e879701c714efc)
+        version: 8.13.7(1b7a696fd6d541756f6728965782f3d2)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -5548,39 +5530,11 @@ packages:
       react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
       react-dom: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
 
-  '@react-native-camera-roll/camera-roll@7.10.2':
-    resolution: {integrity: sha512-XgJQJDFUycmqSX+MH7vTcRigQwEIQNLIu1GvOngCZRwlSV2mF61UzeruSmmHwkBcGnHZFXkKg9fil0FQVfyglw==}
-    engines: {node: '>= 18.17.0'}
-    peerDependencies:
-      react-native: '>=0.59'
-
-  '@react-native-clipboard/clipboard@1.16.3':
-    resolution: {integrity: sha512-cMIcvoZKIrShzJHEaHbTAp458R9WOv0fB6UyC7Ek4Qk561Ow/DrzmmJmH/rAZg21Z6ixJ4YSdFDC14crqIBmCQ==}
-    peerDependencies:
-      react: '>= 16.9.0'
-      react-native: '>= 0.61.5'
-      react-native-macos: '>= 0.61.0'
-      react-native-windows: '>= 0.61.0'
-    peerDependenciesMeta:
-      react-native-macos:
-        optional: true
-      react-native-windows:
-        optional: true
-
   '@react-native-community/netinfo@11.5.2':
     resolution: {integrity: sha512-/g0m65BtX9HU+bPiCH2517bOHpEIUsGrWFXDzi1a5nNKn5KujQgm04WhL7/OSXWKHyrT8VVtUoJA0XKRxueBpQ==}
     peerDependencies:
       react: '*'
       react-native: '>=0.59'
-
-  '@react-native-community/slider@5.1.2':
-    resolution: {integrity: sha512-UV/MjCyCtSjS5BQDrrGIMmCXm309xEG6XbR0Dj65kzTraJSVDxSjQS2uBUXgX+5SZUOCzCxzv3OufOZBdtQY4w==}
-
-  '@react-native-documents/picker@12.0.1':
-    resolution: {integrity: sha512-vpJKb4t/5bnxe9+gQl+plJfKrrIsmYwANGhNH2B9E1dS1+6FDBzg4Dwmcq4ueaGfkRKEPJ606mJttVEH1ZKZaA==}
-    peerDependencies:
-      react: '*'
-      react-native: '>=0.79.0'
 
   '@react-native/assets-registry@0.83.4':
     resolution: {integrity: sha512-aqKtpbJDSQeSX/Dwv0yMe1/Rd2QfXi12lnyZDXNn/OEKz59u6+LuPBVgO/9CRyclHmdlvwg8c7PJ9eX2ZMnjWg==}
@@ -8222,9 +8176,6 @@ packages:
   bare-url@2.3.2:
     resolution: {integrity: sha512-ZMq4gd9ngV5aTMa5p9+UfY0b3skwhHELaDkhEHetMdX0LRkW9kzaym4oo/Eh+Ghm0CCDuMTsRIGM/ytUc1ZYmw==}
 
-  base-64@0.1.0:
-    resolution: {integrity: sha512-Y5gU45svrR5tI2Vt/X9GPd3L0HNIKzGu202EjxrXMpuc2V2CiKgemAbUUsqYmZJvPtCXoUKjNZwBJzsNScUbXA==}
-
   base-64@1.0.0:
     resolution: {integrity: sha512-kwDPIFCGx0NZHog36dj+tHiwP4QMzsZ3AgMViUBKI0+V5n4U0ufTCUMhnQ04diaRI8EX/QcPfql7zlhZ7j4zgg==}
 
@@ -8832,10 +8783,6 @@ packages:
     resolution: {integrity: sha512-ndfJ/JxxMd3nw31uyKoY2naivF+r29V+Lc0svZxe1JvvIRmi8hUsrMvdOwgS1o6uBHmiz91geQ0ylPP0aj1VUA==}
     engines: {node: '>=12'}
 
-  d@1.0.2:
-    resolution: {integrity: sha512-MOqHvMWF9/9MX6nza0KgvFH4HpMU0EF5uUDXqX/BtxtU8NfB0QzRtJ8Oe/6SuS4kbhyzVJwjd97EA4PKrzJ8bw==}
-    engines: {node: '>=0.12'}
-
   date-fns@4.1.0:
     resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
 
@@ -9333,19 +9280,8 @@ packages:
   es-toolkit@1.45.1:
     resolution: {integrity: sha512-/jhoOj/Fx+A+IIyDNOvO3TItGmlMKhtX8ISAHKE90c4b/k1tqaqEZ+uUqfpU8DMnW5cgNJv606zS55jGvza0Xw==}
 
-  es5-ext@0.10.64:
-    resolution: {integrity: sha512-p2snDhiLaXe6dahss1LddxqEm+SkuDvV8dnIQG0MWjyHpcMNfXKPE+/Cc0y+PhxJX3A4xGNeFCj5oc0BUh6deg==}
-    engines: {node: '>=0.10'}
-
   es6-error@4.1.1:
     resolution: {integrity: sha512-Um/+FxMr9CISWh0bi5Zv0iOD+4cFh5qLeks1qhAopKVAJw3drgKbKySikp7wGhDL0HPeaja0P5ULZrxLkniUVg==}
-
-  es6-iterator@2.0.3:
-    resolution: {integrity: sha512-zw4SRzoUkd+cl+ZoE15A9o1oQd920Bb0iOJMQkQhl3jNc03YqVjAhG7scf9C5KWRU/R13Orf588uCC6525o02g==}
-
-  es6-symbol@3.1.4:
-    resolution: {integrity: sha512-U9bFFjX8tFiATgtkJ1zg25+KviIXpgRvRHS8sau3GfhVzThRQrOeksPeT0BWW2MNZs1OEWJ1DPXOQMn0KKRkvg==}
-    engines: {node: '>=0.12'}
 
   esast-util-from-estree@2.0.0:
     resolution: {integrity: sha512-4CyanoAudUSBAn5K13H4JhsMH6L9ZP7XbLVe/dKybkxMO7eDyLsT8UHl9TRNrU2Gr9nz+FovfSIjuXWJ81uVwQ==}
@@ -9404,10 +9340,6 @@ packages:
     resolution: {integrity: sha512-tD40eHxA35h0PEIZNeIjkHoDR4YjjJp34biM0mDvplBe//mB+IHCqHDGV7pxF+7MklTvighcCPPZC7ynWyjdTA==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
-  esniff@2.0.1:
-    resolution: {integrity: sha512-kTUIGKQ/mDPFoJ0oVfcmyJn4iBDRptjNVIzwIFR7tqWXdVI9xfA2RMwY/gbSpJG3lkdWNEjLap/NqVHZiJsdfg==}
-    engines: {node: '>=0.10'}
-
   esprima@4.0.1:
     resolution: {integrity: sha512-eGuFFw7Upda+g4p+QHvnW0RyTX/SVeJBDM/gCtMARO0cLuT2HcEKnTPvhjV6aGeqrCB/sbNop0Kszm0jsaWU4A==}
     engines: {node: '>=4'}
@@ -9456,9 +9388,6 @@ packages:
   etag@1.8.1:
     resolution: {integrity: sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==}
     engines: {node: '>= 0.6'}
-
-  event-emitter@0.3.5:
-    resolution: {integrity: sha512-D9rRn9y7kLPnJ+hMq7S/nhvoKwwvVJahBi2BPmx3bvbsEdK3W9ii8cBSGjP+72/LnM4n6fo3+dkCX5FeTQruXA==}
 
   event-source-polyfill@1.0.31:
     resolution: {integrity: sha512-4IJSItgS/41IxN5UVAVuAyczwZF7ZIEsM1XAoUzIHA6A+xzusEZUutdXz2Nr+MQPLxfTiCvqE79/C8HT8fKFvA==}
@@ -9602,6 +9531,16 @@ packages:
 
   expo-haptics@55.0.9:
     resolution: {integrity: sha512-KCRyHr/uu4syXmoq3aIQ6ahuaX6FGtlPkWGlLlHJ836WF3nG+5+oCaCQiI7qMTpml+Tp/V/zP4ZaowM2KHgLNA==}
+    peerDependencies:
+      expo: '*'
+
+  expo-image-loader@55.0.0:
+    resolution: {integrity: sha512-NOjp56wDrfuA5aiNAybBIjqIn1IxKeGJ8CECWZncQ/GzjZfyTYAHTCyeApYkdKkMBLHINzI4BbTGSlbCa0fXXQ==}
+    peerDependencies:
+      expo: '*'
+
+  expo-image-manipulator@55.0.11:
+    resolution: {integrity: sha512-90Bgk3nSRRBCmfqUiB9KTj8v9TsjGI7RPESDN3nBXGB+rTunSpie0qB2FUY2vebpxoDTrfvAyz3pSskDMJYWxQ==}
     peerDependencies:
       expo: '*'
 
@@ -9756,9 +9695,6 @@ packages:
 
   exsolve@1.0.8:
     resolution: {integrity: sha512-LmDxfWXwcTArk8fUEnOfSZpHOJ6zOMUJKOtFLFqJLoKJetuQG874Uc7/Kki7zFLzYybmZhp1M7+98pfMqeX8yA==}
-
-  ext@1.7.0:
-    resolution: {integrity: sha512-6hxeJYaL110a9b5TEJSj0gojyHQAmA2ch5Os+ySCiA1QGdS697XWY1pzsrSjqA9LDEEgdB/KypIlR59RcLuHYw==}
 
   extend@3.0.2:
     resolution: {integrity: sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g==}
@@ -11772,9 +11708,6 @@ packages:
       nodemailer:
         optional: true
 
-  next-tick@1.1.0:
-    resolution: {integrity: sha512-CXdUiJembsNjuToQvxayPZF9Vqht7hewsvy2sOWafLvi2awflj9mOC6bHIg50orX8IJvWKY9wYQ/zB2kogPslQ==}
-
   next@16.1.6:
     resolution: {integrity: sha512-hkyRkcu5x/41KoqnROkfTm2pZVbKxvbZRuNvKXLRXxs3VfyO0WhY50TQS40EuKO9SW3rBj/sF3WbVwDACeMZyw==}
     engines: {node: '>=20.9.0'}
@@ -12534,12 +12467,6 @@ packages:
       '@types/react': '>=18'
       react: '>=18'
 
-  react-native-blob-util@0.24.7:
-    resolution: {integrity: sha512-3vgn3hblfJh0+LIoqEhYRqCtwKh1xID2LtXHdTrUml3rYh4xj69eN+lvWU235AL0FRbX5uKrS1c4lIYexSgtWQ==}
-    peerDependencies:
-      react: '*'
-      react-native: '*'
-
   react-native-css@3.0.6:
     resolution: {integrity: sha512-YhP3SGc9VRItWZ9TMt+QENor5ha2ym3z3QiyL/eRVrBmV3LCv9FyxOhw9c0SB8Ndvwc7KH0ch2XCQ7ZgZg5dNQ==}
     peerDependencies:
@@ -12550,17 +12477,6 @@ packages:
 
   react-native-gesture-handler@2.30.0:
     resolution: {integrity: sha512-5YsnKHGa0X9C8lb5oCnKm0fLUPM6CRduvUUw2Bav4RIj/C3HcFh4RIUnF8wgG6JQWCL1//gRx4v+LVWgcIQdGA==}
-    peerDependencies:
-      react: '*'
-      react-native: '*'
-
-  react-native-haptic-feedback@2.3.4:
-    resolution: {integrity: sha512-3nHECsi+pL1c2TKNpOD5aPtAfFzrkjpABjioi6OUBb6OVeuUObQlx9idoXSbj1h/L7TCaC13LqKT5ILl0xxHjQ==}
-    peerDependencies:
-      react-native: '>=0.60.0'
-
-  react-native-image-picker@8.2.1:
-    resolution: {integrity: sha512-FBeGYJGFDjMdGCcyubDJgBAPCQ4L1D3hwLXyUU91jY9ahOZMTbluceVvRmrEKqnDPFJ0gF1NVhJ0nr1nROFLdg==}
     peerDependencies:
       react: '*'
       react-native: '*'
@@ -12588,13 +12504,6 @@ packages:
     peerDependencies:
       react: '*'
       react-native: '*'
-
-  react-native-nitro-sound@0.2.12:
-    resolution: {integrity: sha512-186xM1O0q+qqgvJ5xwu6NglodDs0b4bVGsUOwZ8xaQATGsf0hjqvrbeI1+1nacpz5u6wA2cFP0fzVLKUlItd2A==}
-    peerDependencies:
-      react: '*'
-      react-native: '*'
-      react-native-nitro-modules: '>=0.35.0'
 
   react-native-reanimated@4.2.1:
     resolution: {integrity: sha512-/NcHnZMyOvsD/wYXug/YqSKw90P9edN0kEPL5lP4PFf1aQ4F1V7MKe/E0tvfkXKIajy3Qocp5EiEnlcrK/+BZg==}
@@ -13330,6 +13239,43 @@ packages:
     resolution: {integrity: sha512-uyQK/mx5QjHun80FLJTfaWE7JtwfRMKBLkMne6udYOmvH0CawotVa7TfgYHzAnpphn4+TweIx1QKMnRIbipmUg==}
     engines: {node: '>= 0.10.0'}
 
+  stream-chat-expo@8.13.7:
+    resolution: {integrity: sha512-gYHDqiLjTTJx2HRNgYU8SD7mt6keseJOe3NizHueBL/83kGf0iioHr9xOyqjIJ/OKIighZnqUwgOVQNMfoKNEQ==}
+    peerDependencies:
+      expo: '>=51.0.0'
+      expo-audio: '*'
+      expo-av: '*'
+      expo-clipboard: '*'
+      expo-document-picker: '*'
+      expo-file-system: '*'
+      expo-haptics: '*'
+      expo-image-manipulator: '*'
+      expo-image-picker: '*'
+      expo-media-library: '*'
+      expo-sharing: '*'
+      expo-video: '*'
+    peerDependenciesMeta:
+      expo-audio:
+        optional: true
+      expo-av:
+        optional: true
+      expo-clipboard:
+        optional: true
+      expo-document-picker:
+        optional: true
+      expo-file-system:
+        optional: true
+      expo-haptics:
+        optional: true
+      expo-image-picker:
+        optional: true
+      expo-media-library:
+        optional: true
+      expo-sharing:
+        optional: true
+      expo-video:
+        optional: true
+
   stream-chat-react-native-core@8.13.7:
     resolution: {integrity: sha512-77lgyDArQaH04lcgJ0uUhNc0fm8oGvTFDs5Tjb7nn9ym+A4yUV6q4mKEtPpgqat+fhGvEBy6vnRG2F1Qx3Vr7A==}
     peerDependencies:
@@ -13351,45 +13297,6 @@ packages:
       '@shopify/flash-list':
         optional: true
       emoji-mart:
-        optional: true
-
-  stream-chat-react-native@8.13.7:
-    resolution: {integrity: sha512-k/p4k+uyl41UnYT3e2qXGxUqbstD9KIeoAMFWjaDjYWFwbdFS/TmoXBcFIcegJqNzAS3Dm7gESr+CaVaT0gWeg==}
-    peerDependencies:
-      '@react-native-camera-roll/camera-roll': '>=7.8.0'
-      '@react-native-clipboard/clipboard': '>=1.14.1'
-      '@react-native-documents/picker': '>=10.1.1'
-      '@stream-io/flat-list-mvcp': '>=0.10.3'
-      react-native: '>=0.73.0'
-      react-native-audio-recorder-player: '>=3.6.13'
-      react-native-blob-util: '>=0.21.1'
-      react-native-haptic-feedback: '>=2.3.0'
-      react-native-image-picker: '>=7.1.2'
-      react-native-nitro-sound: '>=0.2.9'
-      react-native-share: '>=11.0.0'
-      react-native-video: '>=6.4.2'
-    peerDependenciesMeta:
-      '@react-native-camera-roll/camera-roll':
-        optional: true
-      '@react-native-clipboard/clipboard':
-        optional: true
-      '@react-native-documents/picker':
-        optional: true
-      '@stream-io/flat-list-mvcp':
-        optional: true
-      react-native-audio-recorder-player:
-        optional: true
-      react-native-blob-util:
-        optional: true
-      react-native-haptic-feedback:
-        optional: true
-      react-native-image-picker:
-        optional: true
-      react-native-nitro-sound:
-        optional: true
-      react-native-share:
-        optional: true
-      react-native-video:
         optional: true
 
   stream-chat-react@13.14.2:
@@ -13838,9 +13745,6 @@ packages:
   type-is@2.0.1:
     resolution: {integrity: sha512-OZs6gsjF4vMp32qrCbiVSkrFmXtG/AZhY3t0iAMrMBiAZyV9oALtXO8hsrHbMXF9x6L3grlFuwW2oAz7cav+Gw==}
     engines: {node: '>= 0.6'}
-
-  type@2.7.3:
-    resolution: {integrity: sha512-8j+1QmAbPvLZow5Qpi6NCaN8FB60p/6x8/vfNqOk/hC+HuvFZhL4+WfekuhQLiqFZXOgQdrs3B+XxEmCc6b3FQ==}
 
   typed-array-buffer@1.0.3:
     resolution: {integrity: sha512-nAYYwfY3qnzX30IkA6AQZjVbtK6duGontcQm1WSG1MD94YLqK0515GNApXkoxKOWMusVssAHWLh9SeaoefYFGw==}
@@ -19095,23 +18999,7 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
-  '@react-native-camera-roll/camera-roll@7.10.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))':
-    dependencies:
-      react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
-
-  '@react-native-clipboard/clipboard@1.16.3(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)':
-    dependencies:
-      react: 19.2.0
-      react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
-
   '@react-native-community/netinfo@11.5.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)':
-    dependencies:
-      react: 19.2.0
-      react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
-
-  '@react-native-community/slider@5.1.2': {}
-
-  '@react-native-documents/picker@12.0.1(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)':
     dependencies:
       react: 19.2.0
       react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
@@ -22306,8 +22194,6 @@ snapshots:
     dependencies:
       bare-path: 3.0.0
 
-  base-64@0.1.0: {}
-
   base-64@1.0.0: {}
 
   base64-js@1.5.1: {}
@@ -22975,11 +22861,6 @@ snapshots:
 
   d3-timer@3.0.1: {}
 
-  d@1.0.2:
-    dependencies:
-      es5-ext: 0.10.64
-      type: 2.7.3
-
   date-fns@4.1.0: {}
 
   dayjs@1.11.13: {}
@@ -23396,25 +23277,7 @@ snapshots:
 
   es-toolkit@1.45.1: {}
 
-  es5-ext@0.10.64:
-    dependencies:
-      es6-iterator: 2.0.3
-      es6-symbol: 3.1.4
-      esniff: 2.0.1
-      next-tick: 1.1.0
-
   es6-error@4.1.1: {}
-
-  es6-iterator@2.0.3:
-    dependencies:
-      d: 1.0.2
-      es5-ext: 0.10.64
-      es6-symbol: 3.1.4
-
-  es6-symbol@3.1.4:
-    dependencies:
-      d: 1.0.2
-      ext: 1.7.0
 
   esast-util-from-estree@2.0.0:
     dependencies:
@@ -23508,13 +23371,6 @@ snapshots:
 
   eslint-visitor-keys@5.0.1: {}
 
-  esniff@2.0.1:
-    dependencies:
-      d: 1.0.2
-      es5-ext: 0.10.64
-      event-emitter: 0.3.5
-      type: 2.7.3
-
   esprima@4.0.1: {}
 
   esrecurse@4.3.0:
@@ -23563,11 +23419,6 @@ snapshots:
   esutils@2.0.3: {}
 
   etag@1.8.1: {}
-
-  event-emitter@0.3.5:
-    dependencies:
-      d: 1.0.2
-      es5-ext: 0.10.64
 
   event-source-polyfill@1.0.31: {}
 
@@ -23731,6 +23582,15 @@ snapshots:
   expo-haptics@55.0.9(expo@55.0.9):
     dependencies:
       expo: 55.0.9(@babel/core@7.29.0)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.7)(expo-router@55.0.8)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+
+  expo-image-loader@55.0.0(expo@55.0.9):
+    dependencies:
+      expo: 55.0.9(@babel/core@7.29.0)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.7)(expo-router@55.0.8)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+
+  expo-image-manipulator@55.0.11(expo@55.0.9):
+    dependencies:
+      expo: 55.0.9(@babel/core@7.29.0)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.7)(expo-router@55.0.8)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+      expo-image-loader: 55.0.0(expo@55.0.9)
 
   expo-image@55.0.6(expo@55.0.9)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0):
     dependencies:
@@ -23953,10 +23813,6 @@ snapshots:
       - supports-color
 
   exsolve@1.0.8: {}
-
-  ext@1.7.0:
-    dependencies:
-      type: 2.7.3
 
   extend@3.0.2: {}
 
@@ -26895,8 +26751,6 @@ snapshots:
       react-dom: 19.2.4(react@19.2.4)
       uuid: 8.3.2
 
-  next-tick@1.1.0: {}
-
   next@16.1.6(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
     dependencies:
       '@next/env': 16.1.6
@@ -27846,13 +27700,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  react-native-blob-util@0.24.7(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0):
-    dependencies:
-      base-64: 0.1.0
-      glob: 13.0.6
-      react: 19.2.0
-      react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
-
   react-native-css@3.0.6(@expo/metro-config@55.0.11(expo@55.0.9)(typescript@5.9.3))(lightningcss@1.30.1)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0):
     dependencies:
       '@expo/metro-config': 55.0.11(expo@55.0.9)(typescript@5.9.3)
@@ -27872,15 +27719,6 @@ snapshots:
       '@egjs/hammerjs': 2.0.17
       hoist-non-react-statics: 3.3.2
       invariant: 2.2.4
-      react: 19.2.0
-      react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
-
-  react-native-haptic-feedback@2.3.4(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)):
-    dependencies:
-      react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
-
-  react-native-image-picker@8.2.1(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0):
-    dependencies:
       react: 19.2.0
       react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
 
@@ -27908,13 +27746,6 @@ snapshots:
     dependencies:
       react: 19.2.0
       react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
-
-  react-native-nitro-sound@0.2.12(react-native-nitro-modules@0.35.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0):
-    dependencies:
-      '@react-native-community/slider': 5.1.2
-      react: 19.2.0
-      react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
-      react-native-nitro-modules: 0.35.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
 
   react-native-reanimated@4.2.1(react-native-worklets@0.7.2(@babel/core@7.29.0)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0):
     dependencies:
@@ -28944,6 +28775,35 @@ snapshots:
 
   stream-buffers@2.2.0: {}
 
+  stream-chat-expo@8.13.7(1b7a696fd6d541756f6728965782f3d2):
+    dependencies:
+      expo: 55.0.9(@babel/core@7.29.0)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.7)(expo-router@55.0.8)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+      expo-image-manipulator: 55.0.11(expo@55.0.9)
+      mime: 4.1.0
+      stream-chat-react-native-core: 8.13.7(@react-native-community/netinfo@11.5.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(@types/react@19.2.14)(react-native-gesture-handler@2.30.0(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native-reanimated@4.2.1(react-native-worklets@0.7.2(@babel/core@7.29.0)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native-safe-area-context@5.6.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native-svg@15.15.3(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+    optionalDependencies:
+      expo-clipboard: 55.0.9(expo@55.0.9)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
+      expo-file-system: 55.0.12(expo@55.0.9)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))
+      expo-haptics: 55.0.9(expo@55.0.9)
+    transitivePeerDependencies:
+      - '@emoji-mart/data'
+      - '@op-engineering/op-sqlite'
+      - '@react-native-community/netinfo'
+      - '@shopify/flash-list'
+      - '@types/react'
+      - '@types/react-native'
+      - bufferutil
+      - debug
+      - emoji-mart
+      - react
+      - react-native
+      - react-native-gesture-handler
+      - react-native-reanimated
+      - react-native-safe-area-context
+      - react-native-svg
+      - typescript
+      - utf-8-validate
+
   stream-chat-react-native-core@8.13.7(@react-native-community/netinfo@11.5.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(@types/react@19.2.14)(react-native-gesture-handler@2.30.0(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native-reanimated@4.2.1(react-native-worklets@0.7.2(@babel/core@7.29.0)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native-safe-area-context@5.6.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native-svg@15.15.3(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3):
     dependencies:
       '@gorhom/bottom-sheet': 5.1.8(@types/react@19.2.14)(react-native-gesture-handler@2.30.0(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native-reanimated@4.2.1(react-native-worklets@0.7.2(@babel/core@7.29.0)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
@@ -28972,40 +28832,6 @@ snapshots:
       - bufferutil
       - debug
       - react
-      - typescript
-      - utf-8-validate
-
-  stream-chat-react-native@8.13.7(f4aa49e074fe8d5472e879701c714efc):
-    dependencies:
-      es6-symbol: 3.1.4
-      mime: 4.1.0
-      react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0)
-      stream-chat-react-native-core: 8.13.7(@react-native-community/netinfo@11.5.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(@types/react@19.2.14)(react-native-gesture-handler@2.30.0(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native-reanimated@4.2.1(react-native-worklets@0.7.2(@babel/core@7.29.0)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native-safe-area-context@5.6.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native-svg@15.15.3(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
-    optionalDependencies:
-      '@react-native-camera-roll/camera-roll': 7.10.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))
-      '@react-native-clipboard/clipboard': 1.16.3(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
-      '@react-native-documents/picker': 12.0.1(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
-      react-native-blob-util: 0.24.7(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
-      react-native-haptic-feedback: 2.3.4(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))
-      react-native-image-picker: 8.2.1(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
-      react-native-nitro-sound: 0.2.12(react-native-nitro-modules@0.35.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
-      react-native-share: 12.2.6
-      react-native-video: 6.19.1(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
-    transitivePeerDependencies:
-      - '@emoji-mart/data'
-      - '@op-engineering/op-sqlite'
-      - '@react-native-community/netinfo'
-      - '@shopify/flash-list'
-      - '@types/react'
-      - '@types/react-native'
-      - bufferutil
-      - debug
-      - emoji-mart
-      - react
-      - react-native-gesture-handler
-      - react-native-reanimated
-      - react-native-safe-area-context
-      - react-native-svg
       - typescript
       - utf-8-validate
 
@@ -29463,8 +29289,6 @@ snapshots:
       content-type: 1.0.5
       media-typer: 1.1.0
       mime-types: 3.0.2
-
-  type@2.7.3: {}
 
   typed-array-buffer@1.0.3:
     dependencies:

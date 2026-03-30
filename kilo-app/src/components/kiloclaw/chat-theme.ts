@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
-import { type DeepPartial, type Theme } from 'stream-chat-react-native';
+import { type DeepPartial, type Theme } from 'stream-chat-expo';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 

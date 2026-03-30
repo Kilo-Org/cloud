@@ -35,21 +35,8 @@ export function handleRequestLogging(params: {
   provider: string;
   model: string;
   request: GatewayRequest;
-  feature: string | null;
-  api_kind: string;
-  session_id: string | null;
 }) {
-  const {
-    clonedResponse,
-    user,
-    organization_id,
-    provider,
-    model,
-    request,
-    feature,
-    api_kind,
-    session_id,
-  } = params;
+  const { clonedResponse, user, organization_id, provider, model, request } = params;
   if (!isLoggingEnabledForUser(user, organization_id)) {
     return;
   }
@@ -63,9 +50,6 @@ export function handleRequestLogging(params: {
           status_code: clonedResponse.status,
           model,
           provider,
-          feature,
-          api_kind,
-          session_id,
           request: request.body,
           response: await clonedResponse.text(),
         })

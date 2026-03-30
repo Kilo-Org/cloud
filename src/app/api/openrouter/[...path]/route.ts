@@ -583,9 +583,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     provider: provider.id,
     model: originalModelIdLowerCased,
     request: requestBodyParsed,
-    feature: feature ?? null,
-    api_kind: requestBodyParsed.kind,
-    session_id: taskId ?? null,
   });
 
   {

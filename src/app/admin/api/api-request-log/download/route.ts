@@ -43,6 +43,19 @@ function isJson(value: unknown): boolean {
   return false;
 }
 
+function parseDate(value: string): Date | null {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d;
+}
+
+function jsonError(message: string, status: number) {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 export async function GET(request: NextRequest) {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) {
@@ -55,29 +68,29 @@ export async function GET(request: NextRequest) {
   const endDate = searchParams.get('endDate');
 
   if (!userId || !startDate || !endDate) {
-    return new Response(JSON.stringify({ error: 'userId, startDate, and endDate are required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonError('userId, startDate, and endDate are required', 400);
   }
 
-  const conditions = [
-    eq(api_request_log.kilo_user_id, userId),
-    gte(api_request_log.created_at, new Date(startDate).toISOString()),
-    lte(api_request_log.created_at, new Date(endDate + 'T23:59:59.999Z').toISOString()),
-  ];
+  const parsedStart = parseDate(startDate);
+  const parsedEnd = parseDate(endDate + 'T23:59:59.999Z');
+  if (!parsedStart || !parsedEnd) {
+    return jsonError('Invalid date format. Use YYYY-MM-DD.', 400);
+  }
 
   const rows = await db
     .select()
     .from(api_request_log)
-    .where(and(...conditions))
+    .where(
+      and(
+        eq(api_request_log.kilo_user_id, userId),
+        gte(api_request_log.created_at, parsedStart.toISOString()),
+        lte(api_request_log.created_at, parsedEnd.toISOString())
+      )
+    )
     .orderBy(asc(api_request_log.created_at));
 
   if (rows.length === 0) {
-    return new Response(JSON.stringify({ error: 'No records found for the given criteria' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return jsonError('No records found for the given criteria', 404);
   }
 
   const passthrough = new PassThrough();
@@ -102,13 +115,13 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  archive.finalize();
+  void archive.finalize();
 
   const webStream = new ReadableStream({
     start(controller) {
       passthrough.on('data', (chunk: Buffer) => controller.enqueue(chunk));
       passthrough.on('end', () => controller.close());
-      passthrough.on('error', (err) => controller.error(err));
+      passthrough.on('error', err => controller.error(err));
     },
   });
 

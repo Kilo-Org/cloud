@@ -17,10 +17,9 @@ export default function ApiRequestLogPage() {
   const [userId, setUserId] = useState('');
   const [startDate, setStartDate] = useState(weekAgo);
   const [endDate, setEndDate] = useState(today);
-  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleDownload() {
+  function handleDownload() {
     if (!userId.trim()) {
       setError('User ID is required');
       return;
@@ -31,39 +30,15 @@ export default function ApiRequestLogPage() {
     }
 
     setError(null);
-    setDownloading(true);
 
-    try {
-      const params = new URLSearchParams({
-        userId: userId.trim(),
-        startDate,
-        endDate,
-      });
+    const params = new URLSearchParams({
+      userId: userId.trim(),
+      startDate,
+      endDate,
+    });
 
-      const response = await fetch(`/admin/api/api-request-log/download?${params}`);
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        setError(body?.error ?? `Download failed (${response.status})`);
-        return;
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download =
-        response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] ??
-        'api-request-log.zip';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Download failed');
-    } finally {
-      setDownloading(false);
-    }
+    // Navigate directly to preserve server-side streaming
+    window.location.href = `/admin/api/api-request-log/download?${params}`;
   }
 
   return (
@@ -109,9 +84,9 @@ export default function ApiRequestLogPage() {
 
             {error && <p className="text-sm text-red-500">{error}</p>}
 
-            <Button onClick={handleDownload} disabled={downloading} className="w-full">
+            <Button onClick={handleDownload} className="w-full">
               <Download className="mr-2 h-4 w-4" />
-              {downloading ? 'Downloading...' : 'Download ZIP'}
+              Download ZIP
             </Button>
           </CardContent>
         </Card>

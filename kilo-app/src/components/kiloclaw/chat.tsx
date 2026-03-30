@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
@@ -13,6 +13,7 @@ import {
 } from 'stream-chat-react-native';
 
 import { useBotOnlineStatus, useKeyboardAwareBottomInset } from '@/components/kiloclaw/chat-hooks';
+import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw';
@@ -153,7 +154,7 @@ function StreamChatUI({
   channelId: string;
 }) {
   const { bottomInset, keyboardVisible } = useKeyboardAwareBottomInset();
-  const colors = useThemeColors();
+  const chatTheme = useStreamChatTheme();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -219,18 +220,6 @@ function StreamChatUI({
   const botUserId = `bot-${sandboxId}`;
   const botOnline = useBotOnlineStatus(client, channel, botUserId);
 
-  const chatStyle = useMemo(
-    () => ({
-      messageInput: {
-        container: {
-          paddingHorizontal: 12,
-          borderColor: colors.border,
-        },
-      },
-    }),
-    [colors.border]
-  );
-
   if (connectError) {
     return (
       <ChatShell instanceId={instanceId} name={name}>
@@ -256,8 +245,8 @@ function StreamChatUI({
     >
       <ChatHeader instanceId={instanceId} title={name} botOnline={botOnline} />
       <View className={`flex-1 ${keyboardVisible ? 'pb-1' : 'pb-3'}`}>
-        <OverlayProvider>
-          <Chat client={client} style={chatStyle}>
+        <OverlayProvider value={{ style: chatTheme }}>
+          <Chat client={client} style={chatTheme}>
             <Channel channel={channel} disableKeyboardCompatibleView bottomInset={bottomInset}>
               <MessageList />
               <MessageInput />

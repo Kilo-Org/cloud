@@ -5,31 +5,17 @@ import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useUser } from '@/hooks/useUser';
 import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, GitBranch, Link2 } from 'lucide-react';
+import { ExternalLink, GitBranch } from 'lucide-react';
 import { useOnboarding } from './OnboardingContext';
 import { resolveGitUrlFromRepo } from './onboarding.domain';
 
-type InputMode = 'picker' | 'manual';
-
 export function OnboardingStepRepo() {
-  const { state, setRepo, setTownName, goNext } = useOnboarding();
+  const { state, setRepo, setTownName } = useOnboarding();
   const { data: user } = useUser();
   const mainTrpc = useTRPC();
 
-  const [mode, setMode] = useState<InputMode>(
-    state.repo?.platform === 'manual' ? 'manual' : 'picker'
-  );
-  const [selectedRepoFullName, setSelectedRepoFullName] = useState(
-    state.repo?.platform !== 'manual' ? (state.repo?.fullName ?? '') : ''
-  );
-  const [manualGitUrl, setManualGitUrl] = useState(
-    state.repo?.platform === 'manual' ? (state.repo?.gitUrl ?? '') : ''
-  );
-  const [manualBranch, setManualBranch] = useState(
-    state.repo?.platform === 'manual' ? (state.repo?.defaultBranch ?? 'main') : 'main'
-  );
+  const [selectedRepoFullName, setSelectedRepoFullName] = useState(state.repo?.fullName ?? '');
 
   // Use org-scoped endpoints when onboarding within an org, personal otherwise
   const orgId = state.orgId;
@@ -41,7 +27,6 @@ export function OnboardingStepRepo() {
           forceRefresh: false,
         })
       : mainTrpc.cloudAgent.listGitHubRepositories.queryOptions({ forceRefresh: false })),
-    enabled: mode === 'picker',
   });
 
   const gitlabReposQuery = useQuery({
@@ -51,7 +36,6 @@ export function OnboardingStepRepo() {
           forceRefresh: false,
         })
       : mainTrpc.cloudAgent.listGitLabRepositories.queryOptions({ forceRefresh: false })),
-    enabled: mode === 'picker',
   });
 
   const unifiedRepositories = useMemo<RepositoryOption[]>(() => {
@@ -109,37 +93,8 @@ export function OnboardingStepRepo() {
         platformIntegrationId: undefined,
       });
     },
-    [unifiedRepositories, gitlabReposQuery.data, state.townName, setTownName, setRepo]
+    [unifiedRepositories, gitlabReposQuery.data, state.townNameSetByUser, setTownName, setRepo]
   );
-
-  const handleManualConfirm = useCallback(() => {
-    const trimmedUrl = manualGitUrl.trim();
-    if (!trimmedUrl) return;
-
-    // Derive a name from the URL for rig naming
-    const urlName = trimmedUrl
-      .replace(/\.git$/, '')
-      .split('/')
-      .pop();
-
-    setRepo({
-      platform: 'manual',
-      fullName: urlName ?? 'repo',
-      gitUrl: trimmedUrl,
-      defaultBranch: manualBranch.trim() || 'main',
-    });
-
-    goNext();
-  }, [manualGitUrl, manualBranch, setRepo, goNext]);
-
-  const handlePickerContinue = useCallback(() => {
-    if (state.repo && state.repo.platform !== 'manual') {
-      goNext();
-    }
-  }, [state.repo, goNext]);
-
-  const isPickerReady = state.repo !== null && state.repo.platform !== 'manual';
-  const isManualReady = manualGitUrl.trim().length > 0;
 
   return (
     <div className="flex flex-col items-center justify-center py-12">
@@ -147,133 +102,54 @@ export function OnboardingStepRepo() {
       <p className="mt-2 text-sm text-white/40">Choose a repository for your agents to work on.</p>
 
       <div className="mt-8 w-full max-w-md">
-        {mode === 'picker' ? (
-          <div className="space-y-4">
-            {/* Repo picker */}
-            {isLoadingRepos ? (
-              <div className="space-y-2">
-                <div className="h-9 w-full animate-pulse rounded-md bg-white/[0.06]" />
-                <p className="text-xs text-white/30">Loading repositories...</p>
-              </div>
-            ) : hasAnyIntegration ? (
-              <RepositoryCombobox
-                repositories={unifiedRepositories}
-                value={selectedRepoFullName}
-                onValueChange={handleRepoSelect}
-                isLoading={isLoadingRepos}
-                placeholder="Select a repository..."
-                searchPlaceholder="Search repositories..."
-                groupByPlatform
-                hideLabel
-              />
-            ) : (
-              <div className="space-y-3">
-                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm text-white/50">
-                  No integrations connected yet. Install the GitHub App to see your repos.
-                </div>
-              </div>
-            )}
-
-            {/* Install GitHub App button when no GitHub repos found */}
-            {!isLoadingRepos && (githubReposQuery.data?.repositories?.length ?? 0) === 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleInstallGithub}
-                className="w-full gap-2 border-white/10 text-white/70 hover:text-white/90"
-              >
-                <ExternalLink className="size-4" />
-                Install GitHub App
-              </Button>
-            )}
-
-            {/* Selected repo indicator */}
-            {state.repo && state.repo.platform !== 'manual' && (
-              <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-400/80">
-                <GitBranch className="size-4" />
-                <span className="truncate">{state.repo.fullName}</span>
-                <span className="ml-auto text-xs text-white/30">main</span>
-              </div>
-            )}
-
-            {/* Continue button for picker mode */}
-            {isPickerReady && (
-              <Button
-                type="button"
-                onClick={handlePickerContinue}
-                className="w-full bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
-              >
-                Continue
-              </Button>
-            )}
-
-            {/* Manual URL escape hatch */}
-            <button
-              type="button"
-              onClick={() => setMode('manual')}
-              className="flex w-full items-center justify-center gap-1.5 text-xs text-white/30 transition-colors hover:text-white/50"
-            >
-              <Link2 className="size-3" />
-              Or enter a git URL manually
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Manual URL input */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-white/70">Git URL</label>
-              <Input
-                value={manualGitUrl}
-                onChange={e => setManualGitUrl(e.target.value)}
-                placeholder="https://github.com/org/repo.git"
-                className="border-white/10 bg-black/25"
-                autoFocus
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && isManualReady) {
-                    handleManualConfirm();
-                  }
-                }}
-              />
-              <p className="mt-1 text-xs text-white/30">
-                For private repos, you can add credentials in Town Settings later.
-              </p>
+        <div className="space-y-4">
+          {/* Repo picker */}
+          {isLoadingRepos ? (
+            <div className="space-y-2">
+              <div className="h-9 w-full animate-pulse rounded-md bg-white/[0.06]" />
+              <p className="text-xs text-white/30">Loading repositories...</p>
             </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-white/70">Default Branch</label>
-              <Input
-                value={manualBranch}
-                onChange={e => setManualBranch(e.target.value)}
-                placeholder="main"
-                className="border-white/10 bg-black/25"
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && isManualReady) {
-                    handleManualConfirm();
-                  }
-                }}
-              />
+          ) : hasAnyIntegration ? (
+            <RepositoryCombobox
+              repositories={unifiedRepositories}
+              value={selectedRepoFullName}
+              onValueChange={handleRepoSelect}
+              isLoading={isLoadingRepos}
+              placeholder="Select a repository..."
+              searchPlaceholder="Search repositories..."
+              groupByPlatform
+              hideLabel
+            />
+          ) : (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm text-white/50">
+                No integrations connected yet. Install the GitHub App to see your repos.
+              </div>
             </div>
+          )}
 
-            {/* Continue button */}
+          {/* Install GitHub App button when no GitHub repos found */}
+          {!isLoadingRepos && (githubReposQuery.data?.repositories?.length ?? 0) === 0 && (
             <Button
               type="button"
-              onClick={handleManualConfirm}
-              disabled={!isManualReady}
-              className="w-full bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)] disabled:opacity-50"
+              variant="outline"
+              onClick={handleInstallGithub}
+              className="w-full gap-2 border-white/10 text-white/70 hover:text-white/90"
             >
-              Continue
+              <ExternalLink className="size-4" />
+              Install GitHub App
             </Button>
+          )}
 
-            {/* Back to picker */}
-            <button
-              type="button"
-              onClick={() => setMode('picker')}
-              className="flex w-full items-center justify-center gap-1.5 text-xs text-white/30 transition-colors hover:text-white/50"
-            >
-              Back to repo picker
-            </button>
-          </div>
-        )}
+          {/* Selected repo indicator */}
+          {state.repo && state.repo.platform !== 'manual' && (
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-400/80">
+              <GitBranch className="size-4" />
+              <span className="truncate">{state.repo.fullName}</span>
+              <span className="ml-auto text-xs text-white/30">main</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

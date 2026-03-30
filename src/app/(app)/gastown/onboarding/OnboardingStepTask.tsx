@@ -6,15 +6,20 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useOnboarding } from './OnboardingContext';
 import { presetToConfig, FIRST_TASK_STORAGE_PREFIX, PHASE_LABELS } from './onboarding.domain';
 import type { CreationPhase } from './onboarding.domain';
 
 export function OnboardingStepTask() {
-  const { state, setFirstTask, backgroundTownId, isProvisioning, waitForProvisionedTown } =
-    useOnboarding();
+  const {
+    state,
+    setFirstTask,
+    backgroundTownId,
+    isProvisioning,
+    waitForProvisionedTown,
+    finalStepHandlersRef,
+  } = useOnboarding();
   const router = useRouter();
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
@@ -49,7 +54,6 @@ export function OnboardingStepTask() {
   );
 
   const createRig = useMutation(trpc.gastown.createRig.mutationOptions({}));
-
   const updateConfig = useMutation(trpc.gastown.updateTownConfig.mutationOptions({}));
 
   const ensureMayor = useMutation(
@@ -62,14 +66,8 @@ export function OnboardingStepTask() {
     })
   );
 
-  /**
-   * Resolve the town ID — prefer the already-provisioned town, then await any
-   * in-flight provisioning, and only create a new town as a last resort.
-   */
   async function resolveTownId(): Promise<string> {
     if (backgroundTownId) return backgroundTownId;
-
-    // Wait for in-flight background provisioning before creating a duplicate
     const provisionedId = await waitForProvisionedTown();
     if (provisionedId) return provisionedId;
 
@@ -83,7 +81,6 @@ export function OnboardingStepTask() {
   }
 
   async function finalize(townId: string, firstTask: string | null) {
-    // Create the rig (non-blocking — if it fails, user can add later)
     if (state.repo) {
       setPhase('creating-rig');
       try {
@@ -103,7 +100,6 @@ export function OnboardingStepTask() {
       }
     }
 
-    // If town was NOT background-provisioned, configure models + ensureMayor now
     if (!backgroundTownId) {
       setPhase('configuring-models');
       try {
@@ -114,21 +110,17 @@ export function OnboardingStepTask() {
           configErr instanceof Error ? configErr.message : 'Failed to configure models';
         toast.error(`Model config failed: ${message}. You can update it in settings.`);
       }
-
-      // Fire-and-forget ensureMayor — don't block redirect
       ensureMayor.mutate({ townId });
     }
 
-    // Queue first task for the Mayor terminal via localStorage
     if (firstTask) {
       try {
         localStorage.setItem(`${FIRST_TASK_STORAGE_PREFIX}${townId}`, firstTask);
       } catch {
-        // localStorage may be unavailable; the message just won't be auto-sent
+        // localStorage may be unavailable
       }
     }
 
-    // Redirect to the new town
     setPhase('redirecting');
     const townPath = state.orgId
       ? `/organizations/${state.orgId}/gastown/${townId}`
@@ -138,7 +130,6 @@ export function OnboardingStepTask() {
 
   async function handleSubmit() {
     if (!state.firstTask.trim() || !state.townName.trim()) return;
-
     try {
       setPhase('creating-town');
       const townId = await resolveTownId();
@@ -152,7 +143,6 @@ export function OnboardingStepTask() {
 
   async function handleSkip() {
     if (!state.townName.trim()) return;
-
     try {
       setPhase('creating-town');
       const townId = await resolveTownId();
@@ -167,6 +157,15 @@ export function OnboardingStepTask() {
   const canSubmit =
     state.firstTask.trim().length > 0 && state.townName.trim().length > 0 && !isSubmitting;
   const canSkip = state.townName.trim().length > 0 && !isSubmitting;
+
+  // Register handlers so the wizard nav buttons can trigger submit/skip
+  finalStepHandlersRef.current = {
+    submit: () => void handleSubmit(),
+    skip: () => void handleSkip(),
+    canSubmit,
+    canSkip,
+    isSubmitting,
+  };
 
   return (
     <div className="flex flex-col items-center justify-center py-12">
@@ -196,31 +195,13 @@ export function OnboardingStepTask() {
           </p>
         )}
 
-        {isSubmitting ? (
+        {isSubmitting && (
           <div className="mt-6 flex flex-col items-center gap-3">
             <Loader2 className="size-6 animate-spin text-[color:oklch(95%_0.15_108_/_0.7)]" />
             <p className="text-sm text-white/50">
               {PHASE_LABELS[phase]}
               {isProvisioning && phase === 'creating-town' ? ' (already in progress)' : ''}
             </p>
-          </div>
-        ) : (
-          <div className="mt-6 flex items-center justify-center gap-3">
-            <Button
-              variant="ghost"
-              onClick={() => void handleSkip()}
-              disabled={!canSkip}
-              className="h-11 px-6 text-sm text-white/50 hover:text-white/80"
-            >
-              Skip
-            </Button>
-            <Button
-              onClick={() => void handleSubmit()}
-              disabled={!canSubmit}
-              className="h-11 px-8 text-sm font-medium bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)] disabled:opacity-50"
-            >
-              Create Town &amp; Start
-            </Button>
           </div>
         )}
       </div>

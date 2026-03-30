@@ -36,6 +36,15 @@ type BackgroundTown = {
   customModels: CustomModels;
 };
 
+/** Handlers the task step registers so the wizard nav can trigger submit/skip. */
+export type FinalStepHandlers = {
+  submit: () => void;
+  skip: () => void;
+  canSubmit: boolean;
+  canSkip: boolean;
+  isSubmitting: boolean;
+};
+
 type OnboardingContextValue = {
   state: OnboardingState;
   setTownName: (name: string, setByUser?: boolean) => void;
@@ -55,6 +64,10 @@ type OnboardingContextValue = {
    * the town ID, or null if provisioning failed / was never started.
    */
   waitForProvisionedTown: () => Promise<string | null>;
+  /** Ref for the task step to register its submit/skip handlers. */
+  finalStepHandlersRef: React.RefObject<FinalStepHandlers | null>;
+  /** Delete the background-provisioned town (cleanup on abandon). */
+  deleteBackgroundTown: () => void;
 };
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
@@ -92,6 +105,8 @@ export function OnboardingProvider({
   const provisioningInFlightRef = useRef(false);
   /** Resolves with the town ID on success, or null on failure. */
   const provisioningPromiseRef = useRef<Promise<string | null> | null>(null);
+  /** Ref for the task step to register its submit/skip handlers with the wizard nav. */
+  const finalStepHandlersRef = useRef<FinalStepHandlers | null>(null);
 
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
@@ -117,6 +132,10 @@ export function OnboardingProvider({
   );
 
   const updateConfig = useMutation(trpc.gastown.updateTownConfig.mutationOptions({}));
+  const deleteTownMutation = useMutation(trpc.gastown.deleteTown.mutationOptions({}));
+  const deleteTownRef = useRef(deleteTownMutation);
+  deleteTownRef.current = deleteTownMutation;
+
   const ensureMayor = useMutation(
     trpc.gastown.ensureMayor.mutationOptions({
       onSuccess: () => {
@@ -249,6 +268,13 @@ export function OnboardingProvider({
     return null;
   }, [backgroundTown]);
 
+  const deleteBackgroundTown = useCallback(() => {
+    const bg = backgroundTownRef.current;
+    if (!bg) return;
+    deleteTownRef.current.mutate({ townId: bg.townId });
+    setBackgroundTown(null);
+  }, []);
+
   const setTownName = useCallback(
     (townName: string, setByUser?: boolean) =>
       setState(prev => ({
@@ -289,6 +315,8 @@ export function OnboardingProvider({
         backgroundTownId: backgroundTown?.townId ?? null,
         isProvisioning,
         waitForProvisionedTown,
+        finalStepHandlersRef,
+        deleteBackgroundTown,
       }}
     >
       {children}

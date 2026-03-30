@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CheckCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OnboardingProvider, useOnboarding } from './OnboardingContext';
 import { OnboardingStepName } from './OnboardingStepName';
@@ -102,6 +102,24 @@ function BackgroundProvisioner({ currentStepKey }: { currentStepKey: StepKey }) 
   return null;
 }
 
+/** Cleans up the background-provisioned town if the user leaves without finishing. */
+function AbandonmentCleanup() {
+  const { deleteBackgroundTown, backgroundTownId } = useOnboarding();
+
+  useEffect(() => {
+    if (!backgroundTownId) return;
+
+    const handleBeforeUnload = () => {
+      deleteBackgroundTown();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [backgroundTownId, deleteBackgroundTown]);
+
+  return null;
+}
+
 function WizardContent() {
   const searchParams = useSearchParams();
   const orgId = searchParams.get('orgId');
@@ -129,6 +147,7 @@ function WizardContent() {
   return (
     <OnboardingProvider goNext={goNext} orgId={orgId}>
       <BackgroundProvisioner currentStepKey={currentStepKey} />
+      <AbandonmentCleanup />
       <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center px-4 py-8">
         {/* Header */}
         <div className="mb-2 text-center">
@@ -173,17 +192,53 @@ function WizardContent() {
             Back
           </Button>
 
-          <Button
-            onClick={goNext}
-            disabled={isLastStep}
-            className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)] disabled:opacity-50"
-          >
-            Next
-            <ChevronRight className="size-4" />
-          </Button>
+          {isLastStep ? (
+            <FinalStepNav />
+          ) : (
+            <Button
+              onClick={goNext}
+              className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+            >
+              Next
+              <ChevronRight className="size-4" />
+            </Button>
+          )}
         </div>
       </div>
     </OnboardingProvider>
+  );
+}
+
+/** Submit / Skip buttons shown in the bottom nav on the final (task) step. */
+function FinalStepNav() {
+  const { finalStepHandlersRef } = useOnboarding();
+  const handlers = finalStepHandlersRef.current;
+
+  if (!handlers) return null;
+
+  if (handlers.isSubmitting) {
+    return <Loader2 className="size-5 animate-spin text-[color:oklch(95%_0.15_108_/_0.7)]" />;
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <Button
+        variant="ghost"
+        onClick={handlers.skip}
+        disabled={!handlers.canSkip}
+        className="h-10 px-5 text-sm text-white/50 hover:text-white/80"
+      >
+        Skip
+      </Button>
+      <Button
+        onClick={handlers.submit}
+        disabled={!handlers.canSubmit}
+        className="h-10 gap-1.5 px-6 text-sm font-medium bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)] disabled:opacity-50"
+      >
+        Create Town & Start
+        <ChevronRight className="size-4" />
+      </Button>
+    </div>
   );
 }
 

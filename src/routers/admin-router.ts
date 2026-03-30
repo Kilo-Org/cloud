@@ -680,7 +680,7 @@ export const adminRouter = createTRPCRouter({
           if (activeInstance) {
             try {
               const client = new KiloClawInternalClient();
-              await client.start(input.userId);
+              await client.start(input.userId, activeInstance.id);
             } catch {
               // Best effort — instance will be startable by the user from the dashboard
             }

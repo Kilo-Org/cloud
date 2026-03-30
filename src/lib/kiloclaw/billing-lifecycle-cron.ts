@@ -674,6 +674,7 @@ export async function runKiloClawBillingLifecycleCron(
     .select({
       user_id: kiloclaw_subscriptions.user_id,
       email: kilocode_users.google_user_email,
+      instance_id: kiloclaw_subscriptions.instance_id,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
@@ -691,7 +692,7 @@ export async function runKiloClawBillingLifecycleCron(
       // transition MUST proceed regardless, so transient outages don't
       // leave expired accounts active.
       try {
-        await client.stop(row.user_id);
+        await client.stop(row.user_id, row.instance_id ?? undefined);
       } catch (stopError) {
         const isExpected =
           stopError instanceof KiloClawApiError &&
@@ -748,6 +749,7 @@ export async function runKiloClawBillingLifecycleCron(
     .select({
       user_id: kiloclaw_subscriptions.user_id,
       email: kilocode_users.google_user_email,
+      instance_id: kiloclaw_subscriptions.instance_id,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
@@ -762,7 +764,7 @@ export async function runKiloClawBillingLifecycleCron(
   for (const row of expiredSubscriptions) {
     try {
       try {
-        await client.stop(row.user_id);
+        await client.stop(row.user_id, row.instance_id ?? undefined);
       } catch (stopError) {
         const isExpected =
           stopError instanceof KiloClawApiError &&
@@ -862,6 +864,7 @@ export async function runKiloClawBillingLifecycleCron(
     .select({
       user_id: kiloclaw_subscriptions.user_id,
       email: kilocode_users.google_user_email,
+      instance_id: kiloclaw_subscriptions.instance_id,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
@@ -875,7 +878,7 @@ export async function runKiloClawBillingLifecycleCron(
   for (const row of destructionCandidates) {
     try {
       try {
-        await client.destroy(row.user_id);
+        await client.destroy(row.user_id, row.instance_id ?? undefined);
       } catch (destroyError) {
         const isExpected =
           destroyError instanceof KiloClawApiError &&
@@ -944,6 +947,7 @@ export async function runKiloClawBillingLifecycleCron(
     .select({
       user_id: kiloclaw_subscriptions.user_id,
       email: kilocode_users.google_user_email,
+      instance_id: kiloclaw_subscriptions.instance_id,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
@@ -958,7 +962,7 @@ export async function runKiloClawBillingLifecycleCron(
   for (const row of pastDueRows) {
     try {
       try {
-        await client.stop(row.user_id);
+        await client.stop(row.user_id, row.instance_id ?? undefined);
       } catch (stopError) {
         const isExpected =
           stopError instanceof KiloClawApiError &&

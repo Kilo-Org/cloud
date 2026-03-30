@@ -48,7 +48,7 @@ export async function autoResumeIfSuspended(
   if (targetInstanceId) {
     try {
       const client = new KiloClawInternalClient();
-      await client.start(kiloUserId);
+      await client.start(kiloUserId, targetInstanceId);
     } catch (startError) {
       logError('Failed to auto-resume instance', {
         user_id: kiloUserId,

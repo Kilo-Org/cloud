@@ -105,8 +105,8 @@ export const extendClawTrialRouter = createTRPCRouter({
    *
    * - status 'trialing': extends trial_ends_at by N days from the later of
    *   the current end date or now (so expired trials extend from today).
-   * - status 'canceled': resurrects as a fresh trial for N days, clears
-   *   billing email log, and attempts a best-effort instance start.
+   * - status 'canceled': resurrects as a fresh trial for N days and clears
+   *   billing email log entries so trial notifications can fire again.
    * - no subscription: skipped with an error.
    * - active / past_due / unpaid: skipped with an error.
    */
@@ -182,8 +182,24 @@ export const extendClawTrialRouter = createTRPCRouter({
               .set({
                 trial_ends_at: sql`GREATEST(${kiloclaw_subscriptions.trial_ends_at}::timestamptz, now()) + interval '${sql.raw(String(trialDays))} days'`,
               })
-              .where(eq(kiloclaw_subscriptions.user_id, user.id))
+              .where(
+                and(
+                  eq(kiloclaw_subscriptions.user_id, user.id),
+                  eq(kiloclaw_subscriptions.status, 'trialing')
+                )
+              )
               .returning({ trial_ends_at: kiloclaw_subscriptions.trial_ends_at });
+
+            if (!updated) {
+              // Subscription status changed between match and extend (e.g. user subscribed).
+              results.push({
+                email,
+                userId: user.id,
+                success: false,
+                error: 'Subscription status changed since match — please re-match and retry.',
+              });
+              continue;
+            }
 
             await createKiloClawAdminAuditLog({
               action: 'kiloclaw.subscription.bulk_trial_grant',
@@ -191,12 +207,12 @@ export const extendClawTrialRouter = createTRPCRouter({
               actor_email: ctx.user.google_user_email,
               actor_name: ctx.user.google_user_name,
               target_user_id: user.id,
-              message: `Trial extended by ${trialDays} days via bulk extend, new end: ${updated?.trial_ends_at ?? 'unknown'}`,
+              message: `Trial extended by ${trialDays} days via bulk extend, new end: ${updated.trial_ends_at}`,
               metadata: {
                 source: 'bulk_extend',
                 trialDays,
                 previousTrialEndsAt: subscription.trial_ends_at,
-                newTrialEndsAt: updated?.trial_ends_at,
+                newTrialEndsAt: updated.trial_ends_at,
                 action: 'extended',
               },
             });
@@ -206,7 +222,7 @@ export const extendClawTrialRouter = createTRPCRouter({
               userId: user.id,
               success: true,
               action: 'extended',
-              newTrialEndsAt: updated?.trial_ends_at ?? undefined,
+              newTrialEndsAt: updated.trial_ends_at ?? undefined,
               trialDays,
             });
           } else if (subscription.status === 'canceled') {
@@ -214,7 +230,7 @@ export const extendClawTrialRouter = createTRPCRouter({
             const newEnd = new Date(now.getTime() + trialDays * 86_400_000);
 
             // Resurrect as a fresh trial, mirroring the single-user admin reset path.
-            await db
+            const [resurrected] = await db
               .update(kiloclaw_subscriptions)
               .set({
                 status: 'trialing',
@@ -233,7 +249,24 @@ export const extendClawTrialRouter = createTRPCRouter({
                 suspended_at: null,
                 destruction_deadline: null,
               })
-              .where(eq(kiloclaw_subscriptions.user_id, user.id));
+              .where(
+                and(
+                  eq(kiloclaw_subscriptions.user_id, user.id),
+                  eq(kiloclaw_subscriptions.status, 'canceled')
+                )
+              )
+              .returning({ user_id: kiloclaw_subscriptions.user_id });
+
+            if (!resurrected) {
+              // Subscription status changed between match and extend (e.g. user reactivated).
+              results.push({
+                email,
+                userId: user.id,
+                success: false,
+                error: 'Subscription status changed since match — please re-match and retry.',
+              });
+              continue;
+            }
 
             // Clear billing email log entries so trial notifications can fire again
             // for the new trial period.

@@ -347,12 +347,16 @@ export default function ExtendClawTrialPage() {
     csvData && selectedColumn ? extractEmails(csvData.rows, selectedColumn) : [];
   const parsedEmailCount = extractedEmails.length;
 
-  // Users that cannot have their trial modified (active paid plans)
+  // Users that cannot have their trial modified (active paid plans or no subscription)
   const ineligibleCount = matchedUsers.filter(
     u =>
       u.subscriptionStatus !== null &&
       u.subscriptionStatus !== 'trialing' &&
       u.subscriptionStatus !== 'canceled'
+  ).length;
+
+  const eligibleCount = matchedUsers.filter(
+    u => u.subscriptionStatus === 'trialing' || u.subscriptionStatus === 'canceled'
   ).length;
 
   return (
@@ -556,7 +560,7 @@ export default function ExtendClawTrialPage() {
 
                   <Button
                     onClick={handleExtendTrials}
-                    disabled={extendTrialsMutation.isPending}
+                    disabled={extendTrialsMutation.isPending || eligibleCount === 0}
                     size="lg"
                   >
                     {extendTrialsMutation.isPending ? (

@@ -54,7 +54,6 @@ import {
   security_analysis_owner_state,
   kiloclaw_subscriptions,
   kiloclaw_email_log,
-  kiloclaw_trial_grants,
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
 } from '@kilocode/db/schema';
@@ -623,9 +622,6 @@ export async function softDeleteUser(userId: string) {
     await tx.delete(kiloclaw_email_log).where(eq(kiloclaw_email_log.user_id, userId));
     await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
     await tx.delete(kiloclaw_subscriptions).where(eq(kiloclaw_subscriptions.user_id, userId));
-    await tx
-      .delete(kiloclaw_trial_grants)
-      .where(eq(kiloclaw_trial_grants.email, originalEmail.toLowerCase()));
     await tx.delete(user_period_cache).where(eq(user_period_cache.kilo_user_id, userId));
     await tx
       .delete(kilo_pass_scheduled_changes)
@@ -662,12 +658,6 @@ export async function softDeleteUser(userId: string) {
       .update(kiloclaw_admin_audit_logs)
       .set({ target_user_id: 'deleted-user' })
       .where(eq(kiloclaw_admin_audit_logs.target_user_id, userId));
-
-    // KiloClaw trial grants: strip admin PII where user was the granting admin
-    await tx
-      .update(kiloclaw_trial_grants)
-      .set({ granted_by_email: null })
-      .where(eq(kiloclaw_trial_grants.granted_by_user_id, userId));
 
     // Payment methods: soft-delete and strip address/name/IP fields
     await tx

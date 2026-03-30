@@ -197,21 +197,27 @@ export const extendClawTrialRouter = createTRPCRouter({
               continue;
             }
 
-            await createKiloClawAdminAuditLog({
-              action: 'kiloclaw.subscription.bulk_trial_grant',
-              actor_id: ctx.user.id,
-              actor_email: ctx.user.google_user_email,
-              actor_name: ctx.user.google_user_name,
-              target_user_id: user.id,
-              message: `Trial extended by ${trialDays} days via bulk extend, new end: ${updated.trial_ends_at}`,
-              metadata: {
-                source: 'bulk_extend',
-                trialDays,
-                previousTrialEndsAt: subscription.trial_ends_at,
-                newTrialEndsAt: updated.trial_ends_at,
-                action: 'extended',
-              },
-            });
+            // Audit log is best-effort — its failure does not undo the extension
+            // and must not cause a false failure result that prompts a retry.
+            try {
+              await createKiloClawAdminAuditLog({
+                action: 'kiloclaw.subscription.bulk_trial_grant',
+                actor_id: ctx.user.id,
+                actor_email: ctx.user.google_user_email,
+                actor_name: ctx.user.google_user_name,
+                target_user_id: user.id,
+                message: `Trial extended by ${trialDays} days via bulk extend, new end: ${updated.trial_ends_at}`,
+                metadata: {
+                  source: 'bulk_extend',
+                  trialDays,
+                  previousTrialEndsAt: subscription.trial_ends_at,
+                  newTrialEndsAt: updated.trial_ends_at,
+                  action: 'extended',
+                },
+              });
+            } catch {
+              // Non-fatal
+            }
 
             results.push({
               email,
@@ -264,41 +270,46 @@ export const extendClawTrialRouter = createTRPCRouter({
               continue;
             }
 
-            // Clear billing email log entries so trial notifications can fire again
-            // for the new trial period.
-            const emailTypesToClear = [
-              'claw_trial_1d',
-              'claw_trial_5d',
-              'claw_suspended_trial',
-              'claw_suspended_subscription',
-              'claw_suspended_payment',
-              'claw_destruction_warning',
-              'claw_instance_destroyed',
-            ];
-            await db
-              .delete(kiloclaw_email_log)
-              .where(
-                and(
-                  eq(kiloclaw_email_log.user_id, user.id),
-                  inArray(kiloclaw_email_log.email_type, emailTypesToClear)
-                )
-              );
+            // Email log clear and audit log are best-effort — their failure does
+            // not undo the resurrection and must not cause a false failure result
+            // that prompts a retry (which would extend rather than resurrect).
+            try {
+              const emailTypesToClear = [
+                'claw_trial_1d',
+                'claw_trial_5d',
+                'claw_suspended_trial',
+                'claw_suspended_subscription',
+                'claw_suspended_payment',
+                'claw_destruction_warning',
+                'claw_instance_destroyed',
+              ];
+              await db
+                .delete(kiloclaw_email_log)
+                .where(
+                  and(
+                    eq(kiloclaw_email_log.user_id, user.id),
+                    inArray(kiloclaw_email_log.email_type, emailTypesToClear)
+                  )
+                );
 
-            await createKiloClawAdminAuditLog({
-              action: 'kiloclaw.subscription.bulk_trial_grant',
-              actor_id: ctx.user.id,
-              actor_email: ctx.user.google_user_email,
-              actor_name: ctx.user.google_user_name,
-              target_user_id: user.id,
-              message: `Trial restarted for ${trialDays} days via bulk extend (was canceled)`,
-              metadata: {
-                source: 'bulk_extend',
-                trialDays,
-                previousStatus: subscription.status,
-                newTrialEndsAt: newEnd.toISOString(),
-                action: 'restarted',
-              },
-            });
+              await createKiloClawAdminAuditLog({
+                action: 'kiloclaw.subscription.bulk_trial_grant',
+                actor_id: ctx.user.id,
+                actor_email: ctx.user.google_user_email,
+                actor_name: ctx.user.google_user_name,
+                target_user_id: user.id,
+                message: `Trial restarted for ${trialDays} days via bulk extend (was canceled)`,
+                metadata: {
+                  source: 'bulk_extend',
+                  trialDays,
+                  previousStatus: subscription.status,
+                  newTrialEndsAt: newEnd.toISOString(),
+                  action: 'restarted',
+                },
+              });
+            } catch {
+              // Non-fatal
+            }
 
             results.push({
               email,

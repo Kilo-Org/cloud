@@ -209,7 +209,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     const commitEndsAt = plan === 'commit' ? periodEnd : null;
 
     // If the row doesn't exist yet (settlement arrived before subscription.created),
-    // look up the user's active instance so the INSERT path can populate instance_id.
+    // look up the user's active instance so we can populate instance_id.
     let instanceId = existingRow?.instance_id ?? null;
     if (!existingRow) {
       const [activeInstance] = await tx
@@ -218,9 +218,57 @@ export async function applyStripeFundedKiloClawPeriod(params: {
         .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
         .limit(1);
       instanceId = activeInstance?.id ?? null;
+
+      // The instance may already have a subscription row (e.g. a trial, or a row
+      // inserted by subscription.created arriving just before us). Inserting a new
+      // row keyed on stripe_subscription_id would violate the partial unique index
+      // UQ_kiloclaw_subscriptions_instance. Update the existing instance row
+      // in-place instead, setting the stripe_subscription_id and converting it to
+      // hybrid state. See KILOCODE-WEB-1JJF.
+      if (instanceId) {
+        const [instanceRow] = await tx
+          .select({
+            suspended_at: kiloclaw_subscriptions.suspended_at,
+            scheduled_plan: kiloclaw_subscriptions.scheduled_plan,
+          })
+          .from(kiloclaw_subscriptions)
+          .where(eq(kiloclaw_subscriptions.instance_id, instanceId))
+          .limit(1);
+
+        if (instanceRow) {
+          wasSuspended = !!instanceRow.suspended_at;
+          resolvedInstanceId = instanceId;
+          const shouldClearSchedule = instanceRow.scheduled_plan === plan;
+
+          await tx
+            .update(kiloclaw_subscriptions)
+            .set({
+              stripe_subscription_id: stripeSubscriptionId,
+              payment_source: 'credits',
+              status: 'active',
+              plan,
+              current_period_start: periodStart,
+              current_period_end: periodEnd,
+              credit_renewal_at: periodEnd,
+              commit_ends_at: commitEndsAt,
+              past_due_since: null,
+              auto_top_up_triggered_for_period: null,
+              ...(shouldClearSchedule
+                ? { scheduled_plan: null, scheduled_by: null, stripe_schedule_id: null }
+                : {}),
+            })
+            .where(eq(kiloclaw_subscriptions.instance_id, instanceId));
+
+          return;
+        }
+      }
     }
 
     // Upsert the subscription row to hybrid state, keyed on stripe_subscription_id.
+    // Reached when: (a) a row already exists for this stripe_subscription_id (normal
+    // renewal), or (b) no row exists for either stripe_subscription_id or instance_id
+    // (first settlement with no prior instance row — rare but possible if the instance
+    // was destroyed between checkout and webhook delivery).
     await tx
       .insert(kiloclaw_subscriptions)
       .values({

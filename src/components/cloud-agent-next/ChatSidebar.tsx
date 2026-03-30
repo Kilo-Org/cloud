@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import { usePathname, useRouter } from 'next/navigation';
-import { isToday, isYesterday, isThisWeek } from 'date-fns';
+import { isToday, isYesterday, startOfDay, differenceInCalendarDays, format } from 'date-fns';
 import type { StoredSession } from './types';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { cn } from '@/lib/utils';
@@ -35,22 +35,56 @@ type DateGroup = {
 function groupSessionsByDate(sessions: StoredSession[]): DateGroup[] {
   const today: StoredSession[] = [];
   const yesterday: StoredSession[] = [];
-  const thisWeek: StoredSession[] = [];
+  const namedDayBuckets = new Map<string, { daysAgo: number; sessions: StoredSession[] }>();
   const older: StoredSession[] = [];
+
+  const now = new Date();
+  const todayStart = startOfDay(now);
 
   for (const session of sessions) {
     const date = new Date(session.updatedAt);
-    if (isToday(date)) today.push(session);
-    else if (isYesterday(date)) yesterday.push(session);
-    else if (isThisWeek(date)) thisWeek.push(session);
-    else older.push(session);
+    if (isToday(date)) {
+      today.push(session);
+    } else if (isYesterday(date)) {
+      yesterday.push(session);
+    } else {
+      const daysAgo = differenceInCalendarDays(todayStart, startOfDay(date));
+      if (daysAgo <= 7) {
+        const dayName = format(date, 'EEEE');
+        const bucket = namedDayBuckets.get(dayName);
+        if (bucket) {
+          bucket.sessions.push(session);
+        } else {
+          namedDayBuckets.set(dayName, { daysAgo, sessions: [session] });
+        }
+      } else {
+        older.push(session);
+      }
+    }
   }
 
   const groups: DateGroup[] = [];
   if (today.length > 0) groups.push({ label: 'Today', sessions: today });
   if (yesterday.length > 0) groups.push({ label: 'Yesterday', sessions: yesterday });
-  if (thisWeek.length > 0) groups.push({ label: 'This week', sessions: thisWeek });
-  if (older.length > 0) groups.push({ label: 'Older', sessions: older });
+
+  const sortedNamedDays = [...namedDayBuckets.entries()].sort(
+    (a, b) => a[1].daysAgo - b[1].daysAgo
+  );
+
+  const MAX_NAMED_DAYS = 3;
+  for (const [i, [dayName, bucket]] of sortedNamedDays.entries()) {
+    if (i < MAX_NAMED_DAYS) {
+      groups.push({ label: dayName, sessions: bucket.sessions });
+    } else {
+      older.push(...bucket.sessions);
+    }
+  }
+
+  if (older.length > 0) {
+    older.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    groups.push({ label: 'Older', sessions: older });
+  }
+
   return groups;
 }
 

@@ -63,9 +63,12 @@ import { formatDistanceToNow } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { AdminFileEditor } from './AdminFileEditor';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useKiloclawInstanceEvents,
+  useKiloclawAllEvents,
   type KiloclawEventRow,
+  type KiloclawAllEventRow,
 } from '@/app/admin/api/kiloclaw-analytics/hooks';
 
 function parseTimestamp(timestamp: string): Date {
@@ -884,6 +887,18 @@ function DeliveryBadge({ delivery }: { delivery: string }) {
           reconcile
         </Badge>
       );
+    case 'http':
+      return (
+        <Badge className="bg-green-600 text-xs" variant="default">
+          http
+        </Badge>
+      );
+    case 'queue':
+      return (
+        <Badge className="bg-purple-600 text-xs" variant="default">
+          queue
+        </Badge>
+      );
     default:
       return <Badge variant="outline">{delivery}</Badge>;
   }
@@ -895,7 +910,159 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function InstanceEventsCard({ sandboxId }: { sandboxId: string }) {
+function EventsTable({ rows }: { rows: KiloclawEventRow[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-muted-foreground border-b text-left text-xs">
+            <th className="pr-4 pb-2">Time</th>
+            <th className="pr-4 pb-2">Event</th>
+            <th className="pr-4 pb-2">Delivery</th>
+            <th className="pr-4 pb-2">Status</th>
+            <th className="pr-4 pb-2">Label</th>
+            <th className="pr-4 pb-2">Duration</th>
+            <th className="pb-2">Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => {
+            const eventTimestamp = parseTimestamp(row.timestamp);
+            return (
+              <tr key={`${row.timestamp}-${i}`} className="border-b last:border-0">
+                <td className="py-2 pr-4 whitespace-nowrap">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-xs">
+                        {formatDistanceToNow(eventTimestamp, { addSuffix: true })}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{eventTimestamp.toLocaleString()}</TooltipContent>
+                  </Tooltip>
+                </td>
+                <td className="py-2 pr-4">
+                  <code className="text-xs">{row.event}</code>
+                </td>
+                <td className="py-2 pr-4">
+                  <DeliveryBadge delivery={row.delivery} />
+                </td>
+                <td className="py-2 pr-4">
+                  <span className="text-xs">{row.status || '—'}</span>
+                </td>
+                <td className="py-2 pr-4">
+                  <span className="text-xs">{row.label || '—'}</span>
+                </td>
+                <td className="py-2 pr-4 whitespace-nowrap">
+                  <span className="text-xs">{formatDuration(row.duration_ms)}</span>
+                </td>
+                <td className="py-2">
+                  {row.error ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-destructive block max-w-[200px] truncate text-xs">
+                          {row.error}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[400px]">
+                        <p className="break-words text-xs">{row.error}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">—</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+type InstanceEventsCardProps = {
+  sandboxId: string;
+  userId: string;
+  flyAppName?: string | null;
+  flyMachineId?: string | null;
+};
+
+function AllEventsTabContent({
+  sandboxId,
+  userId,
+  flyAppName,
+  flyMachineId,
+}: InstanceEventsCardProps) {
+  const [offset, setOffset] = useState(0);
+  const { data, isLoading, error } = useKiloclawAllEvents({
+    sandboxId,
+    userId,
+    flyAppName,
+    flyMachineId,
+    offset,
+  });
+
+  const pageSize = 100;
+  const hasNextPage = (data?.data.length ?? 0) === pageSize;
+  const hasPrevPage = offset > 0;
+
+  return (
+    <div className="space-y-3">
+      {isLoading && (
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-muted-foreground text-sm">Loading events...</span>
+        </div>
+      )}
+
+      {error && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            {error instanceof Error ? error.message : 'Failed to load events'}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {data && data.data.length === 0 && (
+        <p className="text-muted-foreground text-sm">No events found.</p>
+      )}
+
+      {data && data.data.length > 0 && <EventsTable rows={data.data as KiloclawAllEventRow[]} />}
+
+      {(hasPrevPage || hasNextPage) && (
+        <div className="flex items-center justify-between pt-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!hasPrevPage || isLoading}
+            onClick={() => setOffset(Math.max(0, offset - pageSize))}
+          >
+            Previous
+          </Button>
+          <span className="text-muted-foreground text-xs">
+            Showing {offset + 1}–{offset + (data?.data.length ?? 0)}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!hasNextPage || isLoading}
+            onClick={() => setOffset(offset + pageSize)}
+          >
+            Next
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InstanceEventsCard({
+  sandboxId,
+  userId,
+  flyAppName,
+  flyMachineId,
+}: InstanceEventsCardProps) {
   const { data, isLoading, error } = useKiloclawInstanceEvents(sandboxId);
 
   return (
@@ -904,99 +1071,51 @@ function InstanceEventsCard({ sandboxId }: { sandboxId: string }) {
         <div className="flex items-center gap-2">
           <Activity className="h-5 w-5" />
           <div>
-            <CardTitle>DO & Reconcile Events</CardTitle>
-            <CardDescription>Recent events from Analytics Engine</CardDescription>
+            <CardTitle>Events</CardTitle>
+            <CardDescription>Events from Analytics Engine</CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading && (
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-muted-foreground text-sm">Loading events...</span>
-          </div>
-        )}
+        <Tabs defaultValue="lifecycle">
+          <TabsList className="mb-4">
+            <TabsTrigger value="lifecycle">DO &amp; Reconcile</TabsTrigger>
+            <TabsTrigger value="all">All Events</TabsTrigger>
+          </TabsList>
 
-        {error && (
-          <Alert>
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              {error instanceof Error ? error.message : 'Failed to load events'}
-            </AlertDescription>
-          </Alert>
-        )}
+          <TabsContent value="lifecycle">
+            {isLoading && (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-muted-foreground text-sm">Loading events...</span>
+              </div>
+            )}
 
-        {data && data.data.length === 0 && (
-          <p className="text-muted-foreground text-sm">No DO or reconcile events found.</p>
-        )}
+            {error && (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  {error instanceof Error ? error.message : 'Failed to load events'}
+                </AlertDescription>
+              </Alert>
+            )}
 
-        {data && data.data.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-muted-foreground border-b text-left text-xs">
-                  <th className="pr-4 pb-2">Time</th>
-                  <th className="pr-4 pb-2">Event</th>
-                  <th className="pr-4 pb-2">Delivery</th>
-                  <th className="pr-4 pb-2">Status</th>
-                  <th className="pr-4 pb-2">Label</th>
-                  <th className="pr-4 pb-2">Duration</th>
-                  <th className="pb-2">Error</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.data.map((row: KiloclawEventRow, i: number) => {
-                  const eventTimestamp = parseTimestamp(row.timestamp);
-                  return (
-                    <tr key={`${row.timestamp}-${i}`} className="border-b last:border-0">
-                      <td className="py-2 pr-4 whitespace-nowrap">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="text-xs">
-                              {formatDistanceToNow(eventTimestamp, { addSuffix: true })}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>{eventTimestamp.toLocaleString()}</TooltipContent>
-                        </Tooltip>
-                      </td>
-                      <td className="py-2 pr-4">
-                        <code className="text-xs">{row.event}</code>
-                      </td>
-                      <td className="py-2 pr-4">
-                        <DeliveryBadge delivery={row.delivery} />
-                      </td>
-                      <td className="py-2 pr-4">
-                        <span className="text-xs">{row.status || '—'}</span>
-                      </td>
-                      <td className="py-2 pr-4">
-                        <span className="text-xs">{row.label || '—'}</span>
-                      </td>
-                      <td className="py-2 pr-4 whitespace-nowrap">
-                        <span className="text-xs">{formatDuration(row.duration_ms)}</span>
-                      </td>
-                      <td className="py-2">
-                        {row.error ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="text-destructive block max-w-[200px] truncate text-xs">
-                                {row.error}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-[400px]">
-                              <p className="break-words text-xs">{row.error}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+            {data && data.data.length === 0 && (
+              <p className="text-muted-foreground text-sm">No DO or reconcile events found.</p>
+            )}
+
+            {data && data.data.length > 0 && <EventsTable rows={data.data} />}
+          </TabsContent>
+
+          <TabsContent value="all">
+            <AllEventsTabContent
+              sandboxId={sandboxId}
+              userId={userId}
+              flyAppName={flyAppName}
+              flyMachineId={flyMachineId}
+            />
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
@@ -1712,8 +1831,15 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
           </CardContent>
         </Card>
 
-        {/* DO & Reconcile Events */}
-        {data.sandbox_id && <InstanceEventsCard sandboxId={data.sandbox_id} />}
+        {/* Events */}
+        {data.sandbox_id && (
+          <InstanceEventsCard
+            sandboxId={data.sandbox_id}
+            userId={data.user_id}
+            flyAppName={data.workerStatus?.flyAppName ?? data.derived_fly_app_name}
+            flyMachineId={data.workerStatus?.flyMachineId}
+          />
+        )}
 
         {/* Machine Controls */}
         {isActive && machineControlsEnabled && (

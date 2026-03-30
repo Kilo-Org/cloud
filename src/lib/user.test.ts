@@ -31,6 +31,7 @@ import {
   security_analysis_owner_state,
   kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
+  kiloclaw_cli_runs,
   bot_requests,
   kiloclaw_admin_audit_logs,
 } from '@kilocode/db/schema';
@@ -901,6 +902,26 @@ describe('User', () => {
           .select({ count: count() })
           .from(kiloclaw_earlybird_purchases)
           .where(eq(kiloclaw_earlybird_purchases.user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+    });
+
+    it('should delete kiloclaw_cli_runs for the user', async () => {
+      const user = await insertTestUser();
+
+      await db.insert(kiloclaw_cli_runs).values({
+        user_id: user.id,
+        prompt: 'fix the gateway',
+        status: 'completed',
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_cli_runs)
+          .where(eq(kiloclaw_cli_runs.user_id, user.id))
           .then(r => r[0].count)
       ).toBe(0);
     });

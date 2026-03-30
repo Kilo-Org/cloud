@@ -101,6 +101,30 @@ export function useControllerVersion(enabled: boolean) {
   );
 }
 
+export function useKiloCliRunStatus(runId: string | null) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.getKiloCliRunStatus.queryOptions(
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by `enabled: runId !== null`
+      { runId: runId! },
+      {
+        enabled: runId !== null,
+        refetchInterval: runId !== null ? 3_000 : false,
+      }
+    )
+  );
+}
+
+export function useKiloCliRunHistory(enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.kiloclaw.listKiloCliRuns.queryOptions(undefined, {
+      enabled,
+      staleTime: 30_000,
+    })
+  );
+}
+
 export function useKiloClawMutations() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -206,6 +230,19 @@ export function useKiloClawMutations() {
     ),
     runDoctor: useMutation(
       trpc.kiloclaw.runDoctor.mutationOptions({ onSuccess: invalidateStatus })
+    ),
+    startKiloCliRun: useMutation(
+      trpc.kiloclaw.startKiloCliRun.mutationOptions({
+        onSuccess: async () => {
+          await invalidateStatus();
+          await queryClient.invalidateQueries({
+            queryKey: trpc.kiloclaw.listKiloCliRuns.queryKey(),
+          });
+        },
+      })
+    ),
+    cancelKiloCliRun: useMutation(
+      trpc.kiloclaw.cancelKiloCliRun.mutationOptions({ onSuccess: invalidateStatus })
     ),
     restoreConfig: useMutation(
       trpc.kiloclaw.restoreConfig.mutationOptions({

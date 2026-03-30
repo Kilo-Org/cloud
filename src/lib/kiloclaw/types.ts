@@ -213,6 +213,23 @@ export type DoctorResponse = {
   output: string;
 };
 
+/** Response from POST /api/platform/kilo-cli-run/start */
+export type KiloCliRunStartResponse = {
+  ok: boolean;
+  startedAt: string;
+};
+
+/** Response from GET /api/platform/kilo-cli-run/status */
+export type KiloCliRunStatusResponse = {
+  hasRun: boolean;
+  status: 'running' | 'completed' | 'failed' | 'cancelled' | null;
+  output: string | null;
+  exitCode: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  prompt: string | null;
+};
+
 /** Response from POST /api/admin/machine/restart */
 export type RestartMachineResponse = {
   success: boolean;

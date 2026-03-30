@@ -137,6 +137,11 @@ export function OnboardingProvider({
   const deleteTownMutation = useMutation(trpc.gastown.deleteTown.mutationOptions({}));
   const deleteTownRef = useRef(deleteTownMutation);
   deleteTownRef.current = deleteTownMutation;
+  const deleteOrgTownMutation = useMutation(trpc.gastown.deleteOrgTown.mutationOptions({}));
+  const deleteOrgTownRef = useRef(deleteOrgTownMutation);
+  deleteOrgTownRef.current = deleteOrgTownMutation;
+  const orgIdRef = useRef(orgId);
+  orgIdRef.current = orgId;
 
   const ensureMayor = useMutation(
     trpc.gastown.ensureMayor.mutationOptions({
@@ -174,18 +179,19 @@ export function OnboardingProvider({
       const townNameTrimmed = currentState.townName.trim();
       const { modelPreset, customModels } = currentState;
 
+      const nameChanged = bg && bg.townName !== townNameTrimmed;
       const configChanged =
         bg &&
         (bg.modelPreset !== modelPreset ||
           JSON.stringify(bg.customModels) !== JSON.stringify(customModels));
 
       // Town already provisioned with matching name + config — nothing to do
-      if (bg && bg.townName === townNameTrimmed && !configChanged) {
+      if (bg && !nameChanged && !configChanged) {
         return currentState;
       }
 
-      // Town exists but config changed — re-apply config only
-      if (bg && configChanged) {
+      // Town exists but only config changed (same name) — re-apply config only
+      if (bg && !nameChanged && configChanged) {
         const townId = bg.townId;
         provisioningInFlightRef.current = true;
         setIsProvisioning(true);
@@ -210,7 +216,20 @@ export function OnboardingProvider({
         return currentState;
       }
 
-      // No background town yet — create one from scratch
+      // If the name changed and an old town exists, delete it first
+      if (bg && nameChanged) {
+        const oldTownId = bg.townId;
+        const oid = currentState.orgId;
+        if (oid) {
+          deleteOrgTownRef.current.mutate({ organizationId: oid, townId: oldTownId });
+        } else {
+          deleteTownRef.current.mutate({ townId: oldTownId });
+        }
+        setBackgroundTown(null);
+        createdTownIdRef.current = null;
+      }
+
+      // Create a new town from scratch
       provisioningInFlightRef.current = true;
       setIsProvisioning(true);
 
@@ -282,17 +301,25 @@ export function OnboardingProvider({
       setBackgroundTown(null);
       createdTownIdRef.current = null;
 
+      const currentOrgId = orgIdRef.current;
+
       if (keepalive) {
         // Use raw fetch with keepalive — tRPC mutations are cancelled
         // when the page unloads or the component tree unmounts.
+        const procedure = currentOrgId ? 'gastown.deleteOrgTown' : 'gastown.deleteTown';
+        const body = currentOrgId
+          ? { json: { organizationId: currentOrgId, townId } }
+          : { json: { townId } };
         void getToken().then(token => {
-          void fetch(`${GASTOWN_URL}/trpc/gastown.deleteTown`, {
+          void fetch(`${GASTOWN_URL}/trpc/${procedure}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ json: { townId } }),
+            body: JSON.stringify(body),
             keepalive: true,
           });
         });
+      } else if (currentOrgId) {
+        deleteOrgTownRef.current.mutate({ organizationId: currentOrgId, townId });
       } else {
         deleteTownRef.current.mutate({ townId });
       }

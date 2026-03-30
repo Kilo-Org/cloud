@@ -641,11 +641,6 @@ const authOptions: NextAuthOptions = {
       let accountInfo: CreateOrUpdateUserArgs | undefined = undefined;
       try {
         if (!trigger) {
-          // SECURITY: Validate that the pepper baked into the JWT still matches the
-          // current pepper in the database. If the pepper was rotated (on logout or
-          // via "Reset API Key"), this rejects the now-stale token and forces
-          // re-authentication, closing the session-invalidation gap described in
-          // Pylon #6353.
           if (token.kiloUserId && token.pepper) {
             const currentUser = await findUserById(token.kiloUserId, readDb);
             if (!currentUser || currentUser.api_token_pepper !== token.pepper) {
@@ -694,14 +689,6 @@ const authOptions: NextAuthOptions = {
     },
   },
   events: {
-    // SECURITY: Rotate the user's api_token_pepper on logout so that any JWT
-    // tokens issued before this logout are immediately rejected by the pepper
-    // check in the jwt callback above. Without this, a captured token would
-    // remain valid for up to 30 days after the user logs out (Pylon #6353).
-    //
-    // Trade-off: because the pepper is per-user (not per-session), this
-    // invalidates ALL of the user's active sessions across all devices.
-    // Logging out of one device is effectively a "log out everywhere" action.
     async signOut({ token }) {
       const kiloUserId = token?.kiloUserId;
       if (!kiloUserId) return;

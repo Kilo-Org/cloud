@@ -68,12 +68,11 @@ function groupSessionsByDate(sessions: StoredSession[]): DateGroup[] {
   if (yesterday.length > 0) groups.push({ label: 'Yesterday', sessions: yesterday });
 
   const sortedNamedDays = [...namedDayBuckets.entries()].sort(
-    (a, b) => a[1].daysAgo - b[1].daysAgo,
+    (a, b) => a[1].daysAgo - b[1].daysAgo
   );
 
   const MAX_NAMED_DAYS = 3;
-  for (let i = 0; i < sortedNamedDays.length; i++) {
-    const [dayName, bucket] = sortedNamedDays[i]!;
+  for (const [i, [dayName, bucket]] of sortedNamedDays.entries()) {
     if (i < MAX_NAMED_DAYS) {
       groups.push({ label: dayName, sessions: bucket.sessions });
     } else {

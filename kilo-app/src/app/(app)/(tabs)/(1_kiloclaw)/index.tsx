@@ -34,7 +34,7 @@ export default function KiloClawInstanceList() {
 
   const instanceId = status?.sandboxId ?? 'default';
   const billingPath = `/(app)/(tabs)/(1_kiloclaw)/${instanceId}/billing` as const;
-  const chatPath = `/(app)/(tabs)/(1_kiloclaw)/${instanceId}` as const;
+  const chatPath = `/(app)/chat/${instanceId}` as const;
   const dashboardPath = `/(app)/(tabs)/(1_kiloclaw)/${instanceId}/dashboard` as const;
 
   const isDestroying = status?.status === 'destroying';

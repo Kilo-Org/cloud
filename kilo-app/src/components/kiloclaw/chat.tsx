@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { Settings } from 'lucide-react-native';
@@ -20,15 +21,16 @@ import { useTRPC } from '@/lib/trpc';
 
 type KiloClawChatProps = {
   instanceId: string;
+  name: string;
   enabled: boolean;
 };
 
-export function KiloClawChat({ instanceId, enabled }: Readonly<KiloClawChatProps>) {
+export function KiloClawChat({ instanceId, name, enabled }: Readonly<KiloClawChatProps>) {
   const { data: creds, isLoading, error } = useStreamChatCredentials(enabled);
 
   if (!enabled) {
     return (
-      <ChatShell instanceId={instanceId}>
+      <ChatShell instanceId={instanceId} name={name}>
         <ChatPlaceholder message="Chat is available when the machine is running." />
       </ChatShell>
     );
@@ -36,7 +38,7 @@ export function KiloClawChat({ instanceId, enabled }: Readonly<KiloClawChatProps
 
   if (isLoading) {
     return (
-      <ChatShell instanceId={instanceId}>
+      <ChatShell instanceId={instanceId} name={name}>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator />
         </View>
@@ -46,7 +48,7 @@ export function KiloClawChat({ instanceId, enabled }: Readonly<KiloClawChatProps
 
   if (error) {
     return (
-      <ChatShell instanceId={instanceId}>
+      <ChatShell instanceId={instanceId} name={name}>
         <ChatPlaceholder message="Failed to load chat. Please try again." />
       </ChatShell>
     );
@@ -54,7 +56,7 @@ export function KiloClawChat({ instanceId, enabled }: Readonly<KiloClawChatProps
 
   if (!creds) {
     return (
-      <ChatShell instanceId={instanceId}>
+      <ChatShell instanceId={instanceId} name={name}>
         <ChatPlaceholder message="Chat requires an upgrade. Use 'Upgrade to Latest' on the dashboard." />
       </ChatShell>
     );
@@ -63,6 +65,7 @@ export function KiloClawChat({ instanceId, enabled }: Readonly<KiloClawChatProps
   return (
     <StreamChatUI
       instanceId={instanceId}
+      name={name}
       apiKey={creds.apiKey}
       userId={creds.userId}
       channelId={creds.channelId}
@@ -72,16 +75,32 @@ export function KiloClawChat({ instanceId, enabled }: Readonly<KiloClawChatProps
 
 // ─── Internal components ────────────────────────────────────────────────────
 
-function ChatShell({ instanceId, children }: { instanceId: string; children: React.ReactNode }) {
+function ChatShell({
+  instanceId,
+  name,
+  children,
+}: {
+  instanceId: string;
+  name: string;
+  children: React.ReactNode;
+}) {
   return (
     <View className="flex-1 bg-background">
-      <ChatHeader instanceId={instanceId} />
+      <ChatHeader instanceId={instanceId} title={name} />
       {children}
     </View>
   );
 }
 
-function ChatHeader({ instanceId, botOnline }: { instanceId: string; botOnline?: boolean }) {
+function ChatHeader({
+  instanceId,
+  title,
+  botOnline,
+}: {
+  instanceId: string;
+  title: string;
+  botOnline?: boolean;
+}) {
   const router = useRouter();
   const colors = useThemeColors();
 
@@ -100,7 +119,7 @@ function ChatHeader({ instanceId, botOnline }: { instanceId: string; botOnline?:
 
   return (
     <ScreenHeader
-      title="Chat"
+      title={title}
       headerRight={
         <View className="flex-row items-center gap-3">
           {botOnline !== undefined && <BotStatusIndicator online={botOnline} />}
@@ -122,15 +141,18 @@ function BotStatusIndicator({ online }: { online: boolean }) {
 
 function StreamChatUI({
   instanceId,
+  name,
   apiKey,
   userId,
   channelId,
 }: {
   instanceId: string;
+  name: string;
   apiKey: string;
   userId: string;
   channelId: string;
 }) {
+  const { bottom: bottomInset } = useSafeAreaInsets();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -186,7 +208,6 @@ function StreamChatUI({
 
     return () => {
       cancelled = true;
-      void chatClient.disconnectUser();
       setClient(null);
       setChannel(null);
     };
@@ -199,7 +220,7 @@ function StreamChatUI({
 
   if (connectError) {
     return (
-      <ChatShell instanceId={instanceId}>
+      <ChatShell instanceId={instanceId} name={name}>
         <ChatPlaceholder message={connectError} />
       </ChatShell>
     );
@@ -207,7 +228,7 @@ function StreamChatUI({
 
   if (!client || !channel) {
     return (
-      <ChatShell instanceId={instanceId}>
+      <ChatShell instanceId={instanceId} name={name}>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator />
         </View>
@@ -217,15 +238,17 @@ function StreamChatUI({
 
   return (
     <View className="flex-1 bg-background">
-      <ChatHeader instanceId={instanceId} botOnline={botOnline} />
-      <OverlayProvider>
-        <Chat client={client}>
-          <Channel channel={channel}>
-            <MessageList />
-            <MessageInput />
-          </Channel>
-        </Chat>
-      </OverlayProvider>
+      <ChatHeader instanceId={instanceId} title={name} botOnline={botOnline} />
+      <View className="flex-1 px-3 py-3">
+        <OverlayProvider>
+          <Chat client={client}>
+            <Channel channel={channel} keyboardVerticalOffset={0} bottomInset={bottomInset}>
+              <MessageList />
+              <MessageInput />
+            </Channel>
+          </Chat>
+        </OverlayProvider>
+      </View>
     </View>
   );
 }

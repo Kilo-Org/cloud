@@ -12,16 +12,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Toaster } from 'sonner-native';
 
-import { LogBox } from 'react-native';
-
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { ContextProvider, useAppContext } from '@/lib/context/context-context';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
-
-// stream-chat i18next promo spam
-LogBox.ignoreLogs(['i18next is made possible']);
 
 const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
@@ -30,7 +25,7 @@ const navigationIntegration = Sentry.reactNavigationIntegration({
 Sentry.init({
   dsn: 'https://618cf025f1c6bdea8043fcd80668fe6b@o4509356317474816.ingest.us.sentry.io/4511110711279616',
 
-  enabled: !__DEV__,
+  enabled: true,
 
   // Adds more context data to events (IP address, cookies, user, etc.)
   // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/

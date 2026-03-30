@@ -473,12 +473,14 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     setVisibleSessionCount(DEFAULT_VISIBLE_SESSIONS);
   }, [manager]);
 
-  // Clear the submit-count once the awaited new session has arrived.
+  // Clear the submit-count once the awaited new session has arrived, or if
+  // the request failed (isStreaming drops back to false with no new session).
   useEffect(() => {
-    if (sessionCountAtSubmit !== null && sessions.length > sessionCountAtSubmit) {
+    if (sessionCountAtSubmit === null) return;
+    if (sessions.length > sessionCountAtSubmit || !isStreaming) {
       setSessionCountAtSubmit(null);
     }
-  }, [sessions.length, sessionCountAtSubmit]);
+  }, [sessions.length, sessionCountAtSubmit, isStreaming]);
 
   // Fetch eligibility to check if user can use App Builder
   const personalEligibilityQuery = useQuery({

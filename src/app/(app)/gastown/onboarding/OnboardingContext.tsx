@@ -87,10 +87,9 @@ export function OnboardingProvider({
 
   const [backgroundTown, setBackgroundTown] = useState<BackgroundTown | null>(null);
   const [isProvisioning, setIsProvisioning] = useState(false);
-  // Tracks whether provisioning is in-flight OR has already been attempted (success or failure).
-  // Once set to true, provisionTownInBackground will not retry — the task step has its own
-  // fallback to create the town if background provisioning failed.
-  const provisionedRef = useRef(false);
+  // Guards against concurrent provisioning calls. Set true while a provisioning
+  // chain is in-flight, reset to false when it completes (success or failure).
+  const provisioningInFlightRef = useRef(false);
   /** Resolves with the town ID on success, or null on failure. */
   const provisioningPromiseRef = useRef<Promise<string | null> | null>(null);
 
@@ -147,23 +146,52 @@ export function OnboardingProvider({
       // Must have a town name to provision
       if (!currentState.townName.trim()) return currentState;
 
-      // Already provisioning/provisioned — never retry automatically
-      if (provisionedRef.current) return currentState;
+      // Don't start another chain while one is already in-flight
+      if (provisioningInFlightRef.current) return currentState;
 
       const bg = backgroundTownRef.current;
-      if (
+      const townNameTrimmed = currentState.townName.trim();
+      const { modelPreset, customModels } = currentState;
+
+      const configChanged =
         bg &&
-        bg.townName === currentState.townName.trim() &&
-        bg.modelPreset === currentState.modelPreset
-      ) {
+        (bg.modelPreset !== modelPreset ||
+          JSON.stringify(bg.customModels) !== JSON.stringify(customModels));
+
+      // Town already provisioned with matching name + config — nothing to do
+      if (bg && bg.townName === townNameTrimmed && !configChanged) {
         return currentState;
       }
 
-      provisionedRef.current = true;
-      setIsProvisioning(true);
+      // Town exists but config changed — re-apply config only
+      if (bg && configChanged) {
+        const townId = bg.townId;
+        provisioningInFlightRef.current = true;
+        setIsProvisioning(true);
 
-      const townNameTrimmed = currentState.townName.trim();
-      const { modelPreset, customModels } = currentState;
+        provisioningPromiseRef.current = (async () => {
+          try {
+            const config = presetToConfig(modelPreset, customModels);
+            await updateConfigRef.current.mutateAsync({ townId, config });
+            setBackgroundTown({ townId, townName: bg.townName, modelPreset, customModels });
+            return townId;
+          } catch (configErr) {
+            const message =
+              configErr instanceof Error ? configErr.message : 'Failed to configure models';
+            toast.error(`Model config failed: ${message}. You can update it in settings.`);
+            return townId; // Town still exists, just config update failed
+          } finally {
+            setIsProvisioning(false);
+            provisioningInFlightRef.current = false;
+          }
+        })();
+
+        return currentState;
+      }
+
+      // No background town yet — create one from scratch
+      provisioningInFlightRef.current = true;
+      setIsProvisioning(true);
 
       // Store a promise so the task step can await in-flight provisioning
       provisioningPromiseRef.current = (async () => {
@@ -204,6 +232,7 @@ export function OnboardingProvider({
           return null;
         } finally {
           setIsProvisioning(false);
+          provisioningInFlightRef.current = false;
         }
       })();
 

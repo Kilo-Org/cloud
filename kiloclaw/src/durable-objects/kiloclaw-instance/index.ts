@@ -1002,7 +1002,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           await this.scheduleAlarm();
           return { started: false };
         }
-        // Machine was force-deleted — clear stale ID so we take the createNewMachine path below.
+        // Machine was force-deleted — clear stale ID so we take the createNewMachine path immediately.
         if (machine.state === 'destroyed') {
           console.log('[DO] Machine destroyed, clearing stale ID');
           this.s.flyMachineId = null;

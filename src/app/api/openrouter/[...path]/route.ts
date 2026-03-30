@@ -29,7 +29,6 @@ import {
 } from '@/lib/models';
 import {
   accountForMicrodollarUsage,
-  alphaPeriodEndedResponse,
   captureProxyError,
   checkOrganizationModelRestrictions,
   dataCollectionRequiredResponse,
@@ -378,11 +377,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     (!autoModel && isForbiddenFreeModel(originalModelIdLowerCased))
   ) {
     console.warn(`User requested forbidden free model ${originalModelIdLowerCased}; rejecting.`);
-    if (isRooCodeBasedClient(fraudHeaders)) {
-      return alphaPeriodEndedResponse();
-    } else {
-      return forbiddenFreeModelResponse();
-    }
+    return forbiddenFreeModelResponse(fraudHeaders, feature);
   }
 
   // Extract properties for usage context

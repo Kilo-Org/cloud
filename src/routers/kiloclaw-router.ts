@@ -44,7 +44,7 @@ import {
   restoreDestroyedInstance,
   type ActiveKiloClawInstance,
 } from '@/lib/kiloclaw/instance-registry';
-import { sandboxIdFromUserId } from '@/lib/kiloclaw/sandbox-id';
+
 import { client as stripe } from '@/lib/stripe-client';
 import { APP_URL } from '@/lib/constants';
 import { getRewardfulReferral } from '@/lib/rewardful';
@@ -81,8 +81,8 @@ const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed
  * exists (e.g. trial expired and personal instance was destroyed).
  *
  * When a new row is created, the subscription row linked to the user's
- * destroyed personal instance (identified by sandboxIdFromUserId) is
- * reassigned to the new instance_id. The update is scoped to that exact
+ * most recently destroyed personal instance is reassigned to the new
+ * instance_id. The update is scoped to that exact
  * destroyed instance row so that subscriptions on other (org or multi-)
  * instances are never touched and UQ_kiloclaw_subscriptions_instance is not
  * violated.
@@ -94,20 +94,20 @@ async function getOrCreateInstanceForBilling(userId: string): Promise<ActiveKilo
   const active = await getActiveInstance(userId);
   if (active) return active;
 
-  // Find the destroyed personal instance row. ensureActiveInstance always
-  // keys personal instances on sandboxIdFromUserId(userId), so this is the
-  // exact row that needs repairing.
-  const sandboxId = sandboxIdFromUserId(userId);
+  // Find the most recently destroyed personal instance. We don't filter by
+  // sandboxId format because both legacy (base64url) and instance-keyed (ki_)
+  // rows may exist.
   const [destroyedInstance] = await db
     .select({ id: kiloclaw_instances.id })
     .from(kiloclaw_instances)
     .where(
       and(
         eq(kiloclaw_instances.user_id, userId),
-        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNull(kiloclaw_instances.organization_id),
         isNotNull(kiloclaw_instances.destroyed_at)
       )
     )
+    .orderBy(desc(kiloclaw_instances.destroyed_at))
     .limit(1);
 
   const newInstance = await ensureActiveInstance(userId);

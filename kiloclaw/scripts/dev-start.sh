@@ -277,8 +277,9 @@ refresh_fly_token() {
     echo "ERROR: 'fly' CLI not found. Install it: https://fly.io/docs/flyctl/install/"
     exit 1
   fi
-  NEW_TOKEN="$(fly tokens create org "$FLY_ORG" 2>&1)"
-  if [ $? -ne 0 ] || [ -z "$NEW_TOKEN" ]; then
+  local token_rc=0
+  NEW_TOKEN="$(fly tokens create org "$FLY_ORG" 2>&1)" || token_rc=$?
+  if [ "$token_rc" -ne 0 ] || [ -z "$NEW_TOKEN" ]; then
     echo "ERROR: Failed to create Fly token. Are you logged in? Try 'fly auth login'."
     echo "$NEW_TOKEN"
     exit 1
@@ -717,8 +718,8 @@ case "$DISPLAY_MODE" in
         "KiloClaw worker" "$WORKER_CMD"
     else
       # Quick tunnel already running in its own tab; put Next.js + worker in splits
-      local safe_nextjs="${NEXTJS_CMD//\\/\\\\}"; safe_nextjs="${safe_nextjs//\"/\\\"}"
-      local safe_worker="${WORKER_CMD//\\/\\\\}"; safe_worker="${safe_worker//\"/\\\"}"
+      safe_nextjs="${NEXTJS_CMD//\\/\\\\}"; safe_nextjs="${safe_nextjs//\"/\\\"}"
+      safe_worker="${WORKER_CMD//\\/\\\\}"; safe_worker="${safe_worker//\"/\\\"}"
       osascript <<EOF
 tell application "iTerm"
   activate

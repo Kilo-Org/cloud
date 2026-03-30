@@ -105,6 +105,9 @@ export function OnboardingProvider({
   const provisioningInFlightRef = useRef(false);
   /** Resolves with the town ID on success, or null on failure. */
   const provisioningPromiseRef = useRef<Promise<string | null> | null>(null);
+  // Tracks the town ID as soon as createTown resolves, even before the full
+  // provisioning chain finishes. Used by deleteBackgroundTown for cleanup.
+  const createdTownIdRef = useRef<string | null>(null);
   const [finalStepHandlers, setFinalStepHandlers] = useState<FinalStepHandlers | null>(null);
 
   const trpc = useGastownTRPC();
@@ -223,6 +226,7 @@ export function OnboardingProvider({
             : await createTownRef.current.mutateAsync({ name: townNameTrimmed });
 
           const townId = town.id;
+          createdTownIdRef.current = townId;
 
           // 2. Configure models (non-blocking; failure is non-critical)
           try {
@@ -269,23 +273,28 @@ export function OnboardingProvider({
 
   const deleteBackgroundTown = useCallback(
     ({ keepalive = false }: { keepalive?: boolean } = {}) => {
-      const bg = backgroundTownRef.current;
-      if (!bg) return;
+      // Check both the completed backgroundTown state AND the in-flight
+      // createdTownIdRef (set as soon as createTown resolves, before the
+      // full provisioning chain finishes).
+      const townId = backgroundTownRef.current?.townId ?? createdTownIdRef.current;
+      if (!townId) return;
+
       setBackgroundTown(null);
+      createdTownIdRef.current = null;
 
       if (keepalive) {
-        // Use raw fetch with keepalive for beforeunload — tRPC mutations are
-        // cancelled when the page unloads, but keepalive requests survive.
+        // Use raw fetch with keepalive — tRPC mutations are cancelled
+        // when the page unloads or the component tree unmounts.
         void getToken().then(token => {
           void fetch(`${GASTOWN_URL}/trpc/gastown.deleteTown`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ townId: bg.townId }),
+            body: JSON.stringify({ json: { townId } }),
             keepalive: true,
           });
         });
       } else {
-        deleteTownRef.current.mutate({ townId: bg.townId });
+        deleteTownRef.current.mutate({ townId });
       }
     },
     []

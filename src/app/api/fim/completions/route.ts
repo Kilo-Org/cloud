@@ -43,10 +43,10 @@ function resolveFimProvider(model: string): {
       upstreamUrl: MISTRAL_FIM_URL,
     };
   }
-  if (model === 'inception/mercury-edit') {
+  if (model.startsWith('inception/')) {
     return {
       provider: 'inception',
-      upstreamModel: 'mercury-edit',
+      upstreamModel: model.slice('inception/'.length),
       upstreamUrl: INCEPTION_FIM_URL,
     };
   }

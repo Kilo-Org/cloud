@@ -164,14 +164,15 @@ export async function makeErrorReadable({
       );
     }
 
-    if (response.status === 404) {
-      const recommendation =
-        feature === 'kiloclaw' || feature === 'openclaw'
-          ? `[BYOK] The model "${requestedModel}" does not exist or is no longer available. We recommend switching to kilo-auto/balanced: /model kilocode/${KILO_AUTO_BALANCED_MODEL.id}`
-          : `[BYOK] The model "${requestedModel}" does not exist or is no longer available. We recommend switching to kilocode/${KILO_AUTO_BALANCED_MODEL.id}.`;
-      warnExceptInTest(`Responding with 404 ${recommendation}`);
-      return NextResponse.json({ error: recommendation, message: recommendation }, { status: 404 });
-    }
+  }
+
+  if (response.status === 404) {
+    const recommendation =
+      feature === 'kiloclaw' || feature === 'openclaw'
+        ? `The model "${requestedModel}" does not exist or is no longer available. We recommend switching to kilo-auto/balanced: /model kilocode/${KILO_AUTO_BALANCED_MODEL.id}`
+        : `The model "${requestedModel}" does not exist or is no longer available. We recommend switching to kilocode/${KILO_AUTO_BALANCED_MODEL.id}.`;
+    warnExceptInTest(`Responding with 404 ${recommendation}`);
+    return NextResponse.json({ error: recommendation, message: recommendation }, { status: 404 });
   }
 
   // Sometimes we get generic or nonsensical errors when the context length is exceeded

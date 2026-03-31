@@ -29,6 +29,7 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { redirect } from 'next/navigation';
 import { isOrganizationHardLocked } from '@/lib/organizations/trial-utils';
+import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
 import { secondsInDay } from 'date-fns/constants';
 import type { AdapterUser } from 'next-auth/adapters';
 import assert from 'node:assert';
@@ -406,7 +407,7 @@ const authOptions: NextAuthOptions = {
               email: { label: 'Email', type: 'email' },
             },
             async authorize(credentials) {
-              console.log('Fake login attempt', credentials);
+              console.log('Fake login attempt', credentials?.email);
               return !credentials?.email
                 ? null
                 : {
@@ -890,7 +891,9 @@ export async function getProfileRedirectPath(user: User) {
   // Check if user is a member of exactly one organization (skip redirect if multiple)
   const singleOrg = await getSingleUserOrganization(user.id);
   if (singleOrg) {
-    if (isOrganizationHardLocked(singleOrg)) {
+    const latestPurchase = await getMostRecentSeatPurchase(singleOrg.id);
+    const hasActiveSubscription = latestPurchase?.subscription_status === 'active';
+    if (isOrganizationHardLocked(singleOrg, hasActiveSubscription)) {
       return '/profile';
     }
     return `/organizations/${singleOrg.id}`;

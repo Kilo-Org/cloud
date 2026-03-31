@@ -82,7 +82,7 @@ export type ServiceEvent =
       branch?: string;
     }
   | { type: 'warning' }
-  | { type: 'preparing'; step: string; message: string }
+  | { type: 'preparing'; step: string; message: string; branch?: string }
   | { type: 'autocommit_started'; messageId: string; message?: string }
   | {
       type: 'autocommit_completed';
@@ -292,7 +292,12 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     case 'preparing': {
       const r = preparingDataSchema.safeParse(data);
       if (!r.success) return null;
-      return { type: 'preparing', step: r.data.step, message: r.data.message };
+      return {
+        type: 'preparing',
+        step: r.data.step,
+        message: r.data.message,
+        branch: r.data.branch,
+      };
     }
 
     case 'autocommit_started': {

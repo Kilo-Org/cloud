@@ -4,7 +4,7 @@
       "id": "kilo-auto/frontier",
       "name": "Kilo Auto Frontier",
       "created": 0,
-      "description": "Highest performance and capability for any task. Uses Claude Opus 4.6 for plan, general, architect, orchestrator, ask, debug; Claude Sonnet 4.6 for build, explore, code.",
+      "description": "Highest performance and capability for any task. Uses Claude Opus 4.6 for KiloClaw, plan, general, architect, orchestrator, ask, debug; Claude Sonnet 4.6 for build, explore, code.",
       "architecture": {
         "input_modalities": [
           "text",
@@ -49,7 +49,7 @@
       "id": "kilo-auto/balanced",
       "name": "Kilo Auto Balanced",
       "created": 0,
-      "description": "Great balance of price and capability. Uses Kimi K2.5 for plan, general, architect, orchestrator, ask, debug; MiniMax M2.7 for build, explore, code.",
+      "description": "Great balance of price and capability. Uses Kimi K2.5 for KiloClaw, plan, general, architect, orchestrator, ask, debug; MiniMax M2.7 for build, explore, code.",
       "architecture": {
         "input_modalities": [
           "text",
@@ -204,6 +204,54 @@
             }
           }
         }
+      }
+    },
+    {
+      "id": "x-ai/grok-code-fast-1:optimized:free",
+      "canonical_slug": "x-ai/grok-code-fast-1:optimized:free",
+      "hugging_face_id": "",
+      "name": "xAI: Grok Code Fast 1 Optimized (free)",
+      "created": 1756238927,
+      "description": "An optimized variant of Grok Code Fast 1, provided free of charge for a limited time. **Note:** All prompts and completions for this model are logged by the provider and may be used to improve their services.",
+      "context_length": 256000,
+      "architecture": {
+        "modality": "text->text",
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Other",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.0000000",
+        "completion": "0.0000000",
+        "request": "0",
+        "image": "0",
+        "web_search": "0",
+        "internal_reasoning": "0",
+        "input_cache_read": "0.00000000"
+      },
+      "top_provider": {
+        "context_length": 256000,
+        "max_completion_tokens": 10000,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "max_tokens",
+        "temperature",
+        "tools",
+        "reasoning",
+        "include_reasoning"
+      ],
+      "default_parameters": {},
+      "preferredIndex": 6,
+      "isFree": true,
+      "opencode": {
+        "ai_sdk_provider": "openai"
       }
     },
     {
@@ -425,6 +473,7 @@
         ]
       },
       "opencode": {
+        "ai_sdk_provider": "openai",
         "variants": {
           "none": {
             "reasoning": {
@@ -676,53 +725,6 @@
             }
           }
         }
-      }
-    },
-    {
-      "id": "x-ai/grok-code-fast-1:optimized:free",
-      "canonical_slug": "x-ai/grok-code-fast-1:optimized:free",
-      "hugging_face_id": "",
-      "name": "xAI: Grok Code Fast 1 Optimized (experimental, free)",
-      "created": 1756238927,
-      "description": "An optimized variant of Grok Code Fast 1, provided free of charge for a limited time. **Note:** All prompts and completions for this model are logged by the provider and may be used to improve their services.",
-      "context_length": 256000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0000000",
-        "completion": "0.0000000",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.00000000"
-      },
-      "top_provider": {
-        "context_length": 256000,
-        "max_completion_tokens": 10000,
-        "is_moderated": false
-      },
-      "per_request_limits": null,
-      "supported_parameters": [
-        "max_tokens",
-        "temperature",
-        "tools",
-        "reasoning",
-        "include_reasoning"
-      ],
-      "default_parameters": {},
-      "isFree": true,
-      "opencode": {
-        "ai_sdk_provider": "openai"
       }
     },
     {

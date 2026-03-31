@@ -42,3 +42,9 @@ export function userIdFromSandboxId(sandboxId: string): string {
   const bytes = base64urlToBytes(sandboxId);
   return new TextDecoder('utf-8', { fatal: false, ignoreBOM: true }).decode(bytes);
 }
+
+// ─── Instance-scoped identity ───────────────────────────────────────
+// Canonical implementation lives in @kilocode/worker-utils/instance-id;
+// re-exported here so existing imports within the worker package continue to work.
+
+export { isValidInstanceId, sandboxIdFromInstanceId } from '@kilocode/worker-utils/instance-id';

@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./instance-id": "./src/instance-id.ts",
+    "./redact-headers": "./src/redact-headers.ts"
   },
   "scripts": {
     "test": "vitest run",

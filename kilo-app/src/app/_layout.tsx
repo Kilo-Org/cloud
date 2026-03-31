@@ -14,6 +14,7 @@ import { Toaster } from 'sonner-native';
 
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { ContextProvider, useAppContext } from '@/lib/context/context-context';
+import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
@@ -24,11 +25,9 @@ const navigationIntegration = Sentry.reactNavigationIntegration({
 Sentry.init({
   dsn: 'https://618cf025f1c6bdea8043fcd80668fe6b@o4509356317474816.ingest.us.sentry.io/4511110711279616',
 
-  enabled: !__DEV__,
+  enabled: true,
 
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
-  sendDefaultPii: true,
+  sendDefaultPii: false,
 
   // Enable Logs
   enableLogs: true,
@@ -55,15 +54,32 @@ void SplashScreen.preventAutoHideAsync();
 function RootLayoutNav() {
   const { token, isLoading: authLoading } = useAuth();
   const { context, isLoading: contextLoading } = useAppContext();
+  const { updateRequired, isChecking: updateChecking } = useForceUpdate();
   const segments = useSegments();
   const router = useRouter();
 
-  const isLoading = authLoading || contextLoading;
+  const isLoading = authLoading || contextLoading || updateChecking;
   const inAuthGroup = segments[0] === '(auth)';
   const inContextGroup = segments[0] === '(context)';
+  const inForceUpdate = segments[0] === 'force-update';
 
   useEffect(() => {
     if (isLoading) {
+      return;
+    }
+
+    if (updateRequired) {
+      if (!inForceUpdate) {
+        router.replace('/force-update');
+      } else {
+        void SplashScreen.hideAsync();
+      }
+      return;
+    }
+
+    if (inForceUpdate) {
+      // Version is now acceptable, leave the force-update screen
+      router.replace('/(app)');
       return;
     }
 
@@ -84,13 +100,27 @@ function RootLayoutNav() {
     } else {
       void SplashScreen.hideAsync();
     }
-  }, [token, context, isLoading, inAuthGroup, inContextGroup, router]);
+  }, [
+    token,
+    context,
+    isLoading,
+    updateRequired,
+    inAuthGroup,
+    inContextGroup,
+    inForceUpdate,
+    router,
+  ]);
+
+  const needsForceUpdate = updateRequired && !inForceUpdate;
+  const showingForceUpdate = updateRequired && inForceUpdate;
+  const needsAuth = !token && !inAuthGroup;
+  const needsContext = token != null && !context && !inContextGroup;
+  const needsAppRedirect =
+    (token != null && context != null && (inAuthGroup || inContextGroup)) || inForceUpdate;
 
   const needsRedirect =
     !isLoading &&
-    ((!token && !inAuthGroup) ||
-      (token != null && !context && !inContextGroup) ||
-      (token != null && context != null && (inAuthGroup || inContextGroup)));
+    (needsForceUpdate || (!showingForceUpdate && (needsAuth || needsContext || needsAppRedirect)));
 
   if (isLoading || needsRedirect) {
     return null;

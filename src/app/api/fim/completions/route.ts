@@ -1,4 +1,4 @@
-import { MISTRAL_API_KEY } from '@/lib/config.server';
+import { MISTRAL_API_KEY, INCEPTION_API_KEY } from '@/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import z from 'zod';
@@ -15,6 +15,7 @@ import {
   extractFraudAndProjectHeaders,
   invalidRequestResponse,
   temporarilyUnavailableResponse,
+  upgradeRequiredResponse,
   wrapInSafeNextResponse,
   captureProxyError,
   extractHeaderAndLimitLength,
@@ -25,12 +26,57 @@ import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { sentryLogger } from '@/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/byok';
 
-const MISTRAL_URL = 'https://api.mistral.ai/v1/fim/completions';
+const MISTRAL_FIM_URL = 'https://api.mistral.ai/v1/fim/completions';
+const INCEPTION_FIM_URL = 'https://api.inceptionlabs.ai/v1/fim/completions';
 const FIM_MAX_TOKENS_LIMIT = 1000;
+
+// These client versions had a bug that caused excessive FIM endpoint requests.
+// Block them and require users to upgrade.
+const BLOCKED_FIM_USER_AGENT_REGEX = /^kilo\/7\.0\.[0-9]+$/;
+const BLOCKED_FIM_USER_AGENTS = ['kilo/7.1.0', 'kilo/7.1.1', 'kilo/7.1.2', 'kilo/7.1.3'];
+
+function isFimClientBlocked(userAgent: string | null): boolean {
+  if (!userAgent) return false;
+  return (
+    BLOCKED_FIM_USER_AGENT_REGEX.test(userAgent) || BLOCKED_FIM_USER_AGENTS.includes(userAgent)
+  );
+}
+
+type FimProvider = 'mistral' | 'inception';
+
+function resolveFimProvider(model: string): {
+  provider: FimProvider;
+  upstreamModel: string;
+  upstreamUrl: string;
+} | null {
+  if (model.startsWith('mistralai/')) {
+    return {
+      provider: 'mistral',
+      upstreamModel: model.slice('mistralai/'.length),
+      upstreamUrl: MISTRAL_FIM_URL,
+    };
+  }
+  if (model.startsWith('inception/')) {
+    return {
+      provider: 'inception',
+      upstreamModel: model.slice('inception/'.length),
+      upstreamUrl: INCEPTION_FIM_URL,
+    };
+  }
+  return null;
+}
+
+function getSystemApiKey(provider: FimProvider): string | null {
+  switch (provider) {
+    case 'mistral':
+      return MISTRAL_API_KEY || null;
+    case 'inception':
+      return INCEPTION_API_KEY || null;
+  }
+}
 
 const FIMRequestBody = z.object({
   //ref: https://docs.mistral.ai/api/endpoint/fim#operation-fim_completion_v1_fim_completions_post
-  provider: z.enum(['mistral', 'inceptionlabs']).optional(),
   model: z.string(),
   prompt: z.string(),
   suffix: z.string().optional(),
@@ -43,6 +89,10 @@ const FIMRequestBody = z.object({
 type FIMRequestBody = z.infer<typeof FIMRequestBody>;
 
 export async function POST(request: NextRequest) {
+  if (isFimClientBlocked(request.headers.get('user-agent'))) {
+    return upgradeRequiredResponse();
+  }
+
   const requestStartedAt = performance.now();
   const requesBodyTextPromise = request.text();
 
@@ -82,17 +132,15 @@ export async function POST(request: NextRequest) {
     return invalidRequestResponse();
   }
 
-  if ((requestBody.provider ?? 'mistral') !== 'mistral') {
+  // Resolve provider from model name
+  const resolved = resolveFimProvider(requestBody.model);
+  if (!resolved) {
     return NextResponse.json(
-      { error: requestBody.provider + ' provider not yet supported' },
+      { error: requestBody.model + ' is not a supported FIM model' },
       { status: 400 }
     );
-    //NOTE: mistral does not do data collection on paid org accounts like ours.
-    //If we ever support OTHER providers, we need to either ensure they don't
-    //either, or at least enforce the rules the org settings configure
-    //see getBalanceAndOrgSettings below and its usage in the openrouter proxy.
-    //ref: https://help.mistral.ai/en/articles/347617-do-you-use-my-user-data-to-train-your-artificial-intelligence-models
   }
+  const { provider: fimProvider, upstreamModel, upstreamUrl } = resolved;
 
   // Validate max_tokens
   if (!requestBody.max_tokens || requestBody.max_tokens > FIM_MAX_TOKENS_LIMIT) {
@@ -102,19 +150,6 @@ export async function POST(request: NextRequest) {
     return temporarilyUnavailableResponse();
   }
 
-  // Map FIM model to OpenRouter format for org settings compatibility
-  const fimModel_withOpenRouterStyleProviderPrefix = requestBody.model;
-
-  const requiredModelPrefix = 'mistralai/';
-  if (!fimModel_withOpenRouterStyleProviderPrefix.startsWith(requiredModelPrefix)) {
-    return NextResponse.json(
-      { error: fimModel_withOpenRouterStyleProviderPrefix + ' is not a mistralai model' },
-      { status: 400 }
-    );
-  }
-
-  const mistralModel = fimModel_withOpenRouterStyleProviderPrefix.slice(requiredModelPrefix.length);
-
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
@@ -122,15 +157,17 @@ export async function POST(request: NextRequest) {
   // Extract properties for usage context
   const promptInfo = extractFimPromptInfo(requestBody);
 
+  const byokProviderKey = fimProvider === 'mistral' ? 'codestral' : 'inception';
+
   const userByok = organizationId
-    ? await getBYOKforOrganization(readDb, organizationId, ['codestral'])
-    : await getBYOKforUser(readDb, user.id, ['codestral']);
+    ? await getBYOKforOrganization(readDb, organizationId, [byokProviderKey])
+    : await getBYOKforUser(readDb, user.id, [byokProviderKey]);
 
   const usageContext: MicrodollarUsageContext = {
     api_kind: 'fim_completions',
     kiloUserId: user.id,
-    provider: 'mistral',
-    requested_model: fimModel_withOpenRouterStyleProviderPrefix,
+    provider: fimProvider,
+    requested_model: requestBody.model,
     promptInfo,
     max_tokens: requestBody.max_tokens ?? null,
     has_middle_out_transform: null, // N/A for FIM
@@ -151,44 +188,68 @@ export async function POST(request: NextRequest) {
     auto_model: null,
   };
 
-  setTag('ui.ai_model', fimModel_withOpenRouterStyleProviderPrefix);
+  setTag('ui.ai_model', requestBody.model);
   // Use read replica for balance check - this is a read-only operation that can tolerate
   // slight replication lag, and provides lower latency for US users
   const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
-  if (balance <= 0 && !isFreeModel(fimModel_withOpenRouterStyleProviderPrefix) && !userByok) {
+  if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
     return NextResponse.json({ error: { message: 'Insufficient credits' } }, { status: 402 });
   }
 
   // Use shared helper for organization model restrictions
-  // Model allow list only applies to Enterprise plans
-  // Provider allow list applies to Enterprise plans; data collection applies to all plans (but FIM doesn't use provider config)
-  const { error: modelRestrictionError } = checkOrganizationModelRestrictions({
-    modelId: fimModel_withOpenRouterStyleProviderPrefix,
+  // Model deny list only applies to Enterprise plans
+  const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
+    modelId: requestBody.model,
     settings,
     organizationPlan: plan,
   });
   if (modelRestrictionError) return modelRestrictionError;
 
+  // FIM routes directly to providers (not via OpenRouter), so enforce
+  // the provider denylist by checking the resolved provider name.
+  if (providerConfig?.ignore?.includes(fimProvider)) {
+    return NextResponse.json(
+      {
+        error: 'Provider not allowed for your team.',
+        message: `The provider "${fimProvider}" is not allowed for your team.`,
+      },
+      { status: 403 }
+    );
+  }
+
+  const systemKey = getSystemApiKey(fimProvider);
+  const apiKey = userByok?.at(0)?.decryptedAPIKey ?? systemKey;
+
+  if (!apiKey) {
+    return NextResponse.json(
+      {
+        error: 'This model requires a BYOK API key. Please configure your API key in settings.',
+      },
+      { status: 400 }
+    );
+  }
+
   sentryRootSpan()?.setAttribute(
-    'mistral-fim.time_to_request_start_ms',
+    'fim.time_to_request_start_ms',
     performance.now() - requestStartedAt
   );
 
-  const mistralRequestSpan = startInactiveSpan({
-    name: 'mistral-fim-request-start',
+  const fimRequestSpan = startInactiveSpan({
+    name: 'fim-request-start',
     op: 'http.client',
   });
 
-  const bodyWithCorrectedModel = { ...requestBody, model: mistralModel };
-  // Make upstream request to Mistral
-  const proxyRes = await fetch(MISTRAL_URL, {
+  const bodyForUpstream = { ...requestBody, model: upstreamModel };
+
+  // Make upstream request to the resolved provider
+  const proxyRes = await fetch(upstreamUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${userByok?.at(0)?.decryptedAPIKey ?? MISTRAL_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify(bodyWithCorrectedModel),
+    body: JSON.stringify(bodyForUpstream),
   });
   usageContext.status_code = proxyRes.status;
 
@@ -200,11 +261,11 @@ export async function POST(request: NextRequest) {
   if (proxyRes.status >= 400) {
     await captureProxyError({
       user,
-      request: bodyWithCorrectedModel,
+      request: bodyForUpstream,
       response: proxyRes,
       organizationId,
-      model: fimModel_withOpenRouterStyleProviderPrefix,
-      errorMessage: `Mistral FIM returned error ${proxyRes.status}`,
+      model: requestBody.model,
+      errorMessage: `FIM provider returned error ${proxyRes.status}`,
       trackInSentry: proxyRes.status >= 500,
     });
   }
@@ -212,7 +273,7 @@ export async function POST(request: NextRequest) {
   const clonedResponse = proxyRes.clone(); // reading from body is side-effectful
 
   // Account for usage using FIM-specific parser
-  countAndStoreFimUsage(clonedResponse, usageContext, mistralRequestSpan);
+  countAndStoreFimUsage(clonedResponse, usageContext, fimRequestSpan);
 
   return wrapInSafeNextResponse(proxyRes);
 }

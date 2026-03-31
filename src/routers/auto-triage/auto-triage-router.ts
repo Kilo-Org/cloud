@@ -8,9 +8,10 @@
 import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
 import {
   organizationMemberProcedure,
-  organizationOwnerProcedure,
+  organizationBillingProcedure,
   ensureOrganizationAccess,
 } from '@/routers/organizations/utils';
+import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { TRPCError } from '@trpc/server';
 import { successResult, failureResult } from '@/lib/maybe-result';
 import {
@@ -270,12 +271,18 @@ export const autoTriageRouter = createTRPCRouter({
    * Save auto-triage configuration for an organization
    * Requires organization owner role
    */
-  saveConfig: organizationOwnerProcedure
+  saveConfig: organizationBillingProcedure
     .input(SaveAutoTriageConfigSchema.omit({ organizationId: true }))
     .mutation(async ({ input, ctx }) => {
       try {
-        // organizationId comes from organizationOwnerProcedure's input
+        // organizationId comes from organizationBillingProcedure's input
         const fullInput = input as typeof input & { organizationId: string };
+
+        // Only enforce trial/subscription when enabling — expired orgs must
+        // still be able to disable agents whose webhook processors keep running.
+        if (fullInput.enabled_for_issues) {
+          await requireActiveSubscriptionOrTrial(fullInput.organizationId);
+        }
 
         // Build config object with defaults for optional fields
         const config = {

@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
+import { sortAgentsByStatus } from '@/lib/gastown/sort-agents';
 import { toast } from 'sonner';
 import { Button } from '@/components/Button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -90,7 +91,7 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
   );
 
   const beads = beadsQuery.data ?? [];
-  const agents = agentsQuery.data ?? [];
+  const agents = useMemo(() => sortAgentsByStatus(agentsQuery.data ?? []), [agentsQuery.data]);
 
   // Filter convoys to those with at least one bead in this rig
   const rigBeadIds = useMemo(() => new Set(beads.map(b => b.bead_id)), [beads]);

@@ -27,7 +27,7 @@ type ProjectLoaderProps = {
 function LoadingSpinner() {
   return (
     <div
-      className="flex h-dvh w-full flex-col items-center justify-center gap-4"
+      className="flex h-[calc(100dvh-3.5rem)] w-full flex-col items-center justify-center gap-4"
       role="status"
       aria-busy="true"
     >
@@ -45,7 +45,7 @@ type ErrorCardProps = {
 
 function ErrorCard({ message, onRetry, isRetrying }: ErrorCardProps) {
   return (
-    <div className="flex h-dvh w-full items-center justify-center p-4">
+    <div className="flex h-[calc(100dvh-3.5rem)] w-full items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -78,7 +78,7 @@ function ErrorCard({ message, onRetry, isRetrying }: ErrorCardProps) {
 
 function NotFoundCard() {
   return (
-    <div className="flex h-dvh w-full items-center justify-center p-4">
+    <div className="flex h-[calc(100dvh-3.5rem)] w-full items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex items-center gap-2">

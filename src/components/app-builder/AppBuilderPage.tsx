@@ -32,7 +32,7 @@ type AppBuilderPageProps = {
  */
 function AppBuilderProjectView({ organizationId }: { organizationId?: string }) {
   return (
-    <div className="flex h-dvh w-full flex-col overflow-hidden lg:flex-row">
+    <div className="flex h-[calc(100dvh-3.5rem)] w-full flex-col overflow-hidden lg:flex-row">
       {/* Chat Pane - 1/3 width on desktop, full width on mobile */}
       <div className="flex h-1/2 w-full flex-col overflow-hidden border-b lg:h-full lg:w-1/3 lg:border-r lg:border-b-0">
         <AppBuilderChat organizationId={organizationId} />

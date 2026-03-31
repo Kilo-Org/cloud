@@ -50,3 +50,7 @@ export type { KiloTokenPayload, SignKiloTokenExtra } from './kilo-token.js';
 
 export { SessionMetricsParamsSchema, TerminationReasons } from './session-metrics-schema.js';
 export type { SessionMetricsParams, SessionMetricsParamsInput } from './session-metrics-schema.js';
+
+export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id.js';
+
+export { redactSensitiveHeaders } from './redact-headers.js';

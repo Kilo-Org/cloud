@@ -120,7 +120,6 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
         await createOrganizationMutation.mutateAsync({
           name: validationResult.data.organizationName,
           autoAddCreator: true,
-          plan: 'enterprise',
           company_domain: companyDomain.trim() || undefined,
         })
       ).organization.id;

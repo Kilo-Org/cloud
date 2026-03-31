@@ -7,14 +7,13 @@ import type {
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
-  organizationOwnerProcedure,
+  organizationBillingMutationProcedure,
   organizationMemberProcedure,
 } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
-import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { listAvailableCustomLlms } from '@/lib/custom-llm/listAvailableCustomLlms';
@@ -185,13 +184,11 @@ export const organizationsSettingsRouter = createTRPCRouter({
       };
     }),
 
-  updateAllowLists: organizationOwnerProcedure
+  updateAllowLists: organizationBillingMutationProcedure
     .input(UpdateDenyListsInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, model_deny_list, provider_deny_list } = input;
-
-      await requireActiveSubscriptionOrTrial(organizationId);
 
       const existingOrg = await getOrganizationById(organizationId);
       if (!existingOrg) {
@@ -258,13 +255,11 @@ export const organizationsSettingsRouter = createTRPCRouter({
       };
     }),
 
-  updateDefaultModel: organizationOwnerProcedure
+  updateDefaultModel: organizationBillingMutationProcedure
     .input(UpdateDefaultModelInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, default_model } = input;
-
-      await requireActiveSubscriptionOrTrial(organizationId);
 
       const existingOrg = await getOrganizationById(organizationId);
       if (!existingOrg) {
@@ -323,13 +318,11 @@ export const organizationsSettingsRouter = createTRPCRouter({
       };
     }),
 
-  updateDataCollection: organizationOwnerProcedure
+  updateDataCollection: organizationBillingMutationProcedure
     .input(UpdateDataCollectionInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input }) => {
       const { organizationId, dataCollection } = input;
-
-      await requireActiveSubscriptionOrTrial(organizationId);
 
       const existingOrg = await getOrganizationById(organizationId);
       if (!existingOrg) {
@@ -350,7 +343,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
       };
     }),
 
-  updateProjectsUIEnabled: organizationOwnerProcedure
+  updateProjectsUIEnabled: organizationBillingMutationProcedure
     .input(UpdateProjectsUIEnabledInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
@@ -438,13 +431,11 @@ export const organizationsSettingsRouter = createTRPCRouter({
       };
     }),
 
-  updateMinimumBalanceAlert: organizationOwnerProcedure
+  updateMinimumBalanceAlert: organizationBillingMutationProcedure
     .input(UpdateMinimumBalanceAlertInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, enabled, minimum_balance, minimum_balance_alert_email } = input;
-
-      await requireActiveSubscriptionOrTrial(organizationId);
 
       const existingOrg = await getOrganizationById(organizationId);
       if (!existingOrg) {

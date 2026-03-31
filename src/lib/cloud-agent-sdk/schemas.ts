@@ -259,6 +259,7 @@ export type WrapperDisconnectedData = z.infer<typeof wrapperDisconnectedDataSche
 export const preparingDataSchema = z.object({
   step: z.string(),
   message: z.string(),
+  branch: z.string().optional(),
 });
 export type PreparingData = z.infer<typeof preparingDataSchema>;
 

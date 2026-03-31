@@ -16,11 +16,12 @@ import type {
   EncryptedEnvelope,
   GoogleCredentials,
   MachineSize,
+  CustomSecretMeta,
 } from '../../schemas/instance-config';
 import { DEFAULT_INSTANCE_FEATURES } from '../../schemas/instance-config';
 import type { FlyVolume, FlyVolumeSnapshot } from '../../fly/types';
 import * as fly from '../../fly/client';
-import { sandboxIdFromUserId } from '../../auth/sandbox-id';
+import { sandboxIdFromUserId, sandboxIdFromInstanceId } from '../../auth/sandbox-id';
 import { resolveLatestVersion, resolveVersionByTag } from '../../lib/image-version';
 import { lookupCatalogVersion } from '../../lib/catalog-registration';
 import { ImageVariantSchema } from '../../schemas/image-version';
@@ -35,9 +36,15 @@ import {
   FIELD_KEY_TO_ENV_VAR,
   ENV_VAR_TO_FIELD_KEY,
   ALL_SECRET_FIELD_KEYS,
+  MAX_CUSTOM_SECRETS,
   type SecretFieldKey,
 } from '@kilocode/kiloclaw-secret-catalog';
-import { parseRegions, prepareRegions, resolveRegions } from '../regions';
+import {
+  parseRegions,
+  prepareRegions,
+  resolveRegions,
+  evictCapacityRegionFromKV,
+} from '../regions';
 import { buildMachineConfig, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
 import type { GatewayProcessStatus } from '../gateway-controller-types';
 
@@ -50,6 +57,7 @@ import { attemptMetadataRecovery } from './reconcile';
 import { resolveImageTag, getRegistryApp, buildUserEnvVars } from './config';
 import * as gateway from './gateway';
 import * as pairing from './pairing';
+import * as kiloCliRun from './kilo-cli-run';
 import * as flyMachines from './fly-machines';
 import {
   reconcileWithFly,
@@ -197,7 +205,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   // Lifecycle methods (called by platform API routes via RPC)
   // ========================================================================
 
-  async provision(userId: string, config: InstanceConfig): Promise<{ sandboxId: string }> {
+  async provision(
+    userId: string,
+    config: InstanceConfig,
+    opts?: { orgId?: string | null; instanceId?: string }
+  ): Promise<{ sandboxId: string }> {
     const provisionStart = performance.now();
     await this.loadState();
 
@@ -208,7 +220,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error('Cannot provision: instance is restoring from snapshot');
     }
 
-    const sandboxId = sandboxIdFromUserId(userId);
+    // For instance-keyed DOs (instanceId provided), derive sandboxId from instanceId.
+    // For legacy userId-keyed DOs, derive from userId.
+    const sandboxId = opts?.instanceId
+      ? sandboxIdFromInstanceId(opts.instanceId)
+      : sandboxIdFromUserId(userId);
     const isNew = !this.s.status;
 
     // Ensure per-user Fly App exists on first provision only.
@@ -234,7 +250,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           size_gb: DEFAULT_VOLUME_SIZE_GB,
           compute: guest,
         },
-        regions
+        regions,
+        {
+          onCapacityError: failedRegion => {
+            void evictCapacityRegionFromKV(this.env.KV_CLAW_CACHE, this.env, failedRegion);
+          },
+        }
       );
       this.s.flyVolumeId = volume.id;
       this.s.flyRegion = volume.region;
@@ -320,6 +341,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const configFields = {
       userId,
       sandboxId,
+      orgId: opts?.orgId ?? null,
       status: (this.s.status ?? 'provisioned') satisfies InstanceStatus,
       envVars: config.envVars ?? null,
       encryptedSecrets: config.encryptedSecrets ?? null,
@@ -369,6 +391,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     this.s.userId = userId;
     this.s.sandboxId = sandboxId;
+    this.s.orgId = opts?.orgId ?? null;
     this.s.status = this.s.status ?? 'provisioned';
     this.s.envVars = config.envVars ?? null;
     this.s.encryptedSecrets = config.encryptedSecrets ?? null;
@@ -547,35 +570,50 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   async updateSecrets(
-    patch: Partial<Record<SecretFieldKey, EncryptedEnvelope | null>>
+    patch: Record<string, EncryptedEnvelope | null>,
+    meta?: Record<string, CustomSecretMeta>
   ): Promise<{ configured: SecretFieldKey[] }> {
     await this.loadState();
 
+    // Separate catalog secrets (keyed by field key) from custom secrets
+    // (keyed directly by env var name).
     const currentSecrets: Record<string, EncryptedEnvelope | null> = {
       ...(this.s.channels ?? {}),
     };
-    const nonCatalogSecrets: Record<string, EncryptedEnvelope> = {};
+    const customSecrets: Record<string, EncryptedEnvelope> = {};
     if (this.s.encryptedSecrets) {
       for (const [key, value] of Object.entries(this.s.encryptedSecrets)) {
         const fieldKey = ENV_VAR_TO_FIELD_KEY.get(key);
         if (fieldKey) {
           currentSecrets[fieldKey] = value;
         } else {
-          nonCatalogSecrets[key] = value;
+          customSecrets[key] = value;
         }
       }
     }
 
+    // Apply the patch — catalog field keys go to currentSecrets, custom
+    // env var names go directly to customSecrets.
     for (const [key, value] of Object.entries(patch)) {
+      const isCatalogKey = ALL_SECRET_FIELD_KEYS.has(key);
       if (value === null) {
-        console.log('[DO] Secret removed', { fieldKey: key, operation: 'remove' });
-        delete currentSecrets[key];
+        console.log('[DO] Secret removed', { key, operation: 'remove' });
+        if (isCatalogKey) {
+          delete currentSecrets[key];
+        } else {
+          delete customSecrets[key];
+        }
       } else {
-        console.log('[DO] Secret updated', { fieldKey: key, operation: 'set' });
-        currentSecrets[key] = value;
+        console.log('[DO] Secret updated', { key, operation: 'set' });
+        if (isCatalogKey) {
+          currentSecrets[key] = value;
+        } else {
+          customSecrets[key] = value;
+        }
       }
     }
 
+    // Enforce allFieldsRequired for catalog entries (e.g., Slack needs both tokens)
     for (const entry of SECRET_CATALOG) {
       if (!entry.allFieldsRequired) continue;
       const fieldValues = entry.fields.map(f => currentSecrets[f.key]);
@@ -590,6 +628,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
     }
 
+    // Enforce custom secret count limit
+    const customCount = Object.keys(customSecrets).length;
+    if (customCount > MAX_CUSTOM_SECRETS) {
+      const err = new Error(
+        `Custom secret limit exceeded: ${customCount} secrets (max ${MAX_CUSTOM_SECRETS})`
+      );
+      (err as Error & { status: number }).status = 400;
+      throw err;
+    }
+
+    // Backward compat: write channel secrets to legacy channels field
     const channelKeys = new Set(
       SECRET_CATALOG.filter(e => e.category === 'channel').flatMap(e => e.fields.map(f => f.key))
     );
@@ -603,6 +652,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const hasChannels = Object.keys(channelsSubset).length > 0;
     this.s.channels = hasChannels ? (channelsSubset as PersistedState['channels']) : null;
 
+    // Build cleaned catalog secrets (non-null only)
     const cleanedSecrets: Record<string, EncryptedEnvelope> = {};
     for (const [key, value] of Object.entries(currentSecrets)) {
       if (value) {
@@ -614,7 +664,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       ALL_SECRET_FIELD_KEYS.has(k)
     );
 
-    const remappedSecrets: Record<string, EncryptedEnvelope> = { ...nonCatalogSecrets };
+    // Merge catalog secrets (remapped to env var names) with custom secrets
+    const remappedSecrets: Record<string, EncryptedEnvelope> = { ...customSecrets };
     for (const [key, value] of Object.entries(cleanedSecrets)) {
       const envName = FIELD_KEY_TO_ENV_VAR.get(key) ?? key;
       remappedSecrets[envName] = value;
@@ -622,9 +673,41 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const hasSecrets = Object.keys(remappedSecrets).length > 0;
     this.s.encryptedSecrets = hasSecrets ? remappedSecrets : null;
 
+    // Update custom secret metadata (config paths, etc.)
+    // Always clean up metadata for deleted secrets, even without a meta param.
+    const currentMeta = { ...(this.s.customSecretMeta ?? {}) };
+    for (const [key, value] of Object.entries(patch)) {
+      if (ALL_SECRET_FIELD_KEYS.has(key)) continue;
+      if (value === null) {
+        delete currentMeta[key];
+      }
+    }
+    // Set/update metadata for any keys provided in meta
+    if (meta) {
+      for (const [key, metaValue] of Object.entries(meta)) {
+        if (ALL_SECRET_FIELD_KEYS.has(key)) continue;
+        // Reject duplicate config paths — no two secrets may target the same path
+        if (metaValue.configPath) {
+          for (const [existingKey, existingMeta] of Object.entries(currentMeta)) {
+            if (existingKey !== key && existingMeta.configPath === metaValue.configPath) {
+              const err = new Error(
+                `Config path "${metaValue.configPath}" is already used by secret "${existingKey}"`
+              );
+              (err as Error & { status: number }).status = 400;
+              throw err;
+            }
+          }
+        }
+        currentMeta[key] = metaValue;
+      }
+    }
+    const hasMeta = Object.keys(currentMeta).length > 0;
+    this.s.customSecretMeta = hasMeta ? currentMeta : null;
+
     await this.ctx.storage.put({
       channels: this.s.channels,
       encryptedSecrets: this.s.encryptedSecrets,
+      customSecretMeta: this.s.customSecretMeta,
     });
 
     return { configured };
@@ -756,6 +839,23 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async runDoctor() {
     await this.loadState();
     return pairing.runDoctor(this.s, this.env);
+  }
+
+  // ── Kilo CLI Run ────────────────────────────────────────────────────
+
+  async startKiloCliRun(prompt: string) {
+    await this.loadState();
+    return kiloCliRun.startKiloCliRun(this.s, this.env, prompt);
+  }
+
+  async getKiloCliRunStatus() {
+    await this.loadState();
+    return kiloCliRun.getKiloCliRunStatus(this.s, this.env);
+  }
+
+  async cancelKiloCliRun() {
+    await this.loadState();
+    return kiloCliRun.cancelKiloCliRun(this.s, this.env);
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────
@@ -964,6 +1064,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         statusCode: code,
         region: this.s.flyRegion ?? 'unknown',
       });
+
+      // Evict the current region from KV so future provisions avoid it.
+      // Only on 403 (org quota exceeded) — 409 (host memory) is transient.
+      // createVolumeWithFallback already evicts on volume-creation failures,
+      // but machine-creation 403s bypass that path.
+      if (code === 403 && this.s.flyRegion) {
+        await evictCapacityRegionFromKV(this.env.KV_CLAW_CACHE, this.env, this.s.flyRegion);
+      }
+
       await flyMachines.replaceStrandedVolume(
         flyConfig,
         this.ctx,
@@ -1216,6 +1325,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async getStatus(): Promise<{
     userId: string | null;
     sandboxId: string | null;
+    orgId: string | null;
     status: InstanceStatus | null;
     provisionedAt: number | null;
     lastStartedAt: number | null;
@@ -1252,6 +1362,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return {
       userId: this.s.userId,
       sandboxId: this.s.sandboxId,
+      orgId: this.s.orgId,
       status: this.s.status,
       provisionedAt: this.s.provisionedAt,
       lastStartedAt: this.s.lastStartedAt,
@@ -1312,6 +1423,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async getDebugState(): Promise<{
     userId: string | null;
     sandboxId: string | null;
+    orgId: string | null;
     status: InstanceStatus | null;
     provisionedAt: number | null;
     lastStartedAt: number | null;
@@ -1355,6 +1467,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return {
       userId: this.s.userId,
       sandboxId: this.s.sandboxId,
+      orgId: this.s.orgId,
       status: this.s.status,
       provisionedAt: this.s.provisionedAt,
       lastStartedAt: this.s.lastStartedAt,
@@ -1406,6 +1519,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       kilocodeDefaultModel: this.s.kilocodeDefaultModel ?? undefined,
       channels: this.s.channels ?? undefined,
       machineSize: this.s.machineSize ?? undefined,
+      customSecretMeta: this.s.customSecretMeta ?? undefined,
     };
   }
 

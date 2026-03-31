@@ -16,7 +16,12 @@ import {
   Unlock,
   Check,
 } from 'lucide-react';
+import { startOfDay, subDays } from 'date-fns';
 import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
+import { SetPageTitle } from '@/components/SetPageTitle';
+import { Badge } from '@/components/ui/badge';
+import { MobileSidebarToggle } from './MobileSidebarToggle';
+import { MobileToolbarPopover } from './MobileToolbarPopover';
 
 import { useProfile, useProfiles, useCombinedProfiles } from '@/hooks/useCloudAgentProfiles';
 import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
@@ -127,6 +132,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const [model, setModel] = useState<string>('');
   const [variant, setVariant] = useState<string | undefined>(undefined);
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
+  const [isRepoUserSelected, setIsRepoUserSelected] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
 
   // ---------------------------------------------------------------------------
@@ -291,9 +297,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         })
   );
 
+  const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 5)).toISOString(), []);
   const { data: recentRepoData } = useQuery(
     trpc.unifiedSessions.recentRepositories.queryOptions({
       organizationId: organizationId ?? null,
+      updatedSince: repoUpdatedSince,
     })
   );
 
@@ -340,8 +348,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const hasMultiplePlatforms = githubRepositories.length > 0 && gitlabRepositories.length > 0;
 
   const handleRepoSelect = useCallback(
-    (repoFullName: string) => {
+    (repoFullName: string, userInitiated = true) => {
       setSelectedRepo(repoFullName);
+      if (userInitiated) setIsRepoUserSelected(true);
       const repo = unifiedRepositories.find(r => r.fullName === repoFullName);
       if (repo?.platform) {
         setSelectedPlatform(repo.platform);
@@ -351,10 +360,20 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   );
 
   // ---------------------------------------------------------------------------
+  // Auto-select repo from last session (most recently used)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (selectedRepo || isRepoUserSelected || recentRepos.length === 0) return;
+    const firstRecent = recentRepos[0];
+    if (!firstRecent) return;
+    handleRepoSelect(firstRecent.fullName, false);
+  }, [recentRepos, selectedRepo, isRepoUserSelected, handleRepoSelect]);
+
+  // ---------------------------------------------------------------------------
   // Auto-select repo from pasted GitHub/GitLab URLs
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (selectedRepo) return;
+    if (isRepoUserSelected) return;
 
     for (const url of findAllGitPlatformUrls(prompt)) {
       const repoName = extractRepoFromGitUrl(url);
@@ -372,7 +391,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       }
       break;
     }
-  }, [prompt, selectedRepo, unifiedRepositories]);
+  }, [prompt, isRepoUserSelected, unifiedRepositories]);
 
   const repoError = githubRepoError || gitlabRepoError;
 
@@ -485,14 +504,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   // Submit
   // ---------------------------------------------------------------------------
   const isFormValid =
-    prompt.trim().length > 0 &&
-    selectedRepo.length > 0 &&
-    model.length > 0 &&
-    !isPreparing &&
-    !hasInsufficientBalance;
+    prompt.trim().length > 0 && model.length > 0 && !isPreparing && !hasInsufficientBalance;
 
   const handleStartSession = useCallback(async () => {
-    if (!prompt.trim() || !selectedRepo) {
+    if (!prompt.trim()) return;
+    if (!selectedRepo) {
+      toast.error('Please select a repository');
       return;
     }
 
@@ -581,7 +598,10 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
-    ta.style.height = `${ta.scrollHeight}px`;
+    // Cap at 50% of dynamic viewport height so the textarea never outgrows the
+    // screen — `dvh` accounts for mobile virtual keyboards.
+    const maxHeight = window.innerHeight * 0.5;
+    ta.style.height = `${Math.min(ta.scrollHeight, maxHeight)}px`;
   }, []);
 
   const handlePromptChange = useCallback(
@@ -617,7 +637,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       'Connect a GitHub or GitLab integration to select a repository for the cloud agent.';
 
     return (
-      <div className="flex h-full flex-col items-center justify-end p-4 pb-8">
+      <div className="relative flex h-full flex-col items-center justify-end p-4 pb-8">
+        <SetPageTitle title="Cloud Agent">
+          <Badge variant="new">new</Badge>
+        </SetPageTitle>
+        <MobileSidebarToggle />
         <div className="w-full max-w-2xl rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-6">
           <div className="mb-3 flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-amber-400" />
@@ -641,8 +665,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <div className="flex h-full flex-col items-center px-4">
-      <div className="flex-1" />
+    <div className="relative flex h-full flex-col items-center px-4 pt-16">
+      <SetPageTitle title="Cloud Agent">
+        <Badge variant="new">new</Badge>
+      </SetPageTitle>
+      <MobileSidebarToggle />
       <div className="w-full max-w-2xl space-y-4">
         {/* Insufficient balance banner */}
         {hasInsufficientBalance && eligibilityData && (
@@ -662,7 +689,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         >
           <textarea
             ref={textareaRef}
-            className="w-full resize-none border-0 bg-transparent p-4 pb-2 text-sm focus:ring-0 focus:outline-none"
+            className="max-h-[50dvh] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-sm focus:ring-0 focus:outline-none"
             placeholder="What would you like to do?"
             rows={5}
             value={prompt}
@@ -670,39 +697,64 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             onKeyDown={handleKeyDown}
             disabled={isPreparing}
           />
-          <div className="flex items-center gap-2 px-3 py-1.5">
-            {/* Mode → Model → Variant */}
-            <ModeCombobox<AgentMode>
-              value={mode}
-              onValueChange={setMode}
-              options={NEXT_MODE_OPTIONS}
-              variant="compact"
-              disabled={isPreparing}
-            />
-            <ModelCombobox
-              models={modelOptions}
-              value={model}
-              onValueChange={newModel => {
+          <div className="flex min-w-0 items-center gap-2 px-3 py-1.5">
+            {/* Mobile: single trigger that opens Mode + Model + Variant */}
+            <MobileToolbarPopover
+              mode={mode}
+              onModeChange={setMode}
+              model={model}
+              modelOptions={modelOptions}
+              onModelChange={newModel => {
                 setModel(newModel);
                 setIsModelUserSelected(true);
-                // Reset variant to first available (typically "none") if current is invalid for new model
                 const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
                 if (!variant || !newVariants.includes(variant)) {
                   setVariant(newVariants[0]);
                 }
               }}
-              isLoading={!modelsData}
-              variant="compact"
+              isLoadingModels={!modelsData}
+              variant={variant}
+              availableVariants={availableVariants}
+              onVariantChange={setVariant}
               disabled={isPreparing}
+              className="md:hidden"
             />
-            {availableVariants.length > 0 && (
-              <VariantCombobox
-                variants={availableVariants}
-                value={variant}
-                onValueChange={setVariant}
+            {/* Desktop: individual pickers */}
+            <div className="hidden md:contents">
+              <ModeCombobox<AgentMode>
+                value={mode}
+                onValueChange={setMode}
+                options={NEXT_MODE_OPTIONS}
+                variant="compact"
                 disabled={isPreparing}
+                className="min-w-0"
               />
-            )}
+              <ModelCombobox
+                models={modelOptions}
+                value={model}
+                onValueChange={newModel => {
+                  setModel(newModel);
+                  setIsModelUserSelected(true);
+                  const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
+                  if (!variant || !newVariants.includes(variant)) {
+                    setVariant(newVariants[0]);
+                  }
+                }}
+                isLoading={!modelsData}
+                variant="compact"
+                disabled={isPreparing}
+                className="min-w-0"
+              />
+              {availableVariants.length > 0 && (
+                <VariantCombobox
+                  variants={availableVariants}
+                  value={variant}
+                  onValueChange={setVariant}
+                  disabled={isPreparing}
+                  className="min-w-0"
+                />
+              )}
+            </div>
 
             <div className="flex-1" />
 
@@ -728,7 +780,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               <button
                 type="button"
                 className={cn(
-                  'text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm',
+                  'text-muted-foreground hover:text-foreground inline-flex cursor-pointer items-center gap-1 text-sm',
                   selectedRepo && 'text-foreground'
                 )}
                 disabled={isPreparing}
@@ -737,7 +789,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                 <span className="max-w-[16rem] truncate">{selectedRepo || 'Repository'}</span>
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-0" align="start">
+            <PopoverContent className="w-[min(20rem,calc(100vw-2rem))] p-0" align="start">
               {isLoadingRepos ? (
                 <div className="text-muted-foreground p-4 text-center text-sm">
                   Loading repositories...
@@ -848,7 +900,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                 Settings
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-[28rem] p-0" align="end" side="bottom" sideOffset={8}>
+            <PopoverContent
+              className="w-[min(28rem,calc(100vw-2rem))] p-0"
+              align="end"
+              side="bottom"
+              sideOffset={8}
+            >
               <div className="px-4 py-3">
                 <p className="text-sm font-medium">Advanced settings</p>
               </div>
@@ -870,7 +927,6 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
           </Popover>
         </div>
       </div>
-      <div className="flex-[1.5]" />
     </div>
   );
 }

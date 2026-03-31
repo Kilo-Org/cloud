@@ -6,13 +6,17 @@ import {
   applyFeatureFlags,
   generateHooksToken,
   configureGitHub,
+  configureLinear,
   runOnboardOrDoctor,
-  updateToolsMdKiloCliSection,
-  updateToolsMd1PasswordSection,
+  updateToolsMdSection,
+  GOG_SECTION_CONFIG,
+  KILO_CLI_SECTION_CONFIG,
+  OP_SECTION_CONFIG,
+  LINEAR_SECTION_CONFIG,
   buildGatewayArgs,
   bootstrap,
 } from './bootstrap';
-import type { BootstrapDeps } from './bootstrap';
+import type { BootstrapDeps, ToolsMdSectionConfig } from './bootstrap';
 
 // ---- Encryption helpers (mirrors kiloclaw/src/utils/env-encryption.ts) ----
 
@@ -277,6 +281,26 @@ describe('setupDirectories', () => {
     expect(env.INVOCATION_ID).toBe('1');
     expect(env.GOG_KEYRING_PASSWORD).toBe('kiloclaw');
   });
+
+  it('derives KILO_API_URL from KILOCODE_API_BASE_URL origin', () => {
+    const { deps } = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      KILOCODE_API_BASE_URL: 'https://api.example.com/v1',
+    };
+
+    setupDirectories(env, deps);
+
+    expect(env.KILO_API_URL).toBe('https://api.example.com');
+  });
+
+  it('does not set KILO_API_URL when KILOCODE_API_BASE_URL is absent', () => {
+    const { deps } = fakeDeps();
+    const env: Record<string, string | undefined> = {};
+
+    setupDirectories(env, deps);
+
+    expect(env.KILO_API_URL).toBeUndefined();
+  });
 });
 
 // ---- applyFeatureFlags ----
@@ -487,6 +511,47 @@ describe('configureGitHub', () => {
   });
 });
 
+// ---- configureLinear ----
+
+describe('configureLinear', () => {
+  it('logs configured when LINEAR_API_KEY is set', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const env: Record<string, string | undefined> = {
+      LINEAR_API_KEY: 'lin_api_test123',
+    };
+
+    configureLinear(env);
+
+    expect(env.LINEAR_API_KEY).toBe('lin_api_test123');
+    expect(logSpy).toHaveBeenCalledWith('Linear MCP configured via LINEAR_API_KEY');
+    logSpy.mockRestore();
+  });
+
+  it('cleans up empty LINEAR_API_KEY and logs not configured', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const env: Record<string, string | undefined> = {
+      LINEAR_API_KEY: '',
+    };
+
+    configureLinear(env);
+
+    expect(env.LINEAR_API_KEY).toBeUndefined();
+    expect(logSpy).toHaveBeenCalledWith('Linear: not configured');
+    logSpy.mockRestore();
+  });
+
+  it('logs not configured when LINEAR_API_KEY is absent', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const env: Record<string, string | undefined> = {};
+
+    configureLinear(env);
+
+    expect(env.LINEAR_API_KEY).toBeUndefined();
+    expect(logSpy).toHaveBeenCalledWith('Linear: not configured');
+    logSpy.mockRestore();
+  });
+});
+
 // ---- runOnboardOrDoctor ----
 
 describe('runOnboardOrDoctor', () => {
@@ -569,32 +634,56 @@ describe('runOnboardOrDoctor', () => {
   });
 });
 
-// ---- updateToolsMdKiloCliSection ----
+// ---- updateToolsMdSection ----
 
-describe('updateToolsMdKiloCliSection', () => {
-  it('adds Kilo CLI section unconditionally', () => {
+describe('updateToolsMdSection', () => {
+  const testConfig: ToolsMdSectionConfig = {
+    name: 'Test',
+    beginMarker: '<!-- BEGIN:test -->',
+    endMarker: '<!-- END:test -->',
+    section: '\n<!-- BEGIN:test -->\n## Test Section\n<!-- END:test -->',
+  };
+
+  it('appends section when enabled and not present', () => {
     const harness = fakeDeps();
     (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('# TOOLS\n');
 
-    const env: Record<string, string | undefined> = {};
-
-    updateToolsMdKiloCliSection(env, harness.deps);
+    updateToolsMdSection(true, testConfig, harness.deps);
 
     expect(harness.writeCalls).toHaveLength(1);
-    expect(harness.writeCalls[0]!.data).toContain('<!-- BEGIN:kilo-cli -->');
-    expect(harness.writeCalls[0]!.data).toContain('kilo run --auto');
-    expect(harness.writeCalls[0]!.data).toContain('<!-- END:kilo-cli -->');
+    expect(harness.writeCalls[0]!.data).toContain('<!-- BEGIN:test -->');
+    expect(harness.writeCalls[0]!.data).toContain('## Test Section');
+    expect(harness.writeCalls[0]!.data).toContain('<!-- END:test -->');
   });
 
   it('skips adding when section already present', () => {
     const harness = fakeDeps();
     (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
-      '# TOOLS\n<!-- BEGIN:kilo-cli -->\nexisting\n<!-- END:kilo-cli -->'
+      '# TOOLS\n<!-- BEGIN:test -->\nexisting\n<!-- END:test -->'
     );
 
-    const env: Record<string, string | undefined> = {};
+    updateToolsMdSection(true, testConfig, harness.deps);
 
-    updateToolsMdKiloCliSection(env, harness.deps);
+    expect(harness.writeCalls).toHaveLength(0);
+  });
+
+  it('removes stale section when disabled', () => {
+    const harness = fakeDeps();
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      '# TOOLS\n<!-- BEGIN:test -->\nold section\n<!-- END:test -->\n'
+    );
+
+    updateToolsMdSection(false, testConfig, harness.deps);
+
+    expect(harness.writeCalls).toHaveLength(1);
+    expect(harness.writeCalls[0]!.data).not.toContain('<!-- BEGIN:test -->');
+  });
+
+  it('no-ops when disabled and no stale section exists', () => {
+    const harness = fakeDeps();
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('# TOOLS\n');
+
+    updateToolsMdSection(false, testConfig, harness.deps);
 
     expect(harness.writeCalls).toHaveLength(0);
   });
@@ -603,85 +692,48 @@ describe('updateToolsMdKiloCliSection', () => {
     const harness = fakeDeps();
     (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
-    const env: Record<string, string | undefined> = {};
-
-    updateToolsMdKiloCliSection(env, harness.deps);
+    updateToolsMdSection(true, testConfig, harness.deps);
 
     expect(harness.writeCalls).toHaveLength(0);
+  });
+
+  it('warns when BEGIN marker found but END marker missing', () => {
+    const harness = fakeDeps();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const brokenConfig: ToolsMdSectionConfig = {
+      ...testConfig,
+      endMarker: '<!-- END:nonexistent -->',
+    };
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      '# TOOLS\n<!-- BEGIN:test -->\norphaned section\n'
+    );
+
+    updateToolsMdSection(false, brokenConfig, harness.deps);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('BEGIN marker found but END marker missing')
+    );
+    expect(harness.writeCalls).toHaveLength(0);
+    warnSpy.mockRestore();
   });
 });
 
-// ---- updateToolsMd1PasswordSection ----
+// ---- section config correctness ----
 
-describe('updateToolsMd1PasswordSection', () => {
-  it('adds 1Password section when OP_SERVICE_ACCOUNT_TOKEN is set', () => {
-    const harness = fakeDeps();
-    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('# TOOLS\n');
+describe('TOOLS.md section configs', () => {
+  const configs: ToolsMdSectionConfig[] = [
+    GOG_SECTION_CONFIG,
+    KILO_CLI_SECTION_CONFIG,
+    OP_SECTION_CONFIG,
+    LINEAR_SECTION_CONFIG,
+  ];
 
-    const env: Record<string, string | undefined> = {
-      OP_SERVICE_ACCOUNT_TOKEN: 'ops_test123',
-    };
-
-    updateToolsMd1PasswordSection(env, harness.deps);
-
-    expect(harness.writeCalls).toHaveLength(1);
-    expect(harness.writeCalls[0]!.data).toContain('<!-- BEGIN:1password -->');
-    expect(harness.writeCalls[0]!.data).toContain('op vault list');
-    expect(harness.writeCalls[0]!.data).toContain('<!-- END:1password -->');
-  });
-
-  it('skips adding when section already present', () => {
-    const harness = fakeDeps();
-    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
-      '# TOOLS\n<!-- BEGIN:1password -->\nexisting\n<!-- END:1password -->'
-    );
-
-    const env: Record<string, string | undefined> = {
-      OP_SERVICE_ACCOUNT_TOKEN: 'ops_test123',
-    };
-
-    updateToolsMd1PasswordSection(env, harness.deps);
-
-    expect(harness.writeCalls).toHaveLength(0);
-  });
-
-  it('removes stale section when token is absent', () => {
-    const harness = fakeDeps();
-    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
-      '# TOOLS\n<!-- BEGIN:1password -->\nold section\n<!-- END:1password -->\n'
-    );
-
-    const env: Record<string, string | undefined> = {};
-
-    updateToolsMd1PasswordSection(env, harness.deps);
-
-    expect(harness.writeCalls).toHaveLength(1);
-    expect(harness.writeCalls[0]!.data).not.toContain('<!-- BEGIN:1password -->');
-  });
-
-  it('no-ops when TOOLS.md does not exist', () => {
-    const harness = fakeDeps();
-    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
-
-    const env: Record<string, string | undefined> = {
-      OP_SERVICE_ACCOUNT_TOKEN: 'ops_test123',
-    };
-
-    updateToolsMd1PasswordSection(env, harness.deps);
-
-    expect(harness.writeCalls).toHaveLength(0);
-  });
-
-  it('no-ops when token absent and no stale section exists', () => {
-    const harness = fakeDeps();
-    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('# TOOLS\n');
-
-    const env: Record<string, string | undefined> = {};
-
-    updateToolsMd1PasswordSection(env, harness.deps);
-
-    expect(harness.writeCalls).toHaveLength(0);
-  });
+  for (const config of configs) {
+    it(`${config.name}: section contains both markers`, () => {
+      expect(config.section).toContain(config.beginMarker);
+      expect(config.section).toContain(config.endMarker);
+    });
+  }
 });
 
 // ---- buildGatewayArgs ----
@@ -743,7 +795,14 @@ describe('bootstrap', () => {
 
     await bootstrap(env, phase => phases.push(phase), harness.deps);
 
-    expect(phases).toEqual(['decrypting', 'directories', 'feature-flags', 'github', 'onboard']);
+    expect(phases).toEqual([
+      'decrypting',
+      'directories',
+      'feature-flags',
+      'github',
+      'linear',
+      'onboard',
+    ]);
   });
 
   it('reports doctor phase when config exists', async () => {

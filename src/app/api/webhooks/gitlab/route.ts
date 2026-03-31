@@ -9,6 +9,7 @@ import { PLATFORM, GITLAB_EVENT, GITLAB_ACTION } from '@/lib/integrations/core/c
 import { logExceptInTest } from '@/lib/utils.server';
 import { logWebhookEvent, updateWebhookEvent } from '@/lib/integrations/db/webhook-events';
 import type { Owner } from '@/lib/integrations/core/types';
+import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
 
 /**
  * GitLab Webhook Handler
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
     // 5. Get event type from header
     const eventType = request.headers.get('x-gitlab-event') || '';
     const eventSignature = request.headers.get('x-gitlab-event-uuid') || `gitlab-${Date.now()}`;
-    const headers = Object.fromEntries(request.headers);
+    const headers = redactSensitiveHeaders(Object.fromEntries(request.headers));
 
     if (!eventType) {
       return NextResponse.json({ error: 'Missing X-Gitlab-Event header' }, { status: 400 });

@@ -148,6 +148,14 @@ export const KiloClawSubscriptionStatus = {
 export type KiloClawSubscriptionStatus =
   (typeof KiloClawSubscriptionStatus)[keyof typeof KiloClawSubscriptionStatus];
 
+export const KiloClawPaymentSource = {
+  Stripe: 'stripe',
+  Credits: 'credits',
+} as const;
+
+export type KiloClawPaymentSource =
+  (typeof KiloClawPaymentSource)[keyof typeof KiloClawPaymentSource];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.reassociate',
@@ -820,15 +828,15 @@ export const VerbositySchema = z.enum(['low', 'medium', 'high', 'max']);
 
 export type Verbosity = z.infer<typeof VerbositySchema>;
 
-export const ReasoningEffortSchema = z.enum(['none', 'low', 'medium', 'high', 'xhigh']);
+export const ReasoningEffortSchema = z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
 
 export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
 
 export const CustomLlmProviderSchema = z.enum([
-  'anthropic',
-  'openai',
-  'openai-compatible',
-  'openrouter',
+  'anthropic', // uses Messages API
+  'openai', // uses Responses API
+  'openai-compatible', // uses Chat Completions API with reasoning_content
+  'openrouter', // uses Chat Completions API with reasoning_details
 ]);
 
 export type CustomLlmProvider = z.infer<typeof CustomLlmProviderSchema>;

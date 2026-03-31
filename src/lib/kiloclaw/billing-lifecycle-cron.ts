@@ -1,22 +1,34 @@
 import 'server-only';
 
-import { and, eq, lt, lte, gte, isNull, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, lt, lte, gte, isNull, isNotNull, inArray, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
+import { addMonths, format } from 'date-fns';
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type * as schema from '@kilocode/db/schema';
 import {
+  credit_transactions,
   kiloclaw_subscriptions,
   kiloclaw_instances,
   kiloclaw_email_log,
   kiloclaw_earlybird_purchases,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { format } from 'date-fns';
+import type {
+  KiloClawPlan,
+  KiloClawSubscriptionStatus,
+  KiloClawScheduledPlan,
+} from '@kilocode/db/schema-types';
 import type { TemplateName } from '@/lib/email';
 import { send as sendEmail } from '@/lib/email';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
-import { ensureAutoIntroSchedule } from '@/lib/kiloclaw/stripe-handlers';
+import { autoResumeIfSuspended, ensureAutoIntroSchedule } from '@/lib/kiloclaw/stripe-handlers';
+import {
+  KILOCLAW_PLAN_COST_MICRODOLLARS,
+  projectPendingKiloPassBonusMicrodollars,
+} from '@/lib/kiloclaw/credit-billing';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
+import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
 import { isIntroPriceId } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { client as stripe } from '@/lib/stripe-client';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
@@ -24,6 +36,7 @@ import { NEXTAUTH_URL, KILOCLAW_BILLING_ENFORCEMENT } from '@/lib/config.server'
 import { sentryLogger } from '@/lib/utils.server';
 
 const logInfo = sentryLogger('kiloclaw-billing-cron', 'info');
+const logWarning = sentryLogger('kiloclaw-billing-cron', 'warning');
 const logError = sentryLogger('kiloclaw-billing-cron', 'error');
 
 const MS_PER_DAY = 86_400_000;
@@ -38,6 +51,12 @@ function formatDateForEmail(d: Date): string {
 }
 
 type CronSummary = {
+  credit_renewals: number;
+  credit_renewals_canceled: number;
+  credit_renewals_past_due: number;
+  credit_renewals_auto_top_up: number;
+  credit_renewals_skipped_duplicate: number;
+  interrupted_auto_resumes: number;
   trial_warnings: number;
   earlybird_warnings: number;
   sweep1_trial_expiry: number;
@@ -108,11 +127,11 @@ async function trySendEmail(
           and(eq(kiloclaw_email_log.user_id, userId), eq(kiloclaw_email_log.email_type, emailType))
         );
     } catch (deleteError) {
-      console.error(
-        '[billing-cron] Failed to remove email log row after send failure:',
-        deleteError,
-        { userId, emailType }
-      );
+      logWarning('Failed to remove email log row after send failure — email may not retry', {
+        user_id: userId,
+        emailType,
+        error: deleteError instanceof Error ? deleteError.message : String(deleteError),
+      });
     }
     throw error;
   }
@@ -120,10 +139,300 @@ async function trySendEmail(
   return true;
 }
 
+type CreditRenewalRow = {
+  user_id: string;
+  email: string;
+  instance_id: string | null;
+  plan: KiloClawPlan;
+  status: KiloClawSubscriptionStatus;
+  credit_renewal_at: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  scheduled_plan: KiloClawScheduledPlan | null;
+  commit_ends_at: string | null;
+  past_due_since: string | null;
+  suspended_at: string | null;
+  auto_top_up_triggered_for_period: string | null;
+  total_microdollars_acquired: number;
+  microdollars_used: number;
+  auto_top_up_enabled: boolean;
+  kilo_pass_threshold: number | null;
+  next_credit_expiration_at: string | null;
+  user_updated_at: string;
+};
+
+/**
+ * Process a single pure-credit subscription renewal.
+ * Implements Credit Renewal rules 2-15.
+ */
+async function processCreditRenewalRow(
+  database: PostgresJsDatabase<typeof schema>,
+  row: CreditRenewalRow,
+  clawUrl: string,
+  summary: CronSummary
+): Promise<void> {
+  const { user_id: userId, credit_renewal_at: renewalAt } = row;
+  if (!renewalAt) return;
+
+  // Scope all subscription mutations to the specific instance row when available.
+  // Legacy rows without instance_id fall back to user-scoped matching.
+  const subscriptionWhere = row.instance_id
+    ? and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        eq(kiloclaw_subscriptions.instance_id, row.instance_id)
+      )
+    : eq(kiloclaw_subscriptions.user_id, userId);
+
+  // Rule 5: Cancel-at-period-end — skip deduction, set status to canceled.
+  if (row.cancel_at_period_end) {
+    await database
+      .update(kiloclaw_subscriptions)
+      .set({
+        status: 'canceled',
+        cancel_at_period_end: false,
+        auto_top_up_triggered_for_period: null,
+      })
+      .where(subscriptionWhere);
+    summary.credit_renewals_canceled++;
+    logInfo('Credit renewal: canceled at period end', { user_id: userId });
+    return;
+  }
+
+  // Rule 15: Determine effective plan (apply scheduled plan switch at period boundary).
+  const effectivePlan =
+    row.scheduled_plan === 'commit' || row.scheduled_plan === 'standard'
+      ? row.scheduled_plan
+      : row.plan;
+  if (effectivePlan !== 'commit' && effectivePlan !== 'standard') {
+    logError('Credit renewal: unexpected plan', { user_id: userId, plan: effectivePlan });
+    return;
+  }
+  const applyingPlanSwitch = row.scheduled_plan !== null && row.scheduled_plan !== row.plan;
+  const costMicrodollars = KILOCLAW_PLAN_COST_MICRODOLLARS[effectivePlan];
+  const periodMonths = effectivePlan === 'commit' ? 6 : 1;
+
+  // Compute effective balance (Credit Enrollment rule 3, referenced by Credit Renewal rule 6).
+  // The deduction increments microdollars_used, so project the post-deduction
+  // value to correctly evaluate whether the spend crosses the bonus threshold.
+  const rawBalance = row.total_microdollars_acquired - row.microdollars_used;
+  const projectedBonus = await projectPendingKiloPassBonusMicrodollars({
+    userId,
+    microdollarsUsed: row.microdollars_used + costMicrodollars,
+    kiloPassThreshold: row.kilo_pass_threshold,
+  });
+  const effectiveBalance = rawBalance + projectedBonus;
+
+  if (effectiveBalance >= costMicrodollars) {
+    // ── Sufficient balance: deduct and advance ──
+    // Rule 2: Idempotency key derived from credit_renewal_at, not wall clock.
+    const periodKey = format(new Date(renewalAt), 'yyyy-MM');
+    const instanceId = row.instance_id ?? 'unknown';
+    const categoryPrefix =
+      effectivePlan === 'commit'
+        ? `kiloclaw-subscription-commit:${instanceId}`
+        : `kiloclaw-subscription:${instanceId}`;
+    const deductionCategory = `${categoryPrefix}:${periodKey}`;
+
+    // Rule 3: Single transaction for deduction + period advancement.
+    const newPeriodStart = renewalAt;
+    const newPeriodEnd = addMonths(new Date(renewalAt), periodMonths).toISOString();
+    const wasPastDue = row.status === 'past_due';
+    let deductionIsNew = false;
+
+    await database.transaction(async tx => {
+      // Rule 2: Insert deduction with conflict-safe uniqueness.
+      const deductionResult = await tx
+        .insert(credit_transactions)
+        .values({
+          id: crypto.randomUUID(),
+          kilo_user_id: userId,
+          amount_microdollars: -costMicrodollars,
+          is_free: false,
+          description: `KiloClaw ${effectivePlan} renewal`,
+          credit_category: deductionCategory,
+          check_category_uniqueness: true,
+          original_baseline_microdollars_used: row.microdollars_used,
+        })
+        .onConflictDoNothing();
+
+      deductionIsNew = (deductionResult.rowCount ?? 0) > 0;
+
+      if (!deductionIsNew) {
+        // Rule 4: Duplicate key from prior committed transaction — skip.
+        return;
+      }
+
+      // Atomically increment microdollars_used so the deduction counts as
+      // spend toward the Kilo Pass bonus unlock threshold.
+      await tx
+        .update(kilocode_users)
+        .set({
+          microdollars_used: sql`${kilocode_users.microdollars_used} + ${costMicrodollars}`,
+        })
+        .where(eq(kilocode_users.id, userId));
+
+      // Build subscription update set.
+      const updateSet: Partial<typeof kiloclaw_subscriptions.$inferInsert> = {
+        current_period_start: newPeriodStart,
+        current_period_end: newPeriodEnd,
+        credit_renewal_at: newPeriodEnd,
+        auto_top_up_triggered_for_period: null,
+      };
+
+      // Rule 15: Apply plan switch inside the transaction.
+      if (applyingPlanSwitch) {
+        updateSet.plan = effectivePlan;
+        updateSet.scheduled_plan = null;
+        updateSet.scheduled_by = null;
+        if (effectivePlan === 'commit') {
+          updateSet.commit_ends_at = addMonths(new Date(newPeriodStart), 6).toISOString();
+        } else {
+          updateSet.commit_ends_at = null;
+        }
+      }
+
+      // Rule 7: Commit plan auto-renewal — extend commit boundary when reached.
+      if (
+        effectivePlan === 'commit' &&
+        !applyingPlanSwitch &&
+        row.commit_ends_at &&
+        new Date(row.commit_ends_at) <= new Date(newPeriodStart)
+      ) {
+        updateSet.commit_ends_at = addMonths(new Date(row.commit_ends_at), 6).toISOString();
+      }
+
+      // Rule 8: Clear past-due state on successful deduction.
+      if (wasPastDue) {
+        updateSet.status = 'active';
+        updateSet.past_due_since = null;
+      }
+
+      await tx.update(kiloclaw_subscriptions).set(updateSet).where(subscriptionWhere);
+    });
+
+    if (!deductionIsNew) {
+      summary.credit_renewals_skipped_duplicate++;
+      logInfo('Credit renewal: skipped duplicate deduction', {
+        user_id: userId,
+        deductionCategory,
+      });
+      return;
+    }
+
+    // Post-transaction side effects.
+
+    // Rule 6: Bonus credit evaluation (best-effort).
+    try {
+      await maybeIssueKiloPassBonusFromUsageThreshold({
+        kiloUserId: userId,
+        nowIso: new Date().toISOString(),
+      });
+    } catch (error) {
+      logError('Kilo Pass bonus evaluation failed after credit renewal', {
+        user_id: userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    // Rule 9: Grace-period recovery — delete credit-renewal-failed email.
+    if (wasPastDue && !row.suspended_at) {
+      await database
+        .delete(kiloclaw_email_log)
+        .where(
+          and(
+            eq(kiloclaw_email_log.user_id, userId),
+            eq(kiloclaw_email_log.email_type, 'claw_credit_renewal_failed')
+          )
+        );
+    }
+
+    // Rule 10: Suspended recovery — auto-resume instance.
+    if (wasPastDue && row.suspended_at) {
+      await autoResumeIfSuspended(userId, row.instance_id ?? undefined);
+    }
+
+    summary.credit_renewals++;
+    logInfo('Credit renewal: deduction succeeded', {
+      user_id: userId,
+      plan: effectivePlan,
+      costMicrodollars,
+      newPeriodEnd,
+      ...(applyingPlanSwitch ? { planSwitch: `${row.plan} → ${effectivePlan}` } : {}),
+    });
+  } else {
+    // ── Insufficient balance ──
+
+    // Rule 11: Check auto top-up before going past-due.
+    if (row.auto_top_up_enabled && !row.auto_top_up_triggered_for_period) {
+      // Persist marker BEFORE triggering (crash safety per spec rule 11).
+      await database
+        .update(kiloclaw_subscriptions)
+        .set({ auto_top_up_triggered_for_period: renewalAt })
+        .where(subscriptionWhere);
+
+      // Fire-and-skip: trigger auto top-up, then skip row.
+      // maybePerformAutoTopUp handles lock acquisition, invoice creation,
+      // and payment asynchronously via webhook.
+      try {
+        await maybePerformAutoTopUp({
+          id: userId,
+          total_microdollars_acquired: row.total_microdollars_acquired,
+          microdollars_used: row.microdollars_used,
+          auto_top_up_enabled: row.auto_top_up_enabled,
+          next_credit_expiration_at: row.next_credit_expiration_at,
+          updated_at: row.user_updated_at,
+        });
+      } catch (error) {
+        logError('Auto top-up trigger failed during credit renewal', {
+          user_id: userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      summary.credit_renewals_auto_top_up++;
+      logInfo('Credit renewal: auto top-up triggered, skipping row', { user_id: userId });
+      return;
+    }
+
+    // Rule 12: Set past-due status.
+    await database
+      .update(kiloclaw_subscriptions)
+      .set({
+        status: 'past_due',
+        past_due_since: sql`COALESCE(${kiloclaw_subscriptions.past_due_since}, now())`,
+      })
+      .where(subscriptionWhere);
+
+    // Rule 13: Send credit-renewal-failed notification.
+    await trySendEmail(
+      database,
+      userId,
+      row.email,
+      'claw_credit_renewal_failed',
+      'clawCreditRenewalFailed',
+      { claw_url: clawUrl },
+      summary
+    );
+
+    summary.credit_renewals_past_due++;
+    logInfo('Credit renewal: insufficient balance, set past-due', {
+      user_id: userId,
+      effectiveBalance,
+      costMicrodollars,
+    });
+  }
+}
+
 export async function runKiloClawBillingLifecycleCron(
   database: PostgresJsDatabase<typeof schema>
 ): Promise<CronSummary> {
   const summary: CronSummary = {
+    credit_renewals: 0,
+    credit_renewals_canceled: 0,
+    credit_renewals_past_due: 0,
+    credit_renewals_auto_top_up: 0,
+    credit_renewals_skipped_duplicate: 0,
+    interrupted_auto_resumes: 0,
     trial_warnings: 0,
     earlybird_warnings: 0,
     sweep1_trial_expiry: 0,
@@ -145,6 +454,89 @@ export async function runKiloClawBillingLifecycleCron(
   const now = new Date().toISOString();
   const client = new KiloClawInternalClient();
   const clawUrl = `${NEXTAUTH_URL}/claw`;
+
+  // ── Credit Renewal Sweep ────────────────────────────────────────────
+  // Runs before all other sweeps (spec Billing Lifecycle Background Job rule 4).
+  // Selects pure credit subscriptions where renewal is due. Hybrid rows
+  // are excluded — their renewal is owned by invoice settlement.
+  const creditRenewalRows = await database
+    .select({
+      user_id: kiloclaw_subscriptions.user_id,
+      email: kilocode_users.google_user_email,
+      instance_id: kiloclaw_subscriptions.instance_id,
+      plan: kiloclaw_subscriptions.plan,
+      status: kiloclaw_subscriptions.status,
+      credit_renewal_at: kiloclaw_subscriptions.credit_renewal_at,
+      current_period_end: kiloclaw_subscriptions.current_period_end,
+      cancel_at_period_end: kiloclaw_subscriptions.cancel_at_period_end,
+      scheduled_plan: kiloclaw_subscriptions.scheduled_plan,
+      commit_ends_at: kiloclaw_subscriptions.commit_ends_at,
+      past_due_since: kiloclaw_subscriptions.past_due_since,
+      suspended_at: kiloclaw_subscriptions.suspended_at,
+      auto_top_up_triggered_for_period: kiloclaw_subscriptions.auto_top_up_triggered_for_period,
+      total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
+      microdollars_used: kilocode_users.microdollars_used,
+      auto_top_up_enabled: kilocode_users.auto_top_up_enabled,
+      kilo_pass_threshold: kilocode_users.kilo_pass_threshold,
+      next_credit_expiration_at: kilocode_users.next_credit_expiration_at,
+      user_updated_at: kilocode_users.updated_at,
+    })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.payment_source, 'credits'),
+        isNull(kiloclaw_subscriptions.stripe_subscription_id),
+        inArray(kiloclaw_subscriptions.status, ['active', 'past_due']),
+        lte(kiloclaw_subscriptions.credit_renewal_at, now)
+      )
+    );
+
+  for (const row of creditRenewalRows) {
+    try {
+      await processCreditRenewalRow(database, row, clawUrl, summary);
+    } catch (error) {
+      summary.errors++;
+      captureException(error);
+      logError('Credit renewal sweep failed for user', {
+        user_id: row.user_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  // ── Interrupted Auto-Resume Retry ───────────────────────────────────
+  // Detects credit-funded subscriptions (hybrid + pure) in active status
+  // with a non-null suspension timestamp — indicates auto-resume was
+  // interrupted after payment recovery (spec rule 5).
+  const interruptedResumeRows = await database
+    .select({
+      user_id: kiloclaw_subscriptions.user_id,
+      instance_id: kiloclaw_subscriptions.instance_id,
+    })
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.payment_source, 'credits'),
+        eq(kiloclaw_subscriptions.status, 'active'),
+        isNotNull(kiloclaw_subscriptions.suspended_at)
+      )
+    );
+
+  for (const row of interruptedResumeRows) {
+    try {
+      await autoResumeIfSuspended(row.user_id, row.instance_id ?? undefined);
+      summary.interrupted_auto_resumes++;
+      logInfo('Retried interrupted auto-resume', { user_id: row.user_id });
+    } catch (error) {
+      summary.errors++;
+      captureException(error);
+      logError('Interrupted auto-resume retry failed', {
+        user_id: row.user_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   // ── Sweep 0a: Trial ending-soon warning ─────────────────────────────
   const trialWarningCutoff = new Date(Date.now() + TRIAL_WARNING_DAYS * MS_PER_DAY).toISOString();

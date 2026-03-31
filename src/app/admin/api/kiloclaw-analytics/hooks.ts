@@ -19,6 +19,11 @@ export type KiloclawEventRow = {
   value: number;
 };
 
+export type KiloclawAllEventRow = KiloclawEventRow & {
+  user_id: string;
+  sandbox_id: string;
+};
+
 type AnalyticsEngineResponse<T> = {
   data: T[];
   meta: { name: string; type: string }[];
@@ -39,5 +44,44 @@ export function useKiloclawInstanceEvents(sandboxId: string) {
     },
     enabled: !!sandboxId,
     refetchInterval: 60000,
+  });
+}
+
+type AllEventsParams = {
+  sandboxId: string;
+  userId: string;
+  flyAppName?: string | null;
+  flyMachineId?: string | null;
+  offset: number;
+};
+
+export function useKiloclawAllEvents(params: AllEventsParams) {
+  const { sandboxId, userId, flyAppName, flyMachineId, offset } = params;
+  return useQuery<AnalyticsEngineResponse<KiloclawAllEventRow>>({
+    queryKey: [
+      'kiloclaw-analytics',
+      'all-events',
+      sandboxId,
+      userId,
+      flyAppName,
+      flyMachineId,
+      offset,
+    ],
+    queryFn: async () => {
+      const searchParams = new URLSearchParams({
+        query: 'all-events',
+        sandboxId,
+        userId,
+        offset: String(offset),
+      });
+      if (flyAppName) searchParams.set('flyAppName', flyAppName);
+      if (flyMachineId) searchParams.set('flyMachineId', flyMachineId);
+      const response = await fetch(`/admin/api/kiloclaw-analytics?${searchParams.toString()}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch kiloclaw all events');
+      }
+      return response.json() as Promise<AnalyticsEngineResponse<KiloclawAllEventRow>>;
+    },
+    enabled: !!sandboxId && !!userId,
   });
 }

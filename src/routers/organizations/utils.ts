@@ -2,6 +2,7 @@ import type { Organization } from '@kilocode/db/schema';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { baseProcedure } from '@/lib/trpc/init';
 import type { TRPCContext } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
@@ -120,10 +121,28 @@ export const organizationMemberProcedure = baseProcedure
     }
   });
 
-// Custom procedure that ensures user has owner access to the organization
-export const organizationOwnerProcedure = baseProcedure
+// Member procedure that also enforces trial/subscription status on mutations
+export const organizationMemberMutationProcedure = baseProcedure
+  .input(OrganizationIdInputSchema)
+  .use(async ({ ctx, next, input }) => {
+    await ensureOrganizationAccess(ctx, input.organizationId);
+    await requireActiveSubscriptionOrTrial(input.organizationId);
+    return next();
+  });
+
+// Custom procedure that ensures user has owner or billing_manager access to the organization
+export const organizationBillingProcedure = baseProcedure
   .input(OrganizationIdInputSchema)
   .use(async ({ ctx, next, input }) => {
     await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
+    return next();
+  });
+
+// Owner or billing_manager procedure that also enforces trial/subscription status on mutations
+export const organizationBillingMutationProcedure = baseProcedure
+  .input(OrganizationIdInputSchema)
+  .use(async ({ ctx, next, input }) => {
+    await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
+    await requireActiveSubscriptionOrTrial(input.organizationId);
     return next();
   });

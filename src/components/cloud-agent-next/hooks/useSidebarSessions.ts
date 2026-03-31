@@ -16,6 +16,7 @@ import {
   type DbSession,
   type DbSessionV2,
 } from '../store/db-session-atoms';
+import { startOfDay, subDays } from 'date-fns';
 import { extractRepoFromGitUrl } from '../utils/git-utils';
 import type { StoredSession } from '../types';
 
@@ -75,7 +76,14 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
   const isSearchActive = searchQuery.length > 0;
 
   // --- List query (default, non-search) ---
-  const listInput = { limit: 10, organizationId, createdOnPlatform, gitUrl };
+  const updatedSince = useMemo(() => startOfDay(subDays(new Date(), 5)).toISOString(), []);
+  const listInput = {
+    updatedSince,
+    orderBy: 'updated_at' as const,
+    organizationId,
+    createdOnPlatform,
+    gitUrl,
+  };
   const listQueryKey = trpc.unifiedSessions.list.queryKey(listInput);
 
   const { data: listData, isLoading: isListLoading } = useQuery({

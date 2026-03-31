@@ -28,6 +28,7 @@ const config: Config = {
       '<rootDir>/src/tests/setup/__mocks__/lib/integrations/platforms/github/adapter.ts',
     '^@kilocode/db/(.*)$': '<rootDir>/packages/db/src/$1',
     '^@kilocode/db$': '<rootDir>/packages/db/src/index.ts',
+    '^@kilocode/worker-utils/(.*)$': '<rootDir>/packages/worker-utils/src/$1',
     '^@kilocode/worker-utils$': '<rootDir>/packages/worker-utils/src/index.ts',
     '^(\\.{1,2}/.+)\\.js$': '$1',
     '^@/(.*)$': '<rootDir>/src/$1',

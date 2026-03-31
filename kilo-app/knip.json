@@ -7,7 +7,8 @@
     "expo-system-ui",
     "postcss",
     "eslint-plugin-sonarjs",
-    "@sentry/cli"
+    "@sentry/cli",
+    "@react-native-community/netinfo"
   ],
   "ignoreBinaries": ["oxfmt", "oxlint"],
   "ignore": ["src/components/ui/**"],

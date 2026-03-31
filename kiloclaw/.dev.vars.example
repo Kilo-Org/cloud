@@ -39,8 +39,9 @@ FLY_API_TOKEN=fo1_...
 # Fly org slug. The dev-start script reads this value for token creation.
 # Use "kilo-dev" for Kilo team members, or "personal" for your own Fly account.
 FLY_ORG_SLUG=kilo-dev
-# Shared Docker image registry app (images are pushed here, referenced by all per-user apps)
-FLY_REGISTRY_APP=kiloclaw-dev
+# Shared Docker image registry app (images are pushed here, referenced by all per-user apps).
+# In production this is "kiloclaw-machines". For dev, use "kiloclaw-registry-dev".
+FLY_REGISTRY_APP=kiloclaw-registry-dev
 # Default region for new users. Comma-separated priority list of region codes or aliases.
 # Fly tries the first region, falls back to the next if unavailable.
 # Examples: "us,eu" (try US first, then Europe), "lhr,fra" (London first, then Frankfurt)

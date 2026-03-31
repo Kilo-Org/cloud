@@ -111,9 +111,13 @@ export function InviteMemberDialog({
   // Calculate remaining seats
   const usedSeats = seatUsage?.usedSeats || 0;
   const totalSeats = seatUsage?.totalSeats || 0;
-  const remainingSeats = totalSeats > 0 ? totalSeats - usedSeats : Infinity;
+  const remainingSeats = totalSeats - usedSeats;
   const isOrgEnterprise = organizationData?.plan === 'enterprise';
-  const hasSeatsAvailable = totalSeats === 0 || remainingSeats > 0 || isOrgEnterprise;
+  // Enterprise orgs have no seat-based invitation restrictions.
+  // For Teams orgs, seat capacity only gates seat-consuming roles (not billing_manager).
+  const seatCapacityAvailable = isOrgEnterprise || remainingSeats > 0;
+  const isSeatConsumingRole = role !== 'billing_manager';
+  const hasSeatsAvailable = seatCapacityAvailable || !isSeatConsumingRole;
 
   const handleInviteMember = () => {
     if (!email.trim()) {
@@ -219,7 +223,7 @@ export function InviteMemberDialog({
                         variant="outline"
                         size="sm"
                         className="flex h-10 items-center justify-between gap-2 px-3"
-                        disabled={inviteMemberMutation.isPending || !hasSeatsAvailable}
+                        disabled={inviteMemberMutation.isPending}
                       >
                         {ROLE_LABELS[role]}
                         <ChevronDown className="h-3 w-3" />
@@ -270,6 +274,15 @@ export function InviteMemberDialog({
                     {emailDomainMatchesSSODomain && ssoErrorText}
                   </p>
                 </div>
+              </div>
+            )}
+
+            {!seatCapacityAvailable && !isOrgEnterprise && (
+              <div className="rounded-md border border-amber-800 bg-amber-950/30 p-3">
+                <p className="text-sm text-amber-300">
+                  All seats are in use ({usedSeats}/{totalSeats}). You can still invite billing
+                  managers, who don&apos;t consume a seat.
+                </p>
               </div>
             )}
           </div>

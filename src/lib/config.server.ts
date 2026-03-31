@@ -1,10 +1,6 @@
 import { APP_URL } from '@/lib/constants';
 import { getEnvVariable } from '@/lib/dotenvx';
 import 'server-only';
-// centralized place to normalize and export environment variables
-// this file only works on the sever and is meant to be an easier
-// way to see what environment variables are used vs searching the full
-// codebase for process.env.*
 
 export const IS_IN_AUTOMATED_TEST = !!getEnvVariable('IS_IN_AUTOMATED_TEST');
 export const NEXTAUTH_URL = APP_URL;
@@ -28,6 +24,7 @@ export const NEXTAUTH_SECRET = getEnvVariable('NEXTAUTH_SECRET');
 export const OPENROUTER_API_KEY = getEnvVariable('OPENROUTER_API_KEY');
 export const MISTRAL_API_KEY = getEnvVariable('MISTRAL_API_KEY');
 export const OPENAI_API_KEY = getEnvVariable('OPENAI_API_KEY');
+export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
 export const CODE_REVIEW_WORKER_AUTH_TOKEN = getEnvVariable('CODE_REVIEW_WORKER_AUTH_TOKEN');
 
@@ -40,6 +37,15 @@ export const STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID = getEnvVariable(
 
 export const STRIPE_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID = getEnvVariable(
   'STRIPE_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID'
+);
+
+export const STRIPE_TEAMS_MONTHLY_PRICE_ID = getEnvVariable('STRIPE_TEAMS_MONTHLY_PRICE_ID');
+export const STRIPE_TEAMS_ANNUAL_PRICE_ID = getEnvVariable('STRIPE_TEAMS_ANNUAL_PRICE_ID');
+export const STRIPE_ENTERPRISE_MONTHLY_PRICE_ID = getEnvVariable(
+  'STRIPE_ENTERPRISE_MONTHLY_PRICE_ID'
+);
+export const STRIPE_ENTERPRISE_ANNUAL_PRICE_ID = getEnvVariable(
+  'STRIPE_ENTERPRISE_ANNUAL_PRICE_ID'
 );
 
 export const USER_DEPLOYMENTS_API_BASE_URL =

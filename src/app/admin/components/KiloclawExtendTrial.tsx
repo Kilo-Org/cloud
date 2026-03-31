@@ -728,7 +728,6 @@ export function KiloclawExtendTrial() {
                       <TableRow>
                         <TableHead>Email</TableHead>
                         <TableHead>Subscription</TableHead>
-                        <TableHead>Reason</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -743,9 +742,6 @@ export function KiloclawExtendTrial() {
                             <TableCell className="font-mono text-sm">{user.email}</TableCell>
                             <TableCell>
                               {subscriptionStatusBadge(user.subscriptionStatus)}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground text-xs">
-                              {ineligibleReason(user.subscriptionStatus)}
                             </TableCell>
                           </TableRow>
                         ))}

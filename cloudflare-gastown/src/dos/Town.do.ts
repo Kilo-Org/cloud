@@ -3765,9 +3765,20 @@ export class TownDO extends DurableObject<Env> {
     try {
       const container = getTownContainerStub(this.env, townId);
       const headers: Record<string, string> = {};
-      // When draining, pass the nonce and town ID so the container
-      // can call /container-ready even if it has no running agents.
-      if (this._draining && this._drainNonce) {
+      // When draining AND enough time has passed for the old container
+      // to have exited (drainAll waits up to 10 min + exit), pass the
+      // nonce so the replacement container can acknowledge readiness.
+      // We only send the nonce after 11 minutes to avoid the old
+      // (still-draining) container receiving it and clearing drain
+      // prematurely — the health check goes to whichever container is
+      // currently serving this town.
+      const DRAIN_HANDOFF_DELAY_MS = 11 * 60 * 1000;
+      if (
+        this._draining &&
+        this._drainNonce &&
+        this._drainStartedAt &&
+        Date.now() - this._drainStartedAt > DRAIN_HANDOFF_DELAY_MS
+      ) {
         headers['X-Drain-Nonce'] = this._drainNonce;
         headers['X-Town-Id'] = townId;
       }

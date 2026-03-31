@@ -156,8 +156,22 @@ export type PlatformStatusResponse = {
   execAsk: string | null;
 };
 
+/** Response from GET /api/platform/registry-entries (admin only). */
+export type RegistryEntriesResponse = {
+  entries: Array<{
+    instanceId: string;
+    doKey: string;
+    assignedUserId: string;
+    createdAt: string;
+    destroyedAt: string | null;
+  }>;
+  registryKey: string;
+  migrated: boolean;
+};
+
 /** Response from GET /api/platform/debug-status (internal/admin only). */
 export type PlatformDebugStatusResponse = PlatformStatusResponse & {
+  orgId: string | null;
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;
   pendingPostgresMarkOnFinalize: boolean;

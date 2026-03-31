@@ -213,6 +213,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     } satisfies AdminKiloclawInstanceDetail;
   }),
 
+  registryEntries: adminProcedure
+    .input(z.object({ userId: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const client = new KiloClawInternalClient();
+      return client.getRegistryEntries(input.userId);
+    }),
+
   list: adminProcedure.input(ListInstancesSchema).query(async ({ input }) => {
     const { offset, limit, sortBy, sortOrder, search, status } = input;
     const searchTerm = search?.trim() || '';

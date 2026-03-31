@@ -343,6 +343,11 @@ platform.post('/provision', async c => {
       // doKey = instanceId: all new provisions create DOs keyed by instanceId.
       // For lazy-migrated legacy instances, doKey = userId (set in lazyMigrate).
       await registryStub.createInstance(registryKey, userId, instanceId, instanceId);
+      console.log('[platform] Registry entry created:', {
+        registryKey,
+        instanceId,
+        doKey: instanceId,
+      });
     } catch (registryErr) {
       console.error('[platform] Registry create failed (non-fatal):', registryErr);
     }
@@ -1283,6 +1288,7 @@ platform.post('/destroy', async c => {
     // When instanceId is provided, destroy by instanceId directly.
     // When absent (legacy destroy), find the entry with doKey=userId
     // and destroy it by its instanceId from the registry.
+    // Note: The Instance DO also cleans up on finalization (belt-and-suspenders).
     try {
       const registryKeys = [`user:${userId}`];
       if (orgId) registryKeys.push(`org:${orgId}`);
@@ -1292,6 +1298,7 @@ platform.post('/destroy', async c => {
         );
         if (instanceId) {
           await registryStub.destroyInstance(registryKey, instanceId);
+          console.log('[platform] Registry entry destroyed:', { registryKey, instanceId });
         } else {
           // Legacy destroy (no instanceId): the DO was keyed by userId,
           // so find the registry entry with doKey=userId.
@@ -1299,6 +1306,17 @@ platform.post('/destroy', async c => {
           const legacyEntry = entries.find(e => e.doKey === userId);
           if (legacyEntry) {
             await registryStub.destroyInstance(registryKey, legacyEntry.instanceId);
+            console.log('[platform] Registry entry destroyed (legacy):', {
+              registryKey,
+              instanceId: legacyEntry.instanceId,
+              doKey: userId,
+            });
+          } else {
+            console.log('[platform] No registry entry found for legacy destroy:', {
+              registryKey,
+              doKey: userId,
+              entriesCount: entries.length,
+            });
           }
         }
       }
@@ -1425,6 +1443,25 @@ platform.get('/debug-status', async c => {
     return c.json(status);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'debug-status');
+    return jsonError(message, status);
+  }
+});
+
+// GET /api/platform/registry-entries?userId=...
+// Returns all registry entries (including destroyed) for admin inspection.
+platform.get('/registry-entries', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) return c.json({ error: 'userId query parameter is required' }, 400);
+
+  try {
+    const registryKey = `user:${userId}`;
+    const registryStub = c.env.KILOCLAW_REGISTRY.get(
+      c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+    );
+    const entries = await registryStub.listAllInstances(registryKey);
+    return c.json({ entries, registryKey, migrated: true });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'registry-entries');
     return jsonError(message, status);
   }
 });

@@ -6,6 +6,7 @@ import type {
   ProvisionInput,
   PlatformStatusResponse,
   PlatformDebugStatusResponse,
+  RegistryEntriesResponse,
   KiloCodeConfigPatchInput,
   KiloCodeConfigResponse,
   ChannelsPatchInput,
@@ -220,6 +221,13 @@ export class KiloClawInternalClient {
     const params = new URLSearchParams({ userId });
     if (instanceId) params.set('instanceId', instanceId);
     return this.request(`/api/platform/debug-status?${params.toString()}`, undefined, { userId });
+  }
+
+  async getRegistryEntries(userId: string): Promise<RegistryEntriesResponse> {
+    const params = new URLSearchParams({ userId });
+    return this.request(`/api/platform/registry-entries?${params.toString()}`, undefined, {
+      userId,
+    });
   }
 
   async patchKiloCodeConfig(

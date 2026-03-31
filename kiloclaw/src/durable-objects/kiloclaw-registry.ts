@@ -98,6 +98,21 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
       .map(rowToEntry);
   }
 
+  /** List all registry entries including destroyed ones (for admin inspection). */
+  async listAllInstances(ownerKey: string): Promise<RegistryEntry[]> {
+    await this.ensureOwnerKey(ownerKey);
+
+    if (!this.migrated) {
+      const now = Date.now();
+      if (now - this.lastMigrationAttempt >= KiloClawRegistry.MIGRATION_RETRY_COOLDOWN_MS) {
+        this.lastMigrationAttempt = now;
+        await this.lazyMigrate();
+      }
+    }
+
+    return this.db.select().from(registryInstances).all().map(rowToEntry);
+  }
+
   async createInstance(
     ownerKey: string,
     assignedUserId: string,

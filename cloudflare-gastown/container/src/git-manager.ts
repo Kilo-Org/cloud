@@ -275,9 +275,45 @@ async function cloneRepoInner(
     `Cloning repo for rig ${options.rigId}: hasAuth=${hasAuth} envKeys=[${Object.keys(options.envVars ?? {}).join(',')}]`
   );
 
+  // Omit --branch: on empty repos (no commits) the default branch doesn't
+  // exist yet, so `git clone --branch <branch>` would fail with
+  // "Remote branch <branch> not found in upstream origin".
   await mkdir(dir, { recursive: true });
-  await exec('git', ['clone', '--no-checkout', '--branch', options.defaultBranch, authUrl, dir]);
+  await exec('git', ['clone', '--no-checkout', authUrl, dir]);
   await configureRepoCredentials(dir, options.gitUrl, options.envVars);
+
+  // Detect empty repo: git rev-parse HEAD fails when there are no commits.
+  const isEmpty = await exec('git', ['rev-parse', 'HEAD'], dir)
+    .then(() => false)
+    .catch(() => true);
+
+  if (isEmpty) {
+    console.log(`Detected empty repo for rig ${options.rigId}, creating initial commit`);
+    // Create an initial empty commit so branches/worktrees can be created.
+    // Use -c flags for user identity (the repo has no config yet and the
+    // container may not have GIT_AUTHOR_NAME set).
+    await exec(
+      'git',
+      [
+        '-c',
+        'user.name=Gastown',
+        '-c',
+        'user.email=gastown@kilo.ai',
+        'commit',
+        '--allow-empty',
+        '-m',
+        'Initial commit',
+      ],
+      dir
+    );
+    await exec('git', ['push', 'origin', `HEAD:${options.defaultBranch}`], dir);
+    // Best-effort: set remote HEAD so future operations know the default branch
+    await exec('git', ['remote', 'set-head', 'origin', options.defaultBranch], dir).catch(() => {});
+    // Fetch so origin/<defaultBranch> ref is available locally
+    await exec('git', ['fetch', 'origin'], dir);
+    console.log(`Created initial commit on empty repo for rig ${options.rigId}`);
+  }
+
   console.log(`Cloned repo for rig ${options.rigId}`);
   return dir;
 }
@@ -301,6 +337,18 @@ async function createWorktreeInner(options: WorktreeOptions): Promise<string> {
     });
     console.log(`Reused existing worktree at ${dir}`);
     return dir;
+  }
+
+  // Verify the repo has at least one commit. If cloneRepoInner's initial
+  // commit push failed, there's no HEAD and we can't create branches.
+  const hasHead = await exec('git', ['rev-parse', '--verify', 'HEAD'], repo)
+    .then(() => true)
+    .catch(() => false);
+
+  if (!hasHead) {
+    throw new Error(
+      `Cannot create worktree: repo has no commits. Push an initial commit first or re-connect the rig.`
+    );
   }
 
   // When a startPoint is provided (e.g. a convoy feature branch), create
@@ -395,6 +443,24 @@ async function setupBrowseWorktreeInner(rigId: string, defaultBranch: string): P
       const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
       console.warn(`Browse worktree refresh failed for rig ${rigId} (may be stale): ${msg}`);
     }
+    return browseDir;
+  }
+
+  // Check whether origin/<defaultBranch> exists. On a repo that was just
+  // initialized with an empty commit in cloneRepoInner the ref should
+  // exist, but if the push failed (network, permissions) it may not.
+  const hasRemoteBranch = await exec(
+    'git',
+    ['rev-parse', '--verify', `origin/${defaultBranch}`],
+    repo
+  )
+    .then(() => true)
+    .catch(() => false);
+
+  if (!hasRemoteBranch) {
+    console.log(
+      `Skipping browse worktree for rig ${rigId}: origin/${defaultBranch} not found (repo may be empty), will create on next fetch`
+    );
     return browseDir;
   }
 

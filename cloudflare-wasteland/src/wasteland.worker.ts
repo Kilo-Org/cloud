@@ -7,6 +7,9 @@ import { resError } from './util/res.util';
 import { logger } from './util/log.util';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
+import type { AuthVariables } from './middleware/auth.middleware';
+import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
+import { timingMiddleware } from './middleware/analytics.middleware';
 
 // ── DO Exports ──────────────────────────────────────────────────────────
 // Placeholder exports — actual DO classes will be implemented in later issues.
@@ -19,21 +22,13 @@ export { WastelandContainerDO } from './dos/WastelandContainerDO.stub';
 
 export type WastelandEnv = {
   Bindings: Env;
-  Variables: {
-    requestStartTime: number;
-    kiloUserId?: string;
-  };
+  Variables: AuthVariables;
 };
 
 const app = new Hono<WastelandEnv>();
 
 // ── Timing ──────────────────────────────────────────────────────────────
 // Capture high-resolution start timestamp before any other middleware.
-
-async function timingMiddleware(c: Context<WastelandEnv>, next: () => Promise<void>): Promise<void> {
-  c.set('requestStartTime', performance.now());
-  await next();
-}
 
 app.use('*', timingMiddleware);
 
@@ -78,6 +73,14 @@ app.use('/api/*', corsMiddleware);
 
 app.get('/', c => c.json({ service: 'wasteland', status: 'ok' }));
 app.get('/health', c => c.json({ status: 'ok' }));
+
+// ── Kilo User Auth ──────────────────────────────────────────────────────
+// Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for all /api/*
+// routes. Skipped in development mode for easier local testing.
+
+app.use('/api/*', async (c: Context<WastelandEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
+);
 
 // ── Route stubs ─────────────────────────────────────────────────────────
 // Phase 2: Wasteland CRUD

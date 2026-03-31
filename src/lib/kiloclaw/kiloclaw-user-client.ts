@@ -33,7 +33,7 @@ export class KiloClawUserClient {
 
   private async request<T>(path: string, options?: RequestInit, ctx?: RequestContext): Promise<T> {
     const url = ctx?.instanceId
-      ? `${this.baseUrl}${path}?instanceId=${ctx.instanceId}`
+      ? `${this.baseUrl}${path}?instanceId=${encodeURIComponent(ctx.instanceId)}`
       : `${this.baseUrl}${path}`;
     const res = await fetch(url, {
       ...options,

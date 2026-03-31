@@ -172,9 +172,11 @@ export async function handleAgentWaiting(
   c: Context<GastownEnv>,
   params: { rigId: string; agentId: string }
 ) {
+  const body = (await parseJsonBody(c)) as Record<string, unknown>;
+  const firedAt = typeof body?.firedAt === 'number' ? body.firedAt : undefined;
   const townId = c.get('townId');
   const town = getTownDOStub(c.env, townId);
-  await town.mayorWaiting(params.agentId);
+  await town.mayorWaiting(params.agentId, firedAt);
   return c.json(resSuccess({ acknowledged: true }));
 }
 

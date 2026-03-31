@@ -35,7 +35,7 @@ export async function reportMayorWaiting(agent: ManagedAgent): Promise<void> {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${authToken}`,
       },
-      body: JSON.stringify({ agentId: agent.agentId }),
+      body: JSON.stringify({ agentId: agent.agentId, firedAt: Date.now() }),
     });
 
     if (!response.ok) {

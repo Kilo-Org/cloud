@@ -1418,8 +1418,13 @@ export class TownDO extends DurableObject<Env> {
    * container but not doing LLM work — hasActiveWork() returns false,
    * so the alarm drops to the idle cadence and health-check pings stop
    * resetting the container's sleepAfter timer.
+   *
+   * @param firedAt - Timestamp (ms) when the container fired this
+   *   callback. Used to reject stale session.idle callbacks from a
+   *   previous turn that arrive after the mayor has already been
+   *   re-activated by a new prompt.
    */
-  async mayorWaiting(agentId?: string): Promise<void> {
+  async mayorWaiting(agentId?: string, firedAt?: number): Promise<void> {
     let resolvedAgentId = agentId;
     if (!resolvedAgentId) {
       const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0];
@@ -1433,12 +1438,12 @@ export class TownDO extends DurableObject<Env> {
     // Only transition from working → waiting. If the agent has already
     // been set to idle/stalled/dead by another path, don't overwrite.
     // Guard against stale session.idle callbacks: reportMayorWaiting is
-    // fire-and-forget, so a callback from the previous turn can arrive
-    // after sendMayorMessage has already re-activated the mayor. Reject
-    // transitions that arrive within 5s of the mayor being set to working.
+    // fire-and-forget, so a callback from a previous turn can arrive
+    // after sendMayorMessage has already re-activated the mayor. If the
+    // callback carries a firedAt timestamp that predates the last
+    // working transition, it belongs to an older turn — reject it.
     if (agent.status === 'working') {
-      const STALE_GUARD_MS = 5_000;
-      if (Date.now() - this._mayorWorkingSince < STALE_GUARD_MS) return;
+      if (firedAt && firedAt < this._mayorWorkingSince) return;
       agents.updateAgentStatus(this.sql, resolvedAgentId, 'waiting');
     }
   }

@@ -55,7 +55,7 @@ type TrialResult = {
   error?: string;
 };
 
-type InputMode = 'csv' | 'paste';
+type InputMode = 'paste' | 'csv';
 
 // --- CSV Parsing ---
 
@@ -312,14 +312,11 @@ export function KiloclawExtendTrial() {
 
   // Actions
   const handleMatchUsers = () => {
-    let emails: string[];
-
-    if (inputMode === 'csv') {
-      if (!csvData || !selectedColumn) return;
-      emails = extractEmails(csvData.rows, selectedColumn);
-    } else {
-      emails = parseEmailList(pastedText);
-    }
+    // If a CSV is loaded and a column selected, use it; otherwise fall back to paste text.
+    const emails =
+      csvData && selectedColumn
+        ? extractEmails(csvData.rows, selectedColumn)
+        : parseEmailList(pastedText);
 
     if (emails.length === 0) {
       toast.error('No valid emails found');
@@ -352,6 +349,7 @@ export function KiloclawExtendTrial() {
     setPastedText('');
     setEmailsToMatch(null);
     setResults(null);
+    setInputMode('paste');
   };
 
   const handleDownloadResults = (success: boolean) => {
@@ -403,7 +401,7 @@ export function KiloclawExtendTrial() {
     csvData && selectedColumn ? extractEmails(csvData.rows, selectedColumn) : [];
   const csvEmailCount = extractedEmails.length;
 
-  const currentEmailCount = inputMode === 'csv' ? csvEmailCount : pastedEmailCount;
+  const currentEmailCount = csvData && selectedColumn ? csvEmailCount : pastedEmailCount;
 
   const eligibleCount = matchedUsers.filter(
     u => u.subscriptionStatus === 'trialing' || u.subscriptionStatus === 'canceled'
@@ -411,7 +409,8 @@ export function KiloclawExtendTrial() {
 
   const ineligibleCount = matchedUsers.length - eligibleCount;
 
-  const canMatch = inputMode === 'csv' ? selectedColumn && csvEmailCount > 0 : pastedEmailCount > 0;
+  // CSV takes precedence when loaded; fall back to paste text count
+  const canMatch = csvData ? selectedColumn && csvEmailCount > 0 : pastedEmailCount > 0;
 
   return (
     <div className="flex w-full flex-col gap-y-6">
@@ -429,263 +428,178 @@ export function KiloclawExtendTrial() {
             <Upload className="h-5 w-5" />
             {results ? 'Start New Import' : 'Email Input'}
           </CardTitle>
-          <CardDescription>
-            <span className="inline-flex gap-2">
-              <button
-                type="button"
-                className={`underline-offset-4 ${inputMode === 'paste' ? 'font-medium underline' : 'text-muted-foreground hover:underline'}`}
-                onClick={() => setInputMode('paste')}
-              >
-                Paste list
-              </button>
-              <span className="text-muted-foreground">or</span>
-              <button
-                type="button"
-                className={`underline-offset-4 ${inputMode === 'csv' ? 'font-medium underline' : 'text-muted-foreground hover:underline'}`}
-                onClick={() => setInputMode('csv')}
-              >
-                Upload CSV
-              </button>
-            </span>
-          </CardDescription>
+          {/* Tab switcher — only swaps the input widget, everything else stays */}
+          <div className="flex gap-1 border-b">
+            <button
+              type="button"
+              onClick={() => setInputMode('paste')}
+              className={`px-3 py-2 text-sm font-medium transition-colors ${
+                inputMode === 'paste'
+                  ? 'border-b-2 border-current'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Paste list
+            </button>
+            <button
+              type="button"
+              onClick={() => setInputMode('csv')}
+              className={`px-3 py-2 text-sm font-medium transition-colors ${
+                inputMode === 'csv'
+                  ? 'border-b-2 border-current'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Upload CSV
+            </button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Input widget — the only thing that changes between tabs */}
           {inputMode === 'paste' ? (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Email Addresses</Label>
-                <Textarea
-                  placeholder={'user1@example.com\nuser2@example.com\nuser3@example.com'}
-                  value={pastedText}
-                  onChange={e => {
-                    setPastedText(e.target.value);
-                    setResults(null);
-                    setEmailsToMatch(null);
-                  }}
-                  rows={6}
-                  className="font-mono text-sm"
-                />
-                <p className="text-muted-foreground text-sm">
-                  One email per line, or separated by commas, semicolons, or spaces.
-                  {pastedEmailCount > 0 && (
-                    <>
-                      {' '}
-                      <span className="text-foreground font-medium">
-                        {pastedEmailCount} valid email{pastedEmailCount !== 1 ? 's' : ''} detected.
-                      </span>
-                    </>
-                  )}
-                </p>
-              </div>
-
-              {/* CSV upload alternative */}
-              <div
-                onDrop={e => {
-                  e.preventDefault();
-                  setIsDragging(false);
-                  const file = e.dataTransfer.files[0];
-                  if (file) {
-                    handleFile(file);
-                    setInputMode('csv');
-                  }
+            <div className="space-y-1">
+              <Label>Email Addresses</Label>
+              <Textarea
+                placeholder={'user1@example.com\nuser2@example.com\nuser3@example.com'}
+                value={pastedText}
+                onChange={e => {
+                  setPastedText(e.target.value);
+                  setResults(null);
+                  setEmailsToMatch(null);
                 }}
-                onDragOver={e => {
-                  e.preventDefault();
-                  setIsDragging(true);
-                }}
-                onDragLeave={e => {
-                  e.preventDefault();
-                  setIsDragging(false);
-                }}
-                className={`relative flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed px-4 py-3 transition-colors ${
-                  isDragging
-                    ? 'border-primary bg-primary/5'
-                    : 'border-muted-foreground/25 hover:border-muted-foreground/50'
-                }`}
-              >
-                <FileSpreadsheet className="text-muted-foreground h-4 w-4 shrink-0" />
-                <span className="text-muted-foreground text-sm">
-                  Or drop / click to upload a CSV
-                </span>
-                <Input
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={e => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      handleFile(file);
-                      setInputMode('csv');
-                    }
-                  }}
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                />
-              </div>
-
-              {/* Days input */}
-              <div className="flex items-end gap-4">
-                <div className="w-40 space-y-2">
-                  <Label>Trial Days</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="365"
-                    value={trialDays}
-                    onChange={e => setTrialDays(e.target.value)}
-                    placeholder="7"
-                  />
-                </div>
-              </div>
-
-              {/* Match button */}
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleMatchUsers}
-                  disabled={!canMatch || matchUsersQuery.isFetching}
-                >
-                  {matchUsersQuery.isFetching ? (
-                    'Matching...'
-                  ) : (
-                    <>
-                      <Play className="mr-2 h-4 w-4" />
-                      Match {currentEmailCount} Email{currentEmailCount !== 1 ? 's' : ''} to Users
-                    </>
-                  )}
-                </Button>
-                {(pastedText || hasMatched || results) && (
-                  <Button variant="outline" onClick={handleClear}>
-                    Clear
-                  </Button>
+                rows={6}
+                className="font-mono text-sm"
+              />
+              <p className="text-muted-foreground text-sm">
+                One email per line, or separated by commas, semicolons, or spaces.
+                {pastedEmailCount > 0 && (
+                  <>
+                    {' '}
+                    <span className="text-foreground font-medium">
+                      {pastedEmailCount} valid email{pastedEmailCount !== 1 ? 's' : ''} detected.
+                    </span>
+                  </>
                 )}
-              </div>
+              </p>
             </div>
           ) : (
-            <>
-              {/* Drop zone */}
-              <div
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                className={`relative flex min-h-[150px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
-                  isDragging
-                    ? 'border-primary bg-primary/5'
-                    : 'border-muted-foreground/25 hover:border-muted-foreground/50'
-                }`}
-              >
-                <FileSpreadsheet className="text-muted-foreground mb-2 h-10 w-10" />
-                <p className="text-muted-foreground text-sm">
-                  Drop CSV file here or click to browse
-                </p>
-                <Input
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={handleInputChange}
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                />
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              className={`relative flex min-h-[140px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
+                isDragging
+                  ? 'border-primary bg-primary/5'
+                  : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+              }`}
+            >
+              <FileSpreadsheet className="text-muted-foreground mb-2 h-10 w-10" />
+              <p className="text-muted-foreground text-sm">
+                {csvData
+                  ? csvData.rows.length + ' rows loaded — drop to replace'
+                  : 'Drop CSV file here or click to browse'}
+              </p>
+              <Input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleInputChange}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </div>
+          )}
+
+          {/* CSV-specific chrome — appears whenever a file is loaded, regardless of active tab */}
+          {csvData && csvData.headers.length > 0 && (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Email Column</Label>
+                <Select value={selectedColumn} onValueChange={setSelectedColumn}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select the column containing emails" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {csvData.headers.map(h => (
+                      <SelectItem key={h} value={h}>
+                        {h}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedColumn && (
+                  <p className="text-muted-foreground text-sm">
+                    {csvEmailCount} valid email{csvEmailCount !== 1 ? 's' : ''} found in &quot;
+                    {selectedColumn}&quot;
+                  </p>
+                )}
               </div>
 
-              {csvData && csvData.headers.length > 0 && (
-                <div className="space-y-4">
-                  {/* Column selector */}
-                  <div className="flex items-end gap-4">
-                    <div className="flex-1 space-y-2">
-                      <Label>Email Column</Label>
-                      <Select value={selectedColumn} onValueChange={setSelectedColumn}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select the column containing emails" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {csvData.headers.map(h => (
-                            <SelectItem key={h} value={h}>
-                              {h}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {selectedColumn && (
-                        <p className="text-muted-foreground text-sm">
-                          {csvEmailCount} valid email{csvEmailCount !== 1 ? 's' : ''} found in
-                          &quot;{selectedColumn}&quot;
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Days input */}
-                    <div className="w-40 space-y-2">
-                      <Label>Trial Days</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        max="365"
-                        value={trialDays}
-                        onChange={e => setTrialDays(e.target.value)}
-                        placeholder="7"
-                      />
-                    </div>
-                  </div>
-
-                  {/* CSV preview table */}
-                  <div className="max-h-[200px] overflow-auto rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          {csvData.headers.map(h => (
-                            <TableHead
-                              key={h}
-                              className={h === selectedColumn ? 'bg-primary/10 font-semibold' : ''}
-                            >
-                              {h}
-                            </TableHead>
-                          ))}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {csvData.rows.slice(0, 5).map((row, i) => (
-                          <TableRow key={i}>
-                            {csvData.headers.map(h => (
-                              <TableCell
-                                key={h}
-                                className={h === selectedColumn ? 'bg-primary/5' : ''}
-                              >
-                                {row[h]}
-                              </TableCell>
-                            ))}
-                          </TableRow>
+              <div className="max-h-[200px] overflow-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {csvData.headers.map(h => (
+                        <TableHead
+                          key={h}
+                          className={h === selectedColumn ? 'bg-primary/10 font-semibold' : ''}
+                        >
+                          {h}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {csvData.rows.slice(0, 5).map((row, i) => (
+                      <TableRow key={i}>
+                        {csvData.headers.map(h => (
+                          <TableCell key={h} className={h === selectedColumn ? 'bg-primary/5' : ''}>
+                            {row[h]}
+                          </TableCell>
                         ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  {csvData.rows.length > 5 && (
-                    <p className="text-muted-foreground text-xs">
-                      Showing 5 of {csvData.rows.length} rows
-                    </p>
-                  )}
-
-                  {/* Match button */}
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleMatchUsers}
-                      disabled={!canMatch || matchUsersQuery.isFetching}
-                    >
-                      {matchUsersQuery.isFetching ? (
-                        'Matching...'
-                      ) : (
-                        <>
-                          <Play className="mr-2 h-4 w-4" />
-                          Match {currentEmailCount} Email{currentEmailCount !== 1 ? 's' : ''} to
-                          Users
-                        </>
-                      )}
-                    </Button>
-                    {(csvData || hasMatched || results) && (
-                      <Button variant="outline" onClick={handleClear}>
-                        Clear
-                      </Button>
-                    )}
-                  </div>
-                </div>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {csvData.rows.length > 5 && (
+                <p className="text-muted-foreground text-xs">
+                  Showing 5 of {csvData.rows.length} rows
+                </p>
               )}
-            </>
+            </div>
           )}
+
+          {/* Trial days + action buttons — always visible */}
+          <div className="flex items-end gap-4">
+            <div className="w-40 space-y-1">
+              <Label>Trial Days</Label>
+              <Input
+                type="number"
+                min="1"
+                max="365"
+                value={trialDays}
+                onChange={e => setTrialDays(e.target.value)}
+                placeholder="7"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button onClick={handleMatchUsers} disabled={!canMatch || matchUsersQuery.isFetching}>
+              {matchUsersQuery.isFetching ? (
+                'Matching...'
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" />
+                  Match {currentEmailCount} Email{currentEmailCount !== 1 ? 's' : ''} to Users
+                </>
+              )}
+            </Button>
+            {(pastedText || csvData || hasMatched || results) && (
+              <Button variant="outline" onClick={handleClear}>
+                Clear
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 

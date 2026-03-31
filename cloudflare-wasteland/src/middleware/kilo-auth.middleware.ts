@@ -34,7 +34,6 @@ export const kiloAuthMiddleware = createMiddleware<WastelandEnv>(async (c, next)
     c.set('kiloUserId', payload.kiloUserId);
     c.set('kiloIsAdmin', payload.isAdmin === true);
     c.set('kiloApiTokenPepper', payload.apiTokenPepper ?? null);
-    c.set('kiloGastownAccess', payload.gastownAccess === true);
     c.set('kiloOrgMemberships', payload.orgMemberships ?? []);
     logger.setTags({ userId: payload.kiloUserId });
   } catch (err) {

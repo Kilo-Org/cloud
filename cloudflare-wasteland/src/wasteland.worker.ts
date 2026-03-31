@@ -1,0 +1,128 @@
+import * as Sentry from '@sentry/cloudflare';
+import { withSentry } from '@sentry/cloudflare';
+import { Hono } from 'hono';
+import type { Context } from 'hono';
+import { cors } from 'hono/cors';
+import { resError } from './util/res.util';
+import { logger } from './util/log.util';
+import { useWorkersLogger } from 'workers-tagged-logger';
+import type { MiddlewareHandler } from 'hono';
+
+// ── DO Exports ──────────────────────────────────────────────────────────
+// Placeholder exports — actual DO classes will be implemented in later issues.
+// Wrangler requires these exports to match the class_name bindings in wrangler.jsonc.
+
+export { WastelandDO } from './dos/WastelandDO.stub';
+export { WastelandContainerDO } from './dos/WastelandContainerDO.stub';
+
+// ── Types ───────────────────────────────────────────────────────────────
+
+export type WastelandEnv = {
+  Bindings: Env;
+  Variables: {
+    requestStartTime: number;
+    kiloUserId?: string;
+  };
+};
+
+const app = new Hono<WastelandEnv>();
+
+// ── Timing ──────────────────────────────────────────────────────────────
+// Capture high-resolution start timestamp before any other middleware.
+
+async function timingMiddleware(c: Context<WastelandEnv>, next: () => Promise<void>): Promise<void> {
+  c.set('requestStartTime', performance.now());
+  await next();
+}
+
+app.use('*', timingMiddleware);
+
+// ── Structured logging context ──────────────────────────────────────────
+// Establishes AsyncLocalStorage context so all downstream logs are tagged.
+// Cast needed: workers-tagged-logger@1.0.0 was built against an older Hono.
+app.use('*', useWorkersLogger('wasteland-worker') as unknown as MiddlewareHandler);
+
+// ── Request logging ─────────────────────────────────────────────────────
+
+app.use('*', async (c, next) => {
+  const method = c.req.method;
+  const path = c.req.path;
+  logger.info(`--> ${method} ${path}`);
+  await next();
+  const elapsed = Math.round(performance.now() - (c.get('requestStartTime') ?? 0));
+  logger.info(`<-- ${method} ${path} ${c.res.status}`, { durationMs: elapsed });
+});
+
+// ── CORS ────────────────────────────────────────────────────────────────
+// Allow browser requests from the main Kilo app. In development, allow
+// localhost origins for the Next.js dev server.
+
+const corsMiddleware = cors({
+  origin: (origin, c: Context<WastelandEnv>) => {
+    if (c.env.ENVIRONMENT === 'development') {
+      if (origin.startsWith('http://localhost:')) return origin;
+    }
+    const allowed = ['https://app.kilo.ai', 'https://kilo.ai'];
+    return allowed.includes(origin) ? origin : '';
+  },
+  allowHeaders: ['Content-Type', 'Authorization'],
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  exposeHeaders: ['Content-Length'],
+  maxAge: 3600,
+  credentials: true,
+});
+
+app.use('/api/*', corsMiddleware);
+
+// ── Health ──────────────────────────────────────────────────────────────
+
+app.get('/', c => c.json({ service: 'wasteland', status: 'ok' }));
+app.get('/health', c => c.json({ status: 'ok' }));
+
+// ── Route stubs ─────────────────────────────────────────────────────────
+// Phase 2: Wasteland CRUD
+// POST /api/wastelands — create
+// GET  /api/wastelands — list (user's wastelands)
+// GET  /api/wastelands/:wastelandId — get
+// DELETE /api/wastelands/:wastelandId — delete
+
+// Phase 2: Wasteland Settings
+// PATCH /api/wastelands/:wastelandId/config
+// POST  /api/wastelands/:wastelandId/credentials — store DoltHub token
+
+// Phase 2: Members
+// GET  /api/wastelands/:wastelandId/members
+// POST /api/wastelands/:wastelandId/members
+// DELETE /api/wastelands/:wastelandId/members/:memberId
+
+// Phase 3: Wanted Board
+// GET  /api/wastelands/:wastelandId/wanted — browse
+// POST /api/wastelands/:wastelandId/wanted — post new item
+// POST /api/wastelands/:wastelandId/wanted/:itemId/claim
+// POST /api/wastelands/:wastelandId/wanted/:itemId/done
+
+// ── Error handling ──────────────────────────────────────────────────────
+
+app.notFound(c => c.json(resError('Not found'), 404));
+
+app.onError((err, c) => {
+  console.error('Unhandled error', { error: err.message, stack: err.stack });
+  Sentry.captureException(err);
+  return c.json(resError('Internal server error'), 500);
+});
+
+// ── Export with Sentry wrapping ─────────────────────────────────────────
+
+export default withSentry(
+  (env: Env) => ({
+    dsn: env.SENTRY_DSN ?? '',
+    release: env.SENTRY_RELEASE || env.CF_VERSION_METADATA?.id,
+    tracesSampleRate: 0.1,
+    enabled: !!env.SENTRY_DSN,
+  }),
+  {
+    async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+      return app.fetch(request, env, ctx);
+    },
+  }
+);

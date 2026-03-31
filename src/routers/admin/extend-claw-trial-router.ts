@@ -14,6 +14,7 @@ type MatchedUser = {
   subscriptionStatus: string | null;
   instanceId: string | null;
   stripeSubscriptionId: string | null;
+  trialEndsAt: string | null;
 };
 
 type UnmatchedEmail = {
@@ -113,6 +114,7 @@ export const extendClawTrialRouter = createTRPCRouter({
             subscriptionStatus: sub?.status ?? null,
             instanceId: sub?.instance_id ?? null,
             stripeSubscriptionId: sub?.stripe_subscription_id ?? null,
+            trialEndsAt: sub?.trial_ends_at ?? null,
           });
         } else {
           unmatched.push({ email });

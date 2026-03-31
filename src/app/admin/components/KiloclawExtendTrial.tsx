@@ -177,10 +177,10 @@ function downloadCsv(content: string, filename: string) {
 }
 
 function ineligibleReason(status: string | null): string {
-  if (status === null) return 'No subscription — must provision first';
+  if (status === null) return 'No subscription - must provision first';
   if (status === 'active') return 'Active paid subscription';
-  if (status === 'past_due') return 'Past due — active paid subscription';
-  if (status === 'unpaid') return 'Unpaid — active paid subscription';
+  if (status === 'past_due') return 'Past due - active paid subscription';
+  if (status === 'unpaid') return 'Unpaid - active paid subscription';
   return `Ineligible status: ${status}`;
 }
 
@@ -372,8 +372,10 @@ export function KiloclawExtendTrial() {
       return;
     }
     const content = success
-      ? 'email,action,new_trial_ends_at\n' +
-        filtered.map(r => `${r.email},${r.action ?? ''},${r.newTrialEndsAt ?? ''}`).join('\n')
+      ? 'email,instance_id,action,new_trial_ends_at\n' +
+        filtered
+          .map(r => `${r.email},${r.instanceId ?? ''},${r.action ?? ''},${r.newTrialEndsAt ?? ''}`)
+          .join('\n')
       : 'email,error\n' + filtered.map(r => `${r.email},${r.error ?? ''}`).join('\n');
     downloadCsv(content, `${success ? 'successful' : 'failed'}-trial-extensions.csv`);
   };
@@ -657,8 +659,7 @@ export function KiloclawExtendTrial() {
                         <TableHead>Email</TableHead>
                         <TableHead>User Name</TableHead>
                         <TableHead>Subscription</TableHead>
-                        <TableHead>User ID</TableHead>
-                        {ineligibleCount > 0 && <TableHead>Reason</TableHead>}
+                        <TableHead>Trial Ends</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -667,17 +668,11 @@ export function KiloclawExtendTrial() {
                           <TableCell className="font-mono text-sm">{user.email}</TableCell>
                           <TableCell>{user.userName ?? '—'}</TableCell>
                           <TableCell>{subscriptionStatusBadge(user.subscriptionStatus)}</TableCell>
-                          <TableCell className="text-muted-foreground font-mono text-xs">
-                            {user.userId}
+                          <TableCell className="text-sm">
+                            {user.trialEndsAt
+                              ? new Date(user.trialEndsAt).toLocaleDateString()
+                              : '—'}
                           </TableCell>
-                          {ineligibleCount > 0 && (
-                            <TableCell className="text-muted-foreground text-xs">
-                              {user.subscriptionStatus !== 'trialing' &&
-                              user.subscriptionStatus !== 'canceled'
-                                ? ineligibleReason(user.subscriptionStatus)
-                                : '—'}
-                            </TableCell>
-                          )}
                         </TableRow>
                       ))}
                     </TableBody>

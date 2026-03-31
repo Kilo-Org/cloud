@@ -4,7 +4,13 @@
  */
 
 import { z } from 'zod';
-import { beads, BeadRecord, createTableBeads, getIndexesBeads } from '../../db/tables/beads.table';
+import {
+  beads,
+  BeadRecord,
+  createTableBeads,
+  getIndexesBeads,
+  migrateBeads,
+} from '../../db/tables/beads.table';
 import {
   bead_events,
   BeadEventRecord,
@@ -65,7 +71,7 @@ export function initBeadTables(sql: SqlStorage): void {
   dropCheckConstraints(sql);
 
   // Migrations: add columns to existing tables (idempotent)
-  for (const stmt of [...migrateConvoyMetadata(), ...migrateAgentMetadata()]) {
+  for (const stmt of [...migrateBeads(), ...migrateConvoyMetadata(), ...migrateAgentMetadata()]) {
     try {
       query(sql, stmt, []);
     } catch {

@@ -38,6 +38,7 @@ export type GastownEventData = {
   beadId?: string;
   convoyId?: string;
   role?: string; // 'polecat' | 'refinery' | 'mayor'
+  reason?: string; // dispatch failure reason, triage action, etc.
   beadType?: string;
   durationMs?: number;
   value?: number;

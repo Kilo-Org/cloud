@@ -11,6 +11,9 @@
 import '../lib/load-env';
 
 import { execSync } from 'node:child_process';
+import { writeFileSync, unlinkSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
@@ -109,9 +112,31 @@ function assertLocalDatabase() {
   }
 }
 
+let testCsvPath = '';
+
+function generateTestCsv(): string {
+  const dir = mkdtempSync(path.join(tmpdir(), 'expire-test-'));
+  const csvPath = path.join(dir, 'input.csv');
+
+  const csvContent = [
+    'CREDIT_CATEGORY,SHOULD_EXPIRE,DESCRIPTION,RECORDS,USERS,BLOCKED_USERS,FIRST_ISSUED_AT,LAST_ISSUED_AT,AMOUNT_GRANTED_USD,PCT,EXPIRE_IN_DAYS,REVIEWED_BY',
+    'automatic-welcome-credits,TRUE,"Free credits for new users, obtained by stych approval, card validation, or maybe some other method",0,0,0,,,,,30,test',
+    'referral-redeeming-bonus,TRUE,,0,0,0,,,,,30,test',
+    'card-validation-upgrade,TRUE,Upgrade credits for passing card validation after having already passed Stytch validation.,0,0,0,,,,,30,test',
+    'card-validation-no-stytch,TRUE,Free credits for passing card validation without prior Stytch validation.,0,0,0,,,,,30,test',
+    'stytch-validation,TRUE,Free credits for passing Stytch fraud detection.,0,0,0,,,,,30,test',
+  ].join('\n');
+
+  writeFileSync(csvPath, csvContent);
+  return csvPath;
+}
+
 let insertedCreditIds: string[] = [];
 
 async function setup() {
+  testCsvPath = generateTestCsv();
+  console.log(`  Generated test CSV: ${testCsvPath}\n`);
+
   console.log('Setting up test data...\n');
 
   const EARLIER_EXPIRY = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
@@ -261,6 +286,11 @@ async function cleanup() {
     .delete(credit_transactions)
     .where(inArray(credit_transactions.kilo_user_id, ALL_USER_IDS));
   await db.delete(kilocode_users).where(inArray(kilocode_users.id, ALL_USER_IDS));
+  if (testCsvPath) {
+    try {
+      unlinkSync(testCsvPath);
+    } catch {}
+  }
   console.log('  Done.\n');
 }
 
@@ -648,7 +678,7 @@ async function main() {
 
     console.log('Running expire-free-credits script with --execute...\n');
     const output = execSync(
-      'pnpm script src/scripts/d2026-03-18_expire-free-credits.ts --execute --yes --batch-size=1',
+      `pnpm script src/scripts/d2026-03-18_expire-free-credits.ts --input=${testCsvPath} --execute --yes --batch-size=1`,
       {
         cwd: process.cwd(),
         encoding: 'utf-8',

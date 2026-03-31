@@ -11,6 +11,13 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-03-31',
+    description:
+      'Added Webhook Integration — receive webhook events as messages in your KiloClaw chat. Any service that can send an HTTP POST (CI/CD pipelines, monitoring tools, form builders, custom scripts, etc.) can trigger your bot to take action. Enable it in Settings > Webhook Integration. Supports custom prompt templates and optional webhook authentication.',
+    category: 'feature',
+    deployHint: null,
+  },
+  {
     date: '2026-03-27',
     description:
       'Added Linear integration. Connect your Linear API Key in Settings to give your agent access to all Linear features, via the Linear MCP server.',

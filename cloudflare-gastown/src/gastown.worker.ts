@@ -134,7 +134,7 @@ import {
   handleListEscalations,
   handleAcknowledgeEscalation,
 } from './handlers/town-escalations.handler';
-import { handleContainerEviction } from './handlers/town-eviction.handler';
+import { handleContainerEviction, handleContainerReady } from './handlers/town-eviction.handler';
 
 export { GastownUserDO } from './dos/GastownUser.do';
 export { GastownOrgDO } from './dos/GastownOrg.do';
@@ -487,6 +487,12 @@ app.post('/api/towns/:townId/rigs/:rigId/triage/resolve', c =>
 app.post('/api/towns/:townId/container-eviction', c =>
   instrumented(c, 'POST /api/towns/:townId/container-eviction', () =>
     handleContainerEviction(c, c.req.param())
+  )
+);
+
+app.post('/api/towns/:townId/container-ready', c =>
+  instrumented(c, 'POST /api/towns/:townId/container-ready', () =>
+    handleContainerReady(c, c.req.param())
   )
 );
 

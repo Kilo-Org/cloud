@@ -6,6 +6,8 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let gastownApiUrl: string | null = null;
 let sessionToken: string | null = null;
+/** Set once we've successfully acknowledged container-ready. */
+let containerReadyAcknowledged = false;
 
 /**
  * Configure and start the heartbeat reporter.
@@ -36,6 +38,37 @@ export function stopHeartbeat(): void {
     heartbeatTimer = null;
   }
   console.log('Heartbeat reporter stopped');
+}
+
+/**
+ * Call POST /container-ready to acknowledge that this is a fresh
+ * container replacing an evicted one. Clears the TownDO drain flag
+ * so the reconciler can resume dispatching.
+ */
+async function acknowledgeContainerReady(townId: string, drainNonce: string): Promise<void> {
+  const currentToken = process.env.GASTOWN_CONTAINER_TOKEN ?? sessionToken;
+  if (!gastownApiUrl || !currentToken) return;
+
+  try {
+    const response = await fetch(`${gastownApiUrl}/api/towns/${townId}/container-ready`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${currentToken}`,
+      },
+      body: JSON.stringify({ nonce: drainNonce }),
+    });
+    if (response.ok) {
+      containerReadyAcknowledged = true;
+      console.log(`[heartbeat] container-ready acknowledged for town=${townId}`);
+    } else {
+      console.warn(
+        `[heartbeat] container-ready failed for town=${townId}: ${response.status} ${response.statusText}`
+      );
+    }
+  } catch (err) {
+    console.warn(`[heartbeat] container-ready error for town=${townId}:`, err);
+  }
 }
 
 async function sendHeartbeats(): Promise<void> {
@@ -77,6 +110,18 @@ async function sendHeartbeats(): Promise<void> {
         console.warn(
           `Heartbeat failed for agent ${agent.agentId}: ${response.status} ${response.statusText}`
         );
+      } else if (!containerReadyAcknowledged) {
+        // If the TownDO is draining, the heartbeat response includes a
+        // drainNonce. Use it to call /container-ready and clear drain.
+        try {
+          const body = (await response.json()) as { data?: { drainNonce?: string } };
+          const nonce = body?.data?.drainNonce;
+          if (nonce) {
+            void acknowledgeContainerReady(agent.townId, nonce);
+          }
+        } catch {
+          // Non-JSON or unexpected shape — ignore
+        }
       }
     } catch (err) {
       console.warn(`Heartbeat error for agent ${agent.agentId}:`, err);

@@ -232,7 +232,10 @@ export async function handleHeartbeat(
       : undefined
   );
 
-  return c.json(resSuccess({ heartbeat: true }));
+  // When draining, include the drain nonce in the response so the
+  // replacement container can call /container-ready to clear drain.
+  const drainNonce = await town.getDrainNonce();
+  return c.json(resSuccess({ heartbeat: true, ...(drainNonce ? { drainNonce } : {}) }));
 }
 
 const GetOrCreateAgentBody = z.object({

@@ -319,7 +319,9 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               userName: kilocode_users.google_user_name,
               userEmail: kilocode_users.google_user_email,
               ...(groupByModel && {
-                model: sql<string | null>`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
+                model: sql<
+                  string | null
+                >`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
               }),
               microdollarCost: sum(microdollar_usage.cost),
               tokenCount: sum(

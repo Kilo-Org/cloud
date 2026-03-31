@@ -493,6 +493,8 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
     const instance = await ensureActiveInstance(userId);
     const now = new Date();
     const trialEndsAt = new Date(now.getTime() + KILOCLAW_TRIAL_DURATION_DAYS * 86_400_000);
+    // Use onConflictDoNothing so concurrent requests (e.g. double-submit)
+    // don't fail on the per-instance unique constraint.
     const [inserted] = await db
       .insert(kiloclaw_subscriptions)
       .values({

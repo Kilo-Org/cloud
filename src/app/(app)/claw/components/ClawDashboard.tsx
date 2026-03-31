@@ -29,7 +29,6 @@ import { ProvisioningStep } from './ProvisioningStep';
 import type { ExecPreset } from './claw.types';
 import { BillingWrapper } from './billing/BillingWrapper';
 
-/** Renders BillingWrapper for personal context, passes children through for org. */
 function MaybeBillingWrapper({
   skip,
   hideBanners,
@@ -142,7 +141,7 @@ function ClawDashboardInner({
   function handleTabChange(value: string) {
     setActiveTab(value as TabValue);
     const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
-    window.history.replaceState(null, '', value === 'instance' ? basePath : `#${value}`);
+    window.history.replaceState(null, '', value === 'instance' ? basePath : `${basePath}#${value}`);
   }
 
   useEffect(() => {

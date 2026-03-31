@@ -37,7 +37,8 @@ export function CreateInstanceCard({
   const posthog = usePostHog();
   const trpc = useTRPC();
   const searchParams = useSearchParams();
-  const { organizationId: isOrgContext } = useClawContext();
+  const { organizationId } = useClawContext();
+  const isOrgContext = !!organizationId;
   // Billing status is personal-only; org uses org subscription checks
   const { data: billingStatus } = useQuery({
     ...trpc.kiloclaw.getBillingStatus.queryOptions(),

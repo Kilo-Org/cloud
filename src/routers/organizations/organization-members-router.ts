@@ -181,32 +181,29 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       // KiloClaw cleanup: destroy org instances assigned to the removed member.
       // Runs after the membership deletion transaction commits.
-      // Fire-and-forget worker calls with error logging — the Postgres rows
-      // are already soft-deleted, so even if worker calls fail the instance is
-      // "dead" from the platform perspective and reconciliation will clean up.
+      // Fire-and-forget worker calls — Postgres rows are already soft-deleted,
+      // so even if worker calls fail the instance is "dead" from the platform
+      // perspective and reconciliation will clean up.
       try {
         const destroyedInstances = await destroyOrgInstancesForUser(memberId, organizationId);
         if (destroyedInstances.length > 0) {
           const client = new KiloClawInternalClient();
-          await Promise.allSettled(
-            destroyedInstances.map(async ({ instanceId }) => {
-              try {
-                await client.destroy(memberId, instanceId);
-              } catch (err) {
-                console.error(
-                  `[kiloclaw-org] Failed to destroy worker instance ${instanceId} for removed member ${memberId}:`,
-                  err
-                );
-              }
-            })
+          const results = await Promise.allSettled(
+            destroyedInstances.map(({ instanceId }) => client.destroy(memberId, instanceId))
           );
+          for (const [i, result] of results.entries()) {
+            if (result.status === 'rejected') {
+              console.error(
+                `[kiloclaw-org] Failed to destroy worker instance ${destroyedInstances[i].instanceId} for removed member ${memberId}:`,
+                result.reason
+              );
+            }
+          }
           console.log(
             `[kiloclaw-org] Destroyed ${destroyedInstances.length} instance(s) for removed member ${memberId} in org ${organizationId}`
           );
         }
       } catch (err) {
-        // Log but don't fail the member removal — the Postgres rows are
-        // already soft-deleted which revokes lookup access.
         console.error(
           `[kiloclaw-org] Failed to clean up KiloClaw instances for removed member ${memberId}:`,
           err

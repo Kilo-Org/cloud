@@ -1032,6 +1032,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const identity = {
       userId: this.s.userId,
       sandboxId: this.s.sandboxId,
+      orgId: this.s.orgId,
       openclawVersion: this.s.openclawVersion,
       imageVariant: this.s.imageVariant,
     };
@@ -2155,6 +2156,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       const identity = {
         userId: this.s.userId ?? '',
         sandboxId: this.s.sandboxId ?? '',
+        orgId: this.s.orgId,
         openclawVersion: this.s.openclawVersion,
         imageVariant: this.s.imageVariant,
       };

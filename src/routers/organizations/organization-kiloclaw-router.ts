@@ -321,10 +321,9 @@ export const organizationKiloclawRouter = createTRPCRouter({
       try {
         await renameOrgInstance(instance.id, ctx.user.id, input.organizationId, input.name);
       } catch (error) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: error instanceof Error ? error.message : 'Failed to rename instance',
-        });
+        const message = error instanceof Error ? error.message : 'Failed to rename instance';
+        const code = message === 'No active instance found' ? 'NOT_FOUND' : 'BAD_REQUEST';
+        throw new TRPCError({ code, message });
       }
     }),
 

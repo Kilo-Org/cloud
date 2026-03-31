@@ -16,6 +16,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'meta-llama/llama-3.3-70b-instruct:free',
   'mistralai/mistral-small-3.1-24b-instruct:free',
   'minimax/minimax-m2.1:free',
+  'minimax/minimax-m2.5:free', // usable through kilo-auto
   'moonshotai/kimi-k2.5:free',
   'nousresearch/hermes-3-llama-3.1-405b:free',
   'nvidia/nemotron-3-nano-30b-a3b:free',

@@ -11,7 +11,6 @@ import { subDays } from 'date-fns';
 import { hasReceivedPromotion } from '@/lib/promotionalCredits';
 
 import { fromMicrodollars } from '@/lib/utils';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto-model';
 
 /** Pre-fetched data shared across notification generators to avoid duplicate DB queries. */
 type NotificationContext = {
@@ -110,7 +109,6 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateAutoTopUpNotification,
     generateAutoTopUpOrgsNotification,
     generateByokProvidersNotification,
-    generateMiniMaxNoLongerFreeNotification,
     generateFirstDayWelcomeNotification,
     generateKiloPassNotification,
   ];
@@ -227,46 +225,6 @@ async function generateTeamsTrialNotification(
       showIn: ['cli', 'extension'],
     },
   ];
-}
-
-async function generateMiniMaxNoLongerFreeNotification(
-  user: User,
-  _ctx: NotificationContext
-): Promise<KiloNotification[]> {
-  try {
-    const users = await cachedPosthogQuery(
-      z.array(z.tuple([z.string()]).transform(([userId]) => userId))
-    )(
-      'minimax-no-longer-free-users',
-      'select kilo_user_id from notification_mar_23_minimax_no_longer_free limit 5e5'
-    );
-
-    if (!users.includes(user.id)) {
-      console.debug(
-        '[generateMiniMaxNoLongerFreeNotification] user has not used MiniMax M2.5 free'
-      );
-      return [];
-    }
-
-    console.debug('[generateMiniMaxNoLongerFreeNotification] user has used MiniMax M2.5 free');
-    return [
-      {
-        id: 'minimax-no-longer-free-mar-23',
-        title: 'MiniMax M2.5 Free ending soon',
-        message:
-          'The MiniMax M2.5 free promotion ends soon. Please switch to Kilo Auto Free or another free model.',
-        action: {
-          actionText: 'Learn more',
-          actionURL: 'https://kilo.ai/docs/contributing/architecture/auto-model-tiers',
-        },
-        suggestModelId: KILO_AUTO_FREE_MODEL.id,
-        showIn: ['cli', 'extension'],
-      },
-    ];
-  } catch (e) {
-    console.error('[generateMiniMaxNoLongerFreeNotification]', e);
-    return [];
-  }
 }
 
 async function generateByokProvidersNotification(

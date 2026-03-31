@@ -32,6 +32,7 @@
     "clsx": "^2.1.1",
     "expo": "~55.0.9",
     "expo-application": "~55.0.10",
+    "expo-asset": "~55.0.10",
     "expo-audio": "~55.0.9",
     "expo-build-properties": "~55.0.10",
     "expo-clipboard": "~55.0.9",

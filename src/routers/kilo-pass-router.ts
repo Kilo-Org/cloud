@@ -41,6 +41,7 @@ import { timedUsageQuery } from '@/lib/usage-query';
 import type Stripe from 'stripe';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { getRewardfulReferral } from '@/lib/rewardful';
+import { computeChurnkeyAuthHash } from '@/lib/churnkey/auth';
 
 const KiloPassTierSchema = z.enum(KiloPassTier);
 
@@ -1028,5 +1029,19 @@ export const kiloPassRouter = createTRPCRouter({
       });
 
       return { url: typeof session.url === 'string' ? session.url : null };
+    }),
+
+  getChurnkeyAuthHash: baseProcedure
+    .output(z.object({ hash: z.string(), customerId: z.string() }))
+    .query(({ ctx }) => {
+      const stripeCustomerId = ctx.user.stripe_customer_id;
+      if (!stripeCustomerId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
+      }
+
+      return {
+        hash: computeChurnkeyAuthHash(stripeCustomerId),
+        customerId: stripeCustomerId,
+      };
     }),
 });

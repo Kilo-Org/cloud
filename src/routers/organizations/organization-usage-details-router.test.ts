@@ -219,6 +219,7 @@ describe('organizations usage details trpc router', () => {
         output_tokens: 200,
         created_at: now,
         model: 'gpt-4',
+        requested_model: 'gpt-4',
       });
 
       await insertUsageWithOverrides({
@@ -229,6 +230,7 @@ describe('organizations usage details trpc router', () => {
         output_tokens: 100,
         created_at: now,
         model: 'gpt-3.5-turbo',
+        requested_model: 'gpt-3.5-turbo',
       });
 
       const caller = await createCallerForUser(memberUser.id);

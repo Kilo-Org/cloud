@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -206,6 +206,7 @@ const ACTION_CONFIG = {
 
 export function KiloclawExtendTrial() {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
 
   // Input mode
   const [inputMode, setInputMode] = useState<InputMode>('paste');
@@ -270,6 +271,10 @@ export function KiloclawExtendTrial() {
         } else {
           toast.warning(`Processed ${successCount} users, ${failCount} failed`);
         }
+        // Refetch matched users so at_limit status reflects the new trial_ends_at values.
+        void queryClient.invalidateQueries(
+          trpc.admin.extendClawTrial.matchUsers.queryOptions({ emails: emailsToMatch ?? [] })
+        );
       },
       onError: error => {
         toast.error(error.message || 'Failed to extend trials');

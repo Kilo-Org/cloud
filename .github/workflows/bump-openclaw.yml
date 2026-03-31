@@ -5,9 +5,13 @@ on:
     - cron: '0 */12 * * *' # Every 12 hours (midnight and noon UTC)
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:

@@ -15,6 +15,7 @@ permissions:
 jobs:
   check-changes:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
     outputs:
       should_build: ${{ steps.check.outputs.should_build }}
     steps:

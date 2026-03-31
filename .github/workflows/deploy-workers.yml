@@ -30,6 +30,9 @@ on:
           - cloudflare-session-ingest
           - cloudflare-webhook-agent-ingest
 
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-workers-${{ github.ref }}
   cancel-in-progress: false
@@ -39,6 +42,7 @@ jobs:
   deploy-manual:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
     name: Deploy ${{ inputs.worker }}
     steps:
       - name: Checkout code
@@ -68,6 +72,7 @@ jobs:
   detect-changes:
     if: github.event_name == 'push'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -127,6 +132,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != ''
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:

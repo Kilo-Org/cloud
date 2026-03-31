@@ -23,7 +23,7 @@ const LOG = '[scheduling]';
 // ── Constants ──────────────────────────────────────────────────────────
 
 export const DISPATCH_COOLDOWN_MS = 2 * 60_000; // 2 min
-export const MAX_DISPATCH_ATTEMPTS = 20;
+export const MAX_DISPATCH_ATTEMPTS = 5;
 
 // ── Context passed by the Town DO ──────────────────────────────────────
 
@@ -109,6 +109,18 @@ export async function dispatchAgent(
       `,
       [timestamp, agent.id]
     );
+    // Track dispatch attempts on the bead itself so the counter
+    // survives agent re-creation and hookBead cycles.
+    query(
+      ctx.sql,
+      /* sql */ `
+        UPDATE ${beads}
+        SET ${beads.columns.dispatch_attempts} = ${beads.columns.dispatch_attempts} + 1,
+            ${beads.columns.last_dispatch_attempt_at} = ?
+        WHERE ${beads.bead_id} = ?
+      `,
+      [timestamp, bead.bead_id]
+    );
 
     const started = await dispatch.startAgentInContainer(ctx.env, ctx.storage, {
       townId: ctx.townId,
@@ -170,6 +182,7 @@ export async function dispatchAgent(
         agentId: agent.id,
         beadId: bead.bead_id,
         role: agent.role,
+        reason: 'container returned false',
       });
     }
     return started;
@@ -199,6 +212,7 @@ export async function dispatchAgent(
       agentId: agent.id,
       beadId: bead.bead_id,
       role: agent.role,
+      reason: err instanceof Error ? err.message : String(err),
     });
     return false;
   }

@@ -28,7 +28,7 @@ jest.mock('@/lib/stripe-client', () => {
 });
 
 jest.mock('@/lib/email', () => ({
-  send: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  send: jest.fn().mockResolvedValue({ sent: true }),
 }));
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {

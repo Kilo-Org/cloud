@@ -77,7 +77,13 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
 
   // --- List query (default, non-search) ---
   const updatedSince = useMemo(() => startOfDay(subDays(new Date(), 5)).toISOString(), []);
-  const listInput = { updatedSince, organizationId, createdOnPlatform, gitUrl };
+  const listInput = {
+    updatedSince,
+    orderBy: 'updated_at' as const,
+    organizationId,
+    createdOnPlatform,
+    gitUrl,
+  };
   const listQueryKey = trpc.unifiedSessions.list.queryKey(listInput);
 
   const { data: listData, isLoading: isListLoading } = useQuery({

@@ -36,6 +36,7 @@ import {
   RotateCcw,
   Download,
 } from 'lucide-react';
+import { downloadCsv } from '@/lib/admin-csv';
 
 // --- Types ---
 
@@ -163,17 +164,6 @@ function parseEmailList(text: string): string[] {
   return emails;
 }
 
-function downloadCsv(content: string, filename: string) {
-  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
 
 function ineligibleReason(status: string | null): string {
   if (status === null) return 'No subscription - must provision first';
@@ -202,6 +192,10 @@ const ACTION_CONFIG = {
   extended: { label: 'Extended', icon: Clock, variant: 'default' as const },
   restarted: { label: 'Restarted', icon: RotateCcw, variant: 'secondary' as const },
 };
+
+function isEligible(u: { subscriptionStatus: string | null }): boolean {
+  return u.subscriptionStatus === 'trialing' || u.subscriptionStatus === 'canceled';
+}
 
 export function KiloclawExtendTrial() {
   const trpc = useTRPC();
@@ -235,7 +229,9 @@ export function KiloclawExtendTrial() {
   const unmatchedEmails = matchUsersQuery.data?.unmatched ?? [];
   const hasMatched = matchUsersQuery.isSuccess && emailsToMatch !== null;
 
-  // Toast on match completion (fire once per successful fetch)
+  // Toast on match completion — fire once per successful fetch, not on every render.
+  // useQuery v5 removed onSuccess from queryOptions, so we track the previous data
+  // value in a ref and only toast when it changes to a new non-null result.
   const prevMatchDataRef = useRef(matchUsersQuery.data);
   useEffect(() => {
     if (matchUsersQuery.data === prevMatchDataRef.current) return;
@@ -324,11 +320,15 @@ export function KiloclawExtendTrial() {
     [handleFile]
   );
 
+  const extractedEmails =
+    csvData && selectedColumn ? extractEmails(csvData.rows, selectedColumn) : [];
+  const csvEmailCount = extractedEmails.length;
+
   // Actions
   const handleMatchUsers = () => {
     const emails =
       inputMode === 'csv' && csvData && selectedColumn
-        ? extractEmails(csvData.rows, selectedColumn)
+        ? extractedEmails
         : parseEmailList(pastedText);
 
     if (emails.length === 0) {
@@ -345,7 +345,7 @@ export function KiloclawExtendTrial() {
 
   const handleExtendTrials = () => {
     const eligibleEmails = matchedUsers
-      .filter(u => u.subscriptionStatus === 'trialing' || u.subscriptionStatus === 'canceled')
+      .filter(isEligible)
       .map(u => u.email);
     if (eligibleEmails.length === 0) return;
     const days = parseInt(trialDays, 10);
@@ -417,15 +417,9 @@ export function KiloclawExtendTrial() {
   const pastedEmails = parseEmailList(pastedText);
   const pastedEmailCount = pastedEmails.length;
 
-  const extractedEmails =
-    csvData && selectedColumn ? extractEmails(csvData.rows, selectedColumn) : [];
-  const csvEmailCount = extractedEmails.length;
-
   const currentEmailCount = inputMode === 'csv' ? csvEmailCount : pastedEmailCount;
 
-  const eligibleCount = matchedUsers.filter(
-    u => u.subscriptionStatus === 'trialing' || u.subscriptionStatus === 'canceled'
-  ).length;
+  const eligibleCount = matchedUsers.filter(isEligible).length;
 
   const ineligibleCount = matchedUsers.length - eligibleCount;
 
@@ -450,7 +444,10 @@ export function KiloclawExtendTrial() {
             <Upload className="h-5 w-5" />
             {results ? 'Start New Import' : 'Email Input'}
           </CardTitle>
-          {/* Tab switcher — only swaps the input widget, everything else stays */}
+          {/* Plain <button> tabs instead of the Radix Tabs component: this component
+              is itself rendered inside a Radix Tabs panel on the parent page, and nesting
+              two Radix Tabs trees breaks controlled state. These buttons only toggle
+              inputMode and don't need any Radix behaviour. */}
           <div className="flex gap-1 border-b">
             <button
               type="button"
@@ -600,21 +597,6 @@ export function KiloclawExtendTrial() {
             </div>
           )}
 
-          {/* Trial days + action buttons — always visible */}
-          <div className="flex items-end gap-4">
-            <div className="w-40 space-y-1">
-              <Label>Trial Days</Label>
-              <Input
-                type="number"
-                min="1"
-                max="365"
-                value={trialDays}
-                onChange={e => setTrialDays(e.target.value)}
-                placeholder="7"
-              />
-            </div>
-          </div>
-
           <div className="flex gap-2">
             <Button onClick={handleMatchUsers} disabled={!canMatch || matchUsersQuery.isFetching}>
               {matchUsersQuery.isFetching ? (
@@ -653,8 +635,8 @@ export function KiloclawExtendTrial() {
               )}
             </CardTitle>
             <CardDescription>
-              {trialDays}-day trial will be extended or restarted for trialing/canceled users. Users
-              with no subscription or an active paid plan are skipped.
+              Review the matched users below, set the number of days, then apply. Users with no
+              subscription or an active paid plan are skipped automatically.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -673,11 +655,7 @@ export function KiloclawExtendTrial() {
                     </TableHeader>
                     <TableBody>
                       {matchedUsers
-                        .filter(
-                          u =>
-                            u.subscriptionStatus === 'trialing' ||
-                            u.subscriptionStatus === 'canceled'
-                        )
+                        .filter(isEligible)
                         .map(user => (
                           <TableRow key={user.userId}>
                             <TableCell className="font-mono text-sm">{user.email}</TableCell>
@@ -695,21 +673,35 @@ export function KiloclawExtendTrial() {
                     </TableBody>
                   </Table>
                 </div>
-                <Button
-                  onClick={handleExtendTrials}
-                  disabled={extendTrialsMutation.isPending || results !== null}
-                  size="lg"
-                >
-                  {extendTrialsMutation.isPending ? (
-                    'Processing...'
-                  ) : (
-                    <>
-                      <Clock className="mr-2 h-4 w-4" />
-                      Apply {trialDays}-Day Trial to {eligibleCount} Eligible User
-                      {eligibleCount !== 1 ? 's' : ''}
-                    </>
-                  )}
-                </Button>
+                <div className="flex items-end gap-3">
+                  <div className="w-36 space-y-1">
+                    <Label htmlFor="trial-days">Days to extend</Label>
+                    <Input
+                      id="trial-days"
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={trialDays}
+                      onChange={e => setTrialDays(e.target.value)}
+                      placeholder="7"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleExtendTrials}
+                    disabled={extendTrialsMutation.isPending || results !== null}
+                    size="lg"
+                  >
+                    {extendTrialsMutation.isPending ? (
+                      'Processing...'
+                    ) : (
+                      <>
+                        <Clock className="mr-2 h-4 w-4" />
+                        Apply {trialDays}-Day Trial to {eligibleCount} Eligible User
+                        {eligibleCount !== 1 ? 's' : ''}
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -740,11 +732,7 @@ export function KiloclawExtendTrial() {
                     </TableHeader>
                     <TableBody>
                       {matchedUsers
-                        .filter(
-                          u =>
-                            u.subscriptionStatus !== 'trialing' &&
-                            u.subscriptionStatus !== 'canceled'
-                        )
+                        .filter(u => !isEligible(u))
                         .map(user => (
                           <TableRow key={user.userId}>
                             <TableCell className="font-mono text-sm">{user.email}</TableCell>

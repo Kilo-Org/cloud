@@ -106,10 +106,13 @@ export const extendClawTrialRouter = createTRPCRouter({
         const user = usersByEmail.get(email);
         if (user) {
           const sub = latestSubByUserId.get(user.id);
+          // at_limit when trial already fills the ceiling: extending would be a no-op
+          // because the DB caps at now() + 1 year. Use >= so users exactly at the
+          // boundary are flagged, not just those strictly beyond it.
           const beyondCeiling =
             sub?.status === 'trialing' &&
             sub.trial_ends_at !== null &&
-            new Date(sub.trial_ends_at) > new Date(Date.now() + 365 * 86_400_000);
+            new Date(sub.trial_ends_at) >= new Date(Date.now() + 365 * 86_400_000);
           matched.push({
             email: user.email,
             userId: user.id,

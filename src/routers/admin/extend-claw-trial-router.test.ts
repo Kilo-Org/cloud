@@ -45,6 +45,25 @@ describe('matchUsers — at_limit ineligibility', () => {
     expect(matched[0].subscriptionStatus).toBe('at_limit');
   });
 
+  it('marks a trialing user ineligible when trial_ends_at is exactly at the 1-year ceiling', async () => {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: target.id,
+      plan: 'trial',
+      status: 'trialing',
+      trial_started_at: new Date().toISOString(),
+      // Exactly 365 days: extending would be a no-op, so must be at_limit
+      trial_ends_at: new Date(Date.now() + MS_PER_YEAR).toISOString(),
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const { matched } = await caller.admin.extendClawTrial.matchUsers({
+      emails: [target.google_user_email],
+    });
+
+    expect(matched).toHaveLength(1);
+    expect(matched[0].subscriptionStatus).toBe('at_limit');
+  });
+
   it('does not mark a trialing user ineligible when trial ends within 1 year', async () => {
     await db.insert(kiloclaw_subscriptions).values({
       user_id: target.id,

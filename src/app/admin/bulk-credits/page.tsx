@@ -33,6 +33,7 @@ import {
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { KiloclawExtendTrial } from '@/app/admin/components/KiloclawExtendTrial';
+import { downloadCsv } from '@/lib/admin-csv';
 
 type MatchedUser = {
   email: string;
@@ -89,17 +90,6 @@ function parseCsvEmails(text: string): { emails: string[]; skippedLines: string[
   return { emails, skippedLines };
 }
 
-function downloadCsv(content: string, filename: string) {
-  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
 
 function generateEmailsCsv(emails: string[]): string {
   return 'email\n' + emails.join('\n');

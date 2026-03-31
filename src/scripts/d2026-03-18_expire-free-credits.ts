@@ -319,11 +319,27 @@ async function processUser(
   }, 0);
   const headroom = currentBalance - existingExpiredTotal;
   // Determine which affected credits to actually tag with expiry.
+  // Sort by expiry date ascending so earlier-expiring credits are consumed first
+  // when headroom is limited. Tie-break by id for determinism.
+  const sortedAffected = [...affectedCredits].sort((a, b) => {
+    const aExpiry = resolveCreditOrThrow(
+      lookup,
+      a.credit_category ?? '',
+      a.description
+    ).expiryDateIso;
+    const bExpiry = resolveCreditOrThrow(
+      lookup,
+      b.credit_category ?? '',
+      b.description
+    ).expiryDateIso;
+    if (aExpiry !== bExpiry) return aExpiry < bExpiry ? -1 : 1;
+    return a.id < b.id ? -1 : 1;
+  });
   // Walk credits in order; include each one as long as it fits within headroom.
   let remainingHeadroom = headroom;
   const creditsToExpire: typeof affectedCredits = [];
   const creditsSkipped: typeof affectedCredits = [];
-  for (const credit of affectedCredits) {
+  for (const credit of sortedAffected) {
     const expiredAmt = expiredByOriginalId.get(credit.id) ?? 0;
     if (remainingHeadroom >= expiredAmt) {
       remainingHeadroom -= expiredAmt;

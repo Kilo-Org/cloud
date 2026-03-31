@@ -40,6 +40,7 @@ const USER_FREE_USE_BUY = `${TEST_PREFIX}-free-use-buy`;
 const USER_ORB_DOUBLE_DEDUCT = `${TEST_PREFIX}-orb-double-deduct`;
 const USER_ORB_EXISTING_EXPIRY = `${TEST_PREFIX}-orb-existing-expiry`;
 const USER_FALSE_OVERRIDE = `${TEST_PREFIX}-false-override`;
+const USER_MIXED_EXPIRY_HEADROOM = `${TEST_PREFIX}-mixed-expiry-headroom`;
 
 const ALL_USER_IDS = [
   USER_FULLY_SPENT,
@@ -60,6 +61,7 @@ const ALL_USER_IDS = [
   USER_ORB_DOUBLE_DEDUCT,
   USER_ORB_EXISTING_EXPIRY,
   USER_FALSE_OVERRIDE,
+  USER_MIXED_EXPIRY_HEADROOM,
 ];
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -128,6 +130,7 @@ function generateTestCsv(): string {
     'card-validation-no-stytch,TRUE,Free credits for passing card validation without prior Stytch validation.,0,0,0,,,,,30,test',
     'stytch-validation,TRUE,Free credits for passing Stytch fraud detection.,0,0,0,,,,,30,test',
     'referral-redeeming-bonus,FALSE,Specific desc marked false in CSV,0,0,0,,,,,30,test',
+    'custom,TRUE,long-expiry-test,0,0,0,,,,,180,test',
   ].join('\n');
 
   writeFileSync(csvPath, csvContent);
@@ -180,6 +183,11 @@ async function setup() {
     // Specific FALSE overrides catch-all TRUE: referral-redeeming-bonus has a
     // catch-all TRUE row, but the specific description below is marked FALSE.
     makeUser(USER_FALSE_OVERRIDE, 0, 10),
+    // Mixed expiry headroom: Orb clawed back spend, so balance=$5 but has $10 in
+    // free credits. Two $5 credits with different EXPIRE_IN_DAYS. Both would fully
+    // expire ($5 each), but only $5 headroom. The earlier-expiring (30d) should be
+    // preferred. acquired=$5, used=$0, balance=$5.
+    makeUser(USER_MIXED_EXPIRY_HEADROOM, 0, 5),
   ]);
 
   // Insert credits
@@ -287,6 +295,15 @@ async function setup() {
         category: 'referral-redeeming-bonus',
         description: 'Specific desc marked false in CSV',
       }),
+
+      // 19. Mixed expiry headroom: two $5 credits, only one fits within $5 headroom.
+      //     The 30-day credit (automatic-welcome-credits) should be expired.
+      //     The 180-day credit (custom/long-expiry-test) should be skipped.
+      makeCredit(USER_MIXED_EXPIRY_HEADROOM, 5, {
+        category: 'custom',
+        description: 'long-expiry-test',
+      }),
+      makeCredit(USER_MIXED_EXPIRY_HEADROOM, 5),
     ])
     .returning({ id: credit_transactions.id });
 
@@ -691,6 +708,26 @@ async function runAssertions(): Promise<AssertionResult[]> {
       name: 'Specific FALSE overrides catch-all TRUE: NOT touched',
       passed: credits.length === 0,
       detail: `Expected 0 credits with expiry_date, got ${credits.length}`,
+    });
+  }
+
+  // --- 25. Mixed expiry headroom: two $5 credits with different EXPIRE_IN_DAYS,
+  //     only $5 headroom. The earlier-expiring credit (30d, automatic-welcome-credits)
+  //     should be expired; the later-expiring one (180d, custom/long-expiry-test)
+  //     should be skipped.
+  {
+    const credits = creditsFor(USER_MIXED_EXPIRY_HEADROOM);
+    const earlyExpiry = credits.find(c => c.credit_category === 'automatic-welcome-credits');
+    const lateExpiry = credits.find(c => c.credit_category === 'custom');
+    results.push({
+      name: 'Mixed expiry headroom: earlier-expiring credit gets expiry',
+      passed: earlyExpiry?.expiry_date != null,
+      detail: `expiry_date: ${earlyExpiry?.expiry_date}`,
+    });
+    results.push({
+      name: 'Mixed expiry headroom: later-expiring credit skipped',
+      passed: lateExpiry?.expiry_date == null,
+      detail: `expiry_date: ${lateExpiry?.expiry_date}`,
     });
   }
 

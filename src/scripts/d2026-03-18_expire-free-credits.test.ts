@@ -303,7 +303,9 @@ async function cleanup() {
   if (testCsvPath) {
     try {
       unlinkSync(testCsvPath);
-    } catch {}
+    } catch {
+      // ignore — temp file cleanup is best-effort
+    }
   }
   console.log('  Done.\n');
 }

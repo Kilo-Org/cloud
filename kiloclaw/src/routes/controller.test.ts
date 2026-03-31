@@ -72,7 +72,7 @@ function makeBody(overrides?: Record<string, unknown>) {
   return {
     sandboxId,
     machineId: 'machine-1',
-    controllerVersion: '2026.3.22',
+    controllerVersion: '2026.3.23',
     controllerCommit: 'abc1234',
     openclawVersion: '2026.3.13',
     openclawCommit: 'def5678',

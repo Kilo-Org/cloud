@@ -1,0 +1,25 @@
+{
+  "name": "cloudflare-wasteland",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Wasteland: decentralized wanted boards via Durable Objects + DoltHub",
+  "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "dev": "wrangler dev --env dev --ip 0.0.0.0",
+    "start": "wrangler dev --env dev --ip 0.0.0.0",
+    "types": "wrangler types --include-runtime=false",
+    "typecheck": "tsc --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-wasteland/src"
+  },
+  "dependencies": {
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "^22",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

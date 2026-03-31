@@ -1,130 +1,169 @@
 /**
  * Adds expiry dates to free, non-expiring credit transactions so they expire
- * 30 days from when the script is run.
+ * after a configurable number of days (default 30) from when the script is run.
  *
- * The set of credits to expire is defined by (credit_category, description)
- * pairs copied from the reviewed spreadsheet. Each row must match both fields
- * (empty description matches any description for that category).
+ * The set of credits to expire is defined by a CSV file passed via --input.
+ * Each CSV row specifies a (CREDIT_CATEGORY, DESCRIPTION) pair and whether it
+ * should expire, along with an optional EXPIRE_IN_DAYS override.  An empty
+ * DESCRIPTION matches any description for that category.
  *
  * The script queries by credit_category first (much faster than scanning all
  * users), then processes each affected user.
  *
  * For each affected user the script:
  *   1. Fetches all personal credit transactions (excluding org-scoped).
- *   2. Simulates what would expire on EXPIRY_DATE using computeExpiration().
+ *   2. Simulates what would expire on the per-credit expiry date using
+ *      computeExpiration().
  *   3. Writes a JSONL log line with the user's current/projected balance and
  *      per-credit projected expired amounts.
  *   4. In --execute mode, sets expiry_date and expiration_baseline on the
  *      affected transactions and updates the user's next_credit_expiration_at.
  *
  * Usage:
- *   pnpm script src/scripts/d2026-03-18_expire-free-credits.ts
- *   pnpm script src/scripts/d2026-03-18_expire-free-credits.ts --execute
- *   pnpm script src/scripts/d2026-03-18_expire-free-credits.ts --batch-size=1000
- *   pnpm script src/scripts/d2026-03-18_expire-free-credits.ts --concurrency=20
+ *   pnpm script src/scripts/d2026-03-18_expire-free-credits.ts --input=path/to/credits.csv
+ *   pnpm script src/scripts/d2026-03-18_expire-free-credits.ts --input=path/to/credits.csv --execute
+ *   pnpm script src/scripts/d2026-03-18_expire-free-credits.ts --input=path/to/credits.csv --batch-size=1000
+ *   pnpm script src/scripts/d2026-03-18_expire-free-credits.ts --input=path/to/credits.csv --concurrency=20
  */
 
 import '../lib/load-env';
 
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, readFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
+import { parse as csvParse } from 'csv-parse/sync';
 import pLimit from 'p-limit';
 import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
-import { and, eq, gt, isNull, sql, inArray, or } from 'drizzle-orm';
+import { and, eq, gt, isNull, sql, inArray } from 'drizzle-orm';
 import { computeExpiration, type ExpiringTransaction } from '@/lib/creditExpiration';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const EXPIRY_DATE_OBJ = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-EXPIRY_DATE_OBJ.setUTCHours(0, 0, 0, 0);
-const EXPIRY_DATE = EXPIRY_DATE_OBJ.toISOString();
+const DEFAULT_EXPIRE_IN_DAYS = 30;
 
-// ── Excel data ───────────────────────────────────────────────────────────────
-// https://docs.google.com/spreadsheets/d/1G8EAUD39Hn3C01qNnjvWSEQpG3te0HIgiSi0yMD-AZk/edit?gid=458053126#gid=458053126
-// set the should expire filter to true
-// copy credit category name column (without the header)
-// same for credit category description
+// ── Types ────────────────────────────────────────────────────────────────────
 
-const creditCategoryNames = `
-orb_free_credits
-card-validation-upgrade
-stytch-validation
-automatic-welcome-credits
-XCURSOR-W92X91
-XCURSOR-REF-W92X91
-card-validation-no-stytch
-in-app-5usd
-payment-tripled
-THEO
-referral-referring-bonus
-referral-redeeming-bonus
-windsurf-promo-2025-07-12
-orb_free_credits
-THEOKILO
-orb_free_credits
-orb_free_credits
-POWER-OF-EUROPE
-windsurf-promo-2025-07-12
-orb_free_credits
-windsurf-promo-2025-07-12
-windsurf-promo-2025-07-12
-orb_free_credits
-custom
-custom
-custom
-custom`;
+type CsvRow = {
+  category: string;
+  shouldExpire: boolean;
+  description: string | null;
+  expireInDays: number;
+};
 
-const creditCategoryDescriptions = `
+type PairKey = string;
+const pairKey = (cat: string, desc: string | null): PairKey =>
+  desc ? `${cat} | ${desc}` : `${cat} | (any)`;
 
-Upgrade credits for passing card validation after having already passed Stytch validation.
-Free credits for passing Stytch fraud detection.
-Free credits for new users, obtained by stych approval, card validation, or maybe some other method
-Cursor promo 2025-07-17
-Cursor promo 2025-07-17 (referral)
-Free credits for passing card validation without prior Stytch validation.
-In-app survey completion
+type RowLookup = {
+  shouldExpire: boolean;
+  expireInDays: number;
+  expiryDate: Date;
+  expiryDateIso: string;
+};
 
-Influencer: Theo T3
+// ── CSV parsing ──────────────────────────────────────────────────────────────
 
+function parseCsv(inputPath: string): {
+  rows: CsvRow[];
+  lookup: Map<PairKey, RowLookup>;
+  categoriesToQuery: string[];
+} {
+  const content = readFileSync(inputPath, 'utf-8');
+  const rawRows = csvParse(content, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+  }) as Record<string, string>[];
 
-Windsurf promo 2025-07-12 (Brendan O'Leary)
-
-Influencer: Theo T3
-Cohort B - Automated May 1-time early adopter credit
-Cohort 100A - Automated May 1-time early adopter credit
-Hackathon: Power of Europe Amsterdam 2025
-Windsurf promo 2025-07-12 (Olesya Elfimova)
-Email 100 non-expire (via script)
-Windsurf promo 2025-07-12 (Tirumari Jothi)
-Windsurf promo 2025-07-12
-2025-05-24 JP gives stragglers $100
-Dev (Catriel Müller)
-workwork (Eamon Nerbonne)
-Darko: I thought he's a leecher. He paid us in Stripe..a lot (verified in Orb) (Darko Gjorgjievski)
-Part-time UX hire, providing tokens to use product and be productive (Joshua Lambert)`;
-
-// ── Parse excel rows into (category, description) pairs ─────────────────────
-
-type CreditCategoryRow = { category: string; description: string | null };
-
-function parseCreditCategoryRows(): CreditCategoryRow[] {
-  // Split on newlines, dropping the first empty line from the template literal
-  const names = creditCategoryNames.split('\n').slice(1);
-  const descriptions = creditCategoryDescriptions.split('\n').slice(1);
-
-  if (names.length !== descriptions.length) {
-    throw new Error(
-      `Mismatch: ${names.length} category names vs ${descriptions.length} descriptions`
-    );
+  // Validate required columns
+  const requiredColumns = ['CREDIT_CATEGORY', 'SHOULD_EXPIRE', 'DESCRIPTION', 'EXPIRE_IN_DAYS'];
+  if (rawRows.length === 0) {
+    throw new Error(`CSV file "${inputPath}" contains no data rows`);
+  }
+  const firstRow = rawRows[0];
+  for (const col of requiredColumns) {
+    if (!(col in firstRow)) {
+      throw new Error(`CSV is missing required column: ${col}`);
+    }
   }
 
-  return names.map((name, i) => ({
-    category: name.trim(),
-    description: descriptions[i].trim() || null,
-  }));
+  const rows: CsvRow[] = [];
+  const lookup = new Map<PairKey, RowLookup>();
+  const seenPairs = new Set<PairKey>();
+
+  for (const raw of rawRows) {
+    const category = raw['CREDIT_CATEGORY'] ?? '';
+    const shouldExpire = (raw['SHOULD_EXPIRE'] ?? '').toUpperCase() === 'TRUE';
+    const rawDescription = raw['DESCRIPTION'] ?? '';
+    const description = rawDescription === '' ? null : rawDescription;
+    const rawExpireInDays = raw['EXPIRE_IN_DAYS'] ?? '';
+    let expireInDays: number;
+    if (rawExpireInDays === '') {
+      expireInDays = DEFAULT_EXPIRE_IN_DAYS;
+    } else {
+      const parsed = parseInt(rawExpireInDays, 10);
+      if (isNaN(parsed) || parsed <= 0) {
+        throw new Error(
+          `Invalid EXPIRE_IN_DAYS value "${rawExpireInDays}" for category "${category}"`
+        );
+      }
+      expireInDays = parsed;
+    }
+
+    const key = pairKey(category, description);
+    if (seenPairs.has(key)) {
+      throw new Error(`Duplicate (category, description) pair in CSV: "${key}"`);
+    }
+    seenPairs.add(key);
+
+    const row: CsvRow = { category, shouldExpire, description, expireInDays };
+    rows.push(row);
+
+    // Pre-compute expiry date: now + expireInDays, truncated to midnight UTC
+    const expiryDate = new Date(Date.now() + expireInDays * 24 * 60 * 60 * 1000);
+    expiryDate.setUTCHours(0, 0, 0, 0);
+    const expiryDateIso = expiryDate.toISOString();
+
+    lookup.set(key, { shouldExpire, expireInDays, expiryDate, expiryDateIso });
+  }
+
+  // Distinct categories that have at least one shouldExpire=true row
+  const categoriesToQuery = [...new Set(rows.filter(r => r.shouldExpire).map(r => r.category))];
+
+  return { rows, lookup, categoriesToQuery };
+}
+
+// ── Credit resolution ────────────────────────────────────────────────────────
+
+function resolveCredit(
+  lookup: Map<PairKey, RowLookup>,
+  category: string,
+  description: string | null
+): RowLookup | null {
+  // Try specific match first
+  const specific = lookup.get(pairKey(category, description));
+  if (specific) return specific;
+  // Fall back to catch-all (null description)
+  const catchAll = lookup.get(pairKey(category, null));
+  if (catchAll) return catchAll;
+  return null;
+}
+
+/** Resolve a credit that was already filtered to shouldExpire=true. Throws if no match. */
+function resolveCreditOrThrow(
+  lookup: Map<PairKey, RowLookup>,
+  category: string,
+  description: string | null
+): RowLookup {
+  const resolved = resolveCredit(lookup, category, description);
+  if (!resolved) {
+    throw new Error(
+      `No CSV row found for (${category}, ${description ?? '(any)'}). This should not happen — credit passed the shouldExpire filter.`
+    );
+  }
+  return resolved;
 }
 
 // ── Arg parsing ──────────────────────────────────────────────────────────────
@@ -134,12 +173,14 @@ function parseArgs(): {
   yes: boolean;
   batchSize: number;
   concurrency: number;
+  input: string;
 } {
   const args = process.argv.slice(2);
   let execute = false;
   let yes = false;
   let batchSize = 10_000;
   let concurrency = 50;
+  let input = '';
 
   for (const arg of args) {
     if (arg === '--execute') {
@@ -160,10 +201,17 @@ function parseArgs(): {
         process.exit(1);
       }
       concurrency = value;
+    } else if (arg.startsWith('--input=')) {
+      input = arg.slice('--input='.length);
     }
   }
 
-  return { execute, yes, batchSize, concurrency };
+  if (!input) {
+    console.error('Missing required argument: --input=<path>');
+    process.exit(1);
+  }
+
+  return { execute, yes, batchSize, concurrency, input };
 }
 
 // ── Process a single user ────────────────────────────────────────────────────
@@ -173,7 +221,8 @@ async function processUser(
   affectedCredits: (typeof credit_transactions.$inferSelect)[],
   execute: boolean,
   output: ReturnType<typeof createWriteStream>,
-  mutationLog: ReturnType<typeof createWriteStream>
+  mutationLog: ReturnType<typeof createWriteStream>,
+  lookup: Map<PairKey, RowLookup>
 ): Promise<{ creditsAffected: number; creditsSkipped: number; projectedExpiration: number }> {
   // 1. Fetch user info
   const [user] = await db
@@ -223,20 +272,31 @@ async function processUser(
       is_free: t.is_free,
     }));
 
-  const modifiedAffected: ExpiringTransaction[] = affectedCredits.map(t => ({
-    id: t.id,
-    amount_microdollars: t.amount_microdollars,
-    expiration_baseline_microdollars_used: t.original_baseline_microdollars_used ?? 0,
-    expiry_date: EXPIRY_DATE,
-    description: t.description,
-    is_free: t.is_free,
-  }));
+  // Resolve per-credit expiry dates from lookup
+  const modifiedAffected: ExpiringTransaction[] = affectedCredits.map(t => {
+    const resolved = resolveCreditOrThrow(lookup, t.credit_category ?? '', t.description);
+    const expiryDateIso = resolved.expiryDateIso;
+    return {
+      id: t.id,
+      amount_microdollars: t.amount_microdollars,
+      expiration_baseline_microdollars_used: t.original_baseline_microdollars_used ?? 0,
+      expiry_date: expiryDateIso,
+      description: t.description,
+      is_free: t.is_free,
+    };
+  });
 
   const simulationInput = [...existingExpiring, ...modifiedAffected];
 
-  // 5. Run simulation — use EXPIRY_DATE_OBJ as `now` to project what would happen at expiry
+  // 5. Run simulation — use the latest expiry date among modifiedAffected as `now`
+  //    to project what would happen at expiry
   const entity = { id: user.id, microdollars_used: user.microdollars_used };
-  const { newTransactions } = computeExpiration(simulationInput, entity, EXPIRY_DATE_OBJ, user.id);
+  const latestExpiry = modifiedAffected.reduce<Date>((latest, t) => {
+    const d = new Date(t.expiry_date as string);
+    return d > latest ? d : latest;
+  }, new Date(0));
+  const simulationNow = latestExpiry.getTime() > 0 ? latestExpiry : new Date();
+  const { newTransactions } = computeExpiration(simulationInput, entity, simulationNow, user.id);
 
   // 6. Map projected expired amounts back to affected credits
   const expiredByOriginalId = new Map(
@@ -294,22 +354,40 @@ async function processUser(
 
   // 8. Execute mode: write DB changes (only for credits that fit within headroom)
   if (execute && creditsToExpire.length > 0) {
-    const idsToExpire = creditsToExpire.map(t => t.id);
+    // Find earliest expiry date among credits to expire
+    const earliestExpiry = creditsToExpire.reduce<string>((earliest, credit) => {
+      const resolved = resolveCreditOrThrow(
+        lookup,
+        credit.credit_category ?? '',
+        credit.description
+      );
+      return earliest === '' || resolved.expiryDateIso < earliest
+        ? resolved.expiryDateIso
+        : earliest;
+    }, '');
 
     await db.transaction(async tx => {
-      await tx
-        .update(credit_transactions)
-        .set({
-          expiry_date: EXPIRY_DATE,
-          expiration_baseline_microdollars_used: sql`COALESCE(${credit_transactions.original_baseline_microdollars_used}, 0)`,
-        })
-        .where(inArray(credit_transactions.id, idsToExpire));
+      // Update each credit individually with its own expiry date
+      for (const credit of creditsToExpire) {
+        const resolved = resolveCreditOrThrow(
+          lookup,
+          credit.credit_category ?? '',
+          credit.description
+        );
+        await tx
+          .update(credit_transactions)
+          .set({
+            expiry_date: resolved.expiryDateIso,
+            expiration_baseline_microdollars_used: sql`COALESCE(${credit_transactions.original_baseline_microdollars_used}, 0)`,
+          })
+          .where(eq(credit_transactions.id, credit.id));
+      }
 
       // COALESCE needed because LEAST(NULL, x) returns NULL in PostgreSQL
       await tx
         .update(kilocode_users)
         .set({
-          next_credit_expiration_at: sql`COALESCE(LEAST(${kilocode_users.next_credit_expiration_at}, ${EXPIRY_DATE}), ${EXPIRY_DATE})`,
+          next_credit_expiration_at: sql`COALESCE(LEAST(${kilocode_users.next_credit_expiration_at}, ${earliestExpiry}), ${earliestExpiry})`,
         })
         .where(eq(kilocode_users.id, user.id));
     });
@@ -318,7 +396,24 @@ async function processUser(
   // 9. Log mutations (both dry run and execute — after commit in execute mode
   //    so rollbacks don't leave phantom entries)
   if (creditsToExpire.length > 0) {
+    // Find earliest expiry for user record log
+    const earliestExpiryForLog = creditsToExpire.reduce<string>((earliest, credit) => {
+      const resolved = resolveCreditOrThrow(
+        lookup,
+        credit.credit_category ?? '',
+        credit.description
+      );
+      return earliest === '' || resolved.expiryDateIso < earliest
+        ? resolved.expiryDateIso
+        : earliest;
+    }, '');
+
     for (const credit of creditsToExpire) {
+      const resolved = resolveCreditOrThrow(
+        lookup,
+        credit.credit_category ?? '',
+        credit.description
+      );
       mutationLog.write(
         JSON.stringify({
           type: 'credit_transaction',
@@ -329,7 +424,7 @@ async function processUser(
             expiration_baseline_microdollars_used: credit.expiration_baseline_microdollars_used,
           },
           new: {
-            expiry_date: EXPIRY_DATE,
+            expiry_date: resolved.expiryDateIso,
             expiration_baseline_microdollars_used: credit.original_baseline_microdollars_used ?? 0,
           },
         }) + '\n'
@@ -343,7 +438,7 @@ async function processUser(
           next_credit_expiration_at: user.next_credit_expiration_at,
         },
         new: {
-          next_credit_expiration_at_input: EXPIRY_DATE,
+          next_credit_expiration_at_input: earliestExpiryForLog,
         },
       }) + '\n'
     );
@@ -365,17 +460,25 @@ async function processUser(
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const { execute, yes, batchSize, concurrency } = parseArgs();
-  const rows = parseCreditCategoryRows();
+  const { execute, yes, batchSize, concurrency, input } = parseArgs();
+  const { rows, lookup, categoriesToQuery } = parseCsv(input);
+
+  const trueRows = rows.filter(r => r.shouldExpire);
 
   console.log(`Mode: ${execute ? 'EXECUTE' : 'DRY RUN'}`);
-  console.log(`Expiry date: ${EXPIRY_DATE}`);
-  console.log(`Rows: ${rows.length} (category, description) pairs`);
-  console.log(`Batch size: ${batchSize}`);
+  console.log(`Input file:  ${input}`);
+  console.log(`Total rows:  ${rows.length}`);
+  console.log(`TRUE rows:   ${trueRows.length}`);
+  console.log(`Categories to query: ${categoriesToQuery.join(', ')}`);
+  console.log(`Batch size:  ${batchSize}`);
   console.log(`Concurrency: ${concurrency}\n`);
 
-  for (const row of rows) {
-    console.log(`  ${row.category} | ${row.description ?? '(any)'}`);
+  console.log('Rows to expire:');
+  for (const row of trueRows) {
+    const rowLookup = lookup.get(pairKey(row.category, row.description));
+    console.log(
+      `  ${row.category} | ${row.description ?? '(any)'}  [expire_in_days=${row.expireInDays}, expiry=${rowLookup?.expiryDateIso ?? '?'}]`
+    );
   }
   console.log();
 
@@ -402,18 +505,6 @@ async function main() {
   }
   console.log();
 
-  // Build the OR condition matching all (category, description) pairs.
-  // Empty description means "match any description for that category".
-  const rowConditions = rows.map(row =>
-    row.description
-      ? and(
-          eq(credit_transactions.credit_category, row.category),
-          eq(credit_transactions.description, row.description)
-        )
-      : eq(credit_transactions.credit_category, row.category)
-  );
-  const categoryFilter = rowConditions.length === 1 ? rowConditions[0] : or(...rowConditions);
-
   const outputDir = path.join(__dirname, 'output');
   await mkdir(outputDir, { recursive: true });
   const timestamp = new Date().toISOString().replace(/:/g, '-');
@@ -430,9 +521,6 @@ async function main() {
   const limit = pLimit(concurrency);
 
   // Per-(category, description) stats
-  type PairKey = string;
-  const pairKey = (cat: string, desc: string | null): PairKey =>
-    desc ? `${cat} | ${desc}` : `${cat} | (any)`;
   const pairStats = new Map<
     PairKey,
     { credits: number; amount: number; projectedExpiration: number }
@@ -453,7 +541,7 @@ async function main() {
   let totalErrors = 0;
 
   const baseFilter = and(
-    categoryFilter,
+    inArray(credit_transactions.credit_category, categoriesToQuery),
     eq(credit_transactions.is_free, true),
     isNull(credit_transactions.expiry_date),
     isNull(credit_transactions.organization_id)
@@ -470,17 +558,29 @@ async function main() {
       .orderBy(credit_transactions.kilo_user_id)
       .limit(batchSize);
 
-    const batch = await db
+    const rawBatch = await db
       .select()
       .from(credit_transactions)
       .where(and(baseFilter, inArray(credit_transactions.kilo_user_id, userIdSubquery)));
 
-    if (batch.length === 0) break;
+    if (rawBatch.length === 0) break;
+
+    // App-side filtering: only keep credits where resolveCredit returns shouldExpire=true
+    const batch = rawBatch.filter(credit => {
+      const resolved = resolveCredit(lookup, credit.credit_category ?? '', credit.description);
+      return resolved?.shouldExpire === true;
+    });
+
+    if (batch.length === 0) {
+      // Advance cursor using the raw batch to avoid infinite loop
+      lastUserId = [...new Set(rawBatch.map(c => c.kilo_user_id))].sort().pop() ?? lastUserId;
+      continue;
+    }
+
     totalCredits += batch.length;
 
-    // Track per-pair stats from raw batch
+    // Track per-pair stats from filtered batch
     for (const credit of batch) {
-      // Find the matching row (specific description match first, then any-description)
       const specificKey = pairKey(credit.credit_category ?? '', credit.description);
       const anyKey = pairKey(credit.credit_category ?? '', null);
       const stats = pairStats.get(specificKey) ?? pairStats.get(anyKey);
@@ -504,7 +604,7 @@ async function main() {
     const results = await Promise.allSettled(
       [...byUser.entries()].map(([userId, credits]) =>
         limit(async () => {
-          const result = await processUser(userId, credits, execute, output, mutationLog);
+          const result = await processUser(userId, credits, execute, output, mutationLog, lookup);
           return { userId, result };
         })
       )

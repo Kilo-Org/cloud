@@ -39,6 +39,7 @@ const USER_BUY_USE_FREE = `${TEST_PREFIX}-buy-use-free`;
 const USER_FREE_USE_BUY = `${TEST_PREFIX}-free-use-buy`;
 const USER_ORB_DOUBLE_DEDUCT = `${TEST_PREFIX}-orb-double-deduct`;
 const USER_ORB_EXISTING_EXPIRY = `${TEST_PREFIX}-orb-existing-expiry`;
+const USER_FALSE_OVERRIDE = `${TEST_PREFIX}-false-override`;
 
 const ALL_USER_IDS = [
   USER_FULLY_SPENT,
@@ -58,6 +59,7 @@ const ALL_USER_IDS = [
   USER_FREE_USE_BUY,
   USER_ORB_DOUBLE_DEDUCT,
   USER_ORB_EXISTING_EXPIRY,
+  USER_FALSE_OVERRIDE,
 ];
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -125,6 +127,7 @@ function generateTestCsv(): string {
     'card-validation-upgrade,TRUE,Upgrade credits for passing card validation after having already passed Stytch validation.,0,0,0,,,,,30,test',
     'card-validation-no-stytch,TRUE,Free credits for passing card validation without prior Stytch validation.,0,0,0,,,,,30,test',
     'stytch-validation,TRUE,Free credits for passing Stytch fraud detection.,0,0,0,,,,,30,test',
+    'referral-redeeming-bonus,FALSE,Specific desc marked false in CSV,0,0,0,,,,,30,test',
   ].join('\n');
 
   writeFileSync(csvPath, csvContent);
@@ -174,6 +177,9 @@ async function setup() {
       ...makeUser(USER_ORB_EXISTING_EXPIRY, 0, 5),
       next_credit_expiration_at: EARLIER_EXPIRY,
     },
+    // Specific FALSE overrides catch-all TRUE: referral-redeeming-bonus has a
+    // catch-all TRUE row, but the specific description below is marked FALSE.
+    makeUser(USER_FALSE_OVERRIDE, 0, 10),
   ]);
 
   // Insert credits
@@ -273,6 +279,14 @@ async function setup() {
       }),
       //     $5 new free credit (no expiry yet, will be tagged by this script)
       makeCredit(USER_ORB_EXISTING_EXPIRY, 5),
+
+      // 18. Specific FALSE overrides catch-all TRUE:
+      //     referral-redeeming-bonus has a catch-all TRUE row in the CSV,
+      //     but this specific description is marked FALSE → should NOT be expired.
+      makeCredit(USER_FALSE_OVERRIDE, 10, {
+        category: 'referral-redeeming-bonus',
+        description: 'Specific desc marked false in CSV',
+      }),
     ])
     .returning({ id: credit_transactions.id });
 
@@ -663,6 +677,18 @@ async function runAssertions(): Promise<AssertionResult[]> {
       name: 'Orb existing-expiry: new credit skipped (no expiry set)',
       passed: newCredit?.expiry_date == null,
       detail: `expiry_date: ${newCredit?.expiry_date}`,
+    });
+  }
+
+  // --- 24. Specific FALSE overrides catch-all TRUE:
+  //     referral-redeeming-bonus has catch-all TRUE, but the specific description
+  //     is marked FALSE → credit should NOT have expiry_date set.
+  {
+    const credits = creditsFor(USER_FALSE_OVERRIDE).filter(c => c.expiry_date != null);
+    results.push({
+      name: 'Specific FALSE overrides catch-all TRUE: NOT touched',
+      passed: credits.length === 0,
+      detail: `Expected 0 credits with expiry_date, got ${credits.length}`,
     });
   }
 

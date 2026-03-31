@@ -43,14 +43,10 @@ const CIRCUIT_BREAKER_FAILURE_THRESHOLD = 20;
 const CIRCUIT_BREAKER_WINDOW_MINUTES = 30;
 
 /**
- * Town-level dispatch circuit breaker. Checks whether too many beads
- * have had dispatch attempts recently without reaching a terminal state.
- * If the threshold is exceeded, all dispatch_agent actions are suppressed
- * and a mayor escalation is emitted.
- *
- * Counts any bead with a recent dispatch attempt (regardless of status)
- * that is not yet closed or succeeded. This captures failures that leave
- * beads in_progress (the normal outcome of a failed container start).
+ * Town-level dispatch circuit breaker. Counts beads that have definitively
+ * failed dispatch — either already in 'failed' status or having exhausted
+ * all dispatch attempts — within the recent window. Healthy in-progress
+ * beads are excluded so normal concurrent work doesn't trip the breaker.
  */
 function checkDispatchCircuitBreaker(sql: SqlStorage): Action[] {
   const rows = z
@@ -62,9 +58,11 @@ function checkDispatchCircuitBreaker(sql: SqlStorage): Action[] {
         /* sql */ `
           SELECT count(*) as failure_count
           FROM ${beads}
-          WHERE ${beads.dispatch_attempts} > 0
-            AND ${beads.last_dispatch_attempt_at} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-${CIRCUIT_BREAKER_WINDOW_MINUTES} minutes')
-            AND ${beads.status} NOT IN ('closed')
+          WHERE ${beads.last_dispatch_attempt_at} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-${CIRCUIT_BREAKER_WINDOW_MINUTES} minutes')
+            AND (
+              ${beads.status} = 'failed'
+              OR ${beads.dispatch_attempts} >= ${MAX_DISPATCH_ATTEMPTS}
+            )
         `,
         []
       ),
@@ -1161,11 +1159,8 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
     const mr = mrRows[0];
     if (mr.type !== 'merge_request' || mr.status !== 'in_progress') continue;
 
-    // Exponential backoff using bead's last_dispatch_attempt_at
-    const cooldownMs = getDispatchCooldownMs(mr.dispatch_attempts);
-    if (!staleMs(mr.last_dispatch_attempt_at, cooldownMs)) continue;
-
-    // Per-bead dispatch cap (uses bead counter, not agent counter)
+    // Per-bead dispatch cap — check before cooldown so max-attempt MR
+    // beads are failed immediately rather than waiting for the cooldown.
     if (mr.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
       actions.push({
         type: 'transition_bead',
@@ -1182,6 +1177,10 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
       });
       continue;
     }
+
+    // Exponential backoff using bead's last_dispatch_attempt_at
+    const cooldownMs = getDispatchCooldownMs(mr.dispatch_attempts);
+    if (!staleMs(mr.last_dispatch_attempt_at, cooldownMs)) continue;
 
     // Town-level circuit breaker suppresses dispatch
     if (circuitBreakerOpen) continue;

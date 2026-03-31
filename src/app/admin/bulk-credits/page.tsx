@@ -419,9 +419,7 @@ function BulkCreditsTab() {
                       {item.email}
                     </li>
                   ))}
-                  {unmatchedEmails.length > 5 && (
-                    <li>...and {unmatchedEmails.length - 5} more</li>
-                  )}
+                  {unmatchedEmails.length > 5 && <li>...and {unmatchedEmails.length - 5} more</li>}
                 </ul>
               </div>
             )}

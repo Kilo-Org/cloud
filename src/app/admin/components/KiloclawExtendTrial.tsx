@@ -44,18 +44,6 @@ type CsvData = {
   rows: Record<string, string>[];
 };
 
-type MatchedUser = {
-  email: string;
-  userId: string;
-  userName: string | null;
-  subscriptionStatus: string | null;
-  instanceId: string | null;
-};
-
-type UnmatchedEmail = {
-  email: string;
-};
-
 type TrialResult = {
   email: string;
   userId: string;
@@ -164,7 +152,10 @@ function parseEmailList(text: string): string[] {
   const parts = text.split(/[\n,;\s]+/);
   for (const part of parts) {
     // Strip surrounding quotes, angle brackets, and whitespace
-    const val = part.replace(/^[<"'\s]+|[>"'\s]+$/g, '').toLowerCase().trim();
+    const val = part
+      .replace(/^[<"'\s]+|[>"'\s]+$/g, '')
+      .toLowerCase()
+      .trim();
     if (val && val.includes('@') && val.includes('.') && !seen.has(val)) {
       seen.add(val);
       emails.push(val);
@@ -340,9 +331,7 @@ export function KiloclawExtendTrial() {
 
   const handleExtendTrials = () => {
     const eligibleEmails = matchedUsers
-      .filter(
-        u => u.subscriptionStatus === 'trialing' || u.subscriptionStatus === 'canceled'
-      )
+      .filter(u => u.subscriptionStatus === 'trialing' || u.subscriptionStatus === 'canceled')
       .map(u => u.email);
     if (eligibleEmails.length === 0) return;
     const days = parseInt(trialDays, 10);
@@ -422,10 +411,7 @@ export function KiloclawExtendTrial() {
 
   const ineligibleCount = matchedUsers.length - eligibleCount;
 
-  const canMatch =
-    inputMode === 'csv'
-      ? selectedColumn && csvEmailCount > 0
-      : pastedEmailCount > 0;
+  const canMatch = inputMode === 'csv' ? selectedColumn && csvEmailCount > 0 : pastedEmailCount > 0;
 
   return (
     <div className="flex w-full flex-col gap-y-6">
@@ -743,9 +729,7 @@ export function KiloclawExtendTrial() {
                         <TableRow key={user.userId}>
                           <TableCell className="font-mono text-sm">{user.email}</TableCell>
                           <TableCell>{user.userName ?? '—'}</TableCell>
-                          <TableCell>
-                            {subscriptionStatusBadge(user.subscriptionStatus)}
-                          </TableCell>
+                          <TableCell>{subscriptionStatusBadge(user.subscriptionStatus)}</TableCell>
                           <TableCell className="text-muted-foreground font-mono text-xs">
                             {user.userId}
                           </TableCell>
@@ -757,7 +741,9 @@ export function KiloclawExtendTrial() {
 
                 <Button
                   onClick={handleExtendTrials}
-                  disabled={extendTrialsMutation.isPending || eligibleCount === 0 || results !== null}
+                  disabled={
+                    extendTrialsMutation.isPending || eligibleCount === 0 || results !== null
+                  }
                   size="lg"
                 >
                   {extendTrialsMutation.isPending ? (
@@ -785,11 +771,7 @@ export function KiloclawExtendTrial() {
                     {unmatchedEmails.length} email{unmatchedEmails.length !== 1 ? 's' : ''} not
                     found in the database:
                   </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDownloadUnmatched}
-                  >
+                  <Button variant="outline" size="sm" onClick={handleDownloadUnmatched}>
                     <Download className="mr-1 h-3 w-3" />
                     Export
                   </Button>

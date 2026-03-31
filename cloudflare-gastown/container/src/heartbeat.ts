@@ -41,16 +41,28 @@ export function stopHeartbeat(): void {
 }
 
 /**
+ * Notify the TownDO that the replacement container is ready.
+ * Exported so the health endpoint can trigger it when the TownDO
+ * passes the drain nonce via headers (handles idle containers that
+ * have no running agents and thus no per-agent heartbeats).
+ */
+export async function notifyContainerReady(townId: string, drainNonce: string): Promise<void> {
+  if (containerReadyAcknowledged) return;
+  await acknowledgeContainerReady(townId, drainNonce);
+}
+
+/**
  * Call POST /container-ready to acknowledge that this is a fresh
  * container replacing an evicted one. Clears the TownDO drain flag
  * so the reconciler can resume dispatching.
  */
 async function acknowledgeContainerReady(townId: string, drainNonce: string): Promise<void> {
+  const apiUrl = gastownApiUrl ?? process.env.GASTOWN_API_URL;
   const currentToken = process.env.GASTOWN_CONTAINER_TOKEN ?? sessionToken;
-  if (!gastownApiUrl || !currentToken) return;
+  if (!apiUrl || !currentToken) return;
 
   try {
-    const response = await fetch(`${gastownApiUrl}/api/towns/${townId}/container-ready`, {
+    const response = await fetch(`${apiUrl}/api/towns/${townId}/container-ready`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -78,6 +90,12 @@ async function sendHeartbeats(): Promise<void> {
   if (!gastownApiUrl || !currentToken) return;
 
   const active = listAgents().filter(a => a.status === 'running' || a.status === 'starting');
+
+  // When no agents are active, the per-agent heartbeat loop has
+  // nothing to send. Idle container drain acknowledgment is handled
+  // by the /health endpoint instead (the TownDO passes the nonce via
+  // X-Drain-Nonce headers in ensureContainerReady).
+  if (active.length === 0) return;
 
   for (const agent of active) {
     const payload: HeartbeatPayload = {

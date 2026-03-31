@@ -134,7 +134,11 @@ import {
   handleListEscalations,
   handleAcknowledgeEscalation,
 } from './handlers/town-escalations.handler';
-import { handleContainerEviction, handleContainerReady } from './handlers/town-eviction.handler';
+import {
+  handleContainerEviction,
+  handleContainerReady,
+  handleDrainStatus,
+} from './handlers/town-eviction.handler';
 
 export { GastownUserDO } from './dos/GastownUser.do';
 export { GastownOrgDO } from './dos/GastownOrg.do';
@@ -493,6 +497,12 @@ app.post('/api/towns/:townId/container-eviction', c =>
 app.post('/api/towns/:townId/container-ready', c =>
   instrumented(c, 'POST /api/towns/:townId/container-ready', () =>
     handleContainerReady(c, c.req.param())
+  )
+);
+
+app.get('/api/towns/:townId/drain-status', c =>
+  instrumented(c, 'GET /api/towns/:townId/drain-status', () =>
+    handleDrainStatus(c, c.req.param())
   )
 );
 

@@ -54,6 +54,48 @@ export async function handleContainerEviction(
 }
 
 /**
+ * GET /api/towns/:townId/drain-status
+ *
+ * Lightweight endpoint for the container to poll drain state. Used by
+ * the heartbeat module when no agents are running — the per-agent
+ * heartbeat loop has nothing to iterate, so a separate check is needed
+ * to discover the drain nonce and call /container-ready.
+ *
+ * Authenticated with the container-scoped JWT.
+ */
+export async function handleDrainStatus(
+  c: Context<GastownEnv>,
+  params: { townId: string }
+): Promise<Response> {
+  const token = extractBearerToken(c.req.header('Authorization'));
+  if (!token) {
+    return c.json(resError('Authentication required'), 401);
+  }
+
+  const secret = await resolveSecret(c.env.GASTOWN_JWT_SECRET);
+  if (!secret) {
+    return c.json(resError('Internal server error'), 500);
+  }
+
+  const result = verifyContainerJWT(token, secret);
+  if (!result.success) {
+    return c.json(resError(result.error), 401);
+  }
+
+  if (result.payload.townId !== params.townId) {
+    return c.json(resError('Cross-town access denied'), 403);
+  }
+
+  const town = getTownDOStub(c.env, params.townId);
+  const [draining, drainNonce] = await Promise.all([
+    town.isDraining(),
+    town.getDrainNonce(),
+  ]);
+
+  return c.json(resSuccess({ draining, drainNonce }), 200);
+}
+
+/**
  * POST /api/towns/:townId/container-ready
  *
  * Called by the replacement container on startup to signal readiness.

@@ -13,7 +13,7 @@ import {
   getAgentEvents,
   registerEventSink,
 } from './process-manager';
-import { startHeartbeat, stopHeartbeat } from './heartbeat';
+import { startHeartbeat, stopHeartbeat, notifyContainerReady } from './heartbeat';
 import { pushContext as pushDashboardContext } from './dashboard-context';
 import { mergeBranch, setupRigBrowseWorktree } from './git-manager';
 import {
@@ -92,6 +92,15 @@ app.use('*', async (c, next) => {
 
 // GET /health
 app.get('/health', c => {
+  // When the TownDO is draining, it passes the drain nonce and town
+  // ID via headers so idle containers (no running agents) can
+  // acknowledge readiness and clear the drain flag.
+  const drainNonce = c.req.header('X-Drain-Nonce');
+  const townId = c.req.header('X-Town-Id');
+  if (drainNonce && townId) {
+    void notifyContainerReady(townId, drainNonce);
+  }
+
   const response: HealthResponse = {
     status: 'ok',
     agents: activeAgentCount(),

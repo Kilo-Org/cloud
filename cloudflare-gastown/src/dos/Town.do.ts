@@ -1179,6 +1179,13 @@ export class TownDO extends DurableObject<Env> {
 
   // ── Heartbeat ─────────────────────────────────────────────────────
 
+  /**
+   * Update an agent's heartbeat timestamp. Returns the current drain
+   * nonce (if draining) so the caller can include it in the HTTP
+   * response without a second RPC — preventing a TOCTOU race where
+   * an in-flight heartbeat from the old container could observe a
+   * nonce generated between two separate DO calls.
+   */
   async touchAgentHeartbeat(
     agentId: string,
     watermark?: {
@@ -1186,9 +1193,10 @@ export class TownDO extends DurableObject<Env> {
       lastEventAt?: string | null;
       activeTools?: string[];
     }
-  ): Promise<void> {
+  ): Promise<{ drainNonce: string | null }> {
     agents.touchAgent(this.sql, agentId, watermark);
     await this.armAlarmIfNeeded();
+    return { drainNonce: this._drainNonce };
   }
 
   async updateAgentStatusMessage(agentId: string, message: string): Promise<void> {
@@ -3756,8 +3764,16 @@ export class TownDO extends DurableObject<Env> {
 
     try {
       const container = getTownContainerStub(this.env, townId);
+      const headers: Record<string, string> = {};
+      // When draining, pass the nonce and town ID so the container
+      // can call /container-ready even if it has no running agents.
+      if (this._draining && this._drainNonce) {
+        headers['X-Drain-Nonce'] = this._drainNonce;
+        headers['X-Town-Id'] = townId;
+      }
       await container.fetch('http://container/health', {
         signal: AbortSignal.timeout(5_000),
+        headers,
       });
     } catch {
       // Container is starting up or unavailable — alarm will retry

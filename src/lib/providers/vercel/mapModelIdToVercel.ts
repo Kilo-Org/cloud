@@ -2,7 +2,6 @@ import { kiloFreeModels } from '@/lib/models';
 import { inferVercelFirstPartyInferenceProviderForModel } from '@/lib/providers/openrouter/inference-provider-id';
 
 const vercelModelIdMapping: Record<string, string | undefined> = {
-  'arcee-ai/trinity-large-preview:free': 'arcee-ai/trinity-large-preview',
   'mistralai/codestral-2508': 'mistral/codestral',
   'mistralai/devstral-2512': 'mistral/devstral-2',
   'mistralai/mistral-embed-2312': 'mistral/mistral-embed',

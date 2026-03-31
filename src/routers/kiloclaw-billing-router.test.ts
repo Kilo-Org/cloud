@@ -1938,9 +1938,9 @@ describe('enrollWithCredits', () => {
     expect(sub.stripe_subscription_id).toBeNull();
     expect(sub.credit_renewal_at).not.toBeNull();
     expect(sub.cancel_at_period_end).toBe(false);
-    // Stale trial fields must be cleared on conversion to paid
-    expect(sub.trial_started_at).toBeNull();
-    expect(sub.trial_ends_at).toBeNull();
+    // Trial dates are preserved for historical visibility in billing status / admin views
+    expect(sub.trial_started_at).not.toBeNull();
+    expect(sub.trial_ends_at).not.toBeNull();
 
     // Verify credit deduction at intro price ($4, not $9)
     const txns = await db
@@ -2100,10 +2100,9 @@ describe('enrollWithCredits', () => {
 
     expect(sub.status).toBe('active');
     expect(sub.plan).toBe('standard');
-    // Stale trial fields must be cleared so the billing lifecycle cron
-    // does not treat this paid subscription as an expired trial.
-    expect(sub.trial_started_at).toBeNull();
-    expect(sub.trial_ends_at).toBeNull();
+    // Trial dates are preserved for historical visibility
+    expect(sub.trial_started_at).not.toBeNull();
+    expect(sub.trial_ends_at).not.toBeNull();
   });
 
   it('applies intro price for canceled-trial subscriber', async () => {

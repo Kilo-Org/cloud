@@ -64,6 +64,38 @@ describe('matchUsers — at_limit ineligibility', () => {
   });
 });
 
+describe('extendTrials — 1-year ceiling', () => {
+  it('caps result at 1 year from now when existing trial + requested days would exceed it', async () => {
+    // 200 days remaining + 365 days = 565 days out, must be capped to 365.
+    const currentEnd = new Date(Date.now() + 200 * MS_PER_DAY);
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: target.id,
+      plan: 'trial',
+      status: 'trialing',
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: currentEnd.toISOString(),
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    const results = await caller.admin.extendClawTrial.extendTrials({
+      emails: [target.google_user_email],
+      trialDays: 365,
+    });
+
+    expect(results).toHaveLength(1);
+    const [result] = results;
+    expect(result.success).toBe(true);
+
+    const newEnd = new Date(result.newTrialEndsAt!).getTime();
+    const oneYearFromNow = Date.now() + MS_PER_YEAR;
+
+    // Must be capped at ~1 year, not ~565 days
+    expect(newEnd).toBeLessThanOrEqual(oneYearFromNow + 5_000);
+    expect(newEnd).toBeGreaterThan(oneYearFromNow - MS_PER_DAY);
+  });
+});
+
 describe('extendTrials — normal extension', () => {
   it('extends a trialing subscription by the requested days', async () => {
     await db.insert(kiloclaw_subscriptions).values({

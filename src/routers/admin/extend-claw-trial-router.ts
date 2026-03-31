@@ -2,7 +2,7 @@ import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { kilocode_users, kiloclaw_subscriptions, kiloclaw_email_log } from '@kilocode/db/schema';
 import * as z from 'zod';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, inArray, sql, desc } from 'drizzle-orm';
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
 
 const MAX_USERS = 1000;
@@ -33,10 +33,44 @@ type ExtendTrialResult = {
   error?: string;
 };
 
+/**
+ * For each user_id in the given array, return the most recently created
+ * kiloclaw_subscriptions row. Users with no subscription are omitted.
+ *
+ * Using created_at DESC with a subquery so that multi-instance users (who may
+ * have one row per instance) are consistently handled by targeting only their
+ * latest subscription.
+ */
+async function fetchLatestSubscriptionPerUser(
+  userIds: string[]
+): Promise<Map<string, typeof kiloclaw_subscriptions.$inferSelect>> {
+  if (userIds.length === 0) return new Map();
+
+  // Drizzle doesn't support DISTINCT ON natively; use a lateral / row_number
+  // approach via a subquery alias.
+  const rows = await db
+    .select()
+    .from(kiloclaw_subscriptions)
+    .where(inArray(kiloclaw_subscriptions.user_id, userIds))
+    .orderBy(desc(kiloclaw_subscriptions.created_at));
+
+  // Keep only the first (most recent) row per user_id encountered.
+  const latest = new Map<string, typeof kiloclaw_subscriptions.$inferSelect>();
+  for (const row of rows) {
+    if (!latest.has(row.user_id)) {
+      latest.set(row.user_id, row);
+    }
+  }
+  return latest;
+}
+
 export const extendClawTrialRouter = createTRPCRouter({
   /**
    * Match a list of emails to existing Kilo user accounts, including their
-   * KiloClaw subscription status (null = no subscription yet).
+   * most recent KiloClaw subscription status (null = no subscription yet).
+   *
+   * For users with multiple instances (multiple subscription rows), only the
+   * most recently created subscription is considered.
    */
   matchUsers: adminProcedure
     .input(z.object({ emails: z.array(z.string().email()).max(MAX_USERS) }))
@@ -65,15 +99,7 @@ export const extendClawTrialRouter = createTRPCRouter({
       }
 
       const userIds = users.map(u => u.id);
-      const subscriptions = await db
-        .select({
-          user_id: kiloclaw_subscriptions.user_id,
-          status: kiloclaw_subscriptions.status,
-        })
-        .from(kiloclaw_subscriptions)
-        .where(inArray(kiloclaw_subscriptions.user_id, userIds));
-
-      const subStatusByUserId = new Map(subscriptions.map(s => [s.user_id, s.status]));
+      const latestSubByUserId = await fetchLatestSubscriptionPerUser(userIds);
       const usersByEmail = new Map(users.map(u => [u.email.toLowerCase(), u]));
 
       const matched: MatchedUser[] = [];
@@ -86,7 +112,7 @@ export const extendClawTrialRouter = createTRPCRouter({
             email: user.email,
             userId: user.id,
             userName: user.name,
-            subscriptionStatus: subStatusByUserId.get(user.id) ?? null,
+            subscriptionStatus: latestSubByUserId.get(user.id)?.status ?? null,
           });
         } else {
           unmatched.push({ email });
@@ -98,6 +124,9 @@ export const extendClawTrialRouter = createTRPCRouter({
 
   /**
    * Extend or resurrect KiloClaw trials for a list of email addresses.
+   *
+   * Only the most recently created subscription row per user is targeted —
+   * this future-proofs against users with multiple instances.
    *
    * - status 'trialing': extends trial_ends_at by N days from the later of
    *   the current end date or now (so expired trials extend from today).
@@ -132,17 +161,9 @@ export const extendClawTrialRouter = createTRPCRouter({
 
       const usersByEmail = new Map(users.map(u => [u.email.toLowerCase(), u]));
 
-      // Fetch all subscriptions in one query
+      // Fetch the most recently created subscription per user in one query
       const userIds = users.map(u => u.id);
-      const subscriptions =
-        userIds.length > 0
-          ? await db
-              .select()
-              .from(kiloclaw_subscriptions)
-              .where(inArray(kiloclaw_subscriptions.user_id, userIds))
-          : [];
-
-      const subsByUserId = new Map(subscriptions.map(s => [s.user_id, s]));
+      const latestSubByUserId = await fetchLatestSubscriptionPerUser(userIds);
 
       for (const email of normalizedEmails) {
         const user = usersByEmail.get(email);
@@ -157,7 +178,7 @@ export const extendClawTrialRouter = createTRPCRouter({
           continue;
         }
 
-        const subscription = subsByUserId.get(user.id);
+        const subscription = latestSubByUserId.get(user.id);
 
         if (!subscription) {
           results.push({
@@ -173,6 +194,7 @@ export const extendClawTrialRouter = createTRPCRouter({
           if (subscription.status === 'trialing') {
             // Extend from the later of current end date or now, so already-expired
             // trials extend from today rather than from a past date.
+            // Scoped to the specific row id to avoid touching other instances.
             const [updated] = await db
               .update(kiloclaw_subscriptions)
               .set({
@@ -180,7 +202,7 @@ export const extendClawTrialRouter = createTRPCRouter({
               })
               .where(
                 and(
-                  eq(kiloclaw_subscriptions.user_id, user.id),
+                  eq(kiloclaw_subscriptions.id, subscription.id),
                   eq(kiloclaw_subscriptions.status, 'trialing')
                 )
               )
@@ -210,6 +232,7 @@ export const extendClawTrialRouter = createTRPCRouter({
                 metadata: {
                   source: 'bulk_extend',
                   trialDays,
+                  subscriptionId: subscription.id,
                   previousTrialEndsAt: subscription.trial_ends_at,
                   newTrialEndsAt: updated.trial_ends_at,
                   action: 'extended',
@@ -232,6 +255,7 @@ export const extendClawTrialRouter = createTRPCRouter({
             const newEnd = new Date(now.getTime() + trialDays * 86_400_000);
 
             // Resurrect as a fresh trial, mirroring the single-user admin reset path.
+            // Scoped to the specific row id to avoid touching other instances.
             const [resurrected] = await db
               .update(kiloclaw_subscriptions)
               .set({
@@ -244,6 +268,8 @@ export const extendClawTrialRouter = createTRPCRouter({
                 scheduled_plan: null,
                 scheduled_by: null,
                 cancel_at_period_end: false,
+                pending_conversion: false,
+                payment_source: null,
                 current_period_start: null,
                 current_period_end: null,
                 commit_ends_at: null,
@@ -253,7 +279,7 @@ export const extendClawTrialRouter = createTRPCRouter({
               })
               .where(
                 and(
-                  eq(kiloclaw_subscriptions.user_id, user.id),
+                  eq(kiloclaw_subscriptions.id, subscription.id),
                   eq(kiloclaw_subscriptions.status, 'canceled')
                 )
               )
@@ -302,6 +328,7 @@ export const extendClawTrialRouter = createTRPCRouter({
                 metadata: {
                   source: 'bulk_extend',
                   trialDays,
+                  subscriptionId: subscription.id,
                   previousStatus: subscription.status,
                   newTrialEndsAt: newEnd.toISOString(),
                   action: 'restarted',

@@ -277,9 +277,7 @@ export function KiloclawExtendTrial() {
           .join('\n')
       : 'email,user_id,instance_id,error\n' +
         filtered
-          .map(r =>
-            [r.email, r.userId, r.instanceId ?? '', r.error ?? ''].map(csvField).join(',')
-          )
+          .map(r => [r.email, r.userId, r.instanceId ?? '', r.error ?? ''].map(csvField).join(','))
           .join('\n');
     downloadCsv(content, `${success ? 'successful' : 'failed'}-trial-extensions.csv`);
   };

@@ -61,7 +61,9 @@ async function fetchLatestSubscriptionPerUser(
   return new Map(rows.map(r => [r.user_id, r]));
 }
 
-type AdminContext = { user: { id: string; google_user_email: string; google_user_name: string | null } };
+type AdminContext = {
+  user: { id: string; google_user_email: string; google_user_name: string | null };
+};
 
 const EMAIL_TYPES_TO_CLEAR = [
   'claw_trial_1d',
@@ -171,7 +173,9 @@ async function processOneEmail(
     // match what Postgres's `interval '1 year'` produces (calendar year, not 365 days).
     const oneYearFromNow = new Date(now);
     oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
-    const newEnd = new Date(Math.min(now.getTime() + trialDays * 86_400_000, oneYearFromNow.getTime()));
+    const newEnd = new Date(
+      Math.min(now.getTime() + trialDays * 86_400_000, oneYearFromNow.getTime())
+    );
 
     // Resurrect as a fresh trial, mirroring the single-user admin reset path.
     // Scoped to the specific row id to avoid touching other instances.
@@ -390,7 +394,9 @@ export const extendClawTrialRouter = createTRPCRouter({
 
       // Process all emails concurrently — each email's DB work is independent.
       const settled = await Promise.allSettled(
-        normalizedEmails.map(email => processOneEmail(email, usersByEmail, latestSubByUserId, trialDays, ctx))
+        normalizedEmails.map(email =>
+          processOneEmail(email, usersByEmail, latestSubByUserId, trialDays, ctx)
+        )
       );
 
       return settled.map((outcome, i) => {

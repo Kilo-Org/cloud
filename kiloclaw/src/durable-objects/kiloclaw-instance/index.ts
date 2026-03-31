@@ -1337,12 +1337,30 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           );
           if (registryInstanceId) {
             await registryStub.destroyInstance(registryKey, registryInstanceId);
+            console.log('[DO] Registry entry destroyed on finalization:', {
+              registryKey,
+              instanceId: registryInstanceId,
+            });
           } else {
-            // Legacy: find entry by doKey=userId
+            // Legacy: find active entry by doKey=userId
             const entries = await registryStub.listInstances(registryKey);
             const legacyEntry = entries.find(e => e.doKey === preDestroyUserId);
             if (legacyEntry) {
               await registryStub.destroyInstance(registryKey, legacyEntry.instanceId);
+              console.log('[DO] Registry entry destroyed on finalization (legacy):', {
+                registryKey,
+                instanceId: legacyEntry.instanceId,
+                doKey: preDestroyUserId,
+              });
+            } else {
+              console.log(
+                '[DO] Registry cleanup: no active entry found (already cleaned or never existed):',
+                {
+                  registryKey,
+                  doKey: preDestroyUserId,
+                  activeEntryCount: entries.length,
+                }
+              );
             }
           }
         }

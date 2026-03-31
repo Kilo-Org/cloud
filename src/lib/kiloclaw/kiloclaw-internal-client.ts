@@ -223,8 +223,9 @@ export class KiloClawInternalClient {
     return this.request(`/api/platform/debug-status?${params.toString()}`, undefined, { userId });
   }
 
-  async getRegistryEntries(userId: string): Promise<RegistryEntriesResponse> {
+  async getRegistryEntries(userId: string, orgId?: string): Promise<RegistryEntriesResponse> {
     const params = new URLSearchParams({ userId });
+    if (orgId) params.set('orgId', orgId);
     return this.request(`/api/platform/registry-entries?${params.toString()}`, undefined, {
       userId,
     });

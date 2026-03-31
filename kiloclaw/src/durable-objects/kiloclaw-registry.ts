@@ -98,8 +98,10 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
       .map(rowToEntry);
   }
 
-  /** List all registry entries including destroyed ones (for admin inspection). */
-  async listAllInstances(ownerKey: string): Promise<RegistryEntry[]> {
+  /** List all registry entries including destroyed ones, plus migration status (admin). */
+  async listAllInstances(
+    ownerKey: string
+  ): Promise<{ entries: RegistryEntry[]; migrated: boolean }> {
     await this.ensureOwnerKey(ownerKey);
 
     if (!this.migrated) {
@@ -110,7 +112,8 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
       }
     }
 
-    return this.db.select().from(registryInstances).all().map(rowToEntry);
+    const entries = this.db.select().from(registryInstances).all().map(rowToEntry);
+    return { entries, migrated: this.migrated };
   }
 
   async createInstance(

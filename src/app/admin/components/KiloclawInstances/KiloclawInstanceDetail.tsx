@@ -1146,8 +1146,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   });
 
   const userId = data?.user_id;
+  const orgId = data?.organization_id;
   const { data: registryData } = useQuery({
-    ...trpc.admin.kiloclawInstances.registryEntries.queryOptions({ userId: userId ?? '' }),
+    ...trpc.admin.kiloclawInstances.registryEntries.queryOptions({
+      userId: userId ?? '',
+      orgId: orgId ?? undefined,
+    }),
     enabled: !!userId,
   });
 
@@ -1627,17 +1631,21 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         </Card>
 
         {/* Registry Status */}
-        {registryData && (
-          <Card>
+        {registryData?.registries.map(registry => (
+          <Card key={registry.registryKey}>
             <CardHeader>
               <CardTitle>Registry Status</CardTitle>
               <CardDescription>
-                Registry DO entries for <code className="text-xs">{registryData.registryKey}</code>
+                <code className="text-xs">{registry.registryKey}</code>
+                {' · '}
+                <span className="text-xs">
+                  {registry.migrated ? 'migrated' : 'pending migration'}
+                </span>
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {registryData.entries.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No registry entries found</p>
+              {registry.entries.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No registry entries</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -1651,7 +1659,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {registryData.entries.map(entry => {
+                      {registry.entries.map(entry => {
                         const isCurrent = entry.instanceId === data?.id;
                         const isDestroyed = entry.destroyedAt !== null;
                         return (
@@ -1696,7 +1704,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               )}
             </CardContent>
           </Card>
-        )}
+        ))}
 
         <Card>
           <CardHeader>

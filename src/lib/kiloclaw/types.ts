@@ -156,8 +156,9 @@ export type PlatformStatusResponse = {
   execAsk: string | null;
 };
 
-/** Response from GET /api/platform/registry-entries (admin only). */
-export type RegistryEntriesResponse = {
+/** A single registry DO's entries + migration status. */
+export type RegistryResult = {
+  registryKey: string;
   entries: Array<{
     instanceId: string;
     doKey: string;
@@ -165,8 +166,12 @@ export type RegistryEntriesResponse = {
     createdAt: string;
     destroyedAt: string | null;
   }>;
-  registryKey: string;
   migrated: boolean;
+};
+
+/** Response from GET /api/platform/registry-entries (admin only). */
+export type RegistryEntriesResponse = {
+  registries: RegistryResult[];
 };
 
 /** Response from GET /api/platform/debug-status (internal/admin only). */

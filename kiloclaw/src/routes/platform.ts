@@ -1447,19 +1447,42 @@ platform.get('/debug-status', async c => {
   }
 });
 
-// GET /api/platform/registry-entries?userId=...
+// GET /api/platform/registry-entries?userId=...&orgId=...
 // Returns all registry entries (including destroyed) for admin inspection.
+// Queries the personal registry and optionally the org registry.
 platform.get('/registry-entries', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId query parameter is required' }, 400);
+  const orgId = c.req.query('orgId') ?? null;
+
+  const results: Array<{
+    registryKey: string;
+    entries: Array<{
+      instanceId: string;
+      doKey: string;
+      assignedUserId: string;
+      createdAt: string;
+      destroyedAt: string | null;
+    }>;
+    migrated: boolean;
+  }> = [];
 
   try {
-    const registryKey = `user:${userId}`;
-    const registryStub = c.env.KILOCLAW_REGISTRY.get(
-      c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
-    );
-    const entries = await registryStub.listAllInstances(registryKey);
-    return c.json({ entries, registryKey, migrated: true });
+    // Always query the personal registry
+    const userKey = `user:${userId}`;
+    const userStub = c.env.KILOCLAW_REGISTRY.get(c.env.KILOCLAW_REGISTRY.idFromName(userKey));
+    const userResult = await userStub.listAllInstances(userKey);
+    results.push({ registryKey: userKey, ...userResult });
+
+    // If orgId is provided, also query the org registry
+    if (orgId) {
+      const orgKey = `org:${orgId}`;
+      const orgStub = c.env.KILOCLAW_REGISTRY.get(c.env.KILOCLAW_REGISTRY.idFromName(orgKey));
+      const orgResult = await orgStub.listAllInstances(orgKey);
+      results.push({ registryKey: orgKey, ...orgResult });
+    }
+
+    return c.json({ registries: results });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'registry-entries');
     return jsonError(message, status);

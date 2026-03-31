@@ -143,6 +143,7 @@ export type AdminKiloclawInstance = {
   id: string;
   user_id: string;
   sandbox_id: string;
+  organization_id: string | null;
   created_at: string;
   destroyed_at: string | null;
   suspended_at: string | null;
@@ -180,6 +181,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       id: result.instance.id,
       user_id: result.instance.user_id,
       sandbox_id: result.instance.sandbox_id,
+      organization_id: result.instance.organization_id,
       created_at: result.instance.created_at,
       destroyed_at: result.instance.destroyed_at,
       suspended_at: result.suspended_at ?? null,
@@ -214,10 +216,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
   }),
 
   registryEntries: adminProcedure
-    .input(z.object({ userId: z.string().min(1) }))
+    .input(z.object({ userId: z.string().min(1), orgId: z.string().optional() }))
     .query(async ({ input }) => {
       const client = new KiloClawInternalClient();
-      return client.getRegistryEntries(input.userId);
+      return client.getRegistryEntries(input.userId, input.orgId ?? undefined);
     }),
 
   list: adminProcedure.input(ListInstancesSchema).query(async ({ input }) => {
@@ -295,6 +297,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       id: row.instance.id,
       user_id: row.instance.user_id,
       sandbox_id: row.instance.sandbox_id,
+      organization_id: row.instance.organization_id,
       created_at: row.instance.created_at,
       destroyed_at: row.instance.destroyed_at,
       suspended_at: row.suspended_at ?? null,

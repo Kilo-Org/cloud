@@ -4,7 +4,7 @@ import {
   KiloCliRunStatusResponseSchema,
   GatewayCommandResponseSchema,
 } from '../gateway-controller-types';
-import { callGatewayController } from './gateway';
+import { callGatewayController, isErrorUnknownRoute } from './gateway';
 import type { InstanceMutableState } from './types';
 
 type KiloCliRunStartResponse = {
@@ -29,19 +29,24 @@ export async function startKiloCliRun(
   state: InstanceMutableState,
   env: KiloClawEnv,
   prompt: string
-): Promise<KiloCliRunStartResponse> {
+): Promise<KiloCliRunStartResponse | null> {
   if (state.status !== 'running' || !state.flyMachineId) {
     throw Object.assign(new Error('Instance is not running'), { status: 409 });
   }
 
-  return callGatewayController(
-    state,
-    env,
-    '/_kilo/cli-run/start',
-    'POST',
-    KiloCliRunStartResponseSchema,
-    { prompt }
-  );
+  try {
+    return await callGatewayController(
+      state,
+      env,
+      '/_kilo/cli-run/start',
+      'POST',
+      KiloCliRunStartResponseSchema,
+      { prompt }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
 }
 
 /**

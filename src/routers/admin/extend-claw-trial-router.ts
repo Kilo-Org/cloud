@@ -206,10 +206,12 @@ export const extendClawTrialRouter = createTRPCRouter({
             const [updated] = await db
               .update(kiloclaw_subscriptions)
               .set({
-                // Extend from the later of current end date or now, so already-expired
-                // trials extend from today. Users whose trial already exceeds 1 year
-                // are marked ineligible at match time and never reach this path.
-                trial_ends_at: sql`GREATEST(COALESCE(${kiloclaw_subscriptions.trial_ends_at}::timestamptz, now()), now()) + (${trialDays} * interval '1 day')`,
+                // Extend from the later of current end date or now, capped at 1 year
+                // from now. The at_limit check at match time prevents users already
+                // past the ceiling from being submitted, but the LEAST here enforces
+                // the ceiling on the resulting value for users currently within it
+                // (e.g. 200 days remaining + 365 days requested = capped at 365).
+                trial_ends_at: sql`LEAST(GREATEST(COALESCE(${kiloclaw_subscriptions.trial_ends_at}::timestamptz, now()), now()) + (${trialDays} * interval '1 day'), now() + interval '1 year')`,
               })
               .where(
                 and(

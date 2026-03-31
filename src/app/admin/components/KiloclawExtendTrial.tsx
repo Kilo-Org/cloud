@@ -829,7 +829,6 @@ export function KiloclawExtendTrial() {
                     <TableHead>Email</TableHead>
                     <TableHead>Action</TableHead>
                     <TableHead>New Trial End</TableHead>
-                    <TableHead>Days</TableHead>
                     <TableHead>Error</TableHead>
                   </TableRow>
                 </TableHeader>

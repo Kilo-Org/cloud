@@ -615,6 +615,11 @@ export const kiloclawRouter = createTRPCRouter({
       }
     }),
 
+  getActiveInstanceId: clawAccessProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    return instance ? { instanceId: instance.id } : null;
+  }),
+
   getStreamChatCredentials: clawAccessProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
@@ -666,11 +671,15 @@ export const kiloclawRouter = createTRPCRouter({
         if (err instanceof KiloClawApiError) {
           const { message } = getKiloClawApiErrorPayload(err);
           const code =
-            err.statusCode === 404
-              ? 'NOT_FOUND'
-              : err.statusCode === 503
-                ? 'PRECONDITION_FAILED'
-                : 'INTERNAL_SERVER_ERROR';
+            err.statusCode === 400
+              ? 'BAD_REQUEST'
+              : err.statusCode === 403
+                ? 'FORBIDDEN'
+                : err.statusCode === 404
+                  ? 'NOT_FOUND'
+                  : err.statusCode === 503
+                    ? 'PRECONDITION_FAILED'
+                    : 'INTERNAL_SERVER_ERROR';
           throw new TRPCError({
             code,
             message: message ?? 'Failed to send chat message',

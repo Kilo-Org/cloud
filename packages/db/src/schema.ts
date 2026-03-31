@@ -1874,15 +1874,19 @@ export const cloud_agent_webhook_triggers = pgTable(
     organization_id: uuid('organization_id').references(() => organizations.id, {
       onDelete: 'cascade',
     }),
-    github_repo: text('github_repo').notNull(),
+    // Target type: 'cloud_agent' (default) or 'kiloclaw_chat'
+    target_type: text('target_type').notNull().default('cloud_agent'),
+    // KiloClaw Chat target: which instance to send messages to
+    kiloclaw_instance_id: uuid('kiloclaw_instance_id').references(() => kiloclaw_instances.id),
+    // Cloud Agent target fields (nullable — only required when target_type = 'cloud_agent')
+    github_repo: text('github_repo'),
     is_active: boolean('is_active').notNull().default(true),
     // Profile reference - resolved at runtime in the worker via Hyperdrive
     // ON DELETE RESTRICT prevents deletion of profiles referenced by triggers
-    profile_id: uuid('profile_id')
-      .notNull()
-      .references(() => agent_environment_profiles.id, {
-        onDelete: 'restrict',
-      }),
+    // Nullable — only required when target_type = 'cloud_agent'
+    profile_id: uuid('profile_id').references(() => agent_environment_profiles.id, {
+      onDelete: 'restrict',
+    }),
     created_at: timestamp('created_at', { withTimezone: true, mode: 'string' })
       .defaultNow()
       .notNull(),
@@ -1910,6 +1914,22 @@ export const cloud_agent_webhook_triggers = pgTable(
       sql`(
         (${table.user_id} IS NOT NULL AND ${table.organization_id} IS NULL) OR
         (${table.user_id} IS NULL AND ${table.organization_id} IS NOT NULL)
+      )`
+    ),
+    // Cloud Agent triggers require github_repo and profile_id
+    check(
+      'CHK_cloud_agent_webhook_triggers_cloud_agent_fields',
+      sql`(
+        ${table.target_type} != 'cloud_agent' OR
+        (${table.github_repo} IS NOT NULL AND ${table.profile_id} IS NOT NULL)
+      )`
+    ),
+    // KiloClaw Chat triggers require kiloclaw_instance_id
+    check(
+      'CHK_cloud_agent_webhook_triggers_kiloclaw_fields',
+      sql`(
+        ${table.target_type} != 'kiloclaw_chat' OR
+        ${table.kiloclaw_instance_id} IS NOT NULL
       )`
     ),
   ]

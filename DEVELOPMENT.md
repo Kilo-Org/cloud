@@ -317,6 +317,7 @@ Each worker in the workspace can be started individually with `wrangler dev` (or
 ### Limitations in local dev
 
 - **Service bindings** between workers don't function in local `wrangler dev`. This affects chains like session-ingest → o11y, webhook-agent → cloud-agent, and app-builder → db-proxy/git-token-service.
+- **Webhook → KiloClaw Chat** triggers require the KiloClaw worker running on port 8795. The webhook worker calls it via `KILOCLAW_API_URL` (HTTP, not a service binding) to deliver messages to Stream Chat. Stream Chat credentials (`STREAM_CHAT_API_KEY`, `STREAM_CHAT_API_SECRET`) must be in `kiloclaw/.dev.vars`.
 - **Cloudflare Containers** (used by cloud-agent, cloud-agent-next, app-builder) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
 - **Cloudflare-specific features** like Analytics Engine, Pipelines, and dispatch namespaces don't work locally.
 - Most workers require a `.dev.vars` file (created from `.dev.vars.example` in each worker directory) with secrets like `NEXTAUTH_SECRET` and `INTERNAL_API_SECRET`.

@@ -4,7 +4,11 @@ import { TRPCError } from '@trpc/server';
 import { and, eq, isNull } from 'drizzle-orm';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
-import { cloud_agent_webhook_triggers, agent_environment_profiles } from '@kilocode/db/schema';
+import {
+  cloud_agent_webhook_triggers,
+  agent_environment_profiles,
+  kiloclaw_instances,
+} from '@kilocode/db/schema';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
 import { triggerIdSchema } from '@/lib/webhook-trigger-validation';
 import {
@@ -18,24 +22,51 @@ import {
 } from '@/lib/webhook-agent/webhook-agent-client';
 
 // Input schemas
-const WebhookTriggerCreateInput = z.object({
-  triggerId: triggerIdSchema,
-  organizationId: z.string().uuid().optional(),
-  githubRepo: z.string().min(1, 'GitHub repo is required'),
-  mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']),
-  model: z.string().min(1, 'Model is required'),
-  promptTemplate: z.string().min(1, 'Prompt template is required'),
-  profileId: z.string().uuid(),
-  autoCommit: z.boolean().optional(),
-  condenseOnComplete: z.boolean().optional(),
-  webhookAuth: z
-    .object({
-      header: z.string().trim().min(1, 'Webhook auth header is required'),
-      secret: z.string().trim().min(1, 'Webhook auth secret is required'),
-    })
-    .optional(),
-});
+const WebhookTriggerCreateInput = z
+  .object({
+    triggerId: triggerIdSchema,
+    organizationId: z.string().uuid().optional(),
+    targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
+    // KiloClaw Chat target fields
+    kiloclawInstanceId: z.string().uuid().optional(),
+    // Cloud Agent target fields (optional — required only when targetType = 'cloud_agent')
+    githubRepo: z.string().min(1, 'GitHub repo is required').optional(),
+    mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
+    model: z.string().min(1, 'Model is required').optional(),
+    profileId: z.string().uuid().optional(),
+    // Shared fields
+    promptTemplate: z.string().min(1, 'Prompt template is required'),
+    autoCommit: z.boolean().optional(),
+    condenseOnComplete: z.boolean().optional(),
+    webhookAuth: z
+      .object({
+        header: z.string().trim().min(1, 'Webhook auth header is required'),
+        secret: z.string().trim().min(1, 'Webhook auth secret is required'),
+      })
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.targetType === 'cloud_agent') {
+      if (!data.githubRepo)
+        ctx.addIssue({ code: 'custom', message: 'GitHub repo is required', path: ['githubRepo'] });
+      if (!data.mode) ctx.addIssue({ code: 'custom', message: 'Mode is required', path: ['mode'] });
+      if (!data.model)
+        ctx.addIssue({ code: 'custom', message: 'Model is required', path: ['model'] });
+      if (!data.profileId)
+        ctx.addIssue({ code: 'custom', message: 'Profile is required', path: ['profileId'] });
+    }
+    if (data.targetType === 'kiloclaw_chat') {
+      if (!data.kiloclawInstanceId)
+        ctx.addIssue({
+          code: 'custom',
+          message: 'KiloClaw instance is required',
+          path: ['kiloclawInstanceId'],
+        });
+    }
+  });
 
+// Note: targetType and kiloclawInstanceId are immutable after creation.
+// To change the target type or instance, delete and recreate the trigger.
 const WebhookTriggerUpdateInput = z.object({
   triggerId: triggerIdSchema,
   organizationId: z.string().uuid().optional(),
@@ -148,7 +179,12 @@ export const webhookTriggersRouter = createTRPCRouter({
    * Reads from PostgreSQL only (can't enumerate DOs).
    */
   list: baseProcedure
-    .input(z.object({ organizationId: z.string().uuid().optional() }))
+    .input(
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).optional(),
+      })
+    )
     .query(async ({ ctx, input }) => {
       const userId = ctx.user.id;
 
@@ -157,19 +193,24 @@ export const webhookTriggersRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
 
-      // Query PostgreSQL with ownership filter
-      const whereClause = input.organizationId
+      // Query PostgreSQL with ownership + optional target type filter
+      const ownerFilter = input.organizationId
         ? eq(cloud_agent_webhook_triggers.organization_id, input.organizationId)
         : and(
             eq(cloud_agent_webhook_triggers.user_id, userId),
             isNull(cloud_agent_webhook_triggers.organization_id)
           );
+      const whereClause = input.targetType
+        ? and(ownerFilter, eq(cloud_agent_webhook_triggers.target_type, input.targetType))
+        : ownerFilter;
 
       const triggers = await db
         .select({
           id: cloud_agent_webhook_triggers.id,
           triggerId: cloud_agent_webhook_triggers.trigger_id,
+          targetType: cloud_agent_webhook_triggers.target_type,
           githubRepo: cloud_agent_webhook_triggers.github_repo,
+          kiloclawInstanceId: cloud_agent_webhook_triggers.kiloclaw_instance_id,
           isActive: cloud_agent_webhook_triggers.is_active,
           createdAt: cloud_agent_webhook_triggers.created_at,
           updatedAt: cloud_agent_webhook_triggers.updated_at,
@@ -264,8 +305,39 @@ export const webhookTriggersRouter = createTRPCRouter({
       await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
     }
 
-    // Validate profile ownership (profiles are required)
-    await assertProfileOwnership(userId, input.organizationId, input.profileId);
+    // Target-specific validation (superRefine guarantees required fields per target type)
+    if (input.targetType === 'cloud_agent') {
+      if (!input.profileId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Profile is required for Cloud Agent triggers',
+        });
+      }
+      await assertProfileOwnership(userId, input.organizationId, input.profileId);
+    }
+    if (input.targetType === 'kiloclaw_chat') {
+      if (!input.kiloclawInstanceId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'KiloClaw instance is required' });
+      }
+      // Verify user owns the KiloClaw instance and it's not destroyed
+      const [instance] = await db
+        .select({ id: kiloclaw_instances.id })
+        .from(kiloclaw_instances)
+        .where(
+          and(
+            eq(kiloclaw_instances.id, input.kiloclawInstanceId),
+            eq(kiloclaw_instances.user_id, userId),
+            isNull(kiloclaw_instances.destroyed_at)
+          )
+        )
+        .limit(1);
+      if (!instance) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'KiloClaw instance not found or not accessible',
+        });
+      }
+    }
 
     // Insert into PostgreSQL first - unique constraint is source of truth
     let dbRecord: typeof cloud_agent_webhook_triggers.$inferSelect;
@@ -276,9 +348,11 @@ export const webhookTriggersRouter = createTRPCRouter({
           trigger_id: input.triggerId,
           user_id: input.organizationId ? null : userId,
           organization_id: input.organizationId ?? null,
-          github_repo: input.githubRepo,
+          target_type: input.targetType,
+          kiloclaw_instance_id: input.kiloclawInstanceId ?? null,
+          github_repo: input.githubRepo ?? null,
           is_active: true,
-          profile_id: input.profileId,
+          profile_id: input.profileId ?? null,
         })
         .returning();
       dbRecord = inserted;
@@ -302,6 +376,8 @@ export const webhookTriggersRouter = createTRPCRouter({
         input.organizationId,
         input.triggerId,
         {
+          targetType: input.targetType,
+          kiloclawInstanceId: input.kiloclawInstanceId,
           githubRepo: input.githubRepo,
           mode: input.mode,
           model: input.model,
@@ -359,7 +435,8 @@ export const webhookTriggersRouter = createTRPCRouter({
     return {
       id: dbRecord.id,
       triggerId: input.triggerId,
-      githubRepo: input.githubRepo,
+      targetType: input.targetType,
+      githubRepo: input.githubRepo ?? null,
       isActive: true,
       createdAt: dbRecord.created_at,
       inboundUrl,

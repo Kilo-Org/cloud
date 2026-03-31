@@ -1403,9 +1403,10 @@ platform.post('/send-chat-message', async c => {
   }
 
   try {
-    // Get the sandboxId and channel info from the DO
+    // Always use userId for the DO lookup (KiloClaw instances are personal, DO keyed by userId).
+    // instanceId is accepted for future multi-instance support but not used as the DO key today.
     const creds = await withDORetry(
-      instanceStubFactory(c.env, userId, instanceId),
+      instanceStubFactory(c.env, userId),
       stub => stub.getStreamChatCredentials(),
       'getStreamChatCredentials'
     );

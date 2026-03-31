@@ -91,6 +91,107 @@ async function getOrMintToken(
   return { token: result.token, cached: false };
 }
 
+/**
+ * Process a webhook message targeting a KiloClaw Chat instance.
+ * Renders the prompt template with the webhook payload, then calls the
+ * KiloClaw worker's send-chat-message endpoint. The KiloClaw worker
+ * handles instance resolution, destroyed check, and Stream Chat delivery.
+ */
+async function processKiloclawChatMessage(
+  stub: DurableObjectStub<TriggerDO>,
+  webhook: WebhookDeliveryMessage,
+  request: {
+    body: string;
+    method: string;
+    path: string;
+    headers: Record<string, string>;
+    queryString: string | null;
+    sourceIp: string | null;
+    timestamp: string;
+  },
+  triggerConfig: TriggerConfig,
+  env: Env
+): Promise<void> {
+  if (!triggerConfig.kiloclawInstanceId) {
+    await failRequest(stub, webhook.requestId, 'KiloClaw instance ID not configured on trigger');
+    return;
+  }
+
+  // KiloClaw Chat triggers require a user-scoped trigger (KiloClaw instances are personal)
+  if (!triggerConfig.userId) {
+    await failRequest(
+      stub,
+      webhook.requestId,
+      'KiloClaw Chat triggers require a user-scoped trigger (org triggers not supported)'
+    );
+    return;
+  }
+  const userId = triggerConfig.userId;
+
+  const renderedPrompt = renderPromptTemplate(triggerConfig.promptTemplate, {
+    body: request.body,
+    method: request.method,
+    path: request.path,
+    headers: request.headers,
+    queryString: request.queryString,
+    sourceIp: request.sourceIp,
+    timestamp: request.timestamp,
+  });
+
+  logger.debug('KiloClaw Chat prompt rendered', {
+    requestId: webhook.requestId,
+    promptLength: renderedPrompt.length,
+  });
+
+  const internalApiSecret = await env.INTERNAL_API_SECRET.get();
+
+  const response = await fetch(`${env.KILOCLAW_API_URL}/api/platform/send-chat-message`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-internal-api-key': internalApiSecret,
+    },
+    body: JSON.stringify({
+      userId,
+      instanceId: triggerConfig.kiloclawInstanceId,
+      message: renderedPrompt,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => '(unreadable)');
+    let errorMessage: string;
+    try {
+      const parsed = JSON.parse(errorBody) as { error?: string };
+      errorMessage = parsed.error ?? errorBody;
+    } catch {
+      errorMessage = errorBody;
+    }
+    logger.error('KiloClaw Chat message delivery failed', {
+      requestId: webhook.requestId,
+      status: response.status,
+      error: errorMessage,
+    });
+    await failRequest(stub, webhook.requestId, `KiloClaw Chat delivery failed: ${errorMessage}`);
+    return;
+  }
+
+  logger.info('KiloClaw Chat message delivered', {
+    requestId: webhook.requestId,
+    kiloclawInstanceId: triggerConfig.kiloclawInstanceId,
+  });
+
+  await withDORetry(
+    () => stub,
+    doStub =>
+      doStub.updateRequest(webhook.requestId, {
+        process_status: 'success',
+        completed_at: new Date().toISOString(),
+      }),
+    'updateRequest'
+  );
+}
+
 async function processWebhookMessage(
   message: Message<WebhookDeliveryMessage>,
   env: Env
@@ -168,6 +269,31 @@ async function processWebhookMessage(
       return;
     }
 
+    // Branch based on target type
+    if (triggerConfig.targetType === 'kiloclaw_chat') {
+      await processKiloclawChatMessage(stub, webhook, request, triggerConfig, env);
+      message.ack();
+      return;
+    }
+
+    // Cloud Agent path — extract and guard required fields (guaranteed non-null by DB
+    // CHECK constraint, but TypeScript can't infer this from the targetType branch above)
+    const {
+      mode: triggerMode,
+      model: triggerModel,
+      githubRepo: triggerGithubRepo,
+      profileId: triggerProfileId,
+    } = triggerConfig;
+    if (!triggerMode || !triggerModel || !triggerGithubRepo || !triggerProfileId) {
+      await failRequest(
+        stub,
+        webhook.requestId,
+        'Cloud Agent trigger missing required fields (mode, model, githubRepo, or profileId)'
+      );
+      message.ack();
+      return;
+    }
+
     const { token } = await getOrMintToken(env, triggerConfig);
 
     // Fetch internalApiSecret once and reuse for both prepare/initiate calls
@@ -202,7 +328,7 @@ async function processWebhookMessage(
       };
 
       // Resolve profile at runtime via Hyperdrive if profileId is set
-      if (!triggerConfig.profileId) {
+      if (!triggerProfileId) {
         logger.error('No Agent Env Profile found.', {
           triggerId: triggerConfig.triggerId,
           requestId: webhook.requestId,
@@ -214,12 +340,12 @@ async function processWebhookMessage(
 
       logger.debug('Resolving profile for trigger', {
         triggerId: triggerConfig.triggerId,
-        profileId: triggerConfig.profileId,
+        profileId: triggerProfileId,
       });
 
       const profileService = getProfileResolutionService(env);
       const resolvedProfile = await profileService.resolveProfileConfig({
-        profileId: triggerConfig.profileId,
+        profileId: triggerProfileId,
         userId: triggerConfig.userId,
         orgId: triggerConfig.orgId,
       });
@@ -227,7 +353,7 @@ async function processWebhookMessage(
       if (!resolvedProfile) {
         logger.error('No Agent Env Profile found.', {
           triggerId: triggerConfig.triggerId,
-          profileId: triggerConfig.profileId,
+          profileId: triggerProfileId,
           requestId: webhook.requestId,
         });
         await failRequest(stub, webhook.requestId, 'No Agent Env Profile found.');
@@ -254,9 +380,9 @@ async function processWebhookMessage(
         createdOnPlatform: string;
       } = {
         prompt: renderedPrompt,
-        mode: triggerConfig.mode,
-        model: triggerConfig.model,
-        githubRepo: triggerConfig.githubRepo,
+        mode: triggerMode,
+        model: triggerModel,
+        githubRepo: triggerGithubRepo,
         callbackTarget,
         createdOnPlatform: 'webhook',
       };
@@ -286,9 +412,9 @@ async function processWebhookMessage(
 
       logger.debug('Calling prepareSession', {
         requestId: webhook.requestId,
-        mode: triggerConfig.mode,
-        model: triggerConfig.model,
-        githubRepo: triggerConfig.githubRepo,
+        mode: triggerMode,
+        model: triggerModel,
+        githubRepo: triggerGithubRepo,
         callbackUrl,
       });
 

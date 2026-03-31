@@ -207,16 +207,9 @@
       "es5-ext",
       "esbuild",
       "libpq",
+      "protobufjs",
       "stream-chat-react-native-core",
       "workerd"
-    ],
-    "ignoredBuiltDependencies": [
-      "@sentry/cli",
-      "core-js",
-      "es5-ext",
-      "oxc-resolver",
-      "sharp",
-      "unrs-resolver"
     ]
   }
 }

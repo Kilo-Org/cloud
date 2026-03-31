@@ -13,8 +13,8 @@ export function AuthMarketingAside() {
           </li>
           <li className="flex items-center gap-4">
             <div className="flex-1">
-              Use Kilo in all popular IDEs{' '}
-              <span className="font-bold">(VS Code/JetBrains), CLI, Cloud, and App Builder</span>
+              Use them across the Kilo Code extension, Kilo CLI, App Builder, OpenClaw,
+              KiloClaw, and more.
             </div>
           </li>
           <li className="flex items-center gap-4">

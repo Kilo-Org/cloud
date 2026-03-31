@@ -51,7 +51,7 @@ export function AccountTypeChoice() {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-lg leading-6">✓</span>
-                      <span>Use Kilo in IDEs (VS Code/JetBrains), CLI, Cloud, and App Builder</span>
+                      <span>Use them across the Kilo Code extension, Kilo CLI, App Builder, OpenClaw, KiloClaw, and more.</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-lg leading-6">✓</span>

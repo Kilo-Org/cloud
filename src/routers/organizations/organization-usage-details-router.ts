@@ -170,7 +170,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               datetime: timeBucket.as('datetime'),
               userName: kilocode_users.google_user_name,
               userEmail: kilocode_users.google_user_email,
-              model: microdollar_usage.model,
+              model: sql<string>`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
               provider: microdollar_usage.provider,
               projectId: microdollar_usage.project_id,
               costMicrodollars: sum(microdollar_usage.cost),
@@ -191,7 +191,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               timeBucket,
               kilocode_users.google_user_name,
               kilocode_users.google_user_email,
-              microdollar_usage.model,
+              sql`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
               microdollar_usage.provider,
               microdollar_usage.project_id
             )
@@ -319,9 +319,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               userName: kilocode_users.google_user_name,
               userEmail: kilocode_users.google_user_email,
               ...(groupByModel && {
-                model: sql<
-                  string | null
-                >`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
+                model: sql<string | null>`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
               }),
               microdollarCost: sum(microdollar_usage.cost),
               tokenCount: sum(

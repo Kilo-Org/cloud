@@ -137,7 +137,7 @@ export const extendClawTrialRouter = createTRPCRouter({
     .input(
       z.object({
         emails: z.array(z.string().email()).max(MAX_USERS),
-        trialDays: z.number().int().positive().max(365),
+        trialDays: z.number().int().positive().max(730),
       })
     )
     .mutation(async ({ input, ctx }): Promise<ExtendTrialResult[]> => {
@@ -198,7 +198,8 @@ export const extendClawTrialRouter = createTRPCRouter({
             const [updated] = await db
               .update(kiloclaw_subscriptions)
               .set({
-                trial_ends_at: sql`GREATEST(COALESCE(${kiloclaw_subscriptions.trial_ends_at}::timestamptz, now()), now()) + (${trialDays} * interval '1 day')`,
+                // Extend from the later of current end or now, capped at 1 year from now.
+                trial_ends_at: sql`LEAST(GREATEST(COALESCE(${kiloclaw_subscriptions.trial_ends_at}::timestamptz, now()), now()) + (${trialDays} * interval '1 day'), now() + interval '1 year')`,
               })
               .where(
                 and(
@@ -254,7 +255,10 @@ export const extendClawTrialRouter = createTRPCRouter({
             });
           } else if (subscription.status === 'canceled') {
             const now = new Date();
-            const newEnd = new Date(now.getTime() + trialDays * 86_400_000);
+            const oneYearFromNow = new Date(now.getTime() + 365 * 86_400_000);
+            const newEnd = new Date(
+              Math.min(now.getTime() + trialDays * 86_400_000, oneYearFromNow.getTime())
+            );
 
             // Resurrect as a fresh trial, mirroring the single-user admin reset path.
             // Scoped to the specific row id to avoid touching other instances.

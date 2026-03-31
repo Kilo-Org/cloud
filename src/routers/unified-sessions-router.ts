@@ -265,9 +265,7 @@ export const unifiedSessionsRouter = createTRPCRouter({
       v1Where.push(sql`${cliSessions.created_on_platform} != 'app-builder'`);
 
       v2Where.push(sql`${cli_sessions_v2.git_url} IS NOT NULL`);
-      v2Where.push(
-        sql`${cli_sessions_v2.updated_at} >= ${updatedSince}`
-      );
+      v2Where.push(sql`${cli_sessions_v2.updated_at} >= ${updatedSince}`);
       v2Where.push(sql`${cli_sessions_v2.created_on_platform} != 'app-builder'`);
 
       const query = sql`

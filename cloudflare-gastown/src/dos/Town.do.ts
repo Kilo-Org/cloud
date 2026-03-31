@@ -504,6 +504,9 @@ export class TownDO extends DurableObject<Env> {
     const townConfig = await config.getTownConfig(this.ctx.storage);
     this._ownerUserId = townConfig.owner_user_id;
 
+    // Load persisted draining flag
+    this._draining = (await this.ctx.storage.get<boolean>('town:draining')) ?? false;
+
     // All tables are now initialized via beads.initBeadTables():
     // beads, bead_events, bead_dependencies, agent_metadata, review_metadata,
     // escalation_metadata, convoy_metadata
@@ -537,6 +540,7 @@ export class TownDO extends DurableObject<Env> {
   private _townId: string | null = null;
   private _lastReconcilerMetrics: reconciler.ReconcilerMetrics | null = null;
   private _dashboardContext: string | null = null;
+  private _draining = false;
 
   private get townId(): string {
     return this._townId ?? this.ctx.id.name ?? this.ctx.id.toString();
@@ -561,6 +565,27 @@ export class TownDO extends DurableObject<Env> {
 
   async getDashboardContext(): Promise<string | null> {
     return this._dashboardContext;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // Container Eviction (graceful drain)
+  // ══════════════════════════════════════════════════════════════════
+
+  /**
+   * Record a container eviction event and set the draining flag.
+   * Called by the container when it receives SIGTERM. While draining,
+   * the reconciler skips dispatch to prevent new work from starting.
+   */
+  async recordContainerEviction(): Promise<void> {
+    events.insertEvent(this.sql, 'container_eviction', {});
+    this._draining = true;
+    await this.ctx.storage.put('town:draining', true);
+    console.log(`${TOWN_LOG} recordContainerEviction: draining flag set`);
+  }
+
+  /** Whether the town is in draining mode (container eviction in progress). */
+  async isDraining(): Promise<boolean> {
+    return this._draining;
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -1114,6 +1139,15 @@ export class TownDO extends DurableObject<Env> {
     }
   ): Promise<void> {
     agents.touchAgent(this.sql, agentId, watermark);
+
+    // A heartbeat proves the container is alive. If a draining flag was
+    // set from a previous eviction, clear it so dispatch resumes.
+    if (this._draining) {
+      this._draining = false;
+      await this.ctx.storage.put('town:draining', false);
+      console.log(`${TOWN_LOG} touchAgentHeartbeat: cleared draining flag (container alive)`);
+    }
+
     await this.armAlarmIfNeeded();
   }
 

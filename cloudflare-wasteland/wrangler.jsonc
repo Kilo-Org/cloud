@@ -76,6 +76,11 @@
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "NEXTAUTH_SECRET",
     },
+    {
+      "binding": "WASTELAND_ENCRYPTION_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "WASTELAND_ENCRYPTION_KEY",
+    },
   ],
 
   "env": {
@@ -115,6 +120,11 @@
           "binding": "NEXTAUTH_SECRET",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
           "secret_name": "NEXTAUTH_SECRET",
+        },
+        {
+          "binding": "WASTELAND_ENCRYPTION_KEY",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "WASTELAND_ENCRYPTION_KEY",
         },
       ],
     },

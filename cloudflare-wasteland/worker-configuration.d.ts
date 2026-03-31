@@ -9,6 +9,7 @@ declare namespace Cloudflare {
 		WASTELAND_AE: AnalyticsEngineDataset;
 		WASTELAND_JWT_SECRET: SecretsStoreSecret;
 		NEXTAUTH_SECRET: SecretsStoreSecret;
+		WASTELAND_ENCRYPTION_KEY: SecretsStoreSecret;
 		ENVIRONMENT: "development";
 		KILO_API_URL: "http://192.168.65.254:3000";
 		WASTELAND_API_URL: "http://192.168.65.254:8787";
@@ -19,6 +20,7 @@ declare namespace Cloudflare {
 		WASTELAND_AE: AnalyticsEngineDataset;
 		WASTELAND_JWT_SECRET: SecretsStoreSecret;
 		NEXTAUTH_SECRET: SecretsStoreSecret;
+		WASTELAND_ENCRYPTION_KEY: SecretsStoreSecret;
 		ENVIRONMENT: "development" | "production";
 		KILO_API_URL: "http://192.168.65.254:3000" | "https://api.kilo.ai";
 		WASTELAND_API_URL: "http://192.168.65.254:8787" | "https://wasteland.kiloapps.io";

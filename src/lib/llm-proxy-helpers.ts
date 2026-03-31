@@ -151,8 +151,14 @@ function estimateTokenCount(request: GatewayRequest) {
  * even though the model exists (e.g. all allowed providers are unavailable). */
 function hasProviderRestrictions(request: GatewayRequest): boolean {
   const p = request.body.provider;
+  // zdr maps to providerOptions.gateway.zeroDataRetention for Vercel, but is always derived
+  // from provider.zdr so checking p.zdr here covers both routing paths.
   return !!(p?.ignore?.length || p?.only?.length || p?.data_collection === 'deny' || p?.zdr);
 }
+
+// 'kilo/auto-frontier' was a short-lived discontinued alias for 'kilo-auto/frontier'.
+// Some older clients may still send it; the upstream returns 400 for unknown model IDs.
+const DISCONTINUED_MODEL_IDS = new Set(['kilo/auto-frontier']);
 
 export async function makeErrorReadable({
   requestedModel,
@@ -184,7 +190,11 @@ export async function makeErrorReadable({
     }
   }
 
-  if (response.status === 404 && !hasProviderRestrictions(request)) {
+  if (
+    (response.status === 404 ||
+      (response.status === 400 && DISCONTINUED_MODEL_IDS.has(requestedModel))) &&
+    !hasProviderRestrictions(request)
+  ) {
     const recommendedModel = balance <= 0 ? KILO_AUTO_FREE_MODEL : KILO_AUTO_BALANCED_MODEL;
     const recommendation =
       feature === 'kiloclaw' || feature === 'openclaw'

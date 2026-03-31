@@ -1078,6 +1078,8 @@ export async function drainAll(): Promise<void> {
 
   // 4a: Freeze — cancel idle timers and abort sessions so no
   // completion/exit callbacks can fire during the git snapshot.
+  // Only agents that freeze successfully are safe to snapshot.
+  const frozen: typeof stragglers = [];
   for (const agent of stragglers) {
     try {
       // Cancel idle timer FIRST — prevents the timer from firing and
@@ -1101,15 +1103,24 @@ export async function drainAll(): Promise<void> {
 
       agent.status = 'exited';
       agent.exitReason = 'container eviction';
+      frozen.push(agent);
       console.log(`${DRAIN_LOG} Phase 4: froze agent ${agent.agentId}`);
     } catch (err) {
-      console.warn(`${DRAIN_LOG} Phase 4: failed to freeze agent ${agent.agentId}:`, err);
+      // Freeze failed — the session may still be writing to the
+      // worktree. Skip this agent in 4b to avoid .git/index.lock
+      // races and partial snapshots.
+      console.warn(
+        `${DRAIN_LOG} Phase 4: failed to freeze agent ${agent.agentId}, skipping snapshot:`,
+        err
+      );
     }
   }
 
   // 4b: Snapshot — git add/commit/push each worktree now that
-  // all sessions are frozen.
-  for (const agent of stragglers) {
+  // all sessions are frozen. Only iterate agents that froze
+  // successfully; unfrozen agents are skipped to avoid racing
+  // with a still-active SDK session.
+  for (const agent of frozen) {
     try {
       console.log(`${DRAIN_LOG} Phase 4: force-saving agent ${agent.agentId} in ${agent.workdir}`);
       const proc = Bun.spawn(

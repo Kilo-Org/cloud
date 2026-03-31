@@ -6,7 +6,6 @@ import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_FREE_MODEL,
-  KILO_AUTO_FREE_MODEL_DEPRECATED,
   KILO_AUTO_FRONTIER_MODEL,
   resolveAutoModel,
 } from '@/lib/kilo-auto-model';
@@ -62,7 +61,6 @@ export function isFreeModel(model: string): boolean {
   return (
     isKiloFreeModel(model) ||
     model === KILO_AUTO_FREE_MODEL.id ||
-    model === KILO_AUTO_FREE_MODEL_DEPRECATED ||
     (model ?? '').endsWith(':free') ||
     model === 'openrouter/free' ||
     isOpenRouterStealthModel(model ?? '')

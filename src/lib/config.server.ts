@@ -176,6 +176,13 @@ if (process.env.NODE_ENV === 'production') {
   }
 }
 
+// Cloudflare dashboard link construction (admin town inspector)
+export const CLOUDFLARE_ACCOUNT_ID = getEnvVariable('CLOUDFLARE_ACCOUNT_ID');
+export const CLOUDFLARE_TOWN_DO_NAMESPACE_ID = getEnvVariable('CLOUDFLARE_TOWN_DO_NAMESPACE_ID');
+export const CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID = getEnvVariable(
+  'CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID'
+);
+
 // KiloClaw Worker
 export const KILOCLAW_API_URL = getEnvVariable('KILOCLAW_API_URL') || '';
 export const KILOCLAW_INTERNAL_API_SECRET = getEnvVariable('KILOCLAW_INTERNAL_API_SECRET') || '';

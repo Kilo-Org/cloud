@@ -101,7 +101,7 @@ export function updateConfig(sql: SqlStorage, update: WastelandConfigUpdate): vo
           ${wasteland_config.columns.visibility} = ?,
           ${wasteland_config.columns.status} = ?,
           ${wasteland_config.columns.updated_at} = ?
-      WHERE ${wasteland_config.columns.wasteland_id} = ?
+      WHERE ${wasteland_config.wasteland_id} = ?
     `,
     [
       update.name ?? current.name,

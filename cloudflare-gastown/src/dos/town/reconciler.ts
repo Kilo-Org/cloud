@@ -43,10 +43,12 @@ const CIRCUIT_BREAKER_FAILURE_THRESHOLD = 20;
 const CIRCUIT_BREAKER_WINDOW_MINUTES = 30;
 
 /**
- * Town-level dispatch circuit breaker. Counts beads that have definitively
- * failed dispatch — either already in 'failed' status or having exhausted
- * all dispatch attempts — within the recent window. Healthy in-progress
- * beads are excluded so normal concurrent work doesn't trip the breaker.
+ * Town-level dispatch circuit breaker. Counts beads with at least one
+ * dispatch attempt in the recent window that have not yet closed
+ * successfully. This captures beads in active retry loops (in_progress
+ * after a failed container start), beads that have been explicitly
+ * failed, and beads that exhausted all attempts — while excluding
+ * beads that eventually succeeded (status = 'closed').
  */
 function checkDispatchCircuitBreaker(sql: SqlStorage): Action[] {
   const rows = z
@@ -59,10 +61,8 @@ function checkDispatchCircuitBreaker(sql: SqlStorage): Action[] {
           SELECT count(*) as failure_count
           FROM ${beads}
           WHERE ${beads.last_dispatch_attempt_at} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-${CIRCUIT_BREAKER_WINDOW_MINUTES} minutes')
-            AND (
-              ${beads.status} = 'failed'
-              OR ${beads.dispatch_attempts} >= ${MAX_DISPATCH_ATTEMPTS}
-            )
+            AND ${beads.dispatch_attempts} > 0
+            AND ${beads.status} != 'closed'
         `,
         []
       ),

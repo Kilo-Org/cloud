@@ -94,6 +94,7 @@ export type PreparingStep =
   | 'workspace_setup'
   | 'cloning'
   | 'branch'
+  | 'repo_startup_script'
   | 'setup_commands'
   | 'kilo_server'
   | 'kilo_session'

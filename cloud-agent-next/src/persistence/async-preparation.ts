@@ -16,6 +16,7 @@ import {
   SessionService,
   determineBranchName,
   runSetupCommands,
+  runRepoStartupScript,
   writeAuthFile,
 } from '../session-service.js';
 import { WrapperClient } from '../kilo/wrapper-client.js';
@@ -166,7 +167,11 @@ export async function executePreparationSteps(
   emitProgress('branch', 'Setting up branch…');
   await manageBranch(session, workspacePath, branchName, !!input.upstreamBranch);
 
-  // 6. Setup commands
+  // 6a. Repo-scoped startup script (before user setup commands)
+  emitProgress('repo_startup_script', 'Running repo startup script…');
+  await runRepoStartupScript(session, context, true);
+
+  // 6b. Setup commands
   if (input.setupCommands && input.setupCommands.length > 0) {
     emitProgress('setup_commands', 'Running setup commands…');
     await runSetupCommands(session, context, input.setupCommands, true);

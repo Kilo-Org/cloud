@@ -6,6 +6,7 @@ import {
   SessionService,
   determineBranchName,
   runSetupCommands,
+  runRepoStartupScript,
   writeAuthFile,
 } from '../../session-service.js';
 import { InstallationLookupService } from '../../services/installation-lookup-service.js';
@@ -411,7 +412,10 @@ const prepareSessionHandler = internalApiProtectedProcedure
         }
       }
 
-      // 9. Run setup commands
+      // 9a. Run repo-scoped startup script (before user setup commands)
+      await runRepoStartupScript(session, context, true); // fail-fast
+
+      // 9b. Run setup commands
       if (input.setupCommands && input.setupCommands.length > 0) {
         logger.withFields({ count: input.setupCommands.length }).info('Running setup commands');
         await runSetupCommands(session, context, input.setupCommands, true); // fail-fast

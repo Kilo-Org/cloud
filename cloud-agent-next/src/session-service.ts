@@ -245,7 +245,8 @@ export class SetupCommandFailedError extends Error {
     public readonly exitCode: number,
     public readonly stderr: string
   ) {
-    super(`Setup command failed: ${command}`);
+    const details = [`exit code ${exitCode}`, ...(stderr ? [stderr.trim()] : [])].join(': ');
+    super(`Setup command failed: ${command} (${details})`);
     this.name = 'SetupCommandFailedError';
   }
 }
@@ -326,6 +327,88 @@ export async function runSetupCommands(
   }
 
   logger.info('Setup commands completed');
+}
+
+// Candidate paths for repo-scoped cloud-agent setup scripts, checked in order.
+const REPO_STARTUP_SCRIPT_PATHS = [
+  '.kilo/cloud-agent-setup.sh',
+  '.kilocode/cloud-agent-setup.sh',
+] as const;
+
+/**
+ * Run a repo-scoped cloud-agent startup script if one exists in the workspace.
+ *
+ * Looks for `.kilo/cloud-agent-setup.sh` first, then `.kilocode/cloud-agent-setup.sh`.
+ * The first file that exists is executed with `bash`; if neither exists this is a no-op.
+ *
+ * @param session  - ExecutionSession to run the script in
+ * @param context  - Session context (paths, IDs)
+ * @param failFast - Whether a non-zero exit code should throw (default: false)
+ */
+export async function runRepoStartupScript(
+  session: ExecutionSession,
+  context: SessionContext,
+  failFast: boolean = false
+): Promise<void> {
+  // Probe for the first existing script
+  let scriptRelPath: string | undefined;
+  let scriptAbsPath: string | undefined;
+  for (const candidate of REPO_STARTUP_SCRIPT_PATHS) {
+    const absPath = `${context.workspacePath}/${candidate}`;
+    const probe = await session.exec(`test -f '${absPath}'`);
+    if (probe.exitCode === 0) {
+      scriptRelPath = candidate;
+      scriptAbsPath = absPath;
+      break;
+    }
+  }
+
+  if (!scriptRelPath || !scriptAbsPath) {
+    logger.debug('No repo startup script found');
+    return;
+  }
+  logger.withFields({ script: scriptRelPath }).info('Running repo startup script');
+
+  try {
+    const result = await session.exec(`bash '${scriptAbsPath}'`, {
+      cwd: context.workspacePath,
+      timeout: SETUP_COMMAND_TIMEOUT_SECONDS * 1000,
+    });
+
+    if (result.exitCode !== 0) {
+      logger
+        .withFields({
+          script: scriptRelPath,
+          exitCode: result.exitCode,
+          stderr: result.stderr,
+        })
+        .warn('Repo startup script failed');
+
+      if (failFast) {
+        throw new SetupCommandFailedError(scriptRelPath, result.exitCode, result.stderr);
+      }
+    } else {
+      logger.withFields({ script: scriptRelPath }).info('Repo startup script completed');
+    }
+  } catch (error) {
+    if (error instanceof SetupCommandFailedError) {
+      throw error;
+    }
+    logger
+      .withFields({
+        script: scriptRelPath,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      .error('Error executing repo startup script');
+
+    if (failFast) {
+      throw new SetupCommandFailedError(
+        scriptRelPath,
+        -1,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  }
 }
 
 // Write Kilo auth file so the CLI's KiloSessions can call session ingest.
@@ -902,6 +985,9 @@ export class SessionService {
       logger.withTags({ branchName: context.branchName }).info('Successfully created branch');
     }
 
+    // Run repo-scoped startup script (before user setup commands)
+    await runRepoStartupScript(session, context, true); // fail-fast
+
     // Run setup commands after branch checkout
     if (setupCommands && setupCommands.length > 0) {
       await runSetupCommands(session, context, setupCommands, true); // fail-fast
@@ -1078,6 +1164,9 @@ export class SessionService {
     } else {
       logger.info('Skipping branch operations - CLI session will manage its own branch state');
     }
+
+    // Run repo-scoped startup script (lenient since resuming)
+    await runRepoStartupScript(session, context, false);
 
     // Run setup commands (lenient mode since resuming)
     if (setupCommands && setupCommands.length > 0) {
@@ -1374,6 +1463,9 @@ export class SessionService {
       } catch {
         // non-JSON stdout, non-fatal
       }
+
+      // Re-run repo startup script (fresh clone, need to reinstall)
+      await runRepoStartupScript(session, context, false); // lenient
 
       // Re-run setup commands (fresh clone, need to reinstall)
       if (metadata.setupCommands && metadata.setupCommands.length > 0) {

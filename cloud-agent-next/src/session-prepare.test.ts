@@ -76,6 +76,7 @@ vi.mock('./session-service.js', () => ({
     (sessionId: string, upstreamBranch?: string) => upstreamBranch || `session/${sessionId}`
   ),
   runSetupCommands: vi.fn().mockResolvedValue(undefined),
+  runRepoStartupScript: vi.fn().mockResolvedValue(undefined),
   writeAuthFile: vi.fn().mockResolvedValue(undefined),
   InvalidSessionMetadataError: class InvalidSessionMetadataError extends Error {
     constructor(

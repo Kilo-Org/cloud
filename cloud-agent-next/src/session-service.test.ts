@@ -38,7 +38,11 @@ import {
   restoreWorkspace as mockRestoreWorkspace,
   cleanupWorkspace as mockCleanupWorkspace,
 } from './workspace.js';
-import { InvalidSessionMetadataError, SessionService } from './session-service.js';
+import {
+  InvalidSessionMetadataError,
+  SessionService,
+  runRepoStartupScript,
+} from './session-service.js';
 import type { SandboxInstance, SessionId, SessionContext, ExecutionSession } from './types.js';
 import type { PersistenceEnv, CloudAgentSessionState } from './persistence/types.js';
 
@@ -1653,6 +1657,8 @@ describe('SessionService', () => {
             }),
             stderr: '',
           }) // restore script
+          .mockResolvedValueOnce({ exitCode: 1 }) // repo startup script probe (.kilo) - not found
+          .mockResolvedValueOnce({ exitCode: 1 }) // repo startup script probe (.kilocode) - not found
           .mockResolvedValueOnce({ success: true, exitCode: 0, stdout: 'command 1 ok', stderr: '' }) // npm install
           .mockResolvedValueOnce({
             success: false,
@@ -1692,17 +1698,17 @@ describe('SessionService', () => {
         env: testEnv,
       });
 
-      // 1 repo check + 1 restore script + 3 setup commands = 5
-      expect(fakeSession.exec).toHaveBeenCalledTimes(5);
-      expect(fakeSession.exec).toHaveBeenNthCalledWith(3, 'npm install', {
+      // 1 repo check + 1 restore script + 2 startup script probes + 3 setup commands = 7
+      expect(fakeSession.exec).toHaveBeenCalledTimes(7);
+      expect(fakeSession.exec).toHaveBeenNthCalledWith(5, 'npm install', {
         cwd: `/workspace/org/user/sessions/${sessionId}`,
         timeout: 120000,
       });
-      expect(fakeSession.exec).toHaveBeenNthCalledWith(4, 'npm run build', {
+      expect(fakeSession.exec).toHaveBeenNthCalledWith(6, 'npm run build', {
         cwd: `/workspace/org/user/sessions/${sessionId}`,
         timeout: 120000,
       });
-      expect(fakeSession.exec).toHaveBeenNthCalledWith(5, 'npm test', {
+      expect(fakeSession.exec).toHaveBeenNthCalledWith(7, 'npm test', {
         cwd: `/workspace/org/user/sessions/${sessionId}`,
         timeout: 120000,
       });
@@ -1719,6 +1725,8 @@ describe('SessionService', () => {
         exec: vi
           .fn()
           .mockResolvedValueOnce({ exitCode: 0, stdout: 'installed', stderr: '' }) // git checkout -b succeeds
+          .mockResolvedValueOnce({ exitCode: 1 }) // repo startup script probe (.kilo) - not found
+          .mockResolvedValueOnce({ exitCode: 1 }) // repo startup script probe (.kilocode) - not found
           .mockResolvedValueOnce({ exitCode: 0, stdout: 'installed', stderr: '' }) // npm install succeeds
           .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'ERR! 404 Not Found' }), // npm install -g fails
         gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
@@ -1761,8 +1769,8 @@ describe('SessionService', () => {
         stderr: 'ERR! 404 Not Found',
       });
 
-      // Verify only three calls: git checkout -b + first setup command + second setup command that failed
-      expect(fakeSession.exec).toHaveBeenCalledTimes(3);
+      // git checkout -b + 2 startup script probes + npm install + npm install -g (fails) = 5
+      expect(fakeSession.exec).toHaveBeenCalledTimes(5);
     });
 
     it('should run commands with 2-minute timeout', async () => {
@@ -1884,9 +1892,142 @@ describe('SessionService', () => {
         setupCommands: [], // Empty array
       });
 
-      // exec should only be called once for git checkout -b, not for setup commands
-      expect(fakeSession.exec).toHaveBeenCalledTimes(1);
+      // exec: git checkout -b + startup script probe (found) + startup script run = 3
+      // No setup commands since array is empty
+      expect(fakeSession.exec).toHaveBeenCalledTimes(3);
       expect(fakeSession.exec).toHaveBeenCalledWith(expect.stringContaining('git checkout -b'));
+    });
+  });
+
+  describe('Repo Startup Script', () => {
+    const makeContext = (sessionId: SessionId): SessionContext => ({
+      sandboxId: 'org__user',
+      sessionId,
+      sessionHome: `/home/${sessionId}`,
+      workspacePath: `/workspace/org/user/sessions/${sessionId}`,
+      branchName: `session/${sessionId}`,
+      userId: 'user',
+    });
+
+    it('should be a no-op when no startup script exists', async () => {
+      const exec = vi
+        .fn()
+        .mockResolvedValueOnce({ exitCode: 1 }) // .kilo/cloud-agent-setup.sh not found
+        .mockResolvedValueOnce({ exitCode: 1 }); // .kilocode/cloud-agent-setup.sh not found
+      const session = { exec } as unknown as ExecutionSession;
+
+      await runRepoStartupScript(session, makeContext('agent_no_script' as SessionId));
+
+      expect(exec).toHaveBeenCalledTimes(2);
+      expect(exec).toHaveBeenNthCalledWith(
+        1,
+        "test -f '/workspace/org/user/sessions/agent_no_script/.kilo/cloud-agent-setup.sh'"
+      );
+      expect(exec).toHaveBeenNthCalledWith(
+        2,
+        "test -f '/workspace/org/user/sessions/agent_no_script/.kilocode/cloud-agent-setup.sh'"
+      );
+    });
+
+    it('should prefer .kilo/cloud-agent-setup.sh over .kilocode/', async () => {
+      const exec = vi
+        .fn()
+        .mockResolvedValueOnce({ exitCode: 0 }) // .kilo/cloud-agent-setup.sh found
+        .mockResolvedValueOnce({ exitCode: 0, stderr: '' }); // script runs OK
+      const session = { exec } as unknown as ExecutionSession;
+
+      await runRepoStartupScript(session, makeContext('agent_kilo_pref' as SessionId));
+
+      expect(exec).toHaveBeenCalledTimes(2);
+      expect(exec).toHaveBeenNthCalledWith(
+        2,
+        "bash '/workspace/org/user/sessions/agent_kilo_pref/.kilo/cloud-agent-setup.sh'",
+        {
+          cwd: '/workspace/org/user/sessions/agent_kilo_pref',
+          timeout: 120000,
+        }
+      );
+    });
+
+    it('should fall back to .kilocode/cloud-agent-setup.sh', async () => {
+      const exec = vi
+        .fn()
+        .mockResolvedValueOnce({ exitCode: 1 }) // .kilo not found
+        .mockResolvedValueOnce({ exitCode: 0 }) // .kilocode found
+        .mockResolvedValueOnce({ exitCode: 0, stderr: '' }); // script runs OK
+      const session = { exec } as unknown as ExecutionSession;
+
+      await runRepoStartupScript(session, makeContext('agent_kilocode_fb' as SessionId));
+
+      expect(exec).toHaveBeenCalledTimes(3);
+      expect(exec).toHaveBeenNthCalledWith(
+        3,
+        "bash '/workspace/org/user/sessions/agent_kilocode_fb/.kilocode/cloud-agent-setup.sh'",
+        {
+          cwd: '/workspace/org/user/sessions/agent_kilocode_fb',
+          timeout: 120000,
+        }
+      );
+    });
+
+    it('should throw on script failure when failFast is true', async () => {
+      const exec = vi
+        .fn()
+        .mockResolvedValueOnce({ exitCode: 0 }) // .kilo found
+        .mockResolvedValueOnce({ exitCode: 1, stderr: 'syntax error' }); // script fails
+      const session = { exec } as unknown as ExecutionSession;
+
+      await expect(
+        runRepoStartupScript(session, makeContext('agent_ff' as SessionId), true)
+      ).rejects.toMatchObject({
+        name: 'SetupCommandFailedError',
+        command: '.kilo/cloud-agent-setup.sh',
+        exitCode: 1,
+        stderr: 'syntax error',
+      });
+    });
+
+    it('should not throw on script failure when failFast is false', async () => {
+      const exec = vi
+        .fn()
+        .mockResolvedValueOnce({ exitCode: 0 }) // .kilo found
+        .mockResolvedValueOnce({ exitCode: 1, stderr: 'some error' }); // script fails
+      const session = { exec } as unknown as ExecutionSession;
+
+      // Should not throw in lenient mode
+      await runRepoStartupScript(session, makeContext('agent_lenient' as SessionId), false);
+
+      expect(exec).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle exec errors gracefully in lenient mode', async () => {
+      const exec = vi
+        .fn()
+        .mockResolvedValueOnce({ exitCode: 0 }) // .kilo found
+        .mockRejectedValueOnce(new Error('connection lost')); // exec throws
+      const session = { exec } as unknown as ExecutionSession;
+
+      // Should not throw in lenient mode
+      await runRepoStartupScript(session, makeContext('agent_err' as SessionId), false);
+
+      expect(exec).toHaveBeenCalledTimes(2);
+    });
+
+    it('should throw wrapped error in fail-fast mode when exec throws', async () => {
+      const exec = vi
+        .fn()
+        .mockResolvedValueOnce({ exitCode: 0 }) // .kilo found
+        .mockRejectedValueOnce(new Error('connection lost')); // exec throws
+      const session = { exec } as unknown as ExecutionSession;
+
+      await expect(
+        runRepoStartupScript(session, makeContext('agent_err_ff' as SessionId), true)
+      ).rejects.toMatchObject({
+        name: 'SetupCommandFailedError',
+        command: '.kilo/cloud-agent-setup.sh',
+        exitCode: -1,
+        stderr: 'connection lost',
+      });
     });
   });
 

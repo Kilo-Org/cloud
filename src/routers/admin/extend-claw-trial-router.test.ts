@@ -20,7 +20,6 @@ beforeEach(async () => {
 });
 
 const MS_PER_DAY = 86_400_000;
-const MS_PER_YEAR = 365 * MS_PER_DAY;
 
 function ms(isoString: string): number {
   return new Date(isoString).getTime();
@@ -45,17 +44,20 @@ describe('matchUsers — at_limit ineligibility', () => {
     expect(matched[0].subscriptionStatus).toBe('at_limit');
   });
 
-  it('marks a trialing user ineligible when trial_ends_at is exactly at the 1-year ceiling', async () => {
-    // Use calendar-year arithmetic (setFullYear) to match the implementation,
-    // not 365 * MS_PER_DAY which diverges on leap-year boundaries.
-    const oneYearFromNow = new Date();
-    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+  it('marks a trialing user ineligible when trial_ends_at is just past the 1-year ceiling', async () => {
+    // Store one year + one day to avoid ms-level flakiness: if we stored exactly
+    // "one year from now", by the time matchUsers runs its own `new Date()` a few
+    // milliseconds later the boundary has moved forward and the row appears under
+    // the ceiling. One extra day keeps it reliably above the ceiling.
+    const oneYearPlusOneDay = new Date();
+    oneYearPlusOneDay.setFullYear(oneYearPlusOneDay.getFullYear() + 1);
+    oneYearPlusOneDay.setDate(oneYearPlusOneDay.getDate() + 1);
     await db.insert(kiloclaw_subscriptions).values({
       user_id: target.id,
       plan: 'trial',
       status: 'trialing',
       trial_started_at: new Date().toISOString(),
-      trial_ends_at: oneYearFromNow.toISOString(),
+      trial_ends_at: oneYearPlusOneDay.toISOString(),
     });
 
     const caller = await createCallerForUser(admin.id);
@@ -110,7 +112,12 @@ describe('extendTrials — 1-year ceiling', () => {
     expect(result.success).toBe(true);
 
     const newEnd = new Date(result.newTrialEndsAt!).getTime();
-    const oneYearFromNow = Date.now() + MS_PER_YEAR;
+    // Use calendar-year arithmetic to match Postgres `interval '1 year'` and
+    // the JS setFullYear in the canceled path — 365 * MS_PER_DAY is a day short
+    // in leap years.
+    const calendarYearFromNow = new Date();
+    calendarYearFromNow.setFullYear(calendarYearFromNow.getFullYear() + 1);
+    const oneYearFromNow = calendarYearFromNow.getTime();
 
     // Must be capped at ~1 year, not ~565 days
     expect(newEnd).toBeLessThanOrEqual(oneYearFromNow + 5_000);
@@ -166,7 +173,9 @@ describe('extendTrials — normal extension', () => {
     expect(result.action).toBe('restarted');
 
     const newEnd = ms(result.newTrialEndsAt!);
-    const oneYearFromNow = Date.now() + MS_PER_YEAR;
+    const calendarYearFromNow = new Date();
+    calendarYearFromNow.setFullYear(calendarYearFromNow.getFullYear() + 1);
+    const oneYearFromNow = calendarYearFromNow.getTime();
     expect(newEnd).toBeGreaterThan(oneYearFromNow - MS_PER_DAY);
     expect(newEnd).toBeLessThanOrEqual(oneYearFromNow + 5_000);
   });

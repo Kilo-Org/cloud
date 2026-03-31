@@ -23,7 +23,6 @@ import {
   Bell,
   Server,
   Network,
-  Clock,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -135,11 +134,6 @@ const productEngineeringItems: MenuItem[] = [
     title: () => 'KiloClaw',
     url: '/admin/kiloclaw',
     icon: () => <Server />,
-  },
-  {
-    title: () => 'Extend Claw Trial',
-    url: '/admin/extend-claw-trial',
-    icon: () => <Clock />,
   },
   {
     title: () => 'Email Testing',

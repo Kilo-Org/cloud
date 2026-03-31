@@ -7,9 +7,10 @@ import { KiloclawInstancesPage } from './KiloclawInstances/KiloclawInstancesPage
 import { VersionsTab, PinsTab } from './KiloclawVersions/KiloclawVersionsPage';
 import { RegionsTab } from './KiloclawRegions/KiloclawRegionsPage';
 import { CliRunsTab } from './KiloclawCliRuns/KiloclawCliRunsTab';
+import { KiloclawExtendTrial } from './KiloclawExtendTrial';
 
-const VALID_TABS: readonly string[] = ['instances', 'versions', 'pins', 'regions', 'cli-runs'];
-type Tab = 'instances' | 'versions' | 'pins' | 'regions' | 'cli-runs';
+const VALID_TABS: readonly string[] = ['instances', 'versions', 'pins', 'regions', 'cli-runs', 'bulk-extend'];
+type Tab = 'instances' | 'versions' | 'pins' | 'regions' | 'cli-runs' | 'bulk-extend';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -57,6 +58,9 @@ export function KiloclawDashboard() {
           <TabsTrigger value="cli-runs" className={tabTriggerClass}>
             CLI Runs
           </TabsTrigger>
+          <TabsTrigger value="bulk-extend" className={tabTriggerClass}>
+            Bulk Extend
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="instances" className="mt-4">
           <KiloclawInstancesPage />
@@ -72,6 +76,9 @@ export function KiloclawDashboard() {
         </TabsContent>
         <TabsContent value="cli-runs" className="mt-4">
           <CliRunsTab />
+        </TabsContent>
+        <TabsContent value="bulk-extend" className="mt-4">
+          <KiloclawExtendTrial />
         </TabsContent>
       </Tabs>
     </div>

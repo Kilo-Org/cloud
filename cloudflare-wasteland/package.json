@@ -3,22 +3,40 @@
   "version": "1.0.0",
   "type": "module",
   "private": true,
-  "description": "Wasteland: DoltHub-backed wanted board via Durable Objects",
+  "description": "Wasteland: hosted Wasteland service with Kilo auth/billing proxy",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
+    "deploy:prod": "wrangler deploy --env=\"\" --outdir dist --var SENTRY_RELEASE:$(sentry-cli releases propose-version)",
+    "postdeploy:prod": "pnpm sentry:sourcemaps",
+    "deploy:dev": "wrangler deploy --env dev",
+    "sentry:sourcemaps": "_SENTRY_RELEASE=$(sentry-cli releases propose-version) && sentry-cli releases new $_SENTRY_RELEASE --org=kilo-code --project=wasteland-service && sentry-cli sourcemaps upload --org=kilo-code --project=wasteland-service --release=$_SENTRY_RELEASE --strip-prefix 'dist/..' dist",
     "dev": "wrangler dev --env dev --ip 0.0.0.0",
+    "start": "wrangler dev --env dev --ip 0.0.0.0",
     "types": "wrangler types --include-runtime=false",
-    "typecheck": "tsc --noEmit"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-wasteland/src"
   },
   "dependencies": {
     "@cloudflare/containers": "^0.1.0",
+    "@kilocode/worker-utils": "workspace:*",
+    "@sentry/cloudflare": "^9",
+    "@trpc/server": "catalog:",
     "hono": "catalog:",
+    "itty-time": "^1.0.6",
+    "jose": "catalog:",
+    "workers-tagged-logger": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.8",
     "@cloudflare/workers-types": "catalog:",
+    "@sentry/cli": "^2.58.2",
     "@types/node": "^22",
+    "@typescript/native-preview": "7.0.0-dev.20251019.1",
     "typescript": "catalog:",
+    "vitest": "^3.2.4",
     "wrangler": "catalog:"
   }
 }

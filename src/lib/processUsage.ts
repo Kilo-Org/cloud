@@ -820,6 +820,58 @@ async function processTokenData(
       );
     }
     usageStats = genStats;
+
+    // Log cache token reconciliation for Anthropic models with tools
+    if (
+      usageContext.api_kind === 'chat_completions' &&
+      usageContext.has_tools &&
+      usageContext.requested_model.startsWith('anthropic/')
+    ) {
+      console.log(
+        `[CacheDiag:response]`,
+        JSON.stringify({
+          sessionId: usageContext.session_id,
+          model: usageStats.model,
+          source: 'generation',
+          messageId: usageStats.messageId,
+          upstreamId: usageStats.upstream_id,
+          inputTokens: usageStats.inputTokens,
+          cacheHitTokens: usageStats.cacheHitTokens,
+          cacheWriteTokens: usageStats.cacheWriteTokens,
+          outputTokens: usageStats.outputTokens,
+          cost_mUsd: usageStats.cost_mUsd,
+          cacheDiscount_mUsd: usageStats.cacheDiscount_mUsd,
+          inferenceProvider: usageStats.inference_provider,
+        })
+      );
+    }
+  }
+
+  // Log inline-only usage for Anthropic models with tools (no generation data)
+  if (
+    !generation &&
+    usageContext.api_kind === 'chat_completions' &&
+    usageContext.has_tools &&
+    usageContext.requested_model.startsWith('anthropic/')
+  ) {
+    console.log(
+      `[CacheDiag:response]`,
+      JSON.stringify({
+        sessionId: usageContext.session_id,
+        model: usageStats.model,
+        source: 'inline',
+        messageId: usageStats.messageId,
+        upstreamId: usageStats.upstream_id,
+        inputTokens: usageStats.inputTokens,
+        cacheHitTokens: usageStats.cacheHitTokens,
+        cacheWriteTokens: usageStats.cacheWriteTokens,
+        outputTokens: usageStats.outputTokens,
+        cost_mUsd: usageStats.cost_mUsd,
+        cacheDiscount_mUsd: usageStats.cacheDiscount_mUsd ?? null,
+        inferenceProvider: usageStats.inference_provider,
+        generationLookupFailed: true,
+      })
+    );
   }
 
   if (usageStats.inputTokens - usageStats.cacheHitTokens > 100000)

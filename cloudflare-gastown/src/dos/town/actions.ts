@@ -506,31 +506,13 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
         }
       }
 
-      // Set agent to working and bead to in_progress synchronously
+      // Set agent to working and bead to in_progress synchronously.
+      // NOTE: Both agent and bead dispatch_attempts are incremented in
+      // scheduling.dispatchAgent(), which runs on all dispatch paths
+      // (slingBead, slingConvoy, reconciler). Do NOT increment here —
+      // it would double-count on the reconciler path since applyAction
+      // defers to scheduling.dispatchAgent via ctx.dispatchAgent.
       agentOps.updateAgentStatus(sql, agentId, 'working');
-      query(
-        sql,
-        /* sql */ `
-          UPDATE ${agent_metadata}
-          SET ${agent_metadata.columns.dispatch_attempts} = ${agent_metadata.columns.dispatch_attempts} + 1
-          WHERE ${agent_metadata.bead_id} = ?
-        `,
-        [agentId]
-      );
-      // Track dispatch attempts on the bead itself (not just the agent).
-      // The bead counter is never reset by hookBead, so it reliably
-      // tracks total attempts across agent re-creation cycles.
-      const dispatchTimestamp = now();
-      query(
-        sql,
-        /* sql */ `
-          UPDATE ${beads}
-          SET ${beads.columns.dispatch_attempts} = ${beads.columns.dispatch_attempts} + 1,
-              ${beads.columns.last_dispatch_attempt_at} = ?
-          WHERE ${beads.bead_id} = ?
-        `,
-        [dispatchTimestamp, beadId]
-      );
       beadOps.updateBeadStatus(sql, beadId, 'in_progress', agentId);
 
       const capturedAgentId = agentId;

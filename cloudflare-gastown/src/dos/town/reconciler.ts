@@ -795,7 +795,9 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
                b.${beads.columns.assignee_agent_bead_id},
                b.${beads.columns.updated_at},
                b.${beads.columns.labels},
-               b.${beads.columns.created_by}
+               b.${beads.columns.created_by},
+               b.${beads.columns.dispatch_attempts},
+               b.${beads.columns.last_dispatch_attempt_at}
         FROM ${beads} b
         WHERE b.${beads.columns.type} = 'issue'
           AND b.${beads.columns.status} = 'in_review'

@@ -85,7 +85,7 @@ jobs:
         uses: useblacksmith/setup-docker-builder@v1
 
       - name: Login to Fly Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
         with:
           registry: registry.fly.io
           username: x

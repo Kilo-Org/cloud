@@ -28,9 +28,7 @@ export async function GET(request: NextRequest) {
   const selectFields = {
     date: sql<string>`DATE(${microdollar_usage.created_at})`,
     ...(groupByModel && {
-      model: sql<
-        string | null
-      >`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
+      model: sql<string | null>`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
     }),
     total_cost: sql<number>`SUM(${microdollar_usage.cost})::float`,
     request_count: sql<number>`COUNT(*)::float`,

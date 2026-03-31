@@ -147,18 +147,17 @@ function estimateTokenCount(request: GatewayRequest) {
   return Math.round(JSON.stringify(request).length / 4 + (getMaxTokens(request) ?? 0));
 }
 
-/** Returns true if the request has any provider routing restrictions that could cause a 404
- * even though the model exists (e.g. all allowed providers are unavailable). */
 function hasProviderRestrictions(request: GatewayRequest): boolean {
-  const p = request.body.provider;
-  // zdr maps to providerOptions.gateway.zeroDataRetention for Vercel, but is always derived
-  // from provider.zdr so checking p.zdr here covers both routing paths.
-  return !!(p?.ignore?.length || p?.only?.length || p?.data_collection === 'deny' || p?.zdr);
+  const provider = request.body.provider;
+  const providerOptions = request.body.providerOptions;
+  return !!(
+    provider?.ignore?.length ||
+    provider?.only?.length ||
+    provider?.data_collection === 'deny' ||
+    provider?.zdr ||
+    providerOptions?.gateway?.zeroDataRetention
+  );
 }
-
-// 'kilo/auto-frontier' was a short-lived discontinued alias for 'kilo-auto/frontier'.
-// Some older clients may still send it; the upstream returns 400 for unknown model IDs.
-const DISCONTINUED_MODEL_IDS = new Set(['kilo/auto-frontier']);
 
 export async function makeErrorReadable({
   requestedModel,
@@ -192,7 +191,8 @@ export async function makeErrorReadable({
 
   if (
     (response.status === 404 ||
-      (response.status === 400 && DISCONTINUED_MODEL_IDS.has(requestedModel))) &&
+      (response.status === 400 &&
+        requestedModel === 'kilo/auto-frontier')) /*discontinued variant of kilo-auto/frontier*/ &&
     !hasProviderRestrictions(request)
   ) {
     const recommendedModel = balance <= 0 ? KILO_AUTO_FREE_MODEL : KILO_AUTO_BALANCED_MODEL;

@@ -662,12 +662,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <div className="relative flex h-full flex-col items-center px-4">
+    <div className="relative flex h-full flex-col items-center px-4 pt-16">
       <SetPageTitle title="Cloud Agent">
         <Badge variant="new">new</Badge>
       </SetPageTitle>
       <MobileSidebarToggle />
-      <div className="flex-1" />
       <div className="w-full max-w-2xl space-y-4">
         {/* Insufficient balance banner */}
         {hasInsufficientBalance && eligibilityData && (
@@ -925,7 +924,6 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
           </Popover>
         </div>
       </div>
-      <div className="flex-[1.5]" />
     </div>
   );
 }

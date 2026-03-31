@@ -2,7 +2,7 @@ import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { kilocode_users, kiloclaw_subscriptions, kiloclaw_email_log } from '@kilocode/db/schema';
 import * as z from 'zod';
-import { eq, and, inArray, sql, desc } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
 
 const MAX_USERS = 1000;
@@ -37,31 +37,25 @@ type ExtendTrialResult = {
  * For each user_id in the given array, return the most recently created
  * kiloclaw_subscriptions row. Users with no subscription are omitted.
  *
- * Using created_at DESC with a subquery so that multi-instance users (who may
- * have one row per instance) are consistently handled by targeting only their
- * latest subscription.
+ * DISTINCT ON (user_id) ORDER BY user_id, created_at DESC lets Postgres pick
+ * exactly one row per user with a single index scan — no application-side
+ * deduplication needed.
+ *
+ * Multi-instance users (one subscription row per instance) are handled
+ * consistently: only their latest subscription is targeted.
  */
 async function fetchLatestSubscriptionPerUser(
   userIds: string[]
 ): Promise<Map<string, typeof kiloclaw_subscriptions.$inferSelect>> {
   if (userIds.length === 0) return new Map();
 
-  // Drizzle doesn't support DISTINCT ON natively; use a lateral / row_number
-  // approach via a subquery alias.
   const rows = await db
-    .select()
+    .selectDistinctOn([kiloclaw_subscriptions.user_id])
     .from(kiloclaw_subscriptions)
     .where(inArray(kiloclaw_subscriptions.user_id, userIds))
-    .orderBy(desc(kiloclaw_subscriptions.created_at));
+    .orderBy(kiloclaw_subscriptions.user_id, sql`${kiloclaw_subscriptions.created_at} DESC`);
 
-  // Keep only the first (most recent) row per user_id encountered.
-  const latest = new Map<string, typeof kiloclaw_subscriptions.$inferSelect>();
-  for (const row of rows) {
-    if (!latest.has(row.user_id)) {
-      latest.set(row.user_id, row);
-    }
-  }
-  return latest;
+  return new Map(rows.map(r => [r.user_id, r]));
 }
 
 export const extendClawTrialRouter = createTRPCRouter({
@@ -268,8 +262,11 @@ export const extendClawTrialRouter = createTRPCRouter({
                 scheduled_plan: null,
                 scheduled_by: null,
                 cancel_at_period_end: false,
-                pending_conversion: false,
-                payment_source: null,
+                // payment_source and pending_conversion are intentionally left
+                // as-is: stripe_subscription_id = null is the real guard against
+                // stale Stripe webhook replays, and the billing implications of
+                // clearing these fields on a canceled row haven't been fully
+                // analyzed for every payment_source value.
                 current_period_start: null,
                 current_period_end: null,
                 commit_ends_at: null,

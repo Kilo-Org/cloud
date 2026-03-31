@@ -33,7 +33,6 @@ type ExtendTrialResult = {
   success: boolean;
   action?: 'extended' | 'restarted';
   newTrialEndsAt?: string;
-  trialDays?: number;
   error?: string;
 };
 
@@ -263,7 +262,6 @@ export const extendClawTrialRouter = createTRPCRouter({
               success: true,
               action: 'extended',
               newTrialEndsAt: updated.trial_ends_at ?? undefined,
-              trialDays,
             });
           } else if (subscription.status === 'canceled') {
             const now = new Date();
@@ -367,7 +365,6 @@ export const extendClawTrialRouter = createTRPCRouter({
               success: true,
               action: 'restarted',
               newTrialEndsAt: newEnd.toISOString(),
-              trialDays,
             });
           } else {
             // Active paid subscription (active, past_due, unpaid) — must not be reset.

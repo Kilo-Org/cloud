@@ -51,7 +51,6 @@ type TrialResult = {
   success: boolean;
   action?: 'extended' | 'restarted';
   newTrialEndsAt?: string;
-  trialDays?: number;
   error?: string;
 };
 

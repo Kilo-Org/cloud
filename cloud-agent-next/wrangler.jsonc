@@ -137,7 +137,7 @@
       "image": "./Dockerfile",
       "instance_type": "standard-4",
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.0.50",
+        "KILOCODE_CLI_VERSION": "7.1.11",
       },
       "max_instances": 150,
       "rollout_active_grace_period": 1800,
@@ -147,7 +147,7 @@
       "image": "./Dockerfile",
       "instance_type": "standard-2",
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.0.50",
+        "KILOCODE_CLI_VERSION": "7.1.11",
       },
       "max_instances": 100,
       "rollout_active_grace_period": 1800,
@@ -288,7 +288,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.0.50",
+            "KILOCODE_CLI_VERSION": "7.1.11",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -298,7 +298,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-2",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.0.50",
+            "KILOCODE_CLI_VERSION": "7.1.11",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,

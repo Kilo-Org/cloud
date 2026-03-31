@@ -922,17 +922,22 @@ export const kiloclawRouter = createTRPCRouter({
 
   // User-facing (user client -- forwards user's short-lived JWT)
   getConfig: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawUserClient(
       generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
     );
-    return client.getConfig({ userId: ctx.user.id });
+    return client.getConfig({ userId: ctx.user.id, instanceId: workerInstanceId(instance) });
   }),
 
   getChannelCatalog: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawUserClient(
       generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
     );
-    const config = await client.getConfig({ userId: ctx.user.id });
+    const config = await client.getConfig({
+      userId: ctx.user.id,
+      instanceId: workerInstanceId(instance),
+    });
     const channels = getEntriesByCategory('channel');
 
     return channels.map(entry => ({
@@ -954,10 +959,14 @@ export const kiloclawRouter = createTRPCRouter({
   }),
 
   getSecretCatalog: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawUserClient(
       generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
     );
-    const config = await client.getConfig({ userId: ctx.user.id });
+    const config = await client.getConfig({
+      userId: ctx.user.id,
+      instanceId: workerInstanceId(instance),
+    });
     const tools = getEntriesByCategory('tool');
 
     return tools.map(entry => ({
@@ -994,12 +1003,13 @@ export const kiloclawRouter = createTRPCRouter({
         .optional()
     )
     .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawUserClient(
         generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
       );
       const result = await client.restartMachine(
         input?.imageTag ? { imageTag: input.imageTag } : undefined,
-        { userId: ctx.user.id }
+        { userId: ctx.user.id, instanceId: workerInstanceId(instance) }
       );
       if (result.success) {
         PostHogClient().capture({

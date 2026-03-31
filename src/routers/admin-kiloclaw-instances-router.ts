@@ -519,8 +519,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const fallbackMessage = 'Failed to start kilo CLI run';
       try {
+        const instance = await getActiveInstance(input.userId);
         const client = new KiloClawInternalClient();
-        return await client.startKiloCliRun(input.userId, input.prompt);
+        return await client.startKiloCliRun(input.userId, input.prompt, workerInstanceId(instance));
       } catch (err) {
         console.error('Failed to start kilo CLI run for user:', input.userId, err);
         throwKiloclawAdminError(err, fallbackMessage);
@@ -530,8 +531,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
   getKiloCliRunStatus: adminProcedure.input(GatewayProcessSchema).query(async ({ input }) => {
     const fallbackMessage = 'Failed to get kilo CLI run status';
     try {
+      const instance = await getActiveInstance(input.userId);
       const client = new KiloClawInternalClient();
-      return await client.getKiloCliRunStatus(input.userId);
+      return await client.getKiloCliRunStatus(input.userId, workerInstanceId(instance));
     } catch (err) {
       console.error('Failed to get kilo CLI run status for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
@@ -751,7 +753,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       const [row] = await db
-        .select({ user: kilocode_users })
+        .select({
+          user: kilocode_users,
+          instance: {
+            id: kiloclaw_instances.id,
+            sandbox_id: kiloclaw_instances.sandbox_id,
+          },
+        })
         .from(kiloclaw_instances)
         .innerJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
         .where(eq(kiloclaw_instances.id, input.instanceId))
@@ -767,7 +775,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       try {
         return await client.restartMachine(
           input.imageTag ? { imageTag: input.imageTag } : undefined,
-          { userId: row.user.id }
+          { userId: row.user.id, instanceId: workerInstanceId(row.instance) }
         );
       } catch (err) {
         console.error('Failed to restart machine for user:', row.user.id, err);

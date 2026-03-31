@@ -176,6 +176,14 @@ function downloadCsv(content: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+function ineligibleReason(status: string | null): string {
+  if (status === null) return 'No subscription — must provision first';
+  if (status === 'active') return 'Active paid subscription';
+  if (status === 'past_due') return 'Past due — active paid subscription';
+  if (status === 'unpaid') return 'Unpaid — active paid subscription';
+  return `Ineligible status: ${status}`;
+}
+
 function subscriptionStatusBadge(status: string | null) {
   if (status === null) return <Badge variant="outline">no subscription</Badge>;
   if (status === 'trialing') return <Badge variant="default">trialing</Badge>;
@@ -322,6 +330,10 @@ export function KiloclawExtendTrial() {
       toast.error('No valid emails found');
       return;
     }
+    if (emails.length > 1000) {
+      toast.error(`Too many emails (${emails.length}). Maximum batch size is 1,000.`);
+      return;
+    }
     setResults(null);
     setEmailsToMatch(emails);
   };
@@ -359,14 +371,10 @@ export function KiloclawExtendTrial() {
       toast.info(`No ${success ? 'successful' : 'failed'} results to export`);
       return;
     }
-    const content =
-      'email,user_id,instance_id,action,new_trial_ends_at\n' +
-      filtered
-        .map(
-          r =>
-            `${r.email},${r.userId},${r.instanceId ?? ''},${r.action ?? ''},${r.newTrialEndsAt ?? ''}`
-        )
-        .join('\n');
+    const content = success
+      ? 'email,action,new_trial_ends_at\n' +
+        filtered.map(r => `${r.email},${r.action ?? ''},${r.newTrialEndsAt ?? ''}`).join('\n')
+      : 'email,error\n' + filtered.map(r => `${r.email},${r.error ?? ''}`).join('\n');
     downloadCsv(content, `${success ? 'successful' : 'failed'}-trial-extensions.csv`);
   };
 
@@ -379,17 +387,19 @@ export function KiloclawExtendTrial() {
       return;
     }
     const content =
-      'email,user_id,instance_id,subscription_status\n' +
+      'email,instance_id,stripe_subscription_id,reason\n' +
       ineligible
-        .map(u => `${u.email},${u.userId},${u.instanceId ?? ''},${u.subscriptionStatus ?? ''}`)
+        .map(
+          u =>
+            `${u.email},${u.instanceId ?? ''},${u.stripeSubscriptionId ?? ''},${ineligibleReason(u.subscriptionStatus)}`
+        )
         .join('\n');
     downloadCsv(content, 'ineligible-users.csv');
   };
 
   const handleDownloadUnmatched = () => {
     if (unmatchedEmails.length === 0) return;
-    const content =
-      'email,user_id,instance_id\n' + unmatchedEmails.map(u => `${u.email},,`).join('\n');
+    const content = 'email\n' + unmatchedEmails.map(u => u.email).join('\n');
     downloadCsv(content, 'unmatched-emails.csv');
   };
 
@@ -410,7 +420,9 @@ export function KiloclawExtendTrial() {
   const ineligibleCount = matchedUsers.length - eligibleCount;
 
   // CSV takes precedence when loaded; fall back to paste text count
-  const canMatch = csvData ? selectedColumn && csvEmailCount > 0 : pastedEmailCount > 0;
+  const canMatch = csvData
+    ? selectedColumn && csvEmailCount > 0 && csvEmailCount <= 1000
+    : pastedEmailCount > 0 && pastedEmailCount <= 1000;
 
   return (
     <div className="flex w-full flex-col gap-y-6">
@@ -475,8 +487,15 @@ export function KiloclawExtendTrial() {
                 {pastedEmailCount > 0 && (
                   <>
                     {' '}
-                    <span className="text-foreground font-medium">
+                    <span
+                      className={
+                        pastedEmailCount > 1000
+                          ? 'text-destructive font-medium'
+                          : 'text-foreground font-medium'
+                      }
+                    >
                       {pastedEmailCount} valid email{pastedEmailCount !== 1 ? 's' : ''} detected.
+                      {pastedEmailCount > 1000 && ' Exceeds the 1,000 email limit.'}
                     </span>
                   </>
                 )}
@@ -526,9 +545,12 @@ export function KiloclawExtendTrial() {
                   </SelectContent>
                 </Select>
                 {selectedColumn && (
-                  <p className="text-muted-foreground text-sm">
+                  <p
+                    className={`text-sm ${csvEmailCount > 1000 ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
+                  >
                     {csvEmailCount} valid email{csvEmailCount !== 1 ? 's' : ''} found in &quot;
                     {selectedColumn}&quot;
+                    {csvEmailCount > 1000 && ` — exceeds the 1,000 email limit`}
                   </p>
                 )}
               </div>
@@ -636,6 +658,7 @@ export function KiloclawExtendTrial() {
                         <TableHead>User Name</TableHead>
                         <TableHead>Subscription</TableHead>
                         <TableHead>User ID</TableHead>
+                        {ineligibleCount > 0 && <TableHead>Reason</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -647,6 +670,14 @@ export function KiloclawExtendTrial() {
                           <TableCell className="text-muted-foreground font-mono text-xs">
                             {user.userId}
                           </TableCell>
+                          {ineligibleCount > 0 && (
+                            <TableCell className="text-muted-foreground text-xs">
+                              {user.subscriptionStatus !== 'trialing' &&
+                              user.subscriptionStatus !== 'canceled'
+                                ? ineligibleReason(user.subscriptionStatus)
+                                : '—'}
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -772,7 +803,9 @@ export function KiloclawExtendTrial() {
                       </TableCell>
                       <TableCell className="text-sm">
                         {result.newTrialEndsAt
-                          ? new Date(result.newTrialEndsAt).toLocaleDateString()
+                          ? new Date(result.newTrialEndsAt).toLocaleDateString(undefined, {
+                              timeZone: 'UTC',
+                            })
                           : '—'}
                       </TableCell>
                       <TableCell>{result.trialDays ?? '—'}</TableCell>

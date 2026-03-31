@@ -14,7 +14,10 @@ function isClientBlocked(userAgent: string | null): boolean {
 
 export const withBlockedClients: MiddlewareFactory = (nextMiddleware: NextMiddlewareWithAuth) => {
   return async (request: NextRequestWithAuth, nextFetchEvent: NextFetchEvent) => {
-    if (isClientBlocked(request.headers.get('user-agent'))) {
+    if (
+      request.nextUrl.pathname === '/api/fim/completions' &&
+      isClientBlocked(request.headers.get('user-agent'))
+    ) {
       return NextResponse.json(
         {
           error: 'upgrade_required',

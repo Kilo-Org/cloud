@@ -479,6 +479,8 @@ export async function enrollWithCredits(params: {
         commit_ends_at: commitEndsAt,
         past_due_since: null,
         cancel_at_period_end: false,
+        trial_started_at: null,
+        trial_ends_at: null,
         // DO NOT clear suspended_at or destruction_deadline (spec rule 5d)
       })
       .onConflictDoUpdate({

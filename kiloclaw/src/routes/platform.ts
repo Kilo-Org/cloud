@@ -1417,9 +1417,28 @@ platform.post('/send-chat-message', async c => {
 
     await sendMessage(apiKey, apiSecret, creds.channelId, creds.userId, message);
 
+    writeEvent(c.env, {
+      event: 'instance.webhook_chat_message_sent',
+      delivery: 'http',
+      route: '/api/platform/send-chat-message',
+      userId,
+      instanceId: instanceId ?? undefined,
+      channelId: creds.channelId,
+    });
+
     return c.json({ success: true, channelId: creds.channelId });
   } catch (err) {
     const { message: errMsg, status } = sanitizeError(err, 'send-chat-message');
+
+    writeEvent(c.env, {
+      event: 'instance.webhook_chat_message_failed',
+      delivery: 'http',
+      route: '/api/platform/send-chat-message',
+      userId,
+      instanceId: instanceId ?? undefined,
+      error: errMsg,
+    });
+
     return jsonError(errMsg, status);
   }
 });

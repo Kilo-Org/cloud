@@ -306,11 +306,12 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
 // Top-level reconcile
 // ════════════════════════════════════════════════════════════════════
 
-export function reconcile(sql: SqlStorage): Action[] {
+export function reconcile(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
+  const draining = opts?.draining ?? false;
   const actions: Action[] = [];
   actions.push(...reconcileAgents(sql));
-  actions.push(...reconcileBeads(sql));
-  actions.push(...reconcileReviewQueue(sql));
+  actions.push(...reconcileBeads(sql, { draining }));
+  actions.push(...reconcileReviewQueue(sql, { draining }));
   actions.push(...reconcileConvoys(sql));
   actions.push(...reconcileGUPP(sql));
   actions.push(...reconcileGC(sql));
@@ -457,7 +458,8 @@ export function reconcileAgents(sql: SqlStorage): Action[] {
 // reconcileBeads — handle unassigned beads, lost agents, stale reviews
 // ════════════════════════════════════════════════════════════════════
 
-export function reconcileBeads(sql: SqlStorage): Action[] {
+export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
+  const draining = opts?.draining ?? false;
   const actions: Action[] = [];
 
   // Rule 1: Open issue beads with no assignee, no blockers, not staged, not triage
@@ -498,6 +500,10 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
 
   for (const bead of unassigned) {
     if (!bead.rig_id) continue;
+    if (draining) {
+      console.log(`${LOG} Town is draining, skipping dispatch for bead ${bead.bead_id}`);
+      continue;
+    }
     // In shadow mode we can't call getOrCreateAgent, so we just note
     // that a hook_agent + dispatch_agent is needed.
     // The action includes rig_id so Phase 3's applyAction can resolve the agent.
@@ -593,6 +599,11 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
       ]);
 
     if (blockerCount[0]?.cnt > 0) continue;
+
+    if (draining) {
+      console.log(`${LOG} Town is draining, skipping dispatch for bead ${agent.current_hook_bead_id}`);
+      continue;
+    }
 
     actions.push({
       type: 'dispatch_agent',
@@ -743,7 +754,8 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
 // refinery dispatch
 // ════════════════════════════════════════════════════════════════════
 
-export function reconcileReviewQueue(sql: SqlStorage): Action[] {
+export function reconcileReviewQueue(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
+  const draining = opts?.draining ?? false;
   const actions: Action[] = [];
 
   // Get all MR beads that need attention
@@ -933,6 +945,12 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
 
     if (oldestMr.length === 0) continue;
 
+    // Skip dispatch if the town is draining (container eviction in progress)
+    if (draining) {
+      console.log(`${LOG} Town is draining, skipping dispatch for bead ${oldestMr[0].bead_id}`);
+      continue;
+    }
+
     // If no refinery exists or it's busy, emit a dispatch_agent with empty
     // agent_id — applyAction will create the refinery via getOrCreateAgent.
     if (refinery.length === 0) {
@@ -1043,6 +1061,11 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
     if (mrRows.length === 0) continue;
     const mr = mrRows[0];
     if (mr.type !== 'merge_request' || mr.status !== 'in_progress') continue;
+
+    if (draining) {
+      console.log(`${LOG} Town is draining, skipping dispatch for bead ${ref.current_hook_bead_id}`);
+      continue;
+    }
 
     // Container status is checked at apply time (async). In shadow mode,
     // we just note that a dispatch is needed.

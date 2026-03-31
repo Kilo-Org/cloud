@@ -3116,7 +3116,7 @@ export class TownDO extends DurableObject<Env> {
     // Phase 1: Reconcile — compute desired state vs actual state
     const sideEffects: Array<() => Promise<void>> = [];
     try {
-      const actions = reconciler.reconcile(this.sql);
+      const actions = reconciler.reconcile(this.sql, { draining: this._draining });
       metrics.actionsEmitted = actions.length;
       for (const a of actions) {
         metrics.actionsByType[a.type] = (metrics.actionsByType[a.type] ?? 0) + 1;

@@ -46,13 +46,16 @@ describe('matchUsers — at_limit ineligibility', () => {
   });
 
   it('marks a trialing user ineligible when trial_ends_at is exactly at the 1-year ceiling', async () => {
+    // Use calendar-year arithmetic (setFullYear) to match the implementation,
+    // not 365 * MS_PER_DAY which diverges on leap-year boundaries.
+    const oneYearFromNow = new Date();
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
     await db.insert(kiloclaw_subscriptions).values({
       user_id: target.id,
       plan: 'trial',
       status: 'trialing',
       trial_started_at: new Date().toISOString(),
-      // Exactly 365 days: extending would be a no-op, so must be at_limit
-      trial_ends_at: new Date(Date.now() + MS_PER_YEAR).toISOString(),
+      trial_ends_at: oneYearFromNow.toISOString(),
     });
 
     const caller = await createCallerForUser(admin.id);

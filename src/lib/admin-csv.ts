@@ -121,6 +121,7 @@ export function parseEmailList(text: string): string[] {
   return emails;
 }
 
+/** Trigger a browser CSV download. Must only be called from client-side code. */
 export function downloadCsv(content: string, filename: string) {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,18 +45,7 @@ import {
   parseEmailList,
   type CsvTableData,
 } from '@/lib/admin-csv';
-
-// --- Types ---
-
-type TrialResult = {
-  email: string;
-  userId: string;
-  instanceId: string | null;
-  success: boolean;
-  action?: 'extended' | 'restarted';
-  newTrialEndsAt?: string;
-  error?: string;
-};
+import type { ExtendTrialResult as TrialResult } from '@/routers/admin/extend-claw-trial-router';
 
 type InputMode = 'paste' | 'csv';
 
@@ -215,8 +204,10 @@ export function KiloclawExtendTrial() {
     [handleFile]
   );
 
-  const extractedEmails =
-    csvData && selectedColumn ? extractEmailsFromColumn(csvData.rows, selectedColumn) : [];
+  const extractedEmails = useMemo(
+    () => (csvData && selectedColumn ? extractEmailsFromColumn(csvData.rows, selectedColumn) : []),
+    [csvData, selectedColumn]
+  );
   const csvEmailCount = extractedEmails.length;
 
   // Actions
@@ -235,15 +226,21 @@ export function KiloclawExtendTrial() {
       return;
     }
     setResults(null);
+    // Invalidate any cached result before updating state so React Query always
+    // issues a fresh network request — even when the email list hasn't changed
+    // (e.g. re-match after a "status changed since match" failure).
+    void queryClient.invalidateQueries(
+      trpc.admin.extendClawTrial.matchUsers.queryOptions({ emails })
+    );
     setEmailsToMatch(emails);
   };
 
   const handleExtendTrials = () => {
     const eligibleEmails = matchedUsers.filter(isEligible).map(u => u.email);
     if (eligibleEmails.length === 0) return;
-    const days = parseInt(trialDays, 10);
-    if (isNaN(days) || days <= 0) {
-      toast.error('Please enter a valid number of days');
+    const days = Number(trialDays);
+    if (!Number.isInteger(days) || days <= 0) {
+      toast.error('Please enter a whole number of days');
       return;
     }
     extendTrialsMutation.mutate({
@@ -319,7 +316,7 @@ export function KiloclawExtendTrial() {
   };
 
   // Computed
-  const pastedEmails = parseEmailList(pastedText);
+  const pastedEmails = useMemo(() => parseEmailList(pastedText), [pastedText]);
   const pastedEmailCount = pastedEmails.length;
 
   const currentEmailCount = inputMode === 'csv' ? csvEmailCount : pastedEmailCount;
@@ -582,6 +579,7 @@ export function KiloclawExtendTrial() {
                       type="number"
                       min="1"
                       max="365"
+                      step="1"
                       value={trialDays}
                       onChange={e => setTrialDays(e.target.value)}
                       placeholder="7"

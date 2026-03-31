@@ -26,7 +26,7 @@ type MatchUsersResult = {
   unmatched: UnmatchedEmail[];
 };
 
-type ExtendTrialResult = {
+export type ExtendTrialResult = {
   email: string;
   userId: string;
   instanceId: string | null;
@@ -316,20 +316,19 @@ export const extendClawTrialRouter = createTRPCRouter({
         const user = usersByEmail.get(email);
         if (user) {
           const sub = latestSubByUserId.get(user.id);
-          // at_limit when trial already fills the ceiling: extending would be a no-op
-          // because the DB caps at now() + 1 year. Compare at day (UTC midnight)
-          // granularity so ms-level clock drift between the Postgres write and this
-          // JS read cannot let an exact-ceiling row slip through as eligible.
-          const todayUtcMidnight = new Date();
-          todayUtcMidnight.setUTCHours(0, 0, 0, 0);
-          const oneYearFromTodayUtc = new Date(todayUtcMidnight);
-          oneYearFromTodayUtc.setUTCFullYear(oneYearFromTodayUtc.getUTCFullYear() + 1);
-          const trialEndDay = sub?.trial_ends_at ? new Date(sub.trial_ends_at) : null;
-          if (trialEndDay) trialEndDay.setUTCHours(0, 0, 0, 0);
+          // at_limit when trial already meets or exceeds the 1-year ceiling so
+          // that extending would produce the same or an earlier date. Use an
+          // exact ms-level comparison against a calendar-year boundary (same
+          // semantics as Postgres `interval '1 year'`) — no day truncation, so
+          // trials ending later on the same calendar day as the boundary are
+          // still shown as eligible and the SQL LEAST will cap them correctly.
+          const now = new Date();
+          const oneYearFromNow = new Date(now);
+          oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
           const beyondCeiling =
             sub?.status === 'trialing' &&
-            trialEndDay !== null &&
-            trialEndDay >= oneYearFromTodayUtc;
+            sub.trial_ends_at !== null &&
+            new Date(sub.trial_ends_at) >= oneYearFromNow;
           matched.push({
             email: user.email,
             userId: user.id,

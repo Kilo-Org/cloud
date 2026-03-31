@@ -165,7 +165,6 @@ export async function makeErrorReadable({
         { status: response.status }
       );
     }
-
   }
 
   if (response.status === 404) {

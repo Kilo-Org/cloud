@@ -16,6 +16,7 @@ import {
   Unlock,
   Check,
 } from 'lucide-react';
+import { startOfDay, subDays } from 'date-fns';
 import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Badge } from '@/components/ui/badge';
@@ -296,9 +297,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         })
   );
 
+  const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 5)).toISOString(), []);
   const { data: recentRepoData } = useQuery(
     trpc.unifiedSessions.recentRepositories.queryOptions({
       organizationId: organizationId ?? null,
+      updatedSince: repoUpdatedSince,
     })
   );
 

@@ -6,6 +6,7 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
+import { startOfDay, subDays } from 'date-fns';
 import { extractRepoFromGitUrl } from './utils/git-utils';
 import { ChatSidebar } from './ChatSidebar';
 import { useSidebarSessions } from './hooks/useSidebarSessions';
@@ -41,6 +42,7 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
   const [platformFilter, setPlatformFilter] = useState<string | undefined>('cloud-agent');
   const [projectFilter, setProjectFilter] = useState<string | undefined>(undefined);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 30)).toISOString(), []);
 
   const { sessions, refetchSessions, renameSessionLocally } = useSidebarSessions({
     organizationId: organizationId ?? null,
@@ -57,7 +59,7 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
   const { data: recentReposData } = useQuery({
     ...trpc.unifiedSessions.recentRepositories.queryOptions({
       organizationId,
-      recentDays: 30,
+      updatedSince: repoUpdatedSince,
     }),
     staleTime: 60_000,
   });

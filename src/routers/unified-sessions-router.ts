@@ -39,7 +39,7 @@ const ListSessionsInputSchema = z.object({
   organizationId: z.uuid().nullable().optional(),
   includeSubSessions: z.boolean().optional().default(false),
   gitUrl: z.string().optional(),
-  recentDays: z.number().min(1).max(30).optional(),
+  updatedSince: z.iso.datetime().optional(),
 });
 
 const SearchInputSchema = z.object({
@@ -167,7 +167,7 @@ export const unifiedSessionsRouter = createTRPCRouter({
       organizationId,
       includeSubSessions,
       gitUrl,
-      recentDays,
+      updatedSince,
     } = input;
 
     if (organizationId) {
@@ -197,14 +197,12 @@ export const unifiedSessionsRouter = createTRPCRouter({
       v2Where.push(cursorCondition(cli_sessions_v2));
     }
 
-    if (recentDays) {
-      // Use full-day boundaries: recentDays=1 means "from midnight yesterday"
-      const cutoff = sql`date_trunc('day', NOW()) - make_interval(days => ${recentDays})`;
-      v1Where.push(sql`${cliSessions.updated_at} >= ${cutoff}`);
-      v2Where.push(sql`${cli_sessions_v2.updated_at} >= ${cutoff}`);
+    if (updatedSince) {
+      v1Where.push(sql`${cliSessions.updated_at} >= ${updatedSince}`);
+      v2Where.push(sql`${cli_sessions_v2.updated_at} >= ${updatedSince}`);
     }
 
-    const effectiveLimit = recentDays ? RECENT_DAYS_LIMIT : limit;
+    const effectiveLimit = updatedSince ? RECENT_DAYS_LIMIT : limit;
 
     const query = sql`
         SELECT * FROM (
@@ -243,11 +241,11 @@ export const unifiedSessionsRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.uuid().nullable().optional(),
-        recentDays: z.number().min(1).max(365).optional().default(5),
+        updatedSince: z.iso.datetime(),
       })
     )
     .query(async ({ ctx, input }) => {
-      const { organizationId, recentDays } = input;
+      const { organizationId, updatedSince } = input;
 
       if (organizationId) {
         await ensureOrganizationAccess(ctx, organizationId);
@@ -263,12 +261,12 @@ export const unifiedSessionsRouter = createTRPCRouter({
       const v2Where = buildScopeFragments('cli_sessions_v2', scopeOpts);
 
       v1Where.push(sql`${cliSessions.git_url} IS NOT NULL`);
-      v1Where.push(sql`${cliSessions.updated_at} >= NOW() - make_interval(days => ${recentDays})`);
+      v1Where.push(sql`${cliSessions.updated_at} >= ${updatedSince}`);
       v1Where.push(sql`${cliSessions.created_on_platform} != 'app-builder'`);
 
       v2Where.push(sql`${cli_sessions_v2.git_url} IS NOT NULL`);
       v2Where.push(
-        sql`${cli_sessions_v2.updated_at} >= NOW() - make_interval(days => ${recentDays})`
+        sql`${cli_sessions_v2.updated_at} >= ${updatedSince}`
       );
       v2Where.push(sql`${cli_sessions_v2.created_on_platform} != 'app-builder'`);
 

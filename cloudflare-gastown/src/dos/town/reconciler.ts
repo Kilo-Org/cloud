@@ -608,7 +608,9 @@ export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): 
     if (blockerCount[0]?.cnt > 0) continue;
 
     if (draining) {
-      console.log(`${LOG} Town is draining, skipping dispatch for bead ${agent.current_hook_bead_id}`);
+      console.log(
+        `${LOG} Town is draining, skipping dispatch for bead ${agent.current_hook_bead_id}`
+      );
       continue;
     }
 
@@ -1070,7 +1072,9 @@ export function reconcileReviewQueue(sql: SqlStorage, opts?: { draining?: boolea
     if (mr.type !== 'merge_request' || mr.status !== 'in_progress') continue;
 
     if (draining) {
-      console.log(`${LOG} Town is draining, skipping dispatch for bead ${ref.current_hook_bead_id}`);
+      console.log(
+        `${LOG} Town is draining, skipping dispatch for bead ${ref.current_hook_bead_id}`
+      );
       continue;
     }
 

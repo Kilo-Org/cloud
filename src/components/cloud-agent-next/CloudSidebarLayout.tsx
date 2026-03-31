@@ -66,12 +66,17 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
 
   const recentProjects = useMemo(() => {
     if (!recentReposData?.repositories) return [];
+    const seen = new Set<string>();
     return recentReposData.repositories
       .map(r => ({
         gitUrl: r.gitUrl,
         displayName: extractRepoFromGitUrl(r.gitUrl) ?? r.gitUrl,
       }))
-      .filter(r => r.displayName);
+      .filter(r => {
+        if (!r.displayName || seen.has(r.displayName)) return false;
+        seen.add(r.displayName);
+        return true;
+      });
   }, [recentReposData?.repositories]);
   const queryClient = useQueryClient();
   const deleteSessionFromStore = useSetAtom(deleteSessionFromStoreAtom);

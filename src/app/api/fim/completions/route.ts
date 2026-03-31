@@ -15,7 +15,6 @@ import {
   extractFraudAndProjectHeaders,
   invalidRequestResponse,
   temporarilyUnavailableResponse,
-  upgradeRequiredResponse,
   wrapInSafeNextResponse,
   captureProxyError,
   extractHeaderAndLimitLength,
@@ -29,18 +28,6 @@ import { getBYOKforOrganization, getBYOKforUser } from '@/lib/byok';
 const MISTRAL_FIM_URL = 'https://api.mistral.ai/v1/fim/completions';
 const INCEPTION_FIM_URL = 'https://api.inceptionlabs.ai/v1/fim/completions';
 const FIM_MAX_TOKENS_LIMIT = 1000;
-
-// These client versions had a bug that caused excessive FIM endpoint requests.
-// Block them and require users to upgrade.
-const BLOCKED_FIM_USER_AGENT_REGEX = /^kilo\/7\.0\.[0-9]+$/;
-const BLOCKED_FIM_USER_AGENTS = ['kilo/7.1.0', 'kilo/7.1.1', 'kilo/7.1.2', 'kilo/7.1.3'];
-
-function isFimClientBlocked(userAgent: string | null): boolean {
-  if (!userAgent) return false;
-  return (
-    BLOCKED_FIM_USER_AGENT_REGEX.test(userAgent) || BLOCKED_FIM_USER_AGENTS.includes(userAgent)
-  );
-}
 
 type FimProvider = 'mistral' | 'inception';
 
@@ -89,10 +76,6 @@ const FIMRequestBody = z.object({
 type FIMRequestBody = z.infer<typeof FIMRequestBody>;
 
 export async function POST(request: NextRequest) {
-  if (isFimClientBlocked(request.headers.get('user-agent'))) {
-    return upgradeRequiredResponse();
-  }
-
   const requestStartedAt = performance.now();
   const requesBodyTextPromise = request.text();
 

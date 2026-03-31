@@ -137,7 +137,7 @@ export const extendClawTrialRouter = createTRPCRouter({
     .input(
       z.object({
         emails: z.array(z.string().email()).max(MAX_USERS),
-        trialDays: z.number().int().positive().max(730),
+        trialDays: z.number().int().positive().max(365),
       })
     )
     .mutation(async ({ input, ctx }): Promise<ExtendTrialResult[]> => {

@@ -29,9 +29,9 @@ function ms(isoString: string): number {
 }
 
 describe('extendTrials — 1-year ceiling', () => {
-  it('caps a trialing extension at 1 year from now when trialDays=500 and trial already has time remaining', async () => {
-    // Trial currently ends 200 days from now. Adding 500 more days would reach
-    // 700 days out — well past the 1-year ceiling.
+  it('caps a trialing extension at 1 year from now when trial already has time remaining', async () => {
+    // Trial currently ends 200 days from now. Adding the maximum 365 days
+    // would reach 565 days out — past the 1-year ceiling.
     const currentEnd = new Date(Date.now() + 200 * MS_PER_DAY);
 
     await db.insert(kiloclaw_subscriptions).values({
@@ -45,7 +45,7 @@ describe('extendTrials — 1-year ceiling', () => {
     const caller = await createCallerForUser(admin.id);
     const results = await caller.admin.extendClawTrial.extendTrials({
       emails: [target.google_user_email],
-      trialDays: 500,
+      trialDays: 365,
     });
 
     expect(results).toHaveLength(1);
@@ -62,7 +62,9 @@ describe('extendTrials — 1-year ceiling', () => {
     expect(newEnd).toBeGreaterThan(oneYearFromNow - MS_PER_DAY);
   });
 
-  it('caps a canceled resurrection at 1 year from now when trialDays=500', async () => {
+  it('does not cap a canceled resurrection since it always starts from now', async () => {
+    // Canceled path computes now + trialDays, so 365 days is exactly at the ceiling —
+    // no capping should occur. Verify result lands ~365 days out, not less.
     await db.insert(kiloclaw_subscriptions).values({
       user_id: target.id,
       plan: 'trial',
@@ -74,7 +76,7 @@ describe('extendTrials — 1-year ceiling', () => {
     const caller = await createCallerForUser(admin.id);
     const results = await caller.admin.extendClawTrial.extendTrials({
       emails: [target.google_user_email],
-      trialDays: 500,
+      trialDays: 365,
     });
 
     expect(results).toHaveLength(1);

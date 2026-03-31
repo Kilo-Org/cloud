@@ -107,11 +107,15 @@ export const extendClawTrialRouter = createTRPCRouter({
         const user = usersByEmail.get(email);
         if (user) {
           const sub = latestSubByUserId.get(user.id);
+          const beyondCeiling =
+            sub?.status === 'trialing' &&
+            sub.trial_ends_at !== null &&
+            new Date(sub.trial_ends_at) > new Date(Date.now() + 365 * 86_400_000);
           matched.push({
             email: user.email,
             userId: user.id,
             userName: user.name,
-            subscriptionStatus: sub?.status ?? null,
+            subscriptionStatus: beyondCeiling ? 'at_limit' : (sub?.status ?? null),
             instanceId: sub?.instance_id ?? null,
             stripeSubscriptionId: sub?.stripe_subscription_id ?? null,
             trialEndsAt: sub?.trial_ends_at ?? null,
@@ -202,8 +206,10 @@ export const extendClawTrialRouter = createTRPCRouter({
             const [updated] = await db
               .update(kiloclaw_subscriptions)
               .set({
-                // Extend from the later of current end or now, capped at 1 year from now.
-                trial_ends_at: sql`LEAST(GREATEST(COALESCE(${kiloclaw_subscriptions.trial_ends_at}::timestamptz, now()), now()) + (${trialDays} * interval '1 day'), now() + interval '1 year')`,
+                // Extend from the later of current end date or now, so already-expired
+                // trials extend from today. Users whose trial already exceeds 1 year
+                // are marked ineligible at match time and never reach this path.
+                trial_ends_at: sql`GREATEST(COALESCE(${kiloclaw_subscriptions.trial_ends_at}::timestamptz, now()), now()) + (${trialDays} * interval '1 day')`,
               })
               .where(
                 and(

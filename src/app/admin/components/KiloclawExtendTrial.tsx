@@ -181,6 +181,7 @@ function ineligibleReason(status: string | null): string {
   if (status === 'active') return 'Active paid subscription';
   if (status === 'past_due') return 'Past due - active paid subscription';
   if (status === 'unpaid') return 'Unpaid - active paid subscription';
+  if (status === 'at_limit') return 'Trial already extends beyond 1 year';
   return `Ineligible status: ${status}`;
 }
 
@@ -188,6 +189,7 @@ function subscriptionStatusBadge(status: string | null) {
   if (status === null) return <Badge variant="outline">no subscription</Badge>;
   if (status === 'trialing') return <Badge variant="default">trialing</Badge>;
   if (status === 'canceled') return <Badge variant="secondary">canceled</Badge>;
+  if (status === 'at_limit') return <Badge variant="outline">at limit</Badge>;
   return (
     <Badge variant="destructive" title="Cannot modify — active paid subscription">
       {status}
@@ -850,7 +852,6 @@ export function KiloclawExtendTrial() {
                             })
                           : '—'}
                       </TableCell>
-                      <TableCell>{result.trialDays ?? '—'}</TableCell>
                       <TableCell className="text-destructive text-sm">
                         {result.error ?? '—'}
                       </TableCell>

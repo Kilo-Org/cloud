@@ -21,7 +21,9 @@ pnpm install
 echo "==> Linking Vercel project…"
 vercel link --yes --project kilocode-app --scope kilocode
 
-if [ -f "$MAIN_WORKTREE/$ENV_FILE" ]; then
+if [ "$(cd "$MAIN_WORKTREE" && pwd -P)" = "$(pwd -P)" ]; then
+  echo "==> Skipping $ENV_FILE copy (already in primary worktree)"
+elif [ -f "$MAIN_WORKTREE/$ENV_FILE" ]; then
   echo "==> Copying $ENV_FILE from main worktree…"
   cp "$MAIN_WORKTREE/$ENV_FILE" "./$ENV_FILE"
 fi

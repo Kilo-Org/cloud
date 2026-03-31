@@ -239,10 +239,10 @@ function StreamChatUI({
       <View onLayout={e => setHeaderHeight(e.nativeEvent.layout.height)}>
         <ChatHeader instanceId={instanceId} title={name} botOnline={botOnline} />
       </View>
-      <View className="flex-1">
+      <View className="flex-1" style={{ paddingBottom: bottom }}>
         <OverlayProvider value={{ style: chatTheme }}>
           <Chat client={client} style={chatTheme}>
-            <Channel channel={channel} bottomInset={bottom} keyboardVerticalOffset={headerHeight}>
+            <Channel channel={channel} keyboardVerticalOffset={headerHeight}>
               <MessageList />
               <MessageInput />
             </Channel>

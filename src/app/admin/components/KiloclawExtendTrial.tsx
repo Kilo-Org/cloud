@@ -649,9 +649,10 @@ export function KiloclawExtendTrial() {
               with no subscription or an active paid plan are skipped.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {matchedUsers.length > 0 ? (
-              <>
+          <CardContent className="space-y-6">
+            {/* Eligible users table + apply button */}
+            {eligibleCount > 0 ? (
+              <div className="space-y-3">
                 <div className="max-h-[300px] overflow-auto rounded-md border">
                   <Table>
                     <TableHeader>
@@ -663,27 +664,32 @@ export function KiloclawExtendTrial() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {matchedUsers.map(user => (
-                        <TableRow key={user.userId}>
-                          <TableCell className="font-mono text-sm">{user.email}</TableCell>
-                          <TableCell>{user.userName ?? '—'}</TableCell>
-                          <TableCell>{subscriptionStatusBadge(user.subscriptionStatus)}</TableCell>
-                          <TableCell className="text-sm">
-                            {user.trialEndsAt
-                              ? new Date(user.trialEndsAt).toLocaleDateString()
-                              : '—'}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {matchedUsers
+                        .filter(
+                          u =>
+                            u.subscriptionStatus === 'trialing' ||
+                            u.subscriptionStatus === 'canceled'
+                        )
+                        .map(user => (
+                          <TableRow key={user.userId}>
+                            <TableCell className="font-mono text-sm">{user.email}</TableCell>
+                            <TableCell>{user.userName ?? '—'}</TableCell>
+                            <TableCell>
+                              {subscriptionStatusBadge(user.subscriptionStatus)}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {user.trialEndsAt
+                                ? new Date(user.trialEndsAt).toLocaleDateString()
+                                : '—'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
                     </TableBody>
                   </Table>
                 </div>
-
                 <Button
                   onClick={handleExtendTrials}
-                  disabled={
-                    extendTrialsMutation.isPending || eligibleCount === 0 || results !== null
-                  }
+                  disabled={extendTrialsMutation.isPending || results !== null}
                   size="lg"
                 >
                   {extendTrialsMutation.isPending ? (
@@ -696,14 +702,60 @@ export function KiloclawExtendTrial() {
                     </>
                   )}
                 </Button>
-              </>
+              </div>
             ) : (
               <div className="text-muted-foreground flex items-center gap-2 text-sm">
                 <AlertCircle className="h-4 w-4" />
-                No matching users found in the database.
+                No eligible users found.
               </div>
             )}
 
+            {/* Ineligible users table */}
+            {ineligibleCount > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium">
+                    {ineligibleCount} ineligible user{ineligibleCount !== 1 ? 's' : ''}:
+                  </p>
+                  <Button variant="outline" size="sm" onClick={handleDownloadIneligible}>
+                    <Download className="mr-1 h-3 w-3" />
+                    Export
+                  </Button>
+                </div>
+                <div className="max-h-[200px] overflow-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Subscription</TableHead>
+                        <TableHead>Reason</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {matchedUsers
+                        .filter(
+                          u =>
+                            u.subscriptionStatus !== 'trialing' &&
+                            u.subscriptionStatus !== 'canceled'
+                        )
+                        .map(user => (
+                          <TableRow key={user.userId}>
+                            <TableCell className="font-mono text-sm">{user.email}</TableCell>
+                            <TableCell>
+                              {subscriptionStatusBadge(user.subscriptionStatus)}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-xs">
+                              {ineligibleReason(user.subscriptionStatus)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
+            {/* Unmatched emails */}
             {unmatchedEmails.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
@@ -832,15 +884,6 @@ export function KiloclawExtendTrial() {
               >
                 <Download className="mr-1 h-3 w-3" />
                 Export Failed
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownloadIneligible}
-                disabled={ineligibleCount === 0}
-              >
-                <Download className="mr-1 h-3 w-3" />
-                Export Ineligible
               </Button>
             </div>
           </CardContent>

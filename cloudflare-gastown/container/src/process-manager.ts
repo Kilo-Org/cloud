@@ -973,6 +973,130 @@ export function activeServerCount(): number {
   return sdkInstances.size;
 }
 
+/**
+ * Gracefully drain all running agents before container eviction.
+ *
+ * 4-phase sequence:
+ *   1. Notify TownDO of the eviction (fire-and-forget)
+ *   2. Nudge running polecats/refineries to commit & push
+ *   3. Poll up to 10 min waiting for agents to finish
+ *   4. Force-save any stragglers via WIP git commit + push
+ *
+ * Never throws — all errors are logged and swallowed so the caller
+ * can always proceed to stopAll() + process.exit().
+ */
+export async function drainAll(): Promise<void> {
+  const DRAIN_LOG = '[drain]';
+
+  // ── Phase 1: Notify TownDO ──────────────────────────────────────────
+  try {
+    const apiUrl = process.env.GASTOWN_API_URL;
+    const token = process.env.GASTOWN_CONTAINER_TOKEN;
+    // Grab townId from any registered agent — all agents in a container
+    // belong to the same town.
+    const anyAgent = [...agents.values()][0];
+    const townId = anyAgent?.townId;
+
+    if (apiUrl && token && townId) {
+      console.log(`${DRAIN_LOG} Phase 1: notifying TownDO of container eviction`);
+      const resp = await fetch(`${apiUrl}/api/towns/${townId}/container-eviction`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      console.log(`${DRAIN_LOG} Phase 1: TownDO responded ${resp.status}`);
+    } else {
+      console.warn(
+        `${DRAIN_LOG} Phase 1: skipping TownDO notification (missing apiUrl=${!!apiUrl} token=${!!token} townId=${!!townId})`
+      );
+    }
+  } catch (err) {
+    console.warn(`${DRAIN_LOG} Phase 1: TownDO notification failed, continuing:`, err);
+  }
+
+  // ── Phase 2: Nudge running agents to save ───────────────────────────
+  const runningAgents = [...agents.values()].filter(a => a.status === 'running');
+  console.log(`${DRAIN_LOG} Phase 2: nudging ${runningAgents.length} running agents`);
+
+  for (const agent of runningAgents) {
+    try {
+      let nudgeMessage: string | null = null;
+
+      if (agent.role === 'polecat') {
+        nudgeMessage =
+          'URGENT: The container is shutting down in ~15 minutes. Please commit and push your current changes immediately, then call gt_done. You have 2 minutes before a forced save.';
+      } else if (agent.role === 'refinery') {
+        nudgeMessage =
+          'URGENT: The container is shutting down. If your review is complete, call gt_done now. Otherwise your work will be pushed as a WIP commit.';
+      }
+      // Mayor and other roles: no nudge needed
+
+      if (nudgeMessage) {
+        console.log(`${DRAIN_LOG} Phase 2: nudging ${agent.role} agent ${agent.agentId}`);
+        await sendMessage(agent.agentId, nudgeMessage);
+      }
+    } catch (err) {
+      console.warn(
+        `${DRAIN_LOG} Phase 2: failed to nudge agent ${agent.agentId} (${agent.role}):`,
+        err
+      );
+    }
+  }
+
+  // ── Phase 3: Wait up to 10 minutes ──────────────────────────────────
+  const DRAIN_WAIT_MS = 10 * 60 * 1000;
+  const pollInterval = 5000;
+  const start = Date.now();
+  console.log(`${DRAIN_LOG} Phase 3: waiting up to ${DRAIN_WAIT_MS / 1000}s for agents to finish`);
+
+  while (Date.now() - start < DRAIN_WAIT_MS) {
+    const running = [...agents.values()].filter(a => a.status === 'running');
+    if (running.length === 0) break;
+    console.log(`${DRAIN_LOG} Waiting for ${running.length} agents...`);
+    await new Promise(r => setTimeout(r, pollInterval));
+  }
+
+  // ── Phase 4: Force-save remaining agents ────────────────────────────
+  const stragglers = [...agents.values()].filter(a => a.status === 'running');
+  if (stragglers.length > 0) {
+    console.log(`${DRAIN_LOG} Phase 4: force-saving ${stragglers.length} straggler(s)`);
+  } else {
+    console.log(`${DRAIN_LOG} Phase 4: all agents finished, no force-save needed`);
+  }
+
+  for (const agent of stragglers) {
+    try {
+      console.log(`${DRAIN_LOG} Phase 4: force-saving agent ${agent.agentId} in ${agent.workdir}`);
+      const proc = Bun.spawn(
+        [
+          'bash',
+          '-c',
+          "git add -A && git commit --allow-empty -m 'WIP: container eviction save' && git push --no-verify",
+        ],
+        {
+          cwd: agent.workdir,
+          stdout: 'pipe',
+          stderr: 'pipe',
+        }
+      );
+      const exitCode = await proc.exited;
+      const stdout = await new Response(proc.stdout).text();
+      const stderr = await new Response(proc.stderr).text();
+      console.log(
+        `${DRAIN_LOG} Phase 4: agent ${agent.agentId} git save exited ${exitCode}` +
+          (stdout ? ` stdout=${stdout.trim()}` : '') +
+          (stderr ? ` stderr=${stderr.trim()}` : '')
+      );
+    } catch (err) {
+      console.warn(`${DRAIN_LOG} Phase 4: force-save failed for agent ${agent.agentId}:`, err);
+    }
+  }
+
+  console.log(`${DRAIN_LOG} Drain complete`);
+}
+
 export async function stopAll(): Promise<void> {
   // Cancel all idle timers
   for (const [, timer] of idleTimers) {

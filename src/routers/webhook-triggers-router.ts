@@ -305,6 +305,14 @@ export const webhookTriggersRouter = createTRPCRouter({
       await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
     }
 
+    // KiloClaw Chat triggers are personal only — org-scoped triggers would fail at delivery
+    if (input.targetType === 'kiloclaw_chat' && input.organizationId) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'KiloClaw Chat triggers are not supported for organizations',
+      });
+    }
+
     // Target-specific validation (superRefine guarantees required fields per target type)
     if (input.targetType === 'cloud_agent') {
       if (!input.profileId) {

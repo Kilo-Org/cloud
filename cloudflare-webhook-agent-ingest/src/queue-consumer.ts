@@ -143,6 +143,17 @@ async function processKiloclawChatMessage(
     promptLength: renderedPrompt.length,
   });
 
+  // Mark as in-progress before the external call to prevent duplicate delivery on queue retry
+  await withDORetry(
+    () => stub,
+    doStub =>
+      doStub.updateRequest(webhook.requestId, {
+        process_status: 'inprogress',
+        started_at: new Date().toISOString(),
+      }),
+    'updateRequest'
+  );
+
   const internalApiSecret = await env.INTERNAL_API_SECRET.get();
 
   const response = await fetch(`${env.KILOCLAW_API_URL}/api/platform/send-chat-message`, {

@@ -65,13 +65,16 @@ export function WebhookIntegrationSection() {
     )
   );
 
-  // Seed auth state from existing trigger config
+  // Seed local state from existing trigger config
   useEffect(() => {
     if (triggerConfig) {
+      setPromptTemplate(triggerConfig.promptTemplate);
+      setPromptDirty(false);
       setAuthEnabled(triggerConfig.webhookAuthConfigured ?? false);
       if (triggerConfig.webhookAuthHeader) {
         setAuthHeader(triggerConfig.webhookAuthHeader);
       }
+      setAuthDirty(false);
       // Secret is never returned — keep field blank (write-only)
     }
   }, [triggerConfig]);
@@ -143,6 +146,15 @@ export function WebhookIntegrationSection() {
   // Rotate URL — create new trigger first, then delete old (safer: if create fails, old is untouched)
   async function handleConfirmRotate() {
     if (!clawTrigger || !instanceId) return;
+    // If auth is enabled, the secret must be re-entered since rotation creates a new trigger
+    // and the existing secret hash can't be carried forward
+    if (authEnabled && authHeader && !authSecret) {
+      toast.error(
+        'Please re-enter the shared secret before rotating — the new URL needs a fresh secret'
+      );
+      setConfirmRotateOpen(false);
+      return;
+    }
     const oldTriggerId = clawTrigger.triggerId;
     const newTriggerId = generateTriggerId();
     await createTrigger({

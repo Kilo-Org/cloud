@@ -708,6 +708,7 @@ console.log('  Your bot can now use Gmail, Calendar, Drive, Docs, Sheets, and mo
 console.log('');
 console.log('  Next steps:');
 console.log('  1. Redeploy your kiloclaw instance to activate Google services');
+console.log('     Go to: https://app.kilo.ai/claw#settings');
 if (pushSetupOk) {
   console.log('  2. Gmail push notifications have been enabled automatically.');
 } else {

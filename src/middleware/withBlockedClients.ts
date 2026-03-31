@@ -7,8 +7,12 @@ import type { NextMiddlewareWithAuth, NextRequestWithAuth } from 'next-auth/midd
 const BLOCKED_USER_AGENT_REGEX = /^kilo\/7\.0\.[0-9]+$/;
 const BLOCKED_USER_AGENTS = new Set(['kilo/7.1.0', 'kilo/7.1.1', 'kilo/7.1.2', 'kilo/7.1.3']);
 
+// Versions that match a block rule but must still be allowed through (e.g. cloud agents).
+const ALLOWED_USER_AGENTS = new Set(['kilo/7.0.50']);
+
 function isClientBlocked(userAgent: string | null): boolean {
   if (!userAgent) return false;
+  if (ALLOWED_USER_AGENTS.has(userAgent)) return false;
   return BLOCKED_USER_AGENT_REGEX.test(userAgent) || BLOCKED_USER_AGENTS.has(userAgent);
 }
 

@@ -134,6 +134,7 @@ import {
   handleListEscalations,
   handleAcknowledgeEscalation,
 } from './handlers/town-escalations.handler';
+import { handleContainerEviction } from './handlers/town-eviction.handler';
 
 export { GastownUserDO } from './dos/GastownUser.do';
 export { GastownOrgDO } from './dos/GastownOrg.do';
@@ -475,6 +476,17 @@ app.post('/api/towns/:townId/rigs/:rigId/escalations', c =>
 app.post('/api/towns/:townId/rigs/:rigId/triage/resolve', c =>
   instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/triage/resolve', () =>
     handleResolveTriage(c, c.req.param())
+  )
+);
+
+// ── Container Eviction ──────────────────────────────────────────────────
+// Called by the container on SIGTERM. Uses container JWT auth (not kilo
+// user auth), so it must be registered before the kiloAuthMiddleware
+// wildcard below.
+
+app.post('/api/towns/:townId/container-eviction', c =>
+  instrumented(c, 'POST /api/towns/:townId/container-eviction', () =>
+    handleContainerEviction(c, c.req.param())
   )
 );
 

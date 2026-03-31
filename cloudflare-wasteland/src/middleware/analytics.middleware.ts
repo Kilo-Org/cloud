@@ -19,11 +19,11 @@ export async function timingMiddleware(c: Context<WastelandEnv>, next: Next): Pr
  * when it ends with a collection, GET maps to "list" instead of "get".
  *
  * Examples:
- *   "POST /api/wastelands"                                   → "wastelands.create"
- *   "GET  /api/wastelands"                                    → "wastelands.list"
- *   "GET  /api/wastelands/:wastelandId"                       → "wastelands.get"
- *   "DELETE /api/wastelands/:wastelandId"                     → "wastelands.delete"
- *   "PATCH /api/wastelands/:wastelandId/config"               → "wastelands.config.update"
+ *   "POST /api/wastelands/:wastelandId/members"              → "members.create"
+ *   "GET  /api/wastelands/:wastelandId/members"               → "members.list"
+ *   "GET  /api/wastelands/:wastelandId/members/:memberId"     → "members.get"
+ *   "DELETE /api/wastelands/:wastelandId/members/:memberId"   → "members.delete"
+ *   "PATCH /api/wastelands/:wastelandId/config"               → "config.update"
  */
 function deriveHttpEventName(method: string, routePath: string): string {
   const segments = routePath
@@ -31,11 +31,14 @@ function deriveHttpEventName(method: string, routePath: string): string {
     .split('/')
     .filter(Boolean);
 
+  // Collect non-param segments after stripping common parent resources
+  const parentResources = new Set(['wastelands']);
   const meaningful: string[] = [];
   const endsWithParam = segments.length > 0 && segments[segments.length - 1].startsWith(':');
 
   for (const seg of segments) {
-    if (seg.startsWith(':')) continue;
+    if (seg.startsWith(':')) continue; // skip params
+    if (parentResources.has(seg)) continue; // skip parent resource names
     meaningful.push(seg);
   }
 
@@ -55,14 +58,14 @@ function deriveHttpEventName(method: string, routePath: string): string {
 }
 
 /**
- * Wraps an individual HTTP route handler to emit an analytics event and
- * capture errors to Sentry. Applied per-route, not as global middleware,
- * so it has access to the matched route pattern.
+ * Wraps an individual HTTP route handler to emit an analytics event.
+ * Applied per-route, not as global middleware, so it has access to the
+ * matched route pattern.
  *
  * Usage:
- *   app.post('/api/wastelands',
- *     c => instrumented(c, 'POST /api/wastelands',
- *       () => handleCreateWasteland(c, c.req.param())));
+ *   app.post('/api/wastelands/:wastelandId/members',
+ *     c => instrumented(c, 'POST /api/wastelands/:wastelandId/members',
+ *       () => handleCreateMember(c, c.req.param())));
  */
 export async function instrumented(
   c: Context<WastelandEnv>,
@@ -79,6 +82,7 @@ export async function instrumented(
     return response;
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
+    // Sentry capture happens in app.onError() — don't double-report
     throw err;
   } finally {
     const durationMs = performance.now() - startTime;

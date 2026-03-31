@@ -1127,7 +1127,7 @@ export async function drainAll(): Promise<void> {
         [
           'bash',
           '-c',
-          "git add -A && git commit --allow-empty -m 'WIP: container eviction save' && git push --no-verify",
+          "git add -A && git commit --allow-empty -m 'WIP: container eviction save' && git push --set-upstream origin HEAD --no-verify",
         ],
         {
           cwd: agent.workdir,

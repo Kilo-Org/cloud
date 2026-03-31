@@ -147,6 +147,13 @@ function estimateTokenCount(request: GatewayRequest) {
   return Math.round(JSON.stringify(request).length / 4 + (getMaxTokens(request) ?? 0));
 }
 
+/** Returns true if the request has any provider routing restrictions that could cause a 404
+ * even though the model exists (e.g. all allowed providers are unavailable). */
+function hasProviderRestrictions(request: GatewayRequest): boolean {
+  const p = request.body.provider;
+  return !!(p?.ignore?.length || p?.only?.length || p?.data_collection === 'deny' || p?.zdr);
+}
+
 export async function makeErrorReadable({
   requestedModel,
   request,
@@ -177,7 +184,7 @@ export async function makeErrorReadable({
     }
   }
 
-  if (response.status === 404 && !request.body.provider?.ignore?.length) {
+  if (response.status === 404 && !hasProviderRestrictions(request)) {
     const recommendedModel = balance <= 0 ? KILO_AUTO_FREE_MODEL : KILO_AUTO_BALANCED_MODEL;
     const recommendation =
       feature === 'kiloclaw' || feature === 'openclaw'

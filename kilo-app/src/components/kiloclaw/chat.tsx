@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type Href, useRouter } from 'expo-router';
 import { Settings } from 'lucide-react-native';
 import { type Channel as StreamChannel, StreamChat } from 'stream-chat';
 import { Channel, Chat, MessageInput, MessageList, OverlayProvider } from 'stream-chat-expo';
 
-import { useBotOnlineStatus, useKeyboardAwareBottomInset } from '@/components/kiloclaw/chat-hooks';
+import { useBotOnlineStatus } from '@/components/kiloclaw/chat-hooks';
 import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
@@ -147,7 +148,8 @@ function StreamChatUI({
   userId: string;
   channelId: string;
 }) {
-  const { bottomInset, keyboardVisible } = useKeyboardAwareBottomInset();
+  const { bottom } = useSafeAreaInsets();
+  const [headerHeight, setHeaderHeight] = useState(0);
   const chatTheme = useStreamChatTheme();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -233,22 +235,21 @@ function StreamChatUI({
   }
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-background"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ChatHeader instanceId={instanceId} title={name} botOnline={botOnline} />
-      <View className={`flex-1 ${keyboardVisible ? 'pb-1' : 'pb-3'}`}>
+    <View className="flex-1 bg-background">
+      <View onLayout={e => setHeaderHeight(e.nativeEvent.layout.height)}>
+        <ChatHeader instanceId={instanceId} title={name} botOnline={botOnline} />
+      </View>
+      <View className="flex-1">
         <OverlayProvider value={{ style: chatTheme }}>
           <Chat client={client} style={chatTheme}>
-            <Channel channel={channel} disableKeyboardCompatibleView bottomInset={bottomInset}>
+            <Channel channel={channel} bottomInset={bottom} keyboardVerticalOffset={headerHeight}>
               <MessageList />
               <MessageInput />
             </Channel>
           </Chat>
         </OverlayProvider>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

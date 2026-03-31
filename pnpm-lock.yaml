@@ -88,6 +88,9 @@ patchedDependencies:
   '@storybook/nextjs@9.1.20':
     hash: e1857649664eed8f87877c352d277c90d4af5a58d0ad931105f033c8c08165c1
     path: patches/@storybook__nextjs@9.1.20.patch
+  stream-chat-expo@8.13.7:
+    hash: c10b927974fac115625837cc300e8c1def183bb2e98f14fdbbdb4e763c636163
+    path: patches/stream-chat-expo@8.13.7.patch
 
 importers:
 
@@ -1518,7 +1521,7 @@ importers:
         version: 9.38.0
       stream-chat-expo:
         specifier: ^8.13.7
-        version: 8.13.7(285f2f200c41b28837f3d04bbb1f3cf6)
+        version: 8.13.7(patch_hash=c10b927974fac115625837cc300e8c1def183bb2e98f14fdbbdb4e763c636163)(285f2f200c41b28837f3d04bbb1f3cf6)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -28875,7 +28878,7 @@ snapshots:
 
   stream-buffers@2.2.0: {}
 
-  stream-chat-expo@8.13.7(285f2f200c41b28837f3d04bbb1f3cf6):
+  stream-chat-expo@8.13.7(patch_hash=c10b927974fac115625837cc300e8c1def183bb2e98f14fdbbdb4e763c636163)(285f2f200c41b28837f3d04bbb1f3cf6):
     dependencies:
       expo: 55.0.9(@babel/core@7.29.0)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.7)(expo-router@55.0.8)(react-dom@19.2.4(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
       expo-image-manipulator: 55.0.11(expo@55.0.9)

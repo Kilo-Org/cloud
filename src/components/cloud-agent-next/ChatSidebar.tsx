@@ -248,7 +248,7 @@ function SessionRow({
   );
 }
 
-const PLATFORM_FILTERS = ['all', 'cloud-agent', 'cli', 'extension'] as const;
+const PLATFORM_FILTERS = ['all', 'cloud-agent', 'cli', 'slack', 'extension'] as const;
 
 function platformFilterLabel(p: (typeof PLATFORM_FILTERS)[number]): string {
   switch (p) {
@@ -258,6 +258,8 @@ function platformFilterLabel(p: (typeof PLATFORM_FILTERS)[number]): string {
       return 'Cloud';
     case 'cli':
       return 'CLI';
+    case 'slack':
+      return 'Slack';
     case 'extension':
       return 'Ext';
   }
@@ -475,9 +477,11 @@ export function ChatSidebar({
                 ? 'Cloud'
                 : platformFilter === 'cli'
                   ? 'CLI'
-                  : platformFilter === 'extension'
-                    ? 'Ext'
-                    : platformFilter}
+                  : platformFilter === 'slack'
+                    ? 'Slack'
+                    : platformFilter === 'extension'
+                      ? 'Ext'
+                      : platformFilter}
               <X className="h-3 w-3 opacity-60" />
             </button>
           )}

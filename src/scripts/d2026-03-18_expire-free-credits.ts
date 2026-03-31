@@ -114,7 +114,10 @@ function parseCsv(inputPath: string): {
 
     const key = pairKey(category, description);
     if (seenPairs.has(key)) {
-      throw new Error(`Duplicate (category, description) pair in CSV: "${key}"`);
+      console.warn(
+        `  Warning: duplicate (category, description) pair in CSV: "${key}" — using first occurrence`
+      );
+      continue;
     }
     seenPairs.add(key);
 

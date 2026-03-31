@@ -599,6 +599,7 @@ export const kiloclawRouter = createTRPCRouter({
       ...status,
       name: instance?.name ?? null,
       workerUrl,
+      instanceId: instance?.id ?? null,
     } satisfies KiloClawDashboardStatus;
   }),
 

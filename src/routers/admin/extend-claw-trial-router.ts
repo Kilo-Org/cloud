@@ -2,7 +2,7 @@ import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { kilocode_users, kiloclaw_subscriptions, kiloclaw_email_log } from '@kilocode/db/schema';
 import * as z from 'zod';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, inArray, sql, desc } from 'drizzle-orm';
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
 
 const MAX_USERS = 1000;
@@ -53,7 +53,7 @@ async function fetchLatestSubscriptionPerUser(
     .selectDistinctOn([kiloclaw_subscriptions.user_id])
     .from(kiloclaw_subscriptions)
     .where(inArray(kiloclaw_subscriptions.user_id, userIds))
-    .orderBy(kiloclaw_subscriptions.user_id, sql`${kiloclaw_subscriptions.created_at} DESC`);
+    .orderBy(kiloclaw_subscriptions.user_id, desc(kiloclaw_subscriptions.created_at));
 
   return new Map(rows.map(r => [r.user_id, r]));
 }

@@ -604,6 +604,32 @@ app.patch('/api/towns/:townId/config', c =>
   instrumented(c, 'PATCH /api/towns/:townId/config', () => handleUpdateTownConfig(c, c.req.param()))
 );
 
+// ── Cloudflare Debug ────────────────────────────────────────────────
+// Returns DO IDs and namespace IDs for constructing Cloudflare dashboard URLs.
+// containerDoId is only returned when the container is actually running,
+// so the UI correctly shows a disabled state when the container is stopped.
+
+app.get('/api/towns/:townId/cloudflare-debug', async c => {
+  const townId = c.req.param('townId');
+  const townDoId = c.env.TOWN.idFromName(townId).toString();
+
+  // Check actual container runtime state before returning the DO ID.
+  // idFromName() is deterministic and always returns an ID even when
+  // no container instance is running — we need to gate on getState().
+  const containerStub = getTownContainerStub(c.env, townId);
+  const containerState = await containerStub.getState();
+  const containerRunning =
+    containerState.status === 'running' || containerState.status === 'healthy';
+  const containerDoId = containerRunning
+    ? c.env.TOWN_CONTAINER.idFromName(townId).toString()
+    : null;
+
+  return c.json({
+    success: true,
+    data: { townDoId, containerDoId },
+  });
+});
+
 // ── Town Events ─────────────────────────────────────────────────────────
 
 app.use('/api/users/:userId/towns/:townId/events', async (c: Context<GastownEnv, string>, next) =>

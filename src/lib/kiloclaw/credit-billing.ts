@@ -497,8 +497,6 @@ export async function enrollWithCredits(params: {
           commit_ends_at: commitEndsAt,
           past_due_since: null,
           cancel_at_period_end: false,
-          // Preserve trial_started_at / trial_ends_at so historical trial
-          // data remains visible in billing status and admin views.
         },
       });
   });

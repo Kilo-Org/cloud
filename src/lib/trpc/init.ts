@@ -74,10 +74,29 @@ const sentryMiddleware = t.middleware(
   })
 );
 
+const timingMiddleware = t.middleware(async ({ path, type, ctx, next }) => {
+  if (process.env.TRPC_TIMING_LOGGING !== '1') return next();
+
+  const start = performance.now();
+  const result = await next();
+  const durationMs = performance.now() - start;
+  console.log(
+    JSON.stringify({
+      type: 'trpc_timing',
+      path,
+      procedureType: type, // 'query' | 'mutation' | 'subscription'
+      durationMs: Math.round(durationMs),
+      ok: result.ok,
+      userId: ctx.user.id,
+    })
+  );
+  return result;
+});
+
 // Base router and procedure helpers
 export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
-export const baseProcedure = t.procedure.use(sentryMiddleware);
+export const baseProcedure = t.procedure.use(timingMiddleware).use(sentryMiddleware);
 
 // Admin-only procedure
 export const adminProcedure = baseProcedure.use(async ({ ctx, next }) => {

@@ -1018,6 +1018,23 @@ export const gastownRouter = router({
       }
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.forceRefreshContainerToken();
+
+      // Also push KILOCODE_TOKEN — this is what actually authenticates
+      // GT tool calls and is the main reason users hit 401s.
+      // Only remint if the caller is the town owner (they have the
+      // correct api_token_pepper). For org towns where a non-owner
+      // member triggers the refresh, push the existing token instead
+      // of overwriting the owner's identity.
+      const user = userFromCtx(ctx);
+      const townConfig = await townStub.getTownConfig();
+      const credentialUserId = townConfig.owner_user_id ?? user.id;
+      if (credentialUserId === user.id) {
+        const newKilocodeToken = await mintKilocodeToken(ctx.env, user);
+        await townStub.updateTownConfig({ kilocode_token: newKilocodeToken });
+      }
+      // syncConfigToContainer pushes KILOCODE_TOKEN (new or existing)
+      // to the running container process.
+      await townStub.syncConfigToContainer();
     }),
 
   // ── Events ──────────────────────────────────────────────────────────

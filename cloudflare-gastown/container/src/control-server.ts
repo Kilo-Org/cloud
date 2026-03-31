@@ -123,13 +123,36 @@ app.post('/dashboard-context', async c => {
 // Hot-swap the container-scoped JWT on the running process. Called by
 // the TownDO alarm to push a fresh token before the current one expires.
 // Updates process.env so all subsequent API calls use the new token.
+//
+// Also accepts an optional `kilocodeToken` field to hot-swap the
+// KILOCODE_TOKEN used by the SDK / LLM gateway. When provided,
+// process.env.KILOCODE_TOKEN is updated so long-lived agents pick up
+// the fresh value without a container restart.
 app.post('/refresh-token', async c => {
   const body: unknown = await c.req.json().catch(() => null);
-  if (!body || typeof body !== 'object' || !('token' in body) || typeof body.token !== 'string') {
-    return c.json({ error: 'Missing or invalid token field' }, 400);
+  const parsed = z
+    .object({
+      token: z.string().optional(),
+      kilocodeToken: z.string().optional(),
+    })
+    .refine(d => d.token || d.kilocodeToken, {
+      message: 'Must provide at least one of: token, kilocodeToken',
+    })
+    .safeParse(body);
+
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? 'Invalid request body' }, 400);
   }
-  process.env.GASTOWN_CONTAINER_TOKEN = body.token;
-  console.log('[control-server] Container token refreshed');
+
+  const { token, kilocodeToken } = parsed.data;
+  if (token) {
+    process.env.GASTOWN_CONTAINER_TOKEN = token;
+    console.log('[control-server] Container token refreshed');
+  }
+  if (kilocodeToken) {
+    process.env.KILOCODE_TOKEN = kilocodeToken;
+    console.log('[control-server] KILOCODE_TOKEN refreshed');
+  }
   return c.json({ refreshed: true });
 });
 
@@ -220,6 +243,7 @@ app.patch('/agents/:agentId/model', async c => {
       ['github_cli_pat', 'GITHUB_CLI_PAT'],
       ['git_author_name', 'GASTOWN_GIT_AUTHOR_NAME'],
       ['git_author_email', 'GASTOWN_GIT_AUTHOR_EMAIL'],
+      ['kilocode_token', 'KILOCODE_TOKEN'],
     ];
     for (const [cfgKey, envKey] of CONFIG_ENV_MAP) {
       const val = cfg[cfgKey];

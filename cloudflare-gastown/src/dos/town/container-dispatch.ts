@@ -185,6 +185,51 @@ export async function forceRefreshContainerToken(
   return token;
 }
 
+/**
+ * Push a fresh KILOCODE_TOKEN to the running container process via
+ * POST /refresh-token. Also persists via setEnvVar for next boot.
+ *
+ * Best-effort: tolerates a downed container (the token will be picked
+ * up on next boot via setEnvVar). Propagates non-network errors so
+ * callers can log or retry.
+ */
+export async function pushKilocodeTokenToContainer(
+  env: Env,
+  townId: string,
+  token: string
+): Promise<void> {
+  const container = getTownContainerStub(env, townId);
+
+  // Persist for next boot
+  try {
+    await container.setEnvVar('KILOCODE_TOKEN', token);
+  } catch (err) {
+    console.warn(
+      `${TOWN_LOG} pushKilocodeTokenToContainer: setEnvVar failed:`,
+      err instanceof Error ? err.message : err
+    );
+  }
+
+  // Push to running process
+  try {
+    const resp = await container.fetch('http://container/refresh-token', {
+      method: 'POST',
+      signal: AbortSignal.timeout(10_000),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kilocodeToken: token }),
+    });
+    if (!resp.ok) {
+      console.warn(`${TOWN_LOG} pushKilocodeTokenToContainer: container returned ${resp.status}`);
+    }
+  } catch (err) {
+    // If the container isn't running, the token will be in envVars when
+    // it boots. Only propagate non-network errors.
+    const isContainerDown =
+      err instanceof TypeError || (err instanceof Error && err.message.includes('fetch'));
+    if (!isContainerDown) throw err;
+  }
+}
+
 /** Build the initial prompt for an agent from its bead. */
 export function buildPrompt(params: {
   beadTitle: string;

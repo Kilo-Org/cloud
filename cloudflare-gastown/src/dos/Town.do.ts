@@ -599,6 +599,10 @@ export class TownDO extends DurableObject<Env> {
    * Push config-derived env vars to the running container. Called after
    * updateTownConfig so that settings changes take effect without a
    * container restart. New agent processes inherit the updated values.
+   *
+   * KILOCODE_TOKEN is pushed to the running process via the /refresh-token
+   * endpoint (not just setEnvVar) so long-lived agents pick up the fresh
+   * value immediately.
    */
   async syncConfigToContainer(): Promise<void> {
     const townId = this.townId;
@@ -627,6 +631,16 @@ export class TownDO extends DurableObject<Env> {
         }
       } catch (err) {
         console.warn(`[Town.do] syncConfigToContainer: ${key} sync failed:`, err);
+      }
+    }
+
+    // Push KILOCODE_TOKEN to the running process so long-lived agents
+    // (especially the mayor) pick up the fresh token immediately.
+    if (townConfig.kilocode_token) {
+      try {
+        await dispatch.pushKilocodeTokenToContainer(this.env, townId, townConfig.kilocode_token);
+      } catch (err) {
+        console.warn('[Town.do] syncConfigToContainer: KILOCODE_TOKEN push failed:', err);
       }
     }
   }

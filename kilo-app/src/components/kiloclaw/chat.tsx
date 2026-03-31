@@ -237,7 +237,11 @@ function StreamChatUI({
 
   return (
     <View className="flex-1 bg-background">
-      <View onLayout={e => setHeaderHeight(e.nativeEvent.layout.height)}>
+      <View
+        onLayout={e => {
+          setHeaderHeight(e.nativeEvent.layout.height);
+        }}
+      >
         <ChatHeader instanceId={instanceId} title={name} botOnline={botOnline} />
       </View>
       <View className="flex-1" style={{ paddingBottom: bottom }}>

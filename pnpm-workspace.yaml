@@ -27,6 +27,7 @@ packages:
   - kiloclaw/packages/secret-catalog
   - cloudflare-gastown
   - cloudflare-gastown/container
+  - cloudflare-wasteland
   - cloudflare-gmail-push
   - kilo-app
 

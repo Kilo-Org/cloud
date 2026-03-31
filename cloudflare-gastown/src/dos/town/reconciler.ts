@@ -290,6 +290,13 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
       return;
     }
 
+    case 'container_eviction': {
+      // Draining flag is managed by the TownDO via KV storage.
+      // The reconciler reads it from there; no SQL state change needed here.
+      // The event is recorded for audit trail.
+      return;
+    }
+
     case 'nudge_timeout': {
       // GUPP violations are handled by reconcileGUPP on the next pass.
       // The event just records the fact for audit trail.

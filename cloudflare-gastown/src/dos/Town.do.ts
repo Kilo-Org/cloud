@@ -3342,15 +3342,13 @@ export class TownDO extends DurableObject<Env> {
       kiloUserId: z.string().optional(),
       apiTokenPepper: z.string().nullable().optional(),
     });
-    const parsed = payloadSchema.safeParse(
-      (() => {
-        try {
-          return JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
-        } catch {
-          return undefined;
-        }
-      })()
-    );
+    let rawPayload: unknown;
+    try {
+      rawPayload = JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
+    } catch {
+      return;
+    }
+    const parsed = payloadSchema.safeParse(rawPayload);
     if (!parsed.success) return;
     const payload = parsed.data;
 

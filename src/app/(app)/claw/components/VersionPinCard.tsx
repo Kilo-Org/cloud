@@ -3,11 +3,8 @@
 import { useState } from 'react';
 import { Pin, PinOff, Info } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  useKiloClawAvailableVersions,
-  useKiloClawMyPin,
-  useKiloClawMutations,
-} from '@/hooks/useKiloClaw';
+import { useClawAvailableVersions, useClawMyPin } from '../hooks/useClawHooks';
+import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -19,16 +16,19 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
+type ClawMutations = ReturnType<typeof useKiloClawMutations>;
+
 export function VersionPinCard({
   trackedImageTag,
   latestImageTag,
+  mutations,
 }: {
   trackedImageTag: string | null;
   latestImageTag: string | null;
+  mutations: ClawMutations;
 }) {
-  const { data: myPin, isLoading: pinLoading } = useKiloClawMyPin();
-  const { data: versions, isLoading: versionsLoading } = useKiloClawAvailableVersions(0, 50);
-  const mutations = useKiloClawMutations();
+  const { data: myPin, isLoading: pinLoading } = useClawMyPin();
+  const { data: versions, isLoading: versionsLoading } = useClawAvailableVersions(0, 50);
 
   const [selectedImageTag, setSelectedImageTag] = useState<string>('');
   const [reason, setReason] = useState('');

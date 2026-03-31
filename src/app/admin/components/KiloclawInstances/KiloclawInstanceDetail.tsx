@@ -1613,9 +1613,31 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             <DetailField label="Instance ID">
               <code className="text-sm">{data.id}</code>
             </DetailField>
+            <DetailField label="Type">
+              {data.organization_id ? (
+                <Badge
+                  variant="outline"
+                  className="border-blue-500/30 bg-blue-500/15 text-blue-400"
+                >
+                  Org
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="border-gray-500/30 bg-gray-500/10 text-gray-400"
+                >
+                  Personal
+                </Badge>
+              )}
+            </DetailField>
             <DetailField label="User ID">
               <code className="text-sm">{data.user_id}</code>
             </DetailField>
+            {data.organization_id && (
+              <DetailField label="Organization ID">
+                <code className="text-sm">{data.organization_id}</code>
+              </DetailField>
+            )}
             <DetailField label="Derived Fly App">
               <a
                 href={`https://fly.io/apps/${data.derived_fly_app_name}`}

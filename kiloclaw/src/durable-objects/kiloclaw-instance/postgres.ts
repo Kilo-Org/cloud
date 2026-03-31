@@ -8,7 +8,7 @@ import {
 } from '../../db';
 import { appNameFromUserId } from '../../fly/apps';
 import type { InstanceMutableState } from './types';
-import { getFlyConfig } from './types';
+import { getAppKey, getFlyConfig } from './types';
 import { storageUpdate } from './state';
 import { attemptMetadataRecovery } from './reconcile';
 import { doError, doWarn, toLoggable, createReconcileContext } from './log';
@@ -58,7 +58,9 @@ export async function restoreFromPostgres(
     const channels = null;
 
     // Recover flyAppName from the App DO or derive deterministically.
-    const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(userId));
+    // Instance-keyed DOs (ki_ sandboxId) have per-instance apps, legacy have per-user.
+    const appKey = getAppKey({ userId, sandboxId: instance.sandboxId });
+    const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(appKey));
     const prefix = env.WORKER_ENV === 'development' ? 'dev' : undefined;
     const recoveredAppName =
       (await appStub.getAppName()) ?? (await appNameFromUserId(userId, prefix));
@@ -67,6 +69,7 @@ export async function restoreFromPostgres(
       storageUpdate({
         userId,
         sandboxId: instance.sandboxId,
+        orgId: instance.orgId ?? null,
         status: 'provisioned',
         envVars,
         encryptedSecrets,
@@ -92,6 +95,7 @@ export async function restoreFromPostgres(
 
     state.userId = userId;
     state.sandboxId = instance.sandboxId;
+    state.orgId = instance.orgId ?? null;
     state.status = 'provisioned';
     state.envVars = envVars;
     state.encryptedSecrets = encryptedSecrets;

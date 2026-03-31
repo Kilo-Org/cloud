@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
@@ -25,12 +25,13 @@ import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { calverAtLeast, cleanVersion, getRunningVersionBadge } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import {
-  useControllerVersion,
-  useKiloClawConfig,
-  useKiloClawLatestVersion,
-  useKiloClawMyPin,
-} from '@/hooks/useKiloClaw';
-import { useTRPC } from '@/lib/trpc/utils';
+  useClawControllerVersion,
+  useClawConfig,
+  useClawLatestVersion,
+  useClawMyPin,
+  useClawGoogleSetupCommand,
+} from '../hooks/useClawHooks';
+
 import { useDefaultModelSelection } from '../hooks/useDefaultModelSelection';
 import { getSettingsModelOptions } from './modelSupport';
 
@@ -58,7 +59,6 @@ import { WorkspaceFileEditor } from './WorkspaceFileEditor';
 import { PermissionPresetCards } from './PermissionPresetCards';
 import { CustomSecretsSection } from './CustomSecretsSection';
 import { type ExecPreset, configToExecPreset, execPresetToConfig } from './claw.types';
-
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
 // ---------------------------------------------------------------------------
@@ -247,14 +247,7 @@ function GoogleAccountCard({
   mutations: ClawMutations;
   onRedeploy?: () => void;
 }) {
-  const trpc = useTRPC();
-  const { data: setupData } = useQuery(
-    trpc.kiloclaw.getGoogleSetupCommand.queryOptions(undefined, {
-      enabled: !connected,
-      refetchInterval: 50 * 60 * 1000,
-      refetchOnWindowFocus: false,
-    })
-  );
+  const { data: setupData } = useClawGoogleSetupCommand(!connected);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
@@ -540,16 +533,16 @@ export function SettingsTab({
   onRequestUpgrade?: () => void;
 }) {
   const posthog = usePostHog();
-  const { data: config } = useKiloClawConfig();
+  const { data: config } = useClawConfig();
   const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
   const isRunning = status.status === 'running';
   const {
     data: controllerVersion,
     isLoading: isLoadingControllerVersion,
     isError: isControllerVersionError,
-  } = useControllerVersion(isRunning);
-  const { data: myPin } = useKiloClawMyPin();
-  const { data: latestVersion } = useKiloClawLatestVersion();
+  } = useClawControllerVersion(isRunning);
+  const { data: myPin } = useClawMyPin();
+  const { data: latestVersion } = useClawLatestVersion();
   const [confirmDestroy, setConfirmDestroy] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
   const trackedVersion = cleanVersion(status.openclawVersion);
@@ -769,6 +762,7 @@ export function SettingsTab({
             <VersionPinCard
               trackedImageTag={status.trackedImageTag}
               latestImageTag={variantsMatch ? (latestVersion?.imageTag ?? null) : null}
+              mutations={mutations}
             />
           </div>
         )}

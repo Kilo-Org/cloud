@@ -5,6 +5,7 @@ import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../../utils/env-encryptio
 import { findPepperByUserId, getWorkerDb } from '../../db';
 import { KILOCODE_API_KEY_EXPIRY_SECONDS } from '../../config';
 import type { InstanceMutableState } from './types';
+import { getAppKey } from './types';
 import { storageUpdate } from './state';
 import { doWarn, toLoggable } from './log';
 
@@ -168,8 +169,10 @@ export async function buildUserEnvVars(
   }
 
   // Get the env encryption key from the App DO, creating it if needed.
-  const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(state.userId));
-  const { key: envKey, secretsVersion } = await appStub.ensureEnvKey(state.userId);
+  // Instance-keyed DOs get per-instance apps, legacy DOs get per-user apps.
+  const appKey = getAppKey({ userId: state.userId, sandboxId: state.sandboxId });
+  const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(appKey));
+  const { key: envKey, secretsVersion } = await appStub.ensureEnvKey(appKey);
 
   // Encrypt sensitive values and prefix their names with KILOCLAW_ENC_
   const result: Record<string, string> = { ...plainEnv };

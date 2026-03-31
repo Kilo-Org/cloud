@@ -24,13 +24,15 @@ type SetupProps = {
 
 type WithStatusProp = {
   status: KiloClawDashboardStatus | undefined;
+  organizationId?: string;
 } & SetupProps;
 
 export function withStatusQueryBoundary(Component: ComponentType<WithStatusProp>) {
   return function StatusBoundary({
     statusQuery,
+    organizationId,
     ...setupProps
-  }: { statusQuery: StatusQueryLike } & SetupProps) {
+  }: { statusQuery: StatusQueryLike; organizationId?: string } & SetupProps) {
     if (statusQuery.isLoading) {
       return (
         <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
@@ -55,6 +57,6 @@ export function withStatusQueryBoundary(Component: ComponentType<WithStatusProp>
       );
     }
 
-    return <Component status={statusQuery.data} {...setupProps} />;
+    return <Component status={statusQuery.data} organizationId={organizationId} {...setupProps} />;
   };
 }

@@ -35,6 +35,16 @@ export class AppNameCollisionError extends Error {
 
 // -- App name derivation --
 
+/** First 20 hex chars of SHA-256(input). */
+async function hashToHex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = new Uint8Array(hashBuffer);
+  return Array.from(hashArray.slice(0, 10))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 /**
  * Derive a deterministic Fly app name from a userId.
  *
@@ -47,14 +57,25 @@ export class AppNameCollisionError extends Error {
  * @param prefix - Environment prefix (e.g. "dev" for WORKER_ENV=development). Omit for production.
  */
 export async function appNameFromUserId(userId: string, prefix?: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(userId);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = new Uint8Array(hashBuffer);
-  const hex = Array.from(hashArray.slice(0, 10))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+  const hex = await hashToHex(userId);
   return prefix ? `${prefix}-${hex}` : `acct-${hex}`;
+}
+
+/**
+ * Derive a deterministic Fly app name from an instanceId (UUID).
+ *
+ * Production: `inst-{first 20 hex chars of SHA-256(instanceId)}` (25 chars)
+ * Development: `dev-inst-{hash}` (29 chars)
+ *
+ * Every new instance (personal and org) gets its own Fly app.
+ * This provides clean per-instance observability (one machine, one volume per app),
+ * eliminates metadata recovery collisions entirely, and simplifies debugging.
+ *
+ * @param prefix - Environment prefix (e.g. "dev" for WORKER_ENV=development). Omit for production.
+ */
+export async function appNameFromInstanceId(instanceId: string, prefix?: string): Promise<string> {
+  const hex = await hashToHex(instanceId);
+  return prefix ? `${prefix}-inst-${hex}` : `inst-${hex}`;
 }
 
 // -- REST API helpers --

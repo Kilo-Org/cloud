@@ -108,10 +108,19 @@ async function processKiloclawChatMessage(
     queryString: string | null;
     sourceIp: string | null;
     timestamp: string;
+    processStatus: string;
   },
   triggerConfig: TriggerConfig,
   env: Env
 ): Promise<void> {
+  // Skip if already delivered (idempotency guard for queue retries)
+  if (request.processStatus === 'success' || request.processStatus === 'failed') {
+    logger.info('KiloClaw Chat request already processed, skipping', {
+      requestId: webhook.requestId,
+      currentStatus: request.processStatus,
+    });
+    return;
+  }
   if (!triggerConfig.kiloclawInstanceId) {
     await failRequest(stub, webhook.requestId, 'KiloClaw instance ID not configured on trigger');
     return;
@@ -142,17 +151,6 @@ async function processKiloclawChatMessage(
     requestId: webhook.requestId,
     promptLength: renderedPrompt.length,
   });
-
-  // Mark as in-progress before the external call to prevent duplicate delivery on queue retry
-  await withDORetry(
-    () => stub,
-    doStub =>
-      doStub.updateRequest(webhook.requestId, {
-        process_status: 'inprogress',
-        started_at: new Date().toISOString(),
-      }),
-    'updateRequest'
-  );
 
   const internalApiSecret = await env.INTERNAL_API_SECRET.get();
 

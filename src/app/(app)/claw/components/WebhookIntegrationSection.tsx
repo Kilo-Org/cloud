@@ -124,6 +124,10 @@ export function WebhookIntegrationSection() {
       toast.error('No active KiloClaw instance found');
       return;
     }
+    if (authEnabled && (!authHeader || !authSecret)) {
+      toast.error('Both header name and secret are required when authentication is enabled');
+      return;
+    }
     const triggerId = generateTriggerId();
     await createTrigger({
       triggerId,

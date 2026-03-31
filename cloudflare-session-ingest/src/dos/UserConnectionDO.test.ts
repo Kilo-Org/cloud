@@ -344,6 +344,16 @@ describe('UserConnectionDO', () => {
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       expect(ctx.storage.setAlarm).toHaveBeenCalled();
     });
+
+    it('sends heartbeat_ack to CLI socket', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+
+      const msgs = allSent(cliWs);
+      expect(msgs).toContainEqual({ type: 'heartbeat_ack' });
+    });
   });
 
   // -------------------------------------------------------------------------

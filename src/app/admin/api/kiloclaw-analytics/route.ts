@@ -7,6 +7,16 @@ type QueryType = 'instance-events' | 'all-events';
 
 const validQueryTypes = new Set<QueryType>(['instance-events', 'all-events']);
 
+/** High-frequency polling events excluded from the "All Events" tab to reduce noise. */
+const NOISY_ALL_EVENTS_EXCLUDED = [
+  'platform.controller-version.get',
+  'platform.volume-snapshots.get',
+  'platform.debug-status.get',
+  'platform.status.get',
+  'platform.gateway.ready.get',
+  'platform.gateway.status.get',
+] as const;
+
 // Validates that a value is safe to interpolate into SQL (alphanumeric, hyphens, underscores only)
 function isSafeIdentifier(value: string): boolean {
   return /^[A-Za-z0-9_-]+$/.test(value);
@@ -74,7 +84,7 @@ FROM kiloclaw_events
 WHERE
   (${orClauses.join(' OR ')})
   AND blob3 IN ('http', 'do', 'reconcile', 'queue')
-  AND blob1 != 'platform.gateway.status.get'
+  AND blob1 NOT IN (${NOISY_ALL_EVENTS_EXCLUDED.map(e => `'${e}'`).join(', ')})
 ORDER BY timestamp DESC
 LIMIT 100
 OFFSET ${p.offset}

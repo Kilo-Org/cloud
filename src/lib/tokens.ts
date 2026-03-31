@@ -1,7 +1,7 @@
 import type { User } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import jwt from 'jsonwebtoken';
-import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
+import { warnExceptInTest } from '@/lib/utils.server';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 
 export const JWT_TOKEN_VERSION = 3;
@@ -114,10 +114,6 @@ function tryJwtVerify(token: string) {
 
 export function validateAuthorizationHeader(headers: Headers) {
   const traceability_logging_id = crypto.randomUUID();
-  if (process.env.NODE_ENV !== 'development') {
-    logExceptInTest(`headers (${traceability_logging_id})`, Object.fromEntries(headers.entries()));
-  }
-
   const authHeader = headers.get('authorization');
   if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
     warnExceptInTest('Authorization header missing or invalid');
@@ -128,12 +124,15 @@ export function validateAuthorizationHeader(headers: Headers) {
   const payload = tryJwtVerify(token);
 
   if (!payload) {
-    warnExceptInTest(`Invalid token (${traceability_logging_id}):`, { token });
+    warnExceptInTest(`Invalid token (${traceability_logging_id})`);
     return { error: `Invalid token (${traceability_logging_id})` };
   }
 
   if (payload.version != JWT_TOKEN_VERSION) {
-    warnExceptInTest(`Token version outdated (${traceability_logging_id}):`, payload);
+    warnExceptInTest(`Token version outdated (${traceability_logging_id}):`, {
+      version: payload.version,
+      kiloUserId: payload.kiloUserId,
+    });
     return { error: `Token version outdated, please re-authenticate (${traceability_logging_id})` };
   }
 

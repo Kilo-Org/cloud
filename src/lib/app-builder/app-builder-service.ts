@@ -255,13 +255,14 @@ type CreateSessionParams = {
   authToken: string;
   gitRepoFullName: string | null;
   images?: Images;
-  reason: 'upgrade' | 'github_migration' | 'model_vision_change';
+  reason: 'upgrade' | 'github_migration' | 'model_vision_change' | 'user_initiated';
 };
 
 function toSessionReason(reason: CreateSessionParams['reason']): string {
   if (reason === 'upgrade') return AppBuilderSessionReason.Upgrade;
   if (reason === 'github_migration') return AppBuilderSessionReason.GitHubMigration;
   if (reason === 'model_vision_change') return AppBuilderSessionReason.ModelVisionChange;
+  if (reason === 'user_initiated') return AppBuilderSessionReason.UserInitiated;
   reason satisfies never;
   throw new Error(`Unhandled session reason: ${reason}`);
 }
@@ -378,6 +379,7 @@ async function createV2Session(params: CreateSessionParams): Promise<InitiateSes
       images,
       appendSystemPrompt: APP_BUILDER_APPEND_SYSTEM_PROMPT,
       mcpServers: buildMCPServersConfig({ userId: createdByUserId, projectId, owner }),
+      createdOnPlatform: 'app-builder',
     };
   } else {
     const { token: gitToken } = await appBuilderClient.generateGitToken(projectId, 'full');
@@ -394,6 +396,7 @@ async function createV2Session(params: CreateSessionParams): Promise<InitiateSes
       images,
       appendSystemPrompt: APP_BUILDER_APPEND_SYSTEM_PROMPT,
       mcpServers: buildMCPServersConfig({ userId: createdByUserId, projectId, owner }),
+      createdOnPlatform: 'app-builder',
     };
   }
 
@@ -989,7 +992,7 @@ export async function startSessionForProject(
 }
 
 export async function sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
-  const { projectId, owner, message, authToken, images, model } = input;
+  const { projectId, owner, message, authToken, images, model, forceNewSession } = input;
 
   const project = await getProjectWithOwnershipCheck(projectId, owner);
 
@@ -1013,6 +1016,33 @@ export async function sendMessage(input: SendMessageInput): Promise<SendMessageR
   const currentWorkerVersion = await getCurrentSessionWorkerVersion(currentSessionId);
   const userId = project.created_by_user_id ?? owner.id;
   const requiredWorkerVersion = await getRequiredWorkerVersion(userId);
+
+  // When forceNewSession is true, bypass the automatic session-change logic and
+  // create a new session immediately with reason 'user_initiated'.
+  if (forceNewSession) {
+    const createParams = {
+      projectId,
+      currentSessionId,
+      createdByUserId: project.created_by_user_id ?? owner.id,
+      owner,
+      message,
+      model: effectiveModel,
+      authToken,
+      gitRepoFullName: project.git_repo_full_name,
+      images,
+      reason: 'user_initiated' as const,
+    } satisfies CreateSessionParams;
+
+    const result =
+      requiredWorkerVersion === 'v2'
+        ? await createV2Session(createParams)
+        : await createV1Session(createParams);
+
+    return {
+      cloudAgentSessionId: result.cloudAgentSessionId,
+      workerVersion: requiredWorkerVersion,
+    };
+  }
 
   const decision = await shouldCreateNewSession(
     project,

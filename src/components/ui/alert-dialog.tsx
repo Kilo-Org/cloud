@@ -13,6 +13,7 @@ import {
   DialogFooter,
   DialogTitle,
   DialogDescription,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -37,6 +38,7 @@ const AlertDialogHeader = DialogHeader;
 const AlertDialogFooter = DialogFooter;
 const AlertDialogTitle = DialogTitle;
 const AlertDialogDescription = DialogDescription;
+const AlertDialogTrigger = DialogTrigger;
 
 type AlertDialogCancelProps = React.ComponentPropsWithoutRef<typeof Button>;
 
@@ -63,6 +65,7 @@ export {
   AlertDialogFooter,
   AlertDialogTitle,
   AlertDialogDescription,
+  AlertDialogTrigger,
   AlertDialogCancel,
   AlertDialogAction,
 };

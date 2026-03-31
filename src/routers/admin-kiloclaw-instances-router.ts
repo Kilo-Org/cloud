@@ -4,6 +4,7 @@ import {
   kiloclaw_instances,
   kiloclaw_subscriptions,
   kiloclaw_email_log,
+  kiloclaw_cli_runs,
   kilocode_users,
 } from '@kilocode/db/schema';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
@@ -493,6 +494,118 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       throwKiloclawAdminError(err, fallbackMessage);
     }
   }),
+
+  startKiloCliRun: adminProcedure
+    .input(z.object({ userId: z.string().min(1), prompt: z.string().min(1).max(10_000) }))
+    .mutation(async ({ input }) => {
+      const fallbackMessage = 'Failed to start kilo CLI run';
+      try {
+        const client = new KiloClawInternalClient();
+        return await client.startKiloCliRun(input.userId, input.prompt);
+      } catch (err) {
+        console.error('Failed to start kilo CLI run for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
+
+  getKiloCliRunStatus: adminProcedure.input(GatewayProcessSchema).query(async ({ input }) => {
+    const fallbackMessage = 'Failed to get kilo CLI run status';
+    try {
+      const client = new KiloClawInternalClient();
+      return await client.getKiloCliRunStatus(input.userId);
+    } catch (err) {
+      console.error('Failed to get kilo CLI run status for user:', input.userId, err);
+      throwKiloclawAdminError(err, fallbackMessage);
+    }
+  }),
+
+  listKiloCliRuns: adminProcedure
+    .input(z.object({ userId: z.string().min(1), limit: z.number().min(1).max(50).default(20) }))
+    .query(async ({ input }) => {
+      const runs = await db
+        .select()
+        .from(kiloclaw_cli_runs)
+        .where(eq(kiloclaw_cli_runs.user_id, input.userId))
+        .orderBy(desc(kiloclaw_cli_runs.started_at))
+        .limit(input.limit);
+
+      return { runs };
+    }),
+
+  listAllCliRuns: adminProcedure
+    .input(
+      z.object({
+        offset: z.number().min(0).default(0),
+        limit: z.number().min(1).max(100).default(25),
+        search: z.string().optional(),
+        status: z.enum(['all', 'running', 'completed', 'failed', 'cancelled']).default('all'),
+      })
+    )
+    .query(async ({ input }) => {
+      const { offset, limit, search, status } = input;
+      const conditions: SQL[] = [];
+
+      if (status !== 'all') {
+        conditions.push(eq(kiloclaw_cli_runs.status, status));
+      }
+
+      const searchTerm = search?.trim();
+      if (searchTerm) {
+        const escaped = searchTerm.replace(/[%_\\]/g, '\\$&');
+        const pattern = `%${escaped}%`;
+        const searchCond = or(
+          ilike(kilocode_users.google_user_email, pattern),
+          ilike(kiloclaw_cli_runs.prompt, pattern)
+        );
+        if (searchCond) conditions.push(searchCond);
+      }
+
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const [rows, countResult] = await Promise.all([
+        db
+          .select({
+            id: kiloclaw_cli_runs.id,
+            user_id: kiloclaw_cli_runs.user_id,
+            user_email: kilocode_users.google_user_email,
+            prompt: kiloclaw_cli_runs.prompt,
+            status: kiloclaw_cli_runs.status,
+            exit_code: kiloclaw_cli_runs.exit_code,
+            started_at: kiloclaw_cli_runs.started_at,
+            completed_at: kiloclaw_cli_runs.completed_at,
+          })
+          .from(kiloclaw_cli_runs)
+          .leftJoin(kilocode_users, eq(kiloclaw_cli_runs.user_id, kilocode_users.id))
+          .where(where)
+          .orderBy(desc(kiloclaw_cli_runs.started_at))
+          .limit(limit)
+          .offset(offset),
+        db
+          .select({ count: sql<number>`COUNT(*)::int` })
+          .from(kiloclaw_cli_runs)
+          .leftJoin(kilocode_users, eq(kiloclaw_cli_runs.user_id, kilocode_users.id))
+          .where(where),
+      ]);
+
+      const total = countResult[0]?.count ?? 0;
+
+      return {
+        runs: rows,
+        pagination: { offset, limit, total, totalPages: Math.ceil(total / limit) },
+      };
+    }),
+
+  getCliRunOutput: adminProcedure
+    .input(z.object({ runId: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const [row] = await db
+        .select({ output: kiloclaw_cli_runs.output })
+        .from(kiloclaw_cli_runs)
+        .where(eq(kiloclaw_cli_runs.id, input.runId))
+        .limit(1);
+
+      return { output: row?.output ?? null };
+    }),
 
   restoreConfig: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
     const fallbackMessage = 'Failed to restore config';

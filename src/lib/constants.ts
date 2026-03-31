@@ -49,6 +49,7 @@ export const SESSION_INGEST_WS_URL = process.env.NEXT_PUBLIC_SESSION_INGEST_WS_U
 
 // Gastown worker URL (client-side, inlined at build time)
 // The browser talks directly to the gastown Cloudflare Worker for tRPC + WS.
+// Must use NEXT_PUBLIC_ prefix so Next.js exposes it to the browser bundle.
 export const GASTOWN_URL = process.env.NEXT_PUBLIC_GASTOWN_URL ?? '';
 
 // Free model rate limits: per-IP for client-side products, per-user for server-side products

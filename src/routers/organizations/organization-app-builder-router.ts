@@ -236,6 +236,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
         authToken,
         images: input.images,
         model: input.model,
+        forceNewSession: input.forceNewSession,
       });
 
       return {

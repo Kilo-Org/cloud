@@ -2336,6 +2336,7 @@ export const AppBuilderSessionReason = {
   GitHubMigration: 'github_migration', // New session after migrating to GitHub
   Upgrade: 'upgrade', // New session after worker version upgrade (v1→v2)
   ModelVisionChange: 'model_vision_change', // New session after switching between vision and text-only models
+  UserInitiated: 'user_initiated', // New session explicitly started by the user via "New Chat"
 } satisfies Record<string, string>;
 
 export const app_builder_project_sessions = pgTable(
@@ -3624,3 +3625,33 @@ export const app_min_versions = pgTable('app_min_versions', {
 
 export type AppMinVersions = typeof app_min_versions.$inferSelect;
 export type NewBotRequest = typeof bot_requests.$inferInsert;
+
+// ─── KiloClaw CLI Runs ──────────────────────────────────────────────
+
+export type KiloClawCliRunStatus = 'running' | 'completed' | 'failed' | 'cancelled';
+
+export const kiloclaw_cli_runs = pgTable(
+  'kiloclaw_cli_runs',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    prompt: text().notNull(),
+    status: text().$type<KiloClawCliRunStatus>().notNull().default('running'),
+    exit_code: integer(),
+    output: text(),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    index('IDX_kiloclaw_cli_runs_user_id').on(table.user_id),
+    index('IDX_kiloclaw_cli_runs_started_at').on(table.started_at),
+  ]
+);
+
+export type KiloClawCliRun = typeof kiloclaw_cli_runs.$inferSelect;
+export type NewKiloClawCliRun = typeof kiloclaw_cli_runs.$inferInsert;

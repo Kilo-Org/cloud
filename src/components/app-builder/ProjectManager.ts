@@ -49,6 +49,10 @@ export type ProjectManager = {
   setGitRepoFullName: (repoFullName: string) => void;
   deploy: () => Promise<DeployResult>;
   destroy: () => void;
+  /** Enter "pending new session" mode — clears the chat area for a new message */
+  requestNewSession: () => void;
+  /** Cancel pending new session mode, returning to the current session view */
+  cancelNewSession: () => void;
 };
 
 export function createProjectManager(config: ProjectManagerConfig): ProjectManager {
@@ -171,7 +175,10 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     logger.log('Session changed', { newSessionId, workerVersion });
 
     const currentActive = getActiveSession();
-    currentActive?.destroy();
+    if (currentActive) {
+      currentActive.info.ended_at = new Date().toISOString();
+      currentActive.destroy();
+    }
 
     const newInfo: SessionDisplayInfo = {
       id: newSessionId,
@@ -316,6 +323,11 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
   }
 
   function sendMessage(message: string, images?: Images, model?: string): void {
+    if (store.getState().pendingNewSession) {
+      sendMessageAsNewSession(message, images, model);
+      return;
+    }
+
     const activeSession = getActiveSession();
     if (!activeSession) {
       logger.logWarn('Cannot send message: no active session');
@@ -328,6 +340,57 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
 
     const effectiveModel = model ?? store.getState().model;
     void activeSession.sendMessage(message, images, effectiveModel);
+  }
+
+  /**
+   * Sends the first message of a user-initiated new session.
+   * Calls sendMessage tRPC mutation with forceNewSession:true, then delegates
+   * to handleSessionChanged to create the new session object and begin streaming.
+   */
+  function sendMessageAsNewSession(message: string, images?: Images, model?: string): void {
+    if (destroyed) {
+      logger.logWarn('Cannot start new session: ProjectManager is destroyed');
+      return;
+    }
+
+    if (model) {
+      store.setState({ model });
+    }
+
+    const effectiveModel = model ?? store.getState().model;
+
+    store.setState({ pendingNewSession: false, isStreaming: true });
+
+    const mutationPromise = organizationId
+      ? trpcClient.organizations.appBuilder.sendMessage.mutate({
+          projectId,
+          organizationId,
+          message,
+          images,
+          model: effectiveModel,
+          forceNewSession: true,
+        })
+      : trpcClient.appBuilder.sendMessage.mutate({
+          projectId,
+          message,
+          images,
+          model: effectiveModel,
+          forceNewSession: true,
+        });
+
+    void mutationPromise
+      .then(result => {
+        if (destroyed) return;
+        handleSessionChanged(result.cloudAgentSessionId, result.workerVersion, {
+          text: message,
+          images,
+        });
+      })
+      .catch((err: Error) => {
+        if (destroyed) return;
+        logger.logError('Failed to start new session', err);
+        store.setState({ isStreaming: false });
+      });
   }
 
   function interrupt(): void {
@@ -373,6 +436,24 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     return deployProject({ projectId, organizationId, trpcClient, store });
   }
 
+  function requestNewSession(): void {
+    if (destroyed) return;
+    const currentActive = getActiveSession();
+    if (currentActive) {
+      currentActive.info.ended_at = new Date().toISOString();
+    }
+    store.setState({ pendingNewSession: true });
+  }
+
+  function cancelNewSession(): void {
+    if (destroyed) return;
+    const currentActive = getActiveSession();
+    if (currentActive) {
+      currentActive.info.ended_at = null;
+    }
+    store.setState({ pendingNewSession: false });
+  }
+
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
@@ -408,5 +489,7 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     setGitRepoFullName,
     deploy,
     destroy,
+    requestNewSession,
+    cancelNewSession,
   };
 }

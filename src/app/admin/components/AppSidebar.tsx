@@ -88,7 +88,7 @@ const financialItems: MenuItem[] = [
     icon: () => <DollarSign />,
   },
   {
-    title: () => 'Bulk Credits',
+    title: () => 'Bulk Credits & Trials',
     url: '/admin/bulk-credits',
     icon: () => <Upload />,
   },

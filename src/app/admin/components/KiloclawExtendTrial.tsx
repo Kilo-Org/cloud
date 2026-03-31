@@ -671,7 +671,7 @@ export function KiloclawExtendTrial() {
 
                 <Button
                   onClick={handleExtendTrials}
-                  disabled={extendTrialsMutation.isPending || eligibleCount === 0}
+                  disabled={extendTrialsMutation.isPending || eligibleCount === 0 || results !== null}
                   size="lg"
                 >
                   {extendTrialsMutation.isPending ? (

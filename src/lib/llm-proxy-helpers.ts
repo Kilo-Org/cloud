@@ -177,7 +177,7 @@ export async function makeErrorReadable({
     }
   }
 
-  if (response.status === 404) {
+  if (response.status === 404 && !request.body.provider?.ignore?.length) {
     const recommendedModel = balance <= 0 ? KILO_AUTO_FREE_MODEL : KILO_AUTO_BALANCED_MODEL;
     const recommendation =
       feature === 'kiloclaw' || feature === 'openclaw'

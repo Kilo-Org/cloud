@@ -3749,7 +3749,7 @@ export class TownDO extends DurableObject<Env> {
     if (!hasRigs) return;
 
     const hasWork = this.hasActiveWork();
-    if (!hasWork) {
+    if (!hasWork && !this._draining) {
       const rigList = rigs.listRigs(this.sql);
       const newestRigAge = rigList.reduce((min, r) => {
         const age = Date.now() - new Date(r.created_at).getTime();

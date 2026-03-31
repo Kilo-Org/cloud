@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
+import { sortAgentsByStatus } from '@/lib/gastown/sort-agents';
 import { Button } from '@/components/Button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateRigDialog } from '@/components/gastown/CreateRigDialog';
@@ -189,13 +190,7 @@ export function TownOverviewPageClient({
         }
       }
     }
-    // Sort by last_activity_at descending, then by created_at
-    agents.sort((a, b) => {
-      const aTime = a.last_activity_at ?? a.created_at;
-      const bTime = b.last_activity_at ?? b.created_at;
-      return new Date(bTime).getTime() - new Date(aTime).getTime();
-    });
-    return agents.slice(0, 5);
+    return sortAgentsByStatus(agents).slice(0, 5);
   }, [agentsByRig, rigs]);
 
   const deleteRig = useMutation(

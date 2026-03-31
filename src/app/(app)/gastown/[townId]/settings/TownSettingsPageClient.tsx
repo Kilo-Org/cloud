@@ -40,6 +40,19 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { motion } from 'motion/react';
 import { AdminViewingBanner } from '@/components/gastown/AdminViewingBanner';
+import { useRouter } from 'next/navigation';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Button as UiButton } from '@/components/ui/button';
 
 type Props = { townId: string; readOnly?: boolean; organizationId?: string };
 
@@ -56,6 +69,7 @@ const SECTIONS = [
   { id: 'merge-strategy', label: 'Merge Strategy', icon: GitPullRequest },
   { id: 'refinery', label: 'Refinery', icon: Shield },
   { id: 'container', label: 'Container', icon: Container },
+  { id: 'danger-zone', label: 'Danger Zone', icon: Trash2 },
 ] as const;
 
 function useScrollSpy(sectionIds: readonly string[]) {
@@ -111,6 +125,37 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
   const { data: currentUser } = useUser();
+  const router = useRouter();
+
+  const deleteTown = useMutation(
+    trpc.gastown.deleteTown.mutationOptions({
+      onSuccess: () => {
+        toast.success('Town deleted');
+        router.push('/gastown');
+      },
+      onError: err => toast.error(`Failed to delete town: ${err.message}`),
+    })
+  );
+
+  const deleteOrgTown = useMutation(
+    trpc.gastown.deleteOrgTown.mutationOptions({
+      onSuccess: () => {
+        toast.success('Town deleted');
+        if (organizationId) {
+          router.push(`/organizations/${organizationId}/gastown`);
+        }
+      },
+      onError: err => toast.error(`Failed to delete town: ${err.message}`),
+    })
+  );
+
+  const handleDeleteTown = () => {
+    if (organizationId) {
+      deleteOrgTown.mutate({ organizationId, townId });
+    } else {
+      deleteTown.mutate({ townId });
+    }
+  };
 
   const {
     data: modelsData,
@@ -780,6 +825,66 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                       />
                       {refreshToken.isPending ? 'Refreshing...' : 'Refresh Token'}
                     </Button>
+                  </div>
+                </div>
+              </SettingsSection>
+
+              {/* ── Danger Zone ──────────────────────────────────────── */}
+              <SettingsSection
+                id="danger-zone"
+                title="Danger Zone"
+                description="Irreversible actions for this town."
+                icon={Trash2}
+                index={9}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3">
+                    <div>
+                      <p className="text-sm text-red-400">Delete Town</p>
+                      <p className="text-[11px] text-red-400/70">
+                        Permanently delete this town, all its agents, and all data. This action
+                        cannot be undone.
+                      </p>
+                    </div>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <UiButton
+                          disabled={
+                            deleteTown.isPending || deleteOrgTown.isPending || effectiveReadOnly
+                          }
+                          variant="destructive"
+                          size="sm"
+                          className="ml-4 shrink-0 gap-1.5"
+                        >
+                          <Trash2 className="size-3" />
+                          Delete Town
+                        </UiButton>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="border-red-500/20 bg-[oklch(0.15_0_0)] sm:max-w-md">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-red-400">
+                            Delete this town?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="text-white/70">
+                            This action cannot be undone. This will permanently delete the town and
+                            all of its associated data, including agents, rigs, and settings.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="border-white/10 text-white/70 hover:bg-white/5 hover:text-white">
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleDeleteTown}
+                            className="bg-red-500/80 text-white hover:bg-red-500"
+                          >
+                            {deleteTown.isPending || deleteOrgTown.isPending
+                              ? 'Deleting...'
+                              : 'Yes, delete town'}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               </SettingsSection>

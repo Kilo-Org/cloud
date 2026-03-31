@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "bun run build.ts",
-    "typecheck": "tsgo --noEmit --incremental false"
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@kilocode/sdk": "7.0.50"

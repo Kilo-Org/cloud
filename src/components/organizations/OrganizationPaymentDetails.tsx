@@ -17,8 +17,7 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { AnimatedDollars } from './AnimatedDollars';
 import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds, fromMicrodollars } from '@/lib/utils';
 import CreditPurchaseOptions from '@/components/payment/CreditPurchaseOptions';
-import { PiggyBank, Bell, ChevronRight, Clock } from 'lucide-react';
-import Link from 'next/link';
+import { PiggyBank, Bell, Clock } from 'lucide-react';
 import { useExpiringCredits } from './useExpiringCredits';
 
 type Props = {
@@ -65,19 +64,10 @@ export function OrganizationPaymentDetails({ organizationId, role, isAutoTopUpEn
       <div className="flex w-full flex-col gap-y-8">
         <OrganizationPageHeader
           organizationId={organizationId}
-          title={
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/organizations/${organizationId}`}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Organization Details
-              </Link>
-              <ChevronRight className="text-muted-foreground h-5 w-5" />
-              <span>Payment Details</span>
-            </div>
-          }
-          showBackButton={false}
+          title="Payment Details"
+          showBackButton={true}
+          backButtonText="Organization Details"
+          backButtonHref={`/organizations/${organizationId}`}
         />
 
         {/* Buy Credits and Auto Top-Up Section */}

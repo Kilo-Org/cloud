@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { ChevronRight, ExternalLink, PlayCircle } from 'lucide-react';
 import { validateFieldValue } from '@kilocode/kiloclaw-secret-catalog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { OnboardingStepView } from './OnboardingStepView';
 import { DiscordIcon } from './icons/DiscordIcon';
 import { ChannelTokenInput } from './ChannelTokenInput';
 import { SlackIcon } from './icons/SlackIcon';
@@ -95,10 +95,12 @@ function pickChannelTokens(
 }
 
 export function ChannelSelectionStepView({
+  instanceRunning,
   onSelect,
   onSkip,
   defaultSelected = null,
 }: {
+  instanceRunning?: boolean;
   onSelect?: (channelId: ChannelId, tokens: Record<string, string>) => void;
   onSkip?: () => void;
   defaultSelected?: ChannelId | null;
@@ -137,72 +139,57 @@ export function ChannelSelectionStepView({
   };
 
   return (
-    <Card className="mt-6">
-      <CardContent className="flex flex-col gap-6 p-6 sm:p-8">
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
-              Step 3 of 4
-            </span>
-            <div className="flex gap-1">
-              <span className="h-1.5 w-6 rounded-full bg-blue-500" />
-              <span className="h-1.5 w-6 rounded-full bg-blue-500" />
-              <span className="h-1.5 w-6 rounded-full bg-blue-500" />
-              <span className="bg-muted h-1.5 w-6 rounded-full" />
-            </div>
-          </div>
-          <h2 className="text-foreground text-2xl font-bold">Where do you want to chat?</h2>
-          <p className="text-muted-foreground text-sm">
-            Pick where you&apos;d like to talk to your KiloClaw bot. You can add more channels any
-            time from settings.
-          </p>
-        </div>
+    <OnboardingStepView
+      currentStep={3}
+      totalSteps={4}
+      title="Where do you want to chat?"
+      description="Pick where you'd like to talk to your KiloClaw bot. You can add more channels any time from settings."
+      showProvisioningBanner={instanceRunning === false}
+    >
+      {telegram && (
+        <ChannelCard
+          option={telegram}
+          isSelected={selected === telegram.id}
+          onSelect={() => setSelected(telegram.id)}
+          expandedContent={expandedSections[telegram.id]}
+        />
+      )}
 
-        {telegram && (
-          <ChannelCard
-            option={telegram}
-            isSelected={selected === telegram.id}
-            onSelect={() => setSelected(telegram.id)}
-            expandedContent={expandedSections[telegram.id]}
-          />
-        )}
+      <div className="flex items-center gap-3">
+        <div className="border-border flex-1 border-t" />
+        <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+          Other options
+        </span>
+        <div className="border-border flex-1 border-t" />
+      </div>
 
-        <div className="flex items-center gap-3">
-          <div className="border-border flex-1 border-t" />
-          <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
-            Other options
-          </span>
-          <div className="border-border flex-1 border-t" />
-        </div>
+      {others.map(option => (
+        <ChannelCard
+          key={option.id}
+          option={option}
+          isSelected={selected === option.id}
+          onSelect={() => setSelected(option.id)}
+          expandedContent={expandedSections[option.id]}
+        />
+      ))}
 
-        {others.map(option => (
-          <ChannelCard
-            key={option.id}
-            option={option}
-            isSelected={selected === option.id}
-            onSelect={() => setSelected(option.id)}
-            expandedContent={expandedSections[option.id]}
-          />
-        ))}
+      <Button
+        className="w-full bg-emerald-600 py-6 text-base text-white hover:bg-emerald-700"
+        disabled={!isChannelValid(selected, tokens)}
+        onClick={() => selected && onSelect?.(selected, pickChannelTokens(selected, tokens))}
+      >
+        Continue
+        <ChevronRight className="ml-1 h-5 w-5" />
+      </Button>
 
-        <Button
-          className="w-full bg-emerald-600 py-6 text-base text-white hover:bg-emerald-700"
-          disabled={!isChannelValid(selected, tokens)}
-          onClick={() => selected && onSelect?.(selected, pickChannelTokens(selected, tokens))}
-        >
-          Continue
-          <ChevronRight className="ml-1 h-5 w-5" />
-        </Button>
-
-        <button
-          type="button"
-          className="text-muted-foreground hover:text-foreground mx-auto text-sm transition-colors"
-          onClick={() => onSkip?.()}
-        >
-          Skip for now
-        </button>
-      </CardContent>
-    </Card>
+      <button
+        type="button"
+        className="text-muted-foreground hover:text-foreground mx-auto text-sm transition-colors"
+        onClick={() => onSkip?.()}
+      >
+        Skip for now
+      </button>
+    </OnboardingStepView>
   );
 }
 

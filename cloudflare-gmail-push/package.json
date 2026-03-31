@@ -5,10 +5,8 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "test": "vitest run",
-    "typecheck": "tsgo --noEmit --incremental false",
-    "lint": "pnpm run lint:oxlint && pnpm run lint:eslint:fallback",
-    "lint:oxlint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-gmail-push/src",
-    "lint:eslint:fallback": "eslint src/",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-gmail-push/src",
     "cf-typegen": "wrangler types --env-file /dev/null"
   },
   "dependencies": {
@@ -18,7 +16,6 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.71",
-    "@kilocode/eslint-config": "workspace:*",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
     "vitest": "~3.2.4",

@@ -28,6 +28,11 @@ export type UserConfig = {
   channels?: EncryptedChannelTokens;
   googleCredentials?: GoogleCredentials;
   instanceFeatures?: string[];
+  execSecurity?: string | null;
+  execAsk?: string | null;
+  /** Organization ID — injected as KILOCODE_ORGANIZATION_ID for org instances. */
+  orgId?: string | null;
+  customSecretMeta?: Record<string, { configPath?: string }> | null;
 };
 
 /**
@@ -61,6 +66,8 @@ export type EnvVarsBuild = {
 const SENSITIVE_KEYS = new Set([
   'KILOCODE_API_KEY',
   'OPENCLAW_GATEWAY_TOKEN',
+  // Stream Chat bot token is auto-provisioned and must stay encrypted in transit
+  'STREAM_CHAT_BOT_USER_TOKEN',
   ...ALL_SECRET_ENV_VARS,
   ...INTERNAL_SENSITIVE_ENV_VARS,
 ]);
@@ -183,16 +190,27 @@ export async function buildEnvVars(
     }
   }
 
+  // Org identity (non-sensitive, plaintext)
+  if (userConfig?.orgId) {
+    plainEnv.KILOCODE_ORGANIZATION_ID = userConfig.orgId;
+  }
+
   // Worker-level passthrough (non-sensitive)
   if (env.TELEGRAM_DM_POLICY) plainEnv.TELEGRAM_DM_POLICY = env.TELEGRAM_DM_POLICY;
   if (env.DISCORD_DM_POLICY) plainEnv.DISCORD_DM_POLICY = env.DISCORD_DM_POLICY;
   if (env.OPENCLAW_ALLOWED_ORIGINS)
     plainEnv.OPENCLAW_ALLOWED_ORIGINS = env.OPENCLAW_ALLOWED_ORIGINS;
+  if (env.KILOCLAW_CHECKIN_URL) plainEnv.KILOCLAW_CHECKIN_URL = env.KILOCLAW_CHECKIN_URL;
   plainEnv.REQUIRE_PROXY_TOKEN = env.REQUIRE_PROXY_TOKEN ?? 'false';
 
   // Layer 5: Reserved system vars (cannot be overridden by any user config)
   sensitive.OPENCLAW_GATEWAY_TOKEN = await deriveGatewayToken(sandboxId, gatewayTokenSecret);
+  plainEnv.KILOCLAW_SANDBOX_ID = sandboxId;
   plainEnv.AUTO_APPROVE_DEVICES = 'true';
+
+  // User-selected exec permissions preset (non-sensitive, survives restarts).
+  if (userConfig?.execSecurity) plainEnv.KILOCLAW_EXEC_SECURITY = userConfig.execSecurity;
+  if (userConfig?.execAsk) plainEnv.KILOCLAW_EXEC_ASK = userConfig.execAsk;
 
   // Instance feature flags → env vars (non-sensitive, not user-overridable).
   // Applied after user env vars so users cannot suppress features via envVars config.
@@ -200,6 +218,18 @@ export async function buildEnvVars(
     for (const feature of userConfig.instanceFeatures) {
       const envVar = FEATURE_TO_ENV_VAR[feature];
       if (envVar) plainEnv[envVar] = 'true';
+    }
+  }
+
+  // Custom secret config path mapping — tells the controller which env vars
+  // to patch into openclaw.json at specific JSON paths.
+  if (userConfig?.customSecretMeta) {
+    const pathMap: Record<string, string> = {};
+    for (const [envVar, meta] of Object.entries(userConfig.customSecretMeta)) {
+      if (meta.configPath) pathMap[envVar] = meta.configPath;
+    }
+    if (Object.keys(pathMap).length > 0) {
+      plainEnv.KILOCLAW_SECRET_CONFIG_PATHS = JSON.stringify(pathMap);
     }
   }
 

@@ -22,6 +22,7 @@ import { AlertCircle, ExternalLink, Loader2, RefreshCw, Rocket, Sparkles } from 
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { PageLayout } from '@/components/PageLayout';
+import { SetPageTitle } from '@/components/SetPageTitle';
 import { DemoSessionCTA } from './DemoSessionCTA';
 import { DemoSessionModal } from './DemoSessionModal';
 import {
@@ -83,7 +84,12 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
 
   // Format models for the combobox (ModelOption format: id, name)
   const modelOptions = useMemo<ModelOption[]>(
-    () => allModels.map(model => ({ id: model.id, name: model.name })),
+    () =>
+      allModels.map(model => ({
+        id: model.id,
+        name: model.name,
+        variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
+      })),
     [allModels]
   );
 
@@ -278,6 +284,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
   // Refresh repositories hook (refreshes both GitHub and GitLab)
   const { refresh: refreshGitHubRepositories, isRefreshing: isRefreshingGitHubRepos } =
     useRefreshRepositories({
+      silent: true,
       getRefreshQueryOptions: useCallback(
         () =>
           organizationId
@@ -306,6 +313,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
 
   const { refresh: refreshGitLabRepositories, isRefreshing: isRefreshingGitLabRepos } =
     useRefreshRepositories({
+      silent: true,
       getRefreshQueryOptions: useCallback(
         () =>
           organizationId
@@ -332,9 +340,16 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
       ),
     });
 
-  // Combined refresh function
+  // Combined refresh function — single toast for both platforms
   const refreshRepositories = useCallback(async () => {
-    await Promise.all([refreshGitHubRepositories(), refreshGitLabRepositories()]);
+    try {
+      await Promise.all([refreshGitHubRepositories(), refreshGitLabRepositories()]);
+      toast.success('Repositories refreshed');
+    } catch (error) {
+      toast.error('Failed to refresh repositories', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   }, [refreshGitHubRepositories, refreshGitLabRepositories]);
 
   const isRefreshingRepos = isRefreshingGitHubRepos || isRefreshingGitLabRepos;
@@ -455,7 +470,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
       void queryClient.invalidateQueries({
         queryKey: trpc.unifiedSessions.list.queryKey({
           limit: 3,
-          createdOnPlatform: 'cloud-agent',
+          createdOnPlatform: ['cloud-agent', 'cloud-agent-web'],
           orderBy: 'updated_at',
           organizationId: organizationId ?? null,
         }),
@@ -595,10 +610,9 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
     !hasInsufficientBalance;
 
   const titleContent = (
-    <div className="flex items-center gap-3">
-      <h1 className="text-foreground text-3xl font-bold">Cloud Agent</h1>
+    <SetPageTitle title="Cloud Agent">
       <Badge variant="new">new</Badge>
-    </div>
+    </SetPageTitle>
   );
 
   const subtitleContent = (

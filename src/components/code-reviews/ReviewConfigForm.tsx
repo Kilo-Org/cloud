@@ -31,7 +31,6 @@ import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
 import { RepositoryMultiSelect, type Repository } from './RepositoryMultiSelect';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/models';
-import { REVIEW_PROMO_MODEL, REVIEW_PROMO_END } from '@/lib/code-reviews/core/constants';
 import {
   getAvailableThinkingEfforts,
   thinkingEffortLabel,
@@ -194,14 +193,6 @@ export function ReviewConfigForm({
 
   // Fetch available models
   const { modelOptions, isLoadingModels } = useOrganizationModels(organizationId);
-
-  const promoModelOptions = useMemo(() => {
-    const promoActive = Date.now() < Date.parse(REVIEW_PROMO_END);
-    if (!promoActive) return modelOptions;
-    return modelOptions.map(m =>
-      m.id === REVIEW_PROMO_MODEL ? { ...m, name: `${m.name} (free)` } : m
-    );
-  }, [modelOptions]);
 
   // Local state
   const [isEnabled, setIsEnabled] = useState(false);
@@ -553,7 +544,7 @@ export function ReviewConfigForm({
             {/* AI Model Selection */}
             <ModelCombobox
               label="AI Model"
-              models={promoModelOptions}
+              models={modelOptions}
               value={selectedModel}
               onValueChange={setSelectedModel}
               isLoading={isLoadingModels}

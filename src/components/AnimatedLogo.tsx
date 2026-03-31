@@ -49,7 +49,7 @@ export function AnimatedLogo() {
         {/* Fallback image for browsers that don't support video */}
         <Image src="/kilo-v1.svg" alt="Kilo Code Logo" width={48} height={48} className="mr-2" />
       </video>
-      <h1 className="text-3xl leading-[0.8] font-bold tracking-tighter">Kilo Code</h1>
+      <h1 className="text-3xl leading-[0.8] font-bold tracking-tighter">Kilo</h1>
     </Link>
   );
 }

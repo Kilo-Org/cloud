@@ -15,9 +15,14 @@ vi.mock('../dos/SessionAccessCacheDO', () => ({
   getSessionAccessCacheDO: vi.fn(),
 }));
 
+vi.mock('../dos/UserConnectionDO', () => ({
+  getUserConnectionDO: vi.fn(),
+}));
+
 import { getWorkerDb } from '@kilocode/db/client';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
+import { getUserConnectionDO } from '../dos/UserConnectionDO';
 
 type HyperdriveBinding = { connectionString: string };
 
@@ -537,5 +542,128 @@ describe('api routes', () => {
 
     expect(res.status).toBe(200);
     expect(fns.updateSet).toHaveBeenCalled();
+  });
+
+  it('GET /sessions/active returns sessions from UserConnectionDO', async () => {
+    const connectionStub = {
+      getActiveSessions: vi.fn(async () => [
+        {
+          id: 'ses_12345678901234567890123456',
+          status: 'active',
+          title: 'My Session',
+          connectionId: 'conn-1',
+        },
+      ]),
+    };
+    vi.mocked(getUserConnectionDO).mockReturnValue(
+      connectionStub as unknown as ReturnType<typeof getUserConnectionDO>
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(new Request('http://local/sessions/active', { method: 'GET' }), {
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(getUserConnectionDO).toHaveBeenCalledWith(expect.anything(), { kiloUserId: 'usr_test' });
+    expect(await res.json()).toEqual({
+      sessions: [
+        {
+          id: 'ses_12345678901234567890123456',
+          status: 'active',
+          title: 'My Session',
+          connectionId: 'conn-1',
+        },
+      ],
+    });
+  });
+
+  it('GET /sessions/active returns empty array when no sessions', async () => {
+    const connectionStub = {
+      getActiveSessions: vi.fn(async () => []),
+    };
+    vi.mocked(getUserConnectionDO).mockReturnValue(
+      connectionStub as unknown as ReturnType<typeof getUserConnectionDO>
+    );
+
+    const app = makeApiApp();
+    const res = await app.fetch(new Request('http://local/sessions/active', { method: 'GET' }), {
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ sessions: [] });
+  });
+
+  it('GET /user/cli returns 426 without Upgrade header', async () => {
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/user/cli', {
+        method: 'GET',
+      }),
+      { HYPERDRIVE: { connectionString: 'postgres://test' } }
+    );
+
+    expect(res.status).toBe(426);
+    expect(await res.json()).toMatchObject({ error: 'Expected WebSocket upgrade' });
+  });
+
+  it('GET /user/web returns 426 without Upgrade header', async () => {
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/user/web', {
+        method: 'GET',
+      }),
+      { HYPERDRIVE: { connectionString: 'postgres://test' } }
+    );
+
+    expect(res.status).toBe(426);
+    expect(await res.json()).toMatchObject({ error: 'Expected WebSocket upgrade' });
+  });
+
+  it('GET /user/cli forwards to DO fetch with /cli path', async () => {
+    const stubFetch = vi.fn(async (_req: Request) => new Response(null, { status: 101 }));
+    const connectionStub = { fetch: stubFetch };
+    vi.mocked(getUserConnectionDO).mockReturnValue(
+      connectionStub as unknown as ReturnType<typeof getUserConnectionDO>
+    );
+
+    const app = makeApiApp();
+    await app.fetch(
+      new Request('http://local/user/cli', {
+        method: 'GET',
+        headers: { Upgrade: 'websocket' },
+      }),
+      { HYPERDRIVE: { connectionString: 'postgres://test' } }
+    );
+
+    expect(stubFetch).toHaveBeenCalledTimes(1);
+    expect(getUserConnectionDO).toHaveBeenCalledWith(expect.anything(), { kiloUserId: 'usr_test' });
+    const forwardedReq = stubFetch.mock.calls[0][0];
+    const forwardedUrl = new URL(forwardedReq.url);
+    expect(forwardedUrl.pathname).toBe('/cli');
+  });
+
+  it('GET /user/web forwards to DO fetch with /web path', async () => {
+    const stubFetch = vi.fn(async (_req: Request) => new Response(null, { status: 101 }));
+    const connectionStub = { fetch: stubFetch };
+    vi.mocked(getUserConnectionDO).mockReturnValue(
+      connectionStub as unknown as ReturnType<typeof getUserConnectionDO>
+    );
+
+    const app = makeApiApp();
+    await app.fetch(
+      new Request('http://local/user/web', {
+        method: 'GET',
+        headers: { Upgrade: 'websocket' },
+      }),
+      { HYPERDRIVE: { connectionString: 'postgres://test' } }
+    );
+
+    expect(stubFetch).toHaveBeenCalledTimes(1);
+    expect(getUserConnectionDO).toHaveBeenCalledWith(expect.anything(), { kiloUserId: 'usr_test' });
+    const forwardedReq = stubFetch.mock.calls[0][0];
+    const forwardedUrl = new URL(forwardedReq.url);
+    expect(forwardedUrl.pathname).toBe('/web');
   });
 });

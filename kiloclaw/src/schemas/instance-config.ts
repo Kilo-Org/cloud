@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { ALL_SECRET_FIELD_KEYS } from '@kilocode/kiloclaw-secret-catalog';
+import {
+  ALL_SECRET_FIELD_KEYS,
+  isValidCustomSecretKey,
+  isValidConfigPath,
+} from '@kilocode/kiloclaw-secret-catalog';
 import { IMAGE_TAG_RE, IMAGE_TAG_MAX_LENGTH } from '../lib/image-tag-validation';
 
 export const EncryptedEnvelopeSchema = z.object({
@@ -38,6 +42,19 @@ export const GoogleCredentialsSchema = z.object({
 
 export type GoogleCredentials = z.infer<typeof GoogleCredentialsSchema>;
 
+/** Metadata for a custom secret (e.g. config path for openclaw.json patching). */
+export const CustomSecretMetaSchema = z.object({
+  configPath: z
+    .string()
+    .refine(isValidConfigPath, {
+      message:
+        'Not a supported credential path. See https://docs.openclaw.ai/reference/secretref-credential-surface',
+    })
+    .optional(),
+});
+
+export type CustomSecretMeta = z.infer<typeof CustomSecretMetaSchema>;
+
 export const InstanceConfigSchema = z.object({
   envVars: z.record(envVarNameSchema, z.string()).optional(),
   encryptedSecrets: z.record(envVarNameSchema, EncryptedEnvelopeSchema).optional(),
@@ -64,6 +81,7 @@ export const InstanceConfigSchema = z.object({
   // If set, use this image tag instead of resolving latest from KV.
   // Set by the cloud app when the user has a version pin.
   pinnedImageTag: z.string().regex(IMAGE_TAG_RE).max(IMAGE_TAG_MAX_LENGTH).optional(),
+  customSecretMeta: z.record(z.string(), CustomSecretMetaSchema).nullable().optional(),
 });
 
 export type InstanceConfig = z.infer<typeof InstanceConfigSchema>;
@@ -85,13 +103,31 @@ export const ChannelsPatchSchema = z.object({
 export const SecretsPatchSchema = z.object({
   userId: z.string().min(1),
   secrets: z.record(
-    z.string().refine(k => ALL_SECRET_FIELD_KEYS.has(k), { message: 'Unknown secret field key' }),
+    z.string().refine(k => ALL_SECRET_FIELD_KEYS.has(k) || isValidCustomSecretKey(k), {
+      message: 'Invalid secret key: must be a catalog field key or valid env var name',
+    }),
     EncryptedEnvelopeSchema.nullable()
   ),
+  meta: z
+    .record(
+      z.string().refine(k => isValidCustomSecretKey(k), { message: 'Invalid meta key' }),
+      CustomSecretMetaSchema
+    )
+    .optional(),
 });
+
+/**
+ * Zod schema for validating instanceId at IO boundaries (query params, path params).
+ * instanceId = kiloclaw_instances.id UUID.
+ */
+export const InstanceIdParam = z.string().uuid();
 
 export const ProvisionRequestSchema = z.object({
   userId: z.string().min(1),
+  /** Optional DB row UUID used as the DO key for multi-instance support. */
+  instanceId: z.string().uuid().optional(),
+  /** Optional org ID — null/absent means personal instance. */
+  orgId: z.string().uuid().nullable().optional(),
   ...InstanceConfigSchema.omit({ googleCredentials: true }).shape,
 });
 
@@ -116,8 +152,18 @@ export const DestroyRequestSchema = z.object({
 export const PersistedStateSchema = z.object({
   userId: z.string().default(''),
   sandboxId: z.string().default(''),
+  /** Organization ID — null for personal instances, set for org instances. */
+  orgId: z.string().nullable().default(null),
   status: z
-    .enum(['provisioned', 'starting', 'running', 'stopped', 'destroying'])
+    .enum([
+      'provisioned',
+      'starting',
+      'restarting',
+      'running',
+      'stopped',
+      'destroying',
+      'restoring',
+    ])
     .default('stopped'),
   envVars: z.record(z.string(), z.string()).nullable().default(null),
   encryptedSecrets: z.record(z.string(), EncryptedEnvelopeSchema).nullable().default(null),
@@ -136,6 +182,8 @@ export const PersistedStateSchema = z.object({
   googleCredentials: GoogleCredentialsSchema.nullable().default(null),
   provisionedAt: z.number().nullable().default(null),
   startingAt: z.number().nullable().default(null),
+  restartingAt: z.number().nullable().default(null),
+  restartUpdateSent: z.boolean().default(false),
   lastStartedAt: z.number().nullable().default(null),
   lastStoppedAt: z.number().nullable().default(null),
   // Fly.io app/machine/volume identifiers
@@ -168,6 +216,8 @@ export const PersistedStateSchema = z.object({
   // Populated by the startAsync() catch handler when start() throws before creating a machine.
   lastStartErrorMessage: z.string().nullable().default(null),
   lastStartErrorAt: z.number().nullable().default(null),
+  lastRestartErrorMessage: z.string().nullable().default(null),
+  lastRestartErrorAt: z.number().nullable().default(null),
   // Cooldown for bound-machine recovery during destroy: avoids repeated getVolume
   // calls when the volume consistently reports no attached machine.
   lastBoundMachineRecoveryAt: z.number().nullable().default(null),
@@ -178,6 +228,46 @@ export const PersistedStateSchema = z.object({
   gmailNotificationsEnabled: z.boolean().default(false),
   gmailLastHistoryId: z.string().nullable().default(null),
   gmailPushOidcEmail: z.string().nullable().default(null),
+  // User-selected exec permissions preset (persisted so it survives restarts).
+  // null = use defaults (security: 'allowlist', ask: 'on-miss').
+  execSecurity: z.string().nullable().default(null),
+  execAsk: z.string().nullable().default(null),
+  // Snapshot restore: tracks the volume before the most recent restore for admin revert path.
+  previousVolumeId: z.string().nullable().default(null),
+  // Snapshot restore: timestamp set at enqueue time. Used by alarm for stuck-restore detection
+  // (>30 min) and by admin UI to show "Restoring... (started X ago)".
+  restoreStartedAt: z.string().nullable().default(null),
+  // Snapshot restore: status before entering 'restoring'. Used by failSnapshotRestore() to
+  // restore the correct status if the restore fails without the queue worker ever running.
+  // Only 'running', 'stopped', or 'provisioned' are reachable in practice — enqueueSnapshotRestore
+  // blocks starting/restarting/destroying/restoring. Uses the full enum for forward compat.
+  preRestoreStatus: z
+    .enum([
+      'provisioned',
+      'starting',
+      'restarting',
+      'running',
+      'stopped',
+      'destroying',
+      'restoring',
+    ])
+    .nullable()
+    .default(null),
+  // Snapshot restore: volume ID created by the queue worker during restore.
+  // Used for idempotency on retry — if set, the worker reuses this volume instead of creating another.
+  pendingRestoreVolumeId: z.string().nullable().default(null),
+  // Tracks whether the "instance ready" email has been sent for this provision lifecycle.
+  // Set to true on first low-load checkin; reset on DO wipe (destroy + re-provision).
+  instanceReadyEmailSent: z.boolean().default(false),
+  // Metadata for custom (non-catalog) secrets: env var name → { configPath? }.
+  // configPath is a JSON dot-notation path for patching into openclaw.json at boot.
+  customSecretMeta: z.record(z.string(), CustomSecretMetaSchema).nullable().default(null),
+  // Stream Chat default channel (auto-provisioned on first instance creation).
+  // Null on existing instances (pre-Stream Chat) and when STREAM_CHAT_API_KEY is not set.
+  streamChatApiKey: z.string().nullable().default(null),
+  streamChatBotUserId: z.string().nullable().default(null),
+  streamChatBotUserToken: z.string().nullable().default(null),
+  streamChatChannelId: z.string().nullable().default(null),
 });
 
 export type PersistedState = z.infer<typeof PersistedStateSchema>;

@@ -37,18 +37,20 @@ export const DEFAULT_MACHINE_GUEST = {
 /** Default Fly Volume size in GB */
 export const DEFAULT_VOLUME_SIZE_GB = 10;
 
-/** Default Fly region priority list when FLY_REGION env var is not set.
- *  Callers shuffle before selecting so order here doesn't matter.
- *  ord omitted due to provisioning issues. */
-export const DEFAULT_FLY_REGION = 'dfw,ewr,iad,lax,sjc,eu';
+/** Default Fly region priority list when FLY_REGION env var is not set. */
+export const DEFAULT_FLY_REGION = 'eu,us';
 
 // Alarm cadence by instance status
 /** Running machines: fast health checks */
 export const ALARM_INTERVAL_RUNNING_MS = 5 * 60 * 1000; // 5 min
 /** Starting: wait for start() to complete and reconcile quickly */
 export const ALARM_INTERVAL_STARTING_MS = 60 * 1000; // 1 min
+/** Restarting: wait for restartMachine() background work and reconcile quickly */
+export const ALARM_INTERVAL_RESTARTING_MS = 60 * 1000; // 1 min
 /** Maximum time to stay in 'starting' before falling back to 'stopped' */
 export const STARTING_TIMEOUT_MS = 5 * 60 * 1000; // 5 min
+/** Maximum time to stay in 'restarting' before surfacing a timeout */
+export const RESTARTING_TIMEOUT_MS = 5 * 60 * 1000; // 5 min
 /** Destroying: retry pending deletes quickly */
 export const ALARM_INTERVAL_DESTROYING_MS = 60 * 1000; // 1 min
 /** Provisioned/stopped: slow drift detection */

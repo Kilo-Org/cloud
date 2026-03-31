@@ -13,7 +13,6 @@ import {
 } from '../../db/tables/bead-events.table';
 import {
   bead_dependencies,
-  BeadDependencyRecord,
   createTableBeadDependencies,
   getIndexesBeadDependencies,
 } from '../../db/tables/bead-dependencies.table';
@@ -49,10 +48,6 @@ function generateId(): string {
 
 function now(): string {
   return new Date().toISOString();
-}
-
-function cloneBeadMetadata(metadata: Bead['metadata'] | null | undefined): Record<string, unknown> {
-  return metadata ? { ...metadata } : {};
 }
 
 export function initBeadTables(sql: SqlStorage): void {
@@ -262,6 +257,17 @@ export function updateBeadStatus(
 
   // No-op if already in the target status — avoids redundant events
   if (bead.status === status) return bead;
+
+  // HARD INVARIANT: terminal states (closed/failed) are immutable.
+  // Once a bead reaches a terminal state, no recovery function, stale MR
+  // failure, or race condition should ever change its status. Return the
+  // bead as-is (no-op, not an error) so callers don't need to pre-check.
+  if (bead.status === 'closed' || bead.status === 'failed') {
+    console.warn(
+      `[beads] updateBeadStatus: blocked ${bead.status} → ${status} for bead=${beadId} — terminal state is immutable`
+    );
+    return bead;
+  }
 
   const oldStatus = bead.status;
   const timestamp = now();
@@ -484,6 +490,26 @@ export function hasUnresolvedBlockers(sql: SqlStorage, beadId: string): boolean 
     ),
   ];
   return z.object({ count: z.number() }).parse(rows[0]).count > 0;
+}
+
+/** Insert a dependency between two beads. */
+export function insertDependency(
+  sql: SqlStorage,
+  beadId: string,
+  dependsOnBeadId: string,
+  dependencyType: 'blocks' | 'tracks' | 'parent-child'
+): void {
+  query(
+    sql,
+    /* sql */ `
+      INSERT OR IGNORE INTO ${bead_dependencies} (
+        ${bead_dependencies.columns.bead_id},
+        ${bead_dependencies.columns.depends_on_bead_id},
+        ${bead_dependencies.columns.dependency_type}
+      ) VALUES (?, ?, ?)
+    `,
+    [beadId, dependsOnBeadId, dependencyType]
+  );
 }
 
 /**
@@ -912,336 +938,4 @@ export function getConvoyFeatureBranch(sql: SqlStorage, convoyId: string): strin
   ];
   if (rows.length === 0) return null;
   return z.object({ feature_branch: z.string().nullable() }).parse(rows[0]).feature_branch;
-}
-
-/**
- * Recount closed_beads for a convoy using the same logic as
- * updateConvoyProgress: a tracked bead counts as closed only when
- * it is closed/failed AND has no pending merge_request child beads.
- */
-function recountConvoyClosedBeads(sql: SqlStorage, convoyId: string): void {
-  const countRows = [
-    ...query(
-      sql,
-      /* sql */ `
-        SELECT COUNT(1) AS count FROM ${bead_dependencies} AS tracked
-        INNER JOIN ${beads} AS tracked_bead
-          ON tracked.${bead_dependencies.columns.bead_id} = tracked_bead.${beads.columns.bead_id}
-        WHERE tracked.${bead_dependencies.columns.depends_on_bead_id} = ?
-          AND tracked.${bead_dependencies.columns.dependency_type} = 'tracks'
-          AND tracked_bead.${beads.columns.status} IN ('closed', 'failed')
-          AND NOT EXISTS (
-            SELECT 1 FROM ${bead_dependencies} AS mr_dep
-            INNER JOIN ${beads} AS mr_bead
-              ON mr_dep.${bead_dependencies.columns.bead_id} = mr_bead.${beads.columns.bead_id}
-            WHERE mr_dep.${bead_dependencies.columns.depends_on_bead_id} = tracked_bead.${beads.columns.bead_id}
-              AND mr_dep.${bead_dependencies.columns.dependency_type} = 'tracks'
-              AND mr_bead.${beads.columns.type} = 'merge_request'
-              AND mr_bead.${beads.columns.status} IN ('open', 'in_progress')
-          )
-      `,
-      [convoyId]
-    ),
-  ];
-  const closedCount = z.object({ count: z.number() }).parse(countRows[0]).count;
-
-  query(
-    sql,
-    /* sql */ `
-      UPDATE ${convoy_metadata}
-      SET ${convoy_metadata.columns.closed_beads} = ?
-      WHERE ${convoy_metadata.bead_id} = ?
-    `,
-    [closedCount, convoyId]
-  );
-}
-
-// ── Convoy Membership ───────────────────────────────────────────────
-
-/**
- * Add a bead to an existing convoy. Creates the 'tracks' dependency,
- * merges convoy_id + feature_branch into the bead's metadata, and
- * increments the convoy's total_beads counter.
- *
- * No-ops if the bead already tracks this convoy.
- */
-export function addBeadToConvoy(sql: SqlStorage, beadId: string, convoyId: string): void {
-  // Verify both exist
-  const bead = getBead(sql, beadId);
-  if (!bead) throw new Error(`Bead ${beadId} not found`);
-
-  const convoyBead = getBead(sql, convoyId);
-  if (!convoyBead) throw new Error(`Convoy ${convoyId} not found`);
-  if (convoyBead.type !== 'convoy') {
-    throw new Error(`Bead ${convoyId} is not a convoy (type: ${convoyBead.type})`);
-  }
-
-  // Check if already tracked
-  const existing = getConvoyForBead(sql, beadId);
-  if (existing === convoyId) return; // already a member
-  if (existing) {
-    throw new Error(
-      `Bead ${beadId} already belongs to convoy ${existing}. Remove it first before adding to a different convoy.`
-    );
-  }
-
-  // Insert 'tracks' dependency
-  query(
-    sql,
-    /* sql */ `
-      INSERT INTO ${bead_dependencies} (
-        ${bead_dependencies.columns.bead_id},
-        ${bead_dependencies.columns.depends_on_bead_id},
-        ${bead_dependencies.columns.dependency_type}
-      ) VALUES (?, ?, 'tracks')
-      ON CONFLICT DO NOTHING
-    `,
-    [beadId, convoyId]
-  );
-
-  // Merge convoy_id + feature_branch into bead metadata
-  const featureBranch = getConvoyFeatureBranch(sql, convoyId);
-  const timestamp = now();
-  const metadataPatch: Record<string, unknown> = { convoy_id: convoyId };
-  if (featureBranch) metadataPatch.feature_branch = featureBranch;
-
-  const existingMetadata = cloneBeadMetadata(bead.metadata);
-  const merged = { ...existingMetadata, ...metadataPatch };
-
-  query(
-    sql,
-    /* sql */ `
-      UPDATE ${beads}
-      SET ${beads.columns.metadata} = ?,
-          ${beads.columns.updated_at} = ?
-      WHERE ${beads.bead_id} = ?
-    `,
-    [JSON.stringify(merged), timestamp, beadId]
-  );
-
-  // Increment total_beads and recount closed_beads (the bead may already
-  // be closed/failed, so a naive +1 on total_beads alone would leave
-  // closed_beads stale).
-  query(
-    sql,
-    /* sql */ `
-      UPDATE ${convoy_metadata}
-      SET ${convoy_metadata.columns.total_beads} = ${convoy_metadata.columns.total_beads} + 1
-      WHERE ${convoy_metadata.bead_id} = ?
-    `,
-    [convoyId]
-  );
-  recountConvoyClosedBeads(sql, convoyId);
-
-  // If the bead is still open, clear the ready_to_land flag on the convoy
-  // in case it was already set — a new open bead means the convoy is not
-  // complete and must not submit the final landing MR.
-  if (bead.status !== 'closed' && bead.status !== 'failed') {
-    query(
-      sql,
-      /* sql */ `
-        UPDATE ${beads}
-        SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.ready_to_land'),
-            ${beads.columns.updated_at} = ?
-        WHERE ${beads.bead_id} = ?
-      `,
-      [timestamp, convoyId]
-    );
-  }
-}
-
-/**
- * Remove a bead from its convoy. Deletes the 'tracks' dependency,
- * strips convoy_id + feature_branch from metadata, and decrements
- * the convoy's total_beads counter.
- *
- * No-ops if the bead is not in any convoy.
- */
-export function removeBeadFromConvoy(sql: SqlStorage, beadId: string): string | null {
-  const convoyId = getConvoyForBead(sql, beadId);
-  if (!convoyId) return null;
-
-  // Remove 'tracks' dependency
-  query(
-    sql,
-    /* sql */ `
-      DELETE FROM ${bead_dependencies}
-      WHERE ${bead_dependencies.bead_id} = ?
-        AND ${bead_dependencies.depends_on_bead_id} = ?
-        AND ${bead_dependencies.dependency_type} = 'tracks'
-    `,
-    [beadId, convoyId]
-  );
-
-  // Strip convoy_id + feature_branch from metadata
-  const bead = getBead(sql, beadId);
-  if (bead) {
-    const existingMetadata = cloneBeadMetadata(bead.metadata);
-    delete existingMetadata.convoy_id;
-    delete existingMetadata.feature_branch;
-    const timestamp = now();
-
-    query(
-      sql,
-      /* sql */ `
-        UPDATE ${beads}
-        SET ${beads.columns.metadata} = ?,
-            ${beads.columns.updated_at} = ?
-        WHERE ${beads.bead_id} = ?
-      `,
-      [JSON.stringify(existingMetadata), timestamp, beadId]
-    );
-  }
-
-  // Decrement total_beads and recount closed_beads. A naive decrement of
-  // closed_beads is unreliable because updateConvoyProgress excludes beads
-  // with pending MR children from the count — a bead that is closed but
-  // mid-review was never counted, so decrementing would undercount.
-  query(
-    sql,
-    /* sql */ `
-      UPDATE ${convoy_metadata}
-      SET ${convoy_metadata.columns.total_beads} = MAX(${convoy_metadata.columns.total_beads} - 1, 0)
-      WHERE ${convoy_metadata.bead_id} = ?
-    `,
-    [convoyId]
-  );
-  recountConvoyClosedBeads(sql, convoyId);
-
-  return convoyId;
-}
-
-// ── Bead Dependency Editing ─────────────────────────────────────────
-
-/**
- * Add a dependency edge between two beads.
- *
- * - Validates self-reference (`beadId !== dependsOnBeadId`)
- * - Checks both beads exist
- * - Runs cycle detection for 'blocks' dependencies (DFS from `dependsOnBeadId`
- *   — if you can reach `beadId`, adding the edge would create a cycle)
- * - Uses `ON CONFLICT DO NOTHING` so duplicate adds are a no-op
- */
-export function addBeadDependency(
-  sql: SqlStorage,
-  beadId: string,
-  dependsOnBeadId: string,
-  type: 'blocks' | 'tracks' | 'parent-child'
-): void {
-  if (beadId === dependsOnBeadId) {
-    throw new Error('A bead cannot depend on itself');
-  }
-
-  // Verify both beads exist
-  const existCheck = [
-    ...query(
-      sql,
-      /* sql */ `
-        SELECT ${beads.bead_id}
-        FROM ${beads}
-        WHERE ${beads.bead_id} IN (?, ?)
-      `,
-      [beadId, dependsOnBeadId]
-    ),
-  ];
-  const foundIds = new Set(
-    z
-      .object({ bead_id: z.string() })
-      .array()
-      .parse(existCheck)
-      .map(r => r.bead_id)
-  );
-  if (!foundIds.has(beadId)) throw new Error(`Bead ${beadId} not found`);
-  if (!foundIds.has(dependsOnBeadId)) throw new Error(`Bead ${dependsOnBeadId} not found`);
-
-  // Cycle detection for 'blocks' dependencies: DFS from dependsOnBeadId
-  // following existing 'blocks' edges. If we can reach beadId, adding
-  // this edge would create a cycle.
-  if (type === 'blocks') {
-    const adjacency = new Map<string, string[]>();
-    const edgeRows = [
-      ...query(
-        sql,
-        /* sql */ `
-          SELECT ${bead_dependencies.bead_id}, ${bead_dependencies.depends_on_bead_id}
-          FROM ${bead_dependencies}
-          WHERE ${bead_dependencies.dependency_type} = 'blocks'
-        `,
-        []
-      ),
-    ];
-    const edges = BeadDependencyRecord.pick({ bead_id: true, depends_on_bead_id: true })
-      .array()
-      .parse(edgeRows);
-    for (const edge of edges) {
-      const neighbors = adjacency.get(edge.bead_id) ?? [];
-      neighbors.push(edge.depends_on_bead_id);
-      adjacency.set(edge.bead_id, neighbors);
-    }
-
-    // DFS from dependsOnBeadId following the direction: bead_id → depends_on_bead_id
-    // We want to check: can dependsOnBeadId reach beadId through existing edges?
-    // The graph direction is: beadId depends on dependsOnBeadId.
-    // A cycle means: dependsOnBeadId already (transitively) depends on beadId.
-    // So we follow edges from dependsOnBeadId: check dependsOnBeadId's own
-    // depends_on edges to see if beadId is reachable.
-    const visited = new Set<string>();
-    const stack = [dependsOnBeadId];
-    while (stack.length > 0) {
-      const current = stack.pop();
-      if (current === undefined) break;
-      if (current === beadId) {
-        throw new Error(
-          `Adding dependency would create a cycle: ${beadId} → ${dependsOnBeadId} → ... → ${beadId}`
-        );
-      }
-      if (visited.has(current)) continue;
-      visited.add(current);
-      const neighbors = adjacency.get(current);
-      if (neighbors) {
-        for (const neighbor of neighbors) {
-          if (!visited.has(neighbor)) stack.push(neighbor);
-        }
-      }
-    }
-  }
-
-  query(
-    sql,
-    /* sql */ `
-      INSERT INTO ${bead_dependencies} (
-        ${bead_dependencies.columns.bead_id},
-        ${bead_dependencies.columns.depends_on_bead_id},
-        ${bead_dependencies.columns.dependency_type}
-      ) VALUES (?, ?, ?)
-      ON CONFLICT DO NOTHING
-    `,
-    [beadId, dependsOnBeadId, type]
-  );
-}
-
-/**
- * Remove a dependency edge between two beads.
- * Does NOT allow removing 'tracks' dependencies (system-managed convoy edges).
- * Returns true if a row was actually deleted, false otherwise.
- */
-export function removeBeadDependency(
-  sql: SqlStorage,
-  beadId: string,
-  dependsOnBeadId: string
-): boolean {
-  const result = [
-    ...query(
-      sql,
-      /* sql */ `
-        DELETE FROM ${bead_dependencies}
-        WHERE ${bead_dependencies.bead_id} = ?
-          AND ${bead_dependencies.depends_on_bead_id} = ?
-          AND ${bead_dependencies.dependency_type} != 'tracks'
-        RETURNING ${bead_dependencies.bead_id}
-      `,
-      [beadId, dependsOnBeadId]
-    ),
-  ];
-  return result.length > 0;
 }

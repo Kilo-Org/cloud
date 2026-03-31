@@ -1,7 +1,9 @@
 'use client';
 
-import { useCallback, useState } from 'react';
-import { Check, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import dynamic from 'next/dynamic';
+import { Check, MessageSquare, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import {
   useKiloClawGatewayStatus,
@@ -19,13 +21,24 @@ import { InstanceControls } from './InstanceControls';
 import { InstanceTab } from './InstanceTab';
 import { OpenClawButton } from './OpenClawButton';
 import { SettingsTab } from './SettingsTab';
-import { ChangelogCard } from './ChangelogCard';
-import { PairingCard } from './PairingCard';
+import { ChangelogTab } from './ChangelogTab';
+import { SubscriptionTab } from './SubscriptionTab';
+import { ChannelPairingStep } from './ChannelPairingStep';
 import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { PermissionStep } from './PermissionStep';
 import { ProvisioningStep } from './ProvisioningStep';
 import type { ExecPreset } from './claw.types';
 import { BillingWrapper } from './billing/BillingWrapper';
+
+// Lazy-load the Chat tab so the stream-chat-react bundle (~200KB) only loads
+// when the user opens that tab, not on every /claw page visit.
+const ChatTab = dynamic(() => import('./ChatTab').then(m => ({ default: m.ChatTab })), {
+  loading: () => (
+    <div className="flex h-96 items-center justify-center text-sm text-muted-foreground">
+      Loading chat…
+    </div>
+  ),
+});
 
 type PopulatedClawStatus = KiloClawDashboardStatus & {
   status: NonNullable<KiloClawDashboardStatus['status']>;
@@ -65,24 +78,97 @@ export function ClawDashboard({
     Date.now() - instanceStatus.provisionedAt < SEVEN_DAYS_MS;
   const configServiceNudgeVisible = !instanceStatus || instanceYoung;
 
+  const VALID_TABS = ['instance', 'chat', 'settings', 'subscription', 'changelog'] as const;
+  type TabValue = (typeof VALID_TABS)[number];
+
+  function tabFromHash(): TabValue {
+    if (typeof window === 'undefined') return 'instance';
+    const hash = window.location.hash.slice(1);
+    return VALID_TABS.includes(hash as TabValue) ? (hash as TabValue) : 'instance';
+  }
+
+  const [activeTab, setActiveTab] = useState<TabValue>(tabFromHash);
+
+  function handleTabChange(value: string) {
+    setActiveTab(value as TabValue);
+    window.history.replaceState(null, '', value === 'instance' ? '/claw' : `#${value}`);
+  }
+
+  useEffect(() => {
+    function onHashChange() {
+      setActiveTab(tabFromHash());
+    }
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
   const [onboardingStep, setOnboardingStep] = useState<
-    'permissions' | 'channels' | 'provisioning' | 'done'
+    'permissions' | 'channels' | 'provisioning' | 'pairing' | 'done'
   >('permissions');
   const [selectedPreset, setSelectedPreset] = useState<ExecPreset | null>(null);
   const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+  const hasPairingStep = selectedChannelId === 'telegram' || selectedChannelId === 'discord';
+
+  // Reset onboarding wizard to step 1 whenever we enter setup mode so that
+  // a destroy → re-provision cycle always starts fresh.
+  const prevIsNewSetup = useRef(isNewSetup);
+  useEffect(() => {
+    if (isNewSetup && !prevIsNewSetup.current) {
+      setOnboardingStep('permissions');
+      setSelectedPreset(null);
+      setChannelTokens(null);
+      setSelectedChannelId(null);
+    }
+    prevIsNewSetup.current = isNewSetup;
+  }, [isNewSetup]);
 
   const [dirtySecrets, setDirtySecrets] = useState<Set<string>>(new Set());
 
   const onSecretsChanged = useCallback((entryId: string) => {
     setDirtySecrets(prev => new Set([...prev, entryId]));
   }, []);
+  const [upgradeRequested, setUpgradeRequested] = useState(false);
+  const onRequestUpgrade = useCallback(() => setUpgradeRequested(true), []);
+  const onUpgradeHandled = useCallback(() => setUpgradeRequested(false), []);
+
   const onRedeploySuccess = useCallback(() => {
     setDirtySecrets(new Set());
   }, []);
 
+  const onRedeploy = useCallback(() => {
+    mutations.restartMachine.mutate(undefined, {
+      onSuccess: () => {
+        toast.success('Redeploying');
+        onRedeploySuccess();
+      },
+      onError: err => {
+        toast.error(err.message, { duration: 10000 });
+      },
+    });
+  }, [mutations.restartMachine, onRedeploySuccess]);
+
+  const onUpgrade = useCallback(() => {
+    mutations.restartMachine.mutate(
+      { imageTag: 'latest' },
+      {
+        onSuccess: () => {
+          toast.success('Upgrading to latest image');
+          onRedeploySuccess();
+        },
+        onError: err => {
+          toast.error(err.message, { duration: 10000 });
+        },
+      }
+    );
+  }, [mutations.restartMachine, onRedeploySuccess]);
+
   // Billing gating (welcome page for new users, loading spinner) is handled
   // by page.tsx before this component mounts. ClawDashboard always renders
   // the full dashboard with BillingWrapper handling lock dialogs and banners.
+
+  const tabTriggerClass =
+    'border-border text-muted-foreground hover:bg-muted hover:text-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground rounded-md border px-4 py-2 text-sm font-medium transition-colors data-[state=active]:shadow-none';
 
   return (
     <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
@@ -98,32 +184,29 @@ export function ClawDashboard({
       {isServiceDegraded && (
         <Alert variant="warning">
           <TriangleAlert className="size-4" />
-          <AlertDescription className="flex flex-col">
+          <AlertDescription>
             <span>
-              KiloClaw ended up being really popular! We&apos;re working on getting additional
-              capacity. If you have trouble starting a machine, please try again in a few minutes.
-            </span>
-            <span className="mt-2 flex flex-row gap-1">
-              <span>You can also</span>
+              KiloClaw is really popular today. If you run into issues,{' '}
               <a
                 href="https://status.kilo.ai/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:opacity-80"
               >
-                check our status page for live updates
-              </a>
+                check our status page
+              </a>{' '}
+              for live updates.
             </span>
           </AlertDescription>
         </Alert>
       )}
 
       {configServiceNudgeVisible && !isNewSetup && (
-        <div className="border-brand-primary/30 bg-brand-primary/5 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="border-violet-500/30 bg-violet-500/10 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <Zap className="text-brand-primary mt-0.5 h-5 w-5 shrink-0" />
+            <Zap className="text-violet-400 mt-0.5 h-5 w-5 shrink-0" />
             <div>
-              <p className="text-brand-primary text-sm font-semibold">
+              <p className="text-violet-400 text-sm font-semibold">
                 Go from inbox chaos to an AI executive assistant — in one hour.
               </p>
               <p className="text-muted-foreground mt-0.5 text-sm">
@@ -136,7 +219,7 @@ export function ClawDashboard({
             href="https://kilo.ai/kiloclaw/config-service"
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-brand-primary text-primary-foreground hover:bg-brand-primary/90 inline-flex shrink-0 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors"
+            className="bg-violet-500 text-white hover:bg-violet-500/90 inline-flex shrink-0 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors"
           >
             Book your session
           </a>
@@ -148,6 +231,7 @@ export function ClawDashboard({
           <CreateInstanceCard
             mutations={mutations}
             onProvisionStart={() => onNewSetupChange(true)}
+            onProvisionFailed={() => onNewSetupChange(false)}
           />
         ) : isNewSetup && onboardingStep === 'permissions' ? (
           <PermissionStep
@@ -159,11 +243,14 @@ export function ClawDashboard({
           />
         ) : isNewSetup && onboardingStep === 'channels' ? (
           <ChannelSelectionStepView
-            onSelect={(_channelId, tokens) => {
+            instanceRunning={isRunning && gatewayStatus?.state === 'running'}
+            onSelect={(channelId, tokens) => {
+              setSelectedChannelId(channelId);
               setChannelTokens(tokens);
               setOnboardingStep('provisioning');
             }}
             onSkip={() => {
+              setSelectedChannelId(null);
               setChannelTokens(null);
               setOnboardingStep('provisioning');
             }}
@@ -174,7 +261,17 @@ export function ClawDashboard({
             channelTokens={channelTokens}
             instanceRunning={isRunning && gatewayStatus?.state === 'running'}
             mutations={mutations}
+            totalSteps={hasPairingStep ? 5 : 4}
+            onComplete={() => setOnboardingStep(hasPairingStep ? 'pairing' : 'done')}
+          />
+        ) : isNewSetup &&
+          onboardingStep === 'pairing' &&
+          (selectedChannelId === 'telegram' || selectedChannelId === 'discord') ? (
+          <ChannelPairingStep
+            channelId={selectedChannelId}
+            mutations={mutations}
             onComplete={() => setOnboardingStep('done')}
+            onSkip={() => setOnboardingStep('done')}
           />
         ) : isNewSetup ? (
           <Card className="mt-6 overflow-hidden">
@@ -239,22 +336,28 @@ export function ClawDashboard({
                 status={instanceStatus}
                 mutations={mutations}
                 onRedeploySuccess={onRedeploySuccess}
+                upgradeRequested={upgradeRequested}
+                onUpgradeHandled={onUpgradeHandled}
               />
             </CardContent>
-            <Tabs defaultValue="instance">
+            <Tabs value={activeTab} onValueChange={handleTabChange}>
               <div className="px-5">
-                <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-b bg-transparent p-0">
-                  <TabsTrigger
-                    value="instance"
-                    className="text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-                  >
+                <TabsList className="mt-4 h-auto w-full justify-start gap-2 overflow-x-auto rounded-none border-b bg-transparent p-0 pb-3">
+                  <TabsTrigger value="instance" className={tabTriggerClass}>
                     Gateway Process
                   </TabsTrigger>
-                  <TabsTrigger
-                    value="settings"
-                    className="text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground rounded-none border-b-2 border-transparent px-0 py-3 text-sm font-medium transition-colors data-[state=active]:border-0 data-[state=active]:border-b-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-                  >
+                  <TabsTrigger value="chat" className={tabTriggerClass}>
+                    <MessageSquare className="mr-1.5 inline h-3.5 w-3.5" />
+                    Chat
+                  </TabsTrigger>
+                  <TabsTrigger value="settings" className={tabTriggerClass}>
                     Settings
+                  </TabsTrigger>
+                  <TabsTrigger value="subscription" className={tabTriggerClass}>
+                    Subscription
+                  </TabsTrigger>
+                  <TabsTrigger value="changelog" className={tabTriggerClass}>
+                    What&apos;s New <Sparkles className="ml-1 inline h-3 w-3 text-amber-400" />
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -267,25 +370,31 @@ export function ClawDashboard({
                     gatewayError={gatewayError}
                   />
                 </TabsContent>
+                <TabsContent value="chat" className="mt-0">
+                  <ChatTab enabled={activeTab === 'chat' && isRunning} />
+                </TabsContent>
                 <TabsContent value="settings" className="mt-0">
                   <SettingsTab
                     status={instanceStatus}
                     mutations={mutations}
                     onSecretsChanged={onSecretsChanged}
                     dirtySecrets={dirtySecrets}
+                    onRedeploy={onRedeploy}
+                    onUpgrade={onUpgrade}
+                    onRequestUpgrade={onRequestUpgrade}
                   />
+                </TabsContent>
+                <TabsContent value="subscription" className="mt-0">
+                  <SubscriptionTab />
+                </TabsContent>
+                <TabsContent value="changelog" className="mt-0">
+                  <ChangelogTab />
                 </TabsContent>
               </CardContent>
             </Tabs>
           </Card>
         )}
-
-        {instanceStatus?.status === 'running' && !isNewSetup && (
-          <PairingCard mutations={mutations} />
-        )}
       </BillingWrapper>
-
-      {instanceStatus && !isNewSetup && <ChangelogCard />}
     </div>
   );
 }

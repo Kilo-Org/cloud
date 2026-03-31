@@ -6,6 +6,7 @@ import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.se
 import { APP_URL } from '@/lib/constants';
 import { TRPCError } from '@trpc/server';
 import {
+  credit_transactions,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
   kilo_pass_scheduled_changes,
@@ -78,6 +79,7 @@ const KiloPassSubscriptionStateSchema = KiloPassSubscriptionStateBaseSchema.exte
   /** Derived, per-current-period values used for the profile card UI */
   currentPeriodBaseCreditsUsd: z.number(),
   currentPeriodUsageUsd: z.number(),
+  currentPeriodHostingCostUsd: z.number(),
   currentPeriodBonusCreditsUsd: z.number().nullable(),
   isBonusUnlocked: z.boolean(),
   refillAt: z.string().nullable(),
@@ -85,6 +87,7 @@ const KiloPassSubscriptionStateSchema = KiloPassSubscriptionStateBaseSchema.exte
 
 const GetStateOutputSchema = z.object({
   subscription: KiloPassSubscriptionStateSchema.nullable(),
+  isEligibleForFirstMonthPromo: z.boolean(),
 });
 
 const GetAverageMonthlyUsageLast3MonthsOutputSchema = z.object({
@@ -219,6 +222,39 @@ async function getCurrentPeriodUsageUsd(params: {
   return roundToCents(fromMicrodollars(totalCost_mUsd));
 }
 
+/**
+ * Sum KiloClaw credit deductions (negative credit_transactions with a
+ * `kiloclaw-subscription` category prefix) within a time window. Returns a
+ * positive USD value representing hosting costs in the period.
+ */
+async function getCurrentPeriodHostingCostUsd(params: {
+  kiloUserId: string;
+  startInclusiveIso: string;
+  endExclusiveIso: string;
+}): Promise<number> {
+  const result = await db
+    .select({
+      totalDeduction_mUsd: sql<unknown>`COALESCE(${sum(
+        sql`ABS(${credit_transactions.amount_microdollars})`
+      )}, 0)`,
+    })
+    .from(credit_transactions)
+    .where(
+      and(
+        eq(credit_transactions.kilo_user_id, params.kiloUserId),
+        isNull(credit_transactions.organization_id),
+        sql`${credit_transactions.amount_microdollars} < 0`,
+        sql`${credit_transactions.credit_category} LIKE 'kiloclaw-subscription%'`,
+        sql`${credit_transactions.created_at} >= ${params.startInclusiveIso}`,
+        sql`${credit_transactions.created_at} < ${params.endExclusiveIso}`
+      )
+    );
+
+  const raw = Number(result[0]?.totalDeduction_mUsd);
+  const totalDeduction_mUsd = isNaN(raw) ? 0 : raw;
+  return roundToCents(fromMicrodollars(totalDeduction_mUsd));
+}
+
 const GetCheckoutReturnStateOutputSchema = z.object({
   subscription: KiloPassSubscriptionStateBaseSchema.nullable(),
   creditsAwarded: z.boolean(),
@@ -231,10 +267,6 @@ const CreateCheckoutSessionInputSchema = z.object({
 
 const CreateCheckoutSessionOutputSchema = z.object({
   url: z.url().nullable(),
-});
-
-const FirstMonthPromoEligibilityOutputSchema = z.object({
-  eligible: z.boolean(),
 });
 
 const CancelSubscriptionOutputSchema = z.object({
@@ -311,7 +343,7 @@ export const kiloPassRouter = createTRPCRouter({
   getState: baseProcedure.output(GetStateOutputSchema).query(async ({ ctx }) => {
     const subscriptionBase = await getKiloPassStateForUser(db, ctx.user.id);
     if (!subscriptionBase) {
-      return { subscription: null };
+      return { subscription: null, isEligibleForFirstMonthPromo: true };
     }
 
     const stripeCustomerId = ctx.user.stripe_customer_id;
@@ -342,10 +374,12 @@ export const kiloPassRouter = createTRPCRouter({
 
           currentPeriodBaseCreditsUsd: baseAmountUsd,
           currentPeriodUsageUsd: 0,
+          currentPeriodHostingCostUsd: 0,
           currentPeriodBonusCreditsUsd: null,
           isBonusUnlocked: false,
           refillAt: null,
         },
+        isEligibleForFirstMonthPromo: false,
       };
     }
 
@@ -448,11 +482,22 @@ export const kiloPassRouter = createTRPCRouter({
       }
     }
 
-    const currentPeriodUsageUsd = await getCurrentPeriodUsageUsd({
-      kiloUserId: ctx.user.id,
-      startInclusiveIso: usageStartInclusiveIso,
-      endExclusiveIso: nowIso,
-    });
+    const [currentPeriodInferenceUsageUsd, currentPeriodHostingCostUsdValue] = await Promise.all([
+      getCurrentPeriodUsageUsd({
+        kiloUserId: ctx.user.id,
+        startInclusiveIso: usageStartInclusiveIso,
+        endExclusiveIso: nowIso,
+      }),
+      getCurrentPeriodHostingCostUsd({
+        kiloUserId: ctx.user.id,
+        startInclusiveIso: usageStartInclusiveIso,
+        endExclusiveIso: nowIso,
+      }),
+    ]);
+
+    const currentPeriodUsageUsd = roundToCents(
+      currentPeriodInferenceUsageUsd + currentPeriodHostingCostUsdValue
+    );
 
     const refillAt =
       subscriptionBase.cadence === KiloPassCadence.Yearly
@@ -469,10 +514,12 @@ export const kiloPassRouter = createTRPCRouter({
 
         currentPeriodBaseCreditsUsd: baseAmountUsd,
         currentPeriodUsageUsd,
+        currentPeriodHostingCostUsd: currentPeriodHostingCostUsdValue,
         currentPeriodBonusCreditsUsd,
         isBonusUnlocked,
         refillAt,
       },
+      isEligibleForFirstMonthPromo: false,
     };
   }),
 
@@ -507,14 +554,6 @@ export const kiloPassRouter = createTRPCRouter({
         subscription,
         creditsAwarded: issuedBaseCredits.length > 0,
       };
-    }),
-
-  getFirstMonthPromoEligibility: baseProcedure
-    .output(FirstMonthPromoEligibilityOutputSchema)
-    .query(async ({ ctx }) => {
-      const subscription = await getKiloPassStateForUser(db, ctx.user.id);
-
-      return { eligible: !subscription };
     }),
 
   getCustomerPortalUrl: baseProcedure
@@ -824,6 +863,7 @@ export const kiloPassRouter = createTRPCRouter({
         }
 
         const updatedSchedule = await stripe.subscriptionSchedules.update(schedule.id, {
+          metadata: { origin: 'kilo-pass-switch' },
           // We want the subscription to continue normally after the final phase starts.
           // Without this, Stripe may require the last phase to specify `duration`/`end_date`.
           end_behavior: 'release',

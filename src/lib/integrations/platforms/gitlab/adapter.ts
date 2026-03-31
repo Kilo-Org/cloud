@@ -906,6 +906,63 @@ export async function findKiloWebhook(
 }
 
 // ============================================================================
+// Commit Inspection
+// ============================================================================
+
+/**
+ * Checks whether a commit is a merge commit (has 2+ parent IDs).
+ * Used to skip code reviews triggered by "merge base into feature" pushes.
+ * Returns false if the API call fails so the review proceeds (fail-open).
+ */
+export async function isMergeCommit(
+  accessToken: string,
+  projectId: string | number,
+  commitSha: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<boolean> {
+  try {
+    const encodedProjectId =
+      typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+    const response = await fetch(
+      `${instanceUrl}/api/v4/projects/${encodedProjectId}/repository/commits/${commitSha}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      logExceptInTest('[isMergeCommit] GitLab commit fetch failed, proceeding with review:', {
+        status: response.status,
+        projectId,
+        sha: commitSha.substring(0, 8),
+      });
+      return false;
+    }
+
+    const data = (await response.json()) as { parent_ids?: string[] };
+    const result = Array.isArray(data.parent_ids) && data.parent_ids.length > 1;
+
+    logExceptInTest('[isMergeCommit] Checked commit parents', {
+      projectId,
+      sha: commitSha.substring(0, 8),
+      parentCount: data.parent_ids?.length ?? 0,
+      isMergeCommit: result,
+    });
+
+    return result;
+  } catch (error) {
+    logExceptInTest(
+      '[isMergeCommit] Failed to check commit parents, proceeding with review:',
+      error
+    );
+    return false;
+  }
+}
+
+// ============================================================================
 // Merge Request API Functions
 // ============================================================================
 
@@ -1096,6 +1153,84 @@ export async function updateKiloReviewNote(
     mrIid,
     noteId,
   });
+}
+
+/**
+ * Creates a new top-level note on a GitLab MR.
+ */
+export async function createMRNote(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  body: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<void> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  const response = await fetch(
+    `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ body }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`GitLab MR note creation failed: ${response.status} ${error}`);
+  }
+
+  logExceptInTest('[createMRNote] Created note', { projectId, mrIid });
+}
+
+/**
+ * Checks whether a note containing the given marker already exists on a GitLab MR.
+ * Paginates through all notes (consistent with findKiloReviewNote).
+ */
+export async function hasMRNoteWithMarker(
+  accessToken: string,
+  projectId: string | number,
+  mrIid: number,
+  marker: string,
+  instanceUrl: string = DEFAULT_GITLAB_URL
+): Promise<boolean> {
+  const encodedProjectId =
+    typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
+
+  let page = 1;
+  const perPage = 100;
+
+  while (true) {
+    const response = await fetch(
+      `${instanceUrl}/api/v4/projects/${encodedProjectId}/merge_requests/${mrIid}/notes?per_page=${perPage}&page=${page}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`GitLab MR notes fetch failed: ${response.status} ${error}`);
+    }
+
+    const notes = (await response.json()) as Array<{ body: string }>;
+    if (notes.some(n => n.body?.includes(marker))) {
+      return true;
+    }
+
+    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    if (page >= totalPages) break;
+    page++;
+  }
+
+  return false;
 }
 
 /**

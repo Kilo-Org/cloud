@@ -9,6 +9,7 @@ import {
   optionalOrgInput,
 } from '@/lib/integrations/resolve-owner';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 
 export const slackRouter = createTRPCRouter({
@@ -55,6 +56,10 @@ export const slackRouter = createTRPCRouter({
 
   // Uninstall Slack integration
   uninstallApp: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {
+    if (input?.organizationId) {
+      await ensureOrganizationAccess(ctx, input.organizationId);
+      await requireActiveSubscriptionOrTrial(input.organizationId);
+    }
     const owner = await resolveAuthorizedOwner(ctx, input?.organizationId);
     const result = await slackService.uninstallApp(owner);
 
@@ -76,6 +81,7 @@ export const slackRouter = createTRPCRouter({
   testConnection: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
+      await requireActiveSubscriptionOrTrial(input.organizationId);
     }
     const owner = resolveOwner(ctx, input?.organizationId);
     return slackService.testConnection(owner);
@@ -85,6 +91,7 @@ export const slackRouter = createTRPCRouter({
   sendTestMessage: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
+      await requireActiveSubscriptionOrTrial(input.organizationId);
     }
     const owner = resolveOwner(ctx, input?.organizationId);
     return slackService.sendTestMessage(owner);
@@ -99,6 +106,10 @@ export const slackRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+        await requireActiveSubscriptionOrTrial(input.organizationId);
+      }
       const owner = await resolveAuthorizedOwner(ctx, input.organizationId);
       const result = await slackService.updateModel(owner, input.modelSlug);
 
@@ -123,6 +134,10 @@ export const slackRouter = createTRPCRouter({
         code: 'FORBIDDEN',
         message: 'This endpoint is only available in development mode',
       });
+    }
+    if (input?.organizationId) {
+      await ensureOrganizationAccess(ctx, input.organizationId);
+      await requireActiveSubscriptionOrTrial(input.organizationId);
     }
     const owner = await resolveAuthorizedOwner(ctx, input?.organizationId);
     return slackService.removeDbRowOnly(owner);

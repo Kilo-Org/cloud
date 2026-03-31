@@ -11,17 +11,14 @@
     "dev": "wrangler dev --env dev",
     "start": "wrangler dev --env dev",
     "types": "wrangler types",
-    "lint": "pnpm run lint:oxlint && pnpm run lint:eslint:fallback",
-    "lint:oxlint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-webhook-agent-ingest/src",
-    "lint:eslint:fallback": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'",
-    "lint:fix": "eslint --config eslint.config.mjs --cache --fix 'src/**/*.ts'",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-webhook-agent-ingest/src",
     "format": "oxfmt src",
     "format:check": "oxfmt --list-different src",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.workers.config.ts",
     "test:integration:watch": "vitest --config vitest.workers.config.ts",
-    "typecheck": "tsgo --noEmit --incremental false"
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
@@ -34,12 +31,10 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.21",
-    "@kilocode/eslint-config": "workspace:*",
     "@types/node": "^22.19.15",
     "@typescript/native-preview": "catalog:",
     "@vitest/ui": "^3.2.4",
     "drizzle-kit": "catalog:",
-    "eslint": "catalog:",
     "typescript": "catalog:",
     "vitest": "^3.2.4",
     "wrangler": "catalog:"

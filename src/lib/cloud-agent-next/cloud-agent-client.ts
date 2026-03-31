@@ -256,6 +256,12 @@ export type RejectQuestionInput = {
   questionId: string;
 };
 
+export type AnswerPermissionInput = {
+  sessionId: string;
+  permissionId: string;
+  response: 'once' | 'always' | 'reject';
+};
+
 /** Output from health procedure */
 export type HealthOutput = {
   status: string;
@@ -355,6 +361,9 @@ type CloudAgentNextTRPCClient = {
   };
   rejectQuestion: {
     mutate: (input: RejectQuestionInput) => Promise<{ success: boolean }>;
+  };
+  answerPermission: {
+    mutate: (input: AnswerPermissionInput) => Promise<{ success: boolean }>;
   };
 };
 
@@ -608,6 +617,18 @@ export class CloudAgentNextClient {
       captureException(error, {
         tags: { source: 'cloud-agent-next-client', endpoint: 'rejectQuestion' },
         extra: { sessionId: input.sessionId, questionId: input.questionId },
+      });
+      throw error;
+    }
+  }
+
+  async answerPermission(input: AnswerPermissionInput): Promise<{ success: boolean }> {
+    try {
+      return await this.client.answerPermission.mutate(input);
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'answerPermission' },
+        extra: { sessionId: input.sessionId, permissionId: input.permissionId },
       });
       throw error;
     }

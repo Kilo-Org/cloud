@@ -152,8 +152,8 @@ describe('SessionService', () => {
           KILOCODE_ORGANIZATION_ID: 'org',
           KILO_PLATFORM: 'cloud-agent',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
@@ -307,8 +307,8 @@ describe('SessionService', () => {
           KILOCODE_ORGANIZATION_ID: 'org',
           KILO_PLATFORM: 'cloud-agent',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
@@ -1165,8 +1165,8 @@ describe('SessionService', () => {
           KILOCODE_ORGANIZATION_ID: 'org',
           KILO_PLATFORM: 'cloud-agent',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
           API_KEY: 'test-key-123',
           DATABASE_URL: 'postgres://localhost:5432/test',
           NODE_ENV: 'development',
@@ -1270,8 +1270,8 @@ describe('SessionService', () => {
           KILOCODE_ORGANIZATION_ID: 'org',
           KILO_PLATFORM: 'cloud-agent',
           KILOCODE_FEATURE: 'cloud-agent',
-          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
-          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"}},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          OPENCODE_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
+          KILO_CONFIG_CONTENT: `{"permission":{"external_directory":{"*":"deny","/tmp/${sessionId}/**":"allow","/workspace/org/user/sessions/${sessionId}/**":"allow"},"question":"deny"},"provider":{"kilo":{"options":{"apiKey":"token","kilocodeToken":"token","kilocodeOrganizationId":"org"}}},"model":"kilo/test-model"}`,
         },
         cwd: `/workspace/org/user/sessions/${sessionId}`,
       });
@@ -1303,7 +1303,7 @@ describe('SessionService', () => {
       };
     };
 
-    it.each([undefined])(
+    it.each(['cloud-agent-web'])(
       'should NOT include question:deny for interactive platform %s',
       async createdOnPlatform => {
         const { sandbox, sandboxCreateSession } = setupForPlatformTest();

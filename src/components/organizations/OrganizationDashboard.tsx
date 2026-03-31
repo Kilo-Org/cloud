@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { OrganizationInfoCard } from './OrganizationInfoCard';
 import { OrganizationAdminMembers } from './OrganizationMembersCard';
-import { OrganizationUsageSummaryCard } from './OrganizationUsageSummaryCard';
 import { OrganizationDataCollectionCard } from './OrganizationDataCollectionCard';
 import { SeatUsageCard } from './SeatUsageCard';
 import { SSOSignupCard } from './SSOSignupCard';
@@ -154,7 +153,6 @@ export function OrganizationDashboard({
                 )}
               </>
             )}
-            <OrganizationUsageSummaryCard organizationId={organizationId} />
           </div>
           <div className="space-y-8 lg:col-span-2">
             <LockableContainer>

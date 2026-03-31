@@ -4,7 +4,6 @@ import type { OpenRouterModel } from '@/lib/providers/openrouter/openrouter-type
 import { OpenRouterModel as OpenRouterModelSchema } from '@/lib/providers/openrouter/openrouter-types';
 import { mockDataRng as rng, randomChoice, randomBoolean, randomInt } from './random';
 import {
-  COMPANY_TYPES,
   MODELS,
   PROVIDER_DESCRIPTION_ADJECTIVES,
   PROVIDER_HEADQUARTERS,

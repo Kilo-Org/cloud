@@ -148,9 +148,20 @@ export const KiloClawSubscriptionStatus = {
 export type KiloClawSubscriptionStatus =
   (typeof KiloClawSubscriptionStatus)[keyof typeof KiloClawSubscriptionStatus];
 
+export const KiloClawPaymentSource = {
+  Stripe: 'stripe',
+  Credits: 'credits',
+} as const;
+
+export type KiloClawPaymentSource =
+  (typeof KiloClawPaymentSource)[keyof typeof KiloClawPaymentSource];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.reassociate',
+  'kiloclaw.snapshot.restore',
+  'kiloclaw.subscription.update_trial_end',
+  'kiloclaw.subscription.reset_trial',
   'kiloclaw.machine.start',
   'kiloclaw.machine.stop',
   'kiloclaw.instance.destroy',
@@ -159,6 +170,7 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.gateway.restart',
   'kiloclaw.config.restore',
   'kiloclaw.doctor.run',
+  'kiloclaw.machine.destroy_fly',
 ]);
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
@@ -279,6 +291,7 @@ export type AuthProviderId =
   | 'github'
   | 'gitlab'
   | 'linkedin'
+  | 'discord'
   | 'fake-login'
   | 'workos';
 
@@ -815,15 +828,15 @@ export const VerbositySchema = z.enum(['low', 'medium', 'high', 'max']);
 
 export type Verbosity = z.infer<typeof VerbositySchema>;
 
-export const ReasoningEffortSchema = z.enum(['none', 'low', 'medium', 'high', 'xhigh']);
+export const ReasoningEffortSchema = z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
 
 export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
 
 export const CustomLlmProviderSchema = z.enum([
-  'anthropic',
-  'openai',
-  'openai-compatible',
-  'openrouter',
+  'anthropic', // uses Messages API
+  'openai', // uses Responses API
+  'openai-compatible', // uses Chat Completions API with reasoning_content
+  'openrouter', // uses Chat Completions API with reasoning_details
 ]);
 
 export type CustomLlmProvider = z.infer<typeof CustomLlmProviderSchema>;
@@ -902,3 +915,23 @@ export type StripeSubscriptionStatus =
   | 'canceled'
   | 'unpaid'
   | 'paused';
+
+// --- Code review terminal reasons ---
+
+/**
+ * Valid values for cloud_agent_code_reviews.terminal_reason.
+ * KEEP IN SYNC with CloudAgentTerminalReason in
+ * packages/worker-utils/src/cloud-agent-next-client.ts — both lists must
+ * contain the same literal values.
+ */
+export const CODE_REVIEW_TERMINAL_REASONS = [
+  'billing',
+  'user_cancelled',
+  'superseded',
+  'interrupted',
+  'timeout',
+  'upstream_error',
+  'unknown',
+] as const;
+
+export type CodeReviewTerminalReason = (typeof CODE_REVIEW_TERMINAL_REASONS)[number];

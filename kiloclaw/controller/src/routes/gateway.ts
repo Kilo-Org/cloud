@@ -1,6 +1,18 @@
+import os from 'node:os';
 import type { Hono } from 'hono';
 import { timingSafeTokenEqual } from '../auth';
 import type { Supervisor } from '../supervisor';
+
+// shared-cpu-2x gives ~6% of 2 physical cores, so even modest load
+// averages represent heavy pressure. After boot completes, an idle
+// system sits near 0. A threshold of 0.1 ensures boot CPU work has
+// fully subsided before we tell the frontend it's safe to proceed.
+const LOAD_SETTLED_THRESHOLD = 0.1;
+
+function loadFields(): { loadAverage: number[]; settled: boolean } {
+  const loadAverage = os.loadavg();
+  return { loadAverage, settled: loadAverage[0] < LOAD_SETTLED_THRESHOLD };
+}
 
 export function getBearerToken(header: string | undefined): string | null {
   if (!header) return null;
@@ -55,6 +67,30 @@ export function registerGatewayRoutes(
     } catch (error) {
       console.error('[controller] /_kilo/gateway/stop failed:', error);
       return c.json({ error: 'Failed to stop gateway' }, 500);
+    }
+  });
+
+  app.get('/_kilo/gateway/ready', async c => {
+    if (supervisor.getState() !== 'running') {
+      return c.json({ ready: false, error: 'Gateway not running', ...loadFields() }, 503);
+    }
+    try {
+      const res = await fetch('http://127.0.0.1:3001/ready');
+      const body = await res.text();
+      let json: unknown;
+      try {
+        json = JSON.parse(body);
+      } catch {
+        json = { raw: body };
+      }
+      const envelope =
+        typeof json === 'object' && json !== null
+          ? { ...json, ...loadFields() }
+          : { raw: json, ...loadFields() };
+      return c.json(envelope, res.ok ? 200 : 503);
+    } catch (error) {
+      console.error('[controller] /_kilo/gateway/ready failed:', error);
+      return c.json({ ready: false, error: 'Failed to reach gateway', ...loadFields() }, 502);
     }
   });
 

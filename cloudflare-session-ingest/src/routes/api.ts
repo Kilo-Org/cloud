@@ -8,6 +8,7 @@ import type { Env } from '../env';
 import { zodJsonValidator, withDORetry } from '@kilocode/worker-utils';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
+import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { getSessionExport } from '../services/session-export';
 import type { IngestQueueMessage } from '../queue-consumer';
 
@@ -316,4 +317,39 @@ api.post('/session/:sessionId/unshare', async c => {
     );
 
   return c.json({ success: true }, 200);
+});
+
+api.get('/sessions/active', async c => {
+  const kiloUserId = c.get('user_id');
+  const stub = getUserConnectionDO(c.env, { kiloUserId });
+  const sessions = await stub.getActiveSessions();
+  return c.json({ sessions }, 200);
+});
+
+// CLI connects to /api/user/cli without userId in the path — userId comes from the JWT.
+api.get('/user/cli', async c => {
+  if (c.req.header('Upgrade') !== 'websocket') {
+    return c.json({ success: false, error: 'Expected WebSocket upgrade' }, 426);
+  }
+
+  const kiloUserId = c.get('user_id');
+  const stub = getUserConnectionDO(c.env, { kiloUserId });
+  const wsUrl = new URL(c.req.url);
+  wsUrl.pathname = '/cli';
+
+  return stub.fetch(new Request(wsUrl.toString(), c.req.raw));
+});
+
+// Web UI connects to /api/user/web without userId in the path — userId comes from the JWT.
+api.get('/user/web', async c => {
+  if (c.req.header('Upgrade') !== 'websocket') {
+    return c.json({ success: false, error: 'Expected WebSocket upgrade' }, 426);
+  }
+
+  const kiloUserId = c.get('user_id');
+  const stub = getUserConnectionDO(c.env, { kiloUserId });
+  const wsUrl = new URL(c.req.url);
+  wsUrl.pathname = '/web';
+
+  return stub.fetch(new Request(wsUrl.toString(), c.req.raw));
 });

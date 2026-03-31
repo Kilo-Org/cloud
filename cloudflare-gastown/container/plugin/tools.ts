@@ -78,6 +78,38 @@ export function createTools(client: GastownClient) {
       },
     }),
 
+    gt_request_changes: tool({
+      description:
+        'Request changes on the code you are reviewing. This creates a rework task ' +
+        'for a polecat to address your feedback. After calling this, call gt_done to ' +
+        'release your session. The polecat will push fixes to the same branch, and ' +
+        'you will be re-dispatched to re-review once the rework is complete. ' +
+        'Only available to refinery agents.',
+      args: {
+        feedback: tool.schema
+          .string()
+          .describe(
+            'Detailed description of what needs to change. Be specific: ' +
+              'reference file names, function names, and the exact issues found.'
+          ),
+        files: tool.schema
+          .array(tool.schema.string())
+          .describe('Optional list of specific file paths that need changes')
+          .optional(),
+      },
+      async execute(args) {
+        const result = await client.requestChanges({
+          feedback: args.feedback,
+          files: args.files,
+        });
+        return (
+          `Rework request created (bead ${result.rework_bead_id}). ` +
+          'A polecat will be assigned to address your feedback. ' +
+          'Call gt_done now to release your session. You will be re-dispatched to re-review once the rework is complete.'
+        );
+      },
+    }),
+
     gt_mail_send: tool({
       description:
         'Send a typed message to another agent in the rig. ' +

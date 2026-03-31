@@ -136,7 +136,7 @@ export function AppBuilderProjectDetail({ projectId }: { projectId: string }) {
                 <div className="text-muted-foreground text-xs">Owner</div>
                 {project.owned_by_user_id ? (
                   <Link
-                    href={`/admin/users/${project.owned_by_user_id}`}
+                    href={`/admin/users/${encodeURIComponent(project.owned_by_user_id)}`}
                     className="text-sm text-blue-600 hover:underline"
                   >
                     {project.owner_email ?? project.owned_by_user_id}
@@ -266,7 +266,7 @@ export function AppBuilderProjectDetail({ projectId }: { projectId: string }) {
               <div>
                 <div className="text-muted-foreground text-xs">Created By User ID</div>
                 <Link
-                  href={`/admin/users/${project.created_by_user_id}`}
+                  href={`/admin/users/${encodeURIComponent(project.created_by_user_id)}`}
                   className="text-sm text-blue-600 hover:underline"
                 >
                   {project.created_by_user_id}

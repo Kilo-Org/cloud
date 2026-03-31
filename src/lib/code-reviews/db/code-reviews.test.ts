@@ -113,4 +113,20 @@ describe('findPreviousCompletedReview', () => {
     expect(result!.head_sha).toBe('sha-legacy-newest');
     expect(result!.session_id).toBeNull();
   });
+
+  it('persists terminal_reason for failed reviews', async () => {
+    const id = await createReview('sha-billing');
+    await updateCodeReviewStatus(id, 'failed', {
+      errorMessage: 'Insufficient credits: add credits to continue',
+      terminalReason: 'billing',
+    });
+
+    const [review] = await db
+      .select({ terminalReason: cloud_agent_code_reviews.terminal_reason })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, id))
+      .limit(1);
+
+    expect(review?.terminalReason).toBe('billing');
+  });
 });

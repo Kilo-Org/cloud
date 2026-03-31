@@ -75,6 +75,14 @@ export const SendMessageRequest = z.object({
 });
 export type SendMessageRequest = z.infer<typeof SendMessageRequest>;
 
+export const UpdateAgentModelRequest = z.object({
+  model: z.string().min(1),
+  smallModel: z.string().optional(),
+  /** Pre-formatted conversation history to inject into the new session prompt. */
+  conversationHistory: z.string().optional(),
+});
+export type UpdateAgentModelRequest = z.infer<typeof UpdateAgentModelRequest>;
+
 // ── Agent lifecycle ─────────────────────────────────────────────────────
 
 export const AgentStatus = z.enum(['starting', 'running', 'stopping', 'exited', 'failed']);
@@ -103,6 +111,10 @@ export type ManagedAgent = {
   workdir: string;
   startedAt: string;
   lastActivityAt: string;
+  /** Event type of the most recent SDK event (e.g. 'message_part.updated') */
+  lastEventType: string | null;
+  /** ISO 8601 timestamp of the most recent SDK event */
+  lastEventAt: string | null;
   /** Last known active tool calls (populated from SSE events) */
   activeTools: string[];
   /** Total messages sent to this agent */
@@ -119,6 +131,8 @@ export type ManagedAgent = {
   completionCallbackUrl: string | null;
   /** Model ID used for this agent's sessions (e.g. "anthropic/claude-sonnet-4.6") */
   model: string | null;
+  /** Full env dict from buildAgentEnv, stored so model hot-swap can replay it. */
+  startupEnv: Record<string, string>;
 };
 
 export type AgentStatusResponse = {
@@ -299,6 +313,11 @@ export type HeartbeatPayload = {
   townId: string;
   status: AgentStatus;
   timestamp: string;
+  // SDK activity watermark
+  lastEventType: string | null;
+  lastEventAt: string | null;
+  activeTools: string[];
+  messageCount: number;
 };
 
 // ── Stream ticket (for WebSocket streaming) ─────────────────────────────

@@ -19,10 +19,20 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DollarSign, Activity, Hash, Users, Calculator, Sparkles } from 'lucide-react';
+import {
+  DollarSign,
+  Activity,
+  Hash,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Users,
+  Calculator,
+  Sparkles,
+} from 'lucide-react';
 
 // Import our extracted modules
 import type { ChartSplitBy } from './types';
+import type { OrganizationUsageMetric } from './FormattedValue';
 import { useUsageFilters } from './hooks/useUsageFilters';
 import { useDateRangeFromPeriod } from './hooks/useDateRangeFromPeriod';
 import { useProcessedMetrics } from './hooks/useProcessedMetrics';
@@ -38,6 +48,17 @@ import { OrganizationAdminContextProvider } from '@/components/organizations/Org
 
 // Chart color constant
 const CHART_COLOR = '#3b82f6';
+
+// Maps internal camelCase metric keys to the snake_case keys used by FiltersSection
+const METRIC_KEY_TO_FILTER_METRIC: Record<string, OrganizationUsageMetric> = {
+  cost: 'cost',
+  requests: 'requests',
+  avgCost: 'avg_cost_per_req',
+  tokens: 'tokens',
+  inputTokens: 'input_tokens',
+  outputTokens: 'output_tokens',
+  users: 'active_users',
+};
 
 export function OrganizationUsageDetailsPage({ organizationId }: { organizationId: string }) {
   return (
@@ -85,7 +106,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
 
   // Fetch autocomplete metrics
   const { data: autocompleteMetrics, isLoading: isLoadingAutocompleteMetrics } =
-    useOrganizationAutocompleteMetrics(organizationId);
+    useOrganizationAutocompleteMetrics(organizationId, timePeriod);
 
   // Apply filters using custom hook
   const {
@@ -118,7 +139,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
           <FormattedMicrodollars
             microdollars={metricsTotals.cost}
             decimalPlaces={2}
-            className="text-2xl font-bold"
+            className="text-xl font-bold"
           />
         ),
         chartType: 'line' as const,
@@ -131,7 +152,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
         key: 'requests',
         title: 'Total Requests',
         value: (
-          <span className="text-2xl font-bold">{formatLargeNumber(metricsTotals.requests)}</span>
+          <span className="text-xl font-bold">{formatLargeNumber(metricsTotals.requests)}</span>
         ),
         chartType: 'line' as const,
         data: convertTimeseriesData(metricsTimeseriesData.requests),
@@ -141,11 +162,11 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
       },
       {
         key: 'avgCost',
-        title: 'Avg Cost per Request',
+        title: 'Avg Cost/Req',
         value: (
           <FormattedMicrodollars
             microdollars={metricsTotals.avg_cost_per_req}
-            className="text-2xl font-bold"
+            className="text-xl font-bold"
           />
         ),
         chartType: 'line' as const,
@@ -157,9 +178,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
       {
         key: 'tokens',
         title: 'Total Tokens',
-        value: (
-          <span className="text-2xl font-bold">{formatLargeNumber(metricsTotals.tokens)}</span>
-        ),
+        value: <span className="text-xl font-bold">{formatLargeNumber(metricsTotals.tokens)}</span>,
         chartType: 'line' as const,
         data: convertTimeseriesData(metricsTimeseriesData.tokens),
         icon: Hash,
@@ -167,10 +186,36 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
         loading: metricsLoading.includes('tokens'),
       },
       {
+        key: 'inputTokens',
+        title: 'Input Tokens',
+        value: (
+          <span className="text-xl font-bold">{formatLargeNumber(metricsTotals.input_tokens)}</span>
+        ),
+        chartType: 'line' as const,
+        data: convertTimeseriesData(metricsTimeseriesData.input_tokens),
+        icon: ArrowDownToLine,
+        color: CHART_COLOR,
+        loading: metricsLoading.includes('input_tokens'),
+      },
+      {
+        key: 'outputTokens',
+        title: 'Output Tokens',
+        value: (
+          <span className="text-xl font-bold">
+            {formatLargeNumber(metricsTotals.output_tokens)}
+          </span>
+        ),
+        chartType: 'line' as const,
+        data: convertTimeseriesData(metricsTimeseriesData.output_tokens),
+        icon: ArrowUpFromLine,
+        color: CHART_COLOR,
+        loading: metricsLoading.includes('output_tokens'),
+      },
+      {
         key: 'users',
         title: 'Active Users',
         value: (
-          <span className="text-2xl font-bold">
+          <span className="text-xl font-bold">
             {formatLargeNumber(Math.round(metricsTotals.active_users))}
           </span>
         ),
@@ -182,6 +227,15 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
       },
     ];
   }, [metricsTimeseriesData, metricsTotals, metricsLoading]);
+
+  const handleMetricChange = (metric: string) => {
+    setSelectedMetric(metric);
+    // Clear tokenType split when switching away from 'tokens' since
+    // the Input/Output toggle is only available for the 'tokens' metric.
+    if (metric !== 'tokens') {
+      setChartSplitBy(prev => (prev.tokenType ? { ...prev, tokenType: false } : prev));
+    }
+  };
 
   // CSV export handler
   const handleExport = () => {
@@ -214,7 +268,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
             adoption={adoption}
             metrics={metricsData}
             selectedMetric={selectedMetric}
-            onMetricChange={setSelectedMetric}
+            onMetricChange={handleMetricChange}
             timeseriesData={filteredTimeseriesData}
             chartSplitBy={chartSplitBy}
             onChartSplitByChange={setChartSplitBy}
@@ -235,7 +289,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
+                  <div className="text-xl font-bold">
                     {isLoadingAutocompleteMetrics ? (
                       <Skeleton className="h-8 w-16" />
                     ) : (
@@ -252,7 +306,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
+                  <div className="text-xl font-bold">
                     {isLoadingAutocompleteMetrics ? (
                       <Skeleton className="h-8 w-20" />
                     ) : (
@@ -269,7 +323,7 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
+                  <div className="text-xl font-bold">
                     {isLoadingAutocompleteMetrics ? (
                       <Skeleton className="h-8 w-16" />
                     ) : (
@@ -284,19 +338,12 @@ export function OrganizationUsageDetails({ organizationId }: { organizationId: s
           {(timeseriesResponse?.timeseries?.length ?? 0) > 0 && (
             <div className="mt-8">
               <FiltersSection
-                selectedMetric={
-                  selectedMetric === 'avgCost'
-                    ? 'avg_cost_per_req'
-                    : selectedMetric === 'users'
-                      ? 'active_users'
-                      : (selectedMetric as 'cost' | 'requests' | 'tokens')
-                }
+                selectedMetric={METRIC_KEY_TO_FILTER_METRIC[selectedMetric] ?? 'cost'}
                 timeseriesData={timeseriesResponse?.timeseries || []}
                 filteredTimeseriesData={filteredTimeseriesData}
                 activeFilters={activeFilters}
                 onFilter={handleFilter}
                 onExclude={handleExclude}
-                className=""
               />
             </div>
           )}

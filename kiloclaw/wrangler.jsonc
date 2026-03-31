@@ -57,6 +57,33 @@
       "id": "1f406d747ead4a5896b750c1000973e0",
     },
   ],
+  "analytics_engine_datasets": [
+    { "binding": "KILOCLAW_AE", "dataset": "kiloclaw_events" },
+    {
+      "binding": "KILOCLAW_CONTROLLER_AE",
+      "dataset": "kiloclaw_controller_telemetry",
+    },
+  ],
+
+  // Cloudflare Queue for async snapshot restore orchestration.
+  // Queues must be created before first deploy:
+  //   npx wrangler queues create kiloclaw-snapshot-restore
+  //   npx wrangler queues create kiloclaw-snapshot-restore-dlq
+  // Local dev (wrangler dev) simulates queues in-memory automatically.
+  "queues": {
+    "producers": [{ "queue": "kiloclaw-snapshot-restore", "binding": "SNAPSHOT_RESTORE_QUEUE" }],
+    "consumers": [
+      {
+        "queue": "kiloclaw-snapshot-restore",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 2,
+        "max_concurrency": 2,
+        "dead_letter_queue": "kiloclaw-snapshot-restore-dlq",
+      },
+    ],
+  },
+
   // Hyperdrive binding for Postgres (pepper validation, instance registry)
   "hyperdrive": [
     {
@@ -70,13 +97,17 @@
     "FLY_REGISTRY_APP": "kiloclaw-machines", // Shared Docker image registry
     "FLY_ORG_SLUG": "kilo-679", // Org for creating per-user Fly apps
     "FLY_IMAGE_TAG": "latest",
-    "FLY_REGION": "dfw,ewr,lax,sjc,eu",
+    "FLY_REGION": "eu,us",
+    "BACKEND_API_URL": "https://app.kilo.ai",
     "OPENCLAW_ALLOWED_ORIGINS": "https://claw.kilosessions.ai,https://kilo.ai,https://www.kilo.ai",
+    "KILOCLAW_CHECKIN_URL": "https://claw.kilosessions.ai/api/controller/checkin",
     "REQUIRE_PROXY_TOKEN": "true",
     // Proactive API key refresh: trigger when key expires within this many hours. Default: 72 (3 days).
     "PROACTIVE_REFRESH_THRESHOLD_HOURS": "72",
     // Defaults to "production". For local dev, override to "development" in .dev.vars.
     "WORKER_ENV": "production",
+    // PostHog product telemetry (public project token, safe to commit).
+    "NEXT_PUBLIC_POSTHOG_KEY": "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z",
   },
   // Secrets (set via wrangler secret put):
   // FLY_API_TOKEN,

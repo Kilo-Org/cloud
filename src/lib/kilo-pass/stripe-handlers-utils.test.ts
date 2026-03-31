@@ -265,7 +265,6 @@ describe('getInvoiceSubscription', () => {
     // Should return the freshly fetched subscription, not the embedded one
     expect(result).toBe(freshSubscription);
     expect(result?.status).toBe('canceled');
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockStripe.subscriptions.retrieve).toHaveBeenCalledWith('sub_123');
   });
 
@@ -292,7 +291,6 @@ describe('getInvoiceSubscription', () => {
 
     const result = await getInvoiceSubscription({ invoice, stripe: mockStripe });
     expect(result).toBe(subscriptionObject);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockStripe.subscriptions.retrieve).toHaveBeenCalledWith('sub_123');
   });
 });

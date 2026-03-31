@@ -383,7 +383,8 @@ export function useSignInFlow({
     }
 
     try {
-      const result = await sendMagicLink(email);
+      const callbackUrl = getSignInCallbackUrl(params);
+      const result = await sendMagicLink(email, callbackUrl);
       if (result.success) {
         saveHint({
           lastEmail: email,
@@ -401,7 +402,7 @@ export function useSignInFlow({
       });
       setError('Failed to send magic link. Please try again.');
     }
-  }, [email, saveHint]);
+  }, [email, params, saveHint]);
 
   const handleTurnstileSuccess = useCallback(
     async (token: string) => {

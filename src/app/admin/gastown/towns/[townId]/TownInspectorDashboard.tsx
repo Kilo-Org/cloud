@@ -51,9 +51,14 @@ export function TownInspectorDashboard({ townId }: { townId: string }) {
           <h1 className="text-2xl font-semibold">Town Inspector</h1>
           <p className="text-muted-foreground font-mono text-sm">{townId}</p>
         </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/admin/gastown/towns/${townId}/audit`}>Audit Log</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/gastown/${townId}`}>View Town UI</Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/admin/gastown/towns/${townId}/audit`}>Audit Log</Link>
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={onTabChange}>

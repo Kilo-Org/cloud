@@ -18,12 +18,26 @@ export async function requireActiveSubscriptionOrTrial(
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
   }
 
+  // Orgs that don't require seats bypass all trial/subscription enforcement
+  if (!organization.require_seats) {
+    return { isReadOnly: false, daysRemaining: Infinity };
+  }
+
   // Check for active subscription by looking at organization_seats_purchases table
   const latestPurchase = await getMostRecentSeatPurchase(organizationId);
   const hasActiveSubscription = latestPurchase?.subscription_status === 'active';
 
-  // If there's an active subscription, organization is in good standing
-  if (hasActiveSubscription || !organization.require_seats) {
+  if (hasActiveSubscription) {
+    return { isReadOnly: false, daysRemaining: Infinity };
+  }
+
+  // OSS sponsorship participants are exempt from trial expiration (Free Trial 9)
+  if (organization.settings.oss_sponsorship_tier != null) {
+    return { isReadOnly: false, daysRemaining: Infinity };
+  }
+
+  // Suppressed trial messaging orgs are treated as subscribed (Free Trial 10)
+  if (organization.settings.suppress_trial_messaging) {
     return { isReadOnly: false, daysRemaining: Infinity };
   }
 
@@ -33,7 +47,7 @@ export async function requireActiveSubscriptionOrTrial(
   );
   const state = getOrgTrialStatusFromDays(daysRemaining);
 
-  // Hard lock block all mutations
+  // Hard lock blocks all mutations
   if (state === 'trial_expired_hard') {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Organization trial has expired.' });
   }

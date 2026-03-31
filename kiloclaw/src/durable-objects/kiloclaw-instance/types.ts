@@ -41,6 +41,7 @@ export type InstanceMutableState = {
   loaded: boolean;
   userId: string | null;
   sandboxId: string | null;
+  orgId: string | null;
   status: InstanceStatus | null;
   envVars: PersistedState['envVars'];
   encryptedSecrets: PersistedState['encryptedSecrets'];
@@ -51,6 +52,8 @@ export type InstanceMutableState = {
   googleCredentials: GoogleCredentials | null;
   provisionedAt: number | null;
   startingAt: number | null;
+  restartingAt: number | null;
+  restartUpdateSent: boolean;
   lastStartedAt: number | null;
   lastStoppedAt: number | null;
   flyAppName: string | null;
@@ -73,15 +76,29 @@ export type InstanceMutableState = {
   lastDestroyErrorAt: number | null;
   lastStartErrorMessage: string | null;
   lastStartErrorAt: number | null;
+  lastRestartErrorMessage: string | null;
+  lastRestartErrorAt: number | null;
   lastBoundMachineRecoveryAt: number | null;
   instanceFeatures: string[];
   gmailNotificationsEnabled: boolean;
   gmailLastHistoryId: string | null;
   gmailPushOidcEmail: string | null;
+  execSecurity: string | null;
+  execAsk: string | null;
+  // Snapshot restore tracking
+  previousVolumeId: string | null;
+  restoreStartedAt: string | null;
+  preRestoreStatus: InstanceStatus | null;
+  pendingRestoreVolumeId: string | null;
+  instanceReadyEmailSent: boolean;
+  customSecretMeta: PersistedState['customSecretMeta'];
+  // Stream Chat default channel (auto-provisioned)
+  streamChatApiKey: string | null;
+  streamChatBotUserId: string | null;
+  streamChatBotUserToken: string | null;
+  streamChatChannelId: string | null;
   /** In-memory only — throttles live Fly checks in getStatus(). */
   lastLiveCheckAt: number | null;
-  /** In-memory only — guards syncStatusFromLiveCheck during restartMachine. */
-  restartingAt: number | null;
 };
 
 /**

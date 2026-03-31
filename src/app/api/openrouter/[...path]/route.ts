@@ -3,7 +3,12 @@ import { type NextRequest } from 'next/server';
 import { isOpenCodeBasedClient, isRooCodeBasedClient, stripRequiredPrefix } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/providerHash';
 import { extractPromptInfo as extractChatCompletionsPromptInfo } from '@/lib/processUsage';
-import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
+import {
+  validateFeatureHeader,
+  FEATURE_HEADER,
+  isUserRateLimitedFeature,
+  type FeatureValue,
+} from '@/lib/feature-detection';
 import type {
   OpenRouterChatCompletionRequest,
   GatewayResponsesRequest,
@@ -20,10 +25,10 @@ import {
   isDataCollectionRequiredOnKiloCodeOnly,
   isDeadFreeModel,
   isKiloFreeModel,
+  isKiloStealthModel,
 } from '@/lib/models';
 import {
   accountForMicrodollarUsage,
-  alphaPeriodEndedResponse,
   captureProxyError,
   checkOrganizationModelRestrictions,
   dataCollectionRequiredResponse,
@@ -37,6 +42,8 @@ import {
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
   forbiddenFreeModelResponse,
+  storeAndPreviousResponseIdIsNotSupported,
+  apiKindNotSupportedResponse,
 } from '@/lib/llm-proxy-helpers';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
@@ -53,28 +60,32 @@ import {
 } from '@/lib/anonymous';
 import {
   checkFreeModelRateLimit,
+  checkFreeModelRateLimitByUser,
   logFreeModelRequest,
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
+import { handleRequestLogging } from '@/lib/handleRequestLogging';
 import { classifyAbuse } from '@/lib/abuse-service';
 import {
   emitApiMetricsForResponse,
   getToolsAvailable,
   getToolsUsed,
 } from '@/lib/o11y/api-metrics.server';
-import { handleRequestLogging } from '@/lib/handleRequestLogging';
-import { customLlmRequest } from '@/lib/custom-llm/customLlmRequest';
+import { grokCodeFastOptimizedRequest } from '@/lib/custom-llm/customLlmRequest';
 import { normalizeModelId } from '@/lib/model-utils';
 import { isForbiddenFreeModel } from '@/lib/forbidden-free-models';
-import { isActiveReviewPromo } from '@/lib/code-reviews/core/constants';
+import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import { applyResolvedAutoModel, isKiloAutoModel } from '@/lib/kilo-auto-model';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/providers/fixOpenCodeDuplicateReasoning';
 import type { MicrodollarUsageContext, PromptInfo } from '@/lib/processUsage.types';
 import { extractResponsesPromptInfo } from '@/lib/processUsage.responses';
 import { extractMessagesPromptInfo } from '@/lib/processUsage.messages';
-import { getMaxTokens, hasMiddleOutTransform } from '@/lib/providers/openrouter/request-helpers';
-import { isKiloAffiliatedUser } from '@/lib/isKiloAffiliatedUser';
+import {
+  fixResponsesRequest,
+  getMaxTokens,
+  hasMiddleOutTransform,
+} from '@/lib/providers/openrouter/request-helpers';
 
 export const maxDuration = 800;
 
@@ -89,6 +100,8 @@ function validatePath(
   | { path: '/chat/completions' | '/responses' | '/messages' }
   | { errorResponse: ReturnType<typeof invalidPathResponse> } {
   const pathSuffix =
+    stripRequiredPrefix(url.pathname, '/api/gateway/v1') ??
+    stripRequiredPrefix(url.pathname, '/api/openrouter/v1') ??
     stripRequiredPrefix(url.pathname, '/api/gateway') ??
     stripRequiredPrefix(url.pathname, '/api/openrouter');
 
@@ -110,6 +123,33 @@ function extractPromptInfo(requestBodyParsed: GatewayRequest): PromptInfo {
     return extractResponsesPromptInfo(requestBodyParsed.body);
   }
   return extractChatCompletionsPromptInfo(requestBodyParsed.body);
+}
+
+async function resolveRateLimit(
+  feature: FeatureValue | null,
+  ipAddress: string,
+  authPromise: Promise<{ user: { id: string } | null }>
+): Promise<
+  | NextResponseType<unknown>
+  | { result: { allowed: boolean; requestCount: number }; subject: string }
+> {
+  if (isUserRateLimitedFeature(feature) && isCloudflareIP(ipAddress)) {
+    const { user } = await authPromise;
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Authentication required for this feature' },
+        { status: 401 }
+      );
+    }
+    return {
+      result: await checkFreeModelRateLimitByUser(user.id),
+      subject: `user: ${user.id}`,
+    };
+  }
+  return {
+    result: await checkFreeModelRateLimit(ipAddress),
+    subject: `ip address: ${ipAddress}`,
+  };
 }
 
 export async function POST(request: NextRequest): Promise<NextResponseType<unknown>> {
@@ -139,7 +179,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestBodyParsed = { kind: 'messages', body };
     } else {
       const body: GatewayResponsesRequest = JSON.parse(requestBodyText);
-      body.store = false;
       requestBodyParsed = { kind: 'responses', body };
     }
   } catch (e) {
@@ -166,11 +205,24 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     request.headers.get(FEATURE_HEADER) || (isLegacyOpenRouterPath ? '' : 'direct-gateway')
   );
 
+  const authPromise = getUserFromAuth({ adminOnly: false });
+  const balanceAndSettingsPromise = authPromise.then(res =>
+    res.user
+      ? getBalanceAndOrgSettings(res.organizationId, res.user)
+      : { balance: 0, settings: undefined, plan: undefined }
+  );
+
   const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
   let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
-    applyResolvedAutoModel(requestedModelLowerCased, requestBodyParsed, modeHeader, feature);
+    await applyResolvedAutoModel(
+      requestedModelLowerCased,
+      requestBodyParsed,
+      modeHeader,
+      feature,
+      balanceAndSettingsPromise.then(res => res.balance)
+    );
   }
 
   const originalModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
@@ -181,14 +233,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return NextResponse.json({ error: 'Unable to determine client IP' }, { status: 400 });
   }
 
-  // For FREE models: check IP rate limit BEFORE auth, log at start
-  // Slackbot-only models are exempt from free model rate limits since they're
-  // already gated behind the Slack integration (internalApiUse auth).
+  // For FREE models: check rate limit, log at start.
+  // Server-side products (cloud-agent, code-review, app-builder) rate-limit
+  // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
+  // All other products rate-limit per IP (fast pre-auth path).
   if (isKiloFreeModel(originalModelIdLowerCased)) {
-    const rateLimitResult = await checkFreeModelRateLimit(ipAddress);
-    if (!rateLimitResult.allowed) {
+    const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
+    if (rateLimit instanceof NextResponse) return rateLimit;
+
+    if (!rateLimit.result.allowed) {
       console.warn(
-        `Free model rate limit exceeded, ip address: ${ipAddress}, model: ${originalModelIdLowerCased}, request count: ${rateLimitResult.requestCount}`
+        `Free model rate limit exceeded, ${rateLimit.subject}, model: ${originalModelIdLowerCased}, request count: ${rateLimit.result.requestCount}`
       );
       return NextResponse.json(
         {
@@ -209,7 +264,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     organizationId: authOrganizationId,
     botId: authBotId,
     tokenSource: authTokenSource,
-  } = await getUserFromAuth({ adminOnly: false });
+  } = await authPromise;
   authSpan.end();
 
   let user: typeof maybeUser | AnonymousUserContext;
@@ -265,17 +320,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   if (
-    ['messages', 'responses'].includes(requestBodyParsed.kind) &&
-    !isKiloAffiliatedUser(maybeUser, organizationId ?? null)
+    requestBodyParsed.kind === 'responses' &&
+    (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
   ) {
-    return NextResponse.json(
-      {
-        error: {
-          message: `The ${requestBodyParsed.kind} API is experimental and not yet available to all users.`,
-        },
-      },
-      { status: 403 }
-    );
+    return storeAndPreviousResponseIdIsNotSupported();
   }
 
   // Log to free_model_usage for rate limiting (at request start, before processing)
@@ -290,13 +338,16 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Use new shared helper for fraud & project headers
   const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
-  const { provider, userByok, customLlm } = await getProvider(
+  const { provider, userByok, bypassAccessCheck } = await getProvider(
     originalModelIdLowerCased,
-    requestBodyParsed.body,
+    requestBodyParsed,
     user,
     organizationId,
     taskId
   );
+  if (!provider.supportedChatApis.includes(requestBodyParsed.kind)) {
+    return apiKindNotSupportedResponse(requestBodyParsed.kind, provider.supportedChatApis);
+  }
 
   console.debug(`Routing request to ${provider.id}`);
 
@@ -325,11 +376,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     (!autoModel && isForbiddenFreeModel(originalModelIdLowerCased))
   ) {
     console.warn(`User requested forbidden free model ${originalModelIdLowerCased}; rejecting.`);
-    if (isRooCodeBasedClient(fraudHeaders)) {
-      return alphaPeriodEndedResponse();
-    } else {
-      return forbiddenFreeModelResponse();
-    }
+    return forbiddenFreeModelResponse(fraudHeaders, feature);
   }
 
   // Extract properties for usage context
@@ -365,17 +412,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   setTag('ui.ai_model', requestBodyParsed.body.model);
 
   // Skip balance/org checks for anonymous users - they can only use free models
-  const bypassAccessCheckForCustomLlm =
-    !!customLlm && !!organizationId && customLlm.organization_ids.includes(organizationId);
-  if (!isAnonymousContext(user) && !bypassAccessCheckForCustomLlm) {
-    const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
+  if (!isAnonymousContext(user) && !bypassAccessCheck) {
+    const { balance, settings, plan } = await balanceAndSettingsPromise;
 
-    if (
-      balance <= 0 &&
-      !isFreeModel(originalModelIdLowerCased) &&
-      !userByok &&
-      !isActiveReviewPromo(botId, originalModelIdLowerCased)
-    ) {
+    if (balance <= 0 && !isFreeModel(originalModelIdLowerCased) && !userByok) {
       return await usageLimitExceededResponse(user, balance);
     }
 
@@ -425,6 +465,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
+  if (requestBodyParsed.kind === 'responses') {
+    fixResponsesRequest(requestBodyParsed.body);
+  }
+
   const toolsAvailable = getToolsAvailable(requestBodyParsed);
   const toolsUsed = getToolsUsed(requestBodyParsed);
 
@@ -438,14 +482,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
 
   let response: Response;
-  if (customLlm && requestBodyParsed.kind === 'chat_completions') {
-    response = await customLlmRequest(
-      customLlm,
+  if (requestBodyParsed.kind === 'chat_completions' && provider.id === 'martian') {
+    response = await grokCodeFastOptimizedRequest(
       requestBodyParsed.body,
       isRooCodeBasedClient(fraudHeaders)
     );
   } else {
-    Object.assign(requestBodyParsed.body, customLlm?.extra_body ?? {});
     response = await openRouterRequest({
       path,
       search: url.search,
@@ -523,10 +565,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       verdict: classifyResult.verdict,
       risk_score: classifyResult.risk_score,
       signals: classifyResult.signals,
-      identity_key: classifyResult.context.identity_key,
+      identity_key: classifyResult.context?.identity_key,
       kilo_user_id: user.id,
       requested_model: originalModelIdLowerCased,
-      rps: classifyResult.context.requests_per_second,
+      rps: classifyResult.context?.requests_per_second,
       request_id: classifyResult.request_id,
     });
     usageContext.abuse_request_id = classifyResult.request_id;
@@ -549,16 +591,24 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       request: requestBodyParsed,
       response,
       isUserByok: !!userByok,
+      feature,
+      balance: (await balanceAndSettingsPromise).balance,
     });
     if (errorResponse) {
       return errorResponse;
     }
   }
 
+  const isFreeModelRequiringCostRemoval =
+    (provider.id === 'openrouter' || provider.id === 'vercel') &&
+    isKiloFreeModel(originalModelIdLowerCased);
+  const isStealthModelRequiringNameRemoval = isKiloStealthModel(originalModelIdLowerCased);
+  const isProviderRequiringResponseFixes = provider.id === 'corethink';
+
   if (
-    provider.id !== 'custom' &&
-    (isKiloFreeModel(originalModelIdLowerCased) ||
-      isActiveReviewPromo(botId, originalModelIdLowerCased))
+    isFreeModelRequiringCostRemoval ||
+    isStealthModelRequiringNameRemoval ||
+    isProviderRequiringResponseFixes
   ) {
     if (requestBodyParsed.kind === 'chat_completions') {
       return rewriteFreeModelResponse_ChatCompletions(response, originalModelIdLowerCased);

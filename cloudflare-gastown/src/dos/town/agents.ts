@@ -5,6 +5,7 @@
  * joined with agent_metadata for operational state.
  */
 
+import { z } from 'zod';
 import { beads, BeadRecord, AgentBeadRecord } from '../../db/tables/beads.table';
 import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { query } from '../../util/query.util';
@@ -256,6 +257,31 @@ export function hookBead(sql: SqlStorage, agentId: string, beadId: string): void
     );
   }
 
+  // Mutual exclusion: unhook any other agents already hooked to this bead.
+  // This prevents multi-agent assignment when reconcileBeads Rule 1 fires
+  // while an idle agent still holds a stale hook from a previous cycle.
+  const staleHooks = z
+    .object({ bead_id: z.string() })
+    .array()
+    .parse([
+      ...query(
+        sql,
+        /* sql */ `
+        SELECT ${agent_metadata.bead_id}
+        FROM ${agent_metadata}
+        WHERE ${agent_metadata.current_hook_bead_id} = ?
+          AND ${agent_metadata.bead_id} != ?
+      `,
+        [beadId, agentId]
+      ),
+    ]);
+  for (const stale of staleHooks) {
+    console.warn(
+      `[agents] hookBead: unhooking stale agent ${stale.bead_id} from bead ${beadId} (replaced by ${agentId})`
+    );
+    unhookBead(sql, stale.bead_id);
+  }
+
   query(
     sql,
     /* sql */ `
@@ -449,11 +475,28 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
   ];
   const openBeads = BeadRecord.array().parse(openBeadRows);
 
+  // Build rework context if the hooked bead is a rework request
+  let rework_context: PrimeContext['rework_context'] = null;
+  if (hookedBead?.labels.includes('gt:rework') && hookedBead.metadata) {
+    const meta = hookedBead.metadata as Record<string, unknown>;
+    const originalBeadId = typeof meta.rework_for === 'string' ? meta.rework_for : null;
+    const originalBead = originalBeadId ? getBead(sql, originalBeadId) : null;
+    rework_context = {
+      feedback: hookedBead.body ?? '',
+      branch: typeof meta.branch === 'string' ? meta.branch : null,
+      target_branch: typeof meta.target_branch === 'string' ? meta.target_branch : null,
+      files: Array.isArray(meta.files) ? (meta.files as string[]) : [],
+      original_bead_title: originalBead?.title ?? null,
+      mr_bead_id: typeof meta.mr_bead_id === 'string' ? meta.mr_bead_id : null,
+    };
+  }
+
   return {
     agent,
     hooked_bead: hookedBead,
     undelivered_mail: undeliveredMail,
     open_beads: openBeads,
+    rework_context,
   };
 }
 
@@ -494,14 +537,40 @@ export function updateAgentStatusMessage(sql: SqlStorage, agentId: string, messa
 
 // ── Touch (heartbeat helper) ────────────────────────────────────────
 
-export function touchAgent(sql: SqlStorage, agentId: string): void {
+export function touchAgent(
+  sql: SqlStorage,
+  agentId: string,
+  watermark?: {
+    lastEventType?: string | null;
+    lastEventAt?: string | null;
+    activeTools?: string[];
+  }
+): void {
+  // A heartbeat is proof the agent is alive in the container.
+  // If the agent's status is 'idle' (e.g. due to a dispatch timeout
+  // race — see #1358), restore it to 'working'. This prevents the
+  // reconciler from treating the agent as lost while it's actively
+  // sending heartbeats.
   query(
     sql,
     /* sql */ `
       UPDATE ${agent_metadata}
-      SET ${agent_metadata.columns.last_activity_at} = ?
+      SET ${agent_metadata.columns.last_activity_at} = ?,
+          ${agent_metadata.columns.status} = CASE
+            WHEN ${agent_metadata.columns.status} = 'idle' THEN 'working'
+            ELSE ${agent_metadata.columns.status}
+          END,
+          ${agent_metadata.columns.last_event_type} = COALESCE(?, ${agent_metadata.columns.last_event_type}),
+          ${agent_metadata.columns.last_event_at} = COALESCE(?, ${agent_metadata.columns.last_event_at}),
+          ${agent_metadata.columns.active_tools} = COALESCE(?, ${agent_metadata.columns.active_tools})
       WHERE ${agent_metadata.bead_id} = ?
     `,
-    [now(), agentId]
+    [
+      now(),
+      watermark?.lastEventType ?? null,
+      watermark?.lastEventAt ?? null,
+      watermark?.activeTools ? JSON.stringify(watermark.activeTools) : null,
+      agentId,
+    ]
   );
 }

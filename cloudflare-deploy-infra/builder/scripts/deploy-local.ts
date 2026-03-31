@@ -58,10 +58,8 @@ function loadEnvFile(): Record<string, string> {
 
 const envFile = loadEnvFile();
 
-/* eslint-disable n/no-process-env */
 const BUILDER_URL = process.env['BUILDER_URL'] || 'http://localhost:8787';
 const BUILDER_AUTH_TOKEN = process.env['BACKEND_AUTH_TOKEN'] || envFile['BACKEND_AUTH_TOKEN'];
-/* eslint-enable n/no-process-env */
 const POLL_INTERVAL = 2000; // ms
 
 async function sleep(ms: number): Promise<void> {
@@ -199,9 +197,7 @@ async function main() {
 
   try {
     // On macOS, set COPYFILE_DISABLE=1 to prevent tar from copying resource fork files
-    /* eslint-disable n/no-process-env */
     const tarEnv = { ...process.env, COPYFILE_DISABLE: '1' };
-    /* eslint-enable n/no-process-env */
     execSync(`tar -czf "${archivePath}" -C "${directory}" ${excludeFlags} .`, {
       stdio: 'pipe',
       env: tarEnv,

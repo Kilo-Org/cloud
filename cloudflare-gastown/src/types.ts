@@ -162,6 +162,15 @@ export type PrimeContext = {
   hooked_bead: Bead | null;
   undelivered_mail: Mail[];
   open_beads: Bead[];
+  /** Present when the hooked bead is a rework request (gt:rework label). */
+  rework_context: {
+    feedback: string;
+    branch: string | null;
+    target_branch: string | null;
+    files: string[];
+    original_bead_title: string | null;
+    mr_bead_id: string | null;
+  } | null;
 };
 
 // -- Agent done --
@@ -220,11 +229,21 @@ export const TownConfigSchema = z.object({
   /** Default LLM model for new agent sessions */
   default_model: z.string().optional(),
 
+  /** Per-role model overrides. When set, the specified role uses this model
+   *  instead of default_model. */
+  role_models: z
+    .object({
+      mayor: z.string().optional(),
+      refinery: z.string().optional(),
+      polecat: z.string().optional(),
+    })
+    .optional(),
+
   /** Lightweight model for title generation, explore subagent, etc. */
   small_model: z.string().optional(),
 
   /** Maximum concurrent polecats per rig */
-  max_polecats_per_rig: z.number().int().min(1).max(20).optional(),
+  max_polecats_per_rig: z.number().int().min(1).max(50).optional(),
 
   /**
    * Town-level merge strategy. Rigs inherit this when they don't set their own.
@@ -299,8 +318,15 @@ export const TownConfigUpdateSchema = z.object({
   organization_id: z.string().optional(),
   kilocode_token: z.string().optional(),
   default_model: z.string().optional(),
+  role_models: z
+    .object({
+      mayor: z.string().optional(),
+      refinery: z.string().optional(),
+      polecat: z.string().optional(),
+    })
+    .optional(),
   small_model: z.string().optional(),
-  max_polecats_per_rig: z.number().int().min(1).max(20).optional(),
+  max_polecats_per_rig: z.number().int().min(1).max(50).optional(),
   merge_strategy: MergeStrategy.optional(),
   refinery: z
     .object({

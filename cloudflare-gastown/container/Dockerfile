@@ -44,6 +44,14 @@ RUN cd /opt/gastown-plugin && npm install --omit=dev && \
     ln -s /opt/gastown-plugin/index.ts /home/agent/.config/kilo/plugins/gastown.ts && \
     chown -R agent:agent /home/agent/.config
 
+# ── Git config for agent user ───────────────────────────────────────
+# Skip LFS smudge filter: agents don't need binary assets and LFS
+# downloads can fail when credentials don't cover the batch endpoint.
+# Also disable LFS fetch entirely so clone/worktree never stalls.
+RUN printf '[filter "lfs"]\n\tsmudge = git-lfs smudge --skip -- %%f\n\tprocess = git-lfs filter-process --skip\n\tclean = git-lfs clean -- %%f\n\trequired = true\n[lfs]\n\tfetchexclude = *\n' \
+      > /home/agent/.gitconfig && \
+    chown agent:agent /home/agent/.gitconfig
+
 WORKDIR /app
 
 # ── Install production deps via pnpm ────────────────────────────────

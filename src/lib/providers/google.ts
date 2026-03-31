@@ -1,5 +1,5 @@
 import type { GatewayRequest } from '@/lib/providers/openrouter/types';
-import type { ProviderId } from '@/lib/providers/provider-id';
+import type { ProviderId } from '@/lib/providers/types';
 
 export function isGeminiModel(model: string) {
   return model.startsWith('google/gemini');

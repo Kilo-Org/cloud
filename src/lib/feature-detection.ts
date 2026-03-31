@@ -47,3 +47,18 @@ export function validateFeatureHeader(headerValue: string | null): FeatureValue 
   const result = featureSchema.safeParse(headerValue.trim().toLowerCase());
   return result.success ? result.data : null;
 }
+
+/**
+ * Server-side products that rate-limit free models per user instead of per IP.
+ * These products share infrastructure IPs, so IP-based limits would be too restrictive.
+ */
+const USER_RATE_LIMITED_FEATURES: ReadonlySet<FeatureValue> = new Set([
+  'cloud-agent',
+  'code-review',
+  'app-builder',
+]);
+
+export function isUserRateLimitedFeature(feature: FeatureValue | null): boolean {
+  if (!feature) return false;
+  return USER_RATE_LIMITED_FEATURES.has(feature);
+}

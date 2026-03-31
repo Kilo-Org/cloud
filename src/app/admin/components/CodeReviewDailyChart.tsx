@@ -22,6 +22,7 @@ type DailyData = {
   cancelled: number;
   interrupted: number;
   inProgress: number;
+  billingErrors: number;
 };
 
 type ChartDataPoint = {
@@ -31,6 +32,7 @@ type ChartDataPoint = {
   cancelled: number;
   interrupted: number;
   inProgress: number;
+  billingErrors: number;
   total: number;
   successRate: number;
 };
@@ -57,6 +59,7 @@ export function CodeReviewDailyChart({ data }: { data: DailyData[] }) {
     cancelled: item.cancelled,
     interrupted: item.interrupted,
     inProgress: item.inProgress,
+    billingErrors: item.billingErrors,
     total: item.total,
     successRate: item.total > 0 ? (item.completed / item.total) * 100 : 0,
   }));
@@ -89,6 +92,10 @@ export function CodeReviewDailyChart({ data }: { data: DailyData[] }) {
             <p className="text-sm">
               <span className="text-muted-foreground">Interrupted:</span>{' '}
               <span className="font-medium text-orange-600">{data.interrupted}</span>
+            </p>
+            <p className="text-sm">
+              <span className="text-muted-foreground">Billing Errors:</span>{' '}
+              <span className="font-medium text-amber-500">{data.billingErrors}</span>
             </p>
             <p className="text-sm">
               <span className="text-muted-foreground">In Progress:</span>{' '}
@@ -165,13 +172,20 @@ export function CodeReviewDailyChart({ data }: { data: DailyData[] }) {
               <Legend />
               <Bar yAxisId="left" dataKey="completed" stackId="a" fill="#16a34a" name="Completed" />
               <Bar yAxisId="left" dataKey="failed" stackId="a" fill="#dc2626" name="Failed" />
-              <Bar yAxisId="left" dataKey="cancelled" stackId="a" fill="#f59e0b" name="Cancelled" />
+              <Bar yAxisId="left" dataKey="cancelled" stackId="a" fill="#eab308" name="Cancelled" />
               <Bar
                 yAxisId="left"
                 dataKey="interrupted"
                 stackId="a"
                 fill="#ea580c"
                 name="Interrupted"
+              />
+              <Bar
+                yAxisId="left"
+                dataKey="billingErrors"
+                stackId="a"
+                fill="#fb7185"
+                name="Billing Errors"
               />
               <Bar
                 yAxisId="left"

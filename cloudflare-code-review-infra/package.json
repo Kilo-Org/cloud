@@ -7,16 +7,12 @@
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "tail": "wrangler tail",
-    "typecheck": "tsgo --noEmit --incremental false",
-    "lint": "pnpm run lint:oxlint && pnpm run lint:eslint:fallback",
-    "lint:oxlint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-code-review-infra/src",
-    "lint:eslint:fallback": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'"
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-code-review-infra/src"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
-    "@kilocode/eslint-config": "workspace:*",
     "@typescript/native-preview": "catalog:",
-    "eslint": "catalog:",
     "typescript": "catalog:",
     "wrangler": "catalog:"
   },

@@ -1,0 +1,92 @@
+{
+  "id": "gen_01KMFKWCKRPKGEG2544TR4ZB17",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "text",
+      "text": "Hi there! 👋 How are you doing? Is there something I can help you with today?"
+    }
+  ],
+  "model": "anthropic/claude-sonnet-4.6",
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 9,
+    "output_tokens": 25,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    }
+  },
+  "provider_metadata": {
+    "anthropic": {
+      "usage": {
+        "input_tokens": 9,
+        "output_tokens": 25,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        }
+      },
+      "cacheCreationInputTokens": 0,
+      "stopSequence": null,
+      "iterations": null,
+      "container": null,
+      "contextManagement": null
+    },
+    "gateway": {
+      "routing": {
+        "originalModelId": "anthropic/claude-sonnet-4.6",
+        "resolvedProvider": "bedrock",
+        "resolvedProviderApiModelId": "global.anthropic.claude-sonnet-4-6",
+        "internalResolvedModelId": "bedrock:global.anthropic.claude-sonnet-4-6",
+        "fallbacksAvailable": ["anthropic", "vertexAnthropic"],
+        "internalReasoning": "Custom provider order specified: bedrock → anthropic → vertexAnthropic. Selected bedrock for claude-sonnet-4.6. 2 fallback(s) available: anthropic, vertexAnthropic",
+        "planningReasoning": "BYOK credentials available for: bedrock, anthropic, vertexAnthropic. System credentials planned for: bedrock, anthropic, vertexAnthropic. Total execution order: bedrock(BYOK) → anthropic(BYOK) → vertexAnthropic(BYOK) → bedrock(system) → anthropic(system) → vertexAnthropic(system)",
+        "canonicalSlug": "anthropic/claude-sonnet-4.6",
+        "finalProvider": "bedrock",
+        "attempts": [
+          {
+            "provider": "bedrock",
+            "internalModelId": "bedrock:global.anthropic.claude-sonnet-4-6",
+            "providerApiModelId": "global.anthropic.claude-sonnet-4-6",
+            "credentialType": "byok",
+            "success": true,
+            "startTime": 455131.775894,
+            "endTime": 458639.926221,
+            "statusCode": 200
+          }
+        ],
+        "modelAttemptCount": 1,
+        "modelAttempts": [
+          {
+            "modelId": "bedrock:global.anthropic.claude-sonnet-4-6",
+            "canonicalSlug": "anthropic/claude-sonnet-4.6",
+            "success": true,
+            "providerAttemptCount": 1,
+            "providerAttempts": [
+              {
+                "provider": "bedrock",
+                "internalModelId": "bedrock:global.anthropic.claude-sonnet-4-6",
+                "providerApiModelId": "global.anthropic.claude-sonnet-4-6",
+                "credentialType": "byok",
+                "success": true,
+                "startTime": 455131.775894,
+                "endTime": 458639.926221,
+                "statusCode": 200
+              }
+            ]
+          }
+        ],
+        "totalProviderAttemptCount": 1
+      },
+      "cost": "0",
+      "marketCost": "0.000402",
+      "generationId": "gen_01KMFKWCKRPKGEG2544TR4ZB17",
+      "billableWebSearchCalls": 0
+    }
+  }
+}

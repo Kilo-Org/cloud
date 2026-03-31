@@ -189,9 +189,18 @@ export async function handleCheckMail(
   return c.json(resSuccess(messages));
 }
 
+const HeartbeatWatermark = z
+  .object({
+    lastEventType: z.string().nullable().optional(),
+    lastEventAt: z.string().nullable().optional(),
+    activeTools: z.array(z.string()).optional(),
+  })
+  .passthrough();
+
 /**
  * Heartbeat endpoint called by the container's heartbeat reporter.
- * Updates the agent's last_activity_at timestamp in the Rig DO.
+ * Updates the agent's last_activity_at timestamp and SDK activity
+ * watermark in the Town DO's agent_metadata.
  */
 export async function handleHeartbeat(
   c: Context<GastownEnv>,
@@ -199,7 +208,30 @@ export async function handleHeartbeat(
 ) {
   const townId = c.get('townId');
   const town = getTownDOStub(c.env, townId);
-  await town.touchAgentHeartbeat(params.agentId);
+
+  // Parse watermark from body (best-effort — old containers send no body)
+  let watermark: z.infer<typeof HeartbeatWatermark> | undefined;
+  try {
+    const body: unknown = await c.req.json();
+    const parsed = HeartbeatWatermark.safeParse(body);
+    if (parsed.success) {
+      watermark = parsed.data;
+    }
+  } catch {
+    // No body or invalid JSON — old container format, just touch
+  }
+
+  await town.touchAgentHeartbeat(
+    params.agentId,
+    watermark
+      ? {
+          lastEventType: watermark.lastEventType ?? null,
+          lastEventAt: watermark.lastEventAt ?? null,
+          activeTools: watermark.activeTools,
+        }
+      : undefined
+  );
+
   return c.json(resSuccess({ heartbeat: true }));
 }
 
@@ -326,4 +358,33 @@ export async function handleNudgeDelivered(
   const town = getTownDOStub(c.env, townId);
   await town.markNudgeDelivered(parsed.data.nudge_id);
   return c.json(resSuccess({ marked: true }));
+}
+
+// ── Request Changes ──────────────────────────────────────────────────
+
+const RequestChangesBody = z.object({
+  feedback: z.string().min(1, 'Feedback is required'),
+  files: z.array(z.string()).optional(),
+});
+
+/**
+ * Refinery requests changes on an in-progress MR. Creates a rework bead
+ * that blocks the MR bead. The reconciler assigns a polecat to the rework
+ * bead; when it closes, the MR unblocks for re-review.
+ */
+export async function handleRequestChanges(
+  c: Context<GastownEnv>,
+  params: { rigId: string; agentId: string }
+) {
+  const parsed = RequestChangesBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+  const townId = c.get('townId');
+  const town = getTownDOStub(c.env, townId);
+  const result = await town.requestChanges(params.agentId, parsed.data);
+  return c.json(resSuccess(result), 201);
 }

@@ -219,6 +219,7 @@ describe('organizations usage details trpc router', () => {
         output_tokens: 200,
         created_at: now,
         model: 'gpt-4',
+        requested_model: 'gpt-4',
       });
 
       await insertUsageWithOverrides({
@@ -229,6 +230,7 @@ describe('organizations usage details trpc router', () => {
         output_tokens: 100,
         created_at: now,
         model: 'gpt-3.5-turbo',
+        requested_model: 'gpt-3.5-turbo',
       });
 
       const caller = await createCallerForUser(memberUser.id);
@@ -248,6 +250,30 @@ describe('organizations usage details trpc router', () => {
 
       expect(gpt35Result).toHaveProperty('model', 'gpt-3.5-turbo');
       expect(gpt35Result?.microdollarCost).toBe('500');
+    });
+
+    it('should fall back to model when requested_model is null (legacy rows)', async () => {
+      const now = await getDateFromDb();
+
+      await insertUsageWithOverrides({
+        kilo_user_id: memberUser.id,
+        organization_id: testOrganization.id,
+        cost: 750,
+        created_at: now,
+        model: 'legacy-model',
+        requested_model: null,
+      });
+
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.get({
+        organizationId: testOrganization.id,
+        groupByModel: true,
+      });
+
+      const legacyRow = result.daily.find(d => d.model === 'legacy-model');
+      expect(legacyRow).toBeDefined();
+      expect(legacyRow?.microdollarCost).toBe('750');
     });
 
     it('should handle empty usage data', async () => {
@@ -387,6 +413,7 @@ describe('organizations usage details trpc router', () => {
 
       const result = await caller.organizations.usageDetails.getAutocomplete({
         organizationId: testOrganization.id,
+        period: 'month',
       });
 
       expect(result.cost).toBe(1500); // 1000 + 500
@@ -412,11 +439,61 @@ describe('organizations usage details trpc router', () => {
 
       const result = await caller.organizations.usageDetails.getAutocomplete({
         organizationId: testOrganization.id,
+        period: 'month',
       });
 
       expect(result.cost).toBe(0);
       expect(result.requests).toBe(0);
       expect(result.tokens).toBe(0);
+    });
+
+    it('should exclude autocomplete usage outside the selected period', async () => {
+      const now = await getDateFromDb();
+      const twoMonthsAgo = await getDateFromDb('60 days');
+
+      // Insert recent autocomplete usage (within the past week)
+      await insertUsageWithOverrides({
+        kilo_user_id: memberUser.id,
+        organization_id: testOrganization.id,
+        cost: 1000,
+        input_tokens: 300,
+        output_tokens: 200,
+        created_at: now,
+        model: 'codestral-2508',
+      });
+
+      // Insert old autocomplete usage (outside the past week)
+      await insertUsageWithOverrides({
+        kilo_user_id: memberUser.id,
+        organization_id: testOrganization.id,
+        cost: 5000,
+        input_tokens: 1000,
+        output_tokens: 800,
+        created_at: twoMonthsAgo,
+        model: 'codestral-2508',
+      });
+
+      const caller = await createCallerForUser(memberUser.id);
+
+      // Query with 'week' period — should only include recent usage
+      const weekResult = await caller.organizations.usageDetails.getAutocomplete({
+        organizationId: testOrganization.id,
+        period: 'week',
+      });
+
+      expect(weekResult.cost).toBe(1000);
+      expect(weekResult.requests).toBe(1);
+      expect(weekResult.tokens).toBe(500); // 300 + 200
+
+      // Query with 'all' period — should include everything
+      const allResult = await caller.organizations.usageDetails.getAutocomplete({
+        organizationId: testOrganization.id,
+        period: 'all',
+      });
+
+      expect(allResult.cost).toBe(6000); // 1000 + 5000
+      expect(allResult.requests).toBe(2);
+      expect(allResult.tokens).toBe(2300); // (300 + 200) + (1000 + 800)
     });
 
     it('should throw UNAUTHORIZED error for non-member users', async () => {

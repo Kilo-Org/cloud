@@ -689,44 +689,45 @@ describe('getMostRecentSeatPurchase', () => {
     expect(result).toBeNull();
   });
 
-  test('should return the most recent purchase when multiple purchases exist', async () => {
+  test('should return the most recently created purchase', async () => {
     const user = await insertTestUser();
     const organization = await createOrganization('Test Org', user.id);
 
-    // Create multiple purchases
+    const now = Date.now();
+    // Use distinct created_at values; the most recently created row should be returned
     await db.insert(organization_seats_purchases).values([
       {
         subscription_stripe_id: 'sub_old123',
         organization_id: organization.id,
         seat_count: 3,
         amount_usd: 30.0,
-        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        expires_at: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
         created_at: sql`NOW() - INTERVAL '2 days'`,
-        starts_at: new Date().toISOString(),
+        starts_at: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(),
       },
       {
         subscription_stripe_id: 'sub_middle123',
         organization_id: organization.id,
         seat_count: 5,
         amount_usd: 50.0,
-        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        expires_at: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
         created_at: sql`NOW() - INTERVAL '1 day'`,
-        starts_at: new Date().toISOString(),
+        starts_at: new Date(now - 1 * 24 * 60 * 60 * 1000).toISOString(),
       },
       {
         subscription_stripe_id: 'sub_new123',
         organization_id: organization.id,
         seat_count: 10,
         amount_usd: 100.0,
-        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        starts_at: new Date().toISOString(),
+        expires_at: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        starts_at: new Date(now).toISOString(),
       },
     ]);
 
     const result = await getMostRecentSeatPurchase(organization.id);
 
     expect(result).not.toBeNull();
-    expect(result?.seat_count).toBe(10); // Should return the most recent purchase
+    expect(result?.seat_count).toBe(10);
     expect(result?.subscription_stripe_id).toBe('sub_new123');
   });
 

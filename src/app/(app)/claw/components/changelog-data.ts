@@ -1,5 +1,5 @@
 type ChangelogCategory = 'feature' | 'bugfix';
-type ChangelogDeployHint = 'redeploy_suggested' | 'redeploy_required' | null;
+type ChangelogDeployHint = 'redeploy_suggested' | 'redeploy_required' | 'upgrade_required' | null;
 
 export type ChangelogEntry = {
   date: string; // ISO date string, e.g. "2026-02-18"
@@ -10,6 +10,62 @@ export type ChangelogEntry = {
 
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
+  {
+    date: '2026-03-27',
+    description:
+      'Added Linear integration. Connect your Linear API Key in Settings to give your agent access to all Linear features, via the Linear MCP server.',
+    category: 'feature',
+    deployHint: 'redeploy_required',
+  },
+  {
+    date: '2026-03-27',
+    description:
+      'Additional Secrets — all OpenClaw SecretRef credential paths are now supported. Add any API key, token, or credential in Settings > Additional Secrets and it will be encrypted and patched into your openclaw.json config at the specified path on every boot. Supports model providers, channels, plugins, web search, and more.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
+    date: '2026-03-26',
+    description:
+      'Added real-time Chat tab — talk to your KiloClaw bot directly from the dashboard.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
+    date: '2026-03-26',
+    description:
+      'Added "Recover with Kilo" — diagnose and fix stuck or broken instances using the Kilo CLI agent directly from the dashboard. Describe the problem, and the agent runs autonomously to resolve it. Monitor output in real time, cancel runs, and view run history.',
+    category: 'feature',
+    deployHint: 'redeploy_suggested',
+  },
+  {
+    date: '2026-03-24',
+    description:
+      'Fixed Kilo CLI discovery — OpenClaw now knows about the kilo CLI on all instances. Previously, instances provisioned before the CLI was added did not advertise it in TOOLS.md, so the agent could not find it.',
+    category: 'bugfix',
+    deployHint: 'upgrade_required',
+  },
+  {
+    date: '2026-03-23',
+    description:
+      'Added Brave Search integration. Connect your Brave Search API key in Settings to enable the web_search tool. Brave Search removed their free tier, so an API key is now required.',
+    category: 'feature',
+    deployHint: 'redeploy_suggested',
+  },
+  {
+    date: '2026-03-19',
+    description:
+      'Added 1Password integration. Connect a service account token in Settings to give your agent access to the op CLI for looking up credentials and managing vault items.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
+    date: '2026-03-19',
+    description:
+      'Added AgentCard integration. Connect your AgentCard.sh credentials in Settings to give your bot the ability to create and spend virtual debit cards via mcporter.',
+    category: 'feature',
+    deployHint: 'redeploy_required',
+  },
   {
     date: '2026-03-17',
     description: 'Updated 1Password CLI to 2.33.0.',

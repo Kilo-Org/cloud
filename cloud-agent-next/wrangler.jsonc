@@ -140,7 +140,7 @@
         "KILOCODE_CLI_VERSION": "7.0.50",
       },
       "max_instances": 150,
-      "rollout_active_grace_period": 120,
+      "rollout_active_grace_period": 1800,
     },
     {
       "class_name": "SandboxSmall",
@@ -150,7 +150,7 @@
         "KILOCODE_CLI_VERSION": "7.0.50",
       },
       "max_instances": 100,
-      "rollout_active_grace_period": 120,
+      "rollout_active_grace_period": 1800,
     },
   ],
   "durable_objects": {

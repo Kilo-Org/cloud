@@ -2,6 +2,7 @@ import { createTRPCRouter } from '@/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationMemberProcedure,
+  organizationMemberMutationProcedure,
 } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -16,7 +17,6 @@ import { OrganizationModeConfigSchema } from '@/lib/organizations/organization-t
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { successResult } from '@/lib/maybe-result';
-import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 
 const CreateModeInputSchema = OrganizationIdInputSchema.extend({
   name: z
@@ -52,12 +52,10 @@ const ModeIdInputSchema = OrganizationIdInputSchema.extend({
 });
 
 export const organizationModesRouter = createTRPCRouter({
-  create: organizationMemberProcedure
+  create: organizationMemberMutationProcedure
     .input(CreateModeInputSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, name, slug, config } = input;
-
-      await requireActiveSubscriptionOrTrial(organizationId);
 
       const organization = await getOrganizationById(organizationId);
       if (!organization) {
@@ -111,12 +109,10 @@ export const organizationModesRouter = createTRPCRouter({
     return { mode };
   }),
 
-  update: organizationMemberProcedure
+  update: organizationMemberMutationProcedure
     .input(UpdateModeInputSchema)
     .mutation(async ({ input, ctx }) => {
       const { modeId, organizationId, ...updates } = input;
-
-      await requireActiveSubscriptionOrTrial(organizationId);
 
       const existingMode = await getOrganizationModeById(organizationId, modeId);
 
@@ -205,12 +201,10 @@ export const organizationModesRouter = createTRPCRouter({
       return { mode };
     }),
 
-  delete: organizationMemberProcedure
+  delete: organizationMemberMutationProcedure
     .input(DeleteModeInputSchema)
     .mutation(async ({ input, ctx }) => {
       const { modeId, organizationId } = input;
-
-      await requireActiveSubscriptionOrTrial(organizationId);
 
       const mode = await getOrganizationModeById(organizationId, modeId);
 

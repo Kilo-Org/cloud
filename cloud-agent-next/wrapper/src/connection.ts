@@ -86,6 +86,8 @@ export type ConnectionManager = {
   isReconnecting: () => boolean;
   /** Abort and restart the SDK event subscription (does not tear down ingest WS). */
   reconnectEventSubscription: () => void;
+  /** Fetch fresh kilo server state and send it as regular kilocode events to the DO. Best-effort. */
+  sendKiloSnapshot: () => Promise<void>;
 };
 
 /**
@@ -155,6 +157,82 @@ export function createConnectionManager(
     }
     eventBuffer.length = 0;
     bufferOverflowed = false;
+  }
+
+  /**
+   * Fetch current kilo server state and send it as regular kilocode events to the DO.
+   * Called after ingest WS opens (initial connect and reconnect).
+   * Best-effort: failures are logged but don't block the connection.
+   */
+  async function sendKiloSnapshot(): Promise<void> {
+    try {
+      const kiloSessionId = state.currentJob?.kiloSessionId;
+      if (!kiloSessionId) {
+        logToFile('skipping kilo snapshot: no kiloSessionId');
+        return;
+      }
+
+      const [statuses, questions, permissions] = await Promise.all([
+        config.kiloClient.getSessionStatuses(),
+        config.kiloClient.getQuestions(),
+        config.kiloClient.getPermissions(),
+      ]);
+
+      const statusEntry = statuses[kiloSessionId];
+      const sessionStatus = (statusEntry ?? { type: 'idle' }) as {
+        type: string;
+        [key: string]: unknown;
+      };
+
+      const pendingQuestion = questions.find(q => q.sessionID === kiloSessionId);
+      const pendingPermission = permissions.find(p => p.sessionID === kiloSessionId);
+
+      // Send session status as a regular kilocode event
+      const statusProperties = { sessionID: kiloSessionId, status: sessionStatus };
+      sendToIngest({
+        streamEventType: 'kilocode',
+        data: {
+          ...statusProperties,
+          event: 'session.status',
+          type: 'session.status',
+          properties: statusProperties,
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+      // Replay pending questions/permissions as regular events
+      // (same format as real-time delivery — matches CLI behavior)
+      if (pendingQuestion) {
+        sendToIngest({
+          streamEventType: 'kilocode',
+          data: {
+            event: 'question.asked',
+            type: 'question.asked',
+            properties: pendingQuestion,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+      if (pendingPermission) {
+        sendToIngest({
+          streamEventType: 'kilocode',
+          data: {
+            event: 'permission.asked',
+            type: 'permission.asked',
+            properties: pendingPermission,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      logToFile(
+        `kilo state sent: status=${sessionStatus.type}, question=${pendingQuestion?.id ?? 'none'}, permission=${pendingPermission?.id ?? 'none'}`
+      );
+    } catch (err) {
+      logToFile(
+        `failed to send kilo snapshot: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
   }
 
   /**
@@ -273,6 +351,28 @@ export function createConnectionManager(
     return false;
   }
 
+  function getTerminalErrorText(eventType: string, properties: Record<string, unknown>): string {
+    const error = properties.error;
+    if (typeof error === 'string') {
+      return error;
+    }
+
+    if (isRecord(error)) {
+      if (typeof error.message === 'string') {
+        return error.message;
+      }
+
+      const data = error.data;
+      if (isRecord(data) && typeof data.message === 'string') {
+        return data.message;
+      }
+
+      return JSON.stringify(error);
+    }
+
+    return `Insufficient credits: ${eventType}`;
+  }
+
   /**
    * Start the SDK event subscription. Runs in the background.
    * Replaces the old SSE consumer with a typed event stream from the SDK.
@@ -367,26 +467,8 @@ export function createConnectionManager(
 
           // Terminal error detection
           if (isTerminalError(eventType, properties)) {
-            callbacks.onTerminalError(eventType);
+            callbacks.onTerminalError(getTerminalErrorText(eventType, properties));
             return;
-          }
-
-          // Auto-reject permission requests — Cloud Agent has no UI to answer them,
-          // so unanswered permissions would block the session indefinitely.
-          if (eventType === 'permission.asked') {
-            const permissionId = typeof properties.id === 'string' ? properties.id : undefined;
-            if (permissionId) {
-              const permissionType =
-                typeof properties.permission === 'string' ? properties.permission : 'unknown';
-              logToFile(`auto-rejecting permission: id=${permissionId} type=${permissionType}`);
-              config.kiloClient
-                .answerPermission(permissionId, 'reject')
-                .catch((err: unknown) =>
-                  logToFile(
-                    `failed to auto-reject permission ${permissionId}: ${err instanceof Error ? err.message : String(err)}`
-                  )
-                );
-            }
           }
 
           // session.idle is the primary completion signal - it means the assistant finished
@@ -447,6 +529,8 @@ export function createConnectionManager(
     if (ingestWs && existingAbort) {
       state.setConnections(ingestWs, existingAbort);
     }
+    // Send fresh kilo state snapshot after reconnecting
+    void sendKiloSnapshot();
     callbacks.onReconnected?.();
   }
 
@@ -512,6 +596,9 @@ export function createConnectionManager(
       // Open ingest WS first
       await openIngestWs();
 
+      // Send initial kilo state snapshot before starting event subscription
+      await sendKiloSnapshot();
+
       // Start SDK event subscription (runs in background)
       startEventSubscription();
 
@@ -559,5 +646,7 @@ export function createConnectionManager(
       // so no separate abort call is needed here.
       startEventSubscription();
     },
+
+    sendKiloSnapshot,
   };
 }

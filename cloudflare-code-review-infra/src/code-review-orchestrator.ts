@@ -9,7 +9,9 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
   createCloudAgentNextFetchClient,
+  CloudAgentNextBillingError,
   type CloudAgentNextFetchClient,
+  type CloudAgentTerminalReason,
 } from '@kilocode/worker-utils';
 import type {
   Env,
@@ -183,6 +185,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       sessionId?: string;
       cliSessionId?: string;
       errorMessage?: string;
+      terminalReason?: CloudAgentTerminalReason;
     }
   ): Promise<void> {
     // Check if there are any actual changes to process
@@ -197,9 +200,19 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       options !== undefined &&
       'errorMessage' in options &&
       options.errorMessage !== this.state.errorMessage;
+    const terminalReasonChanged =
+      options !== undefined &&
+      'terminalReason' in options &&
+      options.terminalReason !== this.state.terminalReason;
 
     // Early return only if nothing has changed
-    if (!statusChanged && !sessionIdChanged && !cliSessionIdChanged && !errorMessageChanged) {
+    if (
+      !statusChanged &&
+      !sessionIdChanged &&
+      !cliSessionIdChanged &&
+      !errorMessageChanged &&
+      !terminalReasonChanged
+    ) {
       return;
     }
 
@@ -249,6 +262,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       this.state.errorMessage = options.errorMessage;
     }
 
+    if (options !== undefined && 'terminalReason' in options) {
+      this.state.terminalReason = options.terminalReason;
+    }
+
     this.state.updatedAt = new Date().toISOString();
     await this.saveState();
 
@@ -279,6 +296,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       sessionId?: string;
       cliSessionId?: string;
       errorMessage?: string;
+      terminalReason?: CloudAgentTerminalReason;
     }
   ): Promise<void> {
     // Use path-based endpoint (same as callback endpoint for consistency)
@@ -290,6 +308,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       sessionId: options?.sessionId,
       cliSessionId: options?.cliSessionId,
       errorMessage: options?.errorMessage,
+      terminalReason: options?.terminalReason,
     };
 
     const response = await fetch(url, {
@@ -305,6 +324,38 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       const errorText = await response.text();
       throw new Error(`Failed to update DB status: ${response.status} ${errorText}`);
     }
+  }
+
+  private getTerminalReason(error: unknown): CloudAgentTerminalReason | undefined {
+    if (error instanceof CloudAgentNextBillingError) {
+      return 'billing';
+    }
+
+    if (!(error instanceof Error)) {
+      return undefined;
+    }
+
+    const message = error.message.toLowerCase();
+    if (
+      message.includes('timeout') ||
+      message.includes('timed out') ||
+      message.includes('etimedout')
+    ) {
+      return 'timeout';
+    }
+    if (
+      message.includes('upstream') ||
+      message.includes('internal server') ||
+      message.includes('502') ||
+      message.includes('503') ||
+      message.includes('504')
+    ) {
+      return 'upstream_error';
+    }
+
+    // Return undefined for unrecognized errors so NULL in the DB
+    // differentiates "not yet classified" from a known category.
+    return undefined;
   }
 
   /**
@@ -375,6 +426,19 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     agentVersion?: string;
     previousCloudAgentSessionId?: string;
   }): Promise<{ status: CodeReviewStatus }> {
+    if (!this.state) {
+      await this.loadState();
+    }
+
+    if (this.state) {
+      console.log('[CodeReviewOrchestrator] Duplicate start ignored', {
+        reviewId: this.state.reviewId,
+        status: this.state.status,
+      });
+
+      return { status: this.state.status };
+    }
+
     this.state = {
       reviewId: params.reviewId,
       authToken: params.authToken,
@@ -486,7 +550,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     };
 
     if (this.state.agentVersion === 'v2') {
-      await this.getCloudAgentNextClient().interruptSession(headers, { sessionId });
+      await this.getCloudAgentNextClient().interruptSession(headers, {
+        sessionId,
+      });
     } else {
       // Legacy cloud-agent path — raw fetch (SSE-based service, not covered by shared client)
       const response = await fetch(`${this.env.CLOUD_AGENT_URL}/trpc/interruptSession`, {
@@ -655,8 +721,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const terminalReason = this.getTerminalReason(error);
 
-      await this.updateStatus('failed', { errorMessage });
+      await this.updateStatus('failed', { errorMessage, terminalReason });
 
       console.error('[CodeReviewOrchestrator] Review failed (cloud-agent-next):', {
         reviewId: this.state.reviewId,
@@ -766,6 +833,24 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
       // Done — cloud-agent-next callback will deliver terminal status
     } catch (error) {
+      if (error instanceof CloudAgentNextBillingError) {
+        const errorMessage = error.message;
+        await this.updateStatus('failed', {
+          errorMessage,
+          terminalReason: 'billing',
+        });
+
+        console.warn(
+          '[CodeReviewOrchestrator] sendMessageV2 billing failure, skipping fresh session fallback',
+          {
+            reviewId: this.state.reviewId,
+            previousCloudAgentSessionId: previousSessionId,
+            error: errorMessage,
+          }
+        );
+        return;
+      }
+
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
       console.warn('[CodeReviewOrchestrator] sendMessageV2 failed, falling back to fresh session', {

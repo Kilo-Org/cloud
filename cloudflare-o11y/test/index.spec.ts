@@ -159,6 +159,7 @@ describe('o11y worker', () => {
         ttfb_ms: 45,
         complete_request_ms: 123,
         status_code: 200,
+        created_at: expect.any(Number),
       },
     ]);
   });
@@ -310,6 +311,7 @@ describe('session metrics RPC', () => {
         stuck_tool_call_count: 0,
         auto_compaction_count: 1,
         ingest_version: 1,
+        created_at: expect.any(Number),
       },
     ]);
   });

@@ -21,6 +21,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import GithubProvider from 'next-auth/providers/github';
 import GitlabProvider from 'next-auth/providers/gitlab';
 import LinkedInProvider from 'next-auth/providers/linkedin';
+import DiscordProvider from 'next-auth/providers/discord';
 import WorkOSProvider from 'next-auth/providers/workos';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { allow_fake_login, ORGANIZATION_ID_HEADER } from './constants';
@@ -28,10 +29,12 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { redirect } from 'next/navigation';
 import { isOrganizationHardLocked } from '@/lib/organizations/trial-utils';
+import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
 import { secondsInDay } from 'date-fns/constants';
 import type { AdapterUser } from 'next-auth/adapters';
 import assert from 'node:assert';
 import type { Organization, User } from '@kilocode/db/schema';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 import PostHogClient from '@/lib/posthog';
 import { captureException } from '@sentry/nextjs';
 import {
@@ -58,6 +61,8 @@ import {
   NEXTAUTH_SECRET,
   GITLAB_CLIENT_ID,
   GITLAB_CLIENT_SECRET,
+  DISCORD_OAUTH_CLIENT_ID,
+  DISCORD_OAUTH_CLIENT_SECRET,
   BLACKLIST_TLDS,
 } from '@/lib/config.server';
 import jwt from 'jsonwebtoken';
@@ -104,16 +109,23 @@ function createGoogleAccountInfo(
     hosted_domain: googleProfile.hd ?? hosted_domain_specials.non_workspace_google_account,
     provider: account.provider,
     provider_account_id: account.providerAccountId,
+    display_name: null, // Google OAuth does not provide a public profile URL
   };
 }
 
 function createGitHubAccountInfo(
   account: Account,
-  user: NextUser | AdapterUser
+  user: NextUser | AdapterUser,
+  profile: Profile | undefined
 ): CreateOrUpdateUserArgs | null {
   if (account.provider !== 'github') return null;
   assert(user.email, 'User email is required for GitHub auth');
   assert(user.name, 'User name is required for GitHub auth');
+
+  const githubProfile = profile as { login?: string } | undefined;
+  const login = githubProfile?.login;
+  const validLogin =
+    login && /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(login) ? login : null;
 
   return {
     google_user_email: user.email,
@@ -122,6 +134,7 @@ function createGitHubAccountInfo(
     google_user_image_url: user.image || '',
     provider: account.provider,
     provider_account_id: account.providerAccountId,
+    display_name: validLogin,
   };
 }
 
@@ -140,6 +153,7 @@ function createGitlabAccountInfo(
     google_user_image_url: user.image || '',
     provider: account.provider,
     provider_account_id: account.providerAccountId,
+    display_name: null, // TODO: populate with profile.username when GitLab auto-link is implemented
   };
 }
 
@@ -158,6 +172,25 @@ function createLinkedInAccountInfo(
     google_user_image_url: user.image || '',
     provider: account.provider,
     provider_account_id: account.providerAccountId,
+    display_name: null, // LinkedIn OAuth response does not include the vanity URL slug needed to construct a profile link
+  };
+}
+
+function createDiscordAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== 'discord') return null;
+  if (!user.email) return null;
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || '',
+    hosted_domain: hosted_domain_specials.discord,
+    google_user_image_url: user.image || '',
+    provider: account.provider as AuthProviderId,
+    provider_account_id: account.providerAccountId,
+    display_name: user.name || null,
   };
 }
 
@@ -177,6 +210,7 @@ function createFakeAccountInfo(
     hosted_domain: hosted_domain_specials.fake_devonly,
     provider: account.provider,
     provider_account_id: account.providerAccountId,
+    display_name: null,
   };
 }
 
@@ -196,6 +230,7 @@ function createSSOAccountInfo(
     google_user_image_url: user.image || '',
     provider: account.provider,
     provider_account_id: account.providerAccountId,
+    display_name: null, // WorkOS SSO does not provide an upstream IdP profile URL
   };
 }
 
@@ -239,6 +274,7 @@ function createEmailAccountInfo(
     hosted_domain,
     provider: account.provider,
     provider_account_id: user.email,
+    display_name: null,
   };
 }
 
@@ -249,9 +285,10 @@ function createAccountInfo(
 ): CreateOrUpdateUserArgs {
   const accountInfo =
     createGoogleAccountInfo(account, user, profile) ??
-    createGitHubAccountInfo(account, user) ??
+    createGitHubAccountInfo(account, user, profile) ??
     createGitlabAccountInfo(account, user) ??
     createLinkedInAccountInfo(account, user) ??
+    createDiscordAccountInfo(account, user) ??
     createEmailAccountInfo(account, user) ??
     createFakeAccountInfo(account, user) ??
     createSSOAccountInfo(account, user, profile);
@@ -288,6 +325,10 @@ const authOptions: NextAuthOptions = {
     GitlabProvider({
       clientId: GITLAB_CLIENT_ID,
       clientSecret: GITLAB_CLIENT_SECRET,
+    }),
+    DiscordProvider({
+      clientId: DISCORD_OAUTH_CLIENT_ID ?? '',
+      clientSecret: DISCORD_OAUTH_CLIENT_SECRET ?? '',
     }),
     LinkedInProvider({
       clientId: LINKEDIN_CLIENT_ID,
@@ -366,7 +407,7 @@ const authOptions: NextAuthOptions = {
               email: { label: 'Email', type: 'email' },
             },
             async authorize(credentials) {
-              console.log('Fake login attempt', credentials);
+              console.log('Fake login attempt', credentials?.email);
               return !credentials?.email
                 ? null
                 : {
@@ -850,7 +891,9 @@ export async function getProfileRedirectPath(user: User) {
   // Check if user is a member of exactly one organization (skip redirect if multiple)
   const singleOrg = await getSingleUserOrganization(user.id);
   if (singleOrg) {
-    if (isOrganizationHardLocked(singleOrg)) {
+    const latestPurchase = await getMostRecentSeatPurchase(singleOrg.id);
+    const hasActiveSubscription = latestPurchase?.subscription_status === 'active';
+    if (isOrganizationHardLocked(singleOrg, hasActiveSubscription)) {
       return '/profile';
     }
     return `/organizations/${singleOrg.id}`;

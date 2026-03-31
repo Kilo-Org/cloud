@@ -3,7 +3,14 @@ import { useMemo, useState } from 'react';
 import { FilterCard, type FilterCardItem } from './FilterCard';
 import { FilterModal } from './FilterModal';
 
-type OrganizationUsageMetric = 'cost' | 'requests' | 'avg_cost_per_req' | 'tokens' | 'active_users';
+type OrganizationUsageMetric =
+  | 'cost'
+  | 'requests'
+  | 'avg_cost_per_req'
+  | 'tokens'
+  | 'input_tokens'
+  | 'output_tokens'
+  | 'active_users';
 
 type TimeseriesDataPoint = {
   datetime: string;
@@ -65,6 +72,10 @@ export function FiltersSection({
         return point.requestCount || 0;
       case 'tokens':
         return (point.inputTokenCount || 0) + (point.outputTokenCount || 0);
+      case 'input_tokens':
+        return point.inputTokenCount || 0;
+      case 'output_tokens':
+        return point.outputTokenCount || 0;
       case 'avg_cost_per_req':
         return (point.requestCount || 0) > 0
           ? (point.costMicrodollars || 0) / (point.requestCount || 0)

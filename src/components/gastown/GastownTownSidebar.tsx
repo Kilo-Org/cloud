@@ -61,9 +61,24 @@ export function GastownTownSidebar({
 
   const navItems = [
     { title: 'Overview', icon: LayoutDashboard, url: basePath },
-    { title: 'Beads', icon: Hexagon, url: `${basePath}/beads` },
-    { title: 'Agents', icon: Bot, url: `${basePath}/agents` },
-    { title: 'Merge Queue', icon: GitMerge, url: `${basePath}/merges` },
+    {
+      title: 'Beads',
+      icon: Hexagon,
+      url: `${basePath}/beads`,
+      onboardingTarget: 'onboarding-beads',
+    },
+    {
+      title: 'Agents',
+      icon: Bot,
+      url: `${basePath}/agents`,
+      onboardingTarget: 'onboarding-agents',
+    },
+    {
+      title: 'Merge Queue',
+      icon: GitMerge,
+      url: `${basePath}/merges`,
+      onboardingTarget: 'onboarding-merges',
+    },
     { title: 'Mail', icon: Mail, url: `${basePath}/mail` },
     { title: 'Observability', icon: Activity, url: `${basePath}/observability` },
   ];
@@ -116,7 +131,11 @@ export function GastownTownSidebar({
                   transition={{ delay: i * 0.04, duration: 0.2 }}
                 >
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive(item.url)}
+                      data-onboarding-target={item.onboardingTarget}
+                    >
                       <Link href={item.url} prefetch={false}>
                         <item.icon className="size-4" />
                         <span>{item.title}</span>

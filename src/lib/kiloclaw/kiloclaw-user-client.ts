@@ -2,7 +2,12 @@ import 'server-only';
 
 import { KILOCLAW_API_URL } from '@/lib/config.server';
 import { KiloClawApiError } from './kiloclaw-internal-client';
-import type { UserConfigResponse, PlatformStatusResponse, RestartMachineResponse } from './types';
+import type {
+  UserConfigResponse,
+  PlatformStatusResponse,
+  RestartMachineResponse,
+  ChatCredentials,
+} from './types';
 
 type RequestContext = { userId: string };
 
@@ -51,6 +56,10 @@ export class KiloClawUserClient {
 
   async getStatus(ctx?: RequestContext): Promise<PlatformStatusResponse> {
     return this.request('/api/kiloclaw/status', undefined, ctx);
+  }
+
+  async getChatCredentials(ctx?: RequestContext): Promise<ChatCredentials> {
+    return this.request('/api/kiloclaw/chat-credentials', undefined, ctx);
   }
 
   async restartMachine(

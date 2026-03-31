@@ -9,10 +9,8 @@
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.workers.config.ts",
     "test:integration:watch": "vitest --config vitest.workers.config.ts",
-    "typecheck": "tsgo --noEmit --incremental false",
-    "lint": "pnpm run lint:oxlint && pnpm run lint:eslint:fallback",
-    "lint:oxlint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-session-ingest/src",
-    "lint:eslint:fallback": "eslint --config eslint.config.mjs --cache 'src/**/*.ts'"
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-session-ingest/src"
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
@@ -25,11 +23,9 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.21",
     "@cloudflare/workers-types": "catalog:",
-    "@kilocode/eslint-config": "workspace:*",
     "@types/node": "^22.19.15",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
-    "eslint": "catalog:",
     "jose": "catalog:",
     "typescript": "catalog:",
     "vitest": "^3.2.4",

@@ -14,6 +14,7 @@ export type CreateSessionForCloudAgentParams = {
   cloudAgentSessionId: string;
   organizationId?: string;
   createdOnPlatform: string;
+  title?: string;
 };
 
 export type DeleteSessionForCloudAgentParams = {

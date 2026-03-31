@@ -1,5 +1,6 @@
 import type { KiloClawInstance } from './durable-objects/kiloclaw-instance';
 import type { KiloClawApp } from './durable-objects/kiloclaw-app';
+import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 
 /**
  * Environment bindings for the KiloClaw Worker
@@ -7,8 +8,14 @@ import type { KiloClawApp } from './durable-objects/kiloclaw-app';
 export type KiloClawEnv = {
   KILOCLAW_INSTANCE: DurableObjectNamespace<KiloClawInstance>;
   KILOCLAW_APP: DurableObjectNamespace<KiloClawApp>;
+  KILOCLAW_AE?: AnalyticsEngineDataset;
+  KILOCLAW_CONTROLLER_AE: AnalyticsEngineDataset;
   HYPERDRIVE?: Hyperdrive;
   KV_CLAW_CACHE: KVNamespace;
+  SNAPSHOT_RESTORE_QUEUE?: Queue<SnapshotRestoreMessage>;
+
+  // Backend app origin for internal API calls (e.g. instance-ready email)
+  BACKEND_API_URL?: string;
 
   // Auth secrets
   NEXTAUTH_SECRET?: string;
@@ -37,9 +44,17 @@ export type KiloClawEnv = {
   FLY_IMAGE_DIGEST?: string;
   OPENCLAW_VERSION?: string;
 
+  // Stream Chat (default channel for new instances)
+  STREAM_CHAT_API_KEY?: string;
+  STREAM_CHAT_API_SECRET?: string;
+
   // OpenClaw gateway configuration
   OPENCLAW_ALLOWED_ORIGINS?: string;
+  KILOCLAW_CHECKIN_URL?: string;
   REQUIRE_PROXY_TOKEN?: string;
+
+  // PostHog product telemetry
+  NEXT_PUBLIC_POSTHOG_KEY?: string;
 
   // Tuning overrides (wrangler vars)
   /** Override proactive API key refresh threshold (hours). Default: 72 (3 days). */
@@ -55,5 +70,6 @@ export type AppEnv = {
     userId: string;
     authToken: string;
     sandboxId: string;
+    requestStartTime: number;
   };
 };

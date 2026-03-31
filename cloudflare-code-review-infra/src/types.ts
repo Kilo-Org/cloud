@@ -3,7 +3,7 @@
  */
 
 import type { CodeReviewOrchestrator } from './code-review-orchestrator';
-import type { Owner, MCPServerConfig } from '@kilocode/worker-utils';
+import type { Owner, MCPServerConfig, CloudAgentTerminalReason } from '@kilocode/worker-utils';
 
 export type { Owner, MCPServerConfig };
 
@@ -50,6 +50,7 @@ export interface CodeReview {
   sessionId?: string; // Cloud agent session ID (agent_xxx)
   cliSessionId?: string; // CLI session UUID (from session_created event or prepareSession)
   errorMessage?: string;
+  terminalReason?: CloudAgentTerminalReason;
   startedAt?: string;
   completedAt?: string;
   updatedAt: string;
@@ -85,6 +86,7 @@ export interface CodeReviewStatusResponse {
   /** Accumulated cost in dollars across all LLM calls */
   totalCost?: number;
   errorMessage?: string;
+  terminalReason?: CloudAgentTerminalReason;
 }
 
 export interface CodeReviewRequest {

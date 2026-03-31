@@ -264,6 +264,9 @@ export function PromptInput({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      // Ignore keyboard events during IME composition (Chinese, Japanese, Korean input)
+      if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+
       if (isLanding) {
         // Landing: Cmd/Ctrl+Enter to submit
         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {

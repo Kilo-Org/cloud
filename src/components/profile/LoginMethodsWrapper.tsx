@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AccountLinkedSuccessHeader } from './AccountLinkedSuccessHeader';
 import { AuthProviderIdSchema, getProviderById } from '@/lib/auth/provider-metadata';
+import { DiscordGuildStatus } from './DiscordGuildStatus';
 
 type LoginMethodsWrapperProps = {
   primaryEmail: string;
@@ -50,6 +51,7 @@ export function LoginMethodsWrapper({ primaryEmail }: LoginMethodsWrapperProps) 
   }, [searchParams, refetchProviders]);
 
   const providers = providersData?.providers || [];
+  const hasDiscordLinked = providers.some(p => p.provider === 'discord');
 
   if (loading) {
     return (
@@ -156,6 +158,8 @@ export function LoginMethodsWrapper({ primaryEmail }: LoginMethodsWrapperProps) 
           onError={setErrorMessage}
         />
       </div>
+
+      <DiscordGuildStatus hasDiscordLinked={hasDiscordLinked} />
     </div>
   );
 }

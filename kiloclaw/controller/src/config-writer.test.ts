@@ -2,7 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   backupConfigFile,
   generateBaseConfig,
+  setNestedValue,
   writeBaseConfig,
+  writeMcporterConfig,
   MAX_CONFIG_BACKUPS,
 } from './config-writer';
 
@@ -99,10 +101,23 @@ describe('generateBaseConfig', () => {
     expect(config.tools.exec.security).toBe('allowlist');
     expect(config.tools.exec.ask).toBe('on-miss');
 
+    // Update checks disabled — KiloClaw manages updates via Docker images
+    expect(config.update.checkOnStart).toBe(false);
+
     // Browser
     expect(config.browser.enabled).toBe(true);
     expect(config.browser.headless).toBe(true);
     expect(config.browser.noSandbox).toBe(true);
+  });
+
+  it('disables update.checkOnStart even when existing config has it enabled', () => {
+    const existing = JSON.stringify({ update: { checkOnStart: true, channel: 'stable' } });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.update.checkOnStart).toBe(false);
+    // Preserves other update keys
+    expect(config.update.channel).toBe('stable');
   });
 
   it('preserves user tool profile on non-fresh boot', () => {
@@ -255,6 +270,27 @@ describe('generateBaseConfig', () => {
     expect(config.agents.defaults.model.primary).toBe('kilocode/openai/gpt-5');
   });
 
+  it('preserves agent model fallback settings on restart', () => {
+    const existing = JSON.stringify({
+      agents: {
+        defaults: {
+          model: {
+            primary: 'kilocode/anthropic/claude-opus-4.6',
+            fallback: 'kilocode/openai/gpt-5',
+            customSetting: 'user-value',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), KILOCODE_DEFAULT_MODEL: 'kilocode/openai/gpt-5' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.agents.defaults.model.primary).toBe('kilocode/openai/gpt-5');
+    expect(config.agents.defaults.model.fallback).toBe('kilocode/openai/gpt-5');
+    expect(config.agents.defaults.model.customSetting).toBe('user-value');
+  });
+
   it('does not set default model when KILOCODE_DEFAULT_MODEL is not set', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
@@ -287,6 +323,28 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.entries.telegram.enabled).toBe(true);
   });
 
+  it('preserves user Telegram customizations on restart', () => {
+    const existing = JSON.stringify({
+      channels: {
+        telegram: {
+          botToken: 'tg-token-old',
+          enabled: true,
+          dmPolicy: 'pairing',
+          groupPolicy: 'restricted',
+          customField: 'user-value',
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), TELEGRAM_BOT_TOKEN: 'tg-token-new' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.channels.telegram.botToken).toBe('tg-token-new');
+    expect(config.channels.telegram.enabled).toBe(true);
+    expect(config.channels.telegram.groupPolicy).toBe('restricted');
+    expect(config.channels.telegram.customField).toBe('user-value');
+  });
+
   it('configures Telegram with open DM policy and allowFrom wildcard', () => {
     const { deps } = fakeDeps();
     const env = {
@@ -311,6 +369,26 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.entries.discord.enabled).toBe(true);
   });
 
+  it('preserves user Discord customizations on restart', () => {
+    const existing = JSON.stringify({
+      channels: {
+        discord: {
+          token: 'dc-token-old',
+          enabled: true,
+          dm: { policy: 'pairing' },
+          guilds: { '123456': { name: 'My Server' } },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), DISCORD_BOT_TOKEN: 'dc-token-new' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.channels.discord.token).toBe('dc-token-new');
+    expect(config.channels.discord.enabled).toBe(true);
+    expect(config.channels.discord.guilds).toEqual({ '123456': { name: 'My Server' } });
+  });
+
   it('configures Slack channel when both tokens present', () => {
     const { deps } = fakeDeps();
     const env = {
@@ -326,12 +404,101 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.entries.slack.enabled).toBe(true);
   });
 
+  it('preserves user Slack customizations on restart', () => {
+    const existing = JSON.stringify({
+      channels: {
+        slack: {
+          botToken: 'slack-bot-old',
+          appToken: 'slack-app-old',
+          enabled: true,
+          slashCommands: ['/deploy', '/status'],
+          customField: 'preserved',
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      SLACK_BOT_TOKEN: 'slack-bot-new',
+      SLACK_APP_TOKEN: 'slack-app-new',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.channels.slack.botToken).toBe('slack-bot-new');
+    expect(config.channels.slack.appToken).toBe('slack-app-new');
+    expect(config.channels.slack.enabled).toBe(true);
+    expect(config.channels.slack.slashCommands).toEqual(['/deploy', '/status']);
+    expect(config.channels.slack.customField).toBe('preserved');
+  });
+
   it('does not configure Slack when only bot token present', () => {
     const { deps } = fakeDeps();
     const env = { ...minimalEnv(), SLACK_BOT_TOKEN: 'slack-bot' };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
     expect(config.channels.slack).toBeUndefined();
+  });
+
+  // ─── Stream Chat (default channel) ───────────────────────────────────────
+
+  it('configures Stream Chat channel and plugin when all three vars are set', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      STREAM_CHAT_API_KEY: 'sc-api-key',
+      STREAM_CHAT_BOT_USER_ID: 'bot-sandbox-abc',
+      STREAM_CHAT_BOT_USER_TOKEN: 'sc-bot-token',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.channels.streamchat.apiKey).toBe('sc-api-key');
+    expect(config.channels.streamchat.botUserId).toBe('bot-sandbox-abc');
+    expect(config.channels.streamchat.botUserToken).toBe('sc-bot-token');
+    expect(config.channels.streamchat.botUserName).toBe('KiloClaw');
+    expect(config.channels.streamchat.enabled).toBe(true);
+    expect(config.plugins.entries.streamchat.enabled).toBe(true);
+    expect(config.plugins.load.paths).toContain(
+      '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'
+    );
+  });
+
+  it('does not configure Stream Chat when any of the three required vars is missing', () => {
+    const cases = [
+      { STREAM_CHAT_API_KEY: 'key', STREAM_CHAT_BOT_USER_ID: 'bot' },
+      { STREAM_CHAT_API_KEY: 'key', STREAM_CHAT_BOT_USER_TOKEN: 'token' },
+      { STREAM_CHAT_BOT_USER_ID: 'bot', STREAM_CHAT_BOT_USER_TOKEN: 'token' },
+    ];
+
+    for (const partial of cases) {
+      const { deps } = fakeDeps();
+      const env = { ...minimalEnv(), ...partial };
+      const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+      expect(config.channels.streamchat).toBeUndefined();
+    }
+  });
+
+  it('does not duplicate the plugin path on repeated generateBaseConfig calls', () => {
+    const existing = JSON.stringify({
+      channels: { streamchat: { apiKey: 'old-key', enabled: true } },
+      plugins: {
+        load: {
+          paths: ['/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'],
+        },
+        entries: { streamchat: { enabled: true } },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      STREAM_CHAT_API_KEY: 'sc-api-key',
+      STREAM_CHAT_BOT_USER_ID: 'bot-sandbox-abc',
+      STREAM_CHAT_BOT_USER_TOKEN: 'sc-bot-token',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    const pluginPath = '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
+    const paths = config.plugins.load.paths as string[];
+    expect(paths.filter(p => p === pluginPath)).toHaveLength(1);
   });
 
   it('does not set gateway auth when OPENCLAW_GATEWAY_TOKEN is missing', () => {
@@ -400,6 +567,124 @@ describe('generateBaseConfig', () => {
 
     expect(config.hooks.presets).toEqual(['gmail']);
     expect(config.hooks.token).toBe('new-token');
+  });
+
+  it('reads exec security and ask from env vars', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCLAW_EXEC_SECURITY: 'full',
+      KILOCLAW_EXEC_ASK: 'off',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.exec.host).toBe('gateway');
+    expect(config.tools.exec.security).toBe('full');
+    expect(config.tools.exec.ask).toBe('off');
+  });
+
+  it('falls back to defaults when exec env vars are not set', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.tools.exec.security).toBe('allowlist');
+    expect(config.tools.exec.ask).toBe('on-miss');
+  });
+
+  it('patches custom secrets into config via KILOCLAW_SECRET_CONFIG_PATHS', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(
+      {
+        MY_API_KEY: 'sk-test-123',
+        ANOTHER_KEY: 'value-456',
+        KILOCLAW_SECRET_CONFIG_PATHS: JSON.stringify({
+          MY_API_KEY: 'models.providers.openai.apiKey',
+          ANOTHER_KEY: 'channels.custom.token',
+        }),
+      },
+      '/root/.openclaw/openclaw.json',
+      deps
+    );
+
+    expect(config.models.providers.openai.apiKey).toBe('sk-test-123');
+    expect(config.channels.custom.token).toBe('value-456');
+  });
+
+  it('skips config path patching for missing env vars', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(
+      {
+        KILOCLAW_SECRET_CONFIG_PATHS: JSON.stringify({
+          MISSING_KEY: 'models.providers.openai.apiKey',
+        }),
+      },
+      '/root/.openclaw/openclaw.json',
+      deps
+    );
+
+    expect(config.models?.providers?.openai?.apiKey).toBeUndefined();
+  });
+
+  it('handles malformed KILOCLAW_SECRET_CONFIG_PATHS gracefully', () => {
+    const { deps } = fakeDeps();
+    // Should not throw, just warn
+    const config = generateBaseConfig(
+      { KILOCLAW_SECRET_CONFIG_PATHS: 'not-valid-json' },
+      '/root/.openclaw/openclaw.json',
+      deps
+    );
+    expect(config).toBeDefined();
+  });
+});
+
+describe('setNestedValue', () => {
+  it('sets a value at a simple path', () => {
+    const obj: Record<string, unknown> = {};
+    setNestedValue(obj, 'foo', 'bar');
+    expect(obj.foo).toBe('bar');
+  });
+
+  it('sets a value at a nested path, creating intermediates', () => {
+    const obj: Record<string, unknown> = {};
+    setNestedValue(obj, 'a.b.c', 'value');
+    expect((obj as any).a.b.c).toBe('value');
+  });
+
+  it('preserves existing sibling keys', () => {
+    const obj: Record<string, unknown> = { a: { existing: true } };
+    setNestedValue(obj, 'a.newKey', 'value');
+    expect((obj as any).a.existing).toBe(true);
+    expect((obj as any).a.newKey).toBe('value');
+  });
+
+  it('overwrites existing values', () => {
+    const obj: Record<string, unknown> = { a: { b: 'old' } };
+    setNestedValue(obj, 'a.b', 'new');
+    expect((obj as any).a.b).toBe('new');
+  });
+
+  it('refuses to patch __proto__ segments', () => {
+    const obj: Record<string, unknown> = {};
+    setNestedValue(obj, '__proto__.polluted', 'yes');
+    expect(({} as any).polluted).toBeUndefined();
+  });
+
+  it('refuses to patch constructor segments', () => {
+    const obj: Record<string, unknown> = {};
+    setNestedValue(obj, 'constructor.prototype.polluted', 'yes');
+    expect(({} as any).polluted).toBeUndefined();
+  });
+
+  it('refuses to patch prototype segments', () => {
+    const obj: Record<string, unknown> = {};
+    setNestedValue(obj, 'a.prototype.b', 'yes');
+    expect((obj as any).a).toBeUndefined();
+  });
+
+  it('skips when intermediate is a non-object primitive', () => {
+    const obj: Record<string, unknown> = { a: 'string-not-object' };
+    setNestedValue(obj, 'a.b.c', 'value');
+    expect(obj.a).toBe('string-not-object');
   });
 });
 
@@ -629,5 +914,108 @@ describe('writeBaseConfig', () => {
     // From our patches
     expect(config.gateway.auth.token).toBe('test-gw-token');
     expect(config.tools.exec.host).toBe('gateway');
+  });
+});
+
+function mcporterFakeDeps(existingMcporterConfig?: string) {
+  const written: { path: string; data: string }[] = [];
+  return {
+    deps: {
+      readFileSync: vi.fn((filePath: string) => {
+        if (existingMcporterConfig !== undefined) return existingMcporterConfig;
+        throw new Error(`ENOENT: no such file: ${filePath}`);
+      }),
+      writeFileSync: vi.fn((filePath: string, data: string) => {
+        written.push({ path: filePath, data });
+      }),
+      renameSync: vi.fn(),
+      copyFileSync: vi.fn(),
+      readdirSync: vi.fn(() => []),
+      unlinkSync: vi.fn(),
+      existsSync: vi.fn((filePath: string) => {
+        if (existingMcporterConfig !== undefined && filePath.endsWith('mcporter.json')) return true;
+        return false;
+      }),
+      execFileSync: vi.fn(),
+    },
+    written,
+  };
+}
+
+describe('writeMcporterConfig', () => {
+  it('adds Linear MCP server when LINEAR_API_KEY is set', () => {
+    const { deps, written } = mcporterFakeDeps();
+    const env = { LINEAR_API_KEY: 'lin_api_test123' };
+
+    writeMcporterConfig(env, '/tmp/mcporter.json', deps);
+
+    expect(written).toHaveLength(1);
+    const config = JSON.parse(written[0].data);
+    expect(config.mcpServers.linear).toEqual({
+      url: 'https://mcp.linear.app/mcp',
+      headers: { Authorization: 'Bearer ${LINEAR_API_KEY}' },
+    });
+  });
+
+  it('removes Linear MCP server when LINEAR_API_KEY is absent', () => {
+    const existing = JSON.stringify({
+      mcpServers: {
+        linear: {
+          url: 'https://mcp.linear.app/mcp',
+          headers: { Authorization: 'Bearer ${LINEAR_API_KEY}' },
+        },
+      },
+    });
+    const { deps, written } = mcporterFakeDeps(existing);
+    const env: Record<string, string | undefined> = {};
+
+    writeMcporterConfig(env, '/tmp/mcporter.json', deps);
+
+    expect(written).toHaveLength(1);
+    const config = JSON.parse(written[0].data);
+    expect(config.mcpServers.linear).toBeUndefined();
+  });
+
+  it('preserves user-added servers when adding Linear', () => {
+    const existing = JSON.stringify({
+      mcpServers: {
+        custom: { url: 'https://custom.example.com/mcp' },
+      },
+    });
+    const { deps, written } = mcporterFakeDeps(existing);
+    const env = { LINEAR_API_KEY: 'lin_api_test123' };
+
+    writeMcporterConfig(env, '/tmp/mcporter.json', deps);
+
+    expect(written).toHaveLength(1);
+    const config = JSON.parse(written[0].data);
+    expect(config.mcpServers.custom).toEqual({ url: 'https://custom.example.com/mcp' });
+    expect(config.mcpServers.linear).toBeDefined();
+  });
+
+  it('adds both AgentCard and Linear when both keys are set', () => {
+    const { deps, written } = mcporterFakeDeps();
+    const env = {
+      AGENTCARD_API_KEY: 'ac_test123',
+      LINEAR_API_KEY: 'lin_api_test123',
+    };
+
+    writeMcporterConfig(env, '/tmp/mcporter.json', deps);
+
+    expect(written).toHaveLength(1);
+    const config = JSON.parse(written[0].data);
+    expect(config.mcpServers.agentcard).toBeDefined();
+    expect(config.mcpServers.linear).toBeDefined();
+  });
+
+  it('uses literal ${LINEAR_API_KEY} in authorization header (not interpolated)', () => {
+    const { deps, written } = mcporterFakeDeps();
+    const env = { LINEAR_API_KEY: 'lin_api_test123' };
+
+    writeMcporterConfig(env, '/tmp/mcporter.json', deps);
+
+    const config = JSON.parse(written[0].data);
+    // The header should contain the literal string ${LINEAR_API_KEY}, not the actual value
+    expect(config.mcpServers.linear.headers.Authorization).toBe('Bearer ${LINEAR_API_KEY}');
   });
 });

@@ -1,3 +1,4 @@
+import { DiscordLogo } from '@/components/auth/DiscordLogo';
 import { GitHubLogo } from '@/components/auth/GitHubLogo';
 import { GitLabLogo } from '@/components/auth/GitLabLogo';
 import { GoogleLogo } from '@/components/auth/GoogleLogo';
@@ -21,6 +22,7 @@ const AllAuthProviders = [
   { id: 'github', name: 'GitHub', icon: <GitHubLogo /> },
   { id: 'gitlab', name: 'GitLab', icon: <GitLabLogo className="size-5" /> },
   { id: 'linkedin', name: 'LinkedIn', icon: <LinkedInLogo /> },
+  { id: 'discord', name: 'Discord', icon: <DiscordLogo /> },
   { id: 'fake-login', name: 'Test Account', icon: fakeLoginIcon },
   { id: 'workos', name: 'Enterprise SSO', icon: <SquareUserRound /> },
 ] as const satisfies readonly ProviderMetadata[];

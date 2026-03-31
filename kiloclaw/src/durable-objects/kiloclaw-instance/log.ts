@@ -2,10 +2,12 @@ import type { InstanceMutableState, InstanceStatus } from './types';
 import {
   ALARM_INTERVAL_RUNNING_MS,
   ALARM_INTERVAL_STARTING_MS,
+  ALARM_INTERVAL_RESTARTING_MS,
   ALARM_INTERVAL_DESTROYING_MS,
   ALARM_INTERVAL_IDLE_MS,
   ALARM_JITTER_MS,
 } from '../../config';
+import { writeEvent, eventContextFromState } from '../../utils/analytics';
 
 /**
  * Structured reconciliation logging — emits a JSON line tagged for
@@ -24,6 +26,61 @@ export function reconcileLog(
       ...details,
     })
   );
+}
+
+// ── ReconcileContext ──────────────────────────────────────────────────
+//
+// Bundles state + env + reason so every reconcileLog call site
+// automatically emits to Cloudflare Analytics Engine without needing
+// to thread env/state through every function signature.
+
+export type ReconcileContext = {
+  readonly state: InstanceMutableState;
+  readonly env: { KILOCLAW_AE?: AnalyticsEngineDataset };
+  readonly reason: string;
+  /** Log a reconcile action to both console and Analytics Engine. */
+  log: (action: string, details?: Record<string, unknown>) => void;
+};
+
+export function createReconcileContext(
+  state: InstanceMutableState,
+  env: { KILOCLAW_AE?: AnalyticsEngineDataset },
+  reason: string
+): ReconcileContext {
+  return {
+    state,
+    env,
+    reason,
+    log(action: string, details: Record<string, unknown> = {}) {
+      reconcileLog(reason, action, details);
+
+      const rawErr = details.error;
+      let errorStr: string | undefined;
+      if (rawErr !== undefined) {
+        try {
+          errorStr = (
+            rawErr instanceof Error
+              ? rawErr.message
+              : typeof rawErr === 'string'
+                ? rawErr
+                : JSON.stringify(rawErr)
+          ).slice(0, 200);
+        } catch {
+          errorStr = '[unserializable error]';
+        }
+      }
+
+      writeEvent(env, {
+        event: `reconcile.${action}`,
+        delivery: 'reconcile',
+        label: typeof details.label === 'string' ? details.label : '',
+        error: errorStr,
+        durationMs: typeof details.durationMs === 'number' ? details.durationMs : undefined,
+        value: typeof details.value === 'number' ? details.value : undefined,
+        ...eventContextFromState(state),
+      });
+    },
+  };
 }
 
 // ── Structured error/warn logging ────────────────────────────────────
@@ -88,7 +145,7 @@ function instanceContext(state: InstanceMutableState): Record<string, unknown> {
  */
 function emitStructuredLog(
   logFn: (...args: unknown[]) => void,
-  level: 'error' | 'warn',
+  level: 'info' | 'error' | 'warn',
   state: InstanceMutableState,
   message: string,
   details: Record<string, unknown>
@@ -108,6 +165,18 @@ function emitStructuredLog(
     // message and context are still captured in the log stream.
     logFn(`[kiloclaw_do] [${level}]`, message, details, instanceContext(state));
   }
+}
+
+/**
+ * Structured info log for DO modules. Instance context fields always
+ * take precedence over caller details to prevent accidental shadowing.
+ */
+export function doLog(
+  state: InstanceMutableState,
+  message: string,
+  details: Record<string, unknown> = {}
+): void {
+  emitStructuredLog(console.log, 'info', state, message, details);
 }
 
 /**
@@ -143,8 +212,12 @@ export function alarmIntervalForStatus(status: InstanceStatus): number {
       return ALARM_INTERVAL_RUNNING_MS;
     case 'starting':
       return ALARM_INTERVAL_STARTING_MS;
+    case 'restarting':
+      return ALARM_INTERVAL_RESTARTING_MS;
     case 'destroying':
       return ALARM_INTERVAL_DESTROYING_MS;
+    case 'restoring':
+      return ALARM_INTERVAL_STARTING_MS; // 1 min — frequent enough to detect stuck restores
     case 'provisioned':
     case 'stopped':
       return ALARM_INTERVAL_IDLE_MS;

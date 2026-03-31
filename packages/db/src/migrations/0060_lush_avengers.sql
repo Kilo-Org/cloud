@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "idx_free_model_usage_user_created_at" ON "free_model_usage" USING btree ("kilo_user_id","created_at") WHERE "free_model_usage"."kilo_user_id" is not null;

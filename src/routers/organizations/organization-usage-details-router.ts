@@ -170,7 +170,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               datetime: timeBucket.as('datetime'),
               userName: kilocode_users.google_user_name,
               userEmail: kilocode_users.google_user_email,
-              model: microdollar_usage.model,
+              model: sql<string>`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
               provider: microdollar_usage.provider,
               projectId: microdollar_usage.project_id,
               costMicrodollars: sum(microdollar_usage.cost),
@@ -191,7 +191,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               timeBucket,
               kilocode_users.google_user_name,
               kilocode_users.google_user_email,
-              microdollar_usage.model,
+              sql`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
               microdollar_usage.provider,
               microdollar_usage.project_id
             )
@@ -318,7 +318,11 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               date: sql<string>`DATE(${microdollar_usage.created_at})`.as('date'),
               userName: kilocode_users.google_user_name,
               userEmail: kilocode_users.google_user_email,
-              ...(groupByModel && { model: microdollar_usage.model }),
+              ...(groupByModel && {
+                model: sql<
+                  string | null
+                >`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
+              }),
               microdollarCost: sum(microdollar_usage.cost),
               tokenCount: sum(
                 sql`${microdollar_usage.input_tokens} + ${microdollar_usage.output_tokens} + ${microdollar_usage.cache_write_tokens} + ${microdollar_usage.cache_hit_tokens}`
@@ -334,7 +338,9 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               sql`DATE(${microdollar_usage.created_at})`,
               kilocode_users.google_user_name,
               kilocode_users.google_user_email,
-              ...(groupByModel ? [microdollar_usage.model] : [])
+              ...(groupByModel
+                ? [sql`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`]
+                : [])
             )
             .orderBy(sql`DATE(${microdollar_usage.created_at}) DESC`)
       );
@@ -358,10 +364,24 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
       };
     }),
   getAutocomplete: organizationMemberProcedure
-    .input(OrganizationIdInputSchema)
+    .input(
+      OrganizationIdInputSchema.extend({
+        period: TimePeriodSchema.default('month'),
+      })
+    )
     .output(AutocompleteMetricsOutputSchema)
     .query(async ({ input }) => {
-      const { organizationId } = input;
+      const { organizationId, period } = input;
+
+      const dateThreshold = getDateThreshold(period);
+
+      const whereConditions = [
+        eq(microdollar_usage.organization_id, organizationId),
+        eq(microdollar_usage.model, AUTOCOMPLETE_MODEL),
+      ];
+      if (dateThreshold) {
+        whereConditions.push(gte(microdollar_usage.created_at, dateThreshold));
+      }
 
       const result = await timedUsageQuery(
         {
@@ -369,7 +389,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
           route: 'organizations.usageDetails.getAutocomplete',
           queryLabel: 'org_autocomplete_aggregate',
           scope: 'org',
-          period: null,
+          period,
         },
         tx =>
           tx
@@ -379,12 +399,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               total_tokens: sql<number>`COALESCE(SUM(${microdollar_usage.input_tokens}) + SUM(${microdollar_usage.output_tokens}), 0)::float`,
             })
             .from(microdollar_usage)
-            .where(
-              and(
-                eq(microdollar_usage.organization_id, organizationId),
-                eq(microdollar_usage.model, AUTOCOMPLETE_MODEL)
-              )
-            )
+            .where(and(...whereConditions))
       );
 
       const metrics = result[0] || { total_cost: 0, request_count: 0, total_tokens: 0 };

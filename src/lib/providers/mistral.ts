@@ -33,34 +33,3 @@ export function applyMistralModelSettings(requestToMutate: GatewayRequest) {
     requestToMutate.body.tool_choice = 'required';
   }
 }
-
-export function applyMistralProviderSettings(
-  requestToMutate: GatewayRequest,
-  extraHeaders: Record<string, string>
-) {
-  if (requestToMutate.kind !== 'chat_completions') {
-    // mistral probably doesn't support the responses api (yet)
-    return;
-  }
-
-  // https://kilo-code.slack.com/archives/C09PV151JMN/p1764256100573969?thread_ts=1764179992.347349&cid=C09PV151JMN
-  if (requestToMutate.body.prompt_cache_key) {
-    extraHeaders['x-affinity'] = requestToMutate.body.prompt_cache_key;
-  }
-
-  // the stuff below is not supported by mistral and causes an error
-  for (const message of requestToMutate.body.messages) {
-    if ('reasoning_details' in message) {
-      delete message.reasoning_details;
-    }
-  }
-  delete requestToMutate.body.reasoning;
-  delete requestToMutate.body.reasoning_effort;
-  delete requestToMutate.body.transforms;
-  delete requestToMutate.body.safety_identifier;
-  delete requestToMutate.body.prompt_cache_key;
-  delete requestToMutate.body.user;
-  delete requestToMutate.body.provider;
-
-  applyMistralModelSettings(requestToMutate);
-}

@@ -184,7 +184,8 @@ export function generateBaseConfig(
   if (env.KILOCODE_DEFAULT_MODEL) {
     config.agents = config.agents ?? {};
     config.agents.defaults = config.agents.defaults ?? {};
-    config.agents.defaults.model = { primary: env.KILOCODE_DEFAULT_MODEL };
+    config.agents.defaults.model = config.agents.defaults.model ?? {};
+    config.agents.defaults.model.primary = env.KILOCODE_DEFAULT_MODEL;
     console.log(`Overriding default model: ${env.KILOCODE_DEFAULT_MODEL}`);
   }
 
@@ -204,12 +205,18 @@ export function generateBaseConfig(
   }
 
   // Exec: KiloClaw machines have no Docker sandbox, so exec must target the
-  // gateway host directly. Allowlist mode gates unknown commands via the
-  // Control UI approval dialog; safe bins auto-allow without approval.
+  // gateway host directly. Security and ask are user-configurable via the
+  // provisioning preset, persisted in DO state and transported as env vars.
+  // Defaults match the 'always-ask' preset (allowlist + on-miss).
   config.tools.exec = config.tools.exec ?? {};
   config.tools.exec.host = 'gateway';
-  config.tools.exec.security = 'allowlist';
-  config.tools.exec.ask = 'on-miss';
+  config.tools.exec.security = env.KILOCLAW_EXEC_SECURITY || 'allowlist';
+  config.tools.exec.ask = env.KILOCLAW_EXEC_ASK || 'on-miss';
+
+  // Disable update checks on start. KiloClaw manages updates via Docker
+  // image deployments, not openclaw's built-in updater.
+  config.update = config.update ?? {};
+  config.update.checkOnStart = false;
 
   // Browser: headless Chromium for the browser tool in Docker.
   // OpenClaw auto-detects /usr/bin/chromium and adds --disable-dev-shm-usage on Linux.
@@ -222,17 +229,17 @@ export function generateBaseConfig(
   // Telegram
   if (env.TELEGRAM_BOT_TOKEN) {
     const dmPolicy = env.TELEGRAM_DM_POLICY || 'pairing';
-    const telegram: ConfigObject = {
-      botToken: env.TELEGRAM_BOT_TOKEN,
-      enabled: true,
-      dmPolicy,
-    };
+    config.channels.telegram = config.channels.telegram ?? {};
+    config.channels.telegram.botToken = env.TELEGRAM_BOT_TOKEN;
+    config.channels.telegram.enabled = true;
+    config.channels.telegram.dmPolicy = dmPolicy;
+    // Explicit env override always wins; otherwise only seed allowFrom on
+    // first boot (when the key is absent) so user edits are preserved.
     if (env.TELEGRAM_DM_ALLOW_FROM) {
-      telegram.allowFrom = env.TELEGRAM_DM_ALLOW_FROM.split(',');
-    } else if (dmPolicy === 'open') {
-      telegram.allowFrom = ['*'];
+      config.channels.telegram.allowFrom = env.TELEGRAM_DM_ALLOW_FROM.split(',');
+    } else if (!('allowFrom' in config.channels.telegram)) {
+      config.channels.telegram.allowFrom = dmPolicy === 'open' ? ['*'] : [];
     }
-    config.channels.telegram = telegram;
 
     config.plugins = config.plugins ?? {};
     config.plugins.entries = config.plugins.entries ?? {};
@@ -243,15 +250,15 @@ export function generateBaseConfig(
   // Discord
   if (env.DISCORD_BOT_TOKEN) {
     const dmPolicy = env.DISCORD_DM_POLICY || 'pairing';
-    const dm: ConfigObject = { policy: dmPolicy };
-    if (dmPolicy === 'open') {
-      dm.allowFrom = ['*'];
+    config.channels.discord = config.channels.discord ?? {};
+    config.channels.discord.token = env.DISCORD_BOT_TOKEN;
+    config.channels.discord.enabled = true;
+    config.channels.discord.dm = config.channels.discord.dm ?? {};
+    config.channels.discord.dm.policy = dmPolicy;
+    // Only seed allowFrom on first boot so user edits are preserved.
+    if (!('allowFrom' in config.channels.discord.dm)) {
+      config.channels.discord.dm.allowFrom = dmPolicy === 'open' ? ['*'] : [];
     }
-    config.channels.discord = {
-      token: env.DISCORD_BOT_TOKEN,
-      enabled: true,
-      dm,
-    };
 
     config.plugins = config.plugins ?? {};
     config.plugins.entries = config.plugins.entries ?? {};
@@ -261,16 +268,39 @@ export function generateBaseConfig(
 
   // Slack
   if (env.SLACK_BOT_TOKEN && env.SLACK_APP_TOKEN) {
-    config.channels.slack = {
-      botToken: env.SLACK_BOT_TOKEN,
-      appToken: env.SLACK_APP_TOKEN,
-      enabled: true,
-    };
+    config.channels.slack = config.channels.slack ?? {};
+    config.channels.slack.botToken = env.SLACK_BOT_TOKEN;
+    config.channels.slack.appToken = env.SLACK_APP_TOKEN;
+    config.channels.slack.enabled = true;
 
     config.plugins = config.plugins ?? {};
     config.plugins.entries = config.plugins.entries ?? {};
     config.plugins.entries.slack = config.plugins.entries.slack ?? {};
     config.plugins.entries.slack.enabled = true;
+  }
+
+  // Stream Chat default channel (auto-provisioned at provision time)
+  if (env.STREAM_CHAT_API_KEY && env.STREAM_CHAT_BOT_USER_ID && env.STREAM_CHAT_BOT_USER_TOKEN) {
+    config.channels.streamchat = config.channels.streamchat ?? {};
+    config.channels.streamchat.apiKey = env.STREAM_CHAT_API_KEY;
+    config.channels.streamchat.botUserId = env.STREAM_CHAT_BOT_USER_ID;
+    config.channels.streamchat.botUserToken = env.STREAM_CHAT_BOT_USER_TOKEN;
+    config.channels.streamchat.botUserName = 'KiloClaw';
+    config.channels.streamchat.enabled = true;
+
+    config.plugins = config.plugins ?? {};
+    config.plugins.load = config.plugins.load ?? {};
+    config.plugins.load.paths = Array.isArray(config.plugins.load.paths)
+      ? config.plugins.load.paths
+      : [];
+    const pluginPath = '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
+    if (!(config.plugins.load.paths as string[]).includes(pluginPath)) {
+      (config.plugins.load.paths as string[]).push(pluginPath);
+    }
+
+    config.plugins.entries = config.plugins.entries ?? {};
+    config.plugins.entries.streamchat = config.plugins.entries.streamchat ?? {};
+    config.plugins.entries.streamchat.enabled = true;
   }
 
   // Webhook hooks configuration (required for Gmail push notifications via gog).
@@ -290,7 +320,133 @@ export function generateBaseConfig(
     console.log('Hooks enabled with gmail preset (dedicated token)');
   }
 
+  // Custom secret config path patching — set decrypted secret values at
+  // user-specified JSON dot-notation paths in openclaw.json.
+  if (env.KILOCLAW_SECRET_CONFIG_PATHS) {
+    try {
+      const pathMap: Record<string, string> = JSON.parse(env.KILOCLAW_SECRET_CONFIG_PATHS);
+      for (const [envVar, configPath] of Object.entries(pathMap)) {
+        const value = env[envVar];
+        if (value) {
+          setNestedValue(config, configPath, value);
+          console.log(`Patched custom secret ${envVar} → ${configPath}`);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to parse KILOCLAW_SECRET_CONFIG_PATHS:', err);
+    }
+  }
+
   return config;
+}
+
+/**
+ * Set a value at a dot-notation path in a nested object, creating
+ * intermediate objects as needed.
+ * e.g. setNestedValue(obj, "models.providers.openai.apiKey", "sk-...")
+ */
+const BANNED_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
+
+export function setNestedValue(obj: ConfigObject, path: string, value: string): void {
+  const segments = path.split('.');
+  for (const seg of segments) {
+    if (BANNED_SEGMENTS.has(seg)) {
+      console.warn(`Refusing to patch ${path}: "${seg}" is a banned path segment`);
+      return;
+    }
+  }
+  let current = obj;
+  for (let i = 0; i < segments.length - 1; i++) {
+    const existing = current[segments[i]];
+    if (existing != null && (typeof existing !== 'object' || Array.isArray(existing))) {
+      console.warn(
+        `Cannot patch ${path}: "${segments.slice(0, i + 1).join('.')}" is not an object`
+      );
+      return;
+    }
+    current[segments[i]] = existing ?? {};
+    current = current[segments[i]] as ConfigObject;
+  }
+  current[segments[segments.length - 1]] = value;
+}
+
+export const DEFAULT_MCPORTER_CONFIG_PATH = '/root/.openclaw/workspace/config/mcporter.json';
+
+/**
+ * Write mcporter.json with MCP server definitions derived from environment variables.
+ * MCPorter is the middleware layer that lets OpenClaw agents call MCP server tools
+ * via `mcporter call <server>.<tool>`. This bypasses openclaw.json's strict schema
+ * validation, which does not yet support `mcp.servers` (requires OpenClaw >= 2026.3.14).
+ *
+ * TODO: When the Dockerfile pins OpenClaw >= 2026.3.14, migrate MCP server config
+ * into generateBaseConfig() using `config.mcp.servers` in openclaw.json instead.
+ * The mcporter approach can then be removed. See PR #48611 in openclaw/openclaw.
+ */
+export function writeMcporterConfig(
+  env: EnvLike,
+  configPath = DEFAULT_MCPORTER_CONFIG_PATH,
+  deps: ConfigWriterDeps = defaultDeps
+): void {
+  // Read existing config to preserve user-added servers
+  let existing: Record<string, unknown> = {};
+  try {
+    const raw = deps.readFileSync(configPath, 'utf8');
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      existing = parsed as Record<string, unknown>;
+    }
+  } catch {
+    // No existing config or unreadable — start fresh
+  }
+
+  const existingServers =
+    typeof existing.mcpServers === 'object' && existing.mcpServers !== null
+      ? { ...(existing.mcpServers as Record<string, unknown>) }
+      : {};
+
+  // Managed server keys — add when env var is set, remove when absent.
+  // This ensures credential removal on the dashboard actually revokes access
+  // even though mcporter.json persists on the volume across restarts.
+  if (env.AGENTCARD_API_KEY) {
+    existingServers['agentcard'] = {
+      url: 'https://mcp.agentcard.sh/mcp',
+      headers: { Authorization: 'Bearer ' + env.AGENTCARD_API_KEY },
+    };
+    console.log('AgentCard MCP server configured (via mcporter)');
+  } else {
+    if ('agentcard' in existingServers) {
+      delete existingServers['agentcard'];
+      console.log('AgentCard MCP server removed from mcporter config');
+    }
+  }
+
+  if (env.LINEAR_API_KEY) {
+    existingServers['linear'] = {
+      url: 'https://mcp.linear.app/mcp',
+      headers: { Authorization: 'Bearer ${LINEAR_API_KEY}' },
+    };
+    console.log('Linear MCP server configured (via mcporter)');
+  } else {
+    if ('linear' in existingServers) {
+      delete existingServers['linear'];
+      console.log('Linear MCP server removed from mcporter config');
+    }
+  }
+
+  // Only write if there are servers to configure or we need to clean up
+  if (Object.keys(existingServers).length === 0 && !deps.existsSync(configPath)) {
+    return;
+  }
+
+  existing.mcpServers = existingServers;
+
+  const dir = path.dirname(configPath);
+  if (!deps.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  deps.writeFileSync(configPath, JSON.stringify(existing, null, 2));
+  console.log(`mcporter config written to ${configPath}`);
 }
 
 /**

@@ -27,8 +27,8 @@ export default function TopUpThankYouPage() {
                 </p>
                 <p>
                   <span className="mr-2">→</span>
-                  <strong>Access 500+ AI models</strong>, including Claude Sonnet 4.5, GPT-5.2,
-                  Gemini 3, and hundreds more
+                  <strong>Access 500+ AI models</strong>, including Claude Sonnet 4.6, GPT-5.4,
+                  Gemini 3.1, and hundreds more
                 </p>
               </div>
 

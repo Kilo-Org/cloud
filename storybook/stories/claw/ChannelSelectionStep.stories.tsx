@@ -38,3 +38,9 @@ export const SlackSelected: Story = {
     defaultSelected: 'slack',
   },
 };
+
+export const WithProvisioningBanner: Story = {
+  args: {
+    instanceRunning: false,
+  },
+};

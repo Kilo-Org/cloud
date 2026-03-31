@@ -198,6 +198,12 @@ export function PrimaryChartView({
             case 'tokens':
               value = point.inputTokenCount + point.outputTokenCount;
               break;
+            case 'inputTokens':
+              value = point.inputTokenCount;
+              break;
+            case 'outputTokens':
+              value = point.outputTokenCount;
+              break;
           }
 
           if (!timeGroups.has(timestamp)) {
@@ -331,7 +337,11 @@ export function PrimaryChartView({
     if (selectedMetric.key === 'cost' || selectedMetric.key === 'avgCost') {
       return `$${(value / 1000000).toFixed(4)}`;
     }
-    if (selectedMetric.key === 'tokens') {
+    if (
+      selectedMetric.key === 'tokens' ||
+      selectedMetric.key === 'inputTokens' ||
+      selectedMetric.key === 'outputTokens'
+    ) {
       return formatLargeNumber(value);
     }
     return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toString();

@@ -30,7 +30,7 @@ RUN apt-get update \
     && curl -fsSL https://downloads.1password.com/linux/keys/1password.asc \
        | gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg \
     && apt-get update \
-    && apt-get install -y --no-install-recommends gh 1password-cli=2.33.0-1 \
+    && apt-get install -y --no-install-recommends gh 1password-cli \
     && apt-get purge -y xz-utils \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* \
@@ -51,12 +51,14 @@ RUN npm install -g clawhub
 # Install mcporter (MCP server tooling)
 RUN npm install -g mcporter@0.7.3
 
+# Install Stream Chat channel plugin for OpenClaw (installed from GitHub, not npm)
+RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#catrielmuller/attach-support
+
 # Install summarize (web page summarization CLI)
 RUN npm install -g @steipete/summarize@0.12.0
 
 # Install Kilo CLI (agentic coding assistant for the terminal)
 RUN npm install -g @kilocode/cli@7.0.46
-
 
 # Install Go (available at runtime for users to `go install` additional tools)
 ENV GO_VERSION=1.26.0
@@ -111,7 +113,7 @@ RUN mkdir -p /root/.openclaw \
 
 # Copy helper scripts (used at runtime by the controller/gateway)
 # Build cache bust: 2026-03-17-v65-remove-startup-script
-RUN echo "10"
+RUN echo "11"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

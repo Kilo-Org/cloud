@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
   Table,
@@ -23,7 +23,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { ChevronLeft, ChevronRight, X, Bomb } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow, format, parseISO } from 'date-fns';
 import {
@@ -38,7 +48,7 @@ import {
 
 type SortField = 'created_at' | 'destroyed_at';
 type SortOrder = 'asc' | 'desc';
-type StatusFilter = 'all' | 'active' | 'destroyed';
+type StatusFilter = 'all' | 'active' | 'suspended' | 'destroyed';
 
 function toSortedSearchParams(obj: Record<string, unknown>): URLSearchParams {
   const params = new URLSearchParams();
@@ -67,6 +77,7 @@ function formatLifespan(minutes: number | null): string {
 type OverviewData = {
   totalInstances: number;
   activeInstances: number;
+  suspendedInstances: number;
   destroyedInstances: number;
   uniqueUsers: number;
   last24hCreated: number;
@@ -77,7 +88,7 @@ type OverviewData = {
 
 function OverviewStatsCards({ data }: { data: OverviewData }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Total Instances</CardTitle>
@@ -99,6 +110,16 @@ function OverviewStatsCards({ data }: { data: OverviewData }) {
           <p className="text-muted-foreground text-xs">
             {data.destroyedInstances.toLocaleString()} destroyed
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Suspended Instances</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{data.suspendedInstances.toLocaleString()}</div>
+          <p className="text-muted-foreground text-xs">Suspended by billing lifecycle</p>
         </CardContent>
       </Card>
 
@@ -216,6 +237,66 @@ function DailyChart({ data }: { data: DailyChartData[] }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// --- Dev Nuke All Button ---
+
+function DevNukeAllButton() {
+  if (process.env.NODE_ENV !== 'development') return null;
+
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+
+  const nukeAll = useMutation(
+    trpc.admin.kiloclawInstances.devNukeAll.mutationOptions({
+      onSuccess(data) {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.list.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.stats.queryKey(),
+        });
+        const errorSuffix =
+          data.errors.length > 0
+            ? `\n${data.errors.length} failed:\n${data.errors.map(e => `  ${e.userId}: ${e.error}`).join('\n')}`
+            : '';
+        alert(`Destroyed ${data.destroyed}/${data.total} instances${errorSuffix}`);
+      },
+    })
+  );
+
+  return (
+    <>
+      <Button variant="destructive" onClick={() => setOpen(true)} disabled={nukeAll.isPending}>
+        <Bomb className="mr-2 h-4 w-4" />
+        {nukeAll.isPending ? 'Nuking...' : 'Nuke All'}
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Nuke all KiloClaw instances?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will destroy every active KiloClaw instance. This action cannot be undone. Only
+              available in development mode.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                nukeAll.mutate();
+                setOpen(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Nuke All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -375,9 +456,12 @@ export function KiloclawInstancesPage() {
           <SelectContent>
             <SelectItem value="all">All Instances</SelectItem>
             <SelectItem value="active">Active Only</SelectItem>
+            <SelectItem value="suspended">Suspended Only</SelectItem>
             <SelectItem value="destroyed">Destroyed Only</SelectItem>
           </SelectContent>
         </Select>
+
+        <DevNukeAllButton />
       </div>
 
       {/* Table */}
@@ -438,7 +522,7 @@ export function KiloclawInstancesPage() {
                 >
                   <TableCell>
                     <Link
-                      href={`/admin/users/${instance.user_id}`}
+                      href={`/admin/users/${encodeURIComponent(instance.user_id)}`}
                       className="text-blue-600 hover:underline"
                       onClick={e => e.stopPropagation()}
                     >
@@ -455,12 +539,14 @@ export function KiloclawInstancesPage() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {instance.destroyed_at === null ? (
+                    {instance.destroyed_at !== null ? (
+                      <Badge variant="secondary">Destroyed</Badge>
+                    ) : instance.suspended_at !== null ? (
+                      <Badge className="bg-amber-600">Suspended</Badge>
+                    ) : (
                       <Badge variant="default" className="bg-green-600">
                         Active
                       </Badge>
-                    ) : (
-                      <Badge variant="secondary">Destroyed</Badge>
                     )}
                   </TableCell>
                   <TableCell

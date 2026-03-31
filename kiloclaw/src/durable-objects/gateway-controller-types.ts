@@ -45,6 +45,22 @@ export const ControllerVersionResponseSchema = z.object({
   openclawCommit: z.string().nullable().optional(),
 });
 
+export type ControllerHealthResponse = {
+  status: 'ok';
+  state: 'bootstrapping' | 'starting' | 'ready' | 'degraded';
+  phase?: string;
+  error?: string;
+};
+
+export const ControllerHealthResponseSchema: ZodType<ControllerHealthResponse> = z.object({
+  status: z.literal('ok'),
+  state: z.enum(['bootstrapping', 'starting', 'ready', 'degraded']),
+  phase: z.string().optional(),
+  error: z.string().optional(),
+});
+
+export const GatewayReadyResponseSchema = z.record(z.string(), z.unknown());
+
 export const EnvPatchResponseSchema = z.object({
   ok: z.boolean(),
   signaled: z.boolean(),
@@ -110,4 +126,23 @@ export const ControllerDevicePairingResponseSchema = z.object({
 export const ControllerPairingApproveResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Kilo CLI run
+// ──────────────────────────────────────────────────────────────────────
+
+export const KiloCliRunStartResponseSchema = z.object({
+  ok: z.boolean(),
+  startedAt: z.string(),
+});
+
+export const KiloCliRunStatusResponseSchema = z.object({
+  hasRun: z.boolean(),
+  status: z.enum(['running', 'completed', 'failed', 'cancelled']).nullable(),
+  output: z.string().nullable(),
+  exitCode: z.number().int().nullable(),
+  startedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  prompt: z.string().nullable(),
 });

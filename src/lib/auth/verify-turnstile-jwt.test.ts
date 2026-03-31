@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { verifyTurnstileJWT } from './verify-turnstile-jwt';
 import jwt from 'jsonwebtoken';

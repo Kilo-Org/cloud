@@ -32,6 +32,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
     cloudAgentSessionId: string;
     organizationId?: string;
     createdOnPlatform: string;
+    title?: string;
   }): Promise<void> {
     const parsed = z
       .object({
@@ -40,6 +41,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
         cloudAgentSessionId: z.string().min(1),
         organizationId: z.string().optional(),
         createdOnPlatform: z.string().min(1),
+        title: z.string().optional(),
       })
       .parse(params);
 
@@ -53,6 +55,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> {
         cloud_agent_session_id: parsed.cloudAgentSessionId,
         organization_id: parsed.organizationId ?? null,
         created_on_platform: parsed.createdOnPlatform,
+        ...(parsed.title !== undefined ? { title: parsed.title } : {}),
         version: 0,
       })
       .onConflictDoUpdate({

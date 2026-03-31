@@ -99,6 +99,11 @@ const DeleteSessionInputSchema = z.object({
   session_id: sessionIdField,
 });
 
+const RenameSessionInputSchema = z.object({
+  session_id: sessionIdField,
+  title: z.string().trim().min(1).max(200),
+});
+
 const ShareSessionInputSchema = z.object({
   session_id: sessionIdField,
 });
@@ -357,7 +362,10 @@ export const cliSessionsV2Router = createTRPCRouter({
         if (!isSessionNotFoundError(err)) {
           captureException(err, {
             tags: { source: 'cli-sessions-v2-router', endpoint: 'delete' },
-            extra: { session_id, cloud_agent_session_id: session.cloud_agent_session_id },
+            extra: {
+              session_id,
+              cloud_agent_session_id: session.cloud_agent_session_id,
+            },
           });
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
@@ -374,6 +382,34 @@ export const cliSessionsV2Router = createTRPCRouter({
     await deleteSessionIngest(session_id, ctx.user.id);
 
     return { success: true, session_id };
+  }),
+
+  /**
+   * Rename a V2 session by updating its title.
+   */
+  rename: baseProcedure.input(RenameSessionInputSchema).mutation(async ({ ctx, input }) => {
+    const { session_id, title } = input;
+    const session = await getSessionWithOwnerCheck(session_id, ctx.user.id);
+
+    const [updated] = await db
+      .update(cli_sessions_v2)
+      .set({ title, updated_at: session.updated_at })
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, session_id),
+          eq(cli_sessions_v2.kilo_user_id, ctx.user.id)
+        )
+      )
+      .returning({ title: cli_sessions_v2.title });
+
+    if (!updated) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Session not found',
+      });
+    }
+
+    return { title: updated.title };
   }),
 
   /**

@@ -27,6 +27,7 @@ export { createCloudAgentNextFetchClient } from './cloud-agent-next-client.js';
 export type {
   CloudAgentNextFetchClient,
   CallbackTarget,
+  CloudAgentTerminalReason,
   CloudAgentPrepareSessionInput,
   CloudAgentPrepareSessionOutput,
   CloudAgentInitiateInput,
@@ -37,6 +38,7 @@ export type {
   CloudAgentInterruptInput,
   CloudAgentInterruptOutput,
 } from './cloud-agent-next-client.js';
+export { CloudAgentNextBillingError, CloudAgentNextError } from './cloud-agent-next-client.js';
 
 export {
   signKiloToken,
@@ -45,3 +47,10 @@ export {
   KILO_TOKEN_VERSION,
 } from './kilo-token.js';
 export type { KiloTokenPayload, SignKiloTokenExtra } from './kilo-token.js';
+
+export { SessionMetricsParamsSchema, TerminationReasons } from './session-metrics-schema.js';
+export type { SessionMetricsParams, SessionMetricsParamsInput } from './session-metrics-schema.js';
+
+export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id.js';
+
+export { redactSensitiveHeaders } from './redact-headers.js';

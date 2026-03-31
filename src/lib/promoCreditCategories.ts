@@ -327,7 +327,7 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
  * These are decrypted at runtime to build the actual selfServicePromos array.
  *
  * To add a new promo code:
- * 1. Run: pnpm promo encrypt PROMO_CODE
+ * 1. Run: vercel env run -e production -- pnpm promo encrypt PROMO_CODE
  * 2. Copy the encrypted value and use in encrypted_credit_category
  */
 const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCategoryConfig[] = [
@@ -571,7 +571,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
-    promotion_ends_at: new Date('2026-03-01'),
+    promotion_ends_at: new Date('2027-01-01'),
     description: 'Emilie Valentine Experiment',
     total_redemptions_allowed: 5000,
   },
@@ -674,6 +674,25 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     promotion_ends_at: new Date('2026-04-30'),
     description: 'Austin ClawCon Credits',
     total_redemptions_allowed: 2000,
+  },
+  {
+    encrypted_credit_category: 'RFk4Mcj/NAJbHZoMe9zs2Q==:80p2tRoXKZS91Rd4DFeLVg==:aVXBzgFw/2Ppmg==',
+    is_user_selfservicable: true,
+    is_idempotent: true,
+    amount_usd: 100,
+    expiry_hours: 30 * 24,
+    description: 'Creator promo',
+    total_redemptions_allowed: 30,
+  },
+  {
+    encrypted_credit_category: 'RIm83T1nOqaomIGaGB/uqA==:+LACBlJljL/mS/65uzflrw==:fNGT77oHV8M=',
+    is_user_selfservicable: true,
+    is_idempotent: true,
+    amount_usd: 50,
+    expiry_hours: 14 * 24,
+    promotion_ends_at: new Date('2026-04-30'),
+    description: 'Miami ClawCon Credits',
+    total_redemptions_allowed: 1050,
   },
 ];
 

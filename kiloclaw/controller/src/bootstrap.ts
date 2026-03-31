@@ -13,7 +13,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync as nodeExecFileSync } from 'node:child_process';
-import { generateBaseConfig, writeBaseConfig } from './config-writer';
+import { generateBaseConfig, writeBaseConfig, writeMcporterConfig } from './config-writer';
 import type { ConfigWriterDeps } from './config-writer';
 import { atomicWrite } from './atomic-write';
 
@@ -188,6 +188,11 @@ export function setupDirectories(env: EnvLike, deps: BootstrapDeps = defaultDeps
 
   // GOG_KEYRING_PASSWORD is NOT a secret — see gog-credentials.ts for context.
   env.GOG_KEYRING_PASSWORD = 'kiloclaw';
+
+  // Derive the API origin for the Kilo CLI from the full base URL.
+  if (env.KILOCODE_API_BASE_URL) {
+    env.KILO_API_URL = new URL(env.KILOCODE_API_BASE_URL).origin;
+  }
 }
 
 // ---- Step 3: Feature flags ----
@@ -324,7 +329,24 @@ export function configureGitHub(env: EnvLike, deps: BootstrapDeps = defaultDeps)
   }
 }
 
-// ---- Step 6: Onboard / doctor + config patching ----
+// ---- Step 6: Linear config ----
+
+/**
+ * Configure or clean up Linear MCP access.
+ * Linear access is provided via the Linear MCP server configured in mcporter.
+ * When LINEAR_API_KEY is present, mcporter uses it to authenticate.
+ * When absent, we just clean up the env var. No on-disk artifacts to clean.
+ */
+export function configureLinear(env: EnvLike): void {
+  if (env.LINEAR_API_KEY) {
+    console.log('Linear MCP configured via LINEAR_API_KEY');
+  } else {
+    delete env.LINEAR_API_KEY;
+    console.log('Linear: not configured');
+  }
+}
+
+// ---- Step 7: Onboard / doctor + config patching ----
 
 /**
  * Run openclaw onboard (first boot) or openclaw doctor (subsequent boots),
@@ -386,13 +408,64 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
   }
 }
 
-// ---- Step 7: TOOLS.md Google Workspace section ----
+// ---- TOOLS.md bounded-section helper ----
 
-const GOG_MARKER_BEGIN = '<!-- BEGIN:google-workspace -->';
-const GOG_MARKER_END = '<!-- END:google-workspace -->';
+export type ToolsMdSectionConfig = {
+  name: string;
+  beginMarker: string;
+  endMarker: string;
+  section: string;
+};
 
-const GOG_TOOLS_SECTION = `
-${GOG_MARKER_BEGIN}
+/**
+ * Manage a bounded section in TOOLS.md.
+ *
+ * When `enabled` is true, append the section if not already present.
+ * When `enabled` is false, remove any stale section.
+ * Idempotent: skips if the marker is already present.
+ */
+export function updateToolsMdSection(
+  enabled: boolean,
+  config: ToolsMdSectionConfig,
+  deps: BootstrapDeps
+): void {
+  if (!deps.existsSync(TOOLS_MD_DEST)) return;
+
+  const content = deps.readFileSync(TOOLS_MD_DEST, 'utf8');
+
+  if (enabled) {
+    if (!content.includes(config.beginMarker)) {
+      deps.writeFileSync(TOOLS_MD_DEST, content + config.section);
+      console.log(`TOOLS.md: added ${config.name} section`);
+    } else {
+      console.log(`TOOLS.md: ${config.name} section already present`);
+    }
+  } else {
+    if (content.includes(config.beginMarker)) {
+      const beginIdx = content.indexOf(config.beginMarker);
+      const endIdx = content.indexOf(config.endMarker);
+      if (beginIdx !== -1 && endIdx !== -1) {
+        const before = content.slice(0, beginIdx).replace(/\n+$/, '\n');
+        const after = content.slice(endIdx + config.endMarker.length).replace(/^\n+/, '');
+        deps.writeFileSync(TOOLS_MD_DEST, before + after);
+        console.log(`TOOLS.md: removed stale ${config.name} section`);
+      } else {
+        console.warn(
+          `TOOLS.md: ${config.name} BEGIN marker found but END marker missing, skipping removal`
+        );
+      }
+    }
+  }
+}
+
+// ---- TOOLS.md section configs ----
+
+export const GOG_SECTION_CONFIG: ToolsMdSectionConfig = {
+  name: 'Google Workspace',
+  beginMarker: '<!-- BEGIN:google-workspace -->',
+  endMarker: '<!-- END:google-workspace -->',
+  section: `
+<!-- BEGIN:google-workspace -->
 ## Google Workspace
 
 The \`gog\` CLI is configured and ready for Google Workspace operations (Gmail, Calendar, Drive, Docs, Sheets, Slides, Tasks, Forms, Chat, Classroom).
@@ -405,44 +478,62 @@ The \`gog\` CLI is configured and ready for Google Workspace operations (Gmail, 
 - Drive — list files: \`gog drive files list --account <email>\`
 - Docs — read: \`gog docs get --account <email> <doc-id>\`
 - Run \`gog --help\` and \`gog <service> --help\` for all available commands.
-${GOG_MARKER_END}`;
+<!-- END:google-workspace -->`,
+};
 
-/**
- * Manage the Google Workspace section in TOOLS.md.
- *
- * When gog credentials are present, append a bounded section so the agent
- * knows gog is available. When credentials are absent, remove any stale
- * section. Idempotent: skips if the marker is already present.
- */
-export function updateToolsMdGoogleSection(env: EnvLike, deps: BootstrapDeps): void {
-  if (!deps.existsSync(TOOLS_MD_DEST)) return;
+export const KILO_CLI_SECTION_CONFIG: ToolsMdSectionConfig = {
+  name: 'Kilo CLI',
+  beginMarker: '<!-- BEGIN:kilo-cli -->',
+  endMarker: '<!-- END:kilo-cli -->',
+  section: `
+<!-- BEGIN:kilo-cli -->
+## Kilo CLI
 
-  const content = deps.readFileSync(TOOLS_MD_DEST, 'utf8');
+The Kilo CLI (\`kilo\`) is an agentic coding assistant for the terminal, pre-configured with your KiloCode account.
 
-  if (env.KILOCLAW_GOG_CONFIG_TARBALL) {
-    // Google connected — add section if not already present
-    if (!content.includes(GOG_MARKER_BEGIN)) {
-      deps.writeFileSync(TOOLS_MD_DEST, content + GOG_TOOLS_SECTION);
-      console.log('TOOLS.md: added Google Workspace section');
-    } else {
-      console.log('TOOLS.md: Google Workspace section already present');
-    }
-  } else {
-    // Google not connected — remove stale section if present
-    if (content.includes(GOG_MARKER_BEGIN)) {
-      const beginIdx = content.indexOf(GOG_MARKER_BEGIN);
-      const endIdx = content.indexOf(GOG_MARKER_END);
-      if (beginIdx !== -1 && endIdx !== -1) {
-        const before = content.slice(0, beginIdx).replace(/\n+$/, '\n');
-        const after = content.slice(endIdx + GOG_MARKER_END.length).replace(/^\n+/, '');
-        deps.writeFileSync(TOOLS_MD_DEST, before + after);
-        console.log('TOOLS.md: removed stale Google Workspace section');
-      }
-    }
-  }
-}
+- Interactive mode: \`kilo\`
+- Autonomous mode: \`kilo run --auto "your task description"\`
+- Config: \`/root/.config/kilo/opencode.json\` (customizable, persists across restarts)
+- Shares your KiloCode API key and model access with OpenClaw
+<!-- END:kilo-cli -->`,
+};
 
-// ---- Step 8: Gateway args ----
+export const OP_SECTION_CONFIG: ToolsMdSectionConfig = {
+  name: '1Password',
+  beginMarker: '<!-- BEGIN:1password -->',
+  endMarker: '<!-- END:1password -->',
+  section: `
+<!-- BEGIN:1password -->
+## 1Password
+
+The \`op\` CLI is configured with a 1Password service account. Use it to look up credentials, generate passwords, and manage vault items.
+
+- List vaults: \`op vault list\`
+- Search items: \`op item list --vault <vault-name>\`
+- Get a credential: \`op item get "<item-name>" --vault <vault-name>\`
+- Get specific field: \`op item get "<item-name>" --fields password --vault <vault-name>\`
+- Generate password: \`op item create --category login --title "New Login" --generate-password\`
+- Run \`op --help\` for all available commands.
+
+**Security note:** Only access credentials the user has explicitly requested. Do not list or expose vault contents unnecessarily.
+<!-- END:1password -->`,
+};
+
+export const LINEAR_SECTION_CONFIG: ToolsMdSectionConfig = {
+  name: 'Linear',
+  beginMarker: '<!-- BEGIN:linear -->',
+  endMarker: '<!-- END:linear -->',
+  section: `
+<!-- BEGIN:linear -->
+## Linear
+
+Linear is configured as your project management tool. Use it  to track issues, plan projects, and manage product roadmaps.
+You can interact with the \`Linear\` MCP server using your \`mcporter\` skill.
+
+  <!-- END:linear -->`,
+};
+
+// ---- Step 11: Gateway args ----
 
 /**
  * Build the gateway CLI arguments array.
@@ -491,12 +582,22 @@ export async function bootstrap(
   configureGitHub(env, deps);
   await yieldToEventLoop();
 
+  setPhase('linear');
+  configureLinear(env);
+  await yieldToEventLoop();
+
   const configExists = deps.existsSync(CONFIG_PATH);
   setPhase(configExists ? 'doctor' : 'onboard');
   runOnboardOrDoctor(env, deps);
   await yieldToEventLoop();
 
-  updateToolsMdGoogleSection(env, deps);
+  updateToolsMdSection(true, KILO_CLI_SECTION_CONFIG, deps);
+  updateToolsMdSection(!!env.KILOCLAW_GOG_CONFIG_TARBALL, GOG_SECTION_CONFIG, deps);
+  updateToolsMdSection(!!env.OP_SERVICE_ACCOUNT_TOKEN, OP_SECTION_CONFIG, deps);
+  updateToolsMdSection(!!env.LINEAR_API_KEY, LINEAR_SECTION_CONFIG, deps);
+
+  // Write mcporter config for MCP servers (AgentCard, etc.)
+  writeMcporterConfig(env);
 
   env.KILOCLAW_GATEWAY_ARGS = JSON.stringify(buildGatewayArgs(env));
 }

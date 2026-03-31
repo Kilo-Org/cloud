@@ -11,7 +11,16 @@ describe('buildConfiguredSecrets', () => {
 
   it('returns all entries as false when no secrets are configured', () => {
     const result = buildConfiguredSecrets({});
-    expect(result).toEqual({ telegram: false, discord: false, slack: false, github: false });
+    expect(result).toEqual({
+      telegram: false,
+      discord: false,
+      slack: false,
+      github: false,
+      linear: false,
+      agentcard: false,
+      onepassword: false,
+      'brave-search': false,
+    });
   });
 
   it('marks entry as configured when encryptedSecrets has the env var key', () => {
@@ -30,7 +39,10 @@ describe('buildConfiguredSecrets', () => {
     expect(partial.slack).toBe(false);
 
     const full = buildConfiguredSecrets({
-      encryptedSecrets: { SLACK_BOT_TOKEN: envelope, SLACK_APP_TOKEN: envelope },
+      encryptedSecrets: {
+        SLACK_BOT_TOKEN: envelope,
+        SLACK_APP_TOKEN: envelope,
+      },
     });
     expect(full.slack).toBe(true);
   });
@@ -101,12 +113,17 @@ describe('buildConfiguredSecrets', () => {
     expect(keys).toContain('telegram');
     expect(keys).toContain('discord');
     expect(keys).toContain('slack');
-    expect(keys).toHaveLength(4);
+    expect(keys).toContain('linear');
+    expect(keys).toContain('onepassword');
+    expect(keys).toContain('brave-search');
+    expect(keys).toHaveLength(8);
   });
 
   it('treats null values as not configured', () => {
     const result = buildConfiguredSecrets({
-      encryptedSecrets: { TELEGRAM_BOT_TOKEN: null as unknown as Record<string, unknown> },
+      encryptedSecrets: {
+        TELEGRAM_BOT_TOKEN: null as unknown as Record<string, unknown>,
+      },
     });
     expect(result.telegram).toBe(false);
   });

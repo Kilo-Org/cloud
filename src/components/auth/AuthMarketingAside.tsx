@@ -19,8 +19,8 @@ export function AuthMarketingAside() {
           </li>
           <li className="flex items-center gap-4">
             <div className="flex-1">
-              Access <span className="font-bold">500+ AI models</span>, including Claude Sonnet 4.5,
-              GPT-5.2, Gemini 3, and hundreds more
+              Access <span className="font-bold">500+ AI models</span>, including Claude Sonnet 4.6,
+              GPT-5.4, Gemini 3.1, and hundreds more
             </div>
           </li>
           <li className="flex items-center gap-4">

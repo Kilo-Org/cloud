@@ -440,7 +440,7 @@ export function OrganizationAdminMembers({
                             {member.status === 'active' && member.name ? (
                               showAdminLinks ? (
                                 <Link
-                                  href={`/admin/users/${member.id}`}
+                                  href={`/admin/users/${encodeURIComponent(member.id)}`}
                                   className="flex items-center gap-1 font-medium hover:underline"
                                 >
                                   {member.name}

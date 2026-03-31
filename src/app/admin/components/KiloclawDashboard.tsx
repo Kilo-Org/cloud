@@ -5,9 +5,11 @@ import { useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { KiloclawInstancesPage } from './KiloclawInstances/KiloclawInstancesPage';
 import { VersionsTab, PinsTab } from './KiloclawVersions/KiloclawVersionsPage';
+import { RegionsTab } from './KiloclawRegions/KiloclawRegionsPage';
+import { CliRunsTab } from './KiloclawCliRuns/KiloclawCliRunsTab';
 
-const VALID_TABS: readonly string[] = ['instances', 'versions', 'pins'];
-type Tab = 'instances' | 'versions' | 'pins';
+const VALID_TABS: readonly string[] = ['instances', 'versions', 'pins', 'regions', 'cli-runs'];
+type Tab = 'instances' | 'versions' | 'pins' | 'regions' | 'cli-runs';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -49,6 +51,12 @@ export function KiloclawDashboard() {
           <TabsTrigger value="pins" className={tabTriggerClass}>
             Pins
           </TabsTrigger>
+          <TabsTrigger value="regions" className={tabTriggerClass}>
+            Regions
+          </TabsTrigger>
+          <TabsTrigger value="cli-runs" className={tabTriggerClass}>
+            CLI Runs
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="instances" className="mt-4">
           <KiloclawInstancesPage />
@@ -58,6 +66,12 @@ export function KiloclawDashboard() {
         </TabsContent>
         <TabsContent value="pins" className="mt-4">
           <PinsTab />
+        </TabsContent>
+        <TabsContent value="regions" className="mt-4">
+          <RegionsTab />
+        </TabsContent>
+        <TabsContent value="cli-runs" className="mt-4">
+          <CliRunsTab />
         </TabsContent>
       </Tabs>
     </div>

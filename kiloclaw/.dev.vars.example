@@ -23,6 +23,10 @@ GATEWAY_TOKEN_SECRET=dev-gateway-secret-kiloclaw
 # Fly app naming prefix ("dev-") for per-user app creation.
 WORKER_ENV=development
 
+# Backend app origin for internal API calls (e.g. instance-ready email).
+# In dev, point this at your local Next.js server.
+BACKEND_API_URL=http://localhost:3000
+
 # Tunnel URL (set automatically by the dev-start script)
 # OpenClaw's native kilocode provider hardcodes https://api.kilo.ai/api/gateway/.
 # In dev, the script sets this to the Cloudflare tunnel URL pointing to your
@@ -35,8 +39,9 @@ FLY_API_TOKEN=fo1_...
 # Fly org slug. The dev-start script reads this value for token creation.
 # Use "kilo-dev" for Kilo team members, or "personal" for your own Fly account.
 FLY_ORG_SLUG=kilo-dev
-# Shared Docker image registry app (images are pushed here, referenced by all per-user apps)
-FLY_REGISTRY_APP=kiloclaw-dev
+# Shared Docker image registry app (images are pushed here, referenced by all per-user apps).
+# In production this is "kiloclaw-machines". For dev, use "kiloclaw-registry-dev".
+FLY_REGISTRY_APP=kiloclaw-registry-dev
 # Default region for new users. Comma-separated priority list of region codes or aliases.
 # Fly tries the first region, falls back to the next if unavailable.
 # Examples: "us,eu" (try US first, then Europe), "lhr,fra" (London first, then Frankfurt)
@@ -61,6 +66,9 @@ FLY_APP_NAME=kiloclaw-dev
 # (claw.kilosessions.ai), so that origin must be included for local dev.
 OPENCLAW_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8795,http://claw.kilosessions.ai
 
+# PostHog product telemetry (public project token, same as .env).
+NEXT_PUBLIC_POSTHOG_KEY=phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z
+
 # Encryption (for user secrets)
 # Get the dev version from 1Password (engineering vault). Quote the value.
 # AGENT_ENV_VARS_PRIVATE_KEY=...
@@ -69,3 +77,7 @@ OPENCLAW_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8795,http://claw
 # In wrangler dev, it connects to the remote Postgres via the Hyperdrive service.
 # To use a local Postgres instead, add "localConnectionString" to the hyperdrive
 # config in wrangler.jsonc (see https://developers.cloudflare.com/hyperdrive/configuration/local-development/).
+
+# StreamChat API Key
+STREAM_CHAT_API_KEY=...
+STREAM_CHAT_API_SECRET=...

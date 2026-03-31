@@ -5,6 +5,14 @@
 
 // -- Machine types --
 
+/**
+ * Fly Machine states we handle.
+ * Based on https://fly.io/docs/machines/machine-states/
+ *
+ * Only states we encounter in practice are listed here. The full Fly docs
+ * enumerate additional states (creating, suspending, restarting, launch_failed,
+ * replaced, migrated) which can be added when we need to handle them explicitly.
+ */
 export type FlyMachineState =
   | 'created'
   | 'starting'
@@ -13,6 +21,7 @@ export type FlyMachineState =
   | 'stopped'
   | 'suspended'
   | 'replacing'
+  | 'updating'
   | 'destroying'
   | 'destroyed'
   | 'failed';
@@ -121,6 +130,7 @@ type CreateVolumeBaseRequest = {
 type CreateFreshVolumeRequest = {
   size_gb: number;
   source_volume_id?: never;
+  snapshot_id?: never;
 };
 
 type CreateForkedVolumeRequest = {
@@ -131,14 +141,23 @@ type CreateForkedVolumeRequest = {
    * Forked volume size is inherited from the source volume.
    */
   size_gb?: never;
+  snapshot_id?: never;
+};
+
+type CreateSnapshotVolumeRequest = {
+  /** Create a new volume from a snapshot. Fly requires size_gb even for snapshots. */
+  snapshot_id: string;
+  size_gb: number;
+  source_volume_id?: never;
 };
 
 export type CreateVolumeRequest =
   | (CreateVolumeBaseRequest & CreateFreshVolumeRequest)
-  | (CreateVolumeBaseRequest & CreateForkedVolumeRequest);
+  | (CreateVolumeBaseRequest & CreateForkedVolumeRequest)
+  | (CreateVolumeBaseRequest & CreateSnapshotVolumeRequest);
 
 export type CreateVolumeRequestWithoutRegion = Omit<CreateVolumeBaseRequest, 'region'> &
-  (CreateFreshVolumeRequest | CreateForkedVolumeRequest);
+  (CreateFreshVolumeRequest | CreateForkedVolumeRequest | CreateSnapshotVolumeRequest);
 
 // -- Volume snapshot types --
 

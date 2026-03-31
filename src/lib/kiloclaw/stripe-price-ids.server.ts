@@ -19,6 +19,7 @@ function getPriceIdMetadata(): Record<string, ClawPlan> {
     cachedPriceIdMetadata = {
       [requireEnvVariable('STRIPE_KILOCLAW_COMMIT_PRICE_ID')]: 'commit',
       [requireEnvVariable('STRIPE_KILOCLAW_STANDARD_PRICE_ID')]: 'standard',
+      [requireEnvVariable('STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID')]: 'standard',
     };
   }
   return cachedPriceIdMetadata;
@@ -40,6 +41,17 @@ export function getStripePriceIdForClawPlan(plan: ClawPlan): string {
   if (plan === 'standard') {
     return requireEnvVariable('STRIPE_KILOCLAW_STANDARD_PRICE_ID');
   }
-  // Exhaustive guard
   throw new Error(`Unsupported KiloClaw plan: ${plan satisfies never}`);
+}
+
+export function getStripePriceIdForClawPlanIntro(plan: ClawPlan): string {
+  if (plan === 'standard') {
+    return requireEnvVariable('STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID');
+  }
+  // Commit has no intro price — fall through to regular price
+  return getStripePriceIdForClawPlan(plan);
+}
+
+export function isIntroPriceId(priceId: string): boolean {
+  return priceId === requireEnvVariable('STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID');
 }

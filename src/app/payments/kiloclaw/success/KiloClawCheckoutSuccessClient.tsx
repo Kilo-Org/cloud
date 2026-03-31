@@ -6,6 +6,15 @@ import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 
+/**
+ * Checkout success polling states:
+ * 1. Waiting for subscription creation (Stripe webhook fires)
+ * 2. Waiting for invoice settlement (payment_source flips to 'credits')
+ * 3. Fully activated — redirect to dashboard
+ *
+ * Per Subscription Checkout rule 10, the subscription is not fully
+ * activated until invoice settlement converts it to hybrid state.
+ */
 export function KiloClawCheckoutSuccessClient() {
   const router = useRouter();
   const trpc = useTRPC();
@@ -16,13 +25,19 @@ export function KiloClawCheckoutSuccessClient() {
     refetchInterval: timedOut ? false : 1_000,
   });
 
-  const isActive = billingStatus?.subscription?.status === 'active';
+  const sub = billingStatus?.subscription;
+  // Subscription row exists (Stripe webhook created it)
+  const subscriptionCreated = sub?.status === 'active';
+  // Invoice settlement completed — payment_source is 'credits' (hybrid state)
+  const settlementCompleted = subscriptionCreated && sub.paymentSource === 'credits';
+  // Fully activated: settlement done, or subscription is active with credits already
+  const isFullyActivated = settlementCompleted;
 
   useEffect(() => {
-    if (!isActive) return;
+    if (!isFullyActivated) return;
     const timer = setTimeout(() => router.push('/claw'), 2_000);
     return () => clearTimeout(timer);
-  }, [isActive, router]);
+  }, [isFullyActivated, router]);
 
   useEffect(() => {
     const timer = setTimeout(() => setTimedOut(true), 30_000);
@@ -32,7 +47,7 @@ export function KiloClawCheckoutSuccessClient() {
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="text-center">
-        {isActive ? (
+        {isFullyActivated ? (
           <>
             <CheckCircle2 className="text-brand-primary mx-auto mb-4 size-12" />
             <h1 className="mb-2 text-2xl font-bold">Subscription Active!</h1>
@@ -51,6 +66,12 @@ export function KiloClawCheckoutSuccessClient() {
             >
               Go to Dashboard
             </button>
+          </>
+        ) : subscriptionCreated ? (
+          <>
+            <Loader2 className="text-brand-primary mx-auto mb-4 size-12 animate-spin" />
+            <h1 className="mb-2 text-2xl font-bold">Processing payment...</h1>
+            <p className="text-muted-foreground">Activating your hosting subscription.</p>
           </>
         ) : (
           <>

@@ -18,7 +18,12 @@ import type {
   OpenRouterProviderConfig,
   GatewayRequest,
 } from '@/lib/providers/openrouter/types';
-import { getFraudDetectionHeaders, toMicrodollars } from '@/lib/utils';
+import {
+  type FraudDetectionHeaders,
+  getFraudDetectionHeaders,
+  isRooCodeBasedClient,
+  toMicrodollars,
+} from '@/lib/utils';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/providers/openrouter';
@@ -32,6 +37,7 @@ import type {
 } from '@/lib/processUsage.types';
 import { getMaxTokens } from '@/lib/providers/openrouter/request-helpers';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto-model';
+import type { GatewayChatApiKind, ProviderId } from '@/lib/providers/types';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
 // This allows FIM requests to be tracked consistently with chat requests
@@ -64,6 +70,16 @@ export function temporarilyUnavailableResponse() {
       message: 'The service is temporarily unavailable. Please try again later.',
     },
     { status: 503 }
+  );
+}
+
+export function upgradeRequiredResponse() {
+  return NextResponse.json(
+    {
+      error: 'upgrade_required',
+      message: 'Please upgrade your Kilo extension to the latest version.',
+    },
+    { status: 426 }
   );
 }
 
@@ -102,10 +118,12 @@ export function dataCollectionRequiredResponse() {
   );
 }
 
-export function alphaPeriodEndedResponse() {
-  // https://github.com/Kilo-Org/kilocode/blob/50d6bd482bec6fae7d1c80b14ffb064de3761507/src/shared/kilocode/errorUtils.ts#L13
-  const error = `The alpha period for this model has ended.`;
-  return NextResponse.json({ error: error, message: error }, { status: 404 });
+export function apiKindNotSupportedResponse(
+  apiKind: GatewayChatApiKind,
+  supportedApiKinds: ReadonlyArray<GatewayChatApiKind>
+) {
+  const error = `This model does not support the ${apiKind} API, please use any of: ${supportedApiKinds.join()}`;
+  return NextResponse.json({ error, message: error }, { status: 400 });
 }
 
 async function stealthModelError(response: Response) {
@@ -134,11 +152,15 @@ export async function makeErrorReadable({
   request,
   response,
   isUserByok,
+  feature,
+  balance,
 }: {
   requestedModel: string;
   request: GatewayRequest;
   response: Response;
   isUserByok: boolean;
+  feature: FeatureValue | null;
+  balance: number;
 }) {
   if (response.status < 400) {
     return undefined;
@@ -153,6 +175,16 @@ export async function makeErrorReadable({
         { status: response.status }
       );
     }
+  }
+
+  if (response.status === 404) {
+    const recommendedModel = balance <= 0 ? KILO_AUTO_FREE_MODEL : KILO_AUTO_BALANCED_MODEL;
+    const recommendation =
+      feature === 'kiloclaw' || feature === 'openclaw'
+        ? `The model "${requestedModel}" does not exist or is no longer available. We recommend switching to ${recommendedModel.name}: /model kilocode/${recommendedModel.id}`
+        : `The model "${requestedModel}" does not exist or is no longer available. We recommend switching to ${recommendedModel.id}.`;
+    warnExceptInTest(`Responding with 404 ${recommendation}`);
+    return NextResponse.json({ error: recommendation, message: recommendation }, { status: 404 });
   }
 
   // Sometimes we get generic or nonsensical errors when the context length is exceeded
@@ -184,9 +216,21 @@ export function modelNotAllowedResponse() {
   );
 }
 
-export function forbiddenFreeModelResponse() {
-  const error = `This is not a free model. Please use ${KILO_AUTO_BALANCED_MODEL.id} for affordable inference or ${KILO_AUTO_FREE_MODEL.id} for limited free inference.`;
-  return NextResponse.json({ error, message: error }, { status: 404 });
+export function forbiddenFreeModelResponse(
+  header: FraudDetectionHeaders,
+  feature: FeatureValue | null
+) {
+  if (feature === 'kiloclaw' || feature === 'openclaw') {
+    const error = `The free period of this model ended. Please use ${KILO_AUTO_FREE_MODEL.name} to continue, switch using: /model kilocode/${KILO_AUTO_FREE_MODEL.id}`;
+    return NextResponse.json({ error, message: error }, { status: 404 });
+  } else if (isRooCodeBasedClient(header)) {
+    // https://github.com/Kilo-Org/kilocode/blob/50d6bd482bec6fae7d1c80b14ffb064de3761507/src/shared/kilocode/errorUtils.ts#L13
+    const error = `The alpha period for this model has ended.`;
+    return NextResponse.json({ error: error, message: error }, { status: 404 });
+  } else {
+    const error = `The free period of this model ended. Please use ${KILO_AUTO_BALANCED_MODEL.id} for affordable inference or ${KILO_AUTO_FREE_MODEL.id} for limited free inference.`;
+    return NextResponse.json({ error, message: error }, { status: 404 });
+  }
 }
 
 export function modelDoesNotExistResponse() {
@@ -197,6 +241,11 @@ export function modelDoesNotExistResponse() {
     },
     { status: 404 }
   );
+}
+
+export function storeAndPreviousResponseIdIsNotSupported() {
+  const error = 'The store and previous_response_id fields are not supported.';
+  return NextResponse.json({ error, message: error }, { status: 400 });
 }
 
 export function getOutputHeaders(response: Response) {
@@ -364,7 +413,7 @@ export function extractFimPromptInfo(body: { prompt: string; suffix?: string | n
 // FIM-Specific Code
 // ============================================================================
 
-export type MistralFimUsage = {
+export type FimUsage = {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
@@ -374,7 +423,7 @@ export type MistralFimCompletion = {
   id: string;
   object: 'fim.completion';
   model: string;
-  usage: MistralFimUsage;
+  usage: FimUsage;
   created: number;
   choices: Array<{
     index: number;
@@ -395,23 +444,38 @@ export type MistralFimStreamChunk = {
     };
     finish_reason: string | null;
   }>;
-  usage?: MistralFimUsage; // Only present in final chunk
+  usage?: FimUsage; // Only present in final chunk
 };
 
-function computeMistralFimMicrodollarCost(usage: MistralFimUsage): number {
-  return Math.round(usage.prompt_tokens * 0.3 + usage.completion_tokens * 0.9);
+function computeInceptionFimMicrodollarCost(usage: FimUsage): number {
+  return Math.round(usage.prompt_tokens * 0.25 + usage.completion_tokens * 0.75);
 }
 
-function parseMistralFimUsageFromString(response: string): MicrodollarUsageStats {
+function computeFimMicrodollarCost(usage: FimUsage, provider: ProviderId): number {
+  switch (provider) {
+    case 'mistral':
+      return Math.round(usage.prompt_tokens * 0.3 + usage.completion_tokens * 0.9);
+    case 'inception':
+      return computeInceptionFimMicrodollarCost(usage);
+    default:
+      console.error('Unknown provider for FIM cost calculation', provider);
+      return 0;
+  }
+}
+
+function parseMistralFimUsageFromString(
+  response: string,
+  provider: ProviderId
+): MicrodollarUsageStats {
   const json: MistralFimCompletion = JSON.parse(response);
-  const cost_mUsd = computeMistralFimMicrodollarCost(json.usage);
+  const cost_mUsd = computeFimMicrodollarCost(json.usage, provider);
 
   return {
     messageId: json.id,
     model: json.model,
     responseContent: json.choices[0]?.text || '',
     hasError: !json.model,
-    inference_provider: 'mistral',
+    inference_provider: provider,
     inputTokens: json.usage.prompt_tokens,
     outputTokens: json.usage.completion_tokens,
     cacheHitTokens: 0,
@@ -430,11 +494,12 @@ function parseMistralFimUsageFromString(response: string): MicrodollarUsageStats
 
 async function parseMistralFimUsageFromStream(
   stream: ReadableStream,
-  requestSpan: Span | undefined
+  requestSpan: Span | undefined,
+  provider: ProviderId
 ): Promise<MicrodollarUsageStats> {
   requestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
-    name: 'mistral-fim-stream-processing',
+    name: 'fim-stream-processing',
     op: 'performance',
   });
   const timeToFirstTokenSpan = startInactiveSpan({
@@ -448,7 +513,7 @@ async function parseMistralFimUsageFromStream(
   let reportedError = false;
   const startedAt = performance.now();
   let firstTokenReceived = false;
-  let usage: MistralFimUsage | undefined;
+  let usage: FimUsage | undefined;
 
   const reader = stream.getReader();
   const decoder = new TextDecoder();
@@ -456,10 +521,7 @@ async function parseMistralFimUsageFromStream(
   const sseStreamParser = createParser({
     onEvent(event: EventSourceMessage) {
       if (!firstTokenReceived) {
-        sentryRootSpan()?.setAttribute(
-          'mistral.time_to_first_token_ms',
-          performance.now() - startedAt
-        );
+        sentryRootSpan()?.setAttribute('fim.time_to_first_token_ms', performance.now() - startedAt);
         firstTokenReceived = true;
         timeToFirstTokenSpan.end();
       }
@@ -511,12 +573,12 @@ async function parseMistralFimUsageFromStream(
     model,
     responseContent,
     hasError: reportedError,
-    inference_provider: 'mistral',
+    inference_provider: provider,
     inputTokens: usage?.prompt_tokens ?? 0,
     outputTokens: usage?.completion_tokens ?? 0,
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
-    cost_mUsd: usage ? computeMistralFimMicrodollarCost(usage) : 0,
+    cost_mUsd: usage ? computeFimMicrodollarCost(usage, provider) : 0,
     is_byok: null,
     upstream_id: null,
     finish_reason: null,
@@ -539,8 +601,10 @@ export function countAndStoreFimUsage(
   const usageStatsPromise = !clonedResponse.body
     ? Promise.resolve(null)
     : usageContext.isStreaming
-      ? parseMistralFimUsageFromStream(clonedResponse.body, requestSpan)
-      : clonedResponse.text().then(content => parseMistralFimUsageFromString(content));
+      ? parseMistralFimUsageFromStream(clonedResponse.body, requestSpan, usageContext.provider)
+      : clonedResponse
+          .text()
+          .then(content => parseMistralFimUsageFromString(content, usageContext.provider));
 
   after(
     usageStatsPromise.then(usageStats => {
@@ -551,6 +615,12 @@ export function countAndStoreFimUsage(
           extra: { usageContext },
         });
         return;
+      }
+
+      usageStats.market_cost = usageStats.cost_mUsd;
+
+      if (usageContext.user_byok) {
+        usageStats.cost_mUsd = 0;
       }
 
       // Use the same logMicrodollarUsage as OpenRouter!
@@ -645,6 +715,14 @@ export function countAndStoreEmbeddingUsage(
         });
         return;
       }
+
+      // Preserve the real upstream cost for analytics before zeroing for BYOK
+      usageStats.market_cost = usageStats.cost_mUsd;
+
+      if (usageContext.user_byok) {
+        usageStats.cost_mUsd = 0;
+      }
+
       return logMicrodollarUsage(usageStats, usageContext);
     })
   );

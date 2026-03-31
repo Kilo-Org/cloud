@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Share2 } from 'lucide-react';
 import { ShareSessionDialog } from './ShareSessionDialog';
+import { formatShortModelName } from '@/lib/format-model-name';
 
 type SessionInfoDialogProps = {
   open: boolean;
@@ -19,6 +20,7 @@ type SessionInfoDialogProps = {
   /** The Kilo session ID (UUID from cliSessions.session_id) */
   kiloSessionId?: string;
   model: string;
+  modelDisplayName?: string;
   cost: number; // in microdollars
 };
 
@@ -27,6 +29,7 @@ export function SessionInfoDialog({
   onOpenChange,
   sessionId,
   model,
+  modelDisplayName,
   cost,
   kiloSessionId,
 }: SessionInfoDialogProps) {
@@ -71,7 +74,9 @@ export function SessionInfoDialog({
 
             <div>
               <label className="text-muted-foreground mb-2 block text-sm font-medium">Model</label>
-              <div className="bg-muted rounded-md px-3 py-2 text-sm">{model}</div>
+              <div className="bg-muted rounded-md px-3 py-2 text-sm">
+                {modelDisplayName ?? formatShortModelName(model)}
+              </div>
             </div>
 
             <div>

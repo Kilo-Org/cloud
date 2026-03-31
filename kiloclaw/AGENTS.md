@@ -9,8 +9,9 @@ KiloClaw is a Cloudflare Worker that runs per-user OpenClaw AI assistant instanc
 These are non-negotiable. Do not reintroduce shared/fallback paths.
 
 - **No shared mode.** Every request, DO, and machine is user-scoped. There is no global machine, no shared fallback, no optional userId parameters.
-- **User scoping.** Each user gets a dedicated Fly App (`acct-{hash}` in production, `dev-{hash}` in development), managed by the `KiloClawApp` DO. Instance DOs (`KiloClawInstance`) are keyed by `idFromName(userId)` (one instance per user). Machine names use `sandboxIdFromUserId(userId)`. Both are deterministic. **Known limitation**: when multi-sandbox-per-user is needed, the Instance DO key should change to `sandboxId` or an instance ID, and the platform API will need to accept a sandbox/instance identifier alongside userId. The App DO already supports this (one app per user, multiple instances per app).
-- **Per-user Fly Apps.** New instances get a per-user Fly app created by `KiloClawApp.ensureApp()`. The app name (`flyAppName`) is cached in the Instance DO for proxy routing. Legacy instances without `flyAppName` fall back to `FLY_APP_NAME`. Apps are kept alive after instance destroy (empty apps cost nothing) and reused on re-provision.
+- **User scoping (transitioning to multi-instance).** Legacy: Instance DOs are keyed by `idFromName(userId)` (one instance per user), sandboxId = `sandboxIdFromUserId(userId)`. **Multi-instance (in progress):** Instance DOs will be keyed by `idFromName(instanceId)` where `instanceId` = `kiloclaw_instances.id` UUID. sandboxId = `sandboxIdFromInstanceId(instanceId)` → `ki_{uuid-no-dashes}` (35 chars). The `ki_` prefix distinguishes instance-keyed sandboxIds from legacy userId-derived ones (base64url). All routes accept an optional `?instanceId=` query param; when absent, they fall back to the legacy userId-keyed path. See the "Multi-Instance Migration" section below for details.
+- **Per-user Fly Apps (unchanged by multi-instance).** Each user gets a dedicated Fly App (`acct-{hash}` in production, `dev-{hash}` in development), managed by the `KiloClawApp` DO. Multiple instances per user share one Fly app. The App DO stays user-keyed.
+- **Per-user Fly Apps (legacy detail).** New instances get a per-user Fly app created by `KiloClawApp.ensureApp()`. The app name (`flyAppName`) is cached in the Instance DO for proxy routing. Legacy instances without `flyAppName` fall back to `FLY_APP_NAME`. Apps are kept alive after instance destroy (empty apps cost nothing) and reused on re-provision.
 - **`buildEnvVars` requires `sandboxId` and `gatewayTokenSecret`.** Returns `{ env, sensitive }` split. Sensitive values are AES-256-GCM encrypted and prefixed with `KILOCLAW_ENC_` before placement in machine config.env. Gateway token and `AUTO_APPROVE_DEVICES` are always set. No fallback to worker-level channel tokens.
 - **Env var name constraints.** User-provided `envVars` and `encryptedSecrets` keys must be valid shell identifiers (`/^[A-Za-z_][A-Za-z0-9_]*$/`) and must not use reserved prefixes `KILOCLAW_ENC_` or `KILOCLAW_ENV_`. Validated at schema level (ingest) and runtime (decrypt block).
 - **Token comparisons must be timing-safe.** Never compare auth/proxy tokens with `===`/`!==`. Use `timingSafeTokenEqual` from `controller/src/auth.ts` (or an equivalent `crypto.timingSafeEqual`-based helper) for bearer/proxy token validation.
@@ -65,7 +66,7 @@ src/
 │   ├── middleware.ts                  # JWT auth + pepper validation via Hyperdrive
 │   ├── jwt.ts                        # Token parsing/verification
 │   ├── gateway-token.ts              # HMAC-SHA256 derivation for per-sandbox tokens
-│   └── sandbox-id.ts                 # userId <-> sandboxId (base64url, reversible)
+│   └── sandbox-id.ts                 # userId <-> sandboxId (base64url) + instanceId validation/derivation
 ├── durable-objects/
 │   ├── kiloclaw-app.ts               # DO: per-user Fly App lifecycle (create app, allocate IPs, env key)
 │   └── kiloclaw-instance.ts          # DO: lifecycle state machine, reconciliation, two-phase destroy
@@ -100,15 +101,16 @@ src/
 
 ## Instance Statuses
 
-| Status        | Meaning                                                         |
-| ------------- | --------------------------------------------------------------- |
-| `provisioned` | Config stored, volume created, no machine yet                   |
-| `starting`    | startAsync() fired; start() running in background via waitUntil |
-| `running`     | Machine is started and healthy                                  |
-| `stopped`     | Machine is stopped, volume persists                             |
-| `destroying`  | Two-phase destroy in progress, pending resource deletion        |
+| Status        | Meaning                                                              |
+| ------------- | -------------------------------------------------------------------- |
+| `provisioned` | Config stored, volume created, no machine yet                        |
+| `starting`    | startAsync() fired; start() running in background via waitUntil      |
+| `running`     | Machine is started and healthy                                       |
+| `stopped`     | Machine is stopped, volume persists                                  |
+| `restoring`   | Snapshot restore in progress via CF Queue; all lifecycle ops blocked |
+| `destroying`  | Two-phase destroy in progress, pending resource deletion             |
 
-The alarm runs for ALL statuses (not just `running`). `destroying` short-circuits reconciliation -- only retries pending deletes, never recreates resources. `starting` uses a 1-min alarm cadence; reconcileStarting() checks Fly machine state and transitions to `running` or `stopped`. If `startingAt` is set and more than 5 minutes have elapsed, it falls back to `stopped` automatically.
+The alarm runs for ALL statuses (not just `running`). `destroying` short-circuits reconciliation -- only retries pending deletes, never recreates resources. `starting` uses a 1-min alarm cadence; reconcileStarting() checks Fly machine state and transitions to `running` or `stopped`. If `startingAt` is set and more than 5 minutes have elapsed, it falls back to `stopped` automatically. `restoring` skips reconciliation entirely (the CF Queue worker owns the lifecycle); the alarm detects stuck restores (>30 min) and resets to `stopped`.
 
 ## Environment Variables
 
@@ -143,7 +145,7 @@ Volumes are region-pinned. Once a user's volume is created in a region, their ma
 
 ```bash
 pnpm typecheck        # tsgo
-pnpm lint             # eslint v9 + typescript-eslint
+pnpm lint             # oxlint
 pnpm format           # oxfmt
 pnpm test             # vitest (node)
 pnpm types            # regenerate worker-configuration.d.ts (run after changing wrangler.jsonc)
@@ -174,6 +176,7 @@ Before submitting any change:
 3. Do not reintroduce optional `userId` or `sandboxId` parameters (they are always required)
 4. If changing bootstrap behavior, update `controller/src/bootstrap.ts` and its tests
 5. If adding or changing user-facing features, add a changelog entry to `src/app/(app)/claw/components/changelog-data.ts` (newest first)
+6. If adding a new route that resolves a KiloClawInstance DO stub, accept optional `?instanceId=` and use it as the DO key when present (see "Multi-Instance Migration" section)
 
 ## Test Targets by Change Type
 
@@ -190,6 +193,34 @@ Before submitting any change:
 | Env var encryption (AES-256-GCM)      | `src/utils/env-encryption.test.ts`                    |
 | Sandbox ID derivation                 | `src/auth/sandbox-id.test.ts`                         |
 | Gateway token derivation              | `src/auth/gateway-token.test.ts`                      |
+
+## Multi-Instance Migration (In Progress)
+
+KiloClaw is transitioning from one-instance-per-user to N-instances-per-owner (personal + org). This affects how you write new code:
+
+### Identity model
+
+| Concept         | Legacy (current default)                              | Multi-instance (new path)                                                  |
+| --------------- | ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| **DO key**      | `idFromName(userId)`                                  | `idFromName(instanceId)` where `instanceId` = `kiloclaw_instances.id` UUID |
+| **sandboxId**   | `sandboxIdFromUserId(userId)` — base64url, reversible | `sandboxIdFromInstanceId(instanceId)` → `ki_{uuid-no-dashes}` (35 chars)   |
+| **Proxy route** | Catch-all `/*`                                        | `/i/:instanceId/*`                                                         |
+| **Ownership**   | Implicit (DO keyed by authed userId)                  | Explicit check: `status.userId === authed userId`                          |
+
+### What to know when making changes
+
+- **All platform/user/admin routes accept optional `?instanceId=`**. When present, it's used as the DO key instead of userId. When absent, legacy userId-keyed behavior applies. If you add a new route that resolves a DO stub, follow this pattern.
+- **The `ki_` prefix on sandboxIds is load-bearing.** It distinguishes instance-keyed sandboxIds from legacy ones. Gateway token derivation, Fly metadata recovery, and volume naming all key off sandboxId. Do not remove or change the prefix scheme.
+- **`orgId` is threaded through DO state and env vars.** The DO persists `orgId`, and `buildEnvVars` injects `KILOCODE_ORGANIZATION_ID` when present. If you add new env var logic, account for org instances.
+- **Ownership checks are required on user-facing routes that accept `instanceId`.** The `/i/:instanceId/*` proxy route, `kiloclaw.ts` routes, and `api.ts` admin routes all verify `status.userId === authenticated userId` before allowing access. New routes must do the same.
+- **The Instance DO `provision()` method accepts `opts.instanceId` and `opts.orgId`.** When `instanceId` is provided, sandboxId is derived from it instead of userId. When `orgId` is provided, it's persisted in DO state and injected as an env var.
+- **Postgres `kiloclaw_instances.id` IS the instanceId.** There is no separate `instance_id` column. The existing UUID primary key is the routing identity.
+- **Next.js is still the sole Postgres writer.** The `ensureActiveInstance()` function returns the row's `id` which callers use as the instanceId for worker API calls.
+
+### Upcoming PRs (do not implement yet)
+
+- **KiloClawRegistry DO** — SQLite-backed DO that indexes instances per owner (`user:{userId}` or `org:{orgId}`). Will replace direct `idFromName(userId)` lookups in the catch-all proxy.
+- **Org instances** — `organization_id` column (already added to schema) links instances to orgs. Org tRPC router, org membership checks, and org member removal cleanup are pending.
 
 ## Code Style
 
@@ -228,27 +259,31 @@ User config is transported to the machine via environment variables set in the F
 
 **Encrypted (stored as `KILOCLAW_ENC_{name}`, decrypted to `{name}` at boot):**
 
-| Env var (after decrypt)  | Source                       | Purpose                     |
-| ------------------------ | ---------------------------- | --------------------------- |
-| `KILOCODE_API_KEY`       | User config (DO)             | KiloCode API authentication |
-| `OPENCLAW_GATEWAY_TOKEN` | Derived from sandboxId       | Per-user gateway auth       |
-| `TELEGRAM_BOT_TOKEN`     | Decrypted channel token      | Telegram channel            |
-| `DISCORD_BOT_TOKEN`      | Decrypted channel token      | Discord channel             |
-| `SLACK_BOT_TOKEN`        | Decrypted channel token      | Slack channel               |
-| `SLACK_APP_TOKEN`        | Decrypted channel token      | Slack channel               |
-| User encrypted secrets   | Decrypted from RSA envelopes | User-provided credentials   |
+| Env var (after decrypt)      | Source                            | Purpose                        |
+| ---------------------------- | --------------------------------- | ------------------------------ |
+| `KILOCODE_API_KEY`           | User config (DO)                  | KiloCode API authentication    |
+| `OPENCLAW_GATEWAY_TOKEN`     | Derived from sandboxId            | Per-user gateway auth          |
+| `TELEGRAM_BOT_TOKEN`         | Decrypted channel token           | Telegram channel               |
+| `DISCORD_BOT_TOKEN`          | Decrypted channel token           | Discord channel                |
+| `SLACK_BOT_TOKEN`            | Decrypted channel token           | Slack channel                  |
+| `SLACK_APP_TOKEN`            | Decrypted channel token           | Slack channel                  |
+| `STREAM_CHAT_BOT_USER_TOKEN` | Auto-provisioned (Stream Chat DO) | Stream Chat bot authentication |
+| User encrypted secrets       | Decrypted from RSA envelopes      | User-provided credentials      |
 
 **Plaintext (stored as-is in config.env):**
 
-| Env var                    | Source                            | Purpose                              |
-| -------------------------- | --------------------------------- | ------------------------------------ |
-| `KILOCODE_DEFAULT_MODEL`   | User config (DO)                  | Default model for agents             |
-| `KILOCODE_MODELS_JSON`     | User config (DO), JSON-serialized | Available model list                 |
-| `KILOCODE_API_BASE_URL`    | Worker env                        | API base URL override                |
-| `AUTO_APPROVE_DEVICES`     | Hardcoded `true`                  | Skip device pairing                  |
-| `TELEGRAM_DM_POLICY`       | Worker env                        | Telegram DM policy                   |
-| `DISCORD_DM_POLICY`        | Worker env                        | Discord DM policy                    |
-| `OPENCLAW_ALLOWED_ORIGINS` | Worker env                        | Control UI WebSocket allowed origins |
+| Env var                          | Source                            | Purpose                              |
+| -------------------------------- | --------------------------------- | ------------------------------------ |
+| `KILOCODE_DEFAULT_MODEL`         | User config (DO)                  | Default model for agents             |
+| `KILOCODE_MODELS_JSON`           | User config (DO), JSON-serialized | Available model list                 |
+| `KILOCODE_API_BASE_URL`          | Worker env                        | API base URL override                |
+| `AUTO_APPROVE_DEVICES`           | Hardcoded `true`                  | Skip device pairing                  |
+| `TELEGRAM_DM_POLICY`             | Worker env                        | Telegram DM policy                   |
+| `DISCORD_DM_POLICY`              | Worker env                        | Discord DM policy                    |
+| `OPENCLAW_ALLOWED_ORIGINS`       | Worker env                        | Control UI WebSocket allowed origins |
+| `STREAM_CHAT_API_KEY`            | Auto-provisioned (Stream Chat DO) | Stream Chat app key                  |
+| `STREAM_CHAT_BOT_USER_ID`        | Auto-provisioned (Stream Chat DO) | Per-user bot identifier              |
+| `STREAM_CHAT_DEFAULT_CHANNEL_ID` | Auto-provisioned (Stream Chat DO) | Default channel ID for the user      |
 
 ### AI Provider Selection
 
@@ -295,14 +330,15 @@ update the `find` command in the workflow's "Compute source content hash" step t
 
 ## Fly Machine Lifecycle
 
-| Operation          | What happens                                                                                                                                                                                                       |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Provision**      | Creates a Fly Volume in the configured region. Stores config in DO. Schedules reconciliation alarm.                                                                                                                |
-| **Start**          | Ensures volume exists. Creates a Fly Machine (or starts an existing stopped one) with volume mounted at `/root`, metadata tags, and env vars. Persists machine ID immediately. Schedules health check alarm.       |
-| **Stop**           | Stops the Fly Machine via API. Volume persists. Alarm continues at idle cadence.                                                                                                                                   |
-| **Restart**        | Stops machine, updates config (env vars, image, metadata), starts it. Volume persists.                                                                                                                             |
-| **Destroy**        | Two-phase: persists pending IDs + `status='destroying'`, attempts Fly deletions, only clears DO state when both confirmed. Alarm retries failures.                                                                 |
-| **Reconciliation** | Alarm runs for all statuses. Running: 5 min. Destroying: 1 min. Idle (provisioned/stopped): 30 min. Fixes status drift, missing volumes, stale machine IDs, wrong mounts, and recovers lost IDs from Fly metadata. |
+| Operation          | What happens                                                                                                                                                                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Provision**      | Creates a Fly Volume in the configured region. Stores config in DO. Schedules reconciliation alarm.                                                                                                                                                                |
+| **Start**          | Ensures volume exists. Creates a Fly Machine (or starts an existing stopped one) with volume mounted at `/root`, metadata tags, and env vars. Persists machine ID immediately. Schedules health check alarm.                                                       |
+| **Stop**           | Stops the Fly Machine via API. Volume persists. Alarm continues at idle cadence.                                                                                                                                                                                   |
+| **Restart**        | Stops machine, updates config (env vars, image, metadata), starts it. Volume persists.                                                                                                                                                                             |
+| **Restore**        | Enqueues a CF Queue job, sets status to `restoring`. Queue worker: stops machine, destroys it (releases volume attachment), creates new volume from snapshot, swaps DO state, creates fresh machine. Old volume retained for revert.                               |
+| **Destroy**        | Two-phase: persists pending IDs + `status='destroying'`, attempts Fly deletions, only clears DO state when both confirmed. Alarm retries failures.                                                                                                                 |
+| **Reconciliation** | Alarm runs for all statuses. Running: 5 min. Destroying: 1 min. Restoring: 1 min (no-op, stuck detection only). Idle (provisioned/stopped): 30 min. Fixes status drift, missing volumes, stale machine IDs, wrong mounts, and recovers lost IDs from Fly metadata. |
 
 ## Metadata Recovery
 

@@ -30,22 +30,25 @@ import {
 import { unstable_cache } from 'next/cache';
 import { StoredModelSchema } from '@/lib/providers/vercel/types';
 import { createGateway, generateText } from 'ai';
-import { PROVIDERS } from '@/lib/providers';
+import PROVIDERS from '@/lib/providers/provider-definitions';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/providers/vercel';
 import { decryptByokRow } from '@/lib/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
+import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
+import CODING_PLANS from '@/lib/providers/coding-plans/coding-plan-definitions';
+import { createAiSdkProvider, formatCodingPlanModelId } from '@/lib/providers/coding-plans';
 
 const fetchSupportedModels = unstable_cache(
   async (): Promise<Record<string, string[]>> => {
-    const vercelModelMetadataRaw = (
+    const modelMetadataRaw = (
       await readDb
-        .select({ vercel: modelsByProvider.vercel })
+        .select({ vercel: modelsByProvider.vercel, openrouter: modelsByProvider.openrouter })
         .from(modelsByProvider)
         .orderBy(desc(modelsByProvider.id))
         .limit(1)
     ).at(0);
 
-    if (!vercelModelMetadataRaw) {
+    if (!modelMetadataRaw) {
       throw new Error(
         'No Vercel model metadata in the database, run ' + MODELS_BY_PROVIDER_SCRIPT_NAME
       );
@@ -53,7 +56,7 @@ const fetchSupportedModels = unstable_cache(
 
     const vercelModelMetadata = z
       .record(z.string(), StoredModelSchema)
-      .safeParse(vercelModelMetadataRaw?.vercel);
+      .safeParse(modelMetadataRaw?.vercel);
 
     if (!vercelModelMetadata.success) {
       throw new Error(
@@ -61,19 +64,41 @@ const fetchSupportedModels = unstable_cache(
       );
     }
 
+    const openRouterModelMetadata = z
+      .record(z.string(), StoredModelSchema)
+      .safeParse(modelMetadataRaw?.openrouter);
+
+    if (!openRouterModelMetadata.success) {
+      throw new Error(
+        'Failed to parse OpenRouter model metadata:\n' +
+          z.prettifyError(openRouterModelMetadata.error)
+      );
+    }
+
     const result: Record<string, string[]> = {};
 
-    result['codestral'] = ['Codestral'];
+    result['codestral'] = ['Codestral (mistralai/codestral-2508)'];
 
-    for (const model of Object.values(vercelModelMetadata.data)) {
-      if (model.id.includes('codestral')) continue;
-      if (model.type !== 'language') continue;
-      for (const endpoint of model.endpoints) {
+    for (const openRouterModel of Object.values(openRouterModelMetadata.data)) {
+      const vercelModel = vercelModelMetadata.data[mapModelIdToVercel(openRouterModel.id)];
+      if (!vercelModel) continue;
+      if (vercelModel.id.includes('codestral')) continue;
+      if (vercelModel.type !== 'language') continue;
+      for (const endpoint of vercelModel.endpoints) {
         const providerParsed = VercelUserByokInferenceProviderIdSchema.safeParse(endpoint.tag);
         if (!providerParsed.success) continue;
         const providerId = providerParsed.data;
         if (!result[providerId]) result[providerId] = [];
-        result[providerId].push(model.name);
+        result[providerId].push(openRouterModel.name + ' (' + openRouterModel.id + ')');
+      }
+    }
+
+    for (const provider of CODING_PLANS) {
+      for (const model of provider.models) {
+        if (!result[provider.id]) result[provider.id] = [];
+        result[provider.id].push(
+          model.name + ' (' + formatCodingPlanModelId(provider, model) + ')'
+        );
       }
     }
 
@@ -381,29 +406,46 @@ export const byokRouter = createTRPCRouter({
         }
       }
 
-      const gateway = createGateway({
-        apiKey: PROVIDERS.VERCEL_AI_GATEWAY.apiKey,
-      });
+      const decryptedKey = decryptByokRow(existingKey);
 
-      const [provider, byokList] = getVercelInferenceProviderConfigForUserByok(
-        decryptByokRow(existingKey)
-      );
+      function setup() {
+        const provider = UserByokProviderIdSchema.parse(decryptedKey.providerId);
+        const model = UserByokTestModels[provider];
+
+        const codingPlanProvider = CODING_PLANS.find(plan => plan.id === provider);
+        if (codingPlanProvider) {
+          if (codingPlanProvider.ai_sdk_provider === 'openai-compatible') {
+            return {
+              finalProvider: provider,
+              model: createAiSdkProvider(codingPlanProvider, decryptedKey.decryptedAPIKey)(model),
+            };
+          } else {
+            throw new Error('Unrecognized AI SDK provider: ' + codingPlanProvider.ai_sdk_provider);
+          }
+        }
+
+        const [finalProvider, byokList] = getVercelInferenceProviderConfigForUserByok(decryptedKey);
+        return {
+          finalProvider,
+          model: createGateway({
+            apiKey: PROVIDERS.VERCEL_AI_GATEWAY.apiKey,
+          })(model),
+          providerOptions: {
+            gateway: {
+              only: [finalProvider],
+              byok: { [finalProvider]: byokList },
+            } satisfies GatewayProviderOptions,
+          },
+        };
+      }
 
       try {
-        const model = gateway(
-          UserByokTestModels[UserByokProviderIdSchema.parse(existingKey.provider_id)]
-        );
-
+        const { finalProvider, model, providerOptions } = setup();
         const output = await generateText({
           model,
           prompt: 'Say hi',
           maxOutputTokens: 100,
-          providerOptions: {
-            gateway: {
-              only: [provider],
-              byok: { [provider]: byokList },
-            } satisfies GatewayProviderOptions,
-          },
+          providerOptions,
         });
 
         const metadata = output.providerMetadata?.gateway?.routing as
@@ -412,13 +454,13 @@ export const byokRouter = createTRPCRouter({
 
         return {
           success: true,
-          message: `API key test success. Provider: ${metadata?.finalProvider ?? 'unknown'}. Model: ${metadata?.originalModelId ?? 'unknown'}. Completion: ${output.text}`,
+          message: `API key test success. Provider: ${metadata?.finalProvider ?? finalProvider}. Model: ${metadata?.originalModelId ?? model.modelId}. Model output: ${output.text}`,
         };
       } catch (e) {
         console.error(e);
         return {
           success: false,
-          message: `API key (${provider}) test failed with: ${e instanceof Error ? e.message : e}`,
+          message: `API key (${decryptedKey.providerId}) test failed with: ${e instanceof Error ? e.message : e}`,
         };
       }
     }),

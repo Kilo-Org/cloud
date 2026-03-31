@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Search, Cloud, Terminal, Puzzle, Bot } from 'lucide-react';
+import { SetPageTitle } from '@/components/SetPageTitle';
 import type { SessionsListItem } from '@/components/cloud-agent/SessionsList';
 import { SessionsList } from '@/components/cloud-agent/SessionsList';
 import { extractRepoFromGitUrl } from '@/components/cloud-agent/store/db-session-atoms';
@@ -79,7 +80,12 @@ export function SessionsPageContent() {
       limit: 50,
       orderBy: 'updated_at',
       organizationId: organizationId ?? null,
-      createdOnPlatform: platformFilter === 'all' ? undefined : platformFilter,
+      createdOnPlatform:
+        platformFilter === 'all'
+          ? undefined
+          : platformFilter === 'cloud-agent'
+            ? ['cloud-agent', 'cloud-agent-web']
+            : platformFilter,
       includeSubSessions,
     })
   );
@@ -91,7 +97,12 @@ export function SessionsPageContent() {
       limit: 50,
       offset: 0,
       organizationId: organizationId ?? null,
-      createdOnPlatform: platformFilter === 'all' ? undefined : platformFilter,
+      createdOnPlatform:
+        platformFilter === 'all'
+          ? undefined
+          : platformFilter === 'cloud-agent'
+            ? ['cloud-agent', 'cloud-agent-web']
+            : platformFilter,
       includeSubSessions,
     }),
     enabled: isSearching,
@@ -136,9 +147,9 @@ export function SessionsPageContent() {
 
   const content = (
     <>
+      <SetPageTitle title="Sessions" />
       {/* Header */}
       <div className="mb-6">
-        <h1 className="mb-4 text-3xl font-bold">Sessions</h1>
         <div className="flex gap-3">
           <div className="relative flex-1">
             <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />

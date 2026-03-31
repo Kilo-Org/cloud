@@ -13,6 +13,7 @@ type CustomerSourceSurveyProps = {
 
 export function CustomerSourceSurvey({ redirectPath }: CustomerSourceSurveyProps) {
   const [source, setSource] = useState('');
+  const [skipped, setSkipped] = useState(false);
   const router = useRouter();
   const trpc = useTRPC();
 
@@ -24,13 +25,21 @@ export function CustomerSourceSurvey({ redirectPath }: CustomerSourceSurveyProps
     })
   );
 
-  const { mutate: skipSource, isPending: isSkipping } = useMutation(
+  const { mutate: skipSource } = useMutation(
     trpc.user.skipCustomerSource.mutationOptions({
       onSuccess: () => {
         router.push(redirectPath);
       },
+      onError: () => {
+        setSkipped(false);
+      },
     })
   );
+
+  function handleSkip() {
+    setSkipped(true);
+    skipSource();
+  }
 
   return (
     <div className="space-y-4 px-6 pb-6">
@@ -45,15 +54,15 @@ export function CustomerSourceSurvey({ redirectPath }: CustomerSourceSurveyProps
       <div className="flex items-center justify-between">
         <button
           type="button"
-          onClick={() => skipSource()}
-          disabled={isSkipping || isPending}
-          className="text-muted-foreground text-sm hover:underline"
+          onClick={handleSkip}
+          disabled={skipped || isPending}
+          className="cursor-pointer text-muted-foreground text-sm hover:underline"
         >
-          {isSkipping ? 'Skipping...' : 'Skip'}
+          {skipped ? 'Skipping...' : 'Skip'}
         </button>
         <Button
           onClick={() => submitSource({ source: source.trim() })}
-          disabled={isPending || isSkipping || source.trim().length === 0}
+          disabled={isPending || skipped || source.trim().length === 0}
         >
           {isPending ? 'Submitting...' : 'Submit'}
         </Button>

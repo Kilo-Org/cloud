@@ -212,4 +212,24 @@
   .animate-pulse-once {
     animation: pulse-glow 0.6s ease-out;
   }
+
+  @keyframes pulse-opacity {
+    0%,
+    100% {
+      opacity: 0.4;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes pulse-opacity-dim {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    50% {
+      opacity: 0.2;
+    }
+  }
 }

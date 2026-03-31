@@ -1,0 +1,33 @@
+{
+  "name": "@kilocode/trpc",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsgo -p tsconfig.json && rollup -c rollup.config.mjs",
+    "typecheck": "tsgo --noEmit"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "dependencies": {
+    "@kilocode/kiloclaw-secret-catalog": "workspace:*",
+    "@trpc/server": "catalog:",
+    "@workos-inc/node": "catalog:",
+    "drizzle-orm": "catalog:",
+    "stripe": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@kilocode/db": "workspace:*",
+    "@kilocode/encryption": "workspace:*",
+    "@sentry/nextjs": "^10.43.0",
+    "@typescript/native-preview": "catalog:",
+    "rollup": "^4.59.0",
+    "rollup-plugin-dts": "^6.4.0",
+    "server-only": "^0.0.1",
+    "typescript": "catalog:"
+  }
+}

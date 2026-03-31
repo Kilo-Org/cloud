@@ -13,7 +13,7 @@ export default async function AuditLogPage({ params }: { params: Promise<{ townI
   const breadcrumbs = (
     <>
       <BreadcrumbItem>
-        <BreadcrumbLink href="/admin/gastown">Gastown</BreadcrumbLink>
+        <BreadcrumbLink href="/admin/gastown">Gas Town</BreadcrumbLink>
       </BreadcrumbItem>
       <BreadcrumbSeparator />
       <BreadcrumbItem>

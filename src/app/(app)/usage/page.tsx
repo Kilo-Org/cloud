@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   formatDollars,
   formatIsoDateString_UsaDateOnlyFormat,
@@ -27,6 +28,8 @@ import { PageLayout } from '@/components/PageLayout';
 
 import { useTRPC } from '@/lib/trpc/utils';
 
+type Period = 'week' | 'month' | 'year' | 'all';
+
 type UsageData = {
   date: string;
   model?: string;
@@ -42,9 +45,13 @@ type UsageResponse = {
   usage: UsageData[];
 };
 
-async function fetchUsageData(groupByModel: boolean, viewType: string): Promise<UsageResponse> {
+async function fetchUsageData(
+  groupByModel: boolean,
+  viewType: string,
+  period: Period
+): Promise<UsageResponse> {
   const response = await fetch(
-    `/api/profile/usage?groupByModel=${groupByModel}&viewType=${viewType}`
+    `/api/profile/usage?groupByModel=${groupByModel}&viewType=${viewType}&period=${period}`
   );
   if (!response.ok) {
     if (response.status === 401) {
@@ -132,11 +139,19 @@ function transformUsageDataForStreakCalendar(
   return streakData;
 }
 
+const PERIOD_LABELS: Record<Period, string> = {
+  week: 'Past Week',
+  month: 'Past Month',
+  year: 'Past Year',
+  all: 'All Time',
+};
+
 export default function UsagePage() {
   const router = useRouter();
   const trpc = useTRPC();
   const [groupByModel, setGroupByModel] = useState(false);
   const [viewType, setViewType] = useState<string>('personal');
+  const [period, setPeriod] = useState<Period>('week');
 
   const {
     data: usageData,
@@ -144,12 +159,12 @@ export default function UsagePage() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['usage-data', groupByModel, viewType],
-    queryFn: () => fetchUsageData(groupByModel, viewType),
+    queryKey: ['usage-data', groupByModel, viewType, period],
+    queryFn: () => fetchUsageData(groupByModel, viewType, period),
   });
 
   const { data: autocompleteMetrics, isLoading: isLoadingAutocompleteMetrics } = useQuery(
-    trpc.user.getAutocompleteMetrics.queryOptions({ viewType })
+    trpc.user.getAutocompleteMetrics.queryOptions({ viewType, period })
   );
 
   const { data: organizations } = useQuery(trpc.organizations.list.queryOptions());
@@ -160,6 +175,8 @@ export default function UsagePage() {
       router.push('/users/sign_in?callbackPath=/usage');
     }
   }, [error, router]);
+
+  const periodLabel = PERIOD_LABELS[period];
 
   if (isLoading) {
     return (
@@ -407,14 +424,26 @@ export default function UsagePage() {
   }));
 
   return (
-    <PageLayout title="Usage">
+    <PageLayout
+      title="Usage"
+      headerActions={
+        <Tabs value={period} onValueChange={value => setPeriod(value as Period)}>
+          <TabsList>
+            <TabsTrigger value="week">Past Week</TabsTrigger>
+            <TabsTrigger value="month">Past Month</TabsTrigger>
+            <TabsTrigger value="year">Past Year</TabsTrigger>
+            <TabsTrigger value="all">All</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      }
+    >
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="grid grid-cols-1 gap-4 lg:col-span-2">
           {/* First row - Total metrics */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
+                <CardTitle className="text-sm font-medium">Cost ({periodLabel})</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatDollars(totalCost)}</div>
@@ -424,7 +453,7 @@ export default function UsagePage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium whitespace-nowrap">
-                  Total Requests
+                  Requests ({periodLabel})
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -434,7 +463,7 @@ export default function UsagePage() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Tokens</CardTitle>
+                <CardTitle className="text-sm font-medium">Tokens ({periodLabel})</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatLargeNumber(totalTokens)}</div>

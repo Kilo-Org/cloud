@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { Organization } from '@kilocode/db/schema';
-import type { OrgTrialStatus } from '@/lib/organizations/organization-types';
+import type { OrgTrialStatus, TimePeriod } from '@/lib/organizations/organization-types';
 import {
   getDaysRemainingInTrial,
   getOrgTrialStatusFromDays,
@@ -92,9 +92,17 @@ export function useOrganizationUsageStats(organizationId: string) {
   return useQuery(trpc.organizations.usageStats.queryOptions({ organizationId }));
 }
 
-export function useOrganizationAutocompleteMetrics(organizationId: string) {
+export function useOrganizationAutocompleteMetrics(
+  organizationId: string,
+  period: TimePeriod = 'month'
+) {
   const trpc = useTRPC();
-  return useQuery(trpc.organizations.usageDetails.getAutocomplete.queryOptions({ organizationId }));
+  return useQuery(
+    trpc.organizations.usageDetails.getAutocomplete.queryOptions({
+      organizationId,
+      period,
+    })
+  );
 }
 
 export function useOrganizationInvoices(organizationId: string, timePeriod: string = 'year') {
@@ -356,6 +364,18 @@ export function useOrganizationSubscription(organizationId: string) {
   );
 }
 
+export function useResubscribeDefaults(organizationId: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.subscription.getResubscribeDefaults.queryOptions(
+      { organizationId },
+      {
+        enabled: !!organizationId,
+      }
+    )
+  );
+}
+
 export function useOrganizationSubscriptionLink() {
   const trpc = useTRPC();
   return useMutation(trpc.organizations.subscription.getSubscriptionStripeUrl.mutationOptions());
@@ -377,6 +397,26 @@ export function useStopOrganizationSubscriptionCancellation() {
 
   return useMutation(
     trpc.organizations.subscription.stopCancellation.mutationOptions({
+      onSuccess,
+    })
+  );
+}
+
+export function useChangeBillingCycle() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateAllOrganizationData();
+  return useMutation(
+    trpc.organizations.subscription.changeBillingCycle.mutationOptions({
+      onSuccess,
+    })
+  );
+}
+
+export function useCancelBillingCycleChange() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateAllOrganizationData();
+  return useMutation(
+    trpc.organizations.subscription.cancelBillingCycleChange.mutationOptions({
       onSuccess,
     })
   );

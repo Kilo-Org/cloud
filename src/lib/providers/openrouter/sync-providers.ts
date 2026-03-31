@@ -15,7 +15,8 @@ import {
 import { modelsByProvider } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { lt } from 'drizzle-orm';
-import { type Provider, PROVIDERS } from '@/lib/providers';
+import PROVIDERS from '@/lib/providers/provider-definitions';
+import type { Provider } from '@/lib/providers/types';
 import type { StoredModel } from '@/lib/providers/vercel/types';
 import { EndpointsSchema, ModelsSchema } from '@/lib/providers/vercel/types';
 

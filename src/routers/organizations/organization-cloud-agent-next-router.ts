@@ -10,7 +10,10 @@ import {
   mergeProfileConfiguration,
   ProfileNotFoundError,
 } from '@/lib/agent/profile-session-config';
-import { organizationMemberProcedure } from '@/routers/organizations/utils';
+import {
+  organizationMemberProcedure,
+  organizationMemberMutationProcedure,
+} from '@/routers/organizations/utils';
 import {
   getGitHubTokenForOrganization,
   fetchGitHubRepositoriesForOrganization,
@@ -32,6 +35,7 @@ import {
   baseGetSessionNextOutputSchema,
   baseAnswerQuestionNextSchema,
   baseRejectQuestionNextSchema,
+  baseAnswerPermissionNextSchema,
 } from '../cloud-agent-next-schemas';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -67,6 +71,10 @@ const RejectQuestionInput = baseRejectQuestionNextSchema.extend({
   organizationId: z.uuid(),
 });
 
+const AnswerPermissionInput = baseAnswerPermissionNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
 const ListGitHubRepositoriesInput = z.object({
   organizationId: z.uuid(),
   forceRefresh: z.boolean().optional().default(false),
@@ -96,7 +104,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
    * The session is in "prepared" state and can be initiated via
    * initiateFromPreparedSession.
    */
-  prepareSession: organizationMemberProcedure
+  prepareSession: organizationMemberMutationProcedure
     .input(PrepareSessionInput)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -149,6 +157,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         const result = await client.prepareSession({
           ...restInput,
           ...gitParams,
+          createdOnPlatform: 'cloud-agent-web',
           kilocodeOrganizationId: organizationId,
           envVars: merged.envVars,
           encryptedSecrets: merged.encryptedSecrets,
@@ -171,7 +180,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
    * Returns immediately with execution info and WebSocket URL for streaming.
    * The client connects to the streamUrl separately to receive events.
    */
-  initiateFromPreparedSession: organizationMemberProcedure
+  initiateFromPreparedSession: organizationMemberMutationProcedure
     .input(InitiateFromPreparedSessionInput)
     .output(baseInitiateSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -198,7 +207,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
    * Returns immediately with execution info and WebSocket URL for streaming.
    * The client connects to the streamUrl separately to receive events.
    */
-  sendMessage: organizationMemberProcedure
+  sendMessage: organizationMemberMutationProcedure
     .input(SendMessageInput)
     .output(baseInitiateSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -239,7 +248,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
   /**
    * Interrupt a running session by killing all associated processes (organization context).
    */
-  interruptSession: organizationMemberProcedure
+  interruptSession: organizationMemberMutationProcedure
     .input(InterruptSessionInput)
     .output(
       z.object({
@@ -255,7 +264,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       return await client.interruptSession(input.sessionId);
     }),
 
-  answerQuestion: organizationMemberProcedure
+  answerQuestion: organizationMemberMutationProcedure
     .input(AnswerQuestionInput)
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
@@ -268,7 +277,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       });
     }),
 
-  rejectQuestion: organizationMemberProcedure
+  rejectQuestion: organizationMemberMutationProcedure
     .input(RejectQuestionInput)
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
@@ -277,6 +286,19 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       return await client.rejectQuestion({
         sessionId: input.sessionId,
         questionId: input.questionId,
+      });
+    }),
+
+  answerPermission: organizationMemberMutationProcedure
+    .input(AnswerPermissionInput)
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const authToken = generateCloudAgentToken(ctx.user);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.answerPermission({
+        sessionId: input.sessionId,
+        permissionId: input.permissionId,
+        response: input.response,
       });
     }),
 

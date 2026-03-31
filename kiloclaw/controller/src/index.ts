@@ -18,12 +18,16 @@ import { createPairingCache } from './pairing-cache';
 import { registerEnvRoutes } from './routes/env';
 import { registerGmailPushRoute } from './routes/gmail-push';
 import { registerFileRoutes } from './routes/files';
+import { registerKiloCliRunRoutes } from './routes/kilo-cli-run';
 import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
 import { writeKiloCliConfig } from './kilo-cli-config';
 import { writeGogCredentials } from './gog-credentials';
 import { startWatchRenewal, stopWatchRenewal } from './gmail-watch-renewal';
 import { bootstrap } from './bootstrap';
 import type { ControllerStateRef, ControllerState } from './bootstrap';
+import { getOpenclawVersion } from './openclaw-version';
+import { startCheckin } from './checkin';
+import { collectProductTelemetry } from './product-telemetry';
 
 export type RuntimeConfig = {
   port: number;
@@ -226,6 +230,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   let supervisor: Supervisor | undefined;
   let gmailWatchSupervisor: Supervisor | undefined;
   let pairingCache: ReturnType<typeof createPairingCache> | undefined;
+  let stopCheckin: (() => void) | undefined;
 
   const onSignal = async (signal: NodeJS.Signals): Promise<void> => {
     if (shuttingDown) return;
@@ -233,6 +238,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     console.log(`[controller] Received ${signal}, shutting down`);
 
     pairingCache?.cleanup();
+    stopCheckin?.();
     stopWatchRenewal();
     const shutdowns: Promise<void>[] = [];
     if (supervisor) shutdowns.push(supervisor.shutdown(signal));
@@ -357,6 +363,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   registerEnvRoutes(honoApp, supervisor, config.expectedToken);
   registerGmailPushRoute(honoApp, gmailWatchSupervisor ?? null, config.expectedToken);
   registerFileRoutes(honoApp, config.expectedToken, '/root/.openclaw');
+  registerKiloCliRunRoutes(honoApp, config.expectedToken);
   honoApp.all(
     '*',
     createHttpProxy({
@@ -395,6 +402,17 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     }
 
     controllerState.current = { state: 'ready' };
+
+    stopCheckin = startCheckin({
+      getApiKey: () => env.KILOCODE_API_KEY ?? '',
+      getGatewayToken: () => config.expectedToken,
+      getSandboxId: () => env.KILOCLAW_SANDBOX_ID ?? '',
+      getCheckinUrl: () => env.KILOCLAW_CHECKIN_URL ?? '',
+      getSupervisorStats: () => supervisor.getStats(),
+      getOpenclawVersion,
+      getProductTelemetry: openclawVersion => collectProductTelemetry(openclawVersion),
+    });
+
     console.log(
       `[controller] Ready version=${CONTROLLER_VERSION} commit=${CONTROLLER_COMMIT} requireProxyToken=${config.requireProxyToken} wsIdleTimeoutMs=${config.wsIdleTimeoutMs} wsHandshakeTimeoutMs=${config.wsHandshakeTimeoutMs} maxWsConnections=${config.maxWsConnections}`
     );

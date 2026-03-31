@@ -29,6 +29,8 @@ import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import {
   addReactionToPR,
+  createPRComment,
+  hasPRCommentWithMarker,
   findKiloReviewComment,
   updateKiloReviewComment,
   updateCheckRun,
@@ -36,6 +38,8 @@ import {
 import type { CheckRunConclusion } from '@/lib/integrations/platforms/github/adapter';
 import {
   addReactionToMR,
+  createMRNote,
+  hasMRNoteWithMarker,
   findKiloReviewNote,
   updateKiloReviewNote,
   setCommitStatus,
@@ -52,6 +56,10 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendUsageFooter } from '@/lib/code-reviews/summary/usage-footer';
 import { APP_URL } from '@/lib/constants';
 import type { CloudAgentCodeReview, PlatformIntegration } from '@kilocode/db/schema';
+import {
+  CODE_REVIEW_TERMINAL_REASONS,
+  type CodeReviewTerminalReason,
+} from '@kilocode/db/schema-types';
 
 /**
  * Payload from the orchestrator DO (legacy format).
@@ -61,6 +69,7 @@ type OrchestratorPayload = {
   cliSessionId?: string;
   status: 'running' | 'completed' | 'failed' | 'cancelled';
   errorMessage?: string;
+  terminalReason?: CodeReviewTerminalReason;
   gateResult?: 'pass' | 'fail';
 };
 
@@ -74,6 +83,7 @@ type CloudAgentNextCallbackPayload = {
   kiloSessionId?: string;
   status: 'completed' | 'failed' | 'interrupted';
   errorMessage?: string;
+  terminalReason?: CodeReviewTerminalReason;
   lastSeenBranch?: string;
   gateResult?: 'pass' | 'fail';
 };
@@ -89,10 +99,12 @@ function normalizePayload(raw: StatusUpdatePayload): {
   sessionId?: string;
   cliSessionId?: string;
   errorMessage?: string;
+  terminalReason?: CodeReviewTerminalReason;
   gateResult?: 'pass' | 'fail';
 } {
   // Map cloud-agent-next 'interrupted' → 'cancelled'
-  const status = raw.status === 'interrupted' ? 'cancelled' : raw.status;
+  let status: 'running' | 'completed' | 'failed' | 'cancelled' =
+    raw.status === 'interrupted' ? 'cancelled' : raw.status;
 
   // Map cloud-agent-next 'kiloSessionId' → 'cliSessionId'
   const cliSessionId =
@@ -106,14 +118,55 @@ function normalizePayload(raw: StatusUpdatePayload): {
   const sessionId =
     raw.sessionId ?? ('cloudAgentSessionId' in raw ? raw.cloudAgentSessionId : undefined);
 
+  // Validate terminalReason against allowlist to prevent free-form text in the DB
+  const validReasons: ReadonlySet<string> = new Set(CODE_REVIEW_TERMINAL_REASONS);
+  let terminalReason: CodeReviewTerminalReason | undefined =
+    raw.terminalReason && validReasons.has(raw.terminalReason) ? raw.terminalReason : undefined;
+
+  // Infer billing when no explicit terminalReason was provided.
+  // v1: billing errors arrive as 'interrupted' (→ cancelled) with billing error text
+  // v2: billing errors arrive as 'failed' with billing error text (after wrapper fix)
+  if (!terminalReason && isBillingCodeReviewTerminalReason(undefined, raw.errorMessage)) {
+    if (status === 'cancelled') {
+      status = 'failed'; // billing is not a user cancellation
+    }
+    terminalReason = 'billing';
+  }
+
   return {
     status,
     sessionId,
     cliSessionId,
     errorMessage: raw.errorMessage,
+    terminalReason,
     gateResult: raw.gateResult,
   };
 }
+
+function isBillingCodeReviewTerminalReason(
+  terminalReason?: CodeReviewTerminalReason,
+  errorMessage?: string | null
+): boolean {
+  if (terminalReason === 'billing') {
+    return true;
+  }
+
+  const message = errorMessage?.toLowerCase();
+  if (!message) {
+    return false;
+  }
+
+  return ['insufficient credits', 'paid model', 'add credits', 'credits required'].some(pattern =>
+    message.includes(pattern)
+  );
+}
+
+const BILLING_NOTICE_MARKER = '<!-- kilo-billing-notice -->';
+
+const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
+**Kilo Code Review could not run — your account is out of credits.**
+
+[Add credits](https://app.kilo.ai/) or [switch to a free model](https://app.kilo.ai/code-reviews) to enable reviews on this change.`;
 
 /**
  * Read a review's usage data.
@@ -185,6 +238,7 @@ async function getReviewUsageData(reviewId: string) {
 function mapStatusToCheckRun(
   reviewStatus: string,
   errorMessage?: string,
+  terminalReason?: CodeReviewTerminalReason,
   gateResult?: 'pass' | 'fail'
 ) {
   const statusMap: Record<string, 'in_progress' | 'completed'> = {
@@ -200,17 +254,19 @@ function mapStatusToCheckRun(
   // When the review completed but the agent reported a gate failure
   // (e.g. findings exceeding the gate_threshold), fail the check.
   const reviewFailed = reviewStatus === 'completed' && gateResult === 'fail';
+  const billingFailure =
+    reviewStatus === 'failed' && isBillingCodeReviewTerminalReason(terminalReason, errorMessage);
 
   const conclusionMap: Record<string, CheckRunConclusion> = {
     completed: reviewFailed ? 'failure' : 'success',
-    failed: 'failure',
+    failed: billingFailure ? 'action_required' : 'failure',
     cancelled: 'cancelled',
   };
 
   const titleMap: Record<string, string> = {
     running: 'Kilo Code Review in progress',
     completed: reviewFailed ? 'Kilo Code Review found issues' : 'Kilo Code Review completed',
-    failed: 'Kilo Code Review failed',
+    failed: billingFailure ? 'Insufficient credits to run review' : 'Kilo Code Review failed',
     cancelled: 'Kilo Code Review cancelled',
   };
 
@@ -219,7 +275,11 @@ function mapStatusToCheckRun(
     completed: reviewFailed
       ? 'Code review completed with findings that require attention.'
       : 'Code review completed successfully.',
-    failed: errorMessage ? `Review failed: ${errorMessage}` : 'Review failed.',
+    failed: billingFailure
+      ? 'Review could not start because the account has insufficient credits.'
+      : errorMessage
+        ? `Review failed: ${errorMessage}`
+        : 'Review failed.',
     cancelled: 'Review was cancelled.',
   };
 
@@ -248,6 +308,32 @@ function mapStatusToGitLabState(
   return stateMap[reviewStatus] ?? 'pending';
 }
 
+function getGitLabStatusDescription(
+  reviewStatus: string,
+  errorMessage?: string,
+  terminalReason?: CodeReviewTerminalReason,
+  gateResult?: 'pass' | 'fail'
+): string | undefined {
+  if (reviewStatus === 'running') return 'Kilo Code Review in progress';
+  if (reviewStatus === 'completed' && gateResult === 'fail') {
+    return 'Kilo Code Review found issues that require attention';
+  }
+  if (reviewStatus === 'completed') return 'Kilo Code Review completed';
+  if (reviewStatus === 'cancelled') return 'Kilo Code Review cancelled';
+  if (
+    reviewStatus === 'failed' &&
+    isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
+  ) {
+    return 'Insufficient credits to run review';
+  }
+  if (reviewStatus === 'failed' && errorMessage) {
+    const desc = `Review failed: ${errorMessage}`;
+    return desc.length > 255 ? desc.slice(0, 252) + '...' : desc;
+  }
+  if (reviewStatus === 'failed') return 'Kilo Code Review failed';
+  return undefined;
+}
+
 /**
  * Resolves a GitLab access token for a review's project.
  * Prefers a stored Project Access Token; falls back to the user's OAuth token.
@@ -264,7 +350,9 @@ async function resolveGitLabAccessToken(
  * Extracts the GitLab instance URL from an integration's metadata.
  */
 function getGitLabInstanceUrl(integration: PlatformIntegration): string {
-  const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
+  const metadata = integration.metadata as {
+    gitlab_instance_url?: string;
+  } | null;
   return metadata?.gitlab_instance_url || 'https://gitlab.com';
 }
 
@@ -277,13 +365,19 @@ async function updatePRGateCheck(
   integration: PlatformIntegration,
   reviewStatus: string,
   errorMessage?: string,
+  terminalReason?: CodeReviewTerminalReason,
   gitlabAccessToken?: string,
   gateResult?: 'pass' | 'fail'
 ) {
   const platform = review.platform || 'github';
   const detailsUrl = `${APP_URL}/code-reviews/${review.id}`;
 
-  const checkRunMapping = mapStatusToCheckRun(reviewStatus, errorMessage, gateResult);
+  const checkRunMapping = mapStatusToCheckRun(
+    reviewStatus,
+    errorMessage,
+    terminalReason,
+    gateResult
+  );
   if (!checkRunMapping) return; // unsupported status (e.g. 'queued') — nothing to update
 
   if (platform === 'github' && integration.platform_installation_id) {
@@ -301,13 +395,19 @@ async function updatePRGateCheck(
         status: checkRunMapping.status,
         conclusion: checkRunMapping.conclusion,
         detailsUrl,
-        output: { title: checkRunMapping.title, summary: checkRunMapping.summary },
+        output: {
+          title: checkRunMapping.title,
+          summary: checkRunMapping.summary,
+        },
       }
     );
 
     logExceptInTest(
       `[code-review-status] Updated check run for ${review.repo_full_name}#${review.pr_number}`,
-      { status: checkRunMapping.status, conclusion: checkRunMapping.conclusion }
+      {
+        status: checkRunMapping.status,
+        conclusion: checkRunMapping.conclusion,
+      }
     );
   } else if (platform === PLATFORM.GITLAB) {
     // GitLab: update commit status
@@ -325,7 +425,12 @@ async function updatePRGateCheck(
       state,
       {
         targetUrl: detailsUrl,
-        description: checkRunMapping.title,
+        description: getGitLabStatusDescription(
+          reviewStatus,
+          errorMessage,
+          terminalReason,
+          gateResult
+        ),
       },
       instanceUrl
     );
@@ -350,7 +455,7 @@ export async function POST(
 
     const { reviewId } = await params;
     const rawPayload: StatusUpdatePayload = await req.json();
-    const { status, sessionId, cliSessionId, errorMessage, gateResult } =
+    const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult } =
       normalizePayload(rawPayload);
 
     // Validate payload
@@ -453,6 +558,7 @@ export async function POST(
           integration,
           status,
           errorMessage,
+          terminalReason,
           gitlabAccessToken,
           validGateResult
         );
@@ -462,7 +568,11 @@ export async function POST(
         if (isTerminal) {
           captureException(gateCheckError, {
             tags: { source: 'code-review-status-gate-check' },
-            extra: { reviewId, status, checkRunId: String(review.check_run_id ?? '') },
+            extra: {
+              reviewId,
+              status,
+              checkRunId: String(review.check_run_id ?? ''),
+            },
           });
           // Abort so the caller retries — once the DB moves to a terminal status
           // the early-return above prevents any later attempt to update the gate.
@@ -476,6 +586,7 @@ export async function POST(
       sessionId,
       cliSessionId,
       errorMessage,
+      terminalReason,
       startedAt: status === 'running' ? new Date() : undefined,
       completedAt:
         status === 'completed' || status === 'failed' || status === 'cancelled'
@@ -510,7 +621,10 @@ export async function POST(
           captureMessage('Bot user missing for organization code review', {
             level: 'error',
             tags: { source: 'code-review-status' },
-            extra: { organizationId: review.owned_by_organization_id, reviewId },
+            extra: {
+              organizationId: review.owned_by_organization_id,
+              reviewId,
+            },
           });
         }
       } else {
@@ -561,6 +675,32 @@ export async function POST(
               logExceptInTest(
                 `[code-review-status] Added ${reaction} reaction to ${review.repo_full_name}#${review.pr_number}`
               );
+
+              // Billing notice (failed + billing only)
+              if (
+                status === 'failed' &&
+                isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
+              ) {
+                const alreadyPosted = await hasPRCommentWithMarker(
+                  integration.platform_installation_id,
+                  repoOwner,
+                  repoName,
+                  review.pr_number,
+                  BILLING_NOTICE_MARKER
+                );
+                if (!alreadyPosted) {
+                  await createPRComment(
+                    integration.platform_installation_id,
+                    repoOwner,
+                    repoName,
+                    review.pr_number,
+                    BILLING_NOTICE_BODY
+                  );
+                  logExceptInTest(
+                    `[code-review-status] Posted billing notice on ${review.repo_full_name}#${review.pr_number}`
+                  );
+                }
+              }
 
               // Usage footer (completed only)
               if (status === 'completed') {
@@ -621,6 +761,32 @@ export async function POST(
               logExceptInTest(
                 `[code-review-status] Added ${emoji} reaction to GitLab MR ${review.repo_full_name}!${review.pr_number}`
               );
+
+              // Billing notice (failed + billing only)
+              if (
+                status === 'failed' &&
+                isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
+              ) {
+                const alreadyPosted = await hasMRNoteWithMarker(
+                  accessToken,
+                  review.repo_full_name,
+                  review.pr_number,
+                  BILLING_NOTICE_MARKER,
+                  instanceUrl
+                );
+                if (!alreadyPosted) {
+                  await createMRNote(
+                    accessToken,
+                    review.repo_full_name,
+                    review.pr_number,
+                    BILLING_NOTICE_BODY,
+                    instanceUrl
+                  );
+                  logExceptInTest(
+                    `[code-review-status] Posted billing notice on GitLab MR ${review.repo_full_name}!${review.pr_number}`
+                  );
+                }
+              }
 
               // Usage footer (completed only)
               if (status === 'completed') {

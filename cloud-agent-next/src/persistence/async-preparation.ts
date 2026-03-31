@@ -179,13 +179,14 @@ export async function executePreparationSteps(
   if (input.kiloSessionId) {
     emitProgress('kilo_session', 'Importing session…');
     const now = Date.now();
+    const defaultTitle = 'New session - ' + new Date(now).toISOString();
     const minimalSessionJson = JSON.stringify({
       info: {
         id: input.kiloSessionId,
         slug: '',
         projectID: '',
         directory: '',
-        title: '',
+        title: defaultTitle,
         version: '2',
         time: { created: now, updated: now },
       },

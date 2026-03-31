@@ -58,12 +58,13 @@ export type ChannelsPatchResponse = {
 
 /** Input to PATCH /api/platform/secrets */
 export type SecretsPatchInput = {
-  secrets: Partial<Record<SecretFieldKey, EncryptedEnvelope | null>>;
+  secrets: Record<string, EncryptedEnvelope | null>;
+  meta?: Record<string, { configPath?: string }>;
 };
 
 /** Response from PATCH /api/platform/secrets */
 export type SecretsPatchResponse = {
-  /** Field keys that have a value set after the patch */
+  /** Catalog field keys that have a value set after the patch */
   configured: SecretFieldKey[];
 };
 
@@ -115,11 +116,25 @@ export type MachineSize = {
   cpu_kind?: 'shared' | 'performance';
 };
 
+/** Response from POST /api/platform/restore-volume-snapshot */
+export type RestoreVolumeSnapshotResponse = {
+  acknowledged: boolean;
+  previousVolumeId: string;
+};
+
 /** Response from GET /api/platform/status and GET /api/kiloclaw/status */
 export type PlatformStatusResponse = {
   userId: string | null;
   sandboxId: string | null;
-  status: 'provisioned' | 'starting' | 'running' | 'stopped' | 'destroying' | null;
+  status:
+    | 'provisioned'
+    | 'starting'
+    | 'restarting'
+    | 'running'
+    | 'stopped'
+    | 'destroying'
+    | 'restoring'
+    | null;
   provisionedAt: number | null;
   lastStartedAt: number | null;
   lastStoppedAt: number | null;
@@ -137,6 +152,8 @@ export type PlatformStatusResponse = {
   trackedImageDigest: string | null;
   googleConnected: boolean;
   gmailNotificationsEnabled: boolean;
+  execSecurity: string | null;
+  execAsk: string | null;
 };
 
 /** Response from GET /api/platform/debug-status (internal/admin only). */
@@ -151,6 +168,12 @@ export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   lastDestroyErrorStatus: number | null;
   lastDestroyErrorMessage: string | null;
   lastDestroyErrorAt: number | null;
+  lastRestartErrorMessage: string | null;
+  lastRestartErrorAt: number | null;
+  previousVolumeId: string | null;
+  restoreStartedAt: string | null;
+  pendingRestoreVolumeId: string | null;
+  instanceReadyEmailSent: boolean;
 };
 
 /** A Fly volume snapshot. */
@@ -178,12 +201,33 @@ export type UserConfigResponse = {
   kilocodeApiKeyExpiresAt?: string | null;
   /** Per catalog entry ID → whether all fields for that entry are configured. */
   configuredSecrets: Record<string, boolean>;
+  /** Env var names of user-defined custom (non-catalog) secrets. */
+  customSecretKeys: string[];
+  /** Metadata for custom secrets (config paths, etc.). */
+  customSecretMeta: Record<string, { configPath?: string }>;
 };
 
 /** Response from POST /api/platform/doctor */
 export type DoctorResponse = {
   success: boolean;
   output: string;
+};
+
+/** Response from POST /api/platform/kilo-cli-run/start */
+export type KiloCliRunStartResponse = {
+  ok: boolean;
+  startedAt: string;
+};
+
+/** Response from GET /api/platform/kilo-cli-run/status */
+export type KiloCliRunStatusResponse = {
+  hasRun: boolean;
+  status: 'running' | 'completed' | 'failed' | 'cancelled' | null;
+  output: string | null;
+  exitCode: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  prompt: string | null;
 };
 
 /** Response from POST /api/admin/machine/restart */
@@ -216,6 +260,9 @@ export type ConfigRestoreResponse = {
   ok: boolean;
   signaled: boolean;
 };
+
+/** Response from GET /api/platform/gateway/ready (opaque — shape depends on OpenClaw version) */
+export type GatewayReadyResponse = Record<string, unknown>;
 
 /** Response from GET /api/platform/controller-version. Null fields = old controller. */
 export type ControllerVersionResponse = {
@@ -274,8 +321,31 @@ export type ReassociateVolumeResponse = {
   newRegion: string;
 };
 
+/** Response from GET /api/platform/regions */
+export type RegionsResponse = {
+  regions: string[];
+  source: 'kv' | 'env' | 'default';
+  raw: string;
+};
+
+/** Response from PUT /api/platform/regions */
+export type UpdateRegionsResponse = {
+  ok: true;
+  regions: string[];
+  raw: string;
+};
+
+/** Stream Chat credentials for a user's KiloClaw channel */
+export type ChatCredentials = {
+  apiKey: string;
+  userId: string;
+  userToken: string;
+  channelId: string;
+} | null;
+
 /** Combined status returned by tRPC getStatus */
 export type KiloClawDashboardStatus = PlatformStatusResponse & {
   /** Worker base URL for constructing the "Open" link. Falls back to claw.kilo.ai. */
   workerUrl: string;
+  name: string | null;
 };

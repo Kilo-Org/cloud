@@ -208,13 +208,15 @@ const prepareSessionHandler = internalApiProtectedProcedure
         logger.setTags({ kiloSessionId });
 
         // Create cli_sessions_v2 record immediately (stream-ticket route needs it for ownership)
+        const defaultTitle = 'New session - ' + new Date().toISOString();
         await sessionService.createCliSessionViaSessionIngest(
           kiloSessionId,
           cloudAgentSessionId,
           ctx.userId,
           ctx.env,
           input.kilocodeOrganizationId,
-          input.createdOnPlatform ?? 'cloud-agent'
+          input.createdOnPlatform ?? 'cloud-agent',
+          defaultTitle
         );
 
         const rollbackCliSession = async () => {
@@ -246,6 +248,9 @@ const prepareSessionHandler = internalApiProtectedProcedure
           model: input.model,
           variant: input.variant,
           kiloSessionId,
+          githubRepo: input.githubRepo,
+          gitUrl: input.gitUrl,
+          platform: input.platform,
         });
 
         if (!registerResult.success) {

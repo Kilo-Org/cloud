@@ -1,5 +1,5 @@
 import { isFreeModel, kiloFreeModels, preferredModels } from '@/lib/models';
-import { PROVIDERS } from '@/lib/providers';
+import PROVIDERS from '@/lib/providers/provider-definitions';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
   OpenRouterModelsResponseSchema,
@@ -14,18 +14,13 @@ import {
   getOpenCodeSettings,
   getVersionedModelSettings,
 } from '@/lib/providers/model-settings';
-import {
-  AUTO_MODELS,
-  deprecatedAutoModelsToPreventNewExtensionModelPickerFromGettingStuck,
-} from '@/lib/kilo-auto-model';
+import { AUTO_MODELS } from '@/lib/kilo-auto-model';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/model-utils';
 
 function buildAutoModels(): OpenRouterModel[] {
-  return AUTO_MODELS.concat(
-    deprecatedAutoModelsToPreventNewExtensionModelPickerFromGettingStuck()
-  ).map(m => ({
+  return AUTO_MODELS.map(m => ({
     id: m.id,
     name: m.name,
     created: 0,
@@ -43,6 +38,8 @@ function buildAutoModels(): OpenRouterModel[] {
     pricing: {
       prompt: m.prompt_price,
       completion: m.completion_price,
+      input_cache_read: m.input_cache_read_price,
+      input_cache_write: m.input_cache_write_price,
       request: '0',
       image: '0',
       web_search: '0',

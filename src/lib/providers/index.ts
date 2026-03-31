@@ -1,4 +1,3 @@
-import { getEnvVariable } from '@/lib/dotenvx';
 import { debugSaveProxyResponseStream } from '../debugUtils';
 import { fetchWithBackoff } from '../fetchWithBackoff';
 import { captureException, captureMessage } from '@sentry/nextjs';
@@ -9,103 +8,74 @@ import type {
   GatewayRequest,
   GatewayMessagesRequest,
 } from '@/lib/providers/openrouter/types';
-import {
-  applyMistralModelSettings,
-  applyMistralProviderSettings,
-  isMistralModel,
-} from '@/lib/providers/mistral';
+import { applyMistralModelSettings, isMistralModel } from '@/lib/providers/mistral';
 import { applyXaiModelSettings, isXaiModel } from '@/lib/providers/xai';
-import { applyVercelSettings, shouldRouteToVercel } from '@/lib/providers/vercel';
+import { shouldRouteToVercel } from '@/lib/providers/vercel';
 import { kiloFreeModels } from '@/lib/models';
 import {
   applyAnthropicModelSettings,
   isAnthropicModel,
   isHaikuModel,
 } from '@/lib/providers/anthropic';
-import { applyGigaPotatoProviderSettings } from '@/lib/providers/gigapotato';
-import {
-  getBYOKforOrganization,
-  getBYOKforUser,
-  getModelUserByokProviders,
-  type BYOKResult,
-} from '@/lib/byok';
-import type { CustomLlm } from '@kilocode/db/schema';
+import { getBYOKforOrganization, getBYOKforUser, getModelUserByokProviders } from '@/lib/byok';
 import { custom_llm, type User } from '@kilocode/db/schema';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/providers/openrouter/inference-provider-id';
-import { applyCoreThinkProviderSettings } from '@/lib/providers/corethink';
 import { hasAttemptCompletionTool } from '@/lib/tool-calling';
 import { applyGoogleModelSettings, isGeminiModel } from '@/lib/providers/google';
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
-import { applyMoonshotProviderSettings, isMoonshotModel } from '@/lib/providers/moonshotai';
+import { applyMoonshotModelSettings, isMoonshotModel } from '@/lib/providers/moonshotai';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
 import { isOpenAiModel, isOpenAiOssModel } from '@/lib/providers/openai';
-import { applyAlibabaProviderSettings } from '@/lib/providers/qwen';
-import type { ProviderId } from '@/lib/providers/provider-id';
 import { isZaiModel } from '@/lib/providers/zai';
 import { isMinimaxModel } from '@/lib/providers/minimax';
 import { isXiaomiModel } from '@/lib/providers/xiaomi';
+import type { BYOKResult, Provider } from '@/lib/providers/types';
+import PROVIDERS from '@/lib/providers/provider-definitions';
+import { getCodingPlanModel } from '@/lib/providers/coding-plans';
+import type { CustomLlmProvider } from '@kilocode/db';
 
-export type Provider = {
-  id: ProviderId;
-  apiUrl: string;
-  apiKey: string;
-  hasGenerationEndpoint: boolean;
-};
+function inferSupportedChatApis(aiSdkProvider: CustomLlmProvider) {
+  return aiSdkProvider === 'anthropic'
+    ? (['messages'] as const)
+    : aiSdkProvider === 'openai'
+      ? (['responses'] as const)
+      : (['chat_completions'] as const);
+}
 
-export const PROVIDERS = {
-  OPENROUTER: {
-    id: 'openrouter',
-    apiUrl: 'https://openrouter.ai/api/v1',
-    apiKey: getEnvVariable('OPENROUTER_API_KEY'),
-    hasGenerationEndpoint: true,
-  },
-  ALIBABA: {
-    id: 'alibaba',
-    apiUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
-    apiKey: getEnvVariable('ALIBABA_API_KEY'),
-    hasGenerationEndpoint: false,
-  },
-  GIGAPOTATO: {
-    id: 'gigapotato',
-    apiUrl: getEnvVariable('GIGAPOTATO_API_URL'),
-    apiKey: getEnvVariable('GIGAPOTATO_API_KEY'),
-    hasGenerationEndpoint: false,
-  },
-  CORETHINK: {
-    id: 'corethink',
-    apiUrl: 'https://api.corethink.ai/v1/code',
-    apiKey: getEnvVariable('CORETHINK_API_KEY'),
-    hasGenerationEndpoint: false,
-  },
-  MARTIAN: {
-    id: 'martian',
-    apiUrl: 'https://api.withmartian.com/v1',
-    apiKey: getEnvVariable('MARTIAN_API_KEY'),
-    hasGenerationEndpoint: false,
-  },
-  MISTRAL: {
-    id: 'mistral',
-    apiUrl: 'https://api.mistral.ai/v1',
-    apiKey: getEnvVariable('MISTRAL_API_KEY'),
-    hasGenerationEndpoint: false,
-  },
-  MORPH: {
-    id: 'morph',
-    apiUrl: 'https://api.morphllm.com/v1',
-    apiKey: getEnvVariable('MORPH_API_KEY'),
-    hasGenerationEndpoint: false,
-  },
-  VERCEL_AI_GATEWAY: {
-    id: 'vercel',
-    apiUrl: 'https://ai-gateway.vercel.sh/v1',
-    apiKey: getEnvVariable('VERCEL_AI_GATEWAY_API_KEY'),
-    hasGenerationEndpoint: true,
-  },
-} as const satisfies Record<string, Provider>;
+async function checkCodingPlanBYOK(
+  user: User | AnonymousUserContext,
+  requestedModel: string,
+  organizationId: string | undefined
+) {
+  const { provider: codingPlan, model: codingPlanModel } = getCodingPlanModel(requestedModel);
+  if (!codingPlan || !codingPlanModel) {
+    return null;
+  }
+  const userByok = organizationId
+    ? await getBYOKforOrganization(db, organizationId, [codingPlan.id])
+    : await getBYOKforUser(db, user.id, [codingPlan.id]);
+  if (!userByok || userByok.length === 0) {
+    return null;
+  }
+  return {
+    provider: {
+      id: 'coding-plan',
+      apiUrl: codingPlan.base_url,
+      apiKey: userByok[0].decryptedAPIKey,
+      supportedChatApis: inferSupportedChatApis(codingPlan.ai_sdk_provider),
+      transformRequest(context) {
+        context.request.body.model = codingPlanModel.id;
+        codingPlan.transformRequest(context);
+      },
+    } satisfies Provider,
+    userByok,
+    bypassAccessCheck: false,
+  };
+}
 
-async function checkBYOK(
+async function checkVercelBYOK(
   user: User | AnonymousUserContext,
   requestedModel: string,
   organizationId: string | undefined
@@ -120,17 +90,22 @@ async function checkBYOK(
 
 export async function getProvider(
   requestedModel: string,
-  request: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest,
+  request: GatewayRequest,
   user: User | AnonymousUserContext,
   organizationId: string | undefined,
   taskId: string | undefined
-): Promise<{ provider: Provider; userByok: BYOKResult[] | null; customLlm: CustomLlm | null }> {
-  const userByokFromByokCheck = await checkBYOK(user, requestedModel, organizationId);
-  if (userByokFromByokCheck) {
+): Promise<{ provider: Provider; userByok: BYOKResult[] | null; bypassAccessCheck: boolean }> {
+  const codingPlanByok = await checkCodingPlanBYOK(user, requestedModel, organizationId);
+  if (codingPlanByok) {
+    return codingPlanByok;
+  }
+
+  const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);
+  if (vercelByok) {
     return {
       provider: PROVIDERS.VERCEL_AI_GATEWAY,
-      userByok: userByokFromByokCheck,
-      customLlm: null,
+      userByok: vercelByok,
+      bypassAccessCheck: false,
     };
   }
 
@@ -145,49 +120,32 @@ export async function getProvider(
           id: 'custom',
           apiUrl: customLlm.base_url,
           apiKey: customLlm.api_key,
-          hasGenerationEndpoint: true,
+          supportedChatApis: inferSupportedChatApis(customLlm.provider),
+          transformRequest(context) {
+            Object.assign(context.request.body, customLlm?.extra_body ?? {});
+            for (const [key, value] of Object.entries(customLlm.extra_headers ?? {})) {
+              context.extraHeaders[key] = value;
+            }
+            context.request.body.model = customLlm.internal_id;
+          },
         },
         userByok: null,
-        customLlm,
+        bypassAccessCheck: true,
       };
     }
   }
 
   if (await shouldRouteToVercel(requestedModel, request, taskId || user.id)) {
-    return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, customLlm: null };
+    return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, bypassAccessCheck: false };
   }
 
   const kiloFreeModel = kiloFreeModels.find(m => m.public_id === requestedModel);
   const freeModelProvider = Object.values(PROVIDERS).find(p => p.id === kiloFreeModel?.gateway);
 
-  if (kiloFreeModel && freeModelProvider?.id === 'martian') {
-    return {
-      provider: { ...freeModelProvider, id: 'custom' },
-      userByok: null,
-      customLlm: {
-        public_id: kiloFreeModel.public_id,
-        internal_id: kiloFreeModel.internal_id,
-        display_name: kiloFreeModel.display_name,
-        context_length: kiloFreeModel.context_length,
-        max_completion_tokens: kiloFreeModel.max_completion_tokens,
-        provider: 'openai', // xai doesn't support preserved reasoning currently: https://github.com/vercel/ai/issues/10542
-        organization_ids: [],
-        base_url: freeModelProvider.apiUrl,
-        api_key: freeModelProvider.apiKey,
-        supports_image_input: kiloFreeModel.flags.includes('vision'),
-        force_reasoning: true,
-        opencode_settings: null,
-        extra_body: null,
-        extra_headers: null,
-        interleaved_format: null,
-      },
-    };
-  }
-
   return {
     provider: freeModelProvider ?? PROVIDERS.OPENROUTER,
     userByok: null,
-    customLlm: null,
+    bypassAccessCheck: false,
   };
 }
 
@@ -197,7 +155,7 @@ export async function getEmbeddingProvider(
   organizationId: string | undefined
 ): Promise<{ provider: Provider; userByok: BYOKResult[] | null }> {
   // 1. BYOK check — route through Vercel AI Gateway when user has their own key
-  const userByok = await checkBYOK(user, requestedModel, organizationId);
+  const userByok = await checkVercelBYOK(user, requestedModel, organizationId);
   if (userByok) {
     return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok };
   }
@@ -252,10 +210,7 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
     return [OpenRouterInferenceProviderIdSchema.enum['xiaomi']];
   }
   if (isZaiModel(requestedModel)) {
-    return [
-      OpenRouterInferenceProviderIdSchema.enum.friendli,
-      OpenRouterInferenceProviderIdSchema.enum['z-ai'],
-    ];
+    return [OpenRouterInferenceProviderIdSchema.enum['z-ai']];
   }
   if (isOpenAiOssModel(requestedModel)) {
     return [
@@ -317,7 +272,7 @@ export function applyProviderSpecificLogic(
   applyPreferredProvider(requestedModel, requestToMutate.body);
 
   if (isXaiModel(requestedModel)) {
-    applyXaiModelSettings(requestedModel, requestToMutate, extraHeaders);
+    applyXaiModelSettings(requestToMutate, extraHeaders);
   }
 
   if (isGeminiModel(requestedModel)) {
@@ -325,30 +280,19 @@ export function applyProviderSpecificLogic(
   }
 
   if (isMoonshotModel(requestedModel)) {
-    applyMoonshotProviderSettings(requestToMutate);
+    applyMoonshotModelSettings(requestToMutate);
   }
 
-  if (provider.id === 'alibaba') {
-    applyAlibabaProviderSettings(requestToMutate);
-  }
-
-  if (provider.id === 'gigapotato') {
-    applyGigaPotatoProviderSettings(requestedModel, requestToMutate);
-  }
-
-  if (provider.id === 'corethink') {
-    applyCoreThinkProviderSettings(requestToMutate);
-  }
-
-  if (provider.id === 'mistral') {
-    applyMistralProviderSettings(requestToMutate, extraHeaders);
-  } else if (isMistralModel(requestedModel)) {
+  if (isMistralModel(requestedModel)) {
     applyMistralModelSettings(requestToMutate);
   }
 
-  if (provider.id === 'vercel') {
-    applyVercelSettings(requestedModel, requestToMutate, userByok);
-  }
+  provider.transformRequest({
+    model: requestedModel,
+    request: requestToMutate,
+    extraHeaders,
+    userByok,
+  });
 }
 
 export async function openRouterRequest({

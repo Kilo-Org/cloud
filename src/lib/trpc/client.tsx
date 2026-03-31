@@ -12,13 +12,14 @@ import { useState } from 'react';
 import type { RootRouter } from '@/routers/root-router';
 import { TRPCProvider } from '@/lib/trpc/utils';
 import { buildInfo } from '@/lib/buildInfo';
+import { APP_URL } from '@/lib/constants';
 import { createNoRetryEventSource } from '@/lib/trpc/noRetryEventSource';
 
 function getUrl() {
   const base = (() => {
     if (typeof window !== 'undefined') return '';
     if (buildInfo.vercelUrl) return `https://${buildInfo.vercelUrl}`;
-    return 'http://localhost:3000';
+    return APP_URL;
   })();
   return `${base}/api/trpc`;
 }

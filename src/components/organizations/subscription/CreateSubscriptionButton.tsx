@@ -27,7 +27,7 @@ export function CreateSubscriptionButton(props: Props) {
     return null;
   }
 
-  const buttonText = `Create a subscription for ${data.members.length} seat${data.members.length > 1 ? 's' : ''}`;
+  const buttonText = 'Create a subscription';
 
   const onClick = () => {
     hog?.capture('create_subscription_clicked', { organizationId });

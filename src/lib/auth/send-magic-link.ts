@@ -7,14 +7,18 @@ export type SendMagicLinkResult = { success: true } | { success: false; error: s
  * Uses the Turnstile JWT cookie (from previous verification) for authentication.
  *
  * @param email - The email address to send the magic link to
+ * @param callbackUrl - Optional post-sign-in redirect URL (e.g. from getSignInCallbackUrl)
  * @returns Promise resolving to success/error result
  */
-export async function sendMagicLink(email: string): Promise<SendMagicLinkResult> {
+export async function sendMagicLink(
+  email: string,
+  callbackUrl?: string
+): Promise<SendMagicLinkResult> {
   try {
     const response = await fetch('/api/auth/magic-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, callbackUrl }),
     });
 
     const result = await response.json();

@@ -35,6 +35,8 @@ export type ProcessedMetricsData = {
   requests: Array<{ ts: string; value: number }>;
   avg_cost_per_req: Array<{ ts: string; value: number }>;
   tokens: Array<{ ts: string; value: number }>;
+  input_tokens: Array<{ ts: string; value: number }>;
+  output_tokens: Array<{ ts: string; value: number }>;
   active_users: Array<{ ts: string; value: number }>;
 };
 
@@ -44,6 +46,8 @@ export type MetricsTotals = {
   requests: number;
   avg_cost_per_req: number;
   tokens: number;
+  input_tokens: number;
+  output_tokens: number;
   active_users: number;
 };
 

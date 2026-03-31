@@ -1,4 +1,4 @@
-import type { BYOKResult } from '@/lib/byok';
+import type { BYOKResult } from '@/lib/providers/types';
 import { kiloFreeModels } from '@/lib/models';
 import { isAnthropicModel } from '@/lib/providers/anthropic';
 import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
@@ -8,7 +8,7 @@ import { isMoonshotModel } from '@/lib/providers/moonshotai';
 import { isOpenAiOssModel } from '@/lib/providers/openai';
 import type { VercelUserByokInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import {
-  AutocompleteUserByokProviderIdSchema,
+  DirectUserByokInferenceProviderIdSchema,
   AwsCredentialsSchema,
   openRouterToVercelInferenceProviderId,
   VercelUserByokInferenceProviderIdSchema,
@@ -18,11 +18,10 @@ import type {
   GatewayRequest,
   VercelInferenceProviderConfig,
   VercelProviderConfig,
-  OpenRouterChatCompletionRequest,
-  GatewayResponsesRequest,
-  GatewayMessagesRequest,
 } from '@/lib/providers/openrouter/types';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
+import { mimo_v2_pro_free_model } from '@/lib/providers/xiaomi';
+import { isZaiModel } from '@/lib/providers/zai';
 import * as crypto from 'crypto';
 
 // EMERGENCY SWITCH
@@ -64,17 +63,17 @@ function isLikelyAvailableOnAllGateways(requestedModel: string) {
 
 export async function shouldRouteToVercel(
   requestedModel: string,
-  request: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest,
+  request: GatewayRequest,
   randomSeed: string
 ) {
-  if (request.provider?.data_collection === 'deny') {
+  if (request.body.provider?.data_collection === 'deny') {
     console.debug(
       `[shouldRouteToVercel] not routing to Vercel because data_collection=deny is not supported`
     );
     return false;
   }
 
-  if ((request.provider?.ignore?.length ?? 0) > 0) {
+  if ((request.body.provider?.ignore?.length ?? 0) > 0) {
     console.debug(
       `[shouldRouteToVercel] not routing to Vercel because provider.ignore is not supported`
     );
@@ -97,7 +96,9 @@ export async function shouldRouteToVercel(
     !isGeminiModel(requestedModel) &&
     !isMinimaxModel(requestedModel) &&
     !isMoonshotModel(requestedModel) &&
-    !isOpenAiOssModel(requestedModel)
+    !isOpenAiOssModel(requestedModel) &&
+    requestedModel !== mimo_v2_pro_free_model.public_id &&
+    !isZaiModel(requestedModel)
   ) {
     console.debug(`[shouldRouteToVercel] model family not allowed for randomized Vercel routing`);
     return false;
@@ -134,13 +135,16 @@ export function getVercelInferenceProviderConfigForUserByok(
   provider: BYOKResult
 ): [VercelUserByokInferenceProviderId, VercelInferenceProviderConfig[]] {
   const key =
-    provider.providerId === AutocompleteUserByokProviderIdSchema.enum.codestral
+    provider.providerId === DirectUserByokInferenceProviderIdSchema.enum.codestral
       ? VercelUserByokInferenceProviderIdSchema.enum.mistral
-      : provider.providerId;
+      : VercelUserByokInferenceProviderIdSchema.parse(provider.providerId);
+
   const list = new Array<VercelInferenceProviderConfig>();
 
   if (key === VercelUserByokInferenceProviderIdSchema.enum.zai) {
-    // Z.AI Coding Plan support
+    // Z.ai Coding Plan support
+    // ideally we remove this and have people use the explicit Z.ai Coding Plan option,
+    // but that's a breaking change
     list.push({
       apiKey: provider.decryptedAPIKey,
       baseURL: 'https://api.z.ai/api/coding/paas/v4',

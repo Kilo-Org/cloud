@@ -4,6 +4,7 @@ import {
   detectGitPlatform,
   extractRepoFromGitUrl,
   buildPrepareSessionRepoParams,
+  findAllGitPlatformUrls,
 } from './git-utils';
 
 describe('buildRepoBrowseUrl', () => {
@@ -157,6 +158,34 @@ describe('extractRepoFromGitUrl', () => {
     );
   });
 
+  test('GitHub issue URL extracts owner/repo', () => {
+    expect(extractRepoFromGitUrl('https://github.com/owner/repo/issues/42')).toBe('owner/repo');
+  });
+
+  test('GitLab merge request URL extracts group/project', () => {
+    expect(extractRepoFromGitUrl('https://gitlab.com/group/project/-/merge_requests/1')).toBe(
+      'group/project'
+    );
+  });
+
+  test('GitLab nested group merge request URL extracts full project path', () => {
+    expect(
+      extractRepoFromGitUrl('https://gitlab.com/group/subgroup/project/-/merge_requests/1')
+    ).toBe('group/subgroup/project');
+  });
+
+  test('GitLab nested plain project URL extracts full project path', () => {
+    expect(extractRepoFromGitUrl('https://gitlab.com/group/subgroup/project')).toBe(
+      'group/subgroup/project'
+    );
+  });
+
+  test('GitLab deeply nested group issue URL extracts full project path', () => {
+    expect(extractRepoFromGitUrl('https://gitlab.com/a/b/c/project/-/issues/5')).toBe(
+      'a/b/c/project'
+    );
+  });
+
   test('null returns undefined', () => {
     expect(extractRepoFromGitUrl(null)).toBeUndefined();
   });
@@ -181,5 +210,66 @@ describe('buildPrepareSessionRepoParams', () => {
 
   test('empty string repo returns null', () => {
     expect(buildPrepareSessionRepoParams({ repo: '', platform: 'github' })).toBeNull();
+  });
+});
+
+describe('findAllGitPlatformUrls', () => {
+  test('extracts GitHub URL from plain text', () => {
+    expect(findAllGitPlatformUrls('Fix https://github.com/owner/repo/issues/42 please')).toEqual([
+      'https://github.com/owner/repo/issues/42',
+    ]);
+  });
+
+  test('extracts GitLab URL', () => {
+    expect(
+      findAllGitPlatformUrls('See https://gitlab.com/group/project/-/merge_requests/1')
+    ).toEqual(['https://gitlab.com/group/project/-/merge_requests/1']);
+  });
+
+  test('returns all URLs in order when multiple are present', () => {
+    expect(findAllGitPlatformUrls('https://github.com/a/b and https://gitlab.com/c/d')).toEqual([
+      'https://github.com/a/b',
+      'https://gitlab.com/c/d',
+    ]);
+  });
+
+  test('returns empty array when no platform URL is present', () => {
+    expect(findAllGitPlatformUrls('Check https://example.com/foo')).toEqual([]);
+  });
+
+  test('handles URL inside markdown link', () => {
+    expect(findAllGitPlatformUrls('[link](https://github.com/owner/repo)')).toEqual([
+      'https://github.com/owner/repo',
+    ]);
+  });
+
+  test('strips trailing period', () => {
+    expect(findAllGitPlatformUrls('See https://github.com/owner/repo.')).toEqual([
+      'https://github.com/owner/repo',
+    ]);
+  });
+
+  test('strips trailing comma', () => {
+    expect(findAllGitPlatformUrls('Check https://github.com/owner/repo, then do X')).toEqual([
+      'https://github.com/owner/repo',
+    ]);
+  });
+
+  test('handles empty string', () => {
+    expect(findAllGitPlatformUrls('')).toEqual([]);
+  });
+
+  test('handles text with no URLs', () => {
+    expect(findAllGitPlatformUrls('Just some plain text')).toEqual([]);
+  });
+
+  test('extracts multiple URLs from mixed platforms', () => {
+    const text =
+      'Fix https://github.com/org/frontend/issues/1, related to https://gitlab.com/org/backend/-/issues/5 and https://github.com/org/shared/pull/10';
+    expect(findAllGitPlatformUrls(text)).toEqual([
+      'https://github.com/org/frontend/issues/1',
+      'https://gitlab.com/org/backend/-/issues/5',
+      'https://github.com/org/shared/pull/10',
+    ]);
   });
 });

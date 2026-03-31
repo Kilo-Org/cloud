@@ -31,6 +31,10 @@ export const AgentMetadataRecord = z.object({
   last_activity_at: z.string().nullable(),
   agent_status_message: z.string().nullable(),
   agent_status_updated_at: z.string().nullable(),
+  // SDK-level activity watermark (populated by enriched heartbeat)
+  last_event_type: z.string().nullable().optional(),
+  last_event_at: z.string().nullable().optional(),
+  active_tools: z.string().nullable().optional(),
 });
 
 export type AgentMetadataRecord = z.output<typeof AgentMetadataRecord>;
@@ -53,6 +57,9 @@ export function createTableAgentMetadata(): string {
     last_activity_at: `text`,
     agent_status_message: `text`,
     agent_status_updated_at: `text`,
+    last_event_type: `text`,
+    last_event_at: `text`,
+    active_tools: `text default '[]'`,
   });
 }
 
@@ -61,5 +68,9 @@ export function migrateAgentMetadata(): string[] {
   return [
     `ALTER TABLE agent_metadata ADD COLUMN agent_status_message text`,
     `ALTER TABLE agent_metadata ADD COLUMN agent_status_updated_at text`,
+    // SDK activity watermark columns (Phase 4 reconciler)
+    `ALTER TABLE agent_metadata ADD COLUMN last_event_type text`,
+    `ALTER TABLE agent_metadata ADD COLUMN last_event_at text`,
+    `ALTER TABLE agent_metadata ADD COLUMN active_tools text default '[]'`,
   ];
 }

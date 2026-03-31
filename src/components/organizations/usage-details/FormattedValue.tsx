@@ -7,6 +7,8 @@ export type OrganizationUsageMetric =
   | 'requests'
   | 'avg_cost_per_req'
   | 'tokens'
+  | 'input_tokens'
+  | 'output_tokens'
   | 'active_users';
 
 export type ActiveFilter = {
@@ -43,6 +45,8 @@ export function FormattedValue({ value, metric }: FormattedValueProps) {
       );
     case 'requests':
     case 'tokens':
+    case 'input_tokens':
+    case 'output_tokens':
       return <>{formatLargeNumber(value)}</>;
     case 'active_users':
       return <>{Math.round(value).toString()}</>;

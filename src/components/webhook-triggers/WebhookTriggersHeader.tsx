@@ -4,6 +4,7 @@ import { memo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { SetPageTitle } from '@/components/SetPageTitle';
 import { Webhook, Plus } from 'lucide-react';
 
 type WebhookTriggersHeaderProps = {
@@ -31,12 +32,10 @@ export const WebhookTriggersHeader = memo(function WebhookTriggersHeader({
 }: WebhookTriggersHeaderProps) {
   return (
     <div className="mb-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Webhook className="h-8 w-8" />
-          <h1 className="text-3xl font-bold">{title}</h1>
-          {badgeLabel && <Badge variant="new">{badgeLabel}</Badge>}
-        </div>
+      <SetPageTitle title={title} icon={<Webhook className="h-4 w-4" />}>
+        {badgeLabel && <Badge variant="new">{badgeLabel}</Badge>}
+      </SetPageTitle>
+      <div className="flex items-center justify-end">
         {!hideCreate && (
           <Button asChild disabled={disabled}>
             <Link href={disabled ? '#' : createUrl}>

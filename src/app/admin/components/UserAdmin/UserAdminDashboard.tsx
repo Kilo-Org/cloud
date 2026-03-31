@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { UserAdminOrganizations } from '@/app/admin/components/UserAdmin/UserAdminOrganizations';
 import { UserAdminKiloPass } from '@/app/admin/components/UserAdmin/UserAdminKiloPass';
+import { UserAdminKiloClaw } from '@/app/admin/components/UserAdmin/UserAdminKiloClaw';
 import { UserAdminGastown } from '@/app/admin/components/UserAdmin/UserAdminGastown';
 
 export function UserAdminDashboard({ ...user }: UserDetailProps) {
@@ -49,6 +50,7 @@ export function UserAdminDashboard({ ...user }: UserDetailProps) {
           <UserAdminNotes {...user} />
           <UserAdminGdprRemoval {...user} />
           <UserAdminKiloPass userId={user.id} />
+          <UserAdminKiloClaw userId={user.id} />
           <UserAdminUsageBilling {...user} />
           <UserAdminCreditGrant
             {...user}

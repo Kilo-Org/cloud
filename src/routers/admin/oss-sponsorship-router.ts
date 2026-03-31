@@ -7,6 +7,7 @@ import {
   organization_memberships,
   kilocode_users,
   cloud_agent_code_reviews,
+  kiloclaw_instances,
 } from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
 import * as z from 'zod';
@@ -375,6 +376,22 @@ export const ossSponsorshipRouter = createTRPCRouter({
         const hasCompletedCodeReview = !!latestCodeReview;
         const lastCodeReviewDate = latestCodeReview?.completed_at ?? null;
 
+        // Check if the owner has an active KiloClaw instance in their personal workspace
+        let hasKiloClawInstance = false;
+        if (kiloUserId) {
+          const [kiloclawInstance] = await db
+            .select({ id: kiloclaw_instances.id })
+            .from(kiloclaw_instances)
+            .where(
+              and(
+                eq(kiloclaw_instances.user_id, kiloUserId),
+                isNull(kiloclaw_instances.destroyed_at)
+              )
+            )
+            .limit(1);
+          hasKiloClawInstance = !!kiloclawInstance;
+        }
+
         return {
           email,
           hasKiloAccount,
@@ -392,6 +409,7 @@ export const ossSponsorshipRouter = createTRPCRouter({
           isOnboardingComplete,
           hasCompletedCodeReview,
           lastCodeReviewDate,
+          hasKiloClawInstance,
         };
       })
     );

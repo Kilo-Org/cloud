@@ -17,6 +17,8 @@ type StatsData = {
   cancelledCount: number;
   interruptedCount: number;
   inProgressCount: number;
+  billingErrorCount: number;
+  billingRate: number;
   successRate: number;
   failureRate: number;
   cancelledRate: number;
@@ -41,7 +43,7 @@ export function CodeReviewStats({ data }: { data: StatsData }) {
   const showVersionBreakdown = byVersion.size > 0;
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Total Reviews</CardTitle>
@@ -120,6 +122,16 @@ export function CodeReviewStats({ data }: { data: StatsData }) {
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold text-yellow-500">{data.cancelledRate.toFixed(1)}%</div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Billing Errors</CardTitle>
+          <CardDescription>{data.billingRate.toFixed(1)}% of terminal outcomes</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold text-orange-500">{data.billingErrorCount}</div>
         </CardContent>
       </Card>
 

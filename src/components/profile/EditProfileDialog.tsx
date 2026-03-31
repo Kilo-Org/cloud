@@ -14,12 +14,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import Link from 'next/link';
 
 type EditProfileDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   linkedinUrl: string | null;
   githubUrl: string | null;
+  githubLinkedViaOAuth: boolean;
 };
 
 function isValidHttpUrlOrEmpty(value: string): boolean {
@@ -37,24 +39,27 @@ export function EditProfileDialog({
   onOpenChange,
   linkedinUrl,
   githubUrl,
+  githubLinkedViaOAuth,
 }: EditProfileDialogProps) {
   const router = useRouter();
   const trpc = useTRPC();
 
   const [linkedinValue, setLinkedinValue] = useState(linkedinUrl ?? '');
-  const [githubValue, setGithubValue] = useState(githubUrl ?? '');
   const [linkedinError, setLinkedinError] = useState<string | null>(null);
+  const [githubValue, setGithubValue] = useState(githubUrl ?? '');
   const [githubError, setGithubError] = useState<string | null>(null);
 
   // Reset form state when dialog opens
   useEffect(() => {
     if (open) {
       setLinkedinValue(linkedinUrl ?? '');
-      setGithubValue(githubUrl ?? '');
       setLinkedinError(null);
-      setGithubError(null);
+      if (!githubLinkedViaOAuth) {
+        setGithubValue(githubUrl ?? '');
+        setGithubError(null);
+      }
     }
-  }, [open, linkedinUrl, githubUrl]);
+  }, [open, linkedinUrl, githubUrl, githubLinkedViaOAuth]);
 
   const updateProfileMutation = useMutation(
     trpc.user.updateProfile.mutationOptions({
@@ -67,7 +72,6 @@ export function EditProfileDialog({
 
   function handleSave() {
     const trimmedLinkedin = linkedinValue.trim();
-    const trimmedGithub = githubValue.trim();
 
     let hasError = false;
 
@@ -78,19 +82,28 @@ export function EditProfileDialog({
       setLinkedinError(null);
     }
 
-    if (trimmedGithub !== '' && !isValidHttpUrlOrEmpty(trimmedGithub)) {
-      setGithubError('URL must start with http:// or https://');
-      hasError = true;
+    if (!githubLinkedViaOAuth) {
+      const trimmedGithub = githubValue.trim();
+      if (trimmedGithub !== '' && !isValidHttpUrlOrEmpty(trimmedGithub)) {
+        setGithubError('URL must start with http:// or https://');
+        hasError = true;
+      } else {
+        setGithubError(null);
+      }
+
+      if (hasError) return;
+
+      updateProfileMutation.mutate({
+        linkedin_url: trimmedLinkedin === '' ? null : trimmedLinkedin,
+        github_url: trimmedGithub === '' ? null : trimmedGithub,
+      });
     } else {
-      setGithubError(null);
+      if (hasError) return;
+
+      updateProfileMutation.mutate({
+        linkedin_url: trimmedLinkedin === '' ? null : trimmedLinkedin,
+      });
     }
-
-    if (hasError) return;
-
-    updateProfileMutation.mutate({
-      linkedin_url: trimmedLinkedin === '' ? null : trimmedLinkedin,
-      github_url: trimmedGithub === '' ? null : trimmedGithub,
-    });
   }
 
   return (
@@ -116,17 +129,28 @@ export function EditProfileDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="github-url">GitHub Profile URL</Label>
-            <Input
-              id="github-url"
-              placeholder="https://github.com/yourusername"
-              value={githubValue}
-              onChange={e => {
-                setGithubValue(e.target.value);
-                setGithubError(null);
-              }}
-              aria-invalid={githubError !== null}
-            />
-            {githubError && <p className="text-destructive text-sm">{githubError}</p>}
+            {githubLinkedViaOAuth ? (
+              <p className="text-muted-foreground text-sm">
+                Linked via GitHub.{' '}
+                <Link href="/connected-accounts" className="text-primary hover:underline">
+                  Change in Connected Accounts
+                </Link>
+              </p>
+            ) : (
+              <>
+                <Input
+                  id="github-url"
+                  placeholder="https://github.com/yourusername"
+                  value={githubValue}
+                  onChange={e => {
+                    setGithubValue(e.target.value);
+                    setGithubError(null);
+                  }}
+                  aria-invalid={githubError !== null}
+                />
+                {githubError && <p className="text-destructive text-sm">{githubError}</p>}
+              </>
+            )}
           </div>
           {updateProfileMutation.error && (
             <p className="text-destructive text-sm">Failed to save profile. Please try again.</p>

@@ -1,6 +1,21 @@
-pnpm format:check
-pnpm lint
-pnpm typecheck
+pnpm format:check &
+pid_format=$!
+
+scripts/lint-all.sh &
+pid_lint=$!
+
+scripts/typecheck-all.sh --changes-only &
+pid_typecheck=$!
+
+failed=""
+wait $pid_format      || failed="$failed format:check"
+wait $pid_lint        || failed="$failed lint"
+wait $pid_typecheck   || failed="$failed typecheck"
+
+if [ -n "$failed" ]; then
+  printf >&2 "\npre-push checks failed:%s\n" "$failed"
+  exit 1
+fi
 
 command -v git-lfs >/dev/null 2>&1 || { printf >&2 "\nThis repository is configured for Git LFS but 'git-lfs' was not found on your path.\n\n"; exit 2; }
 git lfs pre-push "$@"

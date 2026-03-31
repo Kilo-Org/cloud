@@ -1,9 +1,11 @@
 import { createTRPCRouter } from '@/lib/trpc/init';
 import {
   organizationMemberProcedure,
-  organizationOwnerProcedure,
+  organizationMemberMutationProcedure,
+  organizationBillingMutationProcedure,
   OrganizationIdInputSchema,
 } from './utils';
+
 import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import { getGitHubTokenForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import { createSecurityAgentHandlers } from '@/lib/security-agent/router/shared-handlers';
@@ -32,10 +34,10 @@ const handlers = createSecurityAgentHandlers<{ organizationId: string }>({
 export const organizationSecurityAgentRouter = createTRPCRouter({
   getPermissionStatus: organizationMemberProcedure.query(handlers.getPermissionStatus),
   getConfig: organizationMemberProcedure.query(handlers.getConfig),
-  saveConfig: organizationOwnerProcedure
+  saveConfig: organizationBillingMutationProcedure
     .input(OrganizationIdInputSchema.merge(handlers.saveConfig.inputSchema))
     .mutation(handlers.saveConfig.handler),
-  setEnabled: organizationOwnerProcedure
+  setEnabled: organizationBillingMutationProcedure
     .input(OrganizationIdInputSchema.merge(handlers.setEnabled.inputSchema))
     .mutation(handlers.setEnabled.handler),
   getRepositories: organizationMemberProcedure.query(handlers.getRepositories),
@@ -52,22 +54,22 @@ export const organizationSecurityAgentRouter = createTRPCRouter({
   getLastSyncTime: organizationMemberProcedure
     .input(OrganizationIdInputSchema.merge(handlers.getLastSyncTime.inputSchema))
     .query(handlers.getLastSyncTime.handler),
-  triggerSync: organizationMemberProcedure
+  triggerSync: organizationMemberMutationProcedure
     .input(OrganizationIdInputSchema.merge(handlers.triggerSync.inputSchema))
     .mutation(handlers.triggerSync.handler),
-  dismissFinding: organizationOwnerProcedure
+  dismissFinding: organizationBillingMutationProcedure
     .input(OrganizationIdInputSchema.merge(handlers.dismissFinding.inputSchema))
     .mutation(handlers.dismissFinding.handler),
-  startAnalysis: organizationMemberProcedure
+  startAnalysis: organizationMemberMutationProcedure
     .input(OrganizationIdInputSchema.merge(handlers.startAnalysis.inputSchema))
     .mutation(handlers.startAnalysis.handler),
   getAnalysis: organizationMemberProcedure
     .input(OrganizationIdInputSchema.merge(handlers.getAnalysis.inputSchema))
     .query(handlers.getAnalysis.handler),
   getOrphanedRepositories: organizationMemberProcedure.query(handlers.getOrphanedRepositories),
-  deleteFindingsByRepository: organizationOwnerProcedure
+  deleteFindingsByRepository: organizationBillingMutationProcedure
     .input(OrganizationIdInputSchema.merge(handlers.deleteFindingsByRepository.inputSchema))
     .mutation(handlers.deleteFindingsByRepository.handler),
   getAutoDismissEligible: organizationMemberProcedure.query(handlers.getAutoDismissEligible),
-  autoDismissEligible: organizationOwnerProcedure.mutation(handlers.autoDismissEligible),
+  autoDismissEligible: organizationBillingMutationProcedure.mutation(handlers.autoDismissEligible),
 });

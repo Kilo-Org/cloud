@@ -8,6 +8,37 @@
 ## Durable Objects
 
 - Each DO module must export a `get{ClassName}Stub` helper function (e.g. `getRigDOStub`) that centralizes how that DO namespace creates instances. Callers should use this helper instead of accessing the namespace binding directly.
+- **Sub-modules for large DOs**: When a Durable Object grows beyond a few hundred lines, extract domain logic into sub-modules under a `<do-name>/` directory alongside the DO file. For example, `Town.do.ts` delegates to modules in `town/`:
+
+  ```
+  dos/
+    Town.do.ts            # Class definition, RPC methods, alarm loop
+    town/
+      agents.ts           # Agent CRUD, hook management
+      beads.ts            # Bead CRUD, convoy progress
+      scheduling.ts       # Agent dispatch, pending work scheduling
+      review-queue.ts     # Review lifecycle, recovery
+      patrol.ts           # Zombie detection, stale hook recovery
+      config.ts           # Town configuration
+      rigs.ts             # Rig registry
+      mail.ts             # Inter-agent mail
+      container-dispatch.ts  # Container start/stop/status
+  ```
+
+  Each sub-module exports plain functions (not classes) that accept `SqlStorage` and any other required context as arguments. The DO imports them with the `import * as X` pattern:
+
+  ```ts
+  import * as beadOps from './town/beads';
+  import * as agents from './town/agents';
+  import * as scheduling from './town/scheduling';
+
+  // In the DO class:
+  beadOps.updateBeadStatus(this.sql, beadId, 'closed', agentId);
+  agents.getOrCreateAgent(this.sql, 'polecat', rigId, this.townId);
+  await scheduling.schedulePendingWork(this.schedulingCtx);
+  ```
+
+  This keeps the DO class thin (RPC surface + orchestration) while sub-modules own the business logic. The `import * as X` pattern makes call sites self-documenting — you can always tell which domain a function belongs to.
 
 ## IO boundaries
 

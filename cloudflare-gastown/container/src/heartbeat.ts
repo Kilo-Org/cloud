@@ -53,6 +53,10 @@ async function sendHeartbeats(): Promise<void> {
       townId: agent.townId,
       status: agent.status,
       timestamp: new Date().toISOString(),
+      lastEventType: agent.lastEventType ?? null,
+      lastEventAt: agent.lastEventAt ?? null,
+      activeTools: agent.activeTools ?? [],
+      messageCount: agent.messageCount ?? 0,
     };
 
     try {

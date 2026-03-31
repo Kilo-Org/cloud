@@ -1,15 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { Button } from '@/components/Button';
 import { Badge } from '@/components/ui/badge';
+import { SetPageTitle } from '@/components/SetPageTitle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CreateTownDialog } from '@/components/gastown/CreateTownDialog';
 import { GastownBackdrop } from '@/components/gastown/GastownBackdrop';
 import { Plus, Factory, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,10 +18,18 @@ import { formatDistanceToNow } from 'date-fns';
 export function TownListPageClient() {
   const router = useRouter();
   const trpc = useGastownTRPC();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const queryClient = useQueryClient();
   const townsQuery = useQuery(trpc.gastown.listTowns.queryOptions());
+  const didAutoRedirect = useRef(false);
+
+  // Auto-redirect new users with no towns to the onboarding wizard (once per page load)
+  useEffect(() => {
+    if (!didAutoRedirect.current && townsQuery.data && townsQuery.data.length === 0) {
+      didAutoRedirect.current = true;
+      router.replace('/gastown/onboarding');
+    }
+  }, [townsQuery.data, router]);
 
   const deleteTown = useMutation(
     trpc.gastown.deleteTown.mutationOptions({
@@ -41,10 +49,9 @@ export function TownListPageClient() {
         <div className="flex flex-col gap-3">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-semibold tracking-tight text-white/95">Gastown</h1>
+              <SetPageTitle title="Gas Town">
                 <Badge variant="beta">beta</Badge>
-              </div>
+              </SetPageTitle>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/60">
                 A chat-first orchestration console for towns, rigs, beads, and agents. Built for
                 radical transparency: every object is clickable; every outcome is attributable.
@@ -54,7 +61,7 @@ export function TownListPageClient() {
             <Button
               variant="primary"
               size="md"
-              onClick={() => setIsCreateOpen(true)}
+              onClick={() => router.push('/gastown/onboarding')}
               className="gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
             >
               <Plus className="size-5" />
@@ -113,7 +120,7 @@ export function TownListPageClient() {
             <Button
               variant="primary"
               size="md"
-              onClick={() => setIsCreateOpen(true)}
+              onClick={() => router.push('/gastown/onboarding')}
               className="mt-5 gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
             >
               <Plus className="size-5" />
@@ -156,8 +163,6 @@ export function TownListPageClient() {
           ))}
         </div>
       )}
-
-      <CreateTownDialog isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
     </PageContainer>
   );
 }

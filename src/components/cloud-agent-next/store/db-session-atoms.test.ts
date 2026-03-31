@@ -265,6 +265,7 @@ describe('getSessionDisplayTitle', () => {
     session_id: '123e4567-e89b-12d3-a456-426614174000',
     title: null,
     git_url: null,
+    git_branch: null,
     cloud_agent_session_id: null,
     created_on_platform: 'unknown',
     created_at: new Date(),
@@ -646,7 +647,7 @@ describe('New Session Creation Logic', () => {
       title,
       git_url: repository ? `https://github.com/${repository}` : null,
       cloud_agent_session_id: cloudAgentSessionId,
-      created_on_platform: 'cloud-agent',
+      created_on_platform: 'cloud-agent-web',
       created_at: now,
       updated_at: now,
     };

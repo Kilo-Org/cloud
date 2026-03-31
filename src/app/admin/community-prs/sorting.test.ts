@@ -12,6 +12,7 @@ function row(partial: Partial<ExternalOpenPullRequestRow>): ExternalOpenPullRequ
     number: partial.number ?? 1,
     title: partial.title ?? 't',
     url: partial.url ?? 'https://example.com',
+    repo: partial.repo ?? 'kilocode',
     authorLogin: partial.authorLogin ?? 'a',
     createdAt: partial.createdAt ?? new Date('2020-01-01T00:00:00.000Z').toISOString(),
     ageDays: partial.ageDays ?? 0,
@@ -41,6 +42,7 @@ function closedRow(partial: Partial<ExternalClosedPullRequestRow>): ExternalClos
     number: partial.number ?? 1,
     title: partial.title ?? 't',
     url: partial.url ?? 'https://example.com',
+    repo: partial.repo ?? 'kilocode',
     authorLogin: partial.authorLogin ?? 'a',
     closedAt,
     mergedAt,
@@ -90,6 +92,26 @@ describe('sortExternalPullRequests', () => {
     ];
     const sorted = sortExternalPullRequests(rows, { key: 'reviewStatus', direction: 'asc' });
     expect(sorted.map(r => r.number)).toEqual([3, 4, 2, 1]);
+  });
+
+  it('sorts by repo asc (alphabetical)', () => {
+    const rows = [
+      row({ number: 1, repo: 'kilo-marketplace' }),
+      row({ number: 2, repo: 'cloud' }),
+      row({ number: 3, repo: 'kilocode' }),
+    ];
+    const sorted = sortExternalPullRequests(rows, { key: 'repo', direction: 'asc' });
+    expect(sorted.map(r => r.number)).toEqual([2, 1, 3]);
+  });
+
+  it('sorts by repo desc (reverse alphabetical)', () => {
+    const rows = [
+      row({ number: 1, repo: 'kilo-marketplace' }),
+      row({ number: 2, repo: 'cloud' }),
+      row({ number: 3, repo: 'kilocode' }),
+    ];
+    const sorted = sortExternalPullRequests(rows, { key: 'repo', direction: 'desc' });
+    expect(sorted.map(r => r.number)).toEqual([3, 1, 2]);
   });
 });
 
@@ -164,5 +186,15 @@ describe('sortClosedPullRequests', () => {
     ];
     const sorted = sortClosedPullRequests(rows, { key: 'status', direction: 'desc' });
     expect(sorted.map(r => r.number)).toEqual([1, 3, 2]);
+  });
+
+  it('sorts by repo asc (alphabetical)', () => {
+    const rows = [
+      closedRow({ number: 1, repo: 'kilocode' }),
+      closedRow({ number: 2, repo: 'cloud' }),
+      closedRow({ number: 3, repo: 'kilo-marketplace' }),
+    ];
+    const sorted = sortClosedPullRequests(rows, { key: 'repo', direction: 'asc' });
+    expect(sorted.map(r => r.number)).toEqual([2, 3, 1]);
   });
 });

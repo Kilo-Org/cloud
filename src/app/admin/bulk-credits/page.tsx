@@ -435,7 +435,7 @@ export default function BulkCreditsPage() {
                           <TableCell>{user.userName || '—'}</TableCell>
                           <TableCell>
                             <Link
-                              href={`/admin/users/${user.userId}`}
+                              href={`/admin/users/${encodeURIComponent(user.userId)}`}
                               className="font-mono text-sm text-blue-400 hover:underline"
                             >
                               {user.userId.slice(0, 8)}...
@@ -563,7 +563,7 @@ export default function BulkCreditsPage() {
                         <TableCell>
                           {result.userId ? (
                             <Link
-                              href={`/admin/users/${result.userId}`}
+                              href={`/admin/users/${encodeURIComponent(result.userId)}`}
                               className="font-mono text-sm text-blue-400 hover:underline"
                             >
                               {result.userId.slice(0, 8)}...

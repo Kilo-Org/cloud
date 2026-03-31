@@ -12,7 +12,6 @@ type CancellationReason = {
 
 const REASON_COLORS: Record<string, string> = {
   'Superseded by new commit': 'bg-blue-500',
-  'No credits (billing)': 'bg-yellow-500',
   'Stream timeout': 'bg-orange-500',
   'Explicitly cancelled': 'bg-slate-500',
   'Process killed': 'bg-red-500',

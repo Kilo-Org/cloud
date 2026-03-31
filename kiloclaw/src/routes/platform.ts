@@ -15,6 +15,7 @@ import {
   ChannelsPatchSchema,
   GoogleCredentialsSchema,
   SecretsPatchSchema,
+  InstanceIdParam,
 } from '../schemas/instance-config';
 import {
   ImageVersionEntrySchema,
@@ -26,6 +27,10 @@ import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { z } from 'zod';
 import { withDORetry } from '@kilocode/worker-utils';
 import { deriveGatewayToken } from '../auth/gateway-token';
+import { sandboxIdFromUserId } from '../auth/sandbox-id';
+import { writeEvent } from '../utils/analytics';
+import { deriveHttpEventName } from '../middleware/analytics';
+import { sendMessage } from '../stream-chat/client';
 
 const GmailHistoryIdSchema = z.object({
   userId: z.string().min(1),
@@ -48,12 +53,97 @@ const KiloCodeConfigPatchSchema = z.object({
 
 const platform = new Hono<AppEnv>();
 
+// Analytics middleware — runs for every platform route. Captures timing and
+// error state. Skips emitting for routes with no user context (e.g. /versions)
+// unless an error occurred.
+platform.use('*', async (c, next) => {
+  const start = c.get('requestStartTime') ?? performance.now();
+  let error: string | undefined;
+  try {
+    await next();
+    if (c.res.status >= 400) {
+      error = `HTTP ${c.res.status}`;
+    }
+  } catch (err) {
+    error = (err instanceof Error ? err.message : String(err)).slice(0, 200);
+    throw err;
+  } finally {
+    const durationMs = performance.now() - start;
+    const method = c.req.method;
+    const path = c.req.path;
+
+    // userId is always read from Hono context — set by parseBody() for
+    // POST/PATCH routes, or by setValidatedQueryUserId() for GET/DELETE routes.
+    const userId = c.get('userId') || '';
+
+    // Skip analytics for routes with no user context (e.g. /versions) unless
+    // they errored — no userId means nothing useful to attribute.
+    if (userId || error) {
+      let sandboxId = '';
+      if (userId) {
+        try {
+          sandboxId = sandboxIdFromUserId(userId);
+        } catch {
+          // ignore
+        }
+      }
+
+      writeEvent(c.env, {
+        event: deriveHttpEventName(method, path),
+        delivery: 'http',
+        route: `${method} ${path}`,
+        error,
+        userId,
+        sandboxId,
+        durationMs,
+      });
+    }
+  }
+});
+
 /**
- * Create a fresh KiloClawInstance DO stub for a userId.
- * Returns a factory (not the stub itself) so withDORetry can get a fresh stub per attempt.
+ * Validate and set userId from the query string onto the Hono context.
+ * GET/DELETE routes use this so the analytics middleware can read userId
+ * from context without falling back to raw unvalidated query params.
  */
-function instanceStubFactory(env: AppEnv['Bindings'], userId: string) {
-  return () => env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(userId));
+function setValidatedQueryUserId(c: Context<AppEnv>): string | null {
+  const parsed = UserIdRequestSchema.safeParse({ userId: c.req.query('userId') });
+  if (!parsed.success) {
+    return null;
+  }
+
+  c.set('userId', parsed.data.userId);
+  return parsed.data.userId;
+}
+
+/**
+ * Create a fresh KiloClawInstance DO stub.
+ * Returns a factory (not the stub itself) so withDORetry can get a fresh stub per attempt.
+ *
+ * When instanceId is provided, uses it as the DO key (multi-instance).
+ * When absent, uses userId as the DO key (legacy single-instance).
+ */
+function instanceStubFactory(env: AppEnv['Bindings'], userId: string, instanceId?: string) {
+  const doKey = instanceId ?? userId;
+  return () => env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(doKey));
+}
+
+/** Parse and validate optional ?instanceId= query param. Returns 400 on invalid format. */
+function parseInstanceIdQuery(
+  c: Context<AppEnv>
+): { instanceId: string | undefined } | { error: Response } {
+  const raw = c.req.query('instanceId');
+  if (!raw) return { instanceId: undefined };
+  const result = InstanceIdParam.safeParse(raw);
+  if (!result.success) {
+    return {
+      error: new Response(JSON.stringify({ error: 'Invalid instance ID' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      }),
+    };
+  }
+  return { instanceId: result.data };
 }
 
 function statusCodeFromError(err: unknown): number {
@@ -92,6 +182,11 @@ const SAFE_ERROR_PREFIXES = [
   'Cannot enable Gmail ', // no Google account connected
   'New volume ID is ', // reassociate: same volume
   'Volume ', // reassociate: volume not found / bad state
+  'Cannot restore: ', // snapshot restore: bad state
+  'Cannot destroy: ', // destroy while restoring
+  'Cannot retry recovery', // force-retry-recovery guard messages
+  'Stream Chat sendMessage failed', // sendMessage HTTP errors
+  'Stream Chat is not set up', // no Stream Chat on this instance
 ];
 
 function sanitizeError(err: unknown, operation: string): { message: string; status: number } {
@@ -169,6 +264,19 @@ async function parseBody<T extends z.ZodTypeAny>(
     };
   }
 
+  // Expose userId on the Hono context so the analytics middleware can
+  // read it after the handler completes. Platform routes use
+  // x-internal-api-key auth (no JWT), so userId comes from the body.
+  if (
+    parsed.data &&
+    typeof parsed.data === 'object' &&
+    'userId' in parsed.data &&
+    typeof parsed.data.userId === 'string' &&
+    parsed.data.userId
+  ) {
+    c.set('userId', parsed.data.userId);
+  }
+
   return { data: parsed.data };
 }
 
@@ -179,6 +287,8 @@ platform.post('/provision', async c => {
 
   const {
     userId,
+    instanceId,
+    orgId,
     envVars,
     encryptedSecrets,
     channels,
@@ -192,19 +302,23 @@ platform.post('/provision', async c => {
 
   try {
     const provision = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, instanceId),
       stub =>
-        stub.provision(userId, {
-          envVars,
-          encryptedSecrets,
-          channels,
-          kilocodeApiKey,
-          kilocodeApiKeyExpiresAt,
-          kilocodeDefaultModel,
-          machineSize,
-          region,
-          pinnedImageTag,
-        }),
+        stub.provision(
+          userId,
+          {
+            envVars,
+            encryptedSecrets,
+            channels,
+            kilocodeApiKey,
+            kilocodeApiKeyExpiresAt,
+            kilocodeDefaultModel,
+            machineSize,
+            region,
+            pinnedImageTag,
+          },
+          instanceId || orgId ? { instanceId, orgId } : undefined
+        ),
       'provision'
     );
     return c.json(provision, 201);
@@ -264,6 +378,32 @@ platform.patch('/channels', async c => {
   }
 });
 
+// PATCH /api/platform/exec-preset
+const ExecPresetPatchSchema = z.object({
+  userId: z.string().min(1),
+  security: z.string().optional(),
+  ask: z.string().optional(),
+});
+
+platform.patch('/exec-preset', async c => {
+  const result = await parseBody(c, ExecPresetPatchSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, security, ask } = result.data;
+
+  try {
+    const updated = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.updateExecPreset({ security, ask }),
+      'updateExecPreset'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'exec-preset patch');
+    return jsonError(message, status);
+  }
+});
+
 // POST /api/platform/google-credentials
 const GoogleCredentialsPatchSchema = z.object({
   userId: z.string().min(1),
@@ -291,7 +431,7 @@ platform.post('/google-credentials', async c => {
 
 // DELETE /api/platform/google-credentials?userId=...
 platform.delete('/google-credentials', async c => {
-  const userId = c.req.query('userId');
+  const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
 
   try {
@@ -329,7 +469,7 @@ platform.post('/gmail-notifications', async c => {
 
 // DELETE /api/platform/gmail-notifications?userId=...
 platform.delete('/gmail-notifications', async c => {
-  const userId = c.req.query('userId');
+  const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
 
   try {
@@ -368,7 +508,7 @@ platform.post('/gmail-history-id', async c => {
 // GET /api/platform/gmail-oidc-email?userId=...
 // Lightweight lookup for the push worker — no Fly live check.
 platform.get('/gmail-oidc-email', async c => {
-  const userId = c.req.query('userId');
+  const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
 
   try {
@@ -389,12 +529,12 @@ platform.patch('/secrets', async c => {
   const result = await parseBody(c, SecretsPatchSchema);
   if ('error' in result) return result.error;
 
-  const { userId, secrets } = result.data;
+  const { userId, secrets, meta } = result.data;
 
   try {
     const updated = await withDORetry(
       instanceStubFactory(c.env, userId),
-      stub => stub.updateSecrets(secrets),
+      stub => stub.updateSecrets(secrets, meta),
       'updateSecrets'
     );
     return c.json(updated, 200);
@@ -406,7 +546,7 @@ platform.patch('/secrets', async c => {
 
 // GET /api/platform/pairing?userId=...&refresh=true
 platform.get('/pairing', async c => {
-  const userId = c.req.query('userId');
+  const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
 
   const forceRefresh = c.req.query('refresh') === 'true';
@@ -452,7 +592,7 @@ platform.post('/pairing/approve', async c => {
 
 // GET /api/platform/device-pairing?userId=...&refresh=true
 platform.get('/device-pairing', async c => {
-  const userId = c.req.query('userId');
+  const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
 
   const forceRefresh = c.req.query('refresh') === 'true';
@@ -497,7 +637,7 @@ platform.post('/device-pairing/approve', async c => {
 
 // GET /api/platform/gateway/status?userId=...
 platform.get('/gateway/status', async c => {
-  const userId = c.req.query('userId');
+  const userId = setValidatedQueryUserId(c);
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
@@ -515,9 +655,31 @@ platform.get('/gateway/status', async c => {
   }
 });
 
+// GET /api/platform/gateway/ready?userId=...
+// Non-fatal polling endpoint — always returns 200 so the frontend poll
+// doesn't generate a wall of errors during startup.
+platform.get('/gateway/ready', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  try {
+    const result = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.getGatewayReady(),
+      'getGatewayReady'
+    );
+    return c.json(result ?? { ready: false, error: 'controller too old' }, 200);
+  } catch (err) {
+    const { message } = sanitizeError(err, 'gateway ready');
+    return c.json({ ready: false, error: message }, 200);
+  }
+});
+
 // GET /api/platform/controller-version?userId=...
 platform.get('/controller-version', async c => {
-  const userId = c.req.query('userId');
+  const userId = setValidatedQueryUserId(c);
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
@@ -622,7 +784,7 @@ platform.post('/config/restore', async c => {
 // GET /api/platform/openclaw-config?userId=...
 // Returns the live openclaw.json from the running machine.
 platform.get('/openclaw-config', async c => {
-  const userId = c.req.query('userId');
+  const userId = setValidatedQueryUserId(c);
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
@@ -701,7 +863,7 @@ platform.patch('/openclaw-config', async c => {
 
 // GET /api/platform/files/tree?userId=...
 platform.get('/files/tree', async c => {
-  const userId = c.req.query('userId');
+  const userId = setValidatedQueryUserId(c);
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
@@ -727,7 +889,7 @@ platform.get('/files/tree', async c => {
 
 // GET /api/platform/files/read?userId=...&path=...
 platform.get('/files/read', async c => {
-  const userId = c.req.query('userId');
+  const userId = setValidatedQueryUserId(c);
   const filePath = c.req.query('path');
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
@@ -805,20 +967,142 @@ platform.post('/doctor', async c => {
   }
 });
 
-// POST /api/platform/start
-platform.post('/start', async c => {
+// ── Kilo CLI Run ──────────────────────────────────────────────────────
+
+const KiloCliRunStartSchema = z.object({
+  userId: z.string().min(1),
+  prompt: z.string().min(1).max(10_000),
+});
+
+// POST /api/platform/kilo-cli-run/start
+platform.post('/kilo-cli-run/start', async c => {
+  const result = await parseBody(c, KiloCliRunStartSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.startKiloCliRun(result.data.prompt),
+      'startKiloCliRun'
+    );
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'kilo-cli-run start');
+    return jsonError(message, status);
+  }
+});
+
+// GET /api/platform/kilo-cli-run/status?userId=...
+platform.get('/kilo-cli-run/status', async c => {
+  const userId = c.req.query('userId');
+  if (!userId) return jsonError('Missing userId', 400);
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, userId),
+      stub => stub.getKiloCliRunStatus(),
+      'getKiloCliRunStatus'
+    );
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'kilo-cli-run status');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/kilo-cli-run/cancel
+platform.post('/kilo-cli-run/cancel', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
 
   try {
-    await withDORetry(
+    const response = await withDORetry(
       instanceStubFactory(c.env, result.data.userId),
-      stub => stub.start(result.data.userId),
+      stub => stub.cancelKiloCliRun(),
+      'cancelKiloCliRun'
+    );
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'kilo-cli-run cancel');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/start
+const StartRequestSchema = UserIdRequestSchema.extend({
+  skipCooldown: z.boolean().optional(),
+});
+
+platform.post('/start', async c => {
+  const result = await parseBody(c, StartRequestSchema);
+  if ('error' in result) return result.error;
+  const startedAt = performance.now();
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+  const { instanceId } = iidResult;
+
+  try {
+    const options = result.data.skipCooldown ? { skipCooldown: true } : undefined;
+    const { started } = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId, instanceId),
+      stub => stub.start(result.data.userId, options),
       'start'
     );
+    if (started) {
+      writeEvent(c.env, {
+        event: 'instance.manual_start_succeeded',
+        delivery: 'http',
+        route: '/api/platform/start',
+        userId: result.data.userId,
+        durationMs: performance.now() - startedAt,
+      });
+    }
     return c.json({ ok: true });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'start');
+    writeEvent(c.env, {
+      event: 'instance.manual_start_failed',
+      delivery: 'http',
+      route: '/api/platform/start',
+      userId: result.data.userId,
+      error: message,
+      durationMs: performance.now() - startedAt,
+    });
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/force-retry-recovery
+platform.post('/force-retry-recovery', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+  const startedAt = performance.now();
+
+  try {
+    const { ok } = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.forceRetryRecovery(),
+      'forceRetryRecovery'
+    );
+    writeEvent(c.env, {
+      event: 'instance.force_retry_recovery_succeeded',
+      delivery: 'http',
+      route: '/api/platform/force-retry-recovery',
+      userId: result.data.userId,
+      durationMs: performance.now() - startedAt,
+    });
+    return c.json({ ok });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'forceRetryRecovery');
+    writeEvent(c.env, {
+      event: 'instance.force_retry_recovery_failed',
+      delivery: 'http',
+      route: '/api/platform/force-retry-recovery',
+      userId: result.data.userId,
+      error: message,
+      durationMs: performance.now() - startedAt,
+    });
     return jsonError(message, status);
   }
 });
@@ -828,8 +1112,16 @@ platform.post('/stop', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+  const { instanceId } = iidResult;
+
   try {
-    await withDORetry(instanceStubFactory(c.env, result.data.userId), stub => stub.stop(), 'stop');
+    await withDORetry(
+      instanceStubFactory(c.env, result.data.userId, instanceId),
+      stub => stub.stop(),
+      'stop'
+    );
     return c.json({ ok: true });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'stop');
@@ -842,9 +1134,13 @@ platform.post('/destroy', async c => {
   const result = await parseBody(c, DestroyRequestSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+  const { instanceId } = iidResult;
+
   try {
     await withDORetry(
-      instanceStubFactory(c.env, result.data.userId),
+      instanceStubFactory(c.env, result.data.userId, instanceId),
       stub => stub.destroy(),
       'destroy'
     );
@@ -855,16 +1151,19 @@ platform.post('/destroy', async c => {
   }
 });
 
-// GET /api/platform/status?userId=...
+// GET /api/platform/status?userId=...&instanceId=...
 platform.get('/status', async c => {
-  const userId = c.req.query('userId');
+  const userId = setValidatedQueryUserId(c);
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+  const { instanceId } = iidResult;
 
   try {
     const status = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, instanceId),
       stub => stub.getStatus(),
       'getStatus'
     );
@@ -875,17 +1174,89 @@ platform.get('/status', async c => {
   }
 });
 
-// GET /api/platform/debug-status?userId=...
-// Internal/admin-only debug status that includes DO destroy internals.
-platform.get('/debug-status', async c => {
-  const userId = c.req.query('userId');
+// GET /api/platform/stream-chat-credentials?userId=...&instanceId=...
+platform.get('/stream-chat-credentials', async c => {
+  const userId = setValidatedQueryUserId(c);
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+  const { instanceId } = iidResult;
+
+  try {
+    const creds = await withDORetry(
+      instanceStubFactory(c.env, userId, instanceId),
+      stub => stub.getStreamChatCredentials(),
+      'getStreamChatCredentials'
+    );
+    return c.json(creds);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'stream-chat-credentials');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/send-chat-message
+// Send a message to a KiloClaw instance's Stream Chat channel as the human user.
+// The OpenClaw bot picks it up and responds as if the user typed it.
+const SendChatMessageSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().uuid().optional(),
+  message: z.string().min(1).max(32_000),
+});
+
+platform.post('/send-chat-message', async c => {
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = SendChatMessageSchema.safeParse(body);
+  if (!parsed.success) {
+    return jsonError('Invalid request body: userId and message are required', 400);
+  }
+
+  const { userId, instanceId, message } = parsed.data;
+  c.set('userId', userId);
+
+  const apiKey = c.env.STREAM_CHAT_API_KEY;
+  const apiSecret = c.env.STREAM_CHAT_API_SECRET;
+  if (!apiKey || !apiSecret) {
+    return jsonError('Stream Chat is not configured', 503);
+  }
+
+  try {
+    // Get the sandboxId and channel info from the DO
+    const creds = await withDORetry(
+      instanceStubFactory(c.env, userId, instanceId),
+      stub => stub.getStreamChatCredentials(),
+      'getStreamChatCredentials'
+    );
+
+    if (!creds) {
+      return jsonError('Stream Chat is not set up for this instance', 404);
+    }
+
+    await sendMessage(apiKey, apiSecret, creds.channelId, creds.userId, message);
+
+    return c.json({ success: true, channelId: creds.channelId });
+  } catch (err) {
+    const { message: errMsg, status } = sanitizeError(err, 'send-chat-message');
+    return jsonError(errMsg, status);
+  }
+});
+
+// GET /api/platform/debug-status?userId=...&instanceId=...
+// Internal/admin-only debug status that includes DO destroy internals.
+platform.get('/debug-status', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+  const { instanceId } = iidResult;
 
   try {
     const status = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, instanceId),
       stub => stub.getDebugState(),
       'getDebugState'
     );
@@ -896,14 +1267,17 @@ platform.get('/debug-status', async c => {
   }
 });
 
-// GET /api/platform/gateway-token?userId=...
+// GET /api/platform/gateway-token?userId=...&instanceId=...
 // Returns the derived gateway token for a user's sandbox. The Next.js
 // dashboard calls this so it never needs GATEWAY_TOKEN_SECRET directly.
 platform.get('/gateway-token', async c => {
-  const userId = c.req.query('userId');
+  const userId = setValidatedQueryUserId(c);
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+  const { instanceId } = iidResult;
 
   if (!c.env.GATEWAY_TOKEN_SECRET) {
     return c.json({ error: 'GATEWAY_TOKEN_SECRET is not configured' }, 503);
@@ -911,7 +1285,7 @@ platform.get('/gateway-token', async c => {
 
   try {
     const status = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, instanceId),
       stub => stub.getStatus(),
       'getStatus'
     );
@@ -931,7 +1305,7 @@ platform.get('/gateway-token', async c => {
 // GET /api/platform/volume-snapshots?userId=...
 // Returns the list of Fly volume snapshots for the user's instance.
 platform.get('/volume-snapshots', async c => {
-  const userId = c.req.query('userId');
+  const userId = setValidatedQueryUserId(c);
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
@@ -952,7 +1326,7 @@ platform.get('/volume-snapshots', async c => {
 // GET /api/platform/candidate-volumes?userId=...
 // Returns all usable volumes in the user's Fly app for admin volume reassociation.
 platform.get('/candidate-volumes', async c => {
-  const userId = c.req.query('userId');
+  const userId = setValidatedQueryUserId(c);
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
@@ -991,6 +1365,30 @@ platform.post('/reassociate-volume', async c => {
     return c.json(response);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'reassociate-volume');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/restore-volume-snapshot
+// Enqueues a snapshot restore job. Returns immediately; restore runs async via CF Queue.
+const RestoreVolumeSnapshotSchema = z.object({
+  userId: z.string().min(1),
+  snapshotId: z.string().min(1),
+});
+
+platform.post('/restore-volume-snapshot', async c => {
+  const result = await parseBody(c, RestoreVolumeSnapshotSchema);
+  if ('error' in result) return result.error;
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId),
+      stub => stub.enqueueSnapshotRestore(result.data.snapshotId),
+      'enqueueSnapshotRestore'
+    );
+    return c.json(response);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'restore-volume-snapshot');
     return jsonError(message, status);
   }
 });
@@ -1095,6 +1493,122 @@ platform.post('/publish-image-version', async c => {
     setLatest ? '(latest)' : '(backfill)'
   );
   return c.json({ ok: true, setLatest, ...parsed.data }, 201);
+});
+
+// ---------------------------------------------------------------------------
+// Region configuration
+// ---------------------------------------------------------------------------
+
+import { FLY_REGIONS_KV_KEY, parseRegions, ALL_VALID_REGIONS } from '../durable-objects/regions';
+import { DEFAULT_FLY_REGION } from '../config';
+
+const UpdateRegionsSchema = z.object({
+  regions: z
+    .array(z.enum(ALL_VALID_REGIONS))
+    .min(2, 'At least 2 regions required')
+    .refine(
+      regions => new Set(regions).size >= 2,
+      'Must include at least 2 distinct regions (duplicates bias the shuffle, but need 2+ unique for fallback)'
+    ),
+});
+
+// GET /api/platform/regions
+// Returns the current region configuration with its source.
+platform.get('/regions', async c => {
+  try {
+    const kvValue = await c.env.KV_CLAW_CACHE.get(FLY_REGIONS_KV_KEY);
+    const source = kvValue ? 'kv' : c.env.FLY_REGION ? 'env' : 'default';
+    const raw = kvValue ?? c.env.FLY_REGION ?? DEFAULT_FLY_REGION;
+    const regions = parseRegions(raw);
+    return c.json({ regions, source, raw });
+  } catch (err) {
+    console.error('[platform] Failed to read regions:', err);
+    return c.json({ error: 'Failed to read regions' }, 500);
+  }
+});
+
+// PUT /api/platform/regions
+// Updates the region configuration in KV.
+platform.put('/regions', async c => {
+  const result = await parseBody(c, UpdateRegionsSchema);
+  if ('error' in result) return result.error;
+
+  const raw = result.data.regions.join(',');
+  try {
+    await c.env.KV_CLAW_CACHE.put(FLY_REGIONS_KV_KEY, raw);
+  } catch (err) {
+    console.error('[platform] Failed to write regions to KV:', err);
+    return c.json({ error: 'Failed to write regions' }, 500);
+  }
+
+  console.log('[platform] Regions updated:', raw);
+  return c.json({ ok: true, regions: result.data.regions, raw });
+});
+
+// POST /api/platform/destroy-fly-machine
+// This is for admin cleanup only.
+// It directly destroys a Fly machine via the Machines API (force=true).
+// It does not destroy the Fly app or volume.
+const DestroyFlyMachineSchema = z.object({
+  userId: z.string().min(1),
+  appName: z
+    .string()
+    .min(1)
+    .max(63)
+    .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Invalid Fly app name'),
+  machineId: z
+    .string()
+    .min(1)
+    .regex(/^[a-z0-9]+$/, 'Invalid Fly machine ID'),
+});
+
+platform.post('/destroy-fly-machine', async c => {
+  const result = await parseBody(c, DestroyFlyMachineSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, appName, machineId } = result.data;
+  const apiToken = c.env.FLY_API_TOKEN;
+  if (!apiToken) {
+    return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
+  }
+
+  const url = `https://api.machines.dev/v1/apps/${appName}/machines/${machineId}?force=true`;
+  try {
+    const resp = await fetch(url, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${apiToken}` },
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text();
+      console.error(
+        `[platform] destroy-fly-machine failed (${resp.status}) app=${appName} machine=${machineId}:`,
+        body
+      );
+      return jsonError(`Fly API error (${resp.status}): ${body}`, resp.status);
+    }
+
+    console.log(`[platform] destroy-fly-machine ok: app=${appName} machine=${machineId}`);
+
+    // Trigger immediate reconcile so the DO discovers the machine is gone.
+    try {
+      await withDORetry(
+        instanceStubFactory(c.env, userId),
+        stub => stub.forceRetryRecovery(),
+        'forceRetryRecovery'
+      );
+    } catch (err) {
+      console.warn(
+        `[platform] destroy-fly-machine: forceRetryRecovery failed for user=${userId}:`,
+        err
+      );
+    }
+
+    return c.json({ ok: true });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'destroy-fly-machine');
+    return jsonError(message, status);
+  }
 });
 
 export { platform };

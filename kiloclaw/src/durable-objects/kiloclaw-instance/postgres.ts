@@ -6,7 +6,7 @@ import type { InstanceMutableState } from './types';
 import { getFlyConfig } from './types';
 import { storageUpdate } from './state';
 import { attemptMetadataRecovery } from './reconcile';
-import { doError, doWarn, toLoggable } from './log';
+import { doError, doWarn, toLoggable, createReconcileContext } from './log';
 
 /**
  * Restore DO state from Postgres backup if SQLite was wiped.
@@ -102,7 +102,12 @@ export async function restoreFromPostgres(
     // Attempt to recover machine/volume IDs via Fly metadata.
     try {
       const flyConfig = getFlyConfig(env, state);
-      await attemptMetadataRecovery(flyConfig, ctx, state, 'postgres_restore');
+      await attemptMetadataRecovery(
+        flyConfig,
+        ctx,
+        state,
+        createReconcileContext(state, env, 'postgres_restore')
+      );
     } catch (err) {
       doWarn(state, 'Metadata recovery after Postgres restore failed', {
         error: toLoggable(err),

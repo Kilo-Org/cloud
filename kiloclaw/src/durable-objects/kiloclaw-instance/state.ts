@@ -29,6 +29,7 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     const d = parsed.data;
     s.userId = d.userId || null;
     s.sandboxId = d.sandboxId || null;
+    s.orgId = d.orgId;
     s.status = d.userId ? d.status : null;
     s.envVars = d.envVars;
     s.encryptedSecrets = d.encryptedSecrets;
@@ -39,6 +40,8 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.googleCredentials = d.googleCredentials;
     s.provisionedAt = d.provisionedAt;
     s.startingAt = d.startingAt;
+    s.restartingAt = d.restartingAt;
+    s.restartUpdateSent = d.restartUpdateSent;
     s.lastStartedAt = d.lastStartedAt;
     s.lastStoppedAt = d.lastStoppedAt;
     s.flyAppName = d.flyAppName;
@@ -61,11 +64,27 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.lastDestroyErrorAt = d.lastDestroyErrorAt;
     s.lastStartErrorMessage = d.lastStartErrorMessage;
     s.lastStartErrorAt = d.lastStartErrorAt;
+    s.lastRestartErrorMessage = d.lastRestartErrorMessage;
+    s.lastRestartErrorAt = d.lastRestartErrorAt;
     s.lastBoundMachineRecoveryAt = d.lastBoundMachineRecoveryAt;
     s.instanceFeatures = d.instanceFeatures;
     s.gmailNotificationsEnabled = d.gmailNotificationsEnabled;
     s.gmailLastHistoryId = d.gmailLastHistoryId;
     s.gmailPushOidcEmail = d.gmailPushOidcEmail;
+    s.execSecurity = d.execSecurity;
+    s.execAsk = d.execAsk;
+    s.previousVolumeId = d.previousVolumeId;
+    s.restoreStartedAt = d.restoreStartedAt;
+    s.preRestoreStatus = d.preRestoreStatus;
+    s.pendingRestoreVolumeId = d.pendingRestoreVolumeId;
+    // Legacy instances pre-dating this field treat absence as already-sent
+    // to avoid spurious emails after deploy.
+    s.instanceReadyEmailSent = 'instanceReadyEmailSent' in raw ? d.instanceReadyEmailSent : true;
+    s.customSecretMeta = d.customSecretMeta;
+    s.streamChatApiKey = d.streamChatApiKey;
+    s.streamChatBotUserId = d.streamChatBotUserId;
+    s.streamChatBotUserToken = d.streamChatBotUserToken;
+    s.streamChatChannelId = d.streamChatChannelId;
   } else {
     const hasAnyData = entries.size > 0;
     if (hasAnyData) {
@@ -85,6 +104,7 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
 export function resetMutableState(s: InstanceMutableState): void {
   s.userId = null;
   s.sandboxId = null;
+  s.orgId = null;
   s.status = null;
   s.envVars = null;
   s.encryptedSecrets = null;
@@ -95,6 +115,8 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.googleCredentials = null;
   s.provisionedAt = null;
   s.startingAt = null;
+  s.restartingAt = null;
+  s.restartUpdateSent = false;
   s.lastStartedAt = null;
   s.lastStoppedAt = null;
   s.flyAppName = null;
@@ -117,11 +139,24 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.lastDestroyErrorAt = null;
   s.lastStartErrorMessage = null;
   s.lastStartErrorAt = null;
+  s.lastRestartErrorMessage = null;
+  s.lastRestartErrorAt = null;
   s.lastBoundMachineRecoveryAt = null;
   s.instanceFeatures = [];
   s.gmailNotificationsEnabled = false;
   s.gmailLastHistoryId = null;
   s.gmailPushOidcEmail = null;
+  s.execSecurity = null;
+  s.execAsk = null;
+  s.previousVolumeId = null;
+  s.restoreStartedAt = null;
+  s.preRestoreStatus = null;
+  s.pendingRestoreVolumeId = null;
+  s.instanceReadyEmailSent = false;
+  s.streamChatApiKey = null;
+  s.streamChatBotUserId = null;
+  s.streamChatBotUserToken = null;
+  s.streamChatChannelId = null;
   s.lastLiveCheckAt = null;
   s.restartingAt = null;
   s.loaded = false;
@@ -135,6 +170,7 @@ export function createMutableState(): InstanceMutableState {
     loaded: false,
     userId: null,
     sandboxId: null,
+    orgId: null,
     status: null,
     envVars: null,
     encryptedSecrets: null,
@@ -145,6 +181,8 @@ export function createMutableState(): InstanceMutableState {
     googleCredentials: null,
     provisionedAt: null,
     startingAt: null,
+    restartingAt: null,
+    restartUpdateSent: false,
     lastStartedAt: null,
     lastStoppedAt: null,
     flyAppName: null,
@@ -167,12 +205,25 @@ export function createMutableState(): InstanceMutableState {
     lastDestroyErrorAt: null,
     lastStartErrorMessage: null,
     lastStartErrorAt: null,
+    lastRestartErrorMessage: null,
+    lastRestartErrorAt: null,
     lastBoundMachineRecoveryAt: null,
     instanceFeatures: [],
     gmailNotificationsEnabled: false,
     gmailLastHistoryId: null,
     gmailPushOidcEmail: null,
+    execSecurity: null,
+    execAsk: null,
+    previousVolumeId: null,
+    restoreStartedAt: null,
+    preRestoreStatus: null,
+    pendingRestoreVolumeId: null,
+    instanceReadyEmailSent: false,
+    customSecretMeta: null,
+    streamChatApiKey: null,
+    streamChatBotUserId: null,
+    streamChatBotUserToken: null,
+    streamChatChannelId: null,
     lastLiveCheckAt: null,
-    restartingAt: null,
   };
 }

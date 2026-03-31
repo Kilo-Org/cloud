@@ -9,6 +9,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'google/gemma-3-4b-it:free',
   'google/gemma-3n-e2b-it:free',
   'google/gemma-3n-e4b-it:free',
+  'kilo/auto-free', // discontinued variant of kilo-auto/free
   'liquid/lfm-2.5-1.2b-instruct:free',
   'liquid/lfm-2.5-1.2b-thinking:free',
   'meta-llama/llama-3.2-3b-instruct:free',

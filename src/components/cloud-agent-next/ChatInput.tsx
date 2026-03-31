@@ -12,6 +12,7 @@ import { BrowseCommandsDialog } from './BrowseCommandsDialog';
 import { ModeCombobox, NEXT_MODE_OPTIONS } from '@/components/shared/ModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
+import { MobileToolbarPopover } from './MobileToolbarPopover';
 import type { AgentMode } from './types';
 
 type ChatInputProps = {
@@ -239,7 +240,7 @@ export function ChatInput({
             />
           </PopoverAnchor>
           <PopoverContent
-            className="w-[var(--radix-popover-trigger-width)] min-w-[300px] p-0"
+            className="w-[var(--radix-popover-trigger-width)] min-w-[min(300px,calc(100vw-2rem))] p-0"
             side="top"
             align="start"
             sideOffset={4}
@@ -280,35 +281,59 @@ export function ChatInput({
         </Popover>
 
         {/* Toolbar below textarea */}
-        <div className="flex items-center gap-2 px-3 py-1.5">
+        <div className="flex min-w-0 items-center gap-2 overflow-hidden px-3 py-1.5">
           {hasToolbar && (
             <>
-              <ModeCombobox
-                value={mode}
-                onValueChange={onModeChange}
-                options={NEXT_MODE_OPTIONS}
-                variant="compact"
+              {/* Mobile: single trigger that opens Mode + Model + Variant */}
+              <MobileToolbarPopover
+                mode={mode}
+                onModeChange={onModeChange}
+                model={model}
+                modelOptions={modelOptions}
+                onModelChange={onModelChange}
+                isLoadingModels={isLoadingModels}
+                variant={variant}
+                availableVariants={availableVariants}
+                onVariantChange={onVariantChange}
                 disabled={disabled || isStreaming}
+                className="md:hidden"
               />
-              <ModelCombobox
-                models={modelOptions}
-                value={model}
-                onValueChange={onModelChange}
-                variant="compact"
-                isLoading={isLoadingModels}
-                disabled={disabled || isStreaming}
-              />
-              {availableVariants.length > 0 && onVariantChange && (
-                <VariantCombobox
-                  variants={availableVariants}
-                  value={variant}
-                  onValueChange={onVariantChange}
+              {/* Desktop: individual pickers */}
+              <div className="hidden md:contents">
+                <ModeCombobox
+                  value={mode}
+                  onValueChange={onModeChange}
+                  options={NEXT_MODE_OPTIONS}
+                  variant="compact"
                   disabled={disabled || isStreaming}
+                  className="min-w-0"
                 />
-              )}
+                <ModelCombobox
+                  models={modelOptions}
+                  value={model}
+                  onValueChange={onModelChange}
+                  variant="compact"
+                  isLoading={isLoadingModels}
+                  disabled={disabled || isStreaming}
+                  className="min-w-0"
+                />
+                {availableVariants.length > 0 && onVariantChange && (
+                  <VariantCombobox
+                    variants={availableVariants}
+                    value={variant}
+                    onValueChange={onVariantChange}
+                    disabled={disabled || isStreaming}
+                    className="min-w-0"
+                  />
+                )}
+              </div>
             </>
           )}
-          {slashCommands.length > 0 && <BrowseCommandsDialog />}
+          {slashCommands.length > 0 && (
+            <div className="hidden xl:block">
+              <BrowseCommandsDialog />
+            </div>
+          )}
           <div className="flex-1" />
           {isStreaming ? (
             <UIButton

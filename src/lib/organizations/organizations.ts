@@ -10,6 +10,7 @@ import {
 import {
   kilocode_users,
   organization_invitations,
+  organization_membership_removals,
   organization_memberships,
   organization_user_limits,
   organization_user_usage,
@@ -61,8 +62,10 @@ export async function getUserOrganizationsWithSeats(
       total_member_count: sql<number>`(
         SELECT COUNT(*)::int FROM (
           SELECT 1 FROM ${organization_memberships} om
+          INNER JOIN ${kilocode_users} ku ON ku.id = om.kilo_user_id
           WHERE om.organization_id = ${organizations.id}
             AND om.role != 'billing_manager'
+            AND ku.is_bot = false
           UNION ALL
           SELECT 1 FROM ${organization_invitations} oi
           WHERE oi.organization_id = ${organizations.id}
@@ -179,7 +182,8 @@ export async function createOrganization(
   // TODO(bmc): remove this from tests in the future. nbd rn.
   userId?: User['id'] | null,
   addUserAsOwner: boolean = true,
-  company_domain?: string
+  company_domain?: string,
+  plan?: 'teams' | 'enterprise'
 ): Promise<Organization> {
   return await db.transaction(async tx => {
     const now = new Date();
@@ -199,6 +203,7 @@ export async function createOrganization(
           code_indexing_enabled: true,
         },
         ...(company_domain ? { company_domain } : {}),
+        ...(plan ? { plan } : {}),
       })
       .returning();
 
@@ -235,16 +240,55 @@ export async function addUserToOrganization(
 
 export async function removeUserFromOrganization(
   organizationId: Organization['id'],
-  userId: User['id']
+  userId: User['id'],
+  removedBy?: User['id']
 ): Promise<{ rowCount: number | null }> {
-  return await db
-    .delete(organization_memberships)
-    .where(
-      and(
-        eq(organization_memberships.organization_id, organizationId),
-        eq(organization_memberships.kilo_user_id, userId)
-      )
-    );
+  return await db.transaction(async tx => {
+    // Look up the user's current role before deleting
+    const [membership] = await tx
+      .select({ role: organization_memberships.role })
+      .from(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, organizationId),
+          eq(organization_memberships.kilo_user_id, userId)
+        )
+      );
+
+    const result = await tx
+      .delete(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, organizationId),
+          eq(organization_memberships.kilo_user_id, userId)
+        )
+      );
+
+    // Record the removal so webhook handlers don't re-add the user (Subscription Lifecycle 2)
+    if (membership && (result.rowCount ?? 0) > 0) {
+      await tx
+        .insert(organization_membership_removals)
+        .values({
+          organization_id: organizationId,
+          kilo_user_id: userId,
+          removed_by: removedBy,
+          previous_role: membership.role,
+        })
+        .onConflictDoUpdate({
+          target: [
+            organization_membership_removals.organization_id,
+            organization_membership_removals.kilo_user_id,
+          ],
+          set: {
+            removed_at: sql`now()`,
+            removed_by: removedBy,
+            previous_role: membership.role,
+          },
+        });
+    }
+
+    return result;
+  });
 }
 
 export async function updateUserRoleInOrganization(
@@ -517,6 +561,17 @@ export async function acceptOrganizationInvite(
         role: invitation.role,
         invited_by: invitation.invited_by,
       });
+
+      // Clear any previous removal record so the user isn't treated as "removed"
+      // by subsequent webhook events (Subscription Lifecycle 2)
+      await tx
+        .delete(organization_membership_removals)
+        .where(
+          and(
+            eq(organization_membership_removals.organization_id, invitation.organization_id),
+            eq(organization_membership_removals.kilo_user_id, userId)
+          )
+        );
 
       // Mark invitation as accepted
       const [updatedInvitation] = await tx

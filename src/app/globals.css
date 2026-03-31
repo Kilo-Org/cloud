@@ -176,15 +176,12 @@
     @apply border-border outline-ring/50;
     color-scheme: dark;
   }
+  html {
+    scrollbar-gutter: stable;
+  }
   body {
     @apply bg-background text-foreground;
-  }
-
-  /* Desktop only: reserve space for scrollbar to prevent layout shift */
-  @media (min-width: 1024px) {
-    body {
-      scrollbar-gutter: stable;
-    }
+    scrollbar-gutter: stable;
   }
 
   /* Prevent Radix UI Dialog from removing scrollbar and causing layout shift */

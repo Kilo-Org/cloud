@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { createContext, use, useCallback, useEffect, useState } from 'react';
 import type { Channel as StreamChannel, Event } from 'stream-chat';
 import { useQueryClient } from '@tanstack/react-query';
 import { MessageSquare, RotateCw } from 'lucide-react';
@@ -10,13 +10,17 @@ import {
   Window,
   MessageList,
   MessageInput,
+  MessageSimple,
   Thread,
   useCreateChatClient,
   useChatContext,
   useChannelStateContext,
+  useMessageContext,
 } from 'stream-chat-react';
 import { useStreamChatCredentials } from '@/hooks/useKiloClaw';
 import { useTRPC } from '@/lib/trpc/utils';
+
+const BotUserIdContext = createContext<string>('');
 
 type ChatTabProps = {
   /** Only fetch credentials and connect when true (tab is active + instance running). */
@@ -117,19 +121,38 @@ function StreamChatUI({
   }
 
   return (
-    <div className="claw-chat-wrapper h-[560px]">
-      <Chat client={client} theme="str-chat__theme-dark">
-        <Channel channel={channel}>
-          <Window>
-            <BotStatusBar botUserId={botUserId} />
-            <MessageList />
-            <MessageInput />
-          </Window>
-          <Thread />
-        </Channel>
-      </Chat>
-    </div>
+    <BotUserIdContext value={botUserId}>
+      <div className="claw-chat-wrapper h-[560px]">
+        <Chat client={client} theme="str-chat__theme-dark">
+          <Channel channel={channel} Message={ClawMessage}>
+            <Window>
+              <BotStatusBar botUserId={botUserId} />
+              <MessageList />
+              <MessageInput />
+            </Window>
+            <Thread />
+          </Channel>
+        </Chat>
+      </div>
+    </BotUserIdContext>
   );
+}
+
+function ClawMessage() {
+  const botUserId = use(BotUserIdContext);
+  const { message } = useMessageContext();
+  const isBotThinking =
+    message.user?.id === botUserId && !message.text?.trim() && !message.attachments?.length;
+
+  if (isBotThinking) {
+    return (
+      <div className="claw-thinking-message">
+        <span className="claw-thinking-text">Thinking&hellip;</span>
+      </div>
+    );
+  }
+
+  return <MessageSimple />;
 }
 
 function useBotOnlineStatus(botUserId: string): boolean {

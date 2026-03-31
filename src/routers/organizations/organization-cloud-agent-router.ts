@@ -11,7 +11,10 @@ import {
   mergeProfileConfiguration,
   ProfileNotFoundError,
 } from '@/lib/agent/profile-session-config';
-import { organizationMemberProcedure } from '@/routers/organizations/utils';
+import {
+  organizationMemberProcedure,
+  organizationMemberMutationProcedure,
+} from '@/routers/organizations/utils';
 import {
   getGitHubTokenForOrganization,
   fetchGitHubRepositoriesForOrganization,
@@ -113,7 +116,7 @@ export const organizationCloudAgentRouter = createTRPCRouter({
   /**
    * Initiate a new cloud agent session with streaming output (organization context)
    */
-  initiateSessionStream: organizationMemberProcedure
+  initiateSessionStream: organizationMemberMutationProcedure
     .input(InitiateSessionInput)
     .subscription(async function* ({ ctx, input }) {
       const authToken = generateCloudAgentToken(ctx.user);
@@ -141,7 +144,7 @@ export const organizationCloudAgentRouter = createTRPCRouter({
    * - Legacy: { kiloSessionId, githubRepo, prompt, mode, model, ... } for CLI sessions
    * - New: { cloudAgentSessionId } for prepared sessions (after prepareSession)
    */
-  initiateFromKilocodeSessionStream: organizationMemberProcedure
+  initiateFromKilocodeSessionStream: organizationMemberMutationProcedure
     .input(InitiateFromKilocodeSessionInput)
     .subscription(async function* ({ ctx, input }) {
       const authToken = generateCloudAgentToken(ctx.user);
@@ -182,7 +185,7 @@ export const organizationCloudAgentRouter = createTRPCRouter({
    * The session is in "prepared" state and can be initiated via
    * initiateFromKilocodeSessionStream with just the cloudAgentSessionId.
    */
-  prepareSession: organizationMemberProcedure
+  prepareSession: organizationMemberMutationProcedure
     .input(PrepareSessionInput)
     .output(basePrepareSessionOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -256,7 +259,7 @@ export const organizationCloudAgentRouter = createTRPCRouter({
    *
    * Stores session params in the DO without creating a new cliSession.
    */
-  prepareLegacySession: organizationMemberProcedure
+  prepareLegacySession: organizationMemberMutationProcedure
     .input(PrepareLegacySessionInput)
     .output(basePrepareLegacySessionOutputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -325,7 +328,7 @@ export const organizationCloudAgentRouter = createTRPCRouter({
   /**
    * Send a message to an existing session with streaming output
    */
-  sendMessageStream: organizationMemberProcedure
+  sendMessageStream: organizationMemberMutationProcedure
     .input(SendMessageInput)
     .subscription(async function* ({ ctx, input }) {
       const authToken = generateCloudAgentToken(ctx.user);
@@ -365,7 +368,7 @@ export const organizationCloudAgentRouter = createTRPCRouter({
   /**
    * Delete a session from the cloud agent and the corresponding cliSession (organization context)
    */
-  deleteSession: organizationMemberProcedure
+  deleteSession: organizationMemberMutationProcedure
     .input(
       z.object({
         organizationId: z.uuid(),
@@ -424,7 +427,7 @@ export const organizationCloudAgentRouter = createTRPCRouter({
   /**
    * Interrupt a running session (organization context)
    */
-  interruptSession: organizationMemberProcedure
+  interruptSession: organizationMemberMutationProcedure
     .input(InterruptSessionInput)
     .mutation(async ({ ctx, input }) => {
       const authToken = generateCloudAgentToken(ctx.user);
@@ -469,7 +472,7 @@ export const organizationCloudAgentRouter = createTRPCRouter({
    * execution info including a WebSocket URL for streaming. The client connects
    * to the streamUrl separately to receive events.
    */
-  initiateFromKilocodeSessionV2: organizationMemberProcedure
+  initiateFromKilocodeSessionV2: organizationMemberMutationProcedure
     .input(InitiateFromKilocodeSessionInput)
     .output(
       z.object({
@@ -514,7 +517,7 @@ export const organizationCloudAgentRouter = createTRPCRouter({
    * execution info including a WebSocket URL for streaming. The client connects
    * to the streamUrl separately to receive events.
    */
-  sendMessageV2: organizationMemberProcedure
+  sendMessageV2: organizationMemberMutationProcedure
     .input(SendMessageV2Input)
     .output(
       z.object({

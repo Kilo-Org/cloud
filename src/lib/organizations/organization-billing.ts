@@ -30,24 +30,46 @@ export async function getOrCreateStripeCustomerIdForOrganization(
     );
     return org.stripe_customer_id;
   }
-  const stripeCustomerFn = mockCreateStripeCustomer || createStripeCustomer;
 
-  const customer = await stripeCustomerFn({
-    metadata: {
-      organizationId,
-    },
+  // Serialize customer creation per organization using an advisory lock
+  // to prevent concurrent requests from creating duplicate Stripe customers.
+  return await db.transaction(async tx => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${organizationId}))`);
+
+    // Re-check after acquiring lock — another process may have set it
+    const [freshOrg] = await tx
+      .select({ stripe_customer_id: organizations.stripe_customer_id })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId));
+
+    if (freshOrg?.stripe_customer_id != null) {
+      return freshOrg.stripe_customer_id;
+    }
+
+    const stripeCustomerFn = mockCreateStripeCustomer || createStripeCustomer;
+    const customer = await stripeCustomerFn({
+      metadata: { organizationId },
+    });
+
+    try {
+      const rows = await tx
+        .update(organizations)
+        .set({ stripe_customer_id: customer.id })
+        .where(and(eq(organizations.id, organizationId), isNull(organizations.stripe_customer_id)))
+        .returning();
+
+      if (!rows.length || !rows[0].stripe_customer_id) {
+        // Another process won despite the advisory lock (should be unreachable).
+        throw new Error('Failed to create Stripe customer for organization');
+      }
+      return rows[0].stripe_customer_id;
+    } catch (error) {
+      logExceptInTest(
+        `Orphaned Stripe customer ${customer.id} created for org ${organizationId} — manual cleanup required`
+      );
+      throw error;
+    }
   });
-
-  const rows = await db
-    .update(organizations)
-    .set({ stripe_customer_id: customer.id })
-    .where(and(eq(organizations.id, organizationId), isNull(organizations.stripe_customer_id)))
-    .returning();
-
-  if (!rows.length || !rows[0].stripe_customer_id) {
-    throw new Error('Failed to create Stripe customer for organization');
-  }
-  return rows[0].stripe_customer_id;
 }
 
 type Config = StripeConfig;

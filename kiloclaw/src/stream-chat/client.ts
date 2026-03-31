@@ -252,3 +252,48 @@ export async function setupDefaultStreamChatChannel(
 
   return { apiKey, botUserId, botUserToken, channelId };
 }
+
+/**
+ * Send a message to a Stream Chat channel on behalf of a user.
+ *
+ * Used to programmatically inject messages into a KiloClaw instance's chat
+ * channel. The message appears as if the user typed it, so the OpenClaw bot
+ * (listening via the openclaw-channel-streamchat plugin) processes and responds.
+ *
+ * @param apiKey   Stream Chat API key
+ * @param apiSecret Stream Chat API secret (used to mint a server JWT)
+ * @param channelId Target channel ID, e.g. `default-{sandboxId}`
+ * @param userId   The user ID to send the message as (typically the sandboxId)
+ * @param text     Plain-text message content
+ */
+export async function sendMessage(
+  apiKey: string,
+  apiSecret: string,
+  channelId: string,
+  userId: string,
+  text: string
+): Promise<void> {
+  const serverToken = await createServerToken(apiSecret);
+
+  const res = await fetch(
+    `${STREAM_CHAT_API_BASE}/channels/messaging/${channelId}/message?api_key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Stream-Auth-Type': 'jwt',
+        Authorization: serverToken,
+      },
+      body: JSON.stringify({
+        message: { text, user_id: userId },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '(unreadable)');
+    throw Object.assign(new Error(`Stream Chat sendMessage failed (${res.status}): ${body}`), {
+      status: res.status,
+    });
+  }
+}

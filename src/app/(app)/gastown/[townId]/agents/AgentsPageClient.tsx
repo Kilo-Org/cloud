@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
+import { sortAgentsByStatus } from '@/lib/gastown/sort-agents';
 import { useDrawerStack } from '@/components/gastown/DrawerStack';
 import { Bot, Crown, Shield, Eye, Clock, Hexagon, MessageSquare } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -50,7 +51,7 @@ export function AgentsPageClient({ townId }: { townId: string }) {
         }
       }
     });
-    return agents;
+    return sortAgentsByStatus(agents);
   }, [rigAgentData, rigs]);
 
   return (

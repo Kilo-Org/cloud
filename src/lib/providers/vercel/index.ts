@@ -20,7 +20,7 @@ import type {
   VercelProviderConfig,
 } from '@/lib/providers/openrouter/types';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
-import { isXaiModel } from '@/lib/providers/xai';
+import { mimo_v2_pro_free_model } from '@/lib/providers/xiaomi';
 import { isZaiModel } from '@/lib/providers/zai';
 import * as crypto from 'crypto';
 
@@ -97,7 +97,7 @@ export async function shouldRouteToVercel(
     !isMinimaxModel(requestedModel) &&
     !isMoonshotModel(requestedModel) &&
     !isOpenAiOssModel(requestedModel) &&
-    !isXaiModel(requestedModel) &&
+    requestedModel !== mimo_v2_pro_free_model.public_id &&
     !isZaiModel(requestedModel)
   ) {
     console.debug(`[shouldRouteToVercel] model family not allowed for randomized Vercel routing`);

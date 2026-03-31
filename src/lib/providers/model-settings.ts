@@ -4,7 +4,7 @@ import { isMinimaxModel } from '@/lib/providers/minimax';
 import { isMoonshotModel } from '@/lib/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/providers/openai';
 import { qwen35_plus_free_model } from '@/lib/providers/qwen';
-import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
+import { isXaiModel } from '@/lib/providers/xai';
 import { isXiaomiModel } from '@/lib/providers/xiaomi';
 import { isZaiModel } from '@/lib/providers/zai';
 import type {
@@ -109,7 +109,9 @@ function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
     // with 'openai' a bunch of bugs in vercel ai sdk v5 get triggered
     return 'openai-compatible';
   }
-  if (grok_code_fast_1_optimized_free_model.public_id === model) {
+  if (isOpenAiModel(model) || isXaiModel(model)) {
+    // OpenAI: "While Chat Completions remains supported, Responses is recommended for all new projects.""
+    // xAI: "The Responses API is the recommended way to interact with xAI models."
     return 'openai';
   }
   return undefined;

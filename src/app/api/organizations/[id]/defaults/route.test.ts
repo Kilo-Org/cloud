@@ -103,6 +103,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
         user: { ...user, role: 'owner' },
         organization: {
           ...organization,
+          plan: 'enterprise' as const,
           settings: {
             model_deny_list: [PRIMARY_DEFAULT_MODEL],
           },
@@ -131,6 +132,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
         user: { ...user, role: 'owner' },
         organization: {
           ...organization,
+          plan: 'enterprise' as const,
           settings: {
             default_model: 'openai/gpt-4o',
             model_deny_list: ['anthropic/claude-3-opus'],
@@ -161,6 +163,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
         user: { ...user, role: 'owner' },
         organization: {
           ...organization,
+          plan: 'enterprise' as const,
           settings: {
             model_deny_list: [PRIMARY_DEFAULT_MODEL],
           },

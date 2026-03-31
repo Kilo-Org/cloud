@@ -6,13 +6,20 @@ import { toast } from 'sonner';
 import {
   useStopOrganizationSubscriptionCancellation,
   useOrganizationSubscriptionLink,
+  useCancelBillingCycleChange,
 } from '@/app/api/organizations/hooks';
 import { SubscriptionStatusBadge } from './SubscriptionStatusBadge';
 import type {
   SubscriptionItemWithPeriod,
   SubscriptionWithPeriod,
 } from '@/components/organizations/subscription/types';
-import { formatDate, formatCurrency } from './utils';
+import {
+  formatDate,
+  formatCurrency,
+  canManageBilling,
+  findPaidSeatItem,
+  paidSeatQuantity,
+} from './utils';
 import { useIsKiloAdmin } from '@/components/organizations/OrganizationContext';
 import { getSubscriptionStatusConfig, formatBillingInterval } from './subscriptionStatusConfig';
 import { useState } from 'react';
@@ -55,6 +62,43 @@ function SeatCountChangeNotification({
   );
 }
 
+type PendingCycleChange = {
+  targetCycleName: string;
+  effectiveDate: string;
+  description: string | null;
+  targetInterval: string;
+};
+
+function detectPendingCycleChange(
+  subscription: Stripe.Subscription,
+  currentBillingInterval: string | undefined
+): PendingCycleChange | null {
+  const schedule = subscription.schedule;
+  if (!schedule || typeof schedule === 'string') return null;
+  if (schedule.status !== 'active' && schedule.status !== 'not_started') return null;
+
+  const phase2 = schedule.phases?.[1];
+  if (!phase2?.items?.length) return null;
+
+  const currentPriceIds = new Set(subscription.items.data.map(item => item.price?.id));
+  const phase2PriceIds = phase2.items.map(item =>
+    typeof item.price === 'string' ? item.price : item.price?.id
+  );
+
+  const hasChangedPrice = phase2PriceIds.some(id => id && !currentPriceIds.has(id));
+  if (!hasChangedPrice) return null;
+
+  const targetCycleName = currentBillingInterval === 'month' ? 'Annual' : 'Monthly';
+  const effectiveDate = formatDate(phase2.start_date);
+  const isUpgradeToAnnual = currentBillingInterval === 'month';
+  const description = isUpgradeToAnnual
+    ? 'No charges or proration until the switch takes effect.'
+    : null;
+  const targetInterval = currentBillingInterval === 'month' ? 'year' : 'month';
+
+  return { targetCycleName, effectiveDate, description, targetInterval };
+}
+
 export function SubscriptionOverviewCard({
   subscription,
   organizationId,
@@ -78,10 +122,28 @@ export function SubscriptionOverviewCard({
   const currentPeriodEnd =
     firstItem?.current_period_end || subscriptionWithPeriod.current_period_end;
 
+  // Derive billing interval from the paid seat item (unit_amount > 0),
+  // not free promotional items which may have a different cadence.
+  const currentBillingInterval = (
+    findPaidSeatItem(subscription.items.data) ?? subscription.items.data[0]
+  )?.price?.recurring?.interval;
+
   const stopCancellation = useStopOrganizationSubscriptionCancellation();
   const subscriptionLink = useOrganizationSubscriptionLink();
+  const cancelBillingCycleChange = useCancelBillingCycleChange();
   const isKiloAdmin = useIsKiloAdmin();
   const [resubscribeError, setResubscribeError] = useState<string | null>(null);
+
+  const pendingCycleChange = detectPendingCycleChange(subscription, currentBillingInterval);
+
+  const handleCancelBillingCycleChange = async () => {
+    try {
+      const result = await cancelBillingCycleChange.mutateAsync({ organizationId });
+      toast.success(result.message);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to cancel billing cycle change');
+    }
+  };
 
   const handleStopCancellation = async () => {
     try {
@@ -98,13 +160,19 @@ export function SubscriptionOverviewCard({
     setResubscribeError(null);
 
     try {
-      // Get the current seat count from the subscription
-      const currentSeatCount = subscription.items.data[0]?.quantity || 1;
+      // Only count paid seat items (unit_amount > 0). Free-seat items have
+      // unit_amount === 0 and must not be included because checkout creates a
+      // single paid line item — including free seats would overcharge.
+      const currentSeatCount = paidSeatQuantity(subscription.items.data) || 1;
+
+      // Preserve the billing cycle the org was on before cancellation
+      const billingCycle = currentBillingInterval === 'month' ? 'monthly' : 'annual';
 
       const result = await subscriptionLink.mutateAsync({
         organizationId,
         seats: currentSeatCount,
         cancelUrl: window.location.href, // Return to current page if cancelled
+        billingCycle,
       });
 
       // Redirect to Stripe checkout
@@ -126,13 +194,14 @@ export function SubscriptionOverviewCard({
 
   const ended = Boolean(subscription.ended_at);
 
+  const billingAccess = canManageBilling(userRole);
+
   const canStopCancellation =
-    userRole === 'owner' && subscription.status === 'active' && willCancelAtPeriodEnd;
+    billingAccess && subscription.status === 'active' && willCancelAtPeriodEnd;
 
   const statusConfig = getSubscriptionStatusConfig(subscription.status);
 
-  // Check if seats will drop in next billing cycle
-  const subscriptionQuantity = subscription.items.data[0]?.quantity || 0;
+  const subscriptionQuantity = paidSeatQuantity(subscription.items.data);
   const willSeatsDropNextCycle =
     totalSeats > subscriptionQuantity && !ended && !willCancelAtPeriodEnd;
 
@@ -171,13 +240,20 @@ export function SubscriptionOverviewCard({
                   Next Payment
                 </div>
                 <div className="text-xl font-bold">
-                  {subscription.items.data[0]?.price?.unit_amount &&
-                  subscription.items.data[0]?.quantity
-                    ? formatCurrency(
-                        subscription.items.data[0].price.unit_amount *
-                          subscription.items.data[0].quantity
-                      )
-                    : 'N/A'}
+                  {(() => {
+                    if (pendingCycleChange) {
+                      // Phase 2 prices aren't expanded so we can't read
+                      // unit_amount. Show a qualitative indicator instead of
+                      // a stale dollar figure from the current phase.
+                      return 'Changes at renewal';
+                    }
+                    // Sum unit_amount * quantity across all items
+                    const totalAmount = subscription.items.data.reduce(
+                      (sum, item) => sum + (item.price?.unit_amount ?? 0) * (item.quantity ?? 0),
+                      0
+                    );
+                    return totalAmount > 0 ? formatCurrency(totalAmount) : 'N/A';
+                  })()}
                 </div>
                 <div className="text-muted-foreground text-sm">
                   {currentPeriodEnd ? formatDate(currentPeriodEnd) : 'N/A'}
@@ -202,7 +278,9 @@ export function SubscriptionOverviewCard({
                 Billing Cycle
               </div>
               <div className="text-xl font-bold">
-                {formatBillingInterval(subscription.items.data[0]?.price?.recurring?.interval)}
+                {pendingCycleChange
+                  ? `${formatBillingInterval(currentBillingInterval)} \u2192 ${formatBillingInterval(pendingCycleChange.targetInterval)}`
+                  : formatBillingInterval(currentBillingInterval)}
               </div>
               <div className="text-muted-foreground text-sm">
                 Collection:{' '}
@@ -224,6 +302,36 @@ export function SubscriptionOverviewCard({
               </div>
             )}
           </div>
+
+          {/* Pending billing cycle change banner */}
+          {pendingCycleChange && (
+            <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-amber-400/20 bg-amber-400/[0.08] p-3">
+              <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+              <div>
+                <p className="text-sm text-amber-300">
+                  <span className="font-semibold">
+                    Switching to {pendingCycleChange.targetCycleName} billing on{' '}
+                    {pendingCycleChange.effectiveDate}.
+                  </span>{' '}
+                  {pendingCycleChange.description}
+                </p>
+                {billingAccess && (
+                  <div className="mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-amber-400/30 text-amber-400 hover:bg-amber-400/10"
+                      onClick={handleCancelBillingCycleChange}
+                      disabled={cancelBillingCycleChange.isPending}
+                    >
+                      {cancelBillingCycleChange.isPending ? 'Cancelling...' : 'Cancel Change'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2">
             {ended && subscription.ended_at ? (
               <div>
@@ -231,12 +339,12 @@ export function SubscriptionOverviewCard({
                 <p className="text-muted-foreground text-sm">{formatDate(subscription.ended_at)}</p>
               </div>
             ) : (
-              (subscription as SubscriptionWithPeriod).cancel_at && (
+              subscriptionWithPeriod.cancel_at && (
                 <div>
                   <p className="text-sm font-medium">Scheduled Cancellation</p>
                   <p className="text-muted-foreground text-sm">
-                    {(subscription as SubscriptionWithPeriod).cancel_at
-                      ? formatDate((subscription as SubscriptionWithPeriod).cancel_at)
+                    {subscriptionWithPeriod.cancel_at
+                      ? formatDate(subscriptionWithPeriod.cancel_at)
                       : 'N/A'}
                   </p>
                 </div>
@@ -297,17 +405,17 @@ export function SubscriptionOverviewCard({
                   size="sm"
                   onClick={handleStopCancellation}
                   disabled={stopCancellation.isPending}
-                  className="border-amber-300 bg-white text-amber-800 hover:bg-amber-100"
+                  className="border-amber-300 bg-white text-amber-800 hover:bg-amber-100 hover:text-amber-900"
                 >
                   {stopCancellation.isPending ? 'Stopping...' : 'Stop Pending Cancellation'}
                 </Button>
               )}
-              {ended && userRole === 'owner' && (
+              {ended && billingAccess && (
                 <div className="flex flex-col items-end gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="border-green-300 bg-white text-green-800 hover:bg-green-100"
+                    className="border-green-700 bg-green-700 text-white hover:bg-green-800"
                     onClick={handleResubscribe}
                     disabled={subscriptionLink.isPending}
                   >

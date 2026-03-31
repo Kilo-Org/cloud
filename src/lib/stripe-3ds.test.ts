@@ -19,7 +19,7 @@ jest.mock('@/lib/organizations/organization-seats', () => ({
   handleSubscriptionEvent: jest.fn().mockResolvedValue(undefined),
 }));
 
-import { handleUpdateSeatCount } from './stripe';
+import { handleUpdateSeatCount, KNOWN_SEAT_PRICE_IDS } from './stripe';
 import { client } from '@/lib/stripe-client';
 
 // Get references to the mocked functions after import
@@ -32,13 +32,18 @@ describe('handleUpdateSeatCount with 3DS', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    KNOWN_SEAT_PRICE_IDS.add('price_test_seat');
+  });
+
+  afterEach(() => {
+    KNOWN_SEAT_PRICE_IDS.delete('price_test_seat');
   });
 
   it('returns success when seat update completes without 3DS', async () => {
     const mockSubscription = {
       id: mockSubscriptionId,
       items: {
-        data: [{ id: mockItemId, quantity: 5 }],
+        data: [{ id: mockItemId, quantity: 5, price: { id: 'price_test_seat' } }],
       },
       latest_invoice: 'inv_test_789',
     };
@@ -46,7 +51,7 @@ describe('handleUpdateSeatCount with 3DS', () => {
     mockSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
     mockSubscriptionsUpdate.mockResolvedValue({
       ...mockSubscription,
-      items: { data: [{ id: mockItemId, quantity: 10 }] },
+      items: { data: [{ id: mockItemId, quantity: 10, price: { id: 'price_test_seat' } }] },
     });
 
     const result = await handleUpdateSeatCount(mockSubscriptionId, 10, 5);
@@ -63,7 +68,7 @@ describe('handleUpdateSeatCount with 3DS', () => {
     const mockSubscription = {
       id: mockSubscriptionId,
       items: {
-        data: [{ id: mockItemId, quantity: 5 }],
+        data: [{ id: mockItemId, quantity: 5, price: { id: 'price_test_seat' } }],
       },
       latest_invoice: 'inv_test_789',
     };
@@ -111,7 +116,7 @@ describe('handleUpdateSeatCount with 3DS', () => {
     const mockSubscription = {
       id: mockSubscriptionId,
       items: {
-        data: [{ id: mockItemId, quantity: 5 }],
+        data: [{ id: mockItemId, quantity: 5, price: { id: 'price_test_seat' } }],
       },
       latest_invoice: 'inv_test_789',
     };
@@ -138,7 +143,7 @@ describe('handleUpdateSeatCount with 3DS', () => {
     const mockSubscription = {
       id: mockSubscriptionId,
       items: {
-        data: [{ id: mockItemId, quantity: 10 }],
+        data: [{ id: mockItemId, quantity: 10, price: { id: 'price_test_seat' } }],
       },
       latest_invoice: 'inv_test_789',
     };
@@ -146,7 +151,7 @@ describe('handleUpdateSeatCount with 3DS', () => {
     mockSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
     mockSubscriptionsUpdate.mockResolvedValue({
       ...mockSubscription,
-      items: { data: [{ id: mockItemId, quantity: 5 }] },
+      items: { data: [{ id: mockItemId, quantity: 5, price: { id: 'price_test_seat' } }] },
     });
 
     const result = await handleUpdateSeatCount(mockSubscriptionId, 5, 10);
@@ -168,7 +173,7 @@ describe('handleUpdateSeatCount with 3DS', () => {
     const mockSubscription = {
       id: mockSubscriptionId,
       items: {
-        data: [{ id: mockItemId, quantity: 5 }],
+        data: [{ id: mockItemId, quantity: 5, price: { id: 'price_test_seat' } }],
       },
       latest_invoice: 'inv_test_789',
     };
@@ -176,7 +181,7 @@ describe('handleUpdateSeatCount with 3DS', () => {
     mockSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
     mockSubscriptionsUpdate.mockResolvedValue({
       ...mockSubscription,
-      items: { data: [{ id: mockItemId, quantity: 10 }] },
+      items: { data: [{ id: mockItemId, quantity: 10, price: { id: 'price_test_seat' } }] },
     });
 
     await handleUpdateSeatCount(mockSubscriptionId, 10, 5);
@@ -204,7 +209,7 @@ describe('handleUpdateSeatCount with 3DS', () => {
     mockSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
 
     await expect(handleUpdateSeatCount(mockSubscriptionId, 10, 5)).rejects.toThrow(
-      'No subscription items found'
+      `No recognized paid seat item found in subscription ${mockSubscriptionId}`
     );
   });
 });

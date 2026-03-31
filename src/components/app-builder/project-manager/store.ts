@@ -31,6 +31,7 @@ export function createInitialState(
     currentIframeUrl: null,
     gitRepoFullName,
     sessions: [],
+    pendingNewSession: false,
   };
 }
 

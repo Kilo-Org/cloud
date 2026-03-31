@@ -20,6 +20,7 @@ function createMockStore(): ProjectStore & { stateUpdates: Array<Record<string, 
     currentIframeUrl: null,
     gitRepoFullName: null,
     sessions: [],
+    pendingNewSession: false,
   };
 
   return {

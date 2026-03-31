@@ -30,6 +30,7 @@ import { logExceptInTest } from '@/lib/utils.server';
 import { logWebhookEvent, updateWebhookEvent } from '@/lib/integrations/db/webhook-events';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from './app-selector';
+import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
 
 /**
  * Shared GitHub App Webhook Handler
@@ -80,7 +81,7 @@ export async function handleGitHubWebhook(
     // 3. Get event type and action from headers
     const eventType = request.headers.get('x-github-event') || '';
     const eventSignature = request.headers.get('x-github-delivery');
-    const headers = Object.fromEntries(request.headers);
+    const headers = redactSensitiveHeaders(Object.fromEntries(request.headers));
 
     if (!eventType) {
       return NextResponse.json({ error: 'Missing x-github-event header' }, { status: 400 });

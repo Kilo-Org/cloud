@@ -30,6 +30,9 @@ on:
           - cloudflare-session-ingest
           - cloudflare-webhook-agent-ingest
 
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-workers-${{ github.ref }}
   cancel-in-progress: false
@@ -39,27 +42,27 @@ jobs:
   deploy-manual:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
     name: Deploy ${{ inputs.worker }}
     steps:
       - name: Checkout code
-        uses: useblacksmith/checkout@v1
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: 22
+          cache: 'pnpm'
 
       - name: Install dependencies
         working-directory: ${{ inputs.worker }}
         run: pnpm install --frozen-lockfile
 
       - name: Deploy to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ inputs.worker }}
@@ -69,11 +72,12 @@ jobs:
   detect-changes:
     if: github.event_name == 'push'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Checkout code
-        uses: useblacksmith/checkout@v1
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           fetch-depth: 0
 
@@ -128,6 +132,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != ''
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -135,24 +140,23 @@ jobs:
     name: Deploy ${{ matrix.worker }}
     steps:
       - name: Checkout code
-        uses: useblacksmith/checkout@v1
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: 22
+          cache: 'pnpm'
 
       - name: Install dependencies
         working-directory: ${{ matrix.worker }}
         run: pnpm install --frozen-lockfile
 
       - name: Deploy to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ matrix.worker }}

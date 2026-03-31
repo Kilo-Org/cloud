@@ -456,6 +456,13 @@
       "when": 1774861170821,
       "tag": "0064_add_kiloclaw_cli_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1774879757906,
+      "tag": "0065_low_mad_thinker",
+      "breakpoints": true
     }
   ]
 }

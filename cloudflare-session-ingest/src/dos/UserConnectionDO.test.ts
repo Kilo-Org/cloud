@@ -86,8 +86,8 @@ function createMockCtx() {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeSession(id: string, status = 'busy', title = 'Test') {
-  return { id, status, title };
+function makeSession(id: string, status = 'busy', title = 'Test', parentSessionId?: string) {
+  return parentSessionId ? { id, status, title, parentSessionId } : { id, status, title };
 }
 
 function parseSent(ws: MockWS, callIndex = 0): unknown {
@@ -343,6 +343,16 @@ describe('UserConnectionDO', () => {
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       expect(ctx.storage.setAlarm).toHaveBeenCalled();
+    });
+
+    it('sends heartbeat_ack to CLI socket', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+
+      const msgs = allSent(cliWs);
+      expect(msgs).toContainEqual({ type: 'heartbeat_ack' });
     });
   });
 
@@ -1224,6 +1234,40 @@ describe('UserConnectionDO', () => {
 
       const result = doInstance.getActiveSessions();
       expect(result).toEqual([]);
+    });
+
+    it('excludes child sessions reported with parentSessionId in heartbeat', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('root-1', 'busy', 'Root session'),
+        makeSession('child-1', 'busy', 'Child session', 'root-1'),
+      ]);
+
+      const result = doInstance.getActiveSessions();
+      expect(result).toEqual([
+        { id: 'root-1', status: 'busy', title: 'Root session', connectionId: 'cli-1' },
+      ]);
+    });
+
+    it('cleans up child tracking when session disappears from heartbeat', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      // First heartbeat: root + child
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('root-1', 'busy', 'Root session'),
+        makeSession('child-1', 'busy', 'Child session', 'root-1'),
+      ]);
+
+      // Second heartbeat: only root (child finished)
+      sendHeartbeat(doInstance, cliWs, [makeSession('root-1', 'idle', 'Root session')]);
+
+      const result = doInstance.getActiveSessions();
+      expect(result).toEqual([
+        { id: 'root-1', status: 'idle', title: 'Root session', connectionId: 'cli-1' },
+      ]);
     });
   });
 

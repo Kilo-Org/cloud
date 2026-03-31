@@ -999,22 +999,15 @@ export async function drainAll(): Promise<void> {
 
     if (apiUrl && token && townId) {
       console.log(`${DRAIN_LOG} Phase 1: notifying TownDO of container eviction`);
-      const NOTIFY_TIMEOUT_MS = 10_000;
-      const abortCtrl = new AbortController();
-      const timer = setTimeout(() => abortCtrl.abort(), NOTIFY_TIMEOUT_MS);
-      try {
-        const resp = await fetch(`${apiUrl}/api/towns/${townId}/container-eviction`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          signal: abortCtrl.signal,
-        });
-        console.log(`${DRAIN_LOG} Phase 1: TownDO responded ${resp.status}`);
-      } finally {
-        clearTimeout(timer);
-      }
+      const resp = await fetch(`${apiUrl}/api/towns/${townId}/container-eviction`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      console.log(`${DRAIN_LOG} Phase 1: TownDO responded ${resp.status}`);
     } else {
       console.warn(
         `${DRAIN_LOG} Phase 1: skipping TownDO notification (missing apiUrl=${!!apiUrl} token=${!!token} townId=${!!townId})`
@@ -1042,8 +1035,9 @@ export async function drainAll(): Promise<void> {
       // Mayor and other roles: no nudge needed
 
       if (nudgeMessage) {
-        // Clear any existing idle timer so it doesn't fire mid-nudge and
-        // flip the agent to 'exited' before the eviction prompt completes.
+        // Cancel the idle timer before nudging — if the agent was
+        // already idle, the timer could fire mid-nudge and exit the
+        // agent before it processes the eviction message.
         clearIdleTimer(agent.agentId);
         console.log(`${DRAIN_LOG} Phase 2: nudging ${agent.role} agent ${agent.agentId}`);
         await sendMessage(agent.agentId, nudgeMessage);
@@ -1070,42 +1064,51 @@ export async function drainAll(): Promise<void> {
   }
 
   // ── Phase 4: Force-save remaining agents ────────────────────────────
+  // Two sub-steps: first freeze all stragglers (cancel idle timers,
+  // abort event subscriptions and SDK sessions), then snapshot each
+  // worktree. Freezing first prevents the normal completion path
+  // (idle timer → onExit → bead completion) from racing with the WIP
+  // git save, and avoids .git/index.lock collisions with agent git ops.
   const stragglers = [...agents.values()].filter(a => a.status === 'running');
   if (stragglers.length > 0) {
-    console.log(`${DRAIN_LOG} Phase 4: force-saving ${stragglers.length} straggler(s)`);
+    console.log(`${DRAIN_LOG} Phase 4: freezing ${stragglers.length} straggler(s)`);
   } else {
     console.log(`${DRAIN_LOG} Phase 4: all agents finished, no force-save needed`);
   }
 
-  // Abort all straggler sessions first so they stop writing to the worktree.
-  // This prevents races with git (index.lock collisions, missed late writes,
-  // concurrent git commands from the agent).
+  // 4a: Freeze — cancel idle timers and abort sessions so no
+  // completion/exit callbacks can fire during the git snapshot.
   for (const agent of stragglers) {
     try {
-      console.log(`${DRAIN_LOG} Phase 4: aborting session for agent ${agent.agentId}`);
-      // Abort event subscription so handleIdleEvent won't fire
-      const evtCtrl = eventAbortControllers.get(agent.agentId);
-      if (evtCtrl) evtCtrl.abort();
+      // Cancel idle timer FIRST — prevents the timer from firing and
+      // marking the agent as completed via onExit() while we abort.
+      clearIdleTimer(agent.agentId);
 
-      // Abort the SDK session to stop the LLM turn / tool execution
+      // Abort event subscription
+      const controller = eventAbortControllers.get(agent.agentId);
+      if (controller) {
+        controller.abort();
+        eventAbortControllers.delete(agent.agentId);
+      }
+
+      // Abort the SDK session
       const instance = sdkInstances.get(agent.workdir);
       if (instance) {
-        await instance.client.session.abort({ path: { id: agent.sessionId } });
+        await instance.client.session.abort({
+          path: { id: agent.sessionId },
+        });
       }
+
       agent.status = 'exited';
       agent.exitReason = 'container eviction';
+      console.log(`${DRAIN_LOG} Phase 4: froze agent ${agent.agentId}`);
     } catch (err) {
-      console.warn(
-        `${DRAIN_LOG} Phase 4: failed to abort session for agent ${agent.agentId}:`,
-        err
-      );
-      // Mark exited anyway — best-effort freeze before snapshotting
-      agent.status = 'exited';
-      agent.exitReason = 'container eviction (abort failed)';
+      console.warn(`${DRAIN_LOG} Phase 4: failed to freeze agent ${agent.agentId}:`, err);
     }
   }
 
-  // Now that all sessions are frozen, snapshot each worktree
+  // 4b: Snapshot — git add/commit/push each worktree now that
+  // all sessions are frozen.
   for (const agent of stragglers) {
     try {
       console.log(`${DRAIN_LOG} Phase 4: force-saving agent ${agent.agentId} in ${agent.workdir}`);

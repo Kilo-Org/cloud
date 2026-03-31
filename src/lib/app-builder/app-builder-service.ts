@@ -379,6 +379,7 @@ async function createV2Session(params: CreateSessionParams): Promise<InitiateSes
       images,
       appendSystemPrompt: APP_BUILDER_APPEND_SYSTEM_PROMPT,
       mcpServers: buildMCPServersConfig({ userId: createdByUserId, projectId, owner }),
+      createdOnPlatform: 'app-builder',
     };
   } else {
     const { token: gitToken } = await appBuilderClient.generateGitToken(projectId, 'full');
@@ -395,6 +396,7 @@ async function createV2Session(params: CreateSessionParams): Promise<InitiateSes
       images,
       appendSystemPrompt: APP_BUILDER_APPEND_SYSTEM_PROMPT,
       mcpServers: buildMCPServersConfig({ userId: createdByUserId, projectId, owner }),
+      createdOnPlatform: 'app-builder',
     };
   }
 

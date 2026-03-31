@@ -49,6 +49,7 @@ type MatchedUser = {
   userId: string;
   userName: string | null;
   subscriptionStatus: string | null;
+  instanceId: string | null;
 };
 
 type UnmatchedEmail = {
@@ -58,6 +59,7 @@ type UnmatchedEmail = {
 type TrialResult = {
   email: string;
   userId: string;
+  instanceId: string | null;
   success: boolean;
   action?: 'extended' | 'restarted';
   newTrialEndsAt?: string;
@@ -371,9 +373,37 @@ export function KiloclawExtendTrial() {
       return;
     }
     const content =
-      'email,action,new_trial_ends_at\n' +
-      filtered.map(r => `${r.email},${r.action ?? ''},${r.newTrialEndsAt ?? ''}`).join('\n');
+      'email,user_id,instance_id,action,new_trial_ends_at\n' +
+      filtered
+        .map(
+          r =>
+            `${r.email},${r.userId},${r.instanceId ?? ''},${r.action ?? ''},${r.newTrialEndsAt ?? ''}`
+        )
+        .join('\n');
     downloadCsv(content, `${success ? 'successful' : 'failed'}-trial-extensions.csv`);
+  };
+
+  const handleDownloadIneligible = () => {
+    const ineligible = matchedUsers.filter(
+      u => u.subscriptionStatus !== 'trialing' && u.subscriptionStatus !== 'canceled'
+    );
+    if (ineligible.length === 0) {
+      toast.info('No ineligible users to export');
+      return;
+    }
+    const content =
+      'email,user_id,instance_id,subscription_status\n' +
+      ineligible
+        .map(u => `${u.email},${u.userId},${u.instanceId ?? ''},${u.subscriptionStatus ?? ''}`)
+        .join('\n');
+    downloadCsv(content, 'ineligible-users.csv');
+  };
+
+  const handleDownloadUnmatched = () => {
+    if (unmatchedEmails.length === 0) return;
+    const content =
+      'email,user_id,instance_id\n' + unmatchedEmails.map(u => `${u.email},,`).join('\n');
+    downloadCsv(content, 'unmatched-emails.csv');
   };
 
   // Computed
@@ -460,6 +490,49 @@ export function KiloclawExtendTrial() {
                     </>
                   )}
                 </p>
+              </div>
+
+              {/* CSV upload alternative */}
+              <div
+                onDrop={e => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file) {
+                    handleFile(file);
+                    setInputMode('csv');
+                  }
+                }}
+                onDragOver={e => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={e => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                }}
+                className={`relative flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed px-4 py-3 transition-colors ${
+                  isDragging
+                    ? 'border-primary bg-primary/5'
+                    : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+                }`}
+              >
+                <FileSpreadsheet className="text-muted-foreground h-4 w-4 shrink-0" />
+                <span className="text-muted-foreground text-sm">
+                  Or drop / click to upload a CSV
+                </span>
+                <Input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleFile(file);
+                      setInputMode('csv');
+                    }
+                  }}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                />
               </div>
 
               {/* Days input */}
@@ -715,10 +788,7 @@ export function KiloclawExtendTrial() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      const csv = 'email\n' + unmatchedEmails.map(u => u.email).join('\n');
-                      downloadCsv(csv, 'unmatched-emails.csv');
-                    }}
+                    onClick={handleDownloadUnmatched}
                   >
                     <Download className="mr-1 h-3 w-3" />
                     Export
@@ -820,7 +890,7 @@ export function KiloclawExtendTrial() {
             </div>
 
             {/* Export buttons */}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -838,6 +908,15 @@ export function KiloclawExtendTrial() {
               >
                 <Download className="mr-1 h-3 w-3" />
                 Export Failed
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadIneligible}
+                disabled={ineligibleCount === 0}
+              >
+                <Download className="mr-1 h-3 w-3" />
+                Export Ineligible
               </Button>
             </div>
           </CardContent>

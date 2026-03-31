@@ -12,6 +12,7 @@ type MatchedUser = {
   userId: string;
   userName: string | null;
   subscriptionStatus: string | null;
+  instanceId: string | null;
 };
 
 type UnmatchedEmail = {
@@ -26,6 +27,7 @@ type MatchUsersResult = {
 type ExtendTrialResult = {
   email: string;
   userId: string;
+  instanceId: string | null;
   success: boolean;
   action?: 'extended' | 'restarted';
   newTrialEndsAt?: string;
@@ -102,11 +104,13 @@ export const extendClawTrialRouter = createTRPCRouter({
       for (const email of normalizedEmails) {
         const user = usersByEmail.get(email);
         if (user) {
+          const sub = latestSubByUserId.get(user.id);
           matched.push({
             email: user.email,
             userId: user.id,
             userName: user.name,
-            subscriptionStatus: latestSubByUserId.get(user.id)?.status ?? null,
+            subscriptionStatus: sub?.status ?? null,
+            instanceId: sub?.instance_id ?? null,
           });
         } else {
           unmatched.push({ email });
@@ -166,6 +170,7 @@ export const extendClawTrialRouter = createTRPCRouter({
           results.push({
             email,
             userId: '',
+            instanceId: null,
             success: false,
             error: 'User not found',
           });
@@ -178,6 +183,7 @@ export const extendClawTrialRouter = createTRPCRouter({
           results.push({
             email,
             userId: user.id,
+            instanceId: null,
             success: false,
             error: 'No KiloClaw subscription found. User must provision an instance first.',
           });
@@ -207,6 +213,7 @@ export const extendClawTrialRouter = createTRPCRouter({
               results.push({
                 email,
                 userId: user.id,
+                instanceId: subscription.instance_id,
                 success: false,
                 error: 'Subscription status changed since match — please re-match and retry.',
               });
@@ -239,6 +246,7 @@ export const extendClawTrialRouter = createTRPCRouter({
             results.push({
               email,
               userId: user.id,
+              instanceId: subscription.instance_id,
               success: true,
               action: 'extended',
               newTrialEndsAt: updated.trial_ends_at ?? undefined,
@@ -287,6 +295,7 @@ export const extendClawTrialRouter = createTRPCRouter({
               results.push({
                 email,
                 userId: user.id,
+                instanceId: subscription.instance_id,
                 success: false,
                 error: 'Subscription status changed since match — please re-match and retry.',
               });
@@ -338,6 +347,7 @@ export const extendClawTrialRouter = createTRPCRouter({
             results.push({
               email,
               userId: user.id,
+              instanceId: subscription.instance_id,
               success: true,
               action: 'restarted',
               newTrialEndsAt: newEnd.toISOString(),
@@ -348,6 +358,7 @@ export const extendClawTrialRouter = createTRPCRouter({
             results.push({
               email,
               userId: user.id,
+              instanceId: subscription.instance_id,
               success: false,
               error: `Cannot extend trial: subscription status is "${subscription.status}". Only trialing or canceled subscriptions can be modified.`,
             });
@@ -356,6 +367,7 @@ export const extendClawTrialRouter = createTRPCRouter({
           results.push({
             email,
             userId: user.id,
+            instanceId: subscription.instance_id,
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error',
           });

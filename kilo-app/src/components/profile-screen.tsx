@@ -65,7 +65,7 @@ function CreditsCard() {
             <Skeleton className="mt-1 h-3 w-48 rounded" />
           ) : (
             expiringTotal > 0 &&
-            Boolean(earliestExpiry) && (
+            earliestExpiry != null && (
               <Text className="mt-1 text-xs text-muted-foreground">
                 ${expiringTotal.toFixed(2)} in bonus credits expiring{' '}
                 {parseTimestamp(earliestExpiry).toLocaleDateString(undefined, {

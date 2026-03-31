@@ -198,7 +198,8 @@
       "lightningcss": "1.30.1"
     },
     "patchedDependencies": {
-      "@storybook/nextjs@9.1.20": "patches/@storybook__nextjs@9.1.20.patch"
+      "@storybook/nextjs@9.1.20": "patches/@storybook__nextjs@9.1.20.patch",
+      "@gorhom/bottom-sheet@5.1.8": "patches/@gorhom__bottom-sheet@5.1.8.patch"
     },
     "onlyBuiltDependencies": [
       "@swc/core",

@@ -320,9 +320,8 @@ export function KiloclawExtendTrial() {
 
   // Actions
   const handleMatchUsers = () => {
-    // If a CSV is loaded and a column selected, use it; otherwise fall back to paste text.
     const emails =
-      csvData && selectedColumn
+      inputMode === 'csv' && csvData && selectedColumn
         ? extractEmails(csvData.rows, selectedColumn)
         : parseEmailList(pastedText);
 
@@ -413,7 +412,7 @@ export function KiloclawExtendTrial() {
     csvData && selectedColumn ? extractEmails(csvData.rows, selectedColumn) : [];
   const csvEmailCount = extractedEmails.length;
 
-  const currentEmailCount = csvData && selectedColumn ? csvEmailCount : pastedEmailCount;
+  const currentEmailCount = inputMode === 'csv' ? csvEmailCount : pastedEmailCount;
 
   const eligibleCount = matchedUsers.filter(
     u => u.subscriptionStatus === 'trialing' || u.subscriptionStatus === 'canceled'
@@ -421,10 +420,10 @@ export function KiloclawExtendTrial() {
 
   const ineligibleCount = matchedUsers.length - eligibleCount;
 
-  // CSV takes precedence when loaded; fall back to paste text count
-  const canMatch = csvData
-    ? selectedColumn && csvEmailCount > 0 && csvEmailCount <= 1000
-    : pastedEmailCount > 0 && pastedEmailCount <= 1000;
+  const canMatch =
+    inputMode === 'csv'
+      ? selectedColumn && csvEmailCount > 0 && csvEmailCount <= 1000
+      : pastedEmailCount > 0 && pastedEmailCount <= 1000;
 
   return (
     <div className="flex w-full flex-col gap-y-6">
@@ -530,7 +529,7 @@ export function KiloclawExtendTrial() {
           )}
 
           {/* CSV-specific chrome — appears whenever a file is loaded, regardless of active tab */}
-          {csvData && csvData.headers.length > 0 && (
+          {inputMode === 'csv' && csvData && csvData.headers.length > 0 && (
             <div className="space-y-3">
               <div className="space-y-1">
                 <Label>Email Column</Label>

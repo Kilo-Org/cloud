@@ -122,7 +122,7 @@ export function apiKindNotSupportedResponse(
   apiKind: GatewayChatApiKind,
   supportedApiKinds: ReadonlyArray<GatewayChatApiKind>
 ) {
-  const error = `This model does not support the ${apiKind} API, please use any of: ${supportedApiKinds.join()}`;
+  const error = `Please upgrade your Kilo version`;
   return NextResponse.json({ error, message: error }, { status: 400 });
 }
 

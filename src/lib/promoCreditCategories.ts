@@ -684,6 +684,16 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     description: 'Creator promo',
     total_redemptions_allowed: 30,
   },
+  {
+    encrypted_credit_category: 'RIm83T1nOqaomIGaGB/uqA==:+LACBlJljL/mS/65uzflrw==:fNGT77oHV8M=',
+    is_user_selfservicable: true,
+    is_idempotent: true,
+    amount_usd: 50,
+    expiry_hours: 14 * 24,
+    promotion_ends_at: new Date('2026-04-30'),
+    description: 'Miami ClawCon Credits',
+    total_redemptions_allowed: 1050,
+  },
 ];
 
 const selfServicePromos: readonly SelfServicePromoCreditCategoryConfig[] =

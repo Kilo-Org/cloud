@@ -16,6 +16,7 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
         title: z.string(),
         gitUrl: z.string().optional(),
         gitBranch: z.string().optional(),
+        parentSessionId: z.string().optional(),
       })
     ),
   }),
@@ -56,6 +57,9 @@ export const CLIInboundMessageSchema = z.discriminatedUnion('type', [
     type: z.literal('system'),
     event: z.string(),
     data: z.unknown(),
+  }),
+  z.object({
+    type: z.literal('heartbeat_ack'),
   }),
 ]);
 

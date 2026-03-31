@@ -1,10 +1,6 @@
 import { APP_URL } from '@/lib/constants';
 import { getEnvVariable } from '@/lib/dotenvx';
 import 'server-only';
-// centralized place to normalize and export environment variables
-// this file only works on the sever and is meant to be an easier
-// way to see what environment variables are used vs searching the full
-// codebase for process.env.*
 
 export const IS_IN_AUTOMATED_TEST = !!getEnvVariable('IS_IN_AUTOMATED_TEST');
 export const NEXTAUTH_URL = APP_URL;
@@ -41,6 +37,15 @@ export const STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID = getEnvVariable(
 
 export const STRIPE_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID = getEnvVariable(
   'STRIPE_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID'
+);
+
+export const STRIPE_TEAMS_MONTHLY_PRICE_ID = getEnvVariable('STRIPE_TEAMS_MONTHLY_PRICE_ID');
+export const STRIPE_TEAMS_ANNUAL_PRICE_ID = getEnvVariable('STRIPE_TEAMS_ANNUAL_PRICE_ID');
+export const STRIPE_ENTERPRISE_MONTHLY_PRICE_ID = getEnvVariable(
+  'STRIPE_ENTERPRISE_MONTHLY_PRICE_ID'
+);
+export const STRIPE_ENTERPRISE_ANNUAL_PRICE_ID = getEnvVariable(
+  'STRIPE_ENTERPRISE_ANNUAL_PRICE_ID'
 );
 
 export const USER_DEPLOYMENTS_API_BASE_URL =

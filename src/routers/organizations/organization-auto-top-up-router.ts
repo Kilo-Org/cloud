@@ -1,6 +1,7 @@
 import { createTRPCRouter } from '@/lib/trpc/init';
 import {
-  organizationOwnerProcedure,
+  organizationBillingProcedure,
+  organizationBillingMutationProcedure,
   OrganizationIdInputSchema,
 } from '@/routers/organizations/utils';
 import { db } from '@/lib/drizzle';
@@ -20,7 +21,7 @@ import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
 
 export const organizationAutoTopUpRouter = createTRPCRouter({
-  getConfig: organizationOwnerProcedure.query(async ({ input }) => {
+  getConfig: organizationBillingProcedure.query(async ({ input }) => {
     const { organizationId } = input;
 
     const config = await db.query.auto_top_up_configs.findFirst({
@@ -38,7 +39,7 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
     return { enabled: org.auto_top_up_enabled, amountCents, paymentMethod };
   }),
 
-  toggle: organizationOwnerProcedure
+  toggle: organizationBillingMutationProcedure
     .input(
       OrganizationIdInputSchema.extend({
         currentEnabled: z.boolean(),
@@ -100,7 +101,7 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
       }
     }),
 
-  changePaymentMethod: organizationOwnerProcedure
+  changePaymentMethod: organizationBillingMutationProcedure
     .input(
       OrganizationIdInputSchema.extend({
         amountCents: OrgAutoTopUpAmountCentsSchema.optional(),
@@ -129,7 +130,7 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
       return { redirectUrl };
     }),
 
-  updateAmount: organizationOwnerProcedure
+  updateAmount: organizationBillingMutationProcedure
     .input(
       OrganizationIdInputSchema.extend({
         amountCents: OrgAutoTopUpAmountCentsSchema,
@@ -146,7 +147,7 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
       return successResult();
     }),
 
-  removePaymentMethod: organizationOwnerProcedure.mutation(async ({ input }) => {
+  removePaymentMethod: organizationBillingMutationProcedure.mutation(async ({ input }) => {
     const { organizationId } = input;
 
     await db

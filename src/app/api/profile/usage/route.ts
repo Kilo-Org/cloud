@@ -27,7 +27,11 @@ export async function GET(request: NextRequest) {
   // Build the select object conditionally
   const selectFields = {
     date: sql<string>`DATE(${microdollar_usage.created_at})`,
-    ...(groupByModel && { model: microdollar_usage.model }),
+    ...(groupByModel && {
+      model: sql<
+        string | null
+      >`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
+    }),
     total_cost: sql<number>`SUM(${microdollar_usage.cost})::float`,
     request_count: sql<number>`COUNT(*)::float`,
     total_input_tokens: sql<number>`SUM(${microdollar_usage.input_tokens})::float`,
@@ -39,11 +43,15 @@ export async function GET(request: NextRequest) {
   // Build the group by and order by clauses conditionally
   const groupByClause = [
     sql`DATE(${microdollar_usage.created_at})`,
-    ...(groupByModel ? [microdollar_usage.model] : []),
+    ...(groupByModel
+      ? [sql`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`]
+      : []),
   ];
   const orderByClause = [
     desc(sql`DATE(${microdollar_usage.created_at})`),
-    ...(groupByModel ? [microdollar_usage.model] : []),
+    ...(groupByModel
+      ? [sql`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`]
+      : []),
   ];
 
   // Build where conditions based on view type

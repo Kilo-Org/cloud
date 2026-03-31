@@ -52,3 +52,5 @@ export { SessionMetricsParamsSchema, TerminationReasons } from './session-metric
 export type { SessionMetricsParams, SessionMetricsParamsInput } from './session-metrics-schema.js';
 
 export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id.js';
+
+export { redactSensitiveHeaders } from './redact-headers.js';

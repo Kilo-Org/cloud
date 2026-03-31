@@ -30,6 +30,7 @@ import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
 import { deriveHttpEventName } from '../middleware/analytics';
+import { sendMessage } from '../stream-chat/client';
 
 const GmailHistoryIdSchema = z.object({
   userId: z.string().min(1),
@@ -184,6 +185,8 @@ const SAFE_ERROR_PREFIXES = [
   'Cannot restore: ', // snapshot restore: bad state
   'Cannot destroy: ', // destroy while restoring
   'Cannot retry recovery', // force-retry-recovery guard messages
+  'Stream Chat sendMessage failed', // sendMessage HTTP errors
+  'Stream Chat is not set up', // no Stream Chat on this instance
 ];
 
 function sanitizeError(err: unknown, operation: string): { message: string; status: number } {
@@ -1191,6 +1194,52 @@ platform.get('/stream-chat-credentials', async c => {
   } catch (err) {
     const { message, status } = sanitizeError(err, 'stream-chat-credentials');
     return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/send-chat-message
+// Send a message to a KiloClaw instance's Stream Chat channel as the human user.
+// The OpenClaw bot picks it up and responds as if the user typed it.
+const SendChatMessageSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().uuid().optional(),
+  message: z.string().min(1).max(32_000),
+});
+
+platform.post('/send-chat-message', async c => {
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = SendChatMessageSchema.safeParse(body);
+  if (!parsed.success) {
+    return jsonError('Invalid request body: userId and message are required', 400);
+  }
+
+  const { userId, instanceId, message } = parsed.data;
+  c.set('userId', userId);
+
+  const apiKey = c.env.STREAM_CHAT_API_KEY;
+  const apiSecret = c.env.STREAM_CHAT_API_SECRET;
+  if (!apiKey || !apiSecret) {
+    return jsonError('Stream Chat is not configured', 503);
+  }
+
+  try {
+    // Get the sandboxId and channel info from the DO
+    const creds = await withDORetry(
+      instanceStubFactory(c.env, userId, instanceId),
+      stub => stub.getStreamChatCredentials(),
+      'getStreamChatCredentials'
+    );
+
+    if (!creds) {
+      return jsonError('Stream Chat is not set up for this instance', 404);
+    }
+
+    await sendMessage(apiKey, apiSecret, creds.channelId, creds.userId, message);
+
+    return c.json({ success: true, channelId: creds.channelId });
+  } catch (err) {
+    const { message: errMsg, status } = sanitizeError(err, 'send-chat-message');
+    return jsonError(errMsg, status);
   }
 });
 

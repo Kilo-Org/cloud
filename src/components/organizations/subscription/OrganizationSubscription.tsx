@@ -1,5 +1,8 @@
 'use client';
-import { useOrganizationSubscription } from '@/app/api/organizations/hooks';
+import {
+  useOrganizationSubscription,
+  useOrganizationWithMembers,
+} from '@/app/api/organizations/hooks';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { ErrorCard } from '@/components/ErrorCard';
 import { LoadingCard } from '@/components/LoadingCard';
@@ -30,17 +33,19 @@ export function OrganizationSubscription({
     error,
     refetch,
   } = useOrganizationSubscription(organizationId);
+  const { data: orgData } = useOrganizationWithMembers(organizationId);
 
   // Use assumed role if available, otherwise use actual role
   const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || role || 'member';
   const isKiloAdmin = assumedRole === 'KILO ADMIN';
+  const planLabel = orgData?.plan === 'enterprise' ? 'Kilo Enterprise Plan' : 'Kilo Teams Plan';
 
   return (
     <OrganizationContextProvider value={{ userRole: currentRole, isKiloAdmin }}>
       <div className="flex w-full flex-col gap-y-4">
         <OrganizationPageHeader
           organizationId={organizationId}
-          title="Kilo Teams Plan"
+          title={planLabel}
           showBackButton={false}
         />
 

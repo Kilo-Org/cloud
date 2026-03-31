@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
   organizationMemberProcedure,
-  organizationOwnerProcedure,
+  organizationBillingMutationProcedure,
   OrganizationIdInputSchema,
 } from './utils';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
@@ -222,7 +222,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
    * Saves the review agent configuration
    * For GitLab: optionally syncs webhooks for selected repositories
    */
-  saveReviewConfig: organizationOwnerProcedure
+  saveReviewConfig: organizationBillingMutationProcedure
     .input(SaveReviewConfigInputSchema)
     .mutation(async ({ input, ctx }) => {
       try {
@@ -354,7 +354,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
   /**
    * Toggles the review agent on/off
    */
-  toggleReviewAgent: organizationOwnerProcedure
+  toggleReviewAgent: organizationBillingMutationProcedure
     .input(
       OrganizationIdInputSchema.extend({
         platform: PlatformSchema,

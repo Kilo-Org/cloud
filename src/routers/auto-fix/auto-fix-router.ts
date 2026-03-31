@@ -8,9 +8,11 @@
 import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
 import {
   organizationMemberProcedure,
-  organizationOwnerProcedure,
+  organizationBillingProcedure,
+  organizationBillingMutationProcedure,
   ensureOrganizationAccess,
 } from '@/routers/organizations/utils';
+import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { TRPCError } from '@trpc/server';
 import { successResult, failureResult } from '@/lib/maybe-result';
 import {
@@ -352,11 +354,11 @@ export const autoFixRouter = createTRPCRouter({
    * Save auto-fix configuration for an organization
    * Requires organization owner role
    */
-  saveConfig: organizationOwnerProcedure
+  saveConfig: organizationBillingMutationProcedure
     .input(SaveAutoFixConfigSchema.omit({ organizationId: true }))
     .mutation(async ({ input, ctx }) => {
       try {
-        // organizationId comes from organizationOwnerProcedure's input
+        // organizationId comes from organizationBillingMutationProcedure's input
         const fullInput = input as typeof input & { organizationId: string };
 
         const owner: Owner = {
@@ -406,12 +408,18 @@ export const autoFixRouter = createTRPCRouter({
    * Toggle auto-fix agent on/off
    * Requires organization owner role
    */
-  toggleAgent: organizationOwnerProcedure
+  toggleAgent: organizationBillingProcedure
     .input(ToggleAutoFixAgentInputSchema.omit({ organizationId: true }))
     .mutation(async ({ input, ctx }) => {
       try {
-        // organizationId comes from organizationOwnerProcedure's input
+        // organizationId comes from organizationBillingProcedure's input
         const fullInput = input as typeof input & { organizationId: string };
+
+        // Only enforce trial/subscription when enabling — expired orgs must
+        // still be able to disable agents whose webhook processors keep running.
+        if (fullInput.isEnabled) {
+          await requireActiveSubscriptionOrTrial(fullInput.organizationId);
+        }
 
         const owner: Owner = {
           type: 'org',

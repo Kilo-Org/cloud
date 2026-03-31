@@ -51,7 +51,12 @@ import {
   type IngestDOContext,
 } from '../websocket/ingest.js';
 import type { StoredEvent } from '../websocket/types.js';
-import type { WrapperCommand, PreparingStep, CloudStatusData } from '../shared/protocol.js';
+import type {
+  WrapperCommand,
+  PreparingStep,
+  PreparingEventData,
+  CloudStatusData,
+} from '../shared/protocol.js';
 import { STALE_THRESHOLD_MS, SANDBOX_SLEEP_AFTER_SECONDS } from '../core/lease.js';
 import { ExecutionOrchestrator, type OrchestratorDeps } from '../execution/orchestrator.js';
 import type {
@@ -881,6 +886,9 @@ export class CloudAgentSession extends DurableObject {
     model: string;
     variant?: string;
     kiloSessionId?: string;
+    githubRepo?: string;
+    gitUrl?: string;
+    platform?: 'github' | 'gitlab';
   }): Promise<OperationResult> {
     await this.requireSessionId(input.sessionId as SessionId);
     const existing = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
@@ -899,6 +907,9 @@ export class CloudAgentSession extends DurableObject {
       model: input.model,
       variant: input.variant,
       kiloSessionId: input.kiloSessionId,
+      githubRepo: input.githubRepo,
+      gitUrl: input.gitUrl,
+      platform: input.platform,
       version: now,
       timestamp: now,
       // NOTE: preparedAt is NOT set — this is the key difference from prepare()
@@ -945,14 +956,18 @@ export class CloudAgentSession extends DurableObject {
     const prepExecutionId: EventSourceId = `prep_${input.sessionId}`;
     const env = this.env as unknown as WorkerEnv;
 
-    const emitProgress = (step: PreparingStep, message: string) => {
+    const emitProgress = (
+      step: PreparingStep,
+      message: string,
+      extra?: Omit<PreparingEventData, 'step' | 'message'>
+    ) => {
       const now = Date.now();
       // Backward-compatible preparing event
       this.broadcastVolatileEvent({
         executionId: prepExecutionId,
         sessionId: input.sessionId,
         streamEventType: 'preparing',
-        payload: JSON.stringify({ step, message }),
+        payload: JSON.stringify({ step, message, ...extra }),
         timestamp: now,
       });
       // cloud.status event derived from preparation step
@@ -1079,7 +1094,7 @@ export class CloudAgentSession extends DurableObject {
       }
 
       // 12. Emit ready — session is prepared (and initiated, if autoInitiate)
-      emitProgress('ready', 'Session ready');
+      emitProgress('ready', 'Session ready', { branch: result.branchName });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger

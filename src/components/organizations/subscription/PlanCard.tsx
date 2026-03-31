@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   OrganizationPlanSchema,
   type OrganizationPlan,
+  type BillingCycle,
 } from '@/lib/organizations/organization-types';
 
 type PlanCardProps = {
@@ -14,6 +15,7 @@ type PlanCardProps = {
   isSelected: boolean;
   currentPlan: OrganizationPlan;
   onSelect: () => void;
+  billingCycle?: BillingCycle;
   className?: string;
 };
 
@@ -24,6 +26,7 @@ export function PlanCard({
   isSelected,
   currentPlan,
   onSelect,
+  billingCycle,
   className = '',
 }: PlanCardProps) {
   const planName = plan === 'teams' ? 'Teams' : 'Enterprise';
@@ -65,7 +68,9 @@ export function PlanCard({
           ${pricePerMonth}
           <span className="text-lg font-normal text-gray-400">/user/month</span>
         </div>
-        <div className="mt-1 text-sm text-gray-400">Billed annually</div>
+        <div className="mt-1 text-sm text-gray-400">
+          {billingCycle === 'monthly' ? 'Billed monthly' : 'Billed annually'}
+        </div>
       </div>
 
       {/* Features List */}

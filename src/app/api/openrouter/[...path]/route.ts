@@ -591,6 +591,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       request: requestBodyParsed,
       response,
       isUserByok: !!userByok,
+      feature,
+      balance: (await balanceAndSettingsPromise).balance,
     });
     if (errorResponse) {
       return errorResponse;

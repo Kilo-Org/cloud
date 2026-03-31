@@ -58,17 +58,20 @@ export function isStatusReadOnly(status: OrgTrialStatus): boolean {
 }
 
 /**
- * Check if organization is in hard-locked state (trial expired 4+ days ago).
- * Used server-side during login redirect to send users to /profile instead of
- * showing the blocking "Upgrade to Restore Access" modal.
+ * Check if organization is hard-locked (trial expired 4+ days ago, no active subscription).
  *
- * Note: This does not check subscription status to avoid additional DB queries.
- * Organizations with active subscriptions won't have expired trials.
- *
- * @param organization - The organization to check
- * @returns true if organization is hard-locked due to expired trial
+ * Pass `hasActiveSubscription` when available to avoid false positives for subscribed
+ * orgs whose `free_trial_end_at` is in the past.
  */
-export function isOrganizationHardLocked(organization: Organization): boolean {
+export function isOrganizationHardLocked(
+  organization: Organization,
+  hasActiveSubscription = false
+): boolean {
+  // Organizations with an active subscription are never hard-locked
+  if (hasActiveSubscription) {
+    return false;
+  }
+
   // OSS program participants are never hard-locked (authoritative check)
   if (organization.settings.oss_sponsorship_tier != null) {
     return false;

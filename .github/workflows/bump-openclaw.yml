@@ -5,11 +5,15 @@ on:
     - cron: '0 */12 * * *' # Every 12 hours (midnight and noon UTC)
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
     steps:
-      - uses: useblacksmith/checkout@v1
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           sparse-checkout: kiloclaw/Dockerfile
           sparse-checkout-cone-mode: false
@@ -96,7 +100,7 @@ jobs:
       - name: Notify Slack
         if: steps.age.outputs.recent == 'true'
         continue-on-error: true
-        uses: slackapi/slack-github-action@v2
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
         env:
           CURRENT_VERSION: ${{ steps.current.outputs.version }}
           NEW_VERSION: ${{ steps.latest.outputs.version }}

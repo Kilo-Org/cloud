@@ -1109,7 +1109,7 @@ export const organizations = pgTable(
     auto_top_up_enabled: boolean().default(false).notNull(),
     settings: jsonb().default({}).$type<OrganizationSettings>().notNull(),
     seat_count: integer().default(0).notNull(),
-    require_seats: boolean().default(false).notNull(),
+    require_seats: boolean().default(true).notNull(),
     created_by_kilo_user_id: text(),
     deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
     sso_domain: text(),
@@ -1148,6 +1148,25 @@ export const organization_memberships = pgTable(
 );
 
 export type OrganizationMembership = typeof organization_memberships.$inferSelect;
+
+export const organization_membership_removals = pgTable(
+  'organization_membership_removals',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid().notNull(),
+    kilo_user_id: text().notNull(),
+    removed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    removed_by: text(),
+    previous_role: text().$type<OrganizationRole>().notNull(),
+  },
+  table => [
+    unique('UQ_org_membership_removals_org_user').on(table.organization_id, table.kilo_user_id),
+    index('IDX_org_membership_removals_org_id').on(table.organization_id),
+    index('IDX_org_membership_removals_user_id').on(table.kilo_user_id),
+  ]
+);
+
+export type OrganizationMembershipRemoval = typeof organization_membership_removals.$inferSelect;
 
 export const organization_invitations = pgTable(
   'organization_invitations',
@@ -1235,7 +1254,17 @@ export const organization_user_usage = pgTable(
 
 export type OrganizationUserDailyUsage = typeof organization_user_usage.$inferSelect;
 
-type SubscriptionStatus = 'active' | 'pending_cancel' | 'ended';
+type SubscriptionStatus =
+  | 'active'
+  | 'pending_cancel'
+  | 'ended'
+  | 'incomplete'
+  | 'incomplete_expired'
+  | 'trialing'
+  | 'past_due'
+  | 'canceled'
+  | 'unpaid'
+  | 'paused';
 export type BillingCycle = 'monthly' | 'yearly';
 
 export const organization_seats_purchases = pgTable(
@@ -2336,6 +2365,7 @@ export const AppBuilderSessionReason = {
   GitHubMigration: 'github_migration', // New session after migrating to GitHub
   Upgrade: 'upgrade', // New session after worker version upgrade (v1→v2)
   ModelVisionChange: 'model_vision_change', // New session after switching between vision and text-only models
+  UserInitiated: 'user_initiated', // New session explicitly started by the user via "New Chat"
 } satisfies Record<string, string>;
 
 export const app_builder_project_sessions = pgTable(

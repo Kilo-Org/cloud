@@ -5,13 +5,8 @@ import { sql } from 'drizzle-orm';
 import assert from 'node:assert';
 import { attachDatabasePool } from '@vercel/functions';
 export const { Client, Pool } = pg;
-const {
-  POSTGRES_CONNECT_TIMEOUT,
-  POSTGRES_MAX_QUERY_TIME,
-  DEBUG_QUERY_LOGGING,
-  VERCEL_REGION,
-  VERCEL_ENV,
-} = process.env;
+const { POSTGRES_CONNECT_TIMEOUT, POSTGRES_MAX_QUERY_TIME, DEBUG_QUERY_LOGGING, VERCEL_REGION } =
+  process.env;
 
 const POSTGRES_URL = getEnvVariable('POSTGRES_URL');
 
@@ -124,85 +119,9 @@ if (usesSeparateReplica) {
   });
 }
 
-// --- Pool observability ---
-// Periodic pool metrics (every 30s) — picked up by Vercel log drain → Axiom.
-// instanceId lets us deduplicate readings per instance in Axiom queries.
-const instanceId = `${VERCEL_REGION ?? 'unknown'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-// Pool lifecycle events — low-volume, high-signal logs for connection churn.
-// `connect` = new TCP connection to Postgres created
-// `remove`  = connection destroyed (idle timeout, error, pool shutdown)
-function attachPoolLifecycleLogging(targetPool: pg.Pool, label: 'primary' | 'replica') {
-  targetPool.on('connect', () => {
-    console.log(
-      JSON.stringify({
-        type: 'pool_lifecycle',
-        event: 'connect',
-        pool: label,
-        instanceId,
-        region: VERCEL_REGION ?? 'unknown',
-        total: targetPool.totalCount,
-        idle: targetPool.idleCount,
-        waiting: targetPool.waitingCount,
-      })
-    );
-  });
-
-  targetPool.on('remove', () => {
-    console.log(
-      JSON.stringify({
-        type: 'pool_lifecycle',
-        event: 'remove',
-        pool: label,
-        instanceId,
-        region: VERCEL_REGION ?? 'unknown',
-        total: targetPool.totalCount,
-        idle: targetPool.idleCount,
-        waiting: targetPool.waitingCount,
-      })
-    );
-  });
-}
-
-const IS_PROD = VERCEL_ENV === 'production';
-
-if (IS_PROD) {
-  attachPoolLifecycleLogging(pool, 'primary');
-  if (usesSeparateReplica) {
-    attachPoolLifecycleLogging(replicaPool, 'replica');
-  }
-}
-
-function logPoolMetrics() {
-  const primaryMetrics = {
-    total: pool.totalCount,
-    idle: pool.idleCount,
-    waiting: pool.waitingCount,
-    max: pool.options.max,
-  };
-  const replicaMetrics = usesSeparateReplica
-    ? {
-        total: replicaPool.totalCount,
-        idle: replicaPool.idleCount,
-        waiting: replicaPool.waitingCount,
-        max: replicaPool.options.max,
-      }
-    : null;
-  console.log(
-    JSON.stringify({
-      type: 'pool_metrics',
-      instanceId,
-      region: VERCEL_REGION ?? 'unknown',
-      primary: primaryMetrics,
-      replica: replicaMetrics,
-    })
-  );
-}
-
-if (IS_PROD) {
-  logPoolMetrics();
-  setInterval(logPoolMetrics, 30_000).unref();
-}
+// Pool observability is handled centrally by /api/cron/db-pool-metrics,
+// which scrapes PgBouncer metrics from the Supabase Prometheus endpoint
+// for all databases (primary + replicas) every minute.
 
 /**
  * Primary database instance - use for all writes (INSERT, UPDATE, DELETE)

@@ -8,6 +8,7 @@ import {
   deactivateStreamChatUsers,
   reactivateStreamChatUsers,
   setupDefaultStreamChatChannel,
+  sendMessage,
 } from './client';
 
 // Decode a JWT payload without verifying signature (for test assertions only).
@@ -373,5 +374,104 @@ describe('setupDefaultStreamChatChannel', () => {
     const result = await setupDefaultStreamChatChannel('api-key', 'api-secret', 'sandbox-new');
     expect(result.apiKey).toBe('api-key');
     expect(result.botUserId).toBe('bot-sandbox-new');
+  });
+});
+
+describe('sendMessage', () => {
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    mockFetch.mockReset();
+  });
+
+  it('POSTs to /channels/messaging/{channelId}/message with correct payload', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 201 });
+
+    await sendMessage(
+      'my-api-key',
+      'my-api-secret',
+      'default-sandbox-abc',
+      'sandbox-abc',
+      'Hello bot!'
+    );
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    const [url, opts] = mockFetch.mock.calls[0] as [
+      string,
+      RequestInit & { headers: Record<string, string> },
+    ];
+    expect(url).toBe(
+      'https://chat.stream-io-api.com/channels/messaging/default-sandbox-abc/message?api_key=my-api-key'
+    );
+    expect(opts.method).toBe('POST');
+    expect(opts.headers['Content-Type']).toBe('application/json');
+    expect(opts.headers['Stream-Auth-Type']).toBe('jwt');
+    // Authorization header should be a server JWT
+    expect(opts.headers['Authorization']).toBeDefined();
+    expect(opts.headers['Authorization'].split('.')).toHaveLength(3);
+
+    const body = JSON.parse(opts.body as string) as { message: { text: string; user_id: string } };
+    expect(body.message.text).toBe('Hello bot!');
+    expect(body.message.user_id).toBe('sandbox-abc');
+  });
+
+  it('uses a server token (server: true) for authentication', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 201 });
+
+    await sendMessage('key', 'secret', 'chan-1', 'user-1', 'test');
+
+    const [, opts] = mockFetch.mock.calls[0] as [
+      string,
+      RequestInit & { headers: Record<string, string> },
+    ];
+    const payload = decodeJwtPayload(opts.headers['Authorization']);
+    expect(payload.server).toBe(true);
+  });
+
+  it('throws on HTTP error with status and body in the message', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      text: async () => 'User is deactivated',
+    });
+
+    await expect(sendMessage('key', 'secret', 'chan-1', 'user-1', 'test')).rejects.toThrow(
+      'Stream Chat sendMessage failed (403): User is deactivated'
+    );
+  });
+
+  it('preserves HTTP status on the thrown error for upstream handling', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: async () => 'Channel not found',
+    });
+
+    try {
+      await sendMessage('key', 'secret', 'chan-1', 'user-1', 'test');
+      expect.unreachable('should have thrown');
+    } catch (err) {
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error & { status: number }).status).toBe(404);
+    }
+  });
+
+  it('handles unreadable error body gracefully', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: async () => {
+        throw new Error('body read error');
+      },
+    });
+
+    await expect(sendMessage('key', 'secret', 'chan-1', 'user-1', 'test')).rejects.toThrow(
+      'Stream Chat sendMessage failed (500): (unreadable)'
+    );
   });
 });

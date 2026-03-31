@@ -338,6 +338,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(activePermissionAtom, null);
     store.set(failedPromptAtom, null);
     store.set(fetchedSessionDataAtom, null);
+    store.set(chatUIAtom, { shouldAutoScroll: true });
   }
 
   function subscribeToServiceState(
@@ -499,7 +500,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         const ap = store.get(activePermissionAtom);
         if (ap?.requestId === requestId) store.set(activePermissionAtom, null);
       },
-      onBranchChanged: branch => config.onBranchChanged?.(branch),
+      onBranchChanged: branch => {
+        const currentFetched = store.get(fetchedSessionDataAtom);
+        if (currentFetched) {
+          store.set(fetchedSessionDataAtom, { ...currentFetched, gitBranch: branch });
+        }
+        config.onBranchChanged?.(branch);
+      },
       onError: message => store.set(errorAtom, message),
       onEvent: event => {
         if (event.type === 'message.updated' && event.info.role === 'assistant') {

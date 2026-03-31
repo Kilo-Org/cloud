@@ -1,5 +1,9 @@
 import { createTRPCRouter } from '@/lib/trpc/init';
-import { organizationMemberProcedure, organizationOwnerProcedure } from './utils';
+import {
+  organizationMemberProcedure,
+  organizationMemberMutationProcedure,
+  organizationBillingMutationProcedure,
+} from './utils';
 import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   getAgentConfigForOwner,
@@ -28,13 +32,13 @@ const SaveAutoFixConfigInputSchema = z
     pr_base_branch: z.string().optional(),
     max_pr_creation_time_minutes: z.number().optional(),
   })
-  .passthrough(); // Allow organizationId from organizationOwnerProcedure
+  .passthrough(); // Allow organizationId from organizationBillingProcedure
 
 const ToggleAutoFixAgentInputSchema = z
   .object({
     isEnabled: z.boolean(),
   })
-  .passthrough(); // Allow organizationId from organizationOwnerProcedure
+  .passthrough(); // Allow organizationId from organizationBillingProcedure
 
 export const organizationAutoFixRouter = createTRPCRouter({
   listGitHubRepositories: organizationMemberProcedure.query(async ({ input }) => {
@@ -63,11 +67,11 @@ export const organizationAutoFixRouter = createTRPCRouter({
     };
   }),
 
-  saveAutoFixConfig: organizationOwnerProcedure
+  saveAutoFixConfig: organizationBillingMutationProcedure
     .input(SaveAutoFixConfigInputSchema)
     .mutation(async ({ input, ctx }) => {
       try {
-        // Extract organizationId from input (provided by organizationOwnerProcedure)
+        // Extract organizationId from input (provided by organizationBillingProcedure)
         const typedInput = input as typeof input & { organizationId: string };
 
         const owner: Owner = {
@@ -119,11 +123,11 @@ export const organizationAutoFixRouter = createTRPCRouter({
       }
     }),
 
-  toggleAutoFixAgent: organizationOwnerProcedure
+  toggleAutoFixAgent: organizationBillingMutationProcedure
     .input(ToggleAutoFixAgentInputSchema)
     .mutation(async ({ input, ctx }) => {
       try {
-        // Extract organizationId from input (provided by organizationOwnerProcedure)
+        // Extract organizationId from input (provided by organizationBillingProcedure)
         const typedInput = input as typeof input & { organizationId: string };
 
         const owner: Owner = {
@@ -208,7 +212,7 @@ export const organizationAutoFixRouter = createTRPCRouter({
       });
     }),
 
-  retriggerFix: organizationMemberProcedure
+  retriggerFix: organizationMemberMutationProcedure
     .input(
       z.object({
         ticketId: z.string().uuid(),
@@ -218,7 +222,7 @@ export const organizationAutoFixRouter = createTRPCRouter({
       return await autoFixRouter.createCaller(ctx).retrigger({ ticketId: input.ticketId });
     }),
 
-  cancelFix: organizationMemberProcedure
+  cancelFix: organizationMemberMutationProcedure
     .input(
       z.object({
         ticketId: z.string().uuid(),

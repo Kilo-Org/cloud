@@ -107,6 +107,8 @@ export type PreparingStep =
 export type PreparingEventData = {
   step: PreparingStep;
   message: string;
+  /** Branch name, included in the 'ready' step after preparation completes. */
+  branch?: string;
 };
 
 /** Cloud infrastructure status types. */

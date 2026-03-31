@@ -3,9 +3,7 @@ import { captureRouterTransitionStart, init } from '@sentry/nextjs';
 if (process.env.NODE_ENV !== 'development') {
   init({
     dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-    // Adds request headers and IP for users, for more info visit:
-    // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#sendDefaultPii
-    sendDefaultPii: true,
+    sendDefaultPii: false,
     normalizeDepth: 5,
     // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
     tracesSampleRate: 0.05,

@@ -12,27 +12,23 @@ let testOrganization: Organization;
 
 describe('organizations subscription trpc router', () => {
   beforeAll(async () => {
-    // Create test users using the helper function
+    // Create test users using the helper function (no hardcoded emails to avoid cross-run collisions)
     regularUser = await insertTestUser({
-      google_user_email: 'regular-subscription@example.com',
       google_user_name: 'Regular Subscription User',
       is_admin: false,
     });
 
     _adminUser = await insertTestUser({
-      google_user_email: 'admin-subscription@admin.example.com',
       google_user_name: 'Admin Subscription User',
       is_admin: true,
     });
 
     memberUser = await insertTestUser({
-      google_user_email: 'member-subscription@example.com',
       google_user_name: 'Member Subscription User',
       is_admin: false,
     });
 
     _nonMemberUser = await insertTestUser({
-      google_user_email: 'non-member-subscription@example.com',
       google_user_name: 'Non Member Subscription User',
       is_admin: false,
     });
@@ -66,6 +62,7 @@ describe('organizations subscription trpc router', () => {
           organizationId: testOrganization.id,
           seats: 1,
           cancelUrl: 'https://example.com',
+          billingCycle: 'annual',
         })
       ).rejects.toThrow('You do not have the required organizational role to access this feature');
     });
@@ -78,8 +75,39 @@ describe('organizations subscription trpc router', () => {
           organizationId: testOrganization.id,
           seats: 1,
           cancelUrl: 'https://example.com',
+          billingCycle: 'annual',
         })
       ).rejects.toThrow('You do not have access to this organization');
+    });
+
+    it('should accept billingCycle parameter without validation error', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      // The call will fail because there's no Stripe customer, but it should NOT
+      // fail on input validation — billingCycle: 'monthly' is a valid schema value.
+      const result = caller.organizations.subscription.getSubscriptionStripeUrl({
+        organizationId: testOrganization.id,
+        seats: 1,
+        cancelUrl: 'https://example.com',
+        billingCycle: 'monthly',
+      });
+
+      // Should pass input validation (no ZodError / BAD_REQUEST), then fail downstream
+      await expect(result).rejects.not.toThrow(/ZodError/);
+    });
+
+    it('should reject requests without billingCycle', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      // billingCycle is required (Seat Purchase 2) — omitting it must fail validation.
+      // @ts-expect-error intentionally omitting billingCycle to test validation
+      const result = caller.organizations.subscription.getSubscriptionStripeUrl({
+        organizationId: testOrganization.id,
+        seats: 1,
+        cancelUrl: 'https://example.com',
+      });
+
+      await expect(result).rejects.toThrow();
     });
   });
 

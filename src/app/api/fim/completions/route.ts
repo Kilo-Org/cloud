@@ -37,7 +37,9 @@ const BLOCKED_FIM_USER_AGENTS = ['kilo/7.1.0', 'kilo/7.1.1', 'kilo/7.1.2', 'kilo
 
 function isFimClientBlocked(userAgent: string | null): boolean {
   if (!userAgent) return false;
-  return BLOCKED_FIM_USER_AGENT_REGEX.test(userAgent) || BLOCKED_FIM_USER_AGENTS.includes(userAgent);
+  return (
+    BLOCKED_FIM_USER_AGENT_REGEX.test(userAgent) || BLOCKED_FIM_USER_AGENTS.includes(userAgent)
+  );
 }
 
 type FimProvider = 'mistral' | 'inception';

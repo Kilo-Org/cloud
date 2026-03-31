@@ -201,6 +201,21 @@ export class KiloClawInternalClient {
     });
   }
 
+  async sendChatMessage(
+    userId: string,
+    message: string,
+    instanceId?: string
+  ): Promise<{ success: boolean; channelId: string }> {
+    return this.request(
+      '/api/platform/send-chat-message',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, message, instanceId }),
+      },
+      { userId }
+    );
+  }
+
   async getDebugStatus(userId: string, instanceId?: string): Promise<PlatformDebugStatusResponse> {
     const params = new URLSearchParams({ userId });
     if (instanceId) params.set('instanceId', instanceId);

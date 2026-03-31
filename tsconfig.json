@@ -12,7 +12,9 @@
       "@/*": ["./src/*"],
       "@kilocode/db": ["./packages/db/src/index.ts"],
       "@kilocode/db/*": ["./packages/db/src/*"],
-      "@kilocode/encryption": ["./packages/encryption/src/index.ts"]
+      "@kilocode/encryption": ["./packages/encryption/src/index.ts"],
+      "@kilocode/worker-utils": ["./packages/worker-utils/src/index.ts"],
+      "@kilocode/worker-utils/*": ["./packages/worker-utils/src/*"]
     },
     "allowJs": true,
     "noEmit": true,

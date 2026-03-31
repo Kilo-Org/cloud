@@ -6,6 +6,51 @@ import { useGastownTRPC, gastownWsUrl } from '@/lib/gastown/trpc';
 import type { Terminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
 
+/**
+ * xterm.js doesn't support the Kitty keyboard protocol — all Enter
+ * variants are encoded as bare `\r`. The remote TUI enables Kitty
+ * protocol (`\x1b[>5u`) but xterm.js ignores it.
+ *
+ * This handler intercepts modified Enter keys and sends the correct
+ * Kitty CSI u escape sequences directly over the WebSocket:
+ * - Shift+Enter → `\x1b[13;2u`
+ * - Alt+Enter   → `\x1b[13;3u`
+ * - Ctrl+Enter  → `\x1b[13;5u`
+ *
+ * Both keydown and keyup events are suppressed for modified Enter to
+ * prevent xterm from also sending its default `\r`.
+ */
+export function attachKittyEnterHandler(term: Terminal, wsRef?: React.RefObject<WebSocket | null>) {
+  function send(seq: string) {
+    if (wsRef?.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(seq);
+    } else {
+      term.input(seq);
+    }
+  }
+
+  term.attachCustomKeyEventHandler(ev => {
+    // Block both keydown and keyup for modified Enter to prevent xterm
+    // from sending its default \r on either event phase.
+    const isModifiedEnter =
+      ev.key === 'Enter' && (ev.shiftKey || ev.altKey || ev.ctrlKey) && !ev.metaKey;
+
+    if (!isModifiedEnter) return true;
+
+    // Only send the sequence on keydown, but suppress keyup too
+    if (ev.type !== 'keydown') return false;
+
+    if (ev.shiftKey && !ev.ctrlKey && !ev.altKey) {
+      send('\x1b[13;2u');
+    } else if (ev.altKey && !ev.ctrlKey && !ev.shiftKey) {
+      send('\x1b[13;3u');
+    } else if (ev.ctrlKey && !ev.shiftKey && !ev.altKey) {
+      send('\x1b[13;5u');
+    }
+    return false;
+  });
+}
+
 type XtermPtyOptions = {
   townId: string;
   agentId: string | null;
@@ -279,6 +324,7 @@ export function useXtermPty({
       term.loadAddon(fitAddon);
       term.loadAddon(webLinksAddon);
       term.open(container);
+      attachKittyEnterHandler(term, wsRef);
       fitAddon.fit();
 
       xtermRef.current = term;

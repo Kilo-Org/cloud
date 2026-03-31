@@ -611,10 +611,81 @@ export const kiloclawRouter = createTRPCRouter({
     return client.getStreamChatCredentials(ctx.user.id);
   }),
 
+  sendChatMessage: clawAccessProcedure
+    .input(
+      z.object({
+        instanceId: z.string().uuid().optional(),
+        message: z.string().min(1).max(32_000),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.instanceId) {
+        // Explicit instanceId: verify ownership and non-destroyed
+        const [row] = await db
+          .select({ id: kiloclaw_instances.id })
+          .from(kiloclaw_instances)
+          .where(
+            and(
+              eq(kiloclaw_instances.id, input.instanceId),
+              eq(kiloclaw_instances.user_id, ctx.user.id),
+              isNull(kiloclaw_instances.destroyed_at)
+            )
+          )
+          .limit(1);
+        if (!row) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'No active KiloClaw instance found',
+          });
+        }
+      } else {
+        // No instanceId: verify the user has any active instance
+        const instance = await getActiveInstance(ctx.user.id);
+        if (!instance) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'No active KiloClaw instance found',
+          });
+        }
+      }
+
+      const client = new KiloClawInternalClient();
+      try {
+        return await client.sendChatMessage(ctx.user.id, input.message, input.instanceId);
+      } catch (err) {
+        if (err instanceof KiloClawApiError) {
+          const { message } = getKiloClawApiErrorPayload(err);
+          const code =
+            err.statusCode === 404
+              ? 'NOT_FOUND'
+              : err.statusCode === 503
+                ? 'PRECONDITION_FAILED'
+                : 'INTERNAL_SERVER_ERROR';
+          throw new TRPCError({
+            code,
+            message: message ?? 'Failed to send chat message',
+          });
+        }
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to send chat message',
+        });
+      }
+    }),
+
   // Instance lifecycle
   start: clawAccessProcedure.mutation(async ({ ctx }) => {
     const client = new KiloClawInternalClient();
-    return client.start(ctx.user.id);
+    const result = await client.start(ctx.user.id);
+    // /api/platform/start always returns { ok: true } regardless of whether
+    // the machine transitioned state, so this may fire for no-op requests.
+    // The UI only enables Start when isStartable is true, so false fires are rare.
+    PostHogClient().capture({
+      distinctId: ctx.user.google_user_email,
+      event: 'claw_instance_started',
+      properties: { user_id: ctx.user.id },
+    });
+    return result;
   }),
 
   stop: clawAccessProcedure.mutation(async ({ ctx }) => {
@@ -908,9 +979,21 @@ export const kiloclawRouter = createTRPCRouter({
       const client = new KiloClawUserClient(
         generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
       );
-      return client.restartMachine(input?.imageTag ? { imageTag: input.imageTag } : undefined, {
-        userId: ctx.user.id,
-      });
+      const result = await client.restartMachine(
+        input?.imageTag ? { imageTag: input.imageTag } : undefined,
+        { userId: ctx.user.id }
+      );
+      if (result.success) {
+        PostHogClient().capture({
+          distinctId: ctx.user.google_user_email,
+          event: 'claw_instance_redeployed',
+          properties: {
+            user_id: ctx.user.id,
+            redeploy_mode: input?.imageTag === 'latest' ? 'upgrade' : 'redeploy',
+          },
+        });
+      }
+      return result;
     }),
 
   listPairingRequests: clawAccessProcedure

@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { FeatureValue } from '@/lib/feature-detection';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
@@ -65,13 +66,28 @@ function describeRouting(modeToModel: Record<string, ResolvedAutoModel>): string
   return `Uses ${parts.join('; ')}.`;
 }
 
+const modeSchema = z.enum([
+  'KiloClaw',
+  'plan',
+  'general',
+  'architect',
+  'orchestrator',
+  'ask',
+  'debug',
+  'build',
+  'explore',
+  'code',
+]);
+
+type Mode = z.infer<typeof modeSchema>;
+
 const FRONTIER_CODE_MODEL: ResolvedAutoModel = {
   model: CLAUDE_SONNET_CURRENT_MODEL_ID,
   reasoning: { enabled: true },
   verbosity: 'low',
 };
 
-const FRONTIER_MODE_TO_MODEL: Record<string, ResolvedAutoModel> = {
+const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   KiloClaw: {
     model: CLAUDE_OPUS_CURRENT_MODEL_ID,
     reasoning: { enabled: true },
@@ -117,7 +133,7 @@ const BALANCED_IMAGE_MODEL: ResolvedAutoModel = {
   reasoning: { enabled: true },
 };
 
-const BALANCED_MODE_TO_MODEL: Record<string, ResolvedAutoModel> = {
+const BALANCED_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   KiloClaw: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   plan: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   general: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
@@ -236,20 +252,15 @@ export async function resolveAutoModel(
       model: (await balancePromise) > 0 ? GPT_5_NANO_ID : gpt_oss_20b_free_model.public_id,
     };
   }
-  const mode = modeHeader?.trim() ?? '';
+  const modeResult = modeSchema.safeParse(modeHeader?.trim() ?? '');
+  const mode = modeResult.success ? modeResult.data : null;
   if (mappedModel === KILO_AUTO_BALANCED_MODEL.id) {
     if (hasImages) {
       return BALANCED_IMAGE_MODEL;
     }
-    return (
-      (Object.hasOwn(BALANCED_MODE_TO_MODEL, mode) ? BALANCED_MODE_TO_MODEL[mode] : null) ??
-      BALANCED_CODE_MODEL
-    );
+    return (mode !== null ? BALANCED_MODE_TO_MODEL[mode] : null) ?? BALANCED_CODE_MODEL;
   }
-  return (
-    (Object.hasOwn(FRONTIER_MODE_TO_MODEL, mode) ? FRONTIER_MODE_TO_MODEL[mode] : null) ??
-    FRONTIER_CODE_MODEL
-  );
+  return (mode !== null ? FRONTIER_MODE_TO_MODEL[mode] : null) ?? FRONTIER_CODE_MODEL;
 }
 
 export async function applyResolvedAutoModel(

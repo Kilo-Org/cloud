@@ -1,19 +1,19 @@
 import { custom_llm2 } from '@kilocode/db/schema';
 import { readDb } from '@/lib/drizzle';
-import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
+import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
 
-function convert(publicId: string, def: CustomLlmDefinition) {
+function convert(publicId: string, model: CustomLlmDefinition) {
   return {
     id: publicId,
     canonical_slug: publicId,
     hugging_face_id: '',
-    name: def.display_name,
+    name: model.display_name,
     created: 1756238927,
-    description: def.display_name,
-    context_length: def.context_length,
+    description: model.display_name,
+    context_length: model.context_length,
     architecture: {
-      modality: def.supports_image_input ? 'text+image-\u003Etext' : 'text-\u003Etext',
-      input_modalities: def.supports_image_input ? ['text', 'image'] : ['text'],
+      modality: model.supports_image_input ? 'text+image-\u003Etext' : 'text-\u003Etext',
+      input_modalities: model.supports_image_input ? ['text', 'image'] : ['text'],
       output_modalities: ['text'],
       tokenizer: 'Other',
       instruct_type: null,
@@ -28,20 +28,28 @@ function convert(publicId: string, def: CustomLlmDefinition) {
       input_cache_read: '0.00000000',
     },
     top_provider: {
-      context_length: def.context_length,
-      max_completion_tokens: def.max_completion_tokens,
+      context_length: model.context_length,
+      max_completion_tokens: model.max_completion_tokens,
       is_moderated: false,
     },
     per_request_limits: null,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
-    opencode: def.opencode_settings,
+    opencode: model.opencode_settings,
   };
 }
 
 export async function listAvailableCustomLlms(organizationId: string) {
   const rows = await readDb.select().from(custom_llm2);
   return rows
+    .map(row => {
+      const parsed = CustomLlmDefinitionSchema.safeParse(row.definition);
+      if (!parsed.success) {
+        console.log('Failed to parse custom llm definition', parsed.error);
+      }
+      return parsed.success ? { public_id: row.public_id, definition: parsed.data } : null;
+    })
+    .filter(row => row !== null)
     .filter(row => row.definition.organization_ids.includes(organizationId))
     .map(row => convert(row.public_id, row.definition));
 }

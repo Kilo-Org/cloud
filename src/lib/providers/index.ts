@@ -34,7 +34,7 @@ import { isXiaomiModel } from '@/lib/providers/xiaomi';
 import type { BYOKResult, Provider } from '@/lib/providers/types';
 import PROVIDERS from '@/lib/providers/provider-definitions';
 import { getCodingPlanModel } from '@/lib/providers/coding-plans';
-import type { CustomLlmProvider } from '@kilocode/db';
+import { CustomLlmDefinitionSchema, type CustomLlmProvider } from '@kilocode/db';
 
 function inferSupportedChatApis(aiSdkProvider: CustomLlmProvider) {
   return aiSdkProvider === 'anthropic'
@@ -114,29 +114,29 @@ export async function getProvider(
       .select()
       .from(custom_llm2)
       .where(eq(custom_llm2.public_id, requestedModel));
-    if (row) {
-      const def = row.definition;
-      if (def.organization_ids.includes(organizationId)) {
-        return {
-          provider: {
-            id: 'custom',
-            apiUrl: def.base_url,
-            apiKey: def.api_key,
-            supportedChatApis: inferSupportedChatApis(
-              def.opencode_settings?.ai_sdk_provider ?? 'openai-compatible'
-            ),
-            transformRequest(context) {
-              Object.assign(context.request.body, def.extra_body ?? {});
-              for (const [key, value] of Object.entries(def.extra_headers ?? {})) {
-                context.extraHeaders[key] = value;
-              }
-              context.request.body.model = def.internal_id;
-            },
+    const parsedCustomLlm = CustomLlmDefinitionSchema.safeParse(row?.definition);
+    if (row && !parsedCustomLlm.success) {
+      console.log('Failed to parse custom llm definition', parsedCustomLlm.error);
+    }
+    const customLlm = parsedCustomLlm.data;
+    if (customLlm && customLlm.organization_ids.includes(organizationId)) {
+      return {
+        provider: {
+          id: 'custom',
+          apiUrl: customLlm.base_url,
+          apiKey: customLlm.api_key,
+          supportedChatApis: ['chat_completions', 'messages', 'responses'],
+          transformRequest(context) {
+            Object.assign(context.request.body, customLlm.extra_body ?? {});
+            for (const [key, value] of Object.entries(customLlm.extra_headers ?? {})) {
+              context.extraHeaders[key] = value;
+            }
+            context.request.body.model = customLlm.internal_id;
           },
-          userByok: null,
-          bypassAccessCheck: true,
-        };
-      }
+        },
+        userByok: null,
+        bypassAccessCheck: true,
+      };
     }
   }
 

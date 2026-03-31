@@ -1561,6 +1561,22 @@ export class TownDO extends DurableObject<Env> {
             dispatch.stopAgentInContainer(this.env, this.townId, targetAgentId).catch(() => {});
           }
           if (targetAgent) {
+            // Check if the hooked bead has exhausted its dispatch cap.
+            // If so, fail it immediately instead of letting the reconciler
+            // re-dispatch indefinitely (#1653).
+            if (targetAgent.current_hook_bead_id) {
+              const hookedBead = beadOps.getBead(this.sql, targetAgent.current_hook_bead_id);
+              if (hookedBead && hookedBead.dispatch_attempts >= scheduling.MAX_DISPATCH_ATTEMPTS) {
+                beadOps.updateBeadStatus(
+                  this.sql,
+                  targetAgent.current_hook_bead_id,
+                  'failed',
+                  'system'
+                );
+                agents.unhookBead(this.sql, targetAgentId);
+                break;
+              }
+            }
             // RESTART clears last_activity_at so the scheduler picks it
             // up immediately. RESTART_WITH_BACKOFF sets it to now() so
             // the dispatch cooldown (DISPATCH_COOLDOWN_MS) delays the
@@ -1576,6 +1592,21 @@ export class TownDO extends DurableObject<Env> {
               `,
               [activityAt, targetAgentId]
             );
+            // Also stamp the bead's last_dispatch_attempt_at so the
+            // reconciler's exponential backoff gate fires correctly.
+            // Without this, the backoff variant allows immediate
+            // redispatch once last_dispatch_attempt_at ages out.
+            if (action === 'RESTART_WITH_BACKOFF' && targetAgent.current_hook_bead_id) {
+              query(
+                this.sql,
+                /* sql */ `
+                  UPDATE ${beads}
+                  SET ${beads.columns.last_dispatch_attempt_at} = ?
+                  WHERE ${beads.bead_id} = ?
+                `,
+                [now(), targetAgent.current_hook_bead_id]
+              );
+            }
           }
           break;
         }
@@ -1643,20 +1674,31 @@ export class TownDO extends DurableObject<Env> {
               }
               agents.unhookBead(this.sql, targetAgentId);
             }
-            // Reset the bead to open so the scheduler can re-assign it
-            query(
-              this.sql,
-              /* sql */ `
-                UPDATE ${beads}
-                SET ${beads.columns.assignee_agent_bead_id} = NULL,
-                    ${beads.columns.status} = 'open',
-                    ${beads.columns.updated_at} = ?
-                WHERE ${beads.bead_id} = ?
-                  AND ${beads.status} != 'closed'
-                  AND ${beads.status} != 'failed'
-              `,
-              [now(), beadToReassign]
-            );
+            // Check the bead's dispatch_attempts before resetting to open.
+            // If the bead exhausted its dispatch cap, fail it instead of
+            // re-entering the infinite retry loop (#1653).
+            const reassignBead = beadOps.getBead(this.sql, beadToReassign);
+            if (
+              reassignBead &&
+              reassignBead.dispatch_attempts >= scheduling.MAX_DISPATCH_ATTEMPTS
+            ) {
+              beadOps.updateBeadStatus(this.sql, beadToReassign, 'failed', input.agent_id);
+            } else {
+              // Reset the bead to open so the scheduler can re-assign it
+              query(
+                this.sql,
+                /* sql */ `
+                  UPDATE ${beads}
+                  SET ${beads.columns.assignee_agent_bead_id} = NULL,
+                      ${beads.columns.status} = 'open',
+                      ${beads.columns.updated_at} = ?
+                  WHERE ${beads.bead_id} = ?
+                    AND ${beads.status} != 'closed'
+                    AND ${beads.status} != 'failed'
+                `,
+                [now(), beadToReassign]
+              );
+            }
           }
           break;
         }

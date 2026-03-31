@@ -672,9 +672,10 @@ export async function runKiloClawBillingLifecycleCron(
   // ── Sweep 1: Trial Expiry ──────────────────────────────────────────
   const expiredTrials = await database
     .select({
+      id: kiloclaw_subscriptions.id,
       user_id: kiloclaw_subscriptions.user_id,
-      email: kilocode_users.google_user_email,
       instance_id: kiloclaw_subscriptions.instance_id,
+      email: kilocode_users.google_user_email,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
@@ -691,26 +692,29 @@ export async function runKiloClawBillingLifecycleCron(
       // Per spec: stop/destroy failures MUST be logged and the state
       // transition MUST proceed regardless, so transient outages don't
       // leave expired accounts active.
-      try {
-        await client.stop(row.user_id, row.instance_id ?? undefined);
-      } catch (stopError) {
-        const isExpected =
-          stopError instanceof KiloClawApiError &&
-          (stopError.statusCode === 404 || stopError.statusCode === 409);
-        if (isExpected) {
-          logInfo('Sweep 1: stop() returned expected error, proceeding with state transition', {
-            user_id: row.user_id,
-            statusCode: stopError.statusCode,
-            error: stopError.message,
-          });
-        } else {
-          captureException(stopError);
-          logError('Sweep 1: stop() failed, proceeding with state transition', {
-            user_id: row.user_id,
-            error: stopError instanceof Error ? stopError.message : String(stopError),
-          });
+      // Only stop if this subscription row owns an instance; a stale row
+      // with instance_id=null has nothing to stop.
+      if (row.instance_id)
+        try {
+          await client.stop(row.user_id, row.instance_id);
+        } catch (stopError) {
+          const isExpected =
+            stopError instanceof KiloClawApiError &&
+            (stopError.statusCode === 404 || stopError.statusCode === 409);
+          if (isExpected) {
+            logInfo('Sweep 1: stop() returned expected error, proceeding with state transition', {
+              user_id: row.user_id,
+              statusCode: stopError.statusCode,
+              error: stopError.message,
+            });
+          } else {
+            captureException(stopError);
+            logError('Sweep 1: stop() failed, proceeding with state transition', {
+              user_id: row.user_id,
+              error: stopError instanceof Error ? stopError.message : String(stopError),
+            });
+          }
         }
-      }
       const destructionDeadline = new Date(Date.now() + DESTRUCTION_GRACE_DAYS * MS_PER_DAY);
       await database
         .update(kiloclaw_subscriptions)
@@ -719,7 +723,7 @@ export async function runKiloClawBillingLifecycleCron(
           suspended_at: now,
           destruction_deadline: destructionDeadline.toISOString(),
         })
-        .where(eq(kiloclaw_subscriptions.user_id, row.user_id));
+        .where(eq(kiloclaw_subscriptions.id, row.id));
       summary.sweep1_trial_expiry++;
 
       await trySendEmail(
@@ -747,9 +751,10 @@ export async function runKiloClawBillingLifecycleCron(
   // ── Sweep 2: Subscription Period Expiry ────────────────────────────
   const expiredSubscriptions = await database
     .select({
+      id: kiloclaw_subscriptions.id,
       user_id: kiloclaw_subscriptions.user_id,
-      email: kilocode_users.google_user_email,
       instance_id: kiloclaw_subscriptions.instance_id,
+      email: kilocode_users.google_user_email,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
@@ -763,26 +768,27 @@ export async function runKiloClawBillingLifecycleCron(
 
   for (const row of expiredSubscriptions) {
     try {
-      try {
-        await client.stop(row.user_id, row.instance_id ?? undefined);
-      } catch (stopError) {
-        const isExpected =
-          stopError instanceof KiloClawApiError &&
-          (stopError.statusCode === 404 || stopError.statusCode === 409);
-        if (isExpected) {
-          logInfo('Sweep 2: stop() returned expected error, proceeding with state transition', {
-            user_id: row.user_id,
-            statusCode: stopError.statusCode,
-            error: stopError.message,
-          });
-        } else {
-          captureException(stopError);
-          logError('Sweep 2: stop() failed, proceeding with state transition', {
-            user_id: row.user_id,
-            error: stopError instanceof Error ? stopError.message : String(stopError),
-          });
+      if (row.instance_id)
+        try {
+          await client.stop(row.user_id, row.instance_id);
+        } catch (stopError) {
+          const isExpected =
+            stopError instanceof KiloClawApiError &&
+            (stopError.statusCode === 404 || stopError.statusCode === 409);
+          if (isExpected) {
+            logInfo('Sweep 2: stop() returned expected error, proceeding with state transition', {
+              user_id: row.user_id,
+              statusCode: stopError.statusCode,
+              error: stopError.message,
+            });
+          } else {
+            captureException(stopError);
+            logError('Sweep 2: stop() failed, proceeding with state transition', {
+              user_id: row.user_id,
+              error: stopError instanceof Error ? stopError.message : String(stopError),
+            });
+          }
         }
-      }
       const destructionDeadline = new Date(Date.now() + DESTRUCTION_GRACE_DAYS * MS_PER_DAY);
       await database
         .update(kiloclaw_subscriptions)
@@ -790,7 +796,7 @@ export async function runKiloClawBillingLifecycleCron(
           suspended_at: now,
           destruction_deadline: destructionDeadline.toISOString(),
         })
-        .where(eq(kiloclaw_subscriptions.user_id, row.user_id));
+        .where(eq(kiloclaw_subscriptions.id, row.id));
       summary.sweep2_subscription_expiry++;
 
       await trySendEmail(
@@ -862,9 +868,10 @@ export async function runKiloClawBillingLifecycleCron(
   // ── Sweep 3: Instance Destruction ──────────────────────────────────
   const destructionCandidates = await database
     .select({
+      id: kiloclaw_subscriptions.id,
       user_id: kiloclaw_subscriptions.user_id,
-      email: kilocode_users.google_user_email,
       instance_id: kiloclaw_subscriptions.instance_id,
+      email: kilocode_users.google_user_email,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
@@ -877,37 +884,43 @@ export async function runKiloClawBillingLifecycleCron(
 
   for (const row of destructionCandidates) {
     try {
-      try {
-        await client.destroy(row.user_id, row.instance_id ?? undefined);
-      } catch (destroyError) {
-        const isExpected =
-          destroyError instanceof KiloClawApiError &&
-          (destroyError.statusCode === 404 || destroyError.statusCode === 409);
-        if (isExpected) {
-          logInfo('Sweep 3: destroy() returned expected error, proceeding with state transition', {
-            user_id: row.user_id,
-            statusCode: destroyError.statusCode,
-            error: destroyError.message,
-          });
-        } else {
-          captureException(destroyError);
-          logError('Sweep 3: destroy() failed, proceeding with state transition', {
-            user_id: row.user_id,
-            error: destroyError instanceof Error ? destroyError.message : String(destroyError),
-          });
+      if (row.instance_id)
+        try {
+          await client.destroy(row.user_id, row.instance_id);
+        } catch (destroyError) {
+          const isExpected =
+            destroyError instanceof KiloClawApiError &&
+            (destroyError.statusCode === 404 || destroyError.statusCode === 409);
+          if (isExpected) {
+            logInfo(
+              'Sweep 3: destroy() returned expected error, proceeding with state transition',
+              {
+                user_id: row.user_id,
+                statusCode: destroyError.statusCode,
+                error: destroyError.message,
+              }
+            );
+          } else {
+            captureException(destroyError);
+            logError('Sweep 3: destroy() failed, proceeding with state transition', {
+              user_id: row.user_id,
+              error: destroyError instanceof Error ? destroyError.message : String(destroyError),
+            });
+          }
         }
+      // Mark the specific instance as destroyed
+      if (row.instance_id) {
+        await database
+          .update(kiloclaw_instances)
+          .set({ destroyed_at: now })
+          .where(
+            and(eq(kiloclaw_instances.id, row.instance_id), isNull(kiloclaw_instances.destroyed_at))
+          );
       }
-      // Mark active instances as destroyed
-      await database
-        .update(kiloclaw_instances)
-        .set({ destroyed_at: now })
-        .where(
-          and(eq(kiloclaw_instances.user_id, row.user_id), isNull(kiloclaw_instances.destroyed_at))
-        );
       await database
         .update(kiloclaw_subscriptions)
         .set({ destruction_deadline: null })
-        .where(eq(kiloclaw_subscriptions.user_id, row.user_id));
+        .where(eq(kiloclaw_subscriptions.id, row.id));
       summary.sweep3_instance_destruction++;
 
       await trySendEmail(
@@ -945,9 +958,10 @@ export async function runKiloClawBillingLifecycleCron(
   const fourteenDaysAgo = new Date(Date.now() - PAST_DUE_THRESHOLD_DAYS * MS_PER_DAY).toISOString();
   const pastDueRows = await database
     .select({
+      id: kiloclaw_subscriptions.id,
       user_id: kiloclaw_subscriptions.user_id,
-      email: kilocode_users.google_user_email,
       instance_id: kiloclaw_subscriptions.instance_id,
+      email: kilocode_users.google_user_email,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
@@ -961,26 +975,27 @@ export async function runKiloClawBillingLifecycleCron(
 
   for (const row of pastDueRows) {
     try {
-      try {
-        await client.stop(row.user_id, row.instance_id ?? undefined);
-      } catch (stopError) {
-        const isExpected =
-          stopError instanceof KiloClawApiError &&
-          (stopError.statusCode === 404 || stopError.statusCode === 409);
-        if (isExpected) {
-          logInfo('Sweep 4: stop() returned expected error, proceeding with state transition', {
-            user_id: row.user_id,
-            statusCode: stopError.statusCode,
-            error: stopError.message,
-          });
-        } else {
-          captureException(stopError);
-          logError('Sweep 4: stop() failed, proceeding with state transition', {
-            user_id: row.user_id,
-            error: stopError instanceof Error ? stopError.message : String(stopError),
-          });
+      if (row.instance_id)
+        try {
+          await client.stop(row.user_id, row.instance_id);
+        } catch (stopError) {
+          const isExpected =
+            stopError instanceof KiloClawApiError &&
+            (stopError.statusCode === 404 || stopError.statusCode === 409);
+          if (isExpected) {
+            logInfo('Sweep 4: stop() returned expected error, proceeding with state transition', {
+              user_id: row.user_id,
+              statusCode: stopError.statusCode,
+              error: stopError.message,
+            });
+          } else {
+            captureException(stopError);
+            logError('Sweep 4: stop() failed, proceeding with state transition', {
+              user_id: row.user_id,
+              error: stopError instanceof Error ? stopError.message : String(stopError),
+            });
+          }
         }
-      }
       const destructionDeadline = new Date(Date.now() + DESTRUCTION_GRACE_DAYS * MS_PER_DAY);
       await database
         .update(kiloclaw_subscriptions)
@@ -988,7 +1003,7 @@ export async function runKiloClawBillingLifecycleCron(
           suspended_at: now,
           destruction_deadline: destructionDeadline.toISOString(),
         })
-        .where(eq(kiloclaw_subscriptions.user_id, row.user_id));
+        .where(eq(kiloclaw_subscriptions.id, row.id));
       summary.sweep4_past_due_cleanup++;
 
       await trySendEmail(

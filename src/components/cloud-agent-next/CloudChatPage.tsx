@@ -391,18 +391,6 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                     </div>
                   )}
                   <div className={activeQuestion || activePermission ? 'hidden' : ''}>
-                    {sessionConfig?.repository && (
-                      <div className="text-muted-foreground flex items-center gap-1.5 px-[max(1rem,calc(50%_-_27rem))] pb-1 text-xs">
-                        <GitBranch className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{sessionConfig.repository}</span>
-                        {fetchedSessionData?.gitBranch && (
-                          <>
-                            <span>·</span>
-                            <span className="truncate">{fetchedSessionData.gitBranch}</span>
-                          </>
-                        )}
-                      </div>
-                    )}
                     <ChatInput
                       onSend={handleSendMessage}
                       onStop={handleStopExecution}
@@ -422,6 +410,18 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                       showToolbar={Boolean(sessionIdFromParams)}
                       initialValue={failedPrompt ?? undefined}
                     />
+                    {sessionConfig?.repository && (
+                      <div className="text-muted-foreground flex items-center gap-1.5 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">
+                        <GitBranch className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{sessionConfig.repository}</span>
+                        {fetchedSessionData?.gitBranch && (
+                          <>
+                            <span>·</span>
+                            <span className="truncate">{fetchedSessionData.gitBranch}</span>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </>
               )}

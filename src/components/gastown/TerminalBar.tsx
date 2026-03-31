@@ -500,6 +500,7 @@ function TabBar({
                     : 'text-white/35 hover:bg-white/[0.03] hover:text-white/55'
                 }`}
                 title={horizontal ? undefined : tab.label}
+                {...(isMayor ? { 'data-onboarding-target': 'onboarding-mayor' } : {})}
               >
                 {isMayor && (
                   <Crown
@@ -1231,6 +1232,8 @@ function TerminalStatusBadge({
 
 // ── Mayor Terminal Pane ──────────────────────────────────────────────────
 
+const FIRST_TASK_STORAGE_PREFIX = 'gastown_first_task_';
+
 function MayorTerminalPane({ townId, collapsed }: { townId: string; collapsed: boolean }) {
   const trpc = useGastownTRPC();
   const queryClient = useQueryClient();
@@ -1263,6 +1266,24 @@ function MayorTerminalPane({ townId, collapsed }: { townId: string; collapsed: b
   });
 
   const mayorAgentId = statusQuery.data?.session?.agentId ?? null;
+
+  // Send a queued first task from the onboarding wizard via the sendMessage
+  // tRPC procedure (goes through the SDK's session.prompt API, not PTY stdin).
+  const sendMessage = useMutation(trpc.gastown.sendMessage.mutationOptions({}));
+  const firstTaskSentRef = useRef(false);
+  useEffect(() => {
+    if (firstTaskSentRef.current) return;
+    const storageKey = `${FIRST_TASK_STORAGE_PREFIX}${townId}`;
+    try {
+      const msg = localStorage.getItem(storageKey);
+      if (!msg) return;
+      localStorage.removeItem(storageKey);
+      firstTaskSentRef.current = true;
+      sendMessage.mutate({ townId, message: msg });
+    } catch {
+      // localStorage unavailable
+    }
+  }, [townId]);
 
   const { terminalRef, connectionStatus, status, fitAddonRef } = useXtermPty({
     townId,

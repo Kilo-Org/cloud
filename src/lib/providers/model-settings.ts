@@ -43,9 +43,16 @@ export function getVersionedModelSettings(model: string): VersionedSettings | un
   return undefined;
 }
 
-export const BINARY_THINKING_VARIANTS = {
+export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
   thinking: { reasoning: { enabled: true, effort: 'medium' } },
+} as const;
+
+export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
+  minimal: { reasoning: { enabled: true, effort: 'minimal' } },
+  low: { reasoning: { enabled: true, effort: 'low' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {
@@ -62,20 +69,19 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (model.includes('codex') || isGemini3Model(model)) {
     return Object.fromEntries(
       ReasoningEffortSchema.options
-        .filter(e => e !== 'none')
+        .filter(e => e !== 'none' && e !== 'minimal')
         .map(effort => [effort, { reasoning: { enabled: true, effort } }])
     );
   }
   if (isOpenAiModel(model)) {
     return Object.fromEntries(
-      ReasoningEffortSchema.options.map(effort => [
-        effort,
-        { reasoning: { enabled: effort !== 'none', effort } },
-      ])
+      ReasoningEffortSchema.options
+        .filter(e => e !== 'minimal')
+        .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }
   if (isMoonshotModel(model) || isZaiModel(model) || isXiaomiModel(model)) {
-    return BINARY_THINKING_VARIANTS;
+    return REASONING_VARIANTS_BINARY;
   }
   if (model.startsWith('inception/mercury-2')) {
     return {

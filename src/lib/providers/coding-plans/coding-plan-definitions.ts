@@ -1,4 +1,8 @@
-import type { CodingPlanProvider } from '@/lib/providers/coding-plans/types';
+import { COMPATIBLE_USER_AGENT, type CodingPlanProvider } from '@/lib/providers/coding-plans/types';
+import {
+  REASONING_VARIANTS_BINARY,
+  REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
+} from '@/lib/providers/model-settings';
 import { isReasoningExplicitlyDisabled } from '@/lib/providers/openrouter/request-helpers';
 
 export default [
@@ -21,6 +25,7 @@ export default [
         flags: ['recommended', 'vision'],
         context_length: 262144,
         max_completion_tokens: 32768,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'kimi-k2.5',
@@ -30,24 +35,17 @@ export default [
         flags: ['recommended'],
         context_length: 262144,
         max_completion_tokens: 32768,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.7',
         name: 'GLM-4.7',
         description:
-          "Z.AI's latest flagship model, enhanced programming capabilities and more stable multi-step reasoning/execution.",
+          "Z.ai's latest flagship model, enhanced programming capabilities and more stable multi-step reasoning/execution.",
         flags: ['recommended'],
         context_length: 204800,
         max_completion_tokens: 131072,
-      },
-      {
-        id: 'deepseek-v3.2',
-        name: 'DeepSeek-V3.2',
-        description:
-          'Designed to harmonize high computational efficiency with strong reasoning and agentic tool-use performance.',
-        flags: [],
-        context_length: 131072,
-        max_completion_tokens: 32768,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'gpt-oss-120b',
@@ -57,6 +55,7 @@ export default [
         flags: [],
         context_length: 131072,
         max_completion_tokens: 65536,
+        variants: null,
       },
       {
         id: 'dola-seed-2.0-pro',
@@ -66,6 +65,7 @@ export default [
         flags: ['vision'],
         context_length: 262144,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
       },
       {
         id: 'dola-seed-2.0-lite',
@@ -75,6 +75,31 @@ export default [
         flags: ['vision'],
         context_length: 262144,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
+      },
+    ],
+  },
+  {
+    id: 'kimi-coding',
+    name: 'Kimi Code',
+    base_url: 'https://api.kimi.com/coding/v1',
+    ai_sdk_provider: 'openai-compatible',
+    transformRequest(context) {
+      context.request.body.thinking = {
+        type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
+      };
+      context.extraHeaders['user-agent'] = COMPATIBLE_USER_AGENT;
+    },
+    models: [
+      {
+        id: 'kimi-for-coding',
+        name: 'Kimi for Coding',
+        flags: ['recommended', 'vision'],
+        context_length: 262144,
+        max_completion_tokens: 32768,
+        description:
+          'Kimi Code is a premium subscription tier within the Kimi ecosystem, specifically engineered to empower developers with advanced AI capabilities for coding.',
+        variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
       },
     ],
   },
@@ -94,9 +119,10 @@ export default [
         name: 'GLM-5 Turbo',
         description:
           'GLM-5 Turbo is a new model from Z.ai designed for fast inference and strong performance in agent-driven environments such as OpenClaw scenarios. It is deeply optimized for real-world agent workflows involving long execution chains, with improved complex instruction decomposition, tool use, scheduled and persistent execution, and overall stability across extended tasks.',
-        flags: ['recommended'],
+        flags: [],
         context_length: 202752,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-5.1',
@@ -106,24 +132,27 @@ export default [
         flags: ['recommended'],
         context_length: 204800,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-5',
         name: 'GLM-5',
         description:
           "GLM-5 is Z.ai's flagship open-source foundation model engineered for complex systems design and long-horizon agent workflows. Built for expert developers, it delivers production-grade performance on large-scale programming tasks, rivaling leading closed-source models. With advanced agentic planning, deep backend reasoning, and iterative self-correction, GLM-5 moves beyond code generation to full-system construction and autonomous execution.",
-        flags: ['recommended'],
+        flags: [],
         context_length: 204800,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.7',
         name: 'GLM-4.7',
         description:
           "GLM-4.7 is Z.ai's latest flagship model, featuring upgrades in two key areas: enhanced programming capabilities and more stable multi-step reasoning/execution. It demonstrates significant improvements in executing complex agent tasks while delivering more natural conversational experiences and superior front-end aesthetics.",
-        flags: ['recommended'],
+        flags: [],
         context_length: 204800,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.7-flash',
@@ -133,6 +162,7 @@ export default [
         flags: [],
         context_length: 200000,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.7-flashx',
@@ -142,6 +172,7 @@ export default [
         flags: [],
         context_length: 200000,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.6',
@@ -151,6 +182,7 @@ export default [
         flags: [],
         context_length: 204800,
         max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.6v',
@@ -160,6 +192,7 @@ export default [
         flags: ['vision'],
         context_length: 128000,
         max_completion_tokens: 32768,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.5',
@@ -169,6 +202,7 @@ export default [
         flags: [],
         context_length: 131072,
         max_completion_tokens: 98304,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.5-air',
@@ -178,6 +212,7 @@ export default [
         flags: [],
         context_length: 131072,
         max_completion_tokens: 98304,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.5-flash',
@@ -187,6 +222,7 @@ export default [
         flags: [],
         context_length: 131072,
         max_completion_tokens: 98304,
+        variants: REASONING_VARIANTS_BINARY,
       },
       {
         id: 'glm-4.5v',
@@ -196,6 +232,7 @@ export default [
         flags: ['vision'],
         context_length: 64000,
         max_completion_tokens: 16384,
+        variants: REASONING_VARIANTS_BINARY,
       },
     ],
   },

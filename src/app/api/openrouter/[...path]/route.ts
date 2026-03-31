@@ -29,7 +29,6 @@ import {
 } from '@/lib/models';
 import {
   accountForMicrodollarUsage,
-  alphaPeriodEndedResponse,
   captureProxyError,
   checkOrganizationModelRestrictions,
   dataCollectionRequiredResponse,
@@ -72,11 +71,9 @@ import {
   getToolsAvailable,
   getToolsUsed,
 } from '@/lib/o11y/api-metrics.server';
-import { handleRequestLogging } from '@/lib/handleRequestLogging';
 import { grokCodeFastOptimizedRequest } from '@/lib/custom-llm/customLlmRequest';
 import { normalizeModelId } from '@/lib/model-utils';
 import { isForbiddenFreeModel } from '@/lib/forbidden-free-models';
-import { isActiveReviewPromo } from '@/lib/code-reviews/core/constants';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import { applyResolvedAutoModel, isKiloAutoModel } from '@/lib/kilo-auto-model';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/providers/fixOpenCodeDuplicateReasoning';
@@ -378,11 +375,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     (!autoModel && isForbiddenFreeModel(originalModelIdLowerCased))
   ) {
     console.warn(`User requested forbidden free model ${originalModelIdLowerCased}; rejecting.`);
-    if (isRooCodeBasedClient(fraudHeaders)) {
-      return alphaPeriodEndedResponse();
-    } else {
-      return forbiddenFreeModelResponse();
-    }
+    return forbiddenFreeModelResponse(fraudHeaders, feature);
   }
 
   // Extract properties for usage context
@@ -421,12 +414,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user) && !bypassAccessCheck) {
     const { balance, settings, plan } = await balanceAndSettingsPromise;
 
-    if (
-      balance <= 0 &&
-      !isFreeModel(originalModelIdLowerCased) &&
-      !userByok &&
-      !isActiveReviewPromo(botId, originalModelIdLowerCased)
-    ) {
+    if (balance <= 0 && !isFreeModel(originalModelIdLowerCased) && !userByok) {
       return await usageLimitExceededResponse(user, balance);
     }
 
@@ -587,6 +575,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
+  /* disabled pending migration
   handleRequestLogging({
     clonedResponse: response.clone(),
     user: maybeUser,
@@ -595,6 +584,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     model: originalModelIdLowerCased,
     request: requestBodyParsed,
   });
+  */
 
   {
     const errorResponse = await makeErrorReadable({
@@ -610,8 +600,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const isFreeModelRequiringCostRemoval =
     (provider.id === 'openrouter' || provider.id === 'vercel') &&
-    (isKiloFreeModel(originalModelIdLowerCased) ||
-      isActiveReviewPromo(botId, originalModelIdLowerCased));
+    isKiloFreeModel(originalModelIdLowerCased);
   const isStealthModelRequiringNameRemoval = isKiloStealthModel(originalModelIdLowerCased);
   const isProviderRequiringResponseFixes = provider.id === 'corethink';
 

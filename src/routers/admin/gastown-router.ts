@@ -448,7 +448,7 @@ export const adminGastownRouter = createTRPCRouter({
       const debugInfo = await gastownGet(
         ctx.user,
         `/api/towns/${input.townId}/cloudflare-debug`,
-        z.object({ containerDoId: z.string(), townDoId: z.string() })
+        z.object({ containerDoId: z.string().nullable(), townDoId: z.string() })
       ).catch(() => null);
 
       const townDoNamespaceId = CLOUDFLARE_TOWN_DO_NAMESPACE_ID;
@@ -456,7 +456,8 @@ export const adminGastownRouter = createTRPCRouter({
 
       return {
         workerLogsUrl: `https://dash.cloudflare.com/${accountId}/workers/services/view/gastown/production/logs/live`,
-        containerInstanceUrl: debugInfo
+        // containerDoId is only non-null when the container is actually running
+        containerInstanceUrl: debugInfo?.containerDoId
           ? `https://dash.cloudflare.com/${accountId}/workers/containers/app-gastown/instances/${debugInfo.containerDoId}`
           : null,
         townDoLogsUrl:
@@ -464,7 +465,7 @@ export const adminGastownRouter = createTRPCRouter({
             ? `https://dash.cloudflare.com/${accountId}/workers/durable-objects/view/${townDoNamespaceId}/${debugInfo.townDoId}/logs`
             : null,
         containerDoLogsUrl:
-          containerDoNamespaceId && debugInfo
+          containerDoNamespaceId && debugInfo?.containerDoId
             ? `https://dash.cloudflare.com/${accountId}/workers/durable-objects/view/${containerDoNamespaceId}/${debugInfo.containerDoId}/logs`
             : null,
       };

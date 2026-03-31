@@ -86,6 +86,7 @@ import {
   getMaxTokens,
   hasMiddleOutTransform,
 } from '@/lib/providers/openrouter/request-helpers';
+import { logCacheDiagnostics } from '@/lib/providers/cache-debug';
 
 export const maxDuration = 800;
 
@@ -480,6 +481,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     extraHeaders,
     userByok
   );
+
+  logCacheDiagnostics(requestBodyParsed, originalModelIdLowerCased, taskId ?? null);
 
   let response: Response;
   if (requestBodyParsed.kind === 'chat_completions' && provider.id === 'martian') {

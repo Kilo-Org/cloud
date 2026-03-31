@@ -9,7 +9,6 @@ import { captureException } from '@sentry/nextjs';
  * https://{ref}.supabase.co/customer/v1/privileged/metrics
  *
  * Env var: SUPABASE_DATABASE_REFS
- * Example: nfgbhsncmleckmvzblyn,nfgbhsncmleckmvzblyn-rr-us-west-1-drobh,...
  *
  * Update this in Vercel env vars when adding/removing Supabase read replicas.
  */

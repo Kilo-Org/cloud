@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -214,34 +214,47 @@ export function KiloclawExtendTrial() {
   const [trialDays, setTrialDays] = useState<string>('7');
   const [isDragging, setIsDragging] = useState(false);
 
-  // Step 2: Match state
-  const [matchedUsers, setMatchedUsers] = useState<MatchedUser[]>([]);
-  const [unmatchedEmails, setUnmatchedEmails] = useState<UnmatchedEmail[]>([]);
-  const [hasMatched, setHasMatched] = useState(false);
+  // Step 2: Match state — null means "not yet submitted"; non-null triggers the query
+  const [emailsToMatch, setEmailsToMatch] = useState<string[] | null>(null);
 
   // Step 3: Results
   const [results, setResults] = useState<TrialResult[] | null>(null);
 
-  // Mutations
-  const matchUsersMutation = useMutation(
-    trpc.admin.extendClawTrial.matchUsers.mutationOptions({
-      onSuccess: result => {
-        setMatchedUsers(result.matched);
-        setUnmatchedEmails(result.unmatched);
-        setHasMatched(true);
-        if (result.unmatched.length === 0) {
-          toast.success(`All ${result.matched.length} emails matched to users`);
-        } else {
-          toast.warning(
-            `Matched ${result.matched.length} users, ${result.unmatched.length} emails not found`
-          );
-        }
-      },
-      onError: error => {
-        toast.error(error.message || 'Failed to match users');
-      },
-    })
-  );
+  // Query — only fires once emailsToMatch is a non-empty array
+  const matchUsersQuery = useQuery({
+    ...trpc.admin.extendClawTrial.matchUsers.queryOptions({
+      emails: emailsToMatch ?? [],
+    }),
+    enabled: emailsToMatch !== null && emailsToMatch.length > 0,
+  });
+
+  const matchedUsers = matchUsersQuery.data?.matched ?? [];
+  const unmatchedEmails = matchUsersQuery.data?.unmatched ?? [];
+  const hasMatched = matchUsersQuery.isSuccess && emailsToMatch !== null;
+
+  // Toast on match completion (fire once per successful fetch)
+  const prevMatchDataRef = useRef(matchUsersQuery.data);
+  useEffect(() => {
+    if (matchUsersQuery.data === prevMatchDataRef.current) return;
+    prevMatchDataRef.current = matchUsersQuery.data;
+    if (!matchUsersQuery.data) return;
+    const { matched, unmatched } = matchUsersQuery.data;
+    if (unmatched.length === 0) {
+      toast.success(`All ${matched.length} emails matched to users`);
+    } else {
+      toast.warning(`Matched ${matched.length} users, ${unmatched.length} emails not found`);
+    }
+  }, [matchUsersQuery.data]);
+
+  useEffect(() => {
+    if (matchUsersQuery.error) {
+      toast.error(
+        matchUsersQuery.error instanceof Error
+          ? matchUsersQuery.error.message
+          : 'Failed to match users'
+      );
+    }
+  }, [matchUsersQuery.error]);
 
   const extendTrialsMutation = useMutation(
     trpc.admin.extendClawTrial.extendTrials.mutationOptions({
@@ -264,9 +277,7 @@ export function KiloclawExtendTrial() {
   // File handling
   const handleFile = useCallback((file: File) => {
     setResults(null);
-    setHasMatched(false);
-    setMatchedUsers([]);
-    setUnmatchedEmails([]);
+    setEmailsToMatch(null);
     const reader = new FileReader();
     reader.onload = e => {
       const text = typeof e.target?.result === 'string' ? e.target.result : '';
@@ -321,18 +332,24 @@ export function KiloclawExtendTrial() {
       toast.error('No valid emails found');
       return;
     }
-    matchUsersMutation.mutate({ emails });
+    setResults(null);
+    setEmailsToMatch(emails);
   };
 
   const handleExtendTrials = () => {
-    if (matchedUsers.length === 0) return;
+    const eligibleEmails = matchedUsers
+      .filter(
+        u => u.subscriptionStatus === 'trialing' || u.subscriptionStatus === 'canceled'
+      )
+      .map(u => u.email);
+    if (eligibleEmails.length === 0) return;
     const days = parseInt(trialDays, 10);
     if (isNaN(days) || days <= 0) {
       toast.error('Please enter a valid number of days');
       return;
     }
     extendTrialsMutation.mutate({
-      emails: matchedUsers.map(u => u.email),
+      emails: eligibleEmails,
       trialDays: days,
     });
   };
@@ -342,9 +359,7 @@ export function KiloclawExtendTrial() {
     setSelectedColumn('');
     setTrialDays('7');
     setPastedText('');
-    setMatchedUsers([]);
-    setUnmatchedEmails([]);
-    setHasMatched(false);
+    setEmailsToMatch(null);
     setResults(null);
   };
 
@@ -429,9 +444,7 @@ export function KiloclawExtendTrial() {
                   onChange={e => {
                     setPastedText(e.target.value);
                     setResults(null);
-                    setHasMatched(false);
-                    setMatchedUsers([]);
-                    setUnmatchedEmails([]);
+                    setEmailsToMatch(null);
                   }}
                   rows={6}
                   className="font-mono text-sm"
@@ -468,9 +481,9 @@ export function KiloclawExtendTrial() {
               <div className="flex gap-2">
                 <Button
                   onClick={handleMatchUsers}
-                  disabled={!canMatch || matchUsersMutation.isPending}
+                  disabled={!canMatch || matchUsersQuery.isFetching}
                 >
-                  {matchUsersMutation.isPending ? (
+                  {matchUsersQuery.isFetching ? (
                     'Matching...'
                   ) : (
                     <>
@@ -592,9 +605,9 @@ export function KiloclawExtendTrial() {
                   <div className="flex gap-2">
                     <Button
                       onClick={handleMatchUsers}
-                      disabled={!canMatch || matchUsersMutation.isPending}
+                      disabled={!canMatch || matchUsersQuery.isFetching}
                     >
-                      {matchUsersMutation.isPending ? (
+                      {matchUsersQuery.isFetching ? (
                         'Matching...'
                       ) : (
                         <>

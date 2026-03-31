@@ -40,7 +40,7 @@ export const extendClawTrialRouter = createTRPCRouter({
    */
   matchUsers: adminProcedure
     .input(z.object({ emails: z.array(z.string().email()).max(MAX_USERS) }))
-    .mutation(async ({ input }): Promise<MatchUsersResult> => {
+    .query(async ({ input }): Promise<MatchUsersResult> => {
       const { emails } = input;
       if (emails.length === 0) {
         return { matched: [], unmatched: [] };
@@ -176,7 +176,7 @@ export const extendClawTrialRouter = createTRPCRouter({
             const [updated] = await db
               .update(kiloclaw_subscriptions)
               .set({
-                trial_ends_at: sql`GREATEST(COALESCE(${kiloclaw_subscriptions.trial_ends_at}::timestamptz, now()), now()) + interval '${sql.raw(String(trialDays))} days'`,
+                trial_ends_at: sql`GREATEST(COALESCE(${kiloclaw_subscriptions.trial_ends_at}::timestamptz, now()), now()) + (${trialDays} * interval '1 day')`,
               })
               .where(
                 and(

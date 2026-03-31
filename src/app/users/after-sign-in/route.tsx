@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       // after account verification completes.
       const product = resolveSignupProduct(
         callbackPath && isValidCallbackPath(callbackPath) ? responsePath : null,
-        !!url.searchParams.get('source'),
+        !!url.searchParams.get('source')
       );
       if (product) {
         PostHogClient().capture({

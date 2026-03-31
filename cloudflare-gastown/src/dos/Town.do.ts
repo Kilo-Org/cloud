@@ -3335,13 +3335,24 @@ export class TownDO extends DurableObject<Env> {
 
     // Decode JWT payload (base64url, no verification)
     const parts = token.split('.');
-    if (parts.length !== 3) return;
-    let payload: { exp?: number; kiloUserId?: string; apiTokenPepper?: string | null };
-    try {
-      payload = JSON.parse(atob(parts[1]!.replace(/-/g, '+').replace(/_/g, '/')));
-    } catch {
-      return;
-    }
+    const encodedPayload = parts[1];
+    if (!encodedPayload) return;
+    const payloadSchema = z.object({
+      exp: z.number().optional(),
+      kiloUserId: z.string().optional(),
+      apiTokenPepper: z.string().nullable().optional(),
+    });
+    const parsed = payloadSchema.safeParse(
+      (() => {
+        try {
+          return JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
+        } catch {
+          return undefined;
+        }
+      })()
+    );
+    if (!parsed.success) return;
+    const payload = parsed.data;
 
     const exp = payload.exp;
     if (!exp) return;

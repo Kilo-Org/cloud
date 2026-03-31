@@ -220,6 +220,7 @@ app.patch('/agents/:agentId/model', async c => {
       ['github_cli_pat', 'GITHUB_CLI_PAT'],
       ['git_author_name', 'GASTOWN_GIT_AUTHOR_NAME'],
       ['git_author_email', 'GASTOWN_GIT_AUTHOR_EMAIL'],
+      ['kilocode_token', 'KILOCODE_TOKEN'],
     ];
     for (const [cfgKey, envKey] of CONFIG_ENV_MAP) {
       const val = cfg[cfgKey];

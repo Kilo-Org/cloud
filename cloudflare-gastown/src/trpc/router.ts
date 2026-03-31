@@ -1018,6 +1018,13 @@ export const gastownRouter = router({
       }
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.forceRefreshContainerToken();
+
+      // Also remint and push KILOCODE_TOKEN — this is what actually
+      // authenticates GT tool calls and is the main reason users hit 401s.
+      const user = userFromCtx(ctx);
+      const newKilocodeToken = await mintKilocodeToken(ctx.env, user);
+      await townStub.updateTownConfig({ kilocode_token: newKilocodeToken });
+      await townStub.syncConfigToContainer();
     }),
 
   // ── Events ──────────────────────────────────────────────────────────

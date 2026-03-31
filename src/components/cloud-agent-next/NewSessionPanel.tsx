@@ -598,7 +598,10 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
-    ta.style.height = `${ta.scrollHeight}px`;
+    // Cap at 50% of dynamic viewport height so the textarea never outgrows the
+    // screen — `dvh` accounts for mobile virtual keyboards.
+    const maxHeight = window.innerHeight * 0.5;
+    ta.style.height = `${Math.min(ta.scrollHeight, maxHeight)}px`;
   }, []);
 
   const handlePromptChange = useCallback(
@@ -687,7 +690,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         >
           <textarea
             ref={textareaRef}
-            className="w-full resize-none border-0 bg-transparent p-4 pb-2 text-sm focus:ring-0 focus:outline-none"
+            className="max-h-[50dvh] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-sm focus:ring-0 focus:outline-none"
             placeholder="What would you like to do?"
             rows={5}
             value={prompt}

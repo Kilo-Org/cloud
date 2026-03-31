@@ -91,6 +91,7 @@ export async function shouldRouteToVercel(
   }
 
   if (
+    !requestedModel.startsWith('arcee-ai/') &&
     !isAnthropicModel(requestedModel) &&
     !isGeminiModel(requestedModel) &&
     !isMinimaxModel(requestedModel) &&

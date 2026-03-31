@@ -90,7 +90,6 @@ function parseCsvEmails(text: string): { emails: string[]; skippedLines: string[
   return { emails, skippedLines };
 }
 
-
 function generateEmailsCsv(emails: string[]): string {
   return 'email\n' + emails.join('\n');
 }

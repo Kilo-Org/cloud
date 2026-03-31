@@ -164,7 +164,6 @@ function parseEmailList(text: string): string[] {
   return emails;
 }
 
-
 function ineligibleReason(status: string | null): string {
   if (status === null) return 'No subscription - must provision first';
   if (status === 'active') return 'Active paid subscription';
@@ -344,9 +343,7 @@ export function KiloclawExtendTrial() {
   };
 
   const handleExtendTrials = () => {
-    const eligibleEmails = matchedUsers
-      .filter(isEligible)
-      .map(u => u.email);
+    const eligibleEmails = matchedUsers.filter(isEligible).map(u => u.email);
     if (eligibleEmails.length === 0) return;
     const days = parseInt(trialDays, 10);
     if (isNaN(days) || days <= 0) {
@@ -654,22 +651,18 @@ export function KiloclawExtendTrial() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {matchedUsers
-                        .filter(isEligible)
-                        .map(user => (
-                          <TableRow key={user.userId}>
-                            <TableCell className="font-mono text-sm">{user.email}</TableCell>
-                            <TableCell>{user.userName ?? '—'}</TableCell>
-                            <TableCell>
-                              {subscriptionStatusBadge(user.subscriptionStatus)}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {user.trialEndsAt
-                                ? new Date(user.trialEndsAt).toLocaleDateString()
-                                : '—'}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                      {matchedUsers.filter(isEligible).map(user => (
+                        <TableRow key={user.userId}>
+                          <TableCell className="font-mono text-sm">{user.email}</TableCell>
+                          <TableCell>{user.userName ?? '—'}</TableCell>
+                          <TableCell>{subscriptionStatusBadge(user.subscriptionStatus)}</TableCell>
+                          <TableCell className="text-sm">
+                            {user.trialEndsAt
+                              ? new Date(user.trialEndsAt).toLocaleDateString()
+                              : '—'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </div>

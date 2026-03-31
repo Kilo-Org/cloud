@@ -44,12 +44,13 @@ const CIRCUIT_BREAKER_WINDOW_MINUTES = 30;
 
 /**
  * Town-level dispatch circuit breaker. Checks whether too many beads
- * have failed dispatch recently. If the threshold is exceeded, all
- * dispatch_agent actions are suppressed and a mayor escalation is emitted.
+ * have had dispatch attempts recently without reaching a terminal state.
+ * If the threshold is exceeded, all dispatch_agent actions are suppressed
+ * and a mayor escalation is emitted.
  *
- * A "recent dispatch failure" is a bead with dispatch_attempts > 0 whose
- * last_dispatch_attempt_at is within the window AND whose status is 'open'
- * or 'failed' (meaning the dispatch did not succeed).
+ * Counts any bead with a recent dispatch attempt (regardless of status)
+ * that is not yet closed or succeeded. This captures failures that leave
+ * beads in_progress (the normal outcome of a failed container start).
  */
 function checkDispatchCircuitBreaker(sql: SqlStorage): Action[] {
   const rows = z
@@ -63,7 +64,7 @@ function checkDispatchCircuitBreaker(sql: SqlStorage): Action[] {
           FROM ${beads}
           WHERE ${beads.dispatch_attempts} > 0
             AND ${beads.last_dispatch_attempt_at} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-${CIRCUIT_BREAKER_WINDOW_MINUTES} minutes')
-            AND ${beads.status} IN ('open', 'failed')
+            AND ${beads.status} NOT IN ('closed')
         `,
         []
       ),

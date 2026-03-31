@@ -1592,6 +1592,21 @@ export class TownDO extends DurableObject<Env> {
               `,
               [activityAt, targetAgentId]
             );
+            // Also stamp the bead's last_dispatch_attempt_at so the
+            // reconciler's exponential backoff gate fires correctly.
+            // Without this, the backoff variant allows immediate
+            // redispatch once last_dispatch_attempt_at ages out.
+            if (action === 'RESTART_WITH_BACKOFF' && targetAgent.current_hook_bead_id) {
+              query(
+                this.sql,
+                /* sql */ `
+                  UPDATE ${beads}
+                  SET ${beads.columns.last_dispatch_attempt_at} = ?
+                  WHERE ${beads.bead_id} = ?
+                `,
+                [now(), targetAgent.current_hook_bead_id]
+              );
+            }
           }
           break;
         }

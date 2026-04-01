@@ -16,6 +16,7 @@ import { timingMiddleware } from './middleware/analytics.middleware';
 
 export { WastelandDO } from './dos/WastelandDO.stub';
 export { WastelandContainerDO } from './dos/WastelandContainer.do';
+export { WastelandRegistryDO } from './dos/WastelandRegistry.do';
 
 // ── Types ───────────────────────────────────────────────────────────────
 

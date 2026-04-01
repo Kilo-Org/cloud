@@ -608,6 +608,22 @@ describe('createSessionManager', () => {
       );
     });
 
+    it('restores canSend and canInterrupt on interrupt failure', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.canInterrupt)).toBe(true);
+
+      mockSession.interrupt.mockRejectedValueOnce(new Error('transient failure'));
+      await mgr.interrupt();
+
+      // After a failed interrupt, atoms should be restored from session state
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue<boolean>(config.store, mgr.atoms.canInterrupt)).toBe(true);
+    });
+
     it('is a no-op without active session', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

@@ -613,6 +613,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       setIndicator({ type: 'info', message: 'Session stopped', timestamp: Date.now() });
     } catch {
+      // Restore atoms from the session's actual state so the UI isn't stuck.
+      store.set(canInterruptAtom, currentSession.canInterrupt);
+      const cs = store.get(cloudStatusAtom);
+      const cloudReady = cs === null || cs.type === 'ready';
+      store.set(canSendAtom, currentSession.canSend && cloudReady);
       store.set(errorAtom, 'Failed to stop execution');
     }
   }

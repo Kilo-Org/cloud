@@ -23,6 +23,7 @@ import {
   ListChecks,
   Wrench,
   Webhook,
+  Skull,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
@@ -154,6 +155,16 @@ export default function OrganizationAppSidebar({
             title: 'Gas Town',
             icon: Bot,
             url: `/organizations/${organizationId}/gastown`,
+          },
+        ]
+      : []),
+    // Wasteland requires non-billing_manager role; hide for billing-only users
+    ...(currentRole !== 'billing_manager'
+      ? [
+          {
+            title: 'Wastelands',
+            icon: Skull,
+            url: `/organizations/${organizationId}/wasteland`,
           },
         ]
       : []),

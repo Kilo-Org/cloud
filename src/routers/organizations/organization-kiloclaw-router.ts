@@ -1054,7 +1054,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   // ── Google integration ────────────────────────────────────────
 
-  getGoogleSetupCommand: organizationMemberProcedure.query(async ({ ctx }) => {
+  getGoogleSetupCommand: organizationMemberProcedure.query(async ({ ctx, input }) => {
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const token = generateApiToken(ctx.user, undefined, {
       expiresIn: TOKEN_EXPIRY.oneHour,
     });
@@ -1062,9 +1063,12 @@ export const organizationKiloclawRouter = createTRPCRouter({
     const imageTag = isDev ? ':dev' : ':latest';
     const workerFlag = isDev ? ' --worker-url=http://localhost:8795' : '';
     const gmailPushFlag = isDev ? ' --gmail-push-worker-url=${GMAIL_PUSH_WORKER_URL}' : '';
+    // Pass instance ID so the container stores credentials on the org instance,
+    // not the personal one. Requires google-setup container support for --instance-id.
+    const instanceFlag = ` --instance-id=${instance.id}`;
     const imageUrl = `ghcr.io/kilo-org/google-setup${imageTag}`;
     return {
-      command: `docker pull ${imageUrl} && docker run -it --network host ${imageUrl} --token="${token}"${workerFlag}${gmailPushFlag}`,
+      command: `docker pull ${imageUrl} && docker run -it --network host ${imageUrl} --token="${token}"${workerFlag}${gmailPushFlag}${instanceFlag}`,
     };
   }),
 

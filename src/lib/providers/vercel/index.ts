@@ -1,11 +1,6 @@
 import type { BYOKResult } from '@/lib/providers/types';
 import { kiloFreeModels } from '@/lib/models';
-import { isAnthropicModel } from '@/lib/providers/anthropic';
 import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
-import { isGeminiModel } from '@/lib/providers/google';
-import { isMinimaxModel } from '@/lib/providers/minimax';
-import { isMoonshotModel } from '@/lib/providers/moonshotai';
-import { isOpenAiModel, isOpenAiOssModel } from '@/lib/providers/openai';
 import type { VercelUserByokInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import {
   DirectUserByokInferenceProviderIdSchema,
@@ -20,9 +15,11 @@ import type {
   VercelProviderConfig,
 } from '@/lib/providers/openrouter/types';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
-import { mimo_v2_pro_free_model } from '@/lib/providers/xiaomi';
-import { isZaiModel } from '@/lib/providers/zai';
 import * as crypto from 'crypto';
+import { unstable_cache } from 'next/cache';
+import { readDb } from '@/lib/drizzle';
+import { modelsByProvider } from '@kilocode/db/schema';
+import { desc } from 'drizzle-orm';
 
 // EMERGENCY SWITCH
 // This routes all models that normally would be routed to OpenRouter to Vercel instead.
@@ -61,6 +58,19 @@ function isLikelyAvailableOnAllGateways(requestedModel: string) {
   );
 }
 
+const getVercelModels_cached = unstable_cache(
+  async () => {
+    const result = await readDb
+      .select({ vercel: modelsByProvider.vercel })
+      .from(modelsByProvider)
+      .orderBy(desc(modelsByProvider.id))
+      .limit(1);
+    return result.at(0)?.vercel ?? null;
+  },
+  undefined,
+  { revalidate: 3600 }
+);
+
 export async function shouldRouteToVercel(
   requestedModel: string,
   request: GatewayRequest,
@@ -90,25 +100,23 @@ export async function shouldRouteToVercel(
     return true;
   }
 
-  if (
-    !isAnthropicModel(requestedModel) &&
-    !isGeminiModel(requestedModel) &&
-    !isMinimaxModel(requestedModel) &&
-    !isMoonshotModel(requestedModel) &&
-    !isOpenAiModel(requestedModel) &&
-    !isOpenAiOssModel(requestedModel) &&
-    requestedModel !== mimo_v2_pro_free_model.public_id &&
-    !isZaiModel(requestedModel)
-  ) {
-    console.debug(`[shouldRouteToVercel] model family not allowed for randomized Vercel routing`);
+  console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
+  const passedRandomization =
+    getRandomNumberLessThan100('vercel_routing_' + randomSeed) <
+    (await getVercelRoutingPercentage());
+
+  if (!passedRandomization) {
     return false;
   }
 
-  console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  return (
-    getRandomNumberLessThan100('vercel_routing_' + randomSeed) <
-    (await getVercelRoutingPercentage())
-  );
+  const vercelModels = await getVercelModels_cached();
+  const vercelModelId = mapModelIdToVercel(requestedModel);
+  if (!vercelModels || !(vercelModelId in vercelModels)) {
+    console.debug(`[shouldRouteToVercel] model not found in models_by_provider.vercel`);
+    return false;
+  }
+
+  return true;
 }
 
 function convertProviderOptions(

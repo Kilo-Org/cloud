@@ -10,6 +10,7 @@ import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import { openPauseEvent, closePauseEvent } from '@/lib/kilo-pass/pause-events';
 import { getKiloPassSubscriptionMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
 import { getStripeEndedAtIso } from '@/lib/kilo-pass/stripe-handlers-utils';
+import { client as stripe } from '@/lib/stripe-client';
 import type Stripe from 'stripe';
 import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
@@ -89,12 +90,9 @@ export async function handleKiloPassSubscriptionEvent(params: {
     const kiloPassSubscriptionId = upserted[0]?.id;
 
     if (kiloPassSubscriptionId) {
-      // pause_collection is not in the standard Stripe.Subscription type but is present on the object
-      const pauseCollection = (
-        subscription as unknown as {
-          pause_collection?: { behavior: string; resumes_at?: number | null };
-        }
-      ).pause_collection;
+      // Fetch pause_collection from the Stripe API (not included in the webhook type)
+      const freshSubscription = await stripe.subscriptions.retrieve(subscription.id);
+      const pauseCollection = freshSubscription.pause_collection;
 
       if (pauseCollection && pauseCollection.behavior) {
         // Subscription has an active pause — open a pause event

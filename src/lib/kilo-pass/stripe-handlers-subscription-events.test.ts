@@ -14,6 +14,17 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { and, eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockStripeSubscriptionsRetrieve = jest.fn<any>();
+
+jest.mock('@/lib/stripe-client', () => ({
+  client: {
+    subscriptions: {
+      retrieve: (...args: unknown[]) => mockStripeSubscriptionsRetrieve(...args),
+    },
+  },
+}));
+
 function ensureKiloPassStripePriceIdEnv(): void {
   // These env vars are required at module-load time by [`getKnownStripePriceIdsForKiloPass()`](src/lib/kilo-pass/stripe-price-ids.server.ts:24).
   // If the host env already provides them, don't overwrite.
@@ -71,10 +82,13 @@ function toIso(value: string | null | undefined): string | null {
 beforeEach(async () => {
   ensureKiloPassStripePriceIdEnv();
   await cleanupDbForTest();
+  // Default: no pause_collection
+  mockStripeSubscriptionsRetrieve.mockResolvedValue({ pause_collection: null });
 });
 
 afterEach(() => {
   jest.useRealTimers();
+  mockStripeSubscriptionsRetrieve.mockReset();
 });
 
 describe('handleKiloPassSubscriptionEvent', () => {
@@ -358,19 +372,20 @@ describe('handleKiloPassSubscriptionEvent', () => {
     const stripeSubId = `sub_pause_${Math.random()}`;
     const resumesAtSeconds = 1_767_311_000;
 
-    const subscription = {
-      ...makeStripeSubscription({
-        id: stripeSubId,
-        start_date_seconds: 1_767_225_600,
-        status: 'paused',
-        metadata: kiloPassMetadata({
-          kiloUserId: user.id,
-          tier: KiloPassTier.Tier49,
-          cadence: KiloPassCadence.Monthly,
-        }),
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_767_225_600,
+      status: 'paused',
+      metadata: kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
       }),
+    });
+
+    mockStripeSubscriptionsRetrieve.mockResolvedValue({
       pause_collection: { behavior: 'void', resumes_at: resumesAtSeconds },
-    } as unknown as Stripe.Subscription;
+    });
 
     const beforeCall = new Date();
 
@@ -406,19 +421,20 @@ describe('handleKiloPassSubscriptionEvent', () => {
     const resumesAtSeconds = 1_767_311_000;
 
     // Stripe keeps status 'active' when pause_collection is first set (pauses at period end)
-    const subscription = {
-      ...makeStripeSubscription({
-        id: stripeSubId,
-        start_date_seconds: 1_767_225_600,
-        status: 'active',
-        metadata: kiloPassMetadata({
-          kiloUserId: user.id,
-          tier: KiloPassTier.Tier49,
-          cadence: KiloPassCadence.Monthly,
-        }),
+    const subscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_767_225_600,
+      status: 'active',
+      metadata: kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
       }),
+    });
+
+    mockStripeSubscriptionsRetrieve.mockResolvedValue({
       pause_collection: { behavior: 'void', resumes_at: resumesAtSeconds },
-    } as unknown as Stripe.Subscription;
+    });
 
     await handleKiloPassSubscriptionEvent({
       eventId: `evt_${Math.random()}`,
@@ -451,19 +467,20 @@ describe('handleKiloPassSubscriptionEvent', () => {
     const resumesAtSeconds = 1_767_311_000;
 
     // First call: subscription is paused
-    const pausedSubscription = {
-      ...makeStripeSubscription({
-        id: stripeSubId,
-        start_date_seconds: 1_767_225_600,
-        status: 'paused',
-        metadata: kiloPassMetadata({
-          kiloUserId: user.id,
-          tier: KiloPassTier.Tier49,
-          cadence: KiloPassCadence.Monthly,
-        }),
+    const pausedSubscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_767_225_600,
+      status: 'paused',
+      metadata: kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
       }),
+    });
+
+    mockStripeSubscriptionsRetrieve.mockResolvedValue({
       pause_collection: { behavior: 'void', resumes_at: resumesAtSeconds },
-    } as unknown as Stripe.Subscription;
+    });
 
     await handleKiloPassSubscriptionEvent({
       eventId: `evt_${Math.random()}`,
@@ -487,6 +504,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
     const beforeResume = new Date();
 
     // Second call: subscription is active, no pause_collection
+    mockStripeSubscriptionsRetrieve.mockResolvedValue({ pause_collection: null });
     const resumedSubscription = makeStripeSubscription({
       id: stripeSubId,
       start_date_seconds: 1_767_225_600,

@@ -13,6 +13,7 @@ import { getWastelandContainerStub } from '../dos/WastelandContainer.do';
 import { getWastelandRegistryStub } from '../dos/WastelandRegistry.do';
 import { deriveEncryptionKey, encryptToken } from '../util/crypto.util';
 import { resolveSecret } from '../util/secret.util';
+import { meterEvent } from '../util/billing.util';
 import {
   RpcWastelandOutput,
   RpcWastelandMemberOutput,
@@ -127,6 +128,12 @@ export const wastelandRouter = router({
         name: input.name,
       });
 
+      meterEvent(ctx.env, {
+        event: 'billing.wasteland_created',
+        userId: ctx.userId,
+        wastelandId,
+      });
+
       return config;
     }),
 
@@ -207,6 +214,12 @@ export const wastelandRouter = router({
       const registryStub = getWastelandRegistryStub(ctx.env);
       await registryStub.unregister(input.wastelandId);
 
+      meterEvent(ctx.env, {
+        event: 'billing.wasteland_deleted',
+        userId: ctx.userId,
+        wastelandId: input.wastelandId,
+      });
+
       return { success: true };
     }),
 
@@ -269,6 +282,14 @@ export const wastelandRouter = router({
           message: 'Failed to retrieve newly created member',
         });
       }
+
+      meterEvent(ctx.env, {
+        event: 'billing.member_added',
+        userId: ctx.userId,
+        wastelandId: input.wastelandId,
+        value: members.length,
+      });
+
       return member;
     }),
 
@@ -299,6 +320,13 @@ export const wastelandRouter = router({
       }
 
       await stub.removeMember(input.memberId);
+
+      meterEvent(ctx.env, {
+        event: 'billing.member_removed',
+        userId: ctx.userId,
+        wastelandId: input.wastelandId,
+      });
+
       return { success: true };
     }),
 
@@ -324,6 +352,13 @@ export const wastelandRouter = router({
       if (!updated) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Member not found' });
       }
+
+      meterEvent(ctx.env, {
+        event: 'billing.api_operation',
+        userId: ctx.userId,
+        wastelandId: input.wastelandId,
+        label: 'member_update',
+      });
 
       return updated;
     }),
@@ -351,6 +386,13 @@ export const wastelandRouter = router({
         ...(input.dolthubUpstream !== undefined
           ? { dolthub_upstream: input.dolthubUpstream }
           : {}),
+      });
+
+      meterEvent(ctx.env, {
+        event: 'billing.api_operation',
+        userId: ctx.userId,
+        wastelandId: input.wastelandId,
+        label: 'config_update',
       });
 
       return config;
@@ -399,6 +441,12 @@ export const wastelandRouter = router({
         await container.setEnvVar('DOLTHUB_TOKEN', input.dolthubToken);
       }
 
+      meterEvent(ctx.env, {
+        event: 'billing.credential_stored',
+        userId: ctx.userId,
+        wastelandId: input.wastelandId,
+      });
+
       return {
         user_id: credential.user_id,
         dolthub_org: credential.dolthub_org,
@@ -440,6 +488,13 @@ export const wastelandRouter = router({
       // check needed beyond auth (userId comes from the JWT).
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
       await stub.deleteCredential(ctx.userId);
+
+      meterEvent(ctx.env, {
+        event: 'billing.credential_deleted',
+        userId: ctx.userId,
+        wastelandId: input.wastelandId,
+      });
+
       return { success: true };
     }),
 });

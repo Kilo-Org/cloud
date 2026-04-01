@@ -188,10 +188,6 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
   try {
     const result = await agent.generate({ prompt: message.text });
 
-    const startedCloudAgent = collectedSteps.some(step =>
-      (step.toolCalls ?? []).some(toolCall => toolCall.name === 'spawnCloudAgentSession')
-    );
-
     if (botRequestId) {
       updateBotRequest(botRequestId, {
         status: 'completed',

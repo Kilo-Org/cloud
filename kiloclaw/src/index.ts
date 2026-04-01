@@ -13,7 +13,7 @@
 
 import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
-import { getCookie } from 'hono/cookie';
+import { getCookie, deleteCookie } from 'hono/cookie';
 
 import type { AppEnv, KiloClawEnv } from './types';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
@@ -215,6 +215,9 @@ app.all('/i/:instanceId/*', async c => {
 
   if (status.status === 'destroying') {
     return c.json({ error: 'Instance is being destroyed' }, 409);
+  }
+  if (status.status === 'restoring') {
+    return c.json({ error: 'Instance is restoring from a snapshot' }, 409);
   }
   if (!status.flyMachineId) {
     return c.json({ error: 'Instance not provisioned' }, 404);
@@ -466,13 +469,38 @@ app.all('*', async c => {
         c.env.KILOCLAW_INSTANCE.idFromName(activeInstanceId)
       );
       const instanceStatus = await stub.getStatus();
-      // Only use the cookie if the instance belongs to this user and is in a proxyable state
-      if (
-        instanceStatus.userId === userId &&
-        instanceStatus.flyMachineId &&
-        instanceStatus.status !== 'destroying' &&
-        instanceStatus.status !== 'restoring'
-      ) {
+
+      // Ownership mismatch — cookie is stale (e.g. from another user session).
+      // Fall through to default personal resolution.
+      if (instanceStatus.userId !== userId) {
+        // Clear the stale cookie so subsequent requests don't repeat this check
+        deleteCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE);
+      } else {
+        // Cookie points to an instance owned by this user. Return explicit errors
+        // for non-proxyable states instead of silently falling through to the
+        // personal instance.
+        if (instanceStatus.status === 'destroying') {
+          return c.json(
+            { error: 'Instance is being destroyed', hint: 'This instance is being torn down.' },
+            409
+          );
+        }
+        if (instanceStatus.status === 'restoring') {
+          return c.json(
+            {
+              error: 'Instance is restoring',
+              hint: 'This instance is being restored from a snapshot. Please wait.',
+            },
+            409
+          );
+        }
+        if (!instanceStatus.flyMachineId) {
+          return c.json(
+            { error: 'Instance not provisioned', hint: 'The instance has no running machine.' },
+            404
+          );
+        }
+
         const appName = instanceStatus.flyAppName ?? c.env.FLY_APP_NAME;
         if (appName && instanceStatus.sandboxId) {
           console.log(

@@ -143,14 +143,20 @@ function throwKiloclawAdminError(
 }
 
 /**
- * Resolve the instance to operate on. If instanceId is provided, look it up directly.
- * Otherwise fall back to the user's first active instance (legacy behavior).
- * This ensures admin operations target the correct instance when a user has
- * multiple instances (personal + org).
+ * Resolve the target instance for admin operations.
+ * When instanceId is provided, look it up directly and throw NOT_FOUND if missing.
+ * Otherwise fall back to the user's active (personal) instance.
  */
 async function resolveInstance(userId: string, instanceId?: string) {
   if (instanceId) {
-    return getInstanceById(instanceId);
+    const instance = await getInstanceById(instanceId);
+    if (!instance) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: `Instance ${instanceId} not found`,
+      });
+    }
+    return instance;
   }
   return getActiveInstance(userId);
 }

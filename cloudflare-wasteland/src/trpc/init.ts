@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/cloudflare';
 import { initTRPC, TRPCError } from '@trpc/server';
+import { z } from 'zod';
 import { writeEvent } from '../util/analytics.util';
 import { checkRateLimit } from '../util/rate-limit.util';
 
@@ -29,16 +30,15 @@ const BREADCRUMB_OPERATIONS = new Set([
   'wasteland.disconnectKiloTown',
 ]);
 
+const RawInputWithWastelandId = z.object({ wastelandId: z.string() }).passthrough();
+
 /**
  * Extract a wastelandId from the tRPC raw input if present.
  * Input is unvalidated at this point so we defensively check the shape.
  */
 function extractWastelandId(rawInput: unknown): string | undefined {
-  if (rawInput && typeof rawInput === 'object' && 'wastelandId' in rawInput) {
-    const val = (rawInput as Record<string, unknown>).wastelandId;
-    return typeof val === 'string' ? val : undefined;
-  }
-  return undefined;
+  const parsed = RawInputWithWastelandId.safeParse(rawInput);
+  return parsed.success ? parsed.data.wastelandId : undefined;
 }
 
 /**
@@ -47,8 +47,9 @@ function extractWastelandId(rawInput: unknown): string | undefined {
  * 2. Add Sentry breadcrumbs for key operations
  * 3. Set Sentry tags for error correlation
  */
-const analyticsProcedure = t.procedure.use(async ({ ctx, path, type, rawInput, next }) => {
+const analyticsProcedure = t.procedure.use(async ({ ctx, path, type, getRawInput, next }) => {
   const start = performance.now();
+  const rawInput = await getRawInput();
   const wastelandId = extractWastelandId(rawInput);
 
   // Set Sentry tags for error correlation

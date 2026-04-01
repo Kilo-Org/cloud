@@ -613,16 +613,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (session.canInterrupt) {
         await session.interrupt();
       }
-      setIndicator({ type: 'info', message: 'Session stopped', timestamp: Date.now() });
+      if (currentSession === session) {
+        setIndicator({ type: 'info', message: 'Session stopped', timestamp: Date.now() });
+      }
     } catch {
-      // Only restore atoms if the session wasn't swapped during the await.
       if (currentSession === session) {
         store.set(canInterruptAtom, session.canInterrupt);
         const cs = store.get(cloudStatusAtom);
         const cloudReady = cs === null || cs.type === 'ready';
         store.set(canSendAtom, session.canSend && cloudReady);
+        store.set(errorAtom, 'Failed to stop execution');
       }
-      store.set(errorAtom, 'Failed to stop execution');
     }
   }
 

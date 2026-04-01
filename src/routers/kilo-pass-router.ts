@@ -642,7 +642,7 @@ export const kiloPassRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  resumeSubscription: baseProcedure
+  resumeCancelledSubscription: baseProcedure
     .output(CancelSubscriptionOutputSchema)
     .mutation(async ({ ctx }) => {
       const stripeCustomerId = ctx.user.stripe_customer_id;

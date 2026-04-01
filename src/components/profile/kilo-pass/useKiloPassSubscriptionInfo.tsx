@@ -21,7 +21,7 @@ export type KiloPassSubscriptionInfo = {
     isOpeningCustomerPortal: boolean;
     cancelSubscription: (params?: { onSuccess?: () => void }) => void;
     isCancelingSubscription: boolean;
-    resumeSubscription: () => void;
+    resumeCancelledSubscription: () => void;
     isResumingSubscription: boolean;
   };
 };
@@ -87,13 +87,13 @@ export function KiloPassSubscriptionInfoProvider(props: {
     [isCancelingSubscription, queryClient, trpc, trpcClient]
   );
 
-  const resumeSubscription = useCallback(() => {
+  const resumeCancelledSubscription = useCallback(() => {
     if (isResumingSubscription) return;
     setIsResumingSubscription(true);
 
     void (async () => {
       try {
-        await trpcClient.kiloPass.resumeSubscription.mutate();
+        await trpcClient.kiloPass.resumeCancelledSubscription.mutate();
         toast('Subscription resumed');
         void queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() });
       } catch (error) {
@@ -116,7 +116,7 @@ export function KiloPassSubscriptionInfoProvider(props: {
         isOpeningCustomerPortal,
         cancelSubscription,
         isCancelingSubscription,
-        resumeSubscription,
+        resumeCancelledSubscription,
         isResumingSubscription,
       },
     }),
@@ -127,7 +127,7 @@ export function KiloPassSubscriptionInfoProvider(props: {
       isOpeningCustomerPortal,
       cancelSubscription,
       isCancelingSubscription,
-      resumeSubscription,
+      resumeCancelledSubscription,
       isResumingSubscription,
     ]
   );

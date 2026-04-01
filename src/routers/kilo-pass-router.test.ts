@@ -94,7 +94,7 @@ type KiloPassCaller = {
   }>;
   getCustomerPortalUrl: (input: { returnUrl?: string }) => Promise<{ url: string }>;
   cancelSubscription: () => Promise<{ success: boolean }>;
-  resumeSubscription: () => Promise<{ success: boolean }>;
+  resumeCancelledSubscription: () => Promise<{ success: boolean }>;
   scheduleChange: (input: {
     targetTier: KiloPassTier;
     targetCadence: KiloPassCadence;
@@ -974,7 +974,7 @@ describe('kiloPassRouter', () => {
     });
   });
 
-  describe('resumeSubscription', () => {
+  describe('resumeCancelledSubscription', () => {
     it('throws when subscription is not pending cancellation', async () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-resume-not-pending@example.com',
@@ -989,7 +989,7 @@ describe('kiloPassRouter', () => {
       });
 
       const caller = await createCallerForUser(user.id);
-      await expect(caller.kiloPass.resumeSubscription()).rejects.toThrow(
+      await expect(caller.kiloPass.resumeCancelledSubscription()).rejects.toThrow(
         'Kilo Pass subscription is not pending cancellation.'
       );
     });
@@ -1017,7 +1017,7 @@ describe('kiloPassRouter', () => {
         .where(eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_test_resume_me'));
 
       const caller = await createCallerForUser(user.id);
-      const result = await caller.kiloPass.resumeSubscription();
+      const result = await caller.kiloPass.resumeCancelledSubscription();
 
       expect(result).toEqual({ success: true });
       expect(stripeMock.subscriptions.update).toHaveBeenCalledWith('sub_test_resume_me', {

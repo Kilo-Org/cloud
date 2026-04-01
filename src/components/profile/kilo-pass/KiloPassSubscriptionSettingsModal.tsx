@@ -334,7 +334,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
             isOpeningCustomerPortal={actions.isOpeningCustomerPortal}
             resumeAction={resumeAction}
             cancelAction={cancelAction}
-            onResumeSubscription={actions.resumeSubscription}
+            onResumeSubscription={actions.resumeCancelledSubscription}
             onOpenCancelSubscription={handleOpenCancelFlow}
             isResumingSubscription={actions.isResumingSubscription}
             isCancelingSubscription={actions.isCancelingSubscription}

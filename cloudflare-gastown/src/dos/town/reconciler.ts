@@ -355,6 +355,13 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
       return;
     }
 
+    case 'container_eviction': {
+      // Draining flag is managed by the TownDO via KV storage.
+      // The reconciler reads it from there; no SQL state change needed here.
+      // The event is recorded for audit trail.
+      return;
+    }
+
     case 'nudge_timeout': {
       // GUPP violations are handled by reconcileGUPP on the next pass.
       // The event just records the fact for audit trail.
@@ -371,11 +378,12 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
 // Top-level reconcile
 // ════════════════════════════════════════════════════════════════════
 
-export function reconcile(sql: SqlStorage): Action[] {
+export function reconcile(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
+  const draining = opts?.draining ?? false;
   const actions: Action[] = [];
   actions.push(...reconcileAgents(sql));
-  actions.push(...reconcileBeads(sql));
-  actions.push(...reconcileReviewQueue(sql));
+  actions.push(...reconcileBeads(sql, { draining }));
+  actions.push(...reconcileReviewQueue(sql, { draining }));
   actions.push(...reconcileConvoys(sql));
   actions.push(...reconcileGUPP(sql));
   actions.push(...reconcileGC(sql));
@@ -522,7 +530,8 @@ export function reconcileAgents(sql: SqlStorage): Action[] {
 // reconcileBeads — handle unassigned beads, lost agents, stale reviews
 // ════════════════════════════════════════════════════════════════════
 
-export function reconcileBeads(sql: SqlStorage): Action[] {
+export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
+  const draining = opts?.draining ?? false;
   const actions: Action[] = [];
 
   // Town-level circuit breaker: if too many dispatch failures in the
@@ -570,6 +579,10 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
 
   for (const bead of unassigned) {
     if (!bead.rig_id) continue;
+    if (draining) {
+      console.log(`${LOG} Town is draining, skipping dispatch for bead ${bead.bead_id}`);
+      continue;
+    }
 
     // Per-bead dispatch cap: fail the bead if it exhausted all attempts
     if (bead.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
@@ -691,6 +704,13 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
       ]);
 
     if (blockerCount[0]?.cnt > 0) continue;
+
+    if (draining) {
+      console.log(
+        `${LOG} Town is draining, skipping dispatch for bead ${agent.current_hook_bead_id}`
+      );
+      continue;
+    }
 
     // Town-level circuit breaker suppresses dispatch
     if (circuitBreakerOpen) continue;
@@ -869,7 +889,8 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
 // refinery dispatch
 // ════════════════════════════════════════════════════════════════════
 
-export function reconcileReviewQueue(sql: SqlStorage): Action[] {
+export function reconcileReviewQueue(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
+  const draining = opts?.draining ?? false;
   const actions: Action[] = [];
 
   // Town-level circuit breaker
@@ -1062,6 +1083,12 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
 
     if (oldestMr.length === 0) continue;
 
+    // Skip dispatch if the town is draining (container eviction in progress)
+    if (draining) {
+      console.log(`${LOG} Town is draining, skipping dispatch for bead ${oldestMr[0].bead_id}`);
+      continue;
+    }
+
     // Town-level circuit breaker suppresses dispatch
     if (circuitBreakerOpen) continue;
 
@@ -1158,6 +1185,13 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
     if (mrRows.length === 0) continue;
     const mr = mrRows[0];
     if (mr.type !== 'merge_request' || mr.status !== 'in_progress') continue;
+
+    if (draining) {
+      console.log(
+        `${LOG} Town is draining, skipping dispatch for bead ${ref.current_hook_bead_id}`
+      );
+      continue;
+    }
 
     // Per-bead dispatch cap — check before cooldown so max-attempt MR
     // beads are failed immediately rather than waiting for the cooldown.

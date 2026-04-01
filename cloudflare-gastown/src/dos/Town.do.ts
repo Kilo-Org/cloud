@@ -507,6 +507,11 @@ export class TownDO extends DurableObject<Env> {
     const townConfig = await config.getTownConfig(this.ctx.storage);
     this._ownerUserId = townConfig.owner_user_id;
 
+    // Load persisted draining flag, nonce, and start time
+    this._draining = (await this.ctx.storage.get<boolean>('town:draining')) ?? false;
+    this._drainNonce = (await this.ctx.storage.get<string>('town:drainNonce')) ?? null;
+    this._drainStartedAt = (await this.ctx.storage.get<number>('town:drainStartedAt')) ?? null;
+
     // All tables are now initialized via beads.initBeadTables():
     // beads, bead_events, bead_dependencies, agent_metadata, review_metadata,
     // escalation_metadata, convoy_metadata
@@ -540,6 +545,9 @@ export class TownDO extends DurableObject<Env> {
   private _townId: string | null = null;
   private _lastReconcilerMetrics: reconciler.ReconcilerMetrics | null = null;
   private _dashboardContext: string | null = null;
+  private _draining = false;
+  private _drainNonce: string | null = null;
+  private _drainStartedAt: number | null = null;
 
   private get townId(): string {
     return this._townId ?? this.ctx.id.name ?? this.ctx.id.toString();
@@ -564,6 +572,72 @@ export class TownDO extends DurableObject<Env> {
 
   async getDashboardContext(): Promise<string | null> {
     return this._dashboardContext;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // Container Eviction (graceful drain)
+  // ══════════════════════════════════════════════════════════════════
+
+  /**
+   * Record a container eviction event and set the draining flag.
+   * Called by the container when it receives SIGTERM. While draining,
+   * the reconciler skips dispatch to prevent new work from starting.
+   *
+   * Returns a drain nonce that must be presented via
+   * `acknowledgeContainerReady()` to clear the drain flag. This
+   * prevents stale heartbeats from the dying container from
+   * prematurely re-enabling dispatch.
+   */
+  async recordContainerEviction(): Promise<string> {
+    events.insertEvent(this.sql, 'container_eviction', {});
+    const nonce = crypto.randomUUID();
+    const startedAt = Date.now();
+    this._draining = true;
+    this._drainNonce = nonce;
+    this._drainStartedAt = startedAt;
+    await this.ctx.storage.put('town:draining', true);
+    await this.ctx.storage.put('town:drainNonce', nonce);
+    await this.ctx.storage.put('town:drainStartedAt', startedAt);
+    console.log(`${TOWN_LOG} recordContainerEviction: draining flag set, nonce=${nonce}`);
+    return nonce;
+  }
+
+  /**
+   * Acknowledge that the replacement container is ready. Clears the
+   * draining flag only if the provided nonce matches the one generated
+   * during `recordContainerEviction()`. This ensures that only the
+   * new container (which received the nonce via startup config) can
+   * re-enable dispatch — not a stale heartbeat from the old container.
+   */
+  async acknowledgeContainerReady(nonce: string): Promise<boolean> {
+    if (!this._draining) {
+      console.log(`${TOWN_LOG} acknowledgeContainerReady: not draining, noop`);
+      return true;
+    }
+    if (nonce !== this._drainNonce) {
+      console.warn(
+        `${TOWN_LOG} acknowledgeContainerReady: nonce mismatch (got=${nonce}, expected=${this._drainNonce})`
+      );
+      return false;
+    }
+    this._draining = false;
+    this._drainNonce = null;
+    this._drainStartedAt = null;
+    await this.ctx.storage.put('town:draining', false);
+    await this.ctx.storage.delete('town:drainNonce');
+    await this.ctx.storage.delete('town:drainStartedAt');
+    console.log(`${TOWN_LOG} acknowledgeContainerReady: draining flag cleared`);
+    return true;
+  }
+
+  /** Whether the town is in draining mode (container eviction in progress). */
+  async isDraining(): Promise<boolean> {
+    return this._draining;
+  }
+
+  /** The current drain nonce (null when not draining). */
+  async getDrainNonce(): Promise<string | null> {
+    return this._drainNonce;
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -1132,6 +1206,13 @@ export class TownDO extends DurableObject<Env> {
 
   // ── Heartbeat ─────────────────────────────────────────────────────
 
+  /**
+   * Update an agent's heartbeat timestamp. Returns the current drain
+   * nonce (if draining) so the caller can include it in the HTTP
+   * response without a second RPC — preventing a TOCTOU race where
+   * an in-flight heartbeat from the old container could observe a
+   * nonce generated between two separate DO calls.
+   */
   async touchAgentHeartbeat(
     agentId: string,
     watermark?: {
@@ -1139,9 +1220,10 @@ export class TownDO extends DurableObject<Env> {
       lastEventAt?: string | null;
       activeTools?: string[];
     }
-  ): Promise<void> {
+  ): Promise<{ drainNonce: string | null }> {
     agents.touchAgent(this.sql, agentId, watermark);
     await this.armAlarmIfNeeded();
+    return { drainNonce: this._drainNonce };
   }
 
   async updateAgentStatusMessage(agentId: string, message: string): Promise<void> {
@@ -3193,10 +3275,29 @@ export class TownDO extends DurableObject<Env> {
       Sentry.captureException(err);
     }
 
+    // Auto-clear drain flag if it has been active for too long.
+    // The drain sequence (drainAll) waits up to 10 minutes, so 15
+    // minutes is a generous upper bound. After this timeout the old
+    // container is certainly dead and it is safe to resume dispatch.
+    const DRAIN_TIMEOUT_MS = 15 * 60 * 1000;
+    if (
+      this._draining &&
+      this._drainStartedAt &&
+      Date.now() - this._drainStartedAt > DRAIN_TIMEOUT_MS
+    ) {
+      this._draining = false;
+      this._drainNonce = null;
+      this._drainStartedAt = null;
+      await this.ctx.storage.put('town:draining', false);
+      await this.ctx.storage.delete('town:drainNonce');
+      await this.ctx.storage.delete('town:drainStartedAt');
+      logger.info('reconciler: drain timeout exceeded, auto-clearing draining flag');
+    }
+
     // Phase 1: Reconcile — compute desired state vs actual state
     const sideEffects: Array<() => Promise<void>> = [];
     try {
-      const actions = reconciler.reconcile(this.sql);
+      const actions = reconciler.reconcile(this.sql, { draining: this._draining });
       metrics.actionsEmitted = actions.length;
       for (const a of actions) {
         metrics.actionsByType[a.type] = (metrics.actionsByType[a.type] ?? 0) + 1;
@@ -3792,7 +3893,7 @@ export class TownDO extends DurableObject<Env> {
     if (!hasRigs) return;
 
     const hasWork = this.hasActiveWork();
-    if (!hasWork) {
+    if (!hasWork && !this._draining) {
       const rigList = rigs.listRigs(this.sql);
       const newestRigAge = rigList.reduce((min, r) => {
         const age = Date.now() - new Date(r.created_at).getTime();
@@ -3807,8 +3908,27 @@ export class TownDO extends DurableObject<Env> {
 
     try {
       const container = getTownContainerStub(this.env, townId);
+      const headers: Record<string, string> = {};
+      // When draining AND enough time has passed for the old container
+      // to have exited (drainAll waits up to 10 min + exit), pass the
+      // nonce so the replacement container can acknowledge readiness.
+      // We only send the nonce after 11 minutes to avoid the old
+      // (still-draining) container receiving it and clearing drain
+      // prematurely — the health check goes to whichever container is
+      // currently serving this town.
+      const DRAIN_HANDOFF_DELAY_MS = 11 * 60 * 1000;
+      if (
+        this._draining &&
+        this._drainNonce &&
+        this._drainStartedAt &&
+        Date.now() - this._drainStartedAt > DRAIN_HANDOFF_DELAY_MS
+      ) {
+        headers['X-Drain-Nonce'] = this._drainNonce;
+        headers['X-Town-Id'] = townId;
+      }
       await container.fetch('http://container/health', {
         signal: AbortSignal.timeout(5_000),
+        headers,
       });
     } catch {
       // Container is starting up or unavailable — alarm will retry

@@ -221,7 +221,11 @@ export async function handleHeartbeat(
     // No body or invalid JSON — old container format, just touch
   }
 
-  await town.touchAgentHeartbeat(
+  // touchAgentHeartbeat returns the drain nonce atomically — no
+  // second RPC needed, which prevents a TOCTOU race where an
+  // in-flight heartbeat from the old container could observe a nonce
+  // generated between two separate DO calls.
+  const { drainNonce } = await town.touchAgentHeartbeat(
     params.agentId,
     watermark
       ? {
@@ -232,7 +236,7 @@ export async function handleHeartbeat(
       : undefined
   );
 
-  return c.json(resSuccess({ heartbeat: true }));
+  return c.json(resSuccess({ heartbeat: true, ...(drainNonce ? { drainNonce } : {}) }));
 }
 
 const GetOrCreateAgentBody = z.object({

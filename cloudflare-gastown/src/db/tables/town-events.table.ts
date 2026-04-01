@@ -5,6 +5,7 @@ export const TownEventType = z.enum([
   'agent_done',
   'agent_completed',
   'container_status',
+  'container_eviction',
   'pr_status_changed',
   'bead_created',
   'bead_cancelled',

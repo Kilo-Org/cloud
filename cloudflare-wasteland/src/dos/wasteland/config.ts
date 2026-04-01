@@ -96,6 +96,7 @@ export function initializeWasteland(sql: SqlStorage, input: InitWastelandInput):
 
 export function updateConfig(
   sql: SqlStorage,
+  wastelandId: string,
   update: Partial<Pick<WastelandConfigRecord, 'name' | 'visibility' | 'dolthub_upstream' | 'status'>>
 ): void {
   const timestamp = new Date().toISOString();
@@ -109,6 +110,7 @@ export function updateConfig(
         ${wasteland_config.columns.dolthub_upstream} = COALESCE(?, ${wasteland_config.columns.dolthub_upstream}),
         ${wasteland_config.columns.status} = COALESCE(?, ${wasteland_config.columns.status}),
         ${wasteland_config.columns.updated_at} = ?
+      WHERE ${wasteland_config.wasteland_id} = ?
     `,
     [
       update.name ?? null,
@@ -116,6 +118,7 @@ export function updateConfig(
       update.dolthub_upstream ?? null,
       update.status ?? null,
       timestamp,
+      wastelandId,
     ]
   );
 }

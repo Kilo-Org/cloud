@@ -1067,6 +1067,13 @@ describe('kiloPassRouter', () => {
         pause_collection: '',
       });
 
+      // Verify the DB status was updated to active
+      const updatedSub = await db
+        .select({ status: kilo_pass_subscriptions.status })
+        .from(kilo_pass_subscriptions)
+        .where(eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_test_resume_paused'));
+      expect(updatedSub[0]?.status).toBe('active');
+
       // Verify the pause event was closed (resumed_at is set)
       const openEvent = await db
         .select()

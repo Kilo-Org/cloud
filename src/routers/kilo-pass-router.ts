@@ -718,7 +718,15 @@ export const kiloPassRouter = createTRPCRouter({
         pause_collection: '',
       });
 
-      // Close the open pause event in our DB
+      // Update the DB status to active and close the pause event so the UI
+      // reflects the change immediately (without waiting for the webhook).
+      await db
+        .update(kilo_pass_subscriptions)
+        .set({ status: 'active' })
+        .where(
+          eq(kilo_pass_subscriptions.stripe_subscription_id, subscription.stripeSubscriptionId)
+        );
+
       await closePauseEvent(db, {
         kiloPassSubscriptionId: subscription.subscriptionId,
         resumedAt: new Date().toISOString(),

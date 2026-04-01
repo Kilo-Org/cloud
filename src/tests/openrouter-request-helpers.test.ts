@@ -1,6 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import { addCacheBreakpoints } from '@/lib/providers/openrouter/request-helpers';
 import type { GatewayRequest } from '@/lib/providers/openrouter/types';
+import type OpenAI from 'openai';
 
 describe('addCacheBreakpoints', () => {
   test('adds a cache breakpoint to the last eligible chat completions message when none exist', () => {
@@ -48,9 +49,8 @@ describe('addCacheBreakpoints', () => {
               {
                 type: 'text',
                 text: 'First prompt',
-                // @ts-expect-error non-standard cache_control extension
                 cache_control: { type: 'ephemeral' },
-              },
+              } as OpenAI.ChatCompletionContentPartText,
             ],
           },
           { role: 'assistant', content: 'First response' },
@@ -67,7 +67,8 @@ describe('addCacheBreakpoints', () => {
 
     addCacheBreakpoints(request);
 
-    const lastContent = request.body.messages.at(-1)?.content;
+    const lastContent =
+      request.kind === 'chat_completions' && request.body.messages.at(-1)?.content;
     expect(lastContent).toEqual([
       { type: 'text', text: 'Latest prompt' },
       { type: 'text', text: 'Latest detail' },
@@ -106,7 +107,7 @@ describe('addCacheBreakpoints', () => {
 
     addCacheBreakpoints(request);
 
-    const lastItem = request.body.input.at(-1);
+    const lastItem = request.kind === 'responses' && request.body.input?.at(-1);
     expect(lastItem).toMatchObject({
       type: 'function_call_output',
       output: [
@@ -132,7 +133,6 @@ describe('addCacheBreakpoints', () => {
 
     addCacheBreakpoints(request);
 
-    // @ts-expect-error non-standard top-level cache_control extension
     expect(request.body.cache_control).toEqual({ type: 'ephemeral' });
   });
 
@@ -149,7 +149,6 @@ describe('addCacheBreakpoints', () => {
               {
                 type: 'text',
                 text: 'First prompt',
-                // @ts-expect-error non-standard cache_control extension
                 cache_control: { type: 'ephemeral' },
               },
             ],
@@ -162,7 +161,6 @@ describe('addCacheBreakpoints', () => {
 
     addCacheBreakpoints(request);
 
-    // @ts-expect-error non-standard top-level cache_control extension
     expect(request.body.cache_control).toBeUndefined();
   });
 });

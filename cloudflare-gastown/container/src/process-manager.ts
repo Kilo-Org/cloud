@@ -843,6 +843,7 @@ export async function updateAgentModel(
     'GASTOWN_GIT_AUTHOR_NAME',
     'GASTOWN_GIT_AUTHOR_EMAIL',
     'GASTOWN_DISABLE_AI_COAUTHOR',
+    'KILOCODE_TOKEN',
   ]);
   const hotSwapEnv: Record<string, string> = {};
   for (const [key, value] of Object.entries(agent.startupEnv)) {

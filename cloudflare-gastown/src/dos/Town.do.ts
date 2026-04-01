@@ -56,6 +56,8 @@ import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerStub } from './TownContainer.do';
 
+import { generateKiloApiToken } from '../util/kilo-token.util';
+import { resolveSecret } from '../util/secret.util';
 import { writeEvent, type GastownEventData } from '../util/analytics.util';
 import { logger, withLogTags } from '../util/log.util';
 import { BeadPriority } from '../types';
@@ -616,6 +618,7 @@ export class TownDO extends DurableObject<Env> {
       ['GASTOWN_GIT_AUTHOR_NAME', townConfig.git_author_name],
       ['GASTOWN_GIT_AUTHOR_EMAIL', townConfig.git_author_email],
       ['GASTOWN_DISABLE_AI_COAUTHOR', townConfig.disable_ai_coauthor ? '1' : undefined],
+      ['KILOCODE_TOKEN', townConfig.kilocode_token],
     ];
 
     for (const [key, value] of envMapping) {
@@ -3056,6 +3059,16 @@ export class TownDO extends DurableObject<Env> {
           error: err instanceof Error ? err.message : String(err),
         });
       }
+
+      // Proactively remint KILOCODE_TOKEN before it expires (30-day
+      // expiry, checked daily, refreshed within 7 days of expiry).
+      try {
+        await this.refreshKilocodeTokenIfExpiring();
+      } catch (err) {
+        logger.warn('alarm: refreshKilocodeTokenIfExpiring failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
     // ── Pre-phase: Observe container status for working agents ────────
@@ -3339,6 +3352,78 @@ export class TownDO extends DurableObject<Env> {
     // Only mark as refreshed after success — failed refreshes should
     // be retried on the next alarm tick, not throttled for an hour.
     this.lastContainerTokenRefreshAt = now;
+  }
+
+  /**
+   * Proactively remint KILOCODE_TOKEN when it's approaching expiry.
+   * Throttled to once per day — the 30-day token is refreshed when
+   * within 7 days of expiry, providing ample safety margin.
+   *
+   * Decodes the existing JWT payload to extract user identity (no
+   * signature verification needed — we're just reading the claims to
+   * re-sign with the same data).
+   */
+  private lastKilocodeTokenCheckAt = 0;
+  private async refreshKilocodeTokenIfExpiring(): Promise<void> {
+    const CHECK_INTERVAL_MS = 24 * 60 * 60_000; // once per day
+    const REFRESH_WINDOW_SECONDS = 7 * 24 * 60 * 60; // 7 days
+    const now = Date.now();
+    if (now - this.lastKilocodeTokenCheckAt < CHECK_INTERVAL_MS) return;
+    this.lastKilocodeTokenCheckAt = now;
+
+    const townConfig = await this.getTownConfig();
+    const token = townConfig.kilocode_token;
+    if (!token) return;
+
+    // Decode JWT payload (base64url, no verification)
+    const parts = token.split('.');
+    const encodedPayload = parts[1];
+    if (!encodedPayload) return;
+    const payloadSchema = z.object({
+      exp: z.number().optional(),
+      kiloUserId: z.string().optional(),
+      apiTokenPepper: z.string().nullable().optional(),
+    });
+    let rawPayload: unknown;
+    try {
+      rawPayload = JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
+    } catch {
+      return;
+    }
+    const parsed = payloadSchema.safeParse(rawPayload);
+    if (!parsed.success) return;
+    const payload = parsed.data;
+
+    const exp = payload.exp;
+    if (!exp) return;
+
+    const nowSeconds = Math.floor(now / 1000);
+    if (exp - nowSeconds > REFRESH_WINDOW_SECONDS) return;
+
+    // Token expires within 7 days — remint it
+    const userId = payload.kiloUserId;
+    if (!userId) return;
+
+    if (!this.env.NEXTAUTH_SECRET) {
+      logger.warn('refreshKilocodeTokenIfExpiring: NEXTAUTH_SECRET not configured');
+      return;
+    }
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) {
+      logger.warn('refreshKilocodeTokenIfExpiring: failed to resolve NEXTAUTH_SECRET');
+      return;
+    }
+
+    const newToken = await generateKiloApiToken(
+      { id: userId, api_token_pepper: payload.apiTokenPepper ?? null },
+      secret
+    );
+    await this.updateTownConfig({ kilocode_token: newToken });
+    await this.syncConfigToContainer();
+    logger.info('refreshKilocodeTokenIfExpiring: reminted KILOCODE_TOKEN proactively', {
+      userId,
+      oldExp: new Date(exp * 1000).toISOString(),
+    });
   }
 
   private hasActiveWork(): boolean {

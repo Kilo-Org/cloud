@@ -14,7 +14,7 @@ import { timingMiddleware } from './middleware/analytics.middleware';
 // ── DO Exports ──────────────────────────────────────────────────────────
 // Wrangler requires these exports to match the class_name bindings in wrangler.jsonc.
 
-export { WastelandDO } from './dos/WastelandDO.stub';
+export { WastelandDO } from './dos/Wasteland.do';
 export { WastelandContainerDO } from './dos/WastelandContainer.do';
 
 // ── Types ───────────────────────────────────────────────────────────────

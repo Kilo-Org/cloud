@@ -55,10 +55,12 @@ const ListPinsSchema = z.object({
 
 const GetUserPinSchema = z.object({
   userId: z.string().min(1),
+  instanceId: z.uuid().optional(),
 });
 
 const SetPinSchema = z.object({
   userId: z.string().min(1),
+  instanceId: z.uuid().optional(),
   imageTag: z.string().min(1),
   reason: z.string().optional(),
 });
@@ -238,7 +240,8 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
   }),
 
   getUserPin: adminProcedure.input(GetUserPinSchema).query(async ({ input }) => {
-    const instance = await requireActivePersonalInstance(input.userId);
+    const resolvedInstanceId =
+      input.instanceId ?? (await requireActivePersonalInstance(input.userId)).id;
     const pinnedByUser = alias(kilocode_users, 'pinned_by_user');
     const [result] = await db
       .select({
@@ -253,7 +256,7 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
         eq(kiloclaw_version_pins.image_tag, kiloclaw_image_catalog.image_tag)
       )
       .leftJoin(pinnedByUser, eq(kiloclaw_version_pins.pinned_by, pinnedByUser.id))
-      .where(eq(kiloclaw_version_pins.instance_id, instance.id))
+      .where(eq(kiloclaw_version_pins.instance_id, resolvedInstanceId))
       .limit(1);
 
     if (!result) return null;
@@ -267,13 +270,14 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
   }),
 
   setPin: adminProcedure.input(SetPinSchema).mutation(async ({ input, ctx }) => {
-    const instance = await requireActivePersonalInstance(input.userId);
+    const resolvedInstanceId =
+      input.instanceId ?? (await requireActivePersonalInstance(input.userId)).id;
     let result;
     try {
       [result] = await db
         .insert(kiloclaw_version_pins)
         .values({
-          instance_id: instance.id,
+          instance_id: resolvedInstanceId,
           image_tag: input.imageTag,
           pinned_by: ctx.user.id,
           reason: input.reason ?? null,

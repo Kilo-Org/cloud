@@ -169,7 +169,7 @@ function VersionPinCard({ userId, instanceId }: { userId: string; instanceId: st
   const [reason, setReason] = useState('');
 
   const { data: pinData, isLoading: pinLoading } = useQuery(
-    trpc.admin.kiloclawVersions.getUserPin.queryOptions({ userId })
+    trpc.admin.kiloclawVersions.getUserPin.queryOptions({ userId, instanceId })
   );
 
   const { data: versionsData } = useQuery(
@@ -269,6 +269,7 @@ function VersionPinCard({ userId, instanceId }: { userId: string; instanceId: st
                     onClick={() =>
                       void setPin({
                         userId,
+                        instanceId,
                         imageTag: selectedTag,
                         reason: reason || undefined,
                       })
@@ -319,7 +320,12 @@ function VersionPinCard({ userId, instanceId }: { userId: string; instanceId: st
                 <Button
                   size="sm"
                   onClick={() =>
-                    void setPin({ userId, imageTag: selectedTag, reason: reason || undefined })
+                    void setPin({
+                      userId,
+                      instanceId,
+                      imageTag: selectedTag,
+                      reason: reason || undefined,
+                    })
                   }
                   disabled={!selectedTag || isPinning}
                 >

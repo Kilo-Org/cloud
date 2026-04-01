@@ -599,7 +599,10 @@ export const kiloclawRouter = createTRPCRouter({
       ...status,
       name: instance?.name ?? null,
       workerUrl,
-      instanceId: instance?.id ?? null,
+      // Only expose instanceId for instance-keyed instances (ki_ sandboxId).
+      // Legacy instances use userId-keyed DOs — returning their row UUID would
+      // cause the frontend/gateway to resolve the wrong DO.
+      instanceId: workerInstanceId(instance) ? (instance?.id ?? null) : null,
     } satisfies KiloClawDashboardStatus;
   }),
 

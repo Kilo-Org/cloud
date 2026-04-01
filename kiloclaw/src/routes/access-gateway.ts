@@ -37,10 +37,29 @@ const BASE_STYLES = /* css */ `
 `;
 
 /**
+ * Verify that the given instanceId belongs to the given userId.
+ * Throws if the instance doesn't exist or belongs to a different user.
+ */
+async function assertInstanceOwnership(
+  env: KiloClawEnv,
+  userId: string,
+  instanceId: string
+): Promise<void> {
+  const stub = env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(instanceId));
+  const status = await stub.getStatus();
+  if (!status.userId || status.userId !== userId) {
+    throw new Error('Instance access denied');
+  }
+}
+
+/**
  * Resolve the DO's authoritative sandboxId for gateway token derivation.
  *
  * When instanceId is provided (instance-keyed), go directly to the Instance DO.
  * Otherwise fall back to the user registry (legacy personal instances).
+ *
+ * IMPORTANT: Callers must verify instance ownership via assertInstanceOwnership()
+ * before calling this function with a user-supplied instanceId.
  */
 async function resolveSandboxId(
   userId: string,
@@ -52,6 +71,15 @@ async function resolveSandboxId(
     try {
       const stub = env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(instanceId));
       const status = await stub.getStatus();
+      // Belt-and-suspenders: reject even if the caller forgot to check ownership
+      if (status.userId && status.userId !== userId) {
+        console.error('[access-gateway] resolveSandboxId: ownership mismatch', {
+          userId,
+          instanceId,
+          instanceOwner: status.userId,
+        });
+        return sandboxIdFromUserId(userId);
+      }
       if (status.sandboxId) return status.sandboxId;
     } catch {
       // DO unreachable — derive from instanceId directly
@@ -258,6 +286,15 @@ async function redeemCodeAndSetCookie(
     env: c.env.WORKER_ENV,
   });
 
+  // Verify instanceId ownership before minting a gateway token
+  if (instanceId && isValidInstanceId(instanceId)) {
+    try {
+      await assertInstanceOwnership(c.env, redeemedUserId, instanceId);
+    } catch {
+      return { error: 'Access denied', status: 401 as const };
+    }
+  }
+
   setCookie(c, KILOCLAW_AUTH_COOKIE, token, {
     path: '/',
     httpOnly: true,
@@ -282,6 +319,14 @@ accessGatewayRoutes.get('/kilo-access-gateway', async c => {
   if (secret) {
     const cookie = getCookie(c, KILOCLAW_AUTH_COOKIE);
     if (await hasValidCookie(cookie, userId, secret, c.env.WORKER_ENV)) {
+      // Verify instanceId ownership before minting a gateway token
+      if (instanceId && isValidInstanceId(instanceId)) {
+        try {
+          await assertInstanceOwnership(c.env, userId, instanceId);
+        } catch {
+          return c.text('Access denied', 403);
+        }
+      }
       const redirectUrl = await buildRedirectUrl(userId, c.env, instanceId);
       return c.redirect(redirectUrl);
     }

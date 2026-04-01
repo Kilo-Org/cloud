@@ -125,7 +125,8 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const filename = `api-request-log_${userId}_${startDate}_${endDate}.zip`;
+  const safeUserId = userId.replaceAll('/', '-').replaceAll(':', '-');
+  const filename = `api-request-log_${safeUserId}_${startDate}_${endDate}.zip`;
 
   return new Response(webStream, {
     headers: {

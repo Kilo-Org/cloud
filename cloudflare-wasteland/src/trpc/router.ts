@@ -436,8 +436,8 @@ export const wastelandRouter = router({
     .input(z.object({ wastelandId: z.string().uuid() }))
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      // Users can only delete their own credentials — no ownership
-      // check needed beyond auth (userId comes from the JWT).
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
       await stub.deleteCredential(ctx.userId);
       return { success: true };

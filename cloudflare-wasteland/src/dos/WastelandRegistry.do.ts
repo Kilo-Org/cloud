@@ -138,6 +138,20 @@ export class WastelandRegistryDO extends DurableObject<Env> {
     ];
     return WastelandRegistryRecord.array().parse(rows);
   }
+
+  /** Return the total number of registered (active) wastelands. */
+  async countAll(): Promise<number> {
+    await this.ensureInitialized();
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `SELECT COUNT(*) AS cnt FROM ${wasteland_registry}`,
+        []
+      ),
+    ];
+    const row = rows[0] as Record<string, unknown> | undefined;
+    return Number(row?.cnt ?? 0);
+  }
 }
 
 export function getWastelandRegistryStub(env: Env) {

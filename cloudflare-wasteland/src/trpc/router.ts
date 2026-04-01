@@ -637,6 +637,8 @@ export const wastelandRouter = router({
             upstream: config.dolthub_upstream,
             title: input.title,
             description: input.description,
+            ...(input.priority !== undefined ? { priority: input.priority } : {}),
+            ...(input.type !== undefined ? { type: input.type } : {}),
           }),
         })
       );

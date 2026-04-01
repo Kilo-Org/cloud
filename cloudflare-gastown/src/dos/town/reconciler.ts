@@ -612,6 +612,48 @@ export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): 
     });
   }
 
+  // Rule 1b: Open issue beads with a stale assignee (agent exists but is not
+  // hooked to this bead). This happens when a container restart causes the
+  // agent to be unhooked while the bead is reset to open (e.g. by the mayor).
+  // Clear the assignee so Rule 1 can pick it up on the next reconciler tick.
+  const staleAssigned = BeadRow.array().parse([
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT b.${beads.columns.bead_id}, b.${beads.columns.type},
+               b.${beads.columns.status}, b.${beads.columns.rig_id},
+               b.${beads.columns.assignee_agent_bead_id},
+               b.${beads.columns.updated_at},
+               b.${beads.columns.labels},
+               b.${beads.columns.created_by},
+               b.${beads.columns.dispatch_attempts},
+               b.${beads.columns.last_dispatch_attempt_at}
+        FROM ${beads} b
+        WHERE b.${beads.columns.type} = 'issue'
+          AND b.${beads.columns.status} = 'open'
+          AND b.${beads.columns.assignee_agent_bead_id} IS NOT NULL
+          AND b.${beads.columns.rig_id} IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM ${agent_metadata} am
+            WHERE am.${agent_metadata.bead_id} = b.${beads.columns.assignee_agent_bead_id}
+              AND am.${agent_metadata.current_hook_bead_id} = b.${beads.columns.bead_id}
+          )
+      `,
+      []
+    ),
+  ]);
+
+  for (const bead of staleAssigned) {
+    // Skip system-assigned beads (escalations, rework requests) — those
+    // are handled by other subsystems and don't need dispatch.
+    if (bead.assignee_agent_bead_id === 'system') continue;
+
+    actions.push({
+      type: 'clear_bead_assignee',
+      bead_id: bead.bead_id,
+    });
+  }
+
   // Rule 2: Idle agents with hooks need dispatch (schedulePendingWork equivalent)
   const idleHooked = AgentRow.array().parse([
     ...query(

@@ -24,6 +24,7 @@ import {
   Server,
   Network,
   RefreshCw,
+  KeyRound,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -79,6 +80,11 @@ const userManagementItems: MenuItem[] = [
     title: () => 'Blacklisted Domains',
     url: '/admin/blacklisted-domains',
     icon: () => <Shield />,
+  },
+  {
+    title: () => 'Safety Identifiers',
+    url: '/admin/safety-identifiers',
+    icon: () => <KeyRound />,
   },
 ];
 

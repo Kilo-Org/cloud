@@ -52,7 +52,11 @@ type RunBotAgentParams = {
   user: User;
   botRequestId: string | undefined;
   prompt: string;
-  onSessionReady?: (params: { kiloSessionId: string; cloudAgentSessionId: string; prompt: string }) => void;
+  onSessionReady?: (params: {
+    kiloSessionId: string;
+    cloudAgentSessionId: string;
+    prompt: string;
+  }) => void;
 };
 
 export type BotAgentMessageLike = {
@@ -196,7 +200,8 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
   });
 
   const modelSlug =
-    (params.platformIntegration.metadata as { model_slug?: string }).model_slug ?? DEFAULT_BOT_MODEL;
+    (params.platformIntegration.metadata as { model_slug?: string }).model_slug ??
+    DEFAULT_BOT_MODEL;
   const owner = ownerFromIntegration(params.platformIntegration);
 
   const startedAt = Date.now();
@@ -209,7 +214,11 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
 
   const agent = new ToolLoopAgent({
     model: provider.chatModel(modelSlug),
-    instructions: await buildSystemPrompt(params.platformIntegration, params.thread, params.message),
+    instructions: await buildSystemPrompt(
+      params.platformIntegration,
+      params.thread,
+      params.message
+    ),
     stopWhen: stepCountIs(MAX_ITERATIONS),
     tools: {
       spawnCloudAgentSession: tool({

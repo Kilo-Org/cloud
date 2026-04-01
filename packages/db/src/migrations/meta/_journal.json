@@ -474,8 +474,22 @@
     {
       "idx": 67,
       "version": "7",
-      "when": 1774976204421,
-      "tag": "0067_mighty_argent",
+      "when": 1775001379532,
+      "tag": "0067_odd_ironclad",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1775007775741,
+      "tag": "0068_brave_tattoo",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1775049910586,
+      "tag": "0069_slippery_firestar",
       "breakpoints": true
     }
   ]

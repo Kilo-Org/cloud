@@ -5,18 +5,10 @@
 # Generate with: openssl rand -base64 32
 JWT_SECRET=your-secret-key-at-least-32-bytes-long
 
-# Session duration in seconds for JWT tokens and auth cookies (optional)
-# Default: 604800 (7 days)
+# Session duration in seconds for JWT tokens (optional, configured in wrangler.jsonc)
 SESSION_DURATION_SECONDS=604800
-
-# Rate limit window in seconds (optional)
-# Default: 900 (15 minutes)
-RATE_LIMIT_WINDOW_SECONDS=900
-
-# Maximum failed login attempts before blocking (optional)
-# Default: 5
-RATE_LIMIT_MAX_ATTEMPTS=5
 
 # Backend authentication token for Management API endpoints (required)
 # Used by kilocode-backend to authenticate requests to /api/password/:worker
-BACKEND_AUTH_TOKEN=dev-token-change-this-in-production
+# @from USER_DEPLOYMENTS_API_AUTH_KEY
+BACKEND_AUTH_TOKEN=

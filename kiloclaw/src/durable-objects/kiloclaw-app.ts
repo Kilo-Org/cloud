@@ -22,6 +22,9 @@ import { setAppSecret } from '../fly/secrets';
 import { generateEnvKey } from '../utils/env-encryption';
 import { METADATA_KEY_USER_ID } from './machine-config';
 
+/** UUID v4 pattern — used to detect instance-keyed ownerKeys. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // -- Persisted state schema --
 
 const AppStateSchema = z.object({
@@ -80,15 +83,18 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
   }
 
   /**
-   * Ensure a Fly App exists for this user with IPs allocated and env key set.
+   * Ensure a Fly App exists for this owner with IPs allocated and env key set.
    * Idempotent: creates the app only if it doesn't exist yet.
    * Returns the app name for callers to cache.
+   *
+   * @param ownerKey - Either a userId (personal) or `"org:{orgId}"` (org).
+   *   Org keys derive an `oapp-{hash}` app name instead of `acct-{hash}`.
    */
-  async ensureApp(userId: string): Promise<{ appName: string }> {
+  async ensureApp(ownerKey: string): Promise<{ appName: string }> {
     await this.loadState();
 
-    if (this.userId && this.userId !== userId) {
-      throw new Error(`userId mismatch: DO has ${this.userId}, caller passed ${userId}`);
+    if (this.userId && this.userId !== ownerKey) {
+      throw new Error(`ownerKey mismatch: DO has ${this.userId}, caller passed ${ownerKey}`);
     }
 
     const apiToken = this.env.FLY_API_TOKEN;
@@ -96,16 +102,24 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
     const orgSlug = this.env.FLY_ORG_SLUG;
     if (!orgSlug) throw new Error('FLY_ORG_SLUG is not configured');
 
-    // Derive app name (deterministic from userId, with env prefix in dev)
+    // Derive app name based on ownerKey type:
+    // - UUID (instanceId) → inst-{hash} (per-instance app)
+    // - userId string → acct-{hash} (legacy per-user app)
     const prefix = this.env.WORKER_ENV === 'development' ? 'dev' : undefined;
-    const appName = this.flyAppName ?? (await apps.appNameFromUserId(userId, prefix));
+    const isInstanceKeyed = UUID_RE.test(ownerKey);
+    const appName = this.flyAppName
+      ? this.flyAppName
+      : isInstanceKeyed
+        ? await apps.appNameFromInstanceId(ownerKey, prefix)
+        : await apps.appNameFromUserId(ownerKey, prefix);
 
-    // Persist userId + appName early so we can retry on partial failure
+    // Persist ownerKey + appName early so we can retry on partial failure.
+    // The `userId` storage field stores the ownerKey (historical name).
     if (!this.userId || !this.flyAppName) {
-      this.userId = userId;
+      this.userId = ownerKey;
       this.flyAppName = appName;
       await this.ctx.storage.put({
-        userId,
+        userId: ownerKey,
         flyAppName: appName,
       } satisfies Partial<AppState>);
     }
@@ -115,8 +129,8 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
       if (!this.ipv4Allocated || !this.ipv6Allocated) {
         const existing = await apps.getApp({ apiToken }, appName);
         if (!existing) {
-          await apps.createApp({ apiToken }, appName, orgSlug, userId, METADATA_KEY_USER_ID);
-          console.log('[AppDO] Created Fly App:', appName);
+          await apps.createApp({ apiToken }, appName, orgSlug, ownerKey, METADATA_KEY_USER_ID);
+          console.log('[AppDO] Created Fly App:', appName, 'owner:', ownerKey);
         }
       }
 
@@ -139,7 +153,7 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
       // Step 4: Generate and store env encryption key if not done.
       // Uses the same locked path as ensureEnvKey() to prevent interleaving.
       if (!this.envKeySet) {
-        await this.ensureEnvKey(userId);
+        await this.ensureEnvKey(ownerKey);
       }
     } catch (err) {
       // Partial state persisted above — arm a retry alarm so the DO self-heals
@@ -155,15 +169,15 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
   }
 
   /**
-   * Get the env encryption key for this user's app.
-   * Enforces userId match to prevent cross-user key fetches.
+   * Get the env encryption key for this owner's app.
+   * Enforces ownerKey match to prevent cross-owner key fetches.
    * Returns null if key hasn't been set yet.
    */
-  async getEnvKey(userId: string): Promise<string | null> {
+  async getEnvKey(ownerKey: string): Promise<string | null> {
     await this.loadState();
 
-    if (this.userId && this.userId !== userId) {
-      throw new Error(`userId mismatch: DO has ${this.userId}, caller passed ${userId}`);
+    if (this.userId && this.userId !== ownerKey) {
+      throw new Error(`ownerKey mismatch: DO has ${this.userId}, caller passed ${ownerKey}`);
     }
 
     return this.envKey;
@@ -182,11 +196,11 @@ export class KiloClawApp extends DurableObject<KiloClawEnv> {
    * Called by Instance DO at machine start time. This ensures legacy apps that
    * were created before the encryption feature get their key on first start.
    */
-  async ensureEnvKey(userId: string): Promise<{ key: string; secretsVersion: number }> {
+  async ensureEnvKey(ownerKey: string): Promise<{ key: string; secretsVersion: number }> {
     await this.loadState();
 
-    if (this.userId && this.userId !== userId) {
-      throw new Error(`userId mismatch: DO has ${this.userId}, caller passed ${userId}`);
+    if (this.userId && this.userId !== ownerKey) {
+      throw new Error(`ownerKey mismatch: DO has ${this.userId}, caller passed ${ownerKey}`);
     }
 
     const apiToken = this.env.FLY_API_TOKEN;

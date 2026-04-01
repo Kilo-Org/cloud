@@ -2,17 +2,24 @@
 # Copy this file to .dev.vars and update with your actual values
 
 # Authentication token for REST API endpoints (init, preview status, build triggers, logs)
-AUTH_TOKEN=dev-token-change-this-in-production
+# @from APP_BUILDER_AUTH_TOKEN
+AUTH_TOKEN=
+
+# Allowed CORS origins (comma-separated)
+# @url nextjs
+ALLOWED_ORIGINS=http://localhost:3000
 
 # Base hostname for preview deployments (e.g., builder.yourdomain.com or your-subdomain.ngrok-free.dev)
 # Preview URLs will be: https://{appId}.{BUILDER_HOSTNAME}
 # Can use [your-lan-ip].nip.io to support subdomains on local ip
 # For example 192-168-0-1.nip.io will resolve to 192.168.0.1
 # This needs to be a lan address because Cloud Agent will need to push changes to git repo
-BUILDER_HOSTNAME=192-168-0-1.nip.io
+# @url cloudflare-app-builder
+BUILDER_HOSTNAME=localhost:8790
 
 # Backend push notification (optional - enables auto-build on push)
-BACKEND_PUSH_NOTIFICATION_URL=http://192.168.0.1:3000/api/app-builder/push-notification
+# @url nextjs/api/app-builder/push-notification
+BACKEND_PUSH_NOTIFICATION_URL=http://localhost:3000/api/app-builder/push-notification
 
 # JWT secret for generating git authentication tokens (must be at least 32 bytes)
 # Generate with: openssl rand -base64 32
@@ -23,5 +30,6 @@ GIT_JWT_SECRET=your-secret-key-at-least-32-bytes-long
 # In dev mode previews are accessed using regular app builder url
 DEV_MODE=true
 
-# DB Proxy Worker
-DB_PROXY_URL=http://192.168.1.1:8792
+# URL of the DB proxy worker for database provisioning
+# @url cloudflare-db-proxy
+DB_PROXY_URL=http://localhost:8798

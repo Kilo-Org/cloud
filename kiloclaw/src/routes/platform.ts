@@ -206,12 +206,16 @@ function sanitizeError(err: unknown, operation: string): { message: string; stat
 }
 
 /**
- * "Instance not provisioned" / "Instance not running" are semantically 404 but
- * `.status` is lost crossing the DO RPC boundary, so `statusCodeFromError`
- * defaults to 500. Correct it here when the message is recognizable.
+ * DO lifecycle methods throw `Object.assign(new Error('Instance not provisioned'), { status: 404 })`
+ * but `.status` is lost crossing the DO RPC boundary, so `statusCodeFromError`
+ * defaults to 500. Correct it here for this specific message only.
+ *
+ * Note: `requireGatewayControllerContext()` in gateway.ts throws the same message
+ * with status 409 (conflict). We only correct when status === 500 (i.e. lost),
+ * so a preserved 409 passes through unchanged.
  */
 function correctLostStatus(message: string, status: number): number {
-  if (status === 500 && message.startsWith('Instance not ')) return 404;
+  if (status === 500 && message === 'Instance not provisioned') return 404;
   return status;
 }
 

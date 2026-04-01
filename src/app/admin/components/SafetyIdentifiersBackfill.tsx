@@ -11,8 +11,7 @@ import type {
 } from '../api/safety-identifiers/route';
 
 type BatchLog = {
-  openrouterProcessed: number;
-  vercelProcessed: number;
+  processed: number;
   timestamp: Date;
 };
 
@@ -39,57 +38,30 @@ export function SafetyIdentifiersBackfill() {
       return res.json() as Promise<BackfillBatchResponse>;
     },
     onSuccess: data => {
-      setLogs(prev => [
-        { openrouterProcessed: data.openrouterProcessed, vercelProcessed: data.vercelProcessed, timestamp: new Date() },
-        ...prev,
-      ]);
+      setLogs(prev => [{ processed: data.processed, timestamp: new Date() }, ...prev]);
       void queryClient.invalidateQueries({ queryKey: ['safety-identifier-counts'] });
     },
   });
 
-  const isDone = counts?.openrouterMissing === 0 && counts?.vercelMissing === 0;
+  const isDone = counts?.missing === 0;
 
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
-        Backfill safety identifiers for users created before these fields were introduced.
-        Each click processes up to 1 000 users per provider simultaneously. Click repeatedly
-        until both counters reach zero.
+        Backfill safety identifiers for users missing either field. Each click processes up
+        to 1 000 users. Click repeatedly until the counter reaches zero.
       </p>
 
       <div className="bg-background rounded-lg border p-6 space-y-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">OpenRouter upstream</span>
-              {isLoading ? (
-                <Badge variant="secondary">Loading…</Badge>
-              ) : counts?.openrouterMissing === 0 ? (
-                <Badge variant="default" className="bg-green-600">All filled</Badge>
-              ) : (
-                <Badge variant="destructive">{(counts?.openrouterMissing ?? 0).toLocaleString()} missing</Badge>
-              )}
-            </div>
-            <p className="text-muted-foreground text-xs">
-              openrouter_upstream_safety_identifier
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">Vercel downstream</span>
-              {isLoading ? (
-                <Badge variant="secondary">Loading…</Badge>
-              ) : counts?.vercelMissing === 0 ? (
-                <Badge variant="default" className="bg-green-600">All filled</Badge>
-              ) : (
-                <Badge variant="destructive">{(counts?.vercelMissing ?? 0).toLocaleString()} missing</Badge>
-              )}
-            </div>
-            <p className="text-muted-foreground text-xs">
-              vercel_downstream_safety_identifier
-            </p>
-          </div>
+        <div className="flex items-center gap-3">
+          <span className="font-medium">Users missing a safety identifier</span>
+          {isLoading ? (
+            <Badge variant="secondary">Loading…</Badge>
+          ) : isDone ? (
+            <Badge variant="default" className="bg-green-600">All filled</Badge>
+          ) : (
+            <Badge variant="destructive">{(counts?.missing ?? 0).toLocaleString()} missing</Badge>
+          )}
         </div>
 
         {mutation.isError && (
@@ -103,11 +75,7 @@ export function SafetyIdentifiersBackfill() {
           disabled={isLoading || isDone || mutation.isPending}
           variant={isDone ? 'outline' : 'default'}
         >
-          {mutation.isPending
-            ? 'Backfilling…'
-            : isDone
-              ? 'Nothing to do'
-              : 'Backfill next 1 000'}
+          {mutation.isPending ? 'Backfilling…' : isDone ? 'Nothing to do' : 'Backfill next 1 000'}
         </Button>
       </div>
 
@@ -118,9 +86,7 @@ export function SafetyIdentifiersBackfill() {
             {logs.map((log, i) => (
               <div key={i} className="text-muted-foreground flex gap-2">
                 <span className="shrink-0">{log.timestamp.toLocaleTimeString()}</span>
-                <span>
-                  openrouter: {log.openrouterProcessed.toLocaleString()}, vercel: {log.vercelProcessed.toLocaleString()}
-                </span>
+                <span>processed {log.processed.toLocaleString()} users</span>
               </div>
             ))}
           </div>

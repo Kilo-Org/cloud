@@ -1416,7 +1416,11 @@ export const gastownRouter = router({
     .output(RpcBeadOutput)
     .mutation(async ({ ctx, input }) => {
       const townStub = getTownDOStub(ctx.env, input.townId);
-      return townStub.updateBeadStatus(input.beadId, 'failed', 'admin');
+      return townStub.updateBeadStatus(input.beadId, 'failed', 'admin', {
+        code: 'admin_force_fail',
+        message: 'Manually failed by admin',
+        source: 'admin',
+      });
     }),
 
   adminGetAlarmStatus: adminProcedure

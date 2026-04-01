@@ -37,6 +37,20 @@ function now(): string {
   return new Date().toISOString();
 }
 
+/** Extract the human-readable failure message from a bead event's metadata. */
+function extractFailureMessage(
+  status: string,
+  metadata: Record<string, unknown> | null | undefined
+): string | null {
+  if (status !== 'failed' || !metadata) return null;
+  const fr = metadata.failure_reason;
+  if (typeof fr === 'object' && fr !== null && 'message' in fr) {
+    const msg = (fr as Record<string, unknown>).message;
+    if (typeof msg === 'string') return msg;
+  }
+  return null;
+}
+
 export function initReviewQueueTables(_sql: SqlStorage): void {
   // Review queue and molecule tables are now part of beads + satellite tables.
   // Initialization happens in beads.initBeadTables().
@@ -235,29 +249,11 @@ export function completeReview(
   entryId: string,
   status: 'merged' | 'failed'
 ): void {
-  // Guard: don't overwrite terminal states (closed MR bead that was
-  // already merged should never be set to 'failed' by a stale call)
-  const current = getBead(sql, entryId);
-  if (current && (current.status === 'closed' || current.status === 'failed')) {
-    console.warn(
-      `[review-queue] completeReview: bead ${entryId} already ${current.status}, skipping`
-    );
-    return;
-  }
-
   const beadStatus = status === 'merged' ? 'closed' : 'failed';
-  const timestamp = now();
-  query(
-    sql,
-    /* sql */ `
-      UPDATE ${beads}
-      SET ${beads.columns.status} = ?,
-          ${beads.columns.updated_at} = ?,
-          ${beads.columns.closed_at} = ?
-      WHERE ${beads.bead_id} = ?
-    `,
-    [beadStatus, timestamp, beadStatus === 'closed' ? timestamp : null, entryId]
-  );
+  // Delegate to updateBeadStatus so a status_changed event is recorded
+  // on the event timeline. It also handles terminal-state guards,
+  // closed_at timestamps, and convoy progress updates.
+  updateBeadStatus(sql, entryId, beadStatus, 'system');
 }
 
 /**
@@ -705,7 +701,11 @@ export function agentCompleted(
       //    Rule 3 will reset it to open after the staleness timeout.
       const hookedBead = getBead(sql, agent.current_hook_bead_id);
       if (input.status === 'failed') {
-        updateBeadStatus(sql, agent.current_hook_bead_id, 'failed', agentId);
+        updateBeadStatus(sql, agent.current_hook_bead_id, 'failed', agentId, {
+          code: 'agent_failed',
+          message: 'Agent exited with failed status',
+          source: 'container',
+        });
       } else if (hookedBead && hookedBead.status === 'in_progress') {
         // Agent exited 'completed' but bead is still in_progress — gt_done was never called.
         // Don't close the bead. Rule 3 will handle rework.
@@ -1197,12 +1197,7 @@ function mrBeadRowToItem(row: z.output<typeof MrBeadRow>): MergeQueueItem {
       : null,
     rigName: row.rig_name,
     staleSince: null,
-    failureReason:
-      row.status === 'failed' && row.failure_event_metadata
-        ? typeof row.failure_event_metadata.message === 'string'
-          ? row.failure_event_metadata.message
-          : null
-        : null,
+    failureReason: extractFailureMessage(row.status, row.failure_event_metadata),
   };
 }
 

@@ -278,7 +278,11 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
     case 'transition_bead': {
       try {
-        beadOps.updateBeadStatus(sql, action.bead_id, action.to, action.actor);
+        const failureReason =
+          action.to === 'failed'
+            ? { code: 'reconciler', message: action.reason, source: 'scheduler' }
+            : undefined;
+        beadOps.updateBeadStatus(sql, action.bead_id, action.to, action.actor, failureReason);
       } catch (err) {
         console.warn(`${LOG} transition_bead failed: bead=${action.bead_id} to=${action.to}`, err);
       }

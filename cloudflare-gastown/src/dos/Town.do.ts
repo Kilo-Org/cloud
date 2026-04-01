@@ -19,6 +19,7 @@ import { z } from 'zod';
 
 // Sub-modules (plain functions, not classes — per coding style)
 import * as beadOps from './town/beads';
+import type { FailureReason } from './town/types';
 import * as agents from './town/agents';
 import * as mail from './town/mail';
 import * as reviewQueue from './town/review-queue';
@@ -913,7 +914,12 @@ export class TownDO extends DurableObject<Env> {
     return beadOps.listBeads(this.sql, filter);
   }
 
-  async updateBeadStatus(beadId: string, status: string, agentId: string): Promise<Bead> {
+  async updateBeadStatus(
+    beadId: string,
+    status: string,
+    agentId: string,
+    failureReason?: FailureReason
+  ): Promise<Bead> {
     // Record terminal transitions as bead_cancelled events for the reconciler.
     // Non-terminal transitions are normal lifecycle changes, not cancellations.
     if (status === 'closed' || status === 'failed') {
@@ -925,7 +931,7 @@ export class TownDO extends DurableObject<Env> {
 
     // Convoy progress is updated automatically inside beadOps.updateBeadStatus
     // when the bead reaches a terminal status (closed/failed).
-    const bead = beadOps.updateBeadStatus(this.sql, beadId, status, agentId);
+    const bead = beadOps.updateBeadStatus(this.sql, beadId, status, agentId, failureReason);
 
     if (status === 'closed') {
       const durationMs = Date.now() - new Date(bead.created_at).getTime();
@@ -1682,7 +1688,11 @@ export class TownDO extends DurableObject<Env> {
             if (restartBeadId) {
               const hookedBead = beadOps.getBead(this.sql, restartBeadId);
               if (hookedBead && hookedBead.dispatch_attempts >= scheduling.MAX_DISPATCH_ATTEMPTS) {
-                beadOps.updateBeadStatus(this.sql, restartBeadId, 'failed', 'system');
+                beadOps.updateBeadStatus(this.sql, restartBeadId, 'failed', 'system', {
+                  code: 'max_dispatch_attempts',
+                  message: `Dispatch attempts exhausted (${hookedBead.dispatch_attempts})`,
+                  source: 'triage',
+                });
                 agents.unhookBead(this.sql, targetAgentId);
                 break;
               }
@@ -1725,7 +1735,11 @@ export class TownDO extends DurableObject<Env> {
           // created (not the agent's current hook, which may differ).
           const beadToClose = snapshotHookedBeadId ?? targetAgent?.current_hook_bead_id;
           if (beadToClose) {
-            beadOps.updateBeadStatus(this.sql, beadToClose, 'failed', input.agent_id);
+            beadOps.updateBeadStatus(this.sql, beadToClose, 'failed', input.agent_id, {
+              code: 'triage_close',
+              message: input.resolution_notes || 'Closed via triage',
+              source: 'triage',
+            });
             // Only stop and unhook if the agent is still working on this
             // specific bead. If the agent has moved on, stopping it would
             // abort unrelated work.
@@ -1792,7 +1806,11 @@ export class TownDO extends DurableObject<Env> {
               reassignBead &&
               reassignBead.dispatch_attempts >= scheduling.MAX_DISPATCH_ATTEMPTS
             ) {
-              beadOps.updateBeadStatus(this.sql, beadToReassign, 'failed', input.agent_id);
+              beadOps.updateBeadStatus(this.sql, beadToReassign, 'failed', input.agent_id, {
+                code: 'max_dispatch_attempts',
+                message: `Dispatch attempts exhausted during reassign (${reassignBead.dispatch_attempts})`,
+                source: 'triage',
+              });
             } else {
               // Reset the bead to open so the scheduler can re-assign it
               query(
@@ -3675,7 +3693,11 @@ export class TownDO extends DurableObject<Env> {
       // Failing the batch bead triggers cooldown: the guard at the top of
       // this method skips dispatch while a failed batch bead's updated_at
       // is within DISPATCH_COOLDOWN_MS.
-      beadOps.updateBeadStatus(this.sql, triageBead.bead_id, 'failed', triageAgent.id);
+      beadOps.updateBeadStatus(this.sql, triageBead.bead_id, 'failed', triageAgent.id, {
+        code: 'container_start_failed',
+        message: 'Triage agent failed to start in container',
+        source: 'container',
+      });
       console.error(`${TOWN_LOG} maybeDispatchTriageAgent: triage agent failed to start`);
     }
   }

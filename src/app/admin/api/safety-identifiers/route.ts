@@ -28,17 +28,12 @@ export async function GET(): Promise<
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
-  const [result] = await db
-    .select({ count: count() })
-    .from(kilocode_users)
-    .where(missingEither);
+  const [result] = await db.select({ count: count() }).from(kilocode_users).where(missingEither);
 
   return NextResponse.json({ missing: result?.count ?? 0 });
 }
 
-export async function POST(): Promise<
-  NextResponse<BackfillBatchResponse | { error: string }>
-> {
+export async function POST(): Promise<NextResponse<BackfillBatchResponse | { error: string }>> {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 

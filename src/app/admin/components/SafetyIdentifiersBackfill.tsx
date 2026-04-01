@@ -48,8 +48,8 @@ export function SafetyIdentifiersBackfill() {
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
-        Backfill safety identifiers for users missing either field. Each click processes up
-        to 1 000 users. Click repeatedly until the counter reaches zero.
+        Backfill safety identifiers for users missing either field. Each click processes up to 1 000
+        users. Click repeatedly until the counter reaches zero.
       </p>
 
       <div className="bg-background rounded-lg border p-6 space-y-4">
@@ -58,7 +58,9 @@ export function SafetyIdentifiersBackfill() {
           {isLoading ? (
             <Badge variant="secondary">Loading…</Badge>
           ) : isDone ? (
-            <Badge variant="default" className="bg-green-600">All filled</Badge>
+            <Badge variant="default" className="bg-green-600">
+              All filled
+            </Badge>
           ) : (
             <Badge variant="destructive">{(counts?.missing ?? 0).toLocaleString()} missing</Badge>
           )}

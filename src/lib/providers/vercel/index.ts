@@ -110,7 +110,7 @@ export async function shouldRouteToVercel(
   const vercelModels = await getVercelModels();
   const vercelModelId = mapModelIdToVercel(requestedModel);
   if (!vercelModels.includes(vercelModelId)) {
-    console.debug(`[shouldRouteToVercel] model ${vercelModelId} not found in Vercel model list`);
+    console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;
   }
 

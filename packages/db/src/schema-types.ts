@@ -887,7 +887,7 @@ export const CustomLlmDefinitionSchema = z.object({
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
   opencode_settings: OpenCodeSettingsSchema.optional(),
-});
+}).strict();
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 

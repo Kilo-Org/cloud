@@ -4,6 +4,7 @@
   "main": "src/gastown.worker.ts",
   "compatibility_date": "2026-02-24",
   "compatibility_flags": ["nodejs_compat"],
+  "dev": { "port": 8803 },
   "placement": { "mode": "smart" },
   "observability": {
     "enabled": true,

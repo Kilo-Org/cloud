@@ -1286,7 +1286,9 @@ export const kiloclawRouter = createTRPCRouter({
     });
     const isDev = process.env.NODE_ENV === 'development';
     const imageTag = isDev ? ':dev' : ':latest';
-    const workerFlag = isDev ? ' --worker-url=http://localhost:8795' : '';
+    const workerFlag = isDev
+      ? ` --worker-url=${process.env.KILOCLAW_API_URL ?? 'http://localhost:8795'}`
+      : '';
     const gmailPushFlag = isDev ? ' --gmail-push-worker-url=${GMAIL_PUSH_WORKER_URL}' : '';
     const imageUrl = `ghcr.io/kilo-org/google-setup${imageTag}`;
     return {

@@ -22,6 +22,7 @@ export type KiloPassSubscriptionInfo = {
     cancelSubscription: (params?: { onSuccess?: () => void }) => void;
     isCancelingSubscription: boolean;
     resumeCancelledSubscription: () => void;
+    resumePausedSubscription: () => void;
     isResumingSubscription: boolean;
   };
 };
@@ -105,6 +106,20 @@ export function KiloPassSubscriptionInfoProvider(props: {
     })();
   }, [isResumingSubscription, queryClient, trpc, trpcClient]);
 
+  const resumePausedSubscription = useCallback(() => {
+    const run = async () => {
+      try {
+        await trpcClient.kiloPass.resumePausedSubscription.mutate();
+        toast('Subscription resumed');
+        void queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to resume subscription';
+        toast.error(message);
+      }
+    };
+    void run();
+  }, [trpcClient, queryClient, trpc]);
+
   const view = useMemo(() => deriveKiloPassSubscriptionInfoView(subscription), [subscription]);
 
   const value: KiloPassSubscriptionInfo = useMemo(
@@ -117,6 +132,7 @@ export function KiloPassSubscriptionInfoProvider(props: {
         cancelSubscription,
         isCancelingSubscription,
         resumeCancelledSubscription,
+        resumePausedSubscription,
         isResumingSubscription,
       },
     }),
@@ -128,6 +144,7 @@ export function KiloPassSubscriptionInfoProvider(props: {
       cancelSubscription,
       isCancelingSubscription,
       resumeCancelledSubscription,
+      resumePausedSubscription,
       isResumingSubscription,
     ]
   );

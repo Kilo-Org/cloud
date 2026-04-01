@@ -8,6 +8,7 @@ import type Stripe from 'stripe';
 import type { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { getOpenPauseEvent } from '@/lib/kilo-pass/pause-events';
 
 type Db = typeof defaultDb;
 type DbOrTx = Db | DrizzleTransaction;
@@ -22,6 +23,7 @@ export type KiloPassSubscriptionState = {
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
   startedAt: string | null;
+  resumesAt: string | null;
 };
 
 type KiloPassSubscriptionRowForState = {
@@ -122,6 +124,14 @@ export async function getKiloPassStateForUser(
   const selected = pickSubscriptionForState(subscriptions);
   if (!selected) return null;
 
+  let resumesAt: string | null = null;
+  if (selected.status === 'paused') {
+    const openPause = await getOpenPauseEvent(db, {
+      kiloPassSubscriptionId: selected.subscriptionId,
+    });
+    resumesAt = openPause?.resumes_at ? normalizeTimestampToIso(openPause.resumes_at) : null;
+  }
+
   return {
     subscriptionId: selected.subscriptionId,
     stripeSubscriptionId: selected.stripeSubscriptionId,
@@ -132,5 +142,6 @@ export async function getKiloPassStateForUser(
     currentStreakMonths: selected.currentStreakMonths,
     nextYearlyIssueAt: normalizeTimestampToIso(selected.nextYearlyIssueAt),
     startedAt: normalizeTimestampToIso(selected.startedAt),
+    resumesAt,
   };
 }

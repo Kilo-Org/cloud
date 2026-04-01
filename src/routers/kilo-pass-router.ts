@@ -69,6 +69,7 @@ const KiloPassSubscriptionStateBaseSchema = z.object({
   currentStreakMonths: z.number(),
   nextYearlyIssueAt: z.string().nullable(),
   startedAt: z.string().nullable(),
+  resumesAt: z.string().nullable(),
 });
 
 const KiloPassSubscriptionStateSchema = KiloPassSubscriptionStateBaseSchema.extend({

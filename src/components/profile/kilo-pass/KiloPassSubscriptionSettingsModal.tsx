@@ -244,6 +244,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
 
   const cancelAction = view.actions.cancel;
   const resumeAction = view.actions.resume;
+  const resumePausedAction = view.actions.resumePaused;
 
   const isUpdateSubscriptionDisabled = view.status.isPendingCancellation;
 
@@ -333,8 +334,10 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
             onManagePaymentMethod={actions.openCustomerPortal}
             isOpeningCustomerPortal={actions.isOpeningCustomerPortal}
             resumeAction={resumeAction}
+            resumePausedAction={resumePausedAction}
             cancelAction={cancelAction}
             onResumeSubscription={actions.resumeCancelledSubscription}
+            onResumePausedSubscription={actions.resumePausedSubscription}
             onOpenCancelSubscription={handleOpenCancelFlow}
             isResumingSubscription={actions.isResumingSubscription}
             isCancelingSubscription={actions.isCancelingSubscription}

@@ -1,5 +1,7 @@
+import * as Sentry from '@sentry/cloudflare';
 import { initTRPC, TRPCError } from '@trpc/server';
 import { writeEvent } from '../util/analytics.util';
+import { checkRateLimit } from '../util/rate-limit.util';
 
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
 
@@ -15,13 +17,56 @@ const t = initTRPC.context<TRPCContext>().create();
 
 export const router = t.router;
 
+// tRPC procedure paths that correspond to key operations for Sentry breadcrumbs
+const BREADCRUMB_OPERATIONS = new Set([
+  'wasteland.createWasteland',
+  'wasteland.claimWantedItem',
+  'wasteland.markWantedItemDone',
+  'wasteland.postWantedItem',
+  'wasteland.deleteWasteland',
+  'wasteland.storeCredential',
+]);
+
 /**
- * Analytics middleware — wraps every tRPC procedure to emit an analytics
- * event with timing and error capture. Runs before auth so even rejected
- * requests are tracked.
+ * Extract a wastelandId from the tRPC raw input if present.
+ * Input is unvalidated at this point so we defensively check the shape.
  */
-const analyticsProcedure = t.procedure.use(async ({ ctx, path, type, next }) => {
+function extractWastelandId(rawInput: unknown): string | undefined {
+  if (rawInput && typeof rawInput === 'object' && 'wastelandId' in rawInput) {
+    const val = (rawInput as Record<string, unknown>).wastelandId;
+    return typeof val === 'string' ? val : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Analytics + observability middleware — wraps every tRPC procedure to:
+ * 1. Emit analytics events with timing data
+ * 2. Add Sentry breadcrumbs for key operations
+ * 3. Set Sentry tags for error correlation
+ */
+const analyticsProcedure = t.procedure.use(async ({ ctx, path, type, rawInput, next }) => {
   const start = performance.now();
+  const wastelandId = extractWastelandId(rawInput);
+
+  // Set Sentry tags for error correlation
+  Sentry.setTag('operation', path);
+  if (ctx.userId) Sentry.setTag('userId', ctx.userId);
+  if (wastelandId) Sentry.setTag('wastelandId', wastelandId);
+
+  // Add Sentry breadcrumb for key operations
+  if (BREADCRUMB_OPERATIONS.has(path)) {
+    Sentry.addBreadcrumb({
+      category: 'trpc',
+      message: `${type} ${path}`,
+      level: 'info',
+      data: {
+        ...(wastelandId ? { wastelandId } : {}),
+        userId: ctx.userId || undefined,
+      },
+    });
+  }
+
   let error: string | undefined;
   try {
     const result = await next({ ctx });
@@ -37,6 +82,7 @@ const analyticsProcedure = t.procedure.use(async ({ ctx, path, type, next }) => 
       route: `${type} ${path}`,
       error,
       userId: ctx.userId || undefined,
+      wastelandId,
       durationMs,
     });
   }
@@ -47,11 +93,14 @@ const analyticsProcedure = t.procedure.use(async ({ ctx, path, type, next }) => 
  * running before tRPC). The userId is extracted from the JWT and set on the
  * Hono context by kiloAuthMiddleware, then forwarded into the tRPC context
  * by the createContext callback in wasteland.worker.ts.
+ *
+ * Also enforces per-user rate limits for operations that have them configured.
  */
-export const procedure = analyticsProcedure.use(async ({ ctx, next }) => {
+export const procedure = analyticsProcedure.use(async ({ ctx, path, next }) => {
   if (!ctx.userId) {
     throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Authentication required' });
   }
+  checkRateLimit(ctx.userId, path);
   return next({ ctx });
 });
 

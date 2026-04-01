@@ -25,7 +25,7 @@ import {
 } from '@/lib/wasteland/trpc';
 
 const DOLTHUB_UPSTREAM_PATTERN = /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/;
-const NAME_MAX_LENGTH = 100;
+const NAME_MAX_LENGTH = 128;
 
 type OwnershipType = 'personal' | 'organization';
 type Visibility = 'public' | 'private';

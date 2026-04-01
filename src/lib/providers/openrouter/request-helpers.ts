@@ -80,7 +80,28 @@ function setCacheControlOnResponsesMessage(message: OpenAI.Responses.ResponseInp
   }
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function containsCacheControl(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(containsCacheControl);
+  }
+  if (!isObjectRecord(value)) {
+    return false;
+  }
+  if (Object.hasOwn(value, 'cache_control')) {
+    return true;
+  }
+  return Object.values(value).some(containsCacheControl);
+}
+
 export function addCacheBreakpoints(request: GatewayRequest) {
+  if (containsCacheControl(request.body)) {
+    console.debug('[addCacheBreakpoints] skipping because cache_control is already present');
+    return;
+  }
   if (
     request.kind === 'chat_completions' &&
     Array.isArray(request.body.messages) &&

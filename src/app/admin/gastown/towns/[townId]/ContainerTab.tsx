@@ -32,10 +32,12 @@ function CFLink({
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="outline" size="sm" disabled className="gap-1.5">
-            <ExternalLink className="size-3.5" />
-            {label}
-          </Button>
+          <span className="inline-block">
+            <Button variant="outline" size="sm" disabled className="gap-1.5">
+              <ExternalLink className="size-3.5" />
+              {label}
+            </Button>
+          </span>
         </TooltipTrigger>
         {disabledTooltip && <TooltipContent>{disabledTooltip}</TooltipContent>}
       </Tooltip>

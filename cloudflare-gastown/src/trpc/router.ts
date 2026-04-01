@@ -1021,8 +1021,36 @@ export const gastownRouter = router({
 
       // Also remint and push KILOCODE_TOKEN — this is what actually
       // authenticates GT tool calls and is the main reason users hit 401s.
-      const user = userFromCtx(ctx);
-      const newKilocodeToken = await mintKilocodeToken(ctx.env, user);
+      // For personal towns the caller IS the owner; for org towns we must
+      // use the town owner's identity (not the caller's) so that
+      // git-credentials and other owner-scoped APIs continue to work.
+      let tokenUser: { id: string; api_token_pepper: string | null };
+      if (ownership.type === 'user') {
+        tokenUser = userFromCtx(ctx);
+      } else {
+        // Org town: resolve the owner from the town config
+        const config = await townStub.getTownConfig();
+        const ownerId = config.owner_user_id ?? config.created_by_user_id;
+        if (ownerId && ownerId === ctx.userId) {
+          // Caller happens to be the owner — use their live context
+          tokenUser = userFromCtx(ctx);
+        } else if (ownerId) {
+          // Different org member — look up the owner's pepper from the DB
+          const { findUserById } = await import('../util/user-db.util');
+          const ownerUser = await findUserById(ctx.env.HYPERDRIVE.connectionString, ownerId);
+          if (!ownerUser) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Town owner not found — cannot refresh KILOCODE_TOKEN',
+            });
+          }
+          tokenUser = { id: ownerUser.id, api_token_pepper: ownerUser.api_token_pepper };
+        } else {
+          // No owner recorded — fall back to caller
+          tokenUser = userFromCtx(ctx);
+        }
+      }
+      const newKilocodeToken = await mintKilocodeToken(ctx.env, tokenUser);
       await townStub.updateTownConfig({ kilocode_token: newKilocodeToken });
       await townStub.syncConfigToContainer();
     }),

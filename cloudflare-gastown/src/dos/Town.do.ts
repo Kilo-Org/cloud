@@ -56,6 +56,7 @@ import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerStub } from './TownContainer.do';
 
+import { verifyKiloToken } from '@kilocode/worker-utils';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
 import { writeEvent, type GastownEventData } from '../util/analytics.util';
@@ -1587,18 +1588,19 @@ export class TownDO extends DurableObject<Env> {
             dispatch.stopAgentInContainer(this.env, this.townId, targetAgentId).catch(() => {});
           }
           if (targetAgent) {
+            // Use the bead captured in the triage snapshot (not the agent's
+            // current hook, which may have changed since the triage request
+            // was created). Fall back to current hook for backward compat.
+            const restartBeadId =
+              snapshotHookedBeadId ?? targetAgent.current_hook_bead_id;
+
             // Check if the hooked bead has exhausted its dispatch cap.
             // If so, fail it immediately instead of letting the reconciler
             // re-dispatch indefinitely (#1653).
-            if (targetAgent.current_hook_bead_id) {
-              const hookedBead = beadOps.getBead(this.sql, targetAgent.current_hook_bead_id);
+            if (restartBeadId) {
+              const hookedBead = beadOps.getBead(this.sql, restartBeadId);
               if (hookedBead && hookedBead.dispatch_attempts >= scheduling.MAX_DISPATCH_ATTEMPTS) {
-                beadOps.updateBeadStatus(
-                  this.sql,
-                  targetAgent.current_hook_bead_id,
-                  'failed',
-                  'system'
-                );
+                beadOps.updateBeadStatus(this.sql, restartBeadId, 'failed', 'system');
                 agents.unhookBead(this.sql, targetAgentId);
                 break;
               }
@@ -1622,7 +1624,7 @@ export class TownDO extends DurableObject<Env> {
             // reconciler's exponential backoff gate fires correctly.
             // Without this, the backoff variant allows immediate
             // redispatch once last_dispatch_attempt_at ages out.
-            if (action === 'RESTART_WITH_BACKOFF' && targetAgent.current_hook_bead_id) {
+            if (action === 'RESTART_WITH_BACKOFF' && restartBeadId) {
               query(
                 this.sql,
                 /* sql */ `
@@ -1630,7 +1632,7 @@ export class TownDO extends DurableObject<Env> {
                   SET ${beads.columns.last_dispatch_attempt_at} = ?
                   WHERE ${beads.bead_id} = ?
                 `,
-                [now(), targetAgent.current_hook_bead_id]
+                [now(), restartBeadId]
               );
             }
           }
@@ -3382,9 +3384,9 @@ export class TownDO extends DurableObject<Env> {
    * Throttled to once per day — the 30-day token is refreshed when
    * within 7 days of expiry, providing ample safety margin.
    *
-   * Decodes the existing JWT payload to extract user identity (no
-   * signature verification needed — we're just reading the claims to
-   * re-sign with the same data).
+   * Verifies the existing token's signature before trusting its claims,
+   * preventing a forged near-expiry token from being re-signed with
+   * real credentials.
    */
   private lastKilocodeTokenCheckAt = 0;
   private async refreshKilocodeTokenIfExpiring(): Promise<void> {
@@ -3398,24 +3400,26 @@ export class TownDO extends DurableObject<Env> {
     const token = townConfig.kilocode_token;
     if (!token) return;
 
-    // Decode JWT payload (base64url, no verification)
-    const parts = token.split('.');
-    const encodedPayload = parts[1];
-    if (!encodedPayload) return;
-    const payloadSchema = z.object({
-      exp: z.number().optional(),
-      kiloUserId: z.string().optional(),
-      apiTokenPepper: z.string().nullable().optional(),
-    });
-    let rawPayload: unknown;
-    try {
-      rawPayload = JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
-    } catch {
+    if (!this.env.NEXTAUTH_SECRET) {
+      logger.warn('refreshKilocodeTokenIfExpiring: NEXTAUTH_SECRET not configured');
       return;
     }
-    const parsed = payloadSchema.safeParse(rawPayload);
-    if (!parsed.success) return;
-    const payload = parsed.data;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) {
+      logger.warn('refreshKilocodeTokenIfExpiring: failed to resolve NEXTAUTH_SECRET');
+      return;
+    }
+
+    // Verify the existing token's signature before trusting its claims.
+    // This prevents a forged token from being re-signed with real credentials.
+    let payload: { kiloUserId: string; apiTokenPepper?: string | null; exp?: number };
+    try {
+      payload = await verifyKiloToken(token, secret);
+    } catch {
+      // Signature invalid or token malformed — don't remint from untrusted claims.
+      logger.warn('refreshKilocodeTokenIfExpiring: existing token failed signature verification');
+      return;
+    }
 
     const exp = payload.exp;
     if (!exp) return;
@@ -3426,16 +3430,6 @@ export class TownDO extends DurableObject<Env> {
     // Token expires within 7 days — remint it
     const userId = payload.kiloUserId;
     if (!userId) return;
-
-    if (!this.env.NEXTAUTH_SECRET) {
-      logger.warn('refreshKilocodeTokenIfExpiring: NEXTAUTH_SECRET not configured');
-      return;
-    }
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) {
-      logger.warn('refreshKilocodeTokenIfExpiring: failed to resolve NEXTAUTH_SECRET');
-      return;
-    }
 
     const newToken = await generateKiloApiToken(
       { id: userId, api_token_pepper: payload.apiTokenPepper ?? null },

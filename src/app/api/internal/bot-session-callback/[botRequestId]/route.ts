@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { db } from '@/lib/drizzle';
 import { bot_requests, platform_integrations } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
@@ -425,12 +426,23 @@ export async function POST(
   { params }: { params: Promise<{ botRequestId: string }> }
 ) {
   try {
-    const secret = req.headers.get('X-Internal-Secret');
-    if (!INTERNAL_API_SECRET || secret !== INTERNAL_API_SECRET) {
+    const { botRequestId } = await params;
+    const token = req.headers.get('X-Bot-Callback-Token');
+
+    if (!INTERNAL_API_SECRET || !token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { botRequestId } = await params;
+    const expectedToken = createHmac('sha256', INTERNAL_API_SECRET)
+      .update(`bot-callback:${botRequestId}`)
+      .digest('hex');
+    const tokenBuf = Buffer.from(token);
+    const expectedBuf = Buffer.from(expectedToken);
+
+    if (tokenBuf.length !== expectedBuf.length || !timingSafeEqual(tokenBuf, expectedBuf)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const payload = (await req.json()) as Partial<ExecutionCallbackPayload>;
     const callbackSessionId = payload.cloudAgentSessionId;
 

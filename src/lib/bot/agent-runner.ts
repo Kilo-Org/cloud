@@ -175,6 +175,10 @@ export async function postSessionLinkEphemeral(params: {
     )
     .catch(error => {
       console.error('[KiloBot] Failed to post session link ephemeral:', error);
+      captureException(error, {
+        tags: { component: 'kilo-bot', op: 'post-session-link-ephemeral' },
+        extra: { sessionUrl: params.sessionUrl },
+      });
     });
 }
 

@@ -17,8 +17,20 @@ import {
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { APP_URL } from '@/lib/constants';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { createHmac } from 'crypto';
+import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
 import z from 'zod';
+
+/**
+ * Derive a per-request callback token so the shared INTERNAL_API_SECRET
+ * is never stored in session metadata (which is visible via getSession).
+ */
+function deriveBotCallbackToken(botRequestId: string): string {
+  return createHmac('sha256', INTERNAL_API_SECRET)
+    .update(`bot-callback:${botRequestId}`)
+    .digest('hex');
+}
 
 /**
  * Result from spawning a Cloud Agent session
@@ -85,12 +97,13 @@ export default async function spawnCloudAgentSession(
   let prepareInput: PrepareSessionInput;
   let initiateInput: { githubToken?: string; kilocodeOrganizationId?: string };
   const mode: AgentMode = args.mode ?? 'code';
-  const callbackTarget = botRequestId
-    ? {
-        url: `${APP_URL}/api/internal/bot-session-callback/${botRequestId}`,
-        headers: { 'X-Internal-Secret': INTERNAL_API_SECRET },
-      }
-    : undefined;
+  const callbackTarget =
+    botRequestId && INTERNAL_API_SECRET
+      ? {
+          url: `${APP_URL}/api/internal/bot-session-callback/${botRequestId}`,
+          headers: { 'X-Bot-Callback-Token': deriveBotCallbackToken(botRequestId) },
+        }
+      : undefined;
 
   const isGitLab = 'gitlabProject' in args;
   const prompt =
@@ -201,6 +214,10 @@ export default async function spawnCloudAgentSession(
     onSessionReady?.({ cloudAgentSessionId, kiloSessionId });
   } catch (error) {
     console.error('[KiloBot] onSessionReady callback error:', error);
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'onSessionReady' },
+      extra: { cloudAgentSessionId, kiloSessionId },
+    });
   }
 
   const response =

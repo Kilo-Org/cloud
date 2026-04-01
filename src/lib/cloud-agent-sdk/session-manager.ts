@@ -89,7 +89,9 @@ type SessionManagerConfig = {
   cliWebsocketUrl?: string;
   websocketBaseUrl?: string;
   api: CloudAgentApi;
-  prepare: (input: PrepareInput) => Promise<{ cloudAgentSessionId: CloudAgentSessionId }>;
+  prepare: (
+    input: PrepareInput
+  ) => Promise<{ cloudAgentSessionId: CloudAgentSessionId; kiloSessionId: KiloSessionId }>;
   initiate: (input: { cloudAgentSessionId: CloudAgentSessionId }) => Promise<unknown>;
   fetchSession: (kiloSessionId: KiloSessionId) => Promise<FetchedSessionData>;
   onKiloSessionCreated?: (kiloSessionId: KiloSessionId) => void;
@@ -227,7 +229,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // Internal atoms
   const sessionStorageAtom = atom<JotaiSessionStorage | null>(null);
   const optimisticMessageAtom = atom<StoredMessage | null>(null);
-  const sessionParentsAtom = atom<Map<string, string | null>>(new Map());
+  const rootSessionIdAtom = atom<string | null>(null);
 
   // Public writable atoms
   const isStreamingAtom = atom(false);
@@ -258,12 +260,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const ids = get(storage.atoms.messageIds);
     const msgMap = get(storage.atoms.messages);
     const partsMap = get(storage.atoms.parts);
-    const parents = get(sessionParentsAtom);
+    const rootSessionId = get(rootSessionIdAtom);
     const out: StoredMessage[] = [];
     for (const id of ids) {
       const info = msgMap.get(id);
       if (!info) continue;
-      if (parents.has(info.sessionID) && parents.get(info.sessionID) !== null) continue;
+      if (rootSessionId !== null && info.sessionID !== rootSessionId) continue;
       out.push({ info, parts: partsMap.get(id) ?? [] });
     }
     const opt = get(optimisticMessageAtom);
@@ -322,7 +324,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function clearAllAtoms(): void {
     store.set(sessionStorageAtom, null);
     store.set(optimisticMessageAtom, null);
-    store.set(sessionParentsAtom, new Map());
+    store.set(rootSessionIdAtom, null);
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
     store.set(isReadOnlyAtom, false);
@@ -432,6 +434,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // Clean slate immediately — the user asked to switch, so clear all
     // previous session state and show a loading indicator.
     clearAllAtoms();
+    store.set(rootSessionIdAtom, kiloSessionId);
     store.set(isLoadingAtom, true);
 
     let data: FetchedSessionData;
@@ -474,10 +477,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       websocketBaseUrl: config.websocketBaseUrl,
       storage: jotaiStorage,
       onSessionCreated: info => {
-        const parents = new Map(store.get(sessionParentsAtom));
-        parents.set(info.id, info.parentID ?? null);
-        store.set(sessionParentsAtom, parents);
-        if (!info.parentID) {
+        if (info.parentID == null) {
+          // Adopt the server-reported root session ID so message
+          // filtering works even when switchSession was called with a
+          // cast cloudAgentSessionId (the createAndStart path).
+          store.set(rootSessionIdAtom, info.id);
           store.set(isLoadingAtom, false);
         }
       },
@@ -634,14 +638,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   async function createAndStart(input: PrepareInput): Promise<void> {
     try {
-      const { cloudAgentSessionId } = await config.prepare(input);
+      const { cloudAgentSessionId, kiloSessionId } = await config.prepare(input);
       await config.initiate({ cloudAgentSessionId });
       store.set(sessionIdAtom, cloudAgentSessionId);
-      // In the create flow, the cloud agent session ID doubles as the kilo
-      // session ID for the DB lookup. This is the one boundary where the
-      // two IDs are intentionally the same value.
-      const asKiloId = cloudAgentSessionId as unknown as KiloSessionId;
-      await switchSession(asKiloId);
+      await switchSession(kiloSessionId);
     } catch (err) {
       setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
     }

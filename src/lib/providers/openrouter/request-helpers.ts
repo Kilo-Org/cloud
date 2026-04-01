@@ -131,10 +131,10 @@ export function addCacheBreakpoints(request: GatewayRequest) {
   } else if (
     request.kind === 'messages' &&
     request.body.messages.length > 1 &&
+    !request.body.cache_control &&
     !containsCacheControl(request.body.messages)
   ) {
     console.debug('[addCacheBreakpoints] setting cache breakpoint on messages request');
-    // @ts-expect-error non-standard top-level cache_control extension
     request.body.cache_control = { type: 'ephemeral' };
   }
 }

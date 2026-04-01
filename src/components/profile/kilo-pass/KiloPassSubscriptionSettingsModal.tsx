@@ -253,6 +253,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   const handleOpenCancelFlow = useCallback(async () => {
     try {
       const { hash, customerId } = await trpcClient.kiloPass.getChurnkeyAuthHash.query();
+      onClose();
 
       await showCancelFlow({
         authHash: hash,

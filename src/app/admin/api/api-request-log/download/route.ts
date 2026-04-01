@@ -7,7 +7,7 @@ import archiver from 'archiver';
 import { PassThrough } from 'node:stream';
 
 function formatTimestamp(isoString: string): string {
-  return isoString.replace(/[:.]/g, '-').replace('T', '_').replace('Z', '');
+  return isoString.replaceAll(':', '-').replaceAll(' ', '_');
 }
 
 function tryFormatJson(value: unknown): string {

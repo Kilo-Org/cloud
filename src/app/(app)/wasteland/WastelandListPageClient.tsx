@@ -7,11 +7,9 @@ import { PageContainer } from '@/components/layouts/PageContainer';
 import { Button } from '@/components/Button';
 import { Badge } from '@/components/ui/badge';
 import { SetPageTitle } from '@/components/SetPageTitle';
-import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { GastownBackdrop } from '@/components/gastown/GastownBackdrop';
-import { Plus, Skull, ExternalLink, Eye, EyeOff } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { Plus, Skull } from 'lucide-react';
+import { WastelandCard, WastelandListSkeleton } from './_components/WastelandListComponents';
 
 export function WastelandListPageClient() {
   const router = useRouter();
@@ -112,125 +110,5 @@ export function WastelandListPageClient() {
         </div>
       )}
     </PageContainer>
-  );
-}
-
-type WastelandItem = {
-  wasteland_id: string;
-  name: string;
-  owner_type: 'user' | 'org';
-  owner_user_id: string | null;
-  organization_id: string | null;
-  dolthub_upstream: string | null;
-  visibility: 'public' | 'private';
-  status: 'active' | 'deleted';
-  created_at: string;
-  updated_at: string;
-};
-
-function WastelandCard({
-  wasteland,
-  onClick,
-}: {
-  wasteland: WastelandItem;
-  onClick: () => void;
-}) {
-  return (
-    <Card
-      className="cursor-pointer border-white/10 bg-white/[0.03] transition-[border-color,background-color] hover:border-white/20 hover:bg-white/[0.05]"
-      onClick={onClick}
-    >
-      <CardContent className="flex flex-col gap-3 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="truncate text-base font-medium text-white/90">{wasteland.name}</h3>
-          <StatusPill status={wasteland.status} />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <VisibilityBadge visibility={wasteland.visibility} />
-          {wasteland.dolthub_upstream && (
-            <DoltHubLink upstream={wasteland.dolthub_upstream} />
-          )}
-        </div>
-
-        <div className="flex items-center justify-between text-xs text-white/40">
-          <span>
-            Created{' '}
-            {formatDistanceToNow(new Date(wasteland.created_at), { addSuffix: true })}
-          </span>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function StatusPill({ status }: { status: 'active' | 'deleted' }) {
-  if (status === 'active') {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/20">
-        <span className="size-1.5 rounded-full bg-emerald-400" />
-        Active
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-400 ring-1 ring-red-500/20">
-      <span className="size-1.5 rounded-full bg-red-400" />
-      Deleted
-    </span>
-  );
-}
-
-function VisibilityBadge({ visibility }: { visibility: 'public' | 'private' }) {
-  if (visibility === 'public') {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-md bg-white/5 px-2 py-0.5 text-xs text-white/50">
-        <Eye className="size-3" />
-        Public
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-md bg-white/5 px-2 py-0.5 text-xs text-white/50">
-      <EyeOff className="size-3" />
-      Private
-    </span>
-  );
-}
-
-function DoltHubLink({ upstream }: { upstream: string }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-md bg-white/5 px-2 py-0.5 text-xs text-white/50 hover:text-white/70"
-      onClick={e => {
-        e.stopPropagation();
-        window.open(`https://www.dolthub.com/repositories/${upstream}`, '_blank');
-      }}
-    >
-      <ExternalLink className="size-3" />
-      {upstream}
-    </span>
-  );
-}
-
-function WastelandListSkeleton() {
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <Card key={i} className="border-white/10 bg-white/[0.03]">
-          <CardContent className="flex flex-col gap-3 p-4">
-            <div className="flex items-start justify-between">
-              <Skeleton className="h-5 w-32" />
-              <Skeleton className="h-5 w-16 rounded-full" />
-            </div>
-            <div className="flex gap-2">
-              <Skeleton className="h-5 w-16" />
-              <Skeleton className="h-5 w-24" />
-            </div>
-            <Skeleton className="h-4 w-28" />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
   );
 }

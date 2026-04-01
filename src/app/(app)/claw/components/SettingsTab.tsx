@@ -259,8 +259,7 @@ function GoogleAccountCard({
   const [copied, setCopied] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const isDisconnecting = mutations.disconnectGoogle.isPending;
-  const rawCommand = setupData?.command;
-  const command = rawCommand ? rawCommand.replace(' && ', ' ; ') : undefined;
+  const command = setupData?.command;
 
   function handleCopy() {
     if (!command) return;

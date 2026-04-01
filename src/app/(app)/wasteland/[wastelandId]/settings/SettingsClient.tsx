@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
+import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useUser } from '@/hooks/useUser';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,9 @@ import {
   Lock,
   CheckCircle2,
   XCircle,
+  Building2,
+  Plus,
+  Loader2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -54,6 +58,8 @@ export function SettingsClient({ wastelandId }: Props) {
   const { data: currentUser } = useUser();
   const router = useRouter();
 
+  const gastownTrpc = useGastownTRPC();
+
   const wastelandQuery = useQuery(
     trpc.wasteland.getWasteland.queryOptions({ wastelandId })
   );
@@ -62,6 +68,9 @@ export function SettingsClient({ wastelandId }: Props) {
   );
   const membersQuery = useQuery(
     trpc.wasteland.listMembers.queryOptions({ wastelandId })
+  );
+  const connectedTownsQuery = useQuery(
+    trpc.wasteland.listConnectedTowns.queryOptions({ wastelandId })
   );
 
   const wasteland = wastelandQuery.data;
@@ -332,6 +341,17 @@ export function SettingsClient({ wastelandId }: Props) {
             </div>
           </SettingsSection>
 
+          {/* ── Connected Towns ────────────────────────────────── */}
+          <ConnectedTownsSection
+            wastelandId={wastelandId}
+            connectedTowns={connectedTownsQuery.data ?? []}
+            isLoading={connectedTownsQuery.isLoading}
+            isOwner={isOwner}
+            trpc={trpc}
+            gastownTrpc={gastownTrpc}
+            queryClient={queryClient}
+          />
+
           {/* ── Danger Zone ──────────────────────────────────────── */}
           {isOwner && (
             <SettingsSection
@@ -537,6 +557,260 @@ function DeleteWastelandDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+// ── Connected Towns Section ──────────────────────────────────────────────
+
+type ConnectedTown = {
+  town_id: string;
+  wasteland_id: string;
+  connected_by: string;
+  connected_at: string;
+};
+
+function ConnectedTownsSection({
+  wastelandId,
+  connectedTowns,
+  isLoading,
+  isOwner,
+  trpc,
+  gastownTrpc,
+  queryClient,
+}: {
+  wastelandId: string;
+  connectedTowns: ConnectedTown[];
+  isLoading: boolean;
+  isOwner: boolean;
+  trpc: ReturnType<typeof useWastelandTRPC>;
+  gastownTrpc: ReturnType<typeof useGastownTRPC>;
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const connectedTownsQueryKey = trpc.wasteland.listConnectedTowns.queryKey({ wastelandId });
+
+  const disconnectTown = useMutation({
+    ...trpc.wasteland.disconnectKiloTown.mutationOptions(),
+    onSuccess: () => {
+      toast.success('Town disconnected');
+      void queryClient.invalidateQueries({ queryKey: connectedTownsQueryKey });
+    },
+    onError: err => toast.error(`Failed to disconnect: ${err.message}`),
+  });
+
+  return (
+    <SettingsSection
+      title="Connected Towns"
+      description="Kilo towns connected to this wasteland for automated operations."
+      icon={Building2}
+    >
+      <div className="space-y-3">
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-12 w-full rounded-lg" />
+            <Skeleton className="h-12 w-full rounded-lg" />
+          </div>
+        ) : connectedTowns.length === 0 ? (
+          <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-6 text-center">
+            <Building2 className="mx-auto mb-2 size-6 text-white/20" />
+            <p className="text-sm text-white/40">No towns connected yet.</p>
+            <p className="mt-1 text-[11px] text-white/25">
+              Connect a Kilo town to enable one-click wasteland operations from
+              your town&apos;s mayor.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {connectedTowns.map(town => (
+              <div
+                key={town.town_id}
+                className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3"
+              >
+                <div className="flex items-center gap-3">
+                  <Building2 className="size-4 text-white/40" />
+                  <div>
+                    <p className="font-mono text-sm text-white/70">
+                      {town.town_id}
+                    </p>
+                    <p className="text-[11px] text-white/30">
+                      Connected {formatTimestamp(town.connected_at)}
+                    </p>
+                  </div>
+                </div>
+                {isOwner && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 border-red-500/20 text-red-400 hover:bg-red-500/10"
+                      >
+                        <Unlink className="size-3" />
+                        Disconnect
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="border-white/[0.08] bg-[oklch(0.13_0_0)] sm:max-w-md">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-white/90">
+                          Disconnect town?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-white/50">
+                          The mayor in this town will no longer be able to
+                          perform wasteland operations automatically.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="border-white/10 text-white/70 hover:bg-white/5 hover:text-white">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() =>
+                            disconnectTown.mutate({
+                              wastelandId,
+                              townId: town.town_id,
+                            })
+                          }
+                          className="bg-red-500/80 text-white hover:bg-red-500"
+                        >
+                          {disconnectTown.isPending
+                            ? 'Disconnecting...'
+                            : 'Disconnect'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <ConnectTownDialog
+          wastelandId={wastelandId}
+          connectedTownIds={new Set(connectedTowns.map(t => t.town_id))}
+          trpc={trpc}
+          gastownTrpc={gastownTrpc}
+          queryClient={queryClient}
+          connectedTownsQueryKey={connectedTownsQueryKey}
+        />
+      </div>
+    </SettingsSection>
+  );
+}
+
+// ── Connect Town Dialog ─────────────────────────────────────────────────
+
+function ConnectTownDialog({
+  wastelandId,
+  connectedTownIds,
+  trpc,
+  gastownTrpc,
+  queryClient,
+  connectedTownsQueryKey,
+}: {
+  wastelandId: string;
+  connectedTownIds: Set<string>;
+  trpc: ReturnType<typeof useWastelandTRPC>;
+  gastownTrpc: ReturnType<typeof useGastownTRPC>;
+  queryClient: ReturnType<typeof useQueryClient>;
+  connectedTownsQueryKey: readonly unknown[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  // Fetch user's personal towns from Gastown when dialog opens
+  const townsQuery = useQuery({
+    ...gastownTrpc.gastown.listTowns.queryOptions(),
+    enabled: open,
+  });
+
+  const connectTown = useMutation({
+    ...trpc.wasteland.connectKiloTown.mutationOptions(),
+    onSuccess: () => {
+      toast.success('Town connected');
+      void queryClient.invalidateQueries({ queryKey: connectedTownsQueryKey });
+      setOpen(false);
+    },
+    onError: err => toast.error(`Failed to connect: ${err.message}`),
+  });
+
+  const towns = townsQuery.data ?? [];
+  const availableTowns = towns.filter(t => !connectedTownIds.has(t.id));
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          size="sm"
+          className="gap-1.5 bg-white/[0.06] text-white/70 hover:bg-white/[0.1] hover:text-white/90"
+        >
+          <Plus className="size-3" />
+          Connect Town
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="border-white/[0.08] bg-[oklch(0.13_0_0)] sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-white/90">Connect a Town</DialogTitle>
+          <DialogDescription className="text-white/50">
+            Select a Kilo town to connect to this wasteland. The town&apos;s
+            mayor will be able to browse and manage wanted items.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="max-h-64 space-y-2 overflow-y-auto py-2">
+          {townsQuery.isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="size-5 animate-spin text-white/30" />
+            </div>
+          ) : availableTowns.length === 0 ? (
+            <div className="py-6 text-center">
+              <p className="text-sm text-white/40">
+                {towns.length === 0
+                  ? 'No towns found. Create a town in Gastown first.'
+                  : 'All your towns are already connected.'}
+              </p>
+            </div>
+          ) : (
+            availableTowns.map(town => (
+              <button
+                key={town.id}
+                onClick={() =>
+                  connectTown.mutate({
+                    wastelandId,
+                    townId: town.id,
+                  })
+                }
+                disabled={connectTown.isPending}
+                className="flex w-full items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-left transition hover:border-white/[0.12] hover:bg-white/[0.05] disabled:opacity-50"
+              >
+                <Building2 className="size-4 shrink-0 text-white/40" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-white/80">
+                    {town.name}
+                  </p>
+                  <p className="font-mono text-[11px] text-white/30">
+                    {town.id}
+                  </p>
+                </div>
+                {connectTown.isPending ? (
+                  <Loader2 className="size-4 shrink-0 animate-spin text-white/30" />
+                ) : (
+                  <Link2 className="size-4 shrink-0 text-white/20" />
+                )}
+              </button>
+            ))
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setOpen(false)}
+            className="border-white/10 text-white/70 hover:bg-white/5"
+          >
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -1111,6 +1111,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
         .insert(kiloclaw_cli_runs)
         .values({
           user_id: ctx.user.id,
+          instance_id: instance.id,
           prompt: input.prompt,
           status: 'running',
           started_at: result.startedAt,
@@ -1123,11 +1124,16 @@ export const organizationKiloclawRouter = createTRPCRouter({
   getKiloCliRunStatus: organizationMemberProcedure
     .input(z.object({ organizationId: z.uuid(), runId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const [row] = await db
         .select()
         .from(kiloclaw_cli_runs)
         .where(
-          and(eq(kiloclaw_cli_runs.id, input.runId), eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+          and(
+            eq(kiloclaw_cli_runs.id, input.runId),
+            eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+            eq(kiloclaw_cli_runs.instance_id, instance.id)
+          )
         )
         .limit(1);
 
@@ -1155,7 +1161,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
         };
       }
 
-      const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
       const controllerStatus = await client.getKiloCliRunStatus(
         ctx.user.id,
@@ -1179,6 +1184,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
             and(
               eq(kiloclaw_cli_runs.id, input.runId),
               eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              eq(kiloclaw_cli_runs.instance_id, instance.id),
               eq(kiloclaw_cli_runs.status, 'running')
             )
           );
@@ -1208,6 +1214,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
             and(
               eq(kiloclaw_cli_runs.id, input.runId),
               eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              eq(kiloclaw_cli_runs.instance_id, instance.id),
               eq(kiloclaw_cli_runs.status, 'running')
             )
           );
@@ -1224,11 +1231,18 @@ export const organizationKiloclawRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
+      const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+      if (!instance) return { runs: [] };
       const limit = input.limit;
       const runs = await db
         .select()
         .from(kiloclaw_cli_runs)
-        .where(eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+        .where(
+          and(
+            eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+            eq(kiloclaw_cli_runs.instance_id, instance.id)
+          )
+        )
         .orderBy(desc(kiloclaw_cli_runs.started_at))
         .limit(limit);
 

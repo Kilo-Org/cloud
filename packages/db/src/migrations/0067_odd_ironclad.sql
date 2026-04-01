@@ -1,0 +1,3 @@
+ALTER TABLE "kiloclaw_cli_runs" ADD COLUMN "instance_id" uuid;--> statement-breakpoint
+ALTER TABLE "kiloclaw_cli_runs" ADD CONSTRAINT "kiloclaw_cli_runs_instance_id_kiloclaw_instances_id_fk" FOREIGN KEY ("instance_id") REFERENCES "public"."kiloclaw_instances"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "IDX_kiloclaw_cli_runs_instance_id" ON "kiloclaw_cli_runs" USING btree ("instance_id");

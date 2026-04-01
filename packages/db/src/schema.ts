@@ -3674,6 +3674,7 @@ export const kiloclaw_cli_runs = pgTable(
     user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    instance_id: uuid().references(() => kiloclaw_instances.id),
     prompt: text().notNull(),
     status: text().$type<KiloClawCliRunStatus>().notNull().default('running'),
     exit_code: integer(),
@@ -3684,6 +3685,7 @@ export const kiloclaw_cli_runs = pgTable(
   table => [
     index('IDX_kiloclaw_cli_runs_user_id').on(table.user_id),
     index('IDX_kiloclaw_cli_runs_started_at').on(table.started_at),
+    index('IDX_kiloclaw_cli_runs_instance_id').on(table.instance_id),
   ]
 );
 

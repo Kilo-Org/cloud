@@ -875,19 +875,22 @@ export const CustomLlmExtraHeadersSchema = z.record(z.string(), z.string());
 
 export type CustomLlmExtraHeaders = z.infer<typeof CustomLlmExtraHeadersSchema>;
 
-export const CustomLlmDefinitionSchema = z.object({
-  internal_id: z.string(),
-  display_name: z.string(),
-  context_length: z.number(),
-  max_completion_tokens: z.number(),
-  base_url: z.string(),
-  api_key: z.string(),
-  organization_ids: z.array(z.string()),
-  supports_image_input: z.boolean().optional(),
-  extra_headers: CustomLlmExtraHeadersSchema.optional(),
-  extra_body: CustomLlmExtraBodySchema.optional(),
-  opencode_settings: OpenCodeSettingsSchema.optional(),
-});
+export const CustomLlmDefinitionSchema = z
+  .object({
+    internal_id: z.string(),
+    display_name: z.string(),
+    context_length: z.number(),
+    max_completion_tokens: z.number(),
+    base_url: z.string(),
+    api_key: z.string(),
+    organization_ids: z.array(z.string()),
+    supports_image_input: z.boolean().optional(),
+    extra_headers: CustomLlmExtraHeadersSchema.optional(),
+    extra_body: CustomLlmExtraBodySchema.optional(),
+    remove_from_body: z.array(z.string()).optional(),
+    opencode_settings: OpenCodeSettingsSchema.optional(),
+  })
+  .strict();
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 

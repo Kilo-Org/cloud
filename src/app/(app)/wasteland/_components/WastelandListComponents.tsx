@@ -26,15 +26,12 @@ export function WastelandCard({
 
         <div className="flex flex-wrap items-center gap-2">
           <VisibilityBadge visibility={wasteland.visibility} />
-          {wasteland.dolthub_upstream && (
-            <DoltHubLink upstream={wasteland.dolthub_upstream} />
-          )}
+          {wasteland.dolthub_upstream && <DoltHubLink upstream={wasteland.dolthub_upstream} />}
         </div>
 
         <div className="flex items-center justify-between text-xs text-white/40">
           <span>
-            Created{' '}
-            {formatDistanceToNow(new Date(wasteland.created_at), { addSuffix: true })}
+            Created {formatDistanceToNow(new Date(wasteland.created_at), { addSuffix: true })}
           </span>
         </div>
       </CardContent>

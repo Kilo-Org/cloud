@@ -74,7 +74,7 @@ export class WastelandClientError extends Error {
     message: string,
     readonly code: string,
     readonly statusCode: number,
-    readonly details?: unknown,
+    readonly details?: unknown
   ) {
     super(message);
     this.name = 'WastelandClientError';
@@ -103,7 +103,7 @@ type WastelandClientDeps = {
 async function trpcFetch(
   deps: WastelandClientDeps,
   path: string,
-  init: RequestInit,
+  init: RequestInit
 ): Promise<Response> {
   const url = deps.wastelandService
     ? `https://wasteland-service${path}`
@@ -126,15 +126,12 @@ async function trpcFetch(
   throw new WastelandClientError(
     'No Wasteland service binding or API URL configured',
     'CONFIG_ERROR',
-    500,
+    500
   );
 }
 
 /** Parse a tRPC JSON response, validating the envelope and extracting data. */
-async function parseTrpcResponse<T>(
-  response: Response,
-  schema: z.ZodType<T>,
-): Promise<T> {
+async function parseTrpcResponse<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
   if (!response.ok) {
     let errorMessage = `Wasteland service returned ${response.status}`;
     try {
@@ -146,18 +143,14 @@ async function parseTrpcResponse<T>(
           errorMessage,
           String(parsed.data.error.code),
           response.status,
-          parsed.data.error.data,
+          parsed.data.error.data
         );
       }
     } catch (err) {
       if (err instanceof WastelandClientError) throw err;
       // JSON parse failed — use the generic message
     }
-    throw new WastelandClientError(
-      errorMessage,
-      'HTTP_ERROR',
-      response.status,
-    );
+    throw new WastelandClientError(errorMessage, 'HTTP_ERROR', response.status);
   }
 
   const body: unknown = await response.json();
@@ -170,7 +163,7 @@ async function trpcQuery<T>(
   deps: WastelandClientDeps,
   procedure: string,
   input: unknown,
-  schema: z.ZodType<T>,
+  schema: z.ZodType<T>
 ): Promise<T> {
   const encodedInput = encodeURIComponent(JSON.stringify({ json: input }));
   const path = `/trpc/wasteland.${procedure}?input=${encodedInput}`;
@@ -183,7 +176,7 @@ async function trpcMutation<T>(
   deps: WastelandClientDeps,
   procedure: string,
   input: unknown,
-  schema: z.ZodType<T>,
+  schema: z.ZodType<T>
 ): Promise<T> {
   const path = `/trpc/wasteland.${procedure}`;
   const response = await trpcFetch(deps, path, {

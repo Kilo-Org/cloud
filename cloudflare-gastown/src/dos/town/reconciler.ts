@@ -635,8 +635,8 @@ export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): 
           AND b.${beads.columns.rig_id} IS NOT NULL
           AND NOT EXISTS (
             SELECT 1 FROM ${agent_metadata} am
-            WHERE am.${agent_metadata.bead_id} = b.${beads.columns.assignee_agent_bead_id}
-              AND am.${agent_metadata.current_hook_bead_id} = b.${beads.columns.bead_id}
+            WHERE am.${agent_metadata.columns.bead_id} = b.${beads.columns.assignee_agent_bead_id}
+              AND am.${agent_metadata.columns.current_hook_bead_id} = b.${beads.columns.bead_id}
           )
       `,
       []

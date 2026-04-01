@@ -198,7 +198,9 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
       });
     }
 
-    await thread.post({ markdown: result.text });
+    if (!startedCloudAgentSession) {
+      await thread.post({ markdown: result.text });
+    }
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
 

@@ -14,6 +14,7 @@ import { useActiveSessions } from './hooks/useActiveSessions';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { deleteSessionFromStoreAtom } from './store/db-session-atoms';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 // Context for children to toggle the mobile sidebar sheet
 type SidebarLayoutContextValue = {
@@ -39,8 +40,12 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
   const currentSessionId = searchParams.get('sessionId') ?? undefined;
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [platformFilter, setPlatformFilter] = useState<string[]>(['cloud-agent']);
-  const [projectFilter, setProjectFilter] = useState<string[]>([]);
+  const projectFilterKey = `cloud-sessions:project-filter:${organizationId ?? 'personal'}`;
+  const [platformFilter, setPlatformFilter] = useLocalStorage<string[]>(
+    'cloud-sessions:platform-filter',
+    ['cloud-agent']
+  );
+  const [projectFilter, setProjectFilter] = useLocalStorage<string[]>(projectFilterKey, []);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 30)).toISOString(), []);
 

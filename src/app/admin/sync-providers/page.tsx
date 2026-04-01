@@ -71,7 +71,9 @@ export default function SyncProvidersPage() {
               disabled={syncMutation.isPending}
               className="w-fit"
             >
-              <RefreshCw className={`mr-2 h-4 w-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${syncMutation.isPending ? 'animate-spin' : ''}`}
+              />
               {syncMutation.isPending ? 'Syncing...' : 'Run Sync'}
             </Button>
 

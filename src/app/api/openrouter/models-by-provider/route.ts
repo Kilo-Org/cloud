@@ -13,7 +13,9 @@ export async function GET() {
     .limit(1);
 
   if (!result || result.length === 0) {
-    throw new Error('No models data found in database. Use the admin panel at ' + MODELS_BY_PROVIDER_ADMIN_URL);
+    throw new Error(
+      'No models data found in database. Use the admin panel at ' + MODELS_BY_PROVIDER_ADMIN_URL
+    );
   }
 
   return NextResponse.json(result[0].data, {

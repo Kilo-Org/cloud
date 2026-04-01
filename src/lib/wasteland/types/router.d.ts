@@ -245,6 +245,40 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       }[];
       meta: object;
     }>;
+    claimWantedItem: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        itemId: string;
+      };
+      output: {
+        success: boolean;
+      };
+      meta: object;
+    }>;
+    postWantedItem: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        title: string;
+        description: string;
+        priority?: 'low' | 'medium' | 'high' | undefined;
+        type?: 'feature' | 'bug' | 'docs' | 'other' | undefined;
+      };
+      output: {
+        success: boolean;
+      };
+      meta: object;
+    }>;
+    markWantedItemDone: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        itemId: string;
+        evidence: string;
+      };
+      output: {
+        success: boolean;
+      };
+      meta: object;
+    }>;
   }>
 >;
 export type WastelandRouter = typeof wastelandRouter;

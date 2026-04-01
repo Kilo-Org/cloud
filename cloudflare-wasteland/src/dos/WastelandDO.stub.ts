@@ -51,6 +51,20 @@ export type WastelandCredentialResult = {
   connected_at: string;
 };
 
+/** Shape for a wanted board item returned from the DoltHub-backed cache. */
+export type WantedItemResult = {
+  item_id: string;
+  title: string;
+  description: string;
+  status: 'open' | 'claimed' | 'done';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  type: 'feature' | 'bug' | 'docs' | 'other';
+  claimed_by: string | null;
+  evidence: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 /**
  * Stub WastelandDO — placeholder until the full implementation lands.
  * Provides the class export that wrangler.jsonc requires for the
@@ -118,6 +132,16 @@ export class WastelandDO extends DurableObject<Env> {
   }
 
   async deleteCredential(_userId: string): Promise<void> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
+  // ── Wanted board cache RPCs ─────────────────────────────────────────
+
+  async getWantedBoard(): Promise<WantedItemResult[]> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
+  async refreshWantedBoard(): Promise<WantedItemResult[]> {
     throw new Error('WastelandDO not yet implemented');
   }
 }

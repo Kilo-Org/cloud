@@ -3,11 +3,7 @@ import { notFound } from 'next/navigation';
 import { isWastelandEnabled } from '@/lib/wasteland/feature-flags';
 import { ClaimsClient } from './ClaimsClient';
 
-export default async function ClaimsPage({
-  params,
-}: {
-  params: Promise<{ wastelandId: string }>;
-}) {
+export default async function ClaimsPage({ params }: { params: Promise<{ wastelandId: string }> }) {
   const { wastelandId } = await params;
   const user = await getUserFromAuthOrRedirect(
     `/users/sign_in?callbackPath=/wasteland/${wastelandId}/claims`

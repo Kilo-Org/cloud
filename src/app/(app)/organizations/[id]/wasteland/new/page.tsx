@@ -4,11 +4,7 @@ import { NewWastelandWizardClient } from '@/app/(app)/wasteland/new/NewWasteland
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
 import { isWastelandEnabled } from '@/lib/wasteland/feature-flags';
 
-export default async function OrgNewWastelandPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function OrgNewWastelandPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getUserFromAuthOrRedirect(
     `/users/sign_in?callbackPath=/organizations/${id}/wasteland/new`
@@ -21,9 +17,7 @@ export default async function OrgNewWastelandPage({
   return (
     <OrganizationByPageLayout
       params={Promise.resolve({ id })}
-      render={({ organization }) => (
-        <NewWastelandWizardClient lockedOrgId={organization.id} />
-      )}
+      render={({ organization }) => <NewWastelandWizardClient lockedOrgId={organization.id} />}
     />
   );
 }

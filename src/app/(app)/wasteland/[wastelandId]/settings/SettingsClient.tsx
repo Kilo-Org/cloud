@@ -60,15 +60,11 @@ export function SettingsClient({ wastelandId }: Props) {
 
   const gastownTrpc = useGastownTRPC();
 
-  const wastelandQuery = useQuery(
-    trpc.wasteland.getWasteland.queryOptions({ wastelandId })
-  );
+  const wastelandQuery = useQuery(trpc.wasteland.getWasteland.queryOptions({ wastelandId }));
   const credentialQuery = useQuery(
     trpc.wasteland.getCredentialStatus.queryOptions({ wastelandId })
   );
-  const membersQuery = useQuery(
-    trpc.wasteland.listMembers.queryOptions({ wastelandId })
-  );
+  const membersQuery = useQuery(trpc.wasteland.listMembers.queryOptions({ wastelandId }));
   const connectedTownsQuery = useQuery(
     trpc.wasteland.listConnectedTowns.queryOptions({ wastelandId })
   );
@@ -77,8 +73,7 @@ export function SettingsClient({ wastelandId }: Props) {
   const credential = credentialQuery.data;
   const members = membersQuery.data ?? [];
   const currentUserMember = members.find(m => m.user_id === currentUser?.id);
-  const isOwner =
-    currentUserMember?.role === 'owner' || currentUser?.is_admin === true;
+  const isOwner = currentUserMember?.role === 'owner' || currentUser?.is_admin === true;
 
   // ── Local form state ───────────────────────────────────────────────
   const [name, setName] = useState('');
@@ -153,9 +148,7 @@ export function SettingsClient({ wastelandId }: Props) {
       <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-3">
         <div className="flex items-center gap-2.5">
           <Settings className="size-4 text-white/40" />
-          <h2 className="text-lg font-semibold tracking-tight text-white/90">
-            Settings
-          </h2>
+          <h2 className="text-lg font-semibold tracking-tight text-white/90">Settings</h2>
         </div>
         {isOwner && (
           <Button
@@ -193,9 +186,7 @@ export function SettingsClient({ wastelandId }: Props) {
               <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
                 <Switch
                   checked={visibility === 'public'}
-                  onCheckedChange={checked =>
-                    setVisibility(checked ? 'public' : 'private')
-                  }
+                  onCheckedChange={checked => setVisibility(checked ? 'public' : 'private')}
                   disabled={!isOwner}
                 />
                 <div>
@@ -222,10 +213,7 @@ export function SettingsClient({ wastelandId }: Props) {
                     <span className="font-mono text-xs text-white/60">
                       {wasteland.dolthub_upstream}
                     </span>
-                    <Badge
-                      variant="outline"
-                      className="ml-auto text-[9px] text-white/30"
-                    >
+                    <Badge variant="outline" className="ml-auto text-[9px] text-white/30">
                       read-only
                     </Badge>
                   </div>
@@ -256,22 +244,15 @@ export function SettingsClient({ wastelandId }: Props) {
                     <div className="mt-1 space-y-0.5 text-[11px] text-white/40">
                       <p>
                         Organization:{' '}
-                        <span className="font-mono text-white/60">
-                          {credential.dolthub_org}
-                        </span>
+                        <span className="font-mono text-white/60">{credential.dolthub_org}</span>
                       </p>
                       {credential.rig_handle && (
                         <p>
                           Rig handle:{' '}
-                          <span className="font-mono text-white/60">
-                            {credential.rig_handle}
-                          </span>
+                          <span className="font-mono text-white/60">{credential.rig_handle}</span>
                         </p>
                       )}
-                      <p>
-                        Connected{' '}
-                        {formatTimestamp(credential.connected_at)}
-                      </p>
+                      <p>Connected {formatTimestamp(credential.connected_at)}</p>
                     </div>
                   )}
                 </div>
@@ -293,9 +274,7 @@ export function SettingsClient({ wastelandId }: Props) {
                   wastelandId={wastelandId}
                   trpc={trpc}
                   queryClient={queryClient}
-                  credentialQueryKey={trpc.wasteland.getCredentialStatus.queryKey(
-                    { wastelandId }
-                  )}
+                  credentialQueryKey={trpc.wasteland.getCredentialStatus.queryKey({ wastelandId })}
                 />
                 {credential && (
                   <AlertDialog>
@@ -315,8 +294,7 @@ export function SettingsClient({ wastelandId }: Props) {
                           Disconnect DoltHub?
                         </AlertDialogTitle>
                         <AlertDialogDescription className="text-white/50">
-                          This will remove your DoltHub credentials. You can
-                          reconnect later.
+                          This will remove your DoltHub credentials. You can reconnect later.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -324,14 +302,10 @@ export function SettingsClient({ wastelandId }: Props) {
                           Cancel
                         </AlertDialogCancel>
                         <AlertDialogAction
-                          onClick={() =>
-                            deleteCredential.mutate({ wastelandId })
-                          }
+                          onClick={() => deleteCredential.mutate({ wastelandId })}
                           className="bg-red-500/80 text-white hover:bg-red-500"
                         >
-                          {deleteCredential.isPending
-                            ? 'Disconnecting...'
-                            : 'Disconnect'}
+                          {deleteCredential.isPending ? 'Disconnecting...' : 'Disconnect'}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -364,16 +338,14 @@ export function SettingsClient({ wastelandId }: Props) {
                   <div>
                     <p className="text-sm text-red-400">Delete Wasteland</p>
                     <p className="text-[11px] text-red-400/70">
-                      Permanently delete this wasteland and all associated data.
-                      This cannot be undone.
+                      Permanently delete this wasteland and all associated data. This cannot be
+                      undone.
                     </p>
                   </div>
                   <DeleteWastelandDialog
                     wastelandName={wasteland?.name ?? ''}
                     isPending={deleteWasteland.isPending}
-                    onDelete={() =>
-                      deleteWasteland.mutate({ wastelandId })
-                    }
+                    onDelete={() => deleteWasteland.mutate({ wastelandId })}
                   />
                 </div>
               </div>
@@ -482,11 +454,7 @@ function ConnectDoltHubDialog({
                 rigHandle: rigHandle || undefined,
               })
             }
-            disabled={
-              !dolthubToken.trim() ||
-              !dolthubOrg.trim() ||
-              storeCredential.isPending
-            }
+            disabled={!dolthubToken.trim() || !dolthubOrg.trim() || storeCredential.isPending}
             className="bg-white/[0.1] text-white/90 hover:bg-white/[0.15]"
           >
             {storeCredential.isPending ? 'Connecting...' : 'Connect'}
@@ -526,15 +494,11 @@ function DeleteWastelandDialog({
       </AlertDialogTrigger>
       <AlertDialogContent className="border-red-500/20 bg-[oklch(0.13_0_0)] sm:max-w-md">
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-red-400">
-            Delete this wasteland?
-          </AlertDialogTitle>
+          <AlertDialogTitle className="text-red-400">Delete this wasteland?</AlertDialogTitle>
           <AlertDialogDescription className="text-white/50">
             This action cannot be undone. Type{' '}
-            <span className="font-mono font-semibold text-white/80">
-              {wastelandName}
-            </span>{' '}
-            to confirm.
+            <span className="font-mono font-semibold text-white/80">{wastelandName}</span> to
+            confirm.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <Input
@@ -614,8 +578,8 @@ function ConnectedTownsSection({
             <Building2 className="mx-auto mb-2 size-6 text-white/20" />
             <p className="text-sm text-white/40">No towns connected yet.</p>
             <p className="mt-1 text-[11px] text-white/25">
-              Connect a Kilo town to enable one-click wasteland operations from
-              your town&apos;s mayor.
+              Connect a Kilo town to enable one-click wasteland operations from your town&apos;s
+              mayor.
             </p>
           </div>
         ) : (
@@ -628,9 +592,7 @@ function ConnectedTownsSection({
                 <div className="flex items-center gap-3">
                   <Building2 className="size-4 text-white/40" />
                   <div>
-                    <p className="font-mono text-sm text-white/70">
-                      {town.town_id}
-                    </p>
+                    <p className="font-mono text-sm text-white/70">{town.town_id}</p>
                     <p className="text-[11px] text-white/30">
                       Connected {formatTimestamp(town.connected_at)}
                     </p>
@@ -654,8 +616,8 @@ function ConnectedTownsSection({
                           Disconnect town?
                         </AlertDialogTitle>
                         <AlertDialogDescription className="text-white/50">
-                          The mayor in this town will no longer be able to
-                          perform wasteland operations automatically.
+                          The mayor in this town will no longer be able to perform wasteland
+                          operations automatically.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -671,9 +633,7 @@ function ConnectedTownsSection({
                           }
                           className="bg-red-500/80 text-white hover:bg-red-500"
                         >
-                          {disconnectTown.isPending
-                            ? 'Disconnecting...'
-                            : 'Disconnect'}
+                          {disconnectTown.isPending ? 'Disconnecting...' : 'Disconnect'}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -750,8 +710,8 @@ function ConnectTownDialog({
         <DialogHeader>
           <DialogTitle className="text-white/90">Connect a Town</DialogTitle>
           <DialogDescription className="text-white/50">
-            Select a Kilo town to connect to this wasteland. The town&apos;s
-            mayor will be able to browse and manage wanted items.
+            Select a Kilo town to connect to this wasteland. The town&apos;s mayor will be able to
+            browse and manage wanted items.
           </DialogDescription>
         </DialogHeader>
 
@@ -783,12 +743,8 @@ function ConnectTownDialog({
               >
                 <Building2 className="size-4 shrink-0 text-white/40" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-white/80">
-                    {town.name}
-                  </p>
-                  <p className="font-mono text-[11px] text-white/30">
-                    {town.id}
-                  </p>
+                  <p className="truncate text-sm text-white/80">{town.name}</p>
+                  <p className="font-mono text-[11px] text-white/30">{town.id}</p>
                 </div>
                 {connectTown.isPending ? (
                   <Loader2 className="size-4 shrink-0 animate-spin text-white/30" />
@@ -838,9 +794,7 @@ function SettingsSection({
           <p className="mt-0.5 text-xs text-white/35">{description}</p>
         </div>
       </div>
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-        {children}
-      </div>
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">{children}</div>
     </section>
   );
 }

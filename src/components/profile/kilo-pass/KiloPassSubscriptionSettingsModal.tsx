@@ -284,7 +284,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
         actions.cancelSubscription();
       }
     }
-  }, [actions, queryClient, subscription.stripeSubscriptionId, trpc, trpcClient]);
+  }, [actions, onClose, queryClient, subscription.stripeSubscriptionId, trpc, trpcClient]);
 
   return (
     <Dialog

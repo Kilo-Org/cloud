@@ -107,7 +107,10 @@ export function KiloPassSubscriptionInfoProvider(props: {
   }, [isResumingSubscription, queryClient, trpc, trpcClient]);
 
   const resumePausedSubscription = useCallback(() => {
-    const run = async () => {
+    if (isResumingSubscription) return;
+    setIsResumingSubscription(true);
+
+    void (async () => {
       try {
         await trpcClient.kiloPass.resumePausedSubscription.mutate();
         toast('Subscription resumed');
@@ -115,10 +118,11 @@ export function KiloPassSubscriptionInfoProvider(props: {
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to resume subscription';
         toast.error(message);
+      } finally {
+        setIsResumingSubscription(false);
       }
-    };
-    void run();
-  }, [trpcClient, queryClient, trpc]);
+    })();
+  }, [isResumingSubscription, trpcClient, queryClient, trpc]);
 
   const view = useMemo(() => deriveKiloPassSubscriptionInfoView(subscription), [subscription]);
 

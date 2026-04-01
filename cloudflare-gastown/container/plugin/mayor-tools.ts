@@ -473,6 +473,114 @@ export function createMayorTools(client: MayorGastownClient) {
       },
     }),
 
+    // ── Wasteland tools ─────────────────────────────────────────────────
+
+    gt_wasteland_browse: tool({
+      description:
+        'Browse the wanted board of a hosted Wasteland. ' +
+        'Returns a list of wanted items (tasks/bugs/features) posted to the board. ' +
+        'Optionally filter by status and limit the number of results.',
+      args: {
+        wasteland_id: tool.schema.string().describe('The UUID of the wasteland to browse'),
+        status: tool.schema
+          .enum(['open', 'claimed', 'done'])
+          .describe('Filter by item status')
+          .optional(),
+        limit: tool.schema
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .describe('Maximum number of items to return (default: 50)')
+          .optional(),
+      },
+      async execute(args) {
+        const items = await client.wastelandBrowse({
+          wasteland_id: args.wasteland_id,
+          status: args.status,
+          limit: args.limit,
+        });
+        if (items.length === 0) {
+          const statusNote = args.status ? ` with status "${args.status}"` : '';
+          return `No wanted items found${statusNote} in this wasteland.`;
+        }
+        return JSON.stringify(items, null, 2);
+      },
+    }),
+
+    gt_wasteland_claim: tool({
+      description:
+        'Claim an open wanted item from a hosted Wasteland. ' +
+        'Marks the item as claimed by you so others know it is being worked on.',
+      args: {
+        wasteland_id: tool.schema.string().describe('The UUID of the wasteland'),
+        item_id: tool.schema.string().describe('The ID of the wanted item to claim'),
+      },
+      async execute(args) {
+        const result = await client.wastelandClaim({
+          wasteland_id: args.wasteland_id,
+          item_id: args.item_id,
+        });
+        return result.success
+          ? `Successfully claimed item ${args.item_id}.`
+          : `Failed to claim item ${args.item_id}.`;
+      },
+    }),
+
+    gt_wasteland_post: tool({
+      description:
+        'Post a new wanted item to a hosted Wasteland. ' +
+        'Creates a new task, bug report, or feature request on the wanted board.',
+      args: {
+        wasteland_id: tool.schema.string().describe('The UUID of the wasteland'),
+        title: tool.schema.string().describe('Short title for the wanted item'),
+        description: tool.schema.string().describe('Detailed description of what is needed'),
+        priority: tool.schema
+          .enum(['low', 'medium', 'high', 'critical'])
+          .describe('Priority level')
+          .optional(),
+        type: tool.schema
+          .enum(['feature', 'bug', 'docs', 'other'])
+          .describe('Type of wanted item')
+          .optional(),
+      },
+      async execute(args) {
+        const result = await client.wastelandPost({
+          wasteland_id: args.wasteland_id,
+          title: args.title,
+          description: args.description,
+          priority: args.priority,
+          type: args.type,
+        });
+        return result.success
+          ? `Posted new wanted item: "${args.title}".`
+          : `Failed to post wanted item.`;
+      },
+    }),
+
+    gt_wasteland_done: tool({
+      description:
+        'Mark a claimed wanted item as done with evidence. ' +
+        'Provide proof of completion (e.g. commit SHA, PR URL, or description of what was done).',
+      args: {
+        wasteland_id: tool.schema.string().describe('The UUID of the wasteland'),
+        item_id: tool.schema.string().describe('The ID of the wanted item to mark done'),
+        evidence: tool.schema
+          .string()
+          .describe('Evidence of completion (commit SHA, PR URL, description of work done)'),
+      },
+      async execute(args) {
+        const result = await client.wastelandDone({
+          wasteland_id: args.wasteland_id,
+          item_id: args.item_id,
+          evidence: args.evidence,
+        });
+        return result.success
+          ? `Marked item ${args.item_id} as done.`
+          : `Failed to mark item ${args.item_id} as done.`;
+      },
+    }),
+
     gt_report_bug: tool({
       description:
         'File a bug report on the Kilo-Org/cloud GitHub repo. ' +

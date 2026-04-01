@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, jest } from '@jest/globals';
 
 import { db, cleanupDbForTest } from '@/lib/drizzle';
-import { kilo_pass_audit_log, kilo_pass_subscriptions } from '@kilocode/db/schema';
+import {
+  kilo_pass_audit_log,
+  kilo_pass_pause_events,
+  kilo_pass_subscriptions,
+} from '@kilocode/db/schema';
 import { KiloPassAuditLogResult } from './enums';
 import { KiloPassAuditLogAction } from './enums';
 import { KiloPassCadence } from './enums';
@@ -344,5 +348,127 @@ describe('handleKiloPassSubscriptionEvent', () => {
     expect(updated?.status).toBe('active');
     expect(updated?.cancel_at_period_end).toBe(true);
     expect(updated?.current_streak_months).toBe(7);
+  });
+
+  test('creates pause event when subscription has pause_collection set', async () => {
+    const { handleKiloPassSubscriptionEvent } =
+      await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
+
+    const user = await insertTestUser();
+    const stripeSubId = `sub_pause_${Math.random()}`;
+    const resumesAtSeconds = 1_767_311_000;
+
+    const subscription = {
+      ...makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_767_225_600,
+        status: 'paused',
+        metadata: kiloPassMetadata({
+          kiloUserId: user.id,
+          tier: KiloPassTier.Tier49,
+          cadence: KiloPassCadence.Monthly,
+        }),
+      }),
+      pause_collection: { behavior: 'void', resumes_at: resumesAtSeconds },
+    } as unknown as Stripe.Subscription;
+
+    const beforeCall = new Date();
+
+    await handleKiloPassSubscriptionEvent({
+      eventId: `evt_${Math.random()}`,
+      eventType: 'customer.subscription.updated',
+      subscription,
+    });
+
+    const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
+    });
+    expect(subRow).toBeTruthy();
+
+    const pauseEvents = await db
+      .select()
+      .from(kilo_pass_pause_events)
+      .where(eq(kilo_pass_pause_events.kilo_pass_subscription_id, subRow!.id));
+
+    expect(pauseEvents).toHaveLength(1);
+    const pauseEvent = pauseEvents[0]!;
+    expect(pauseEvent.resumed_at).toBeNull();
+    expect(new Date(pauseEvent.paused_at).getTime()).toBeGreaterThanOrEqual(beforeCall.getTime());
+    expect(toIso(pauseEvent.resumes_at)).toBe(new Date(resumesAtSeconds * 1000).toISOString());
+  });
+
+  test('closes pause event when pause_collection is cleared', async () => {
+    const { handleKiloPassSubscriptionEvent } =
+      await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
+
+    const user = await insertTestUser();
+    const stripeSubId = `sub_resume_${Math.random()}`;
+    const resumesAtSeconds = 1_767_311_000;
+
+    // First call: subscription is paused
+    const pausedSubscription = {
+      ...makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_767_225_600,
+        status: 'paused',
+        metadata: kiloPassMetadata({
+          kiloUserId: user.id,
+          tier: KiloPassTier.Tier49,
+          cadence: KiloPassCadence.Monthly,
+        }),
+      }),
+      pause_collection: { behavior: 'void', resumes_at: resumesAtSeconds },
+    } as unknown as Stripe.Subscription;
+
+    await handleKiloPassSubscriptionEvent({
+      eventId: `evt_${Math.random()}`,
+      eventType: 'customer.subscription.updated',
+      subscription: pausedSubscription,
+    });
+
+    const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
+    });
+    expect(subRow).toBeTruthy();
+
+    // Verify pause event was created
+    const pauseEventsAfterPause = await db
+      .select()
+      .from(kilo_pass_pause_events)
+      .where(eq(kilo_pass_pause_events.kilo_pass_subscription_id, subRow!.id));
+    expect(pauseEventsAfterPause).toHaveLength(1);
+    expect(pauseEventsAfterPause[0]!.resumed_at).toBeNull();
+
+    const beforeResume = new Date();
+
+    // Second call: subscription is active, no pause_collection
+    const resumedSubscription = makeStripeSubscription({
+      id: stripeSubId,
+      start_date_seconds: 1_767_225_600,
+      status: 'active',
+      metadata: kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+      }),
+    });
+
+    await handleKiloPassSubscriptionEvent({
+      eventId: `evt_${Math.random()}`,
+      eventType: 'customer.subscription.updated',
+      subscription: resumedSubscription,
+    });
+
+    // Verify pause event was closed
+    const pauseEventsAfterResume = await db
+      .select()
+      .from(kilo_pass_pause_events)
+      .where(eq(kilo_pass_pause_events.kilo_pass_subscription_id, subRow!.id));
+    expect(pauseEventsAfterResume).toHaveLength(1);
+    const closedEvent = pauseEventsAfterResume[0]!;
+    expect(closedEvent.resumed_at).not.toBeNull();
+    expect(new Date(closedEvent.resumed_at!).getTime()).toBeGreaterThanOrEqual(
+      beforeResume.getTime()
+    );
   });
 });

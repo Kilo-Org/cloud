@@ -47,11 +47,7 @@ export class WastelandDO extends DurableObject<Env> {
     throw new Error('WastelandDO not yet implemented');
   }
 
-  async addMember(
-    _userId: string,
-    _role: string,
-    _trustLevel: number
-  ): Promise<string> {
+  async addMember(_userId: string, _role: string, _trustLevel: number): Promise<string> {
     throw new Error('WastelandDO not yet implemented');
   }
 

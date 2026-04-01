@@ -16,11 +16,7 @@ import { RpcWastelandMemberOutput } from './schemas';
  *   - a site admin.
  * Throws FORBIDDEN if the caller only has member-level org access.
  */
-async function requireOwnerAccess(
-  env: Env,
-  ctx: TRPCContext,
-  wastelandId: string
-) {
+async function requireOwnerAccess(env: Env, ctx: TRPCContext, wastelandId: string) {
   const ownership = await resolveWastelandOwnership(env, ctx, wastelandId);
 
   if (ownership.type === 'user' || ownership.type === 'admin') {

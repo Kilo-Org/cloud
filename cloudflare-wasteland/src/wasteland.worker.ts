@@ -13,6 +13,7 @@ import type { AuthVariables } from './middleware/auth.middleware';
 import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
 import { timingMiddleware } from './middleware/analytics.middleware';
 import { wrappedWastelandRouter } from './trpc/router';
+import { getWastelandRegistryStub } from './dos/WastelandRegistry.do';
 
 // ── DO Exports ──────────────────────────────────────────────────────────
 // Wrangler requires these exports to match the class_name bindings in wrangler.jsonc.
@@ -76,7 +77,28 @@ app.use('/trpc/*', corsMiddleware);
 // ── Health ──────────────────────────────────────────────────────────────
 
 app.get('/', c => c.json({ service: 'wasteland', status: 'ok' }));
-app.get('/health', c => c.json({ status: 'ok' }));
+
+app.get('/health', async (c: Context<WastelandEnv>) => {
+  const env = c.env;
+
+  // Query active wasteland count from the registry (best-effort)
+  let activeWastelands: number | null = null;
+  try {
+    const registry = getWastelandRegistryStub(env);
+    activeWastelands = await registry.countAll();
+  } catch {
+    // Registry may be unavailable — report null rather than failing the health check
+  }
+
+  return c.json({
+    status: 'ok',
+    version: env.CF_VERSION_METADATA?.id ?? null,
+    activeWastelands,
+    trpcHealthy: true,
+    sentryConfigured: !!env.SENTRY_DSN,
+    analyticsEngineConfigured: !!env.WASTELAND_AE,
+  });
+});
 
 // ── Kilo User Auth ──────────────────────────────────────────────────────
 // Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for all /api/*

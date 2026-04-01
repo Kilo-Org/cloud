@@ -3466,16 +3466,16 @@ export const discord_gateway_listener = pgTable('discord_gateway_listener', {
 
 export type DiscordGatewayListener = typeof discord_gateway_listener.$inferSelect;
 
-// KiloClaw Version Pins — one row per user, tracks who pinned them and why.
+// KiloClaw Version Pins — one row per instance, tracks who pinned them and why.
 // Both admins and end users can pin (distinguished by pinned_by).
 export const kiloclaw_version_pins = pgTable('kiloclaw_version_pins', {
   id: uuid()
     .default(sql`gen_random_uuid()`)
     .primaryKey()
     .notNull(),
-  user_id: text()
+  instance_id: uuid()
     .notNull()
-    .references(() => kilocode_users.id, { onDelete: 'cascade' })
+    .references(() => kiloclaw_instances.id, { onDelete: 'cascade' })
     .unique(),
   image_tag: text()
     .notNull()
@@ -3674,6 +3674,7 @@ export const kiloclaw_cli_runs = pgTable(
     user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    instance_id: uuid().references(() => kiloclaw_instances.id),
     prompt: text().notNull(),
     status: text().$type<KiloClawCliRunStatus>().notNull().default('running'),
     exit_code: integer(),
@@ -3684,6 +3685,7 @@ export const kiloclaw_cli_runs = pgTable(
   table => [
     index('IDX_kiloclaw_cli_runs_user_id').on(table.user_id),
     index('IDX_kiloclaw_cli_runs_started_at').on(table.started_at),
+    index('IDX_kiloclaw_cli_runs_instance_id').on(table.instance_id),
   ]
 );
 

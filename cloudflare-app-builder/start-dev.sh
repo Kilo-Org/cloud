@@ -4,13 +4,13 @@
 # Uses tmux to create a split terminal with all services running
 #
 # Services started:
-#   - cloudflare-db-proxy (port 8792)
-#   - cloudflare-session-ingest (port 8787)
+#   - cloudflare-db-proxy (port 8798)
+#   - cloudflare-session-ingest (port 8800)
 #   - cloud-agent (port 8788)
 #   - cloud-agent-next (port 8794)
-#   - cloudflare-git-token-service (port 8795)
+#   - cloudflare-git-token-service (port 8802)
 #   - cloudflare-app-builder (port 8790)
-#   - cloudflare-images-mcp (port 8796)
+#   - cloudflare-images-mcp (port 8805)
 #   - cloudflare-webhook-agent-ingest (port 8793)
 #   - ngrok (forwarding to port 8790)
 #
@@ -102,29 +102,29 @@ tmux set-option -t "$SESSION_NAME" pane-border-format " #{pane_index}: #{pane_ti
 tmux set-option -t "$SESSION_NAME" allow-set-title off
 
 # Pane 0 (top-left): cloudflare-db-proxy
-tmux select-pane -t "$SESSION_NAME:services.0" -T "db-proxy (8792)"
+tmux select-pane -t "$SESSION_NAME:services.0" -T "db-proxy (8798)"
 # Using different inspector ports to avoid conflicts (default is 9229)
-tmux send-keys -t "$SESSION_NAME:services.0" "cd $PROJECT_ROOT/cloudflare-db-proxy && echo '🗄️  Starting cloudflare-db-proxy (port 8792)...' && pnpm exec wrangler dev --inspector-port 9230" C-m
+tmux send-keys -t "$SESSION_NAME:services.0" "cd $PROJECT_ROOT/cloudflare-db-proxy && echo '🗄️  Starting cloudflare-db-proxy (port 8798)...' && pnpm exec wrangler dev --inspector-port 9230" C-m
 
 # Pane 1: cloudflare-session-ingest
-tmux select-pane -t "$SESSION_NAME:services.1" -T "session-ingest (8787)"
-tmux send-keys -t "$SESSION_NAME:services.1" "cd $PROJECT_ROOT/cloudflare-session-ingest && echo '📥 Starting cloudflare-session-ingest (port 8787)...' && pnpm exec wrangler dev --inspector-port 9233" C-m
+tmux select-pane -t "$SESSION_NAME:services.1" -T "session-ingest (8800)"
+tmux send-keys -t "$SESSION_NAME:services.1" "cd $PROJECT_ROOT/cloudflare-session-ingest && echo '📥 Starting cloudflare-session-ingest (port 8800)...' && pnpm exec wrangler dev --inspector-port 9233" C-m
 
 # Pane 2: cloud-agent
 tmux select-pane -t "$SESSION_NAME:services.2" -T "cloud-agent (8788)"
 tmux send-keys -t "$SESSION_NAME:services.2" "cd $PROJECT_ROOT/cloud-agent && echo '🤖 Starting cloud-agent (port 8788)...' && pnpm exec wrangler dev --inspector-port 9231" C-m
 
 # Pane 3: cloudflare-images-mcp
-tmux select-pane -t "$SESSION_NAME:services.3" -T "images-mcp (8796)"
-tmux send-keys -t "$SESSION_NAME:services.3" "cd $PROJECT_ROOT/cloudflare-images-mcp && echo '🖼️  Starting cloudflare-images-mcp (port 8796)...' && pnpm exec wrangler dev --env dev --inspector-port 9236" C-m
+tmux select-pane -t "$SESSION_NAME:services.3" -T "images-mcp (8805)"
+tmux send-keys -t "$SESSION_NAME:services.3" "cd $PROJECT_ROOT/cloudflare-images-mcp && echo '🖼️  Starting cloudflare-images-mcp (port 8805)...' && pnpm exec wrangler dev --env dev --inspector-port 9236" C-m
 
 # Pane 4: cloudflare-webhook-agent-ingest
 tmux select-pane -t "$SESSION_NAME:services.4" -T "webhook-ingest (8793)"
 tmux send-keys -t "$SESSION_NAME:services.4" "cd $PROJECT_ROOT/cloudflare-webhook-agent-ingest && echo '🪝 Starting cloudflare-webhook-agent-ingest (port 8793)...' && pnpm exec wrangler dev --env dev --inspector-port 9237" C-m
 
 # Pane 5: cloudflare-git-token-service
-tmux select-pane -t "$SESSION_NAME:services.5" -T "git-token-service (8795)"
-tmux send-keys -t "$SESSION_NAME:services.5" "cd $PROJECT_ROOT/cloudflare-git-token-service && echo '🔑 Starting cloudflare-git-token-service (port 8795)...' && pnpm exec wrangler dev --inspector-port 9235" C-m
+tmux select-pane -t "$SESSION_NAME:services.5" -T "git-token-service (8802)"
+tmux send-keys -t "$SESSION_NAME:services.5" "cd $PROJECT_ROOT/cloudflare-git-token-service && echo '🔑 Starting cloudflare-git-token-service (port 8802)...' && pnpm exec wrangler dev --inspector-port 9235" C-m
 
 # Pane 6: cloudflare-app-builder
 tmux select-pane -t "$SESSION_NAME:services.6" -T "app-builder (8790)"
@@ -146,13 +146,13 @@ echo "╔═══════════════════════�
 echo "║            App Builder Dev Environment Started! 🚀              ║"
 echo "╠══════════════════════════════════════════════════════════════════╣"
 echo "║  Services:                                                       ║"
-echo "║    • cloudflare-db-proxy       → http://localhost:8792          ║"
-echo "║    • cloudflare-session-ingest → http://localhost:8787          ║"
+echo "║    • cloudflare-db-proxy       → http://localhost:8798          ║"
+echo "║    • cloudflare-session-ingest → http://localhost:8800          ║"
 echo "║    • cloud-agent               → http://localhost:8788          ║"
 echo "║    • cloud-agent-next          → http://localhost:8794          ║"
-echo "║    • git-token-service         → http://localhost:8795          ║"
+echo "║    • git-token-service         → http://localhost:8802          ║"
 echo "║    • cloudflare-app-builder    → http://localhost:8790          ║"
-echo "║    • cloudflare-images-mcp     → http://localhost:8796          ║"
+echo "║    • cloudflare-images-mcp     → http://localhost:8805          ║"
 echo "║    • webhook-agent-ingest     → http://localhost:8793          ║"
 echo "║    • ngrok                     → forwarding to :8790            ║"
 echo "╠══════════════════════════════════════════════════════════════════╣"

@@ -29,6 +29,7 @@ const baseStatus: KiloClawDashboardStatus = {
   execSecurity: null,
   execAsk: null,
   workerUrl: 'https://claw.kilo.ai',
+  instanceId: null,
 };
 
 const noop = () => {};

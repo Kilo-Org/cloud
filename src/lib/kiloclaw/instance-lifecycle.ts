@@ -10,6 +10,7 @@ import {
 } from '@kilocode/db/schema';
 import { sentryLogger } from '@/lib/utils.server';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 
 const logInfo = sentryLogger('kiloclaw-instance-lifecycle', 'info');
 const logError = sentryLogger('kiloclaw-instance-lifecycle', 'error');
@@ -39,20 +40,19 @@ export async function autoResumeIfSuspended(
     : and(eq(kiloclaw_instances.user_id, kiloUserId), isNull(kiloclaw_instances.destroyed_at));
 
   const [targetInstance] = await db
-    .select({ id: kiloclaw_instances.id })
+    .select({ id: kiloclaw_instances.id, sandbox_id: kiloclaw_instances.sandbox_id })
     .from(kiloclaw_instances)
     .where(instanceFilter)
     .limit(1);
-  const targetInstanceId = targetInstance?.id;
 
-  if (targetInstanceId) {
+  if (targetInstance) {
     try {
       const client = new KiloClawInternalClient();
-      await client.start(kiloUserId, targetInstanceId);
+      await client.start(kiloUserId, workerInstanceId(targetInstance));
     } catch (startError) {
       logError('Failed to auto-resume instance', {
         user_id: kiloUserId,
-        instance_id: targetInstanceId,
+        instance_id: targetInstance.id,
         error: startError instanceof Error ? startError.message : String(startError),
       });
       // Preserve suspension state so the interrupted-auto-resume retry
@@ -97,6 +97,6 @@ export async function autoResumeIfSuspended(
   logInfo('Auto-resume completed', {
     user_id: kiloUserId,
     instance_id: instanceId ?? null,
-    had_active_instance: !!targetInstanceId,
+    had_active_instance: !!targetInstance,
   });
 }

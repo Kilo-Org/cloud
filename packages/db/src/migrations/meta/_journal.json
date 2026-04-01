@@ -470,6 +470,20 @@
       "when": 1774966268866,
       "tag": "0066_ambitious_jean_grey",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1775001379532,
+      "tag": "0067_odd_ironclad",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1775007775741,
+      "tag": "0068_brave_tattoo",
+      "breakpoints": true
     }
   ]
 }

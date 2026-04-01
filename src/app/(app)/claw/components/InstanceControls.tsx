@@ -400,7 +400,11 @@ export function InstanceControls({
         onOpenChange={setDoctorOpen}
         mutation={mutations.runDoctor}
       />
-      <StartKiloCliRunDialog open={kiloRunOpen} onOpenChange={setKiloRunOpen} />
+      <StartKiloCliRunDialog
+        open={kiloRunOpen}
+        onOpenChange={setKiloRunOpen}
+        machineStatus={status.status}
+      />
     </div>
   );
 }

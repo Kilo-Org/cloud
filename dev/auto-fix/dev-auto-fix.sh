@@ -7,7 +7,7 @@ set -uo pipefail
 #
 # Services:
 #   1. Root (Next.js)           — port 3000
-#   2. Session Worker           — port 8787  (inspector 9230)
+#   2. Session Worker           — port 8800  (inspector 9230)
 #   3. Auto Fix Worker          — port 8792  (inspector 9231)
 #   4. Agent Next Worker        — port 8794  (inspector 9232)
 #

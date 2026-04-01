@@ -1,6 +1,10 @@
 import type { KiloClawEnv } from '../../types';
 import type { GoogleCredentials, PersistedState, MachineSize } from '../../schemas/instance-config';
 import type { FlyClientConfig } from '../../fly/client';
+import {
+  isInstanceKeyedSandboxId,
+  instanceIdFromSandboxId,
+} from '@kilocode/worker-utils/instance-id';
 
 /**
  * Instance status derived from persisted state.
@@ -104,6 +108,26 @@ export type InstanceMutableState = {
 /**
  * Build a FlyClientConfig from the instance runtime + state.
  */
+/**
+ * Derive the App DO key for this instance.
+ *
+ * Instance-keyed DOs (sandboxId starts with `ki_`) get their own Fly app
+ * (`inst-{hash(instanceId)}`). The instanceId is recovered from the sandboxId.
+ *
+ * Legacy DOs (userId-keyed, non-`ki_` sandboxId) keep their existing
+ * user-scoped app (`acct-{hash(userId)}`).
+ *
+ * Used to resolve `env.KILOCLAW_APP.idFromName(appKey)` everywhere
+ * the Instance DO needs the App DO stub.
+ */
+export function getAppKey(state: { userId: string | null; sandboxId: string | null }): string {
+  if (state.sandboxId && isInstanceKeyedSandboxId(state.sandboxId)) {
+    return instanceIdFromSandboxId(state.sandboxId);
+  }
+  if (state.userId) return state.userId;
+  throw new Error('Cannot derive app key: no sandboxId or userId');
+}
+
 export function getFlyConfig(env: KiloClawEnv, state: InstanceMutableState): FlyClientConfig {
   if (!env.FLY_API_TOKEN) {
     throw new Error('FLY_API_TOKEN is not configured');

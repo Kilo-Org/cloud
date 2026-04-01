@@ -1097,10 +1097,17 @@ platform.post('/kilo-cli-run/start', async c => {
       stub => stub.startKiloCliRun(result.data.prompt),
       'startKiloCliRun'
     );
+    if (!response) {
+      return jsonError(
+        'Kilo CLI agent not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
     return c.json(response, 200);
   } catch (err) {
-    const { message, status } = sanitizeError(err, 'kilo-cli-run start');
-    return jsonError(message, status);
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'kilo-cli-run start');
+    return jsonError(message, status, code);
   }
 });
 

@@ -88,7 +88,7 @@ const financialItems: MenuItem[] = [
     icon: () => <DollarSign />,
   },
   {
-    title: () => 'Bulk Credits',
+    title: () => 'Bulk Credits & Trials',
     url: '/admin/bulk-credits',
     icon: () => <Upload />,
   },
@@ -182,6 +182,11 @@ const analyticsObservabilityItems: MenuItem[] = [
     title: () => 'Alerting (TTFB)',
     url: '/admin/alerting-ttfb',
     icon: () => <Bell />,
+  },
+  {
+    title: () => 'API Request Log',
+    url: '/admin/api-request-log',
+    icon: () => <Database />,
   },
 ];
 

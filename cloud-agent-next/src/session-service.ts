@@ -595,6 +595,20 @@ export class SessionService {
         [`${workspacePath}/**`]: 'allow',
       },
       ...(!isInteractive && { question: 'deny' }),
+      read: 'allow',
+      edit: 'allow',
+      glob: 'allow',
+      grep: 'allow',
+      list: 'allow',
+      bash: 'allow',
+      task: 'allow',
+      webfetch: 'allow',
+      websearch: 'allow',
+      codesearch: 'allow',
+      lsp: 'allow',
+      skill: 'allow',
+      todowrite: 'allow',
+      todoread: 'allow',
     };
 
     if (commandGuardPolicy) {

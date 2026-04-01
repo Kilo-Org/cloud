@@ -470,6 +470,7 @@ export function KiloclawInstancesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>User</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead>Sandbox ID</TableHead>
               <TableHead>Status</TableHead>
               <TableHead
@@ -495,13 +496,13 @@ export function KiloclawInstancesPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={6} className="h-24 text-center">
                   Loading instances...
                 </TableCell>
               </TableRow>
             ) : instances.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={6} className="h-24 text-center">
                   No instances found.
                 </TableCell>
               </TableRow>
@@ -528,6 +529,23 @@ export function KiloclawInstancesPage() {
                     >
                       {instance.user_email || instance.user_id}
                     </Link>
+                  </TableCell>
+                  <TableCell>
+                    {instance.organization_id ? (
+                      <Badge
+                        variant="outline"
+                        className="border-blue-500/30 bg-blue-500/15 text-blue-400"
+                      >
+                        Org
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="border-gray-500/30 bg-gray-500/10 text-gray-400"
+                      >
+                        Personal
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="font-mono text-sm">
                     <span

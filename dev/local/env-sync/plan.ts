@@ -219,7 +219,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     const serviceUsesLanIp = dirUsesLanIp.get(workerDir) ?? false;
 
     const resolvedVars = new Map<string, string>();
-    const missingValues: string[] = [];
+    const unresolvedKeys: string[] = [];
 
     for (const entry of entries) {
       const { value, resolved } = resolveAnnotatedValue(
@@ -230,7 +230,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
         serviceUsesLanIp
       );
       resolvedVars.set(entry.key, value);
-      if (!resolved) missingValues.push(entry.key);
+      if (!resolved) unresolvedKeys.push(entry.key);
     }
 
     allResolvedEntries.set(workerDir, { vars: resolvedVars, entries });
@@ -246,17 +246,24 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
 
     const isNew = existingContent === null;
     const keyChanges: KeyChange[] = [];
+    let missingValues: string[];
 
     if (existingContent !== null) {
       const oldVars = parseEnvFile(existingContent);
-      const missingSet = new Set(missingValues);
+      // Only report keys as missing if the existing .dev.vars also lacks a value.
+      // Keys that couldn't be resolved but already have a value in .dev.vars are
+      // kept as-is — skip them from both missing warnings and key change diffs.
+      const unresolvedSet = new Set(unresolvedKeys);
+      missingValues = unresolvedKeys.filter(key => !oldVars.get(key));
       for (const [key, newVal] of resolvedVars) {
-        if (missingSet.has(key)) continue;
+        if (unresolvedSet.has(key)) continue;
         const oldVal = oldVars.get(key);
         if (oldVal !== newVal) {
           keyChanges.push({ key, oldValue: oldVal, newValue: newVal });
         }
       }
+    } else {
+      missingValues = unresolvedKeys;
     }
 
     if (isNew || keyChanges.length > 0 || missingValues.length > 0) {

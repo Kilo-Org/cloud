@@ -42,6 +42,7 @@ import type Stripe from 'stripe';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { getRewardfulReferral } from '@/lib/rewardful';
 import { computeChurnkeyAuthHash } from '@/lib/churnkey/auth';
+import { closePauseEvent } from '@/lib/kilo-pass/pause-events';
 
 const KiloPassTierSchema = z.enum(KiloPassTier);
 
@@ -687,6 +688,40 @@ export const kiloPassRouter = createTRPCRouter({
           message: 'Failed to update Kilo Pass subscription status.',
         });
       }
+
+      return { success: true };
+    }),
+
+  resumePausedSubscription: baseProcedure
+    .output(CancelSubscriptionOutputSchema)
+    .mutation(async ({ ctx }) => {
+      const stripeCustomerId = ctx.user.stripe_customer_id;
+      if (!stripeCustomerId) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });
+      }
+
+      const subscription = await getKiloPassStateForUser(db, ctx.user.id);
+      if (!subscription) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No Kilo Pass subscription found.' });
+      }
+
+      if (subscription.status !== 'paused') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Subscription is not paused.',
+        });
+      }
+
+      // Clear pause_collection on Stripe to resume immediately
+      await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+        pause_collection: '',
+      });
+
+      // Close the open pause event in our DB
+      await closePauseEvent(db, {
+        kiloPassSubscriptionId: subscription.subscriptionId,
+        resumedAt: new Date().toISOString(),
+      });
 
       return { success: true };
     }),

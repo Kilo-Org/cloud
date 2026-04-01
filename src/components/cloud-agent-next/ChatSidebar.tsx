@@ -382,66 +382,66 @@ export function ChatSidebar({
           </button>
           {(onPlatformChange || onProjectChange) && (
             <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className={cn(
-                  'hover:bg-accent rounded-md p-1.5 transition-colors',
-                  hasActiveFilter && 'bg-accent'
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={cn(
+                    'hover:bg-accent rounded-md p-1.5 transition-colors',
+                    hasActiveFilter && 'bg-accent'
+                  )}
+                >
+                  <SlidersHorizontal className="text-muted-foreground h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {onProjectChange && recentProjects.length > 0 && (
+                  <>
+                    <DropdownMenuLabel>Project</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => onProjectChange(undefined)}>
+                      <Check
+                        className={cn('mr-2 h-4 w-4', !projectFilter ? 'opacity-100' : 'opacity-0')}
+                      />
+                      All projects
+                    </DropdownMenuItem>
+                    {recentProjects.map(project => {
+                      const isActive = projectFilter === project.gitUrl;
+                      return (
+                        <DropdownMenuItem
+                          key={project.gitUrl}
+                          onClick={() => onProjectChange(project.gitUrl)}
+                        >
+                          <Check
+                            className={cn('mr-2 h-4 w-4', isActive ? 'opacity-100' : 'opacity-0')}
+                          />
+                          {project.displayName}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </>
                 )}
-              >
-                <SlidersHorizontal className="text-muted-foreground h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {onProjectChange && recentProjects.length > 0 && (
-                <>
-                  <DropdownMenuLabel>Project</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => onProjectChange(undefined)}>
-                    <Check
-                      className={cn('mr-2 h-4 w-4', !projectFilter ? 'opacity-100' : 'opacity-0')}
-                    />
-                    All projects
-                  </DropdownMenuItem>
-                  {recentProjects.map(project => {
-                    const isActive = projectFilter === project.gitUrl;
-                    return (
-                      <DropdownMenuItem
-                        key={project.gitUrl}
-                        onClick={() => onProjectChange(project.gitUrl)}
-                      >
-                        <Check
-                          className={cn('mr-2 h-4 w-4', isActive ? 'opacity-100' : 'opacity-0')}
-                        />
-                        {project.displayName}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </>
-              )}
-              {onPlatformChange && (
-                <>
-                  {onProjectChange && recentProjects.length > 0 && <DropdownMenuSeparator />}
-                  <DropdownMenuLabel>Platform</DropdownMenuLabel>
-                  {PLATFORM_FILTERS.map(p => {
-                    const isFilterActive = p === 'all' ? !platformFilter : platformFilter === p;
-                    return (
-                      <DropdownMenuItem
-                        key={p}
-                        onClick={() => onPlatformChange(p === 'all' ? undefined : p)}
-                      >
-                        <Check
-                          className={cn(
-                            'mr-2 h-4 w-4',
-                            isFilterActive ? 'opacity-100' : 'opacity-0'
-                          )}
-                        />
-                        {platformFilterLabel(p)}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </>
-              )}
-            </DropdownMenuContent>
+                {onPlatformChange && (
+                  <>
+                    {onProjectChange && recentProjects.length > 0 && <DropdownMenuSeparator />}
+                    <DropdownMenuLabel>Platform</DropdownMenuLabel>
+                    {PLATFORM_FILTERS.map(p => {
+                      const isFilterActive = p === 'all' ? !platformFilter : platformFilter === p;
+                      return (
+                        <DropdownMenuItem
+                          key={p}
+                          onClick={() => onPlatformChange(p === 'all' ? undefined : p)}
+                        >
+                          <Check
+                            className={cn(
+                              'mr-2 h-4 w-4',
+                              isFilterActive ? 'opacity-100' : 'opacity-0'
+                            )}
+                          />
+                          {platformFilterLabel(p)}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </>
+                )}
+              </DropdownMenuContent>
             </DropdownMenu>
           )}
         </div>

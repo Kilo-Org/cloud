@@ -485,5 +485,18 @@ describe('Reconciler', () => {
       const statusAfter = await town.getConvoyStatus(result.convoy.id);
       expect(statusAfter?.staged).toBe(false);
     });
+
+    it('should process container_eviction event without error', async () => {
+      // Record a container eviction (inserts a container_eviction event)
+      await town.recordContainerEviction();
+
+      // Run alarm — the reconciler should drain the container_eviction
+      // event and process it as a no-op (audit-only) without throwing.
+      await runDurableObjectAlarm(town);
+
+      // The draining flag should still be true (the reconciler doesn't
+      // clear it — only a heartbeat does).
+      expect(await town.isDraining()).toBe(true);
+    });
   });
 });

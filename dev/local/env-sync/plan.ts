@@ -249,7 +249,9 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
 
     if (existingContent !== null) {
       const oldVars = parseEnvFile(existingContent);
+      const missingSet = new Set(missingValues);
       for (const [key, newVal] of resolvedVars) {
+        if (missingSet.has(key)) continue;
         const oldVal = oldVars.get(key);
         if (oldVal !== newVal) {
           keyChanges.push({ key, oldValue: oldVal, newValue: newVal });

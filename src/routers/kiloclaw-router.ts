@@ -1149,6 +1149,7 @@ export const kiloclawRouter = createTRPCRouter({
         .insert(kiloclaw_cli_runs)
         .values({
           user_id: ctx.user.id,
+          instance_id: instance?.id ?? null,
           prompt: input.prompt,
           status: 'running',
           started_at: result.startedAt,
@@ -1161,14 +1162,21 @@ export const kiloclawRouter = createTRPCRouter({
   getKiloCliRunStatus: clawAccessProcedure
     .input(z.object({ runId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+
       // Load the requested run from the DB to avoid cross-run data leaks.
       // The controller only tracks the *current* run, so polling it for an
       // older run would return the wrong output.
+      const instanceFilter = instance ? eq(kiloclaw_cli_runs.instance_id, instance.id) : undefined;
       const [row] = await db
         .select()
         .from(kiloclaw_cli_runs)
         .where(
-          and(eq(kiloclaw_cli_runs.id, input.runId), eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+          and(
+            eq(kiloclaw_cli_runs.id, input.runId),
+            eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+            instanceFilter
+          )
         )
         .limit(1);
 
@@ -1199,7 +1207,6 @@ export const kiloclawRouter = createTRPCRouter({
       }
 
       // Run is still active — poll the controller for live output.
-      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       const controllerStatus = await client.getKiloCliRunStatus(
         ctx.user.id,
@@ -1224,6 +1231,7 @@ export const kiloclawRouter = createTRPCRouter({
             and(
               eq(kiloclaw_cli_runs.id, input.runId),
               eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              instanceFilter,
               eq(kiloclaw_cli_runs.status, 'running')
             )
           );
@@ -1244,6 +1252,9 @@ export const kiloclawRouter = createTRPCRouter({
 
       // Mark the specific run as cancelled in DB
       if (result.ok) {
+        const instanceFilter = instance
+          ? eq(kiloclaw_cli_runs.instance_id, instance.id)
+          : undefined;
         await db
           .update(kiloclaw_cli_runs)
           .set({
@@ -1254,6 +1265,7 @@ export const kiloclawRouter = createTRPCRouter({
             and(
               eq(kiloclaw_cli_runs.id, input.runId),
               eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              instanceFilter,
               eq(kiloclaw_cli_runs.status, 'running')
             )
           );
@@ -1265,11 +1277,13 @@ export const kiloclawRouter = createTRPCRouter({
   listKiloCliRuns: clawAccessProcedure
     .input(z.object({ limit: z.number().min(1).max(50).default(10) }).optional())
     .query(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const limit = input?.limit ?? 10;
+      const instanceFilter = instance ? eq(kiloclaw_cli_runs.instance_id, instance.id) : undefined;
       const runs = await db
         .select()
         .from(kiloclaw_cli_runs)
-        .where(eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+        .where(and(eq(kiloclaw_cli_runs.user_id, ctx.user.id), instanceFilter))
         .orderBy(desc(kiloclaw_cli_runs.started_at))
         .limit(limit);
 

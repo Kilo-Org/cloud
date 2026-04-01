@@ -87,10 +87,7 @@ export async function handleDrainStatus(
   }
 
   const town = getTownDOStub(c.env, params.townId);
-  const [draining, drainNonce] = await Promise.all([
-    town.isDraining(),
-    town.getDrainNonce(),
-  ]);
+  const [draining, drainNonce] = await Promise.all([town.isDraining(), town.getDrainNonce()]);
 
   return c.json(resSuccess({ draining, drainNonce }), 200);
 }

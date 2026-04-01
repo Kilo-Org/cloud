@@ -204,6 +204,13 @@ export function generateBaseConfig(
     config.tools.profile = 'full';
   }
 
+  // Session DM scope: on fresh install, default to 'main' so DMs are routed
+  // to the main session. On subsequent boots, leave the user's choice untouched.
+  if (env.KILOCLAW_FRESH_INSTALL === 'true') {
+    config.session = config.session ?? {};
+    config.session.dmScope = 'main';
+  }
+
   // Exec: KiloClaw machines have no Docker sandbox, so exec must target the
   // gateway host directly. Security and ask are user-configurable via the
   // provisioning preset, persisted in DO state and transported as env vars.

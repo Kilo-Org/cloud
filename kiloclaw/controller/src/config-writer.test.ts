@@ -144,6 +144,38 @@ describe('generateBaseConfig', () => {
     expect(config.tools.profile).toBe('full');
   });
 
+  it('sets session.dmScope to main on fresh install', () => {
+    const { deps } = fakeDeps();
+    const env = { ...minimalEnv(), KILOCLAW_FRESH_INSTALL: 'true' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.session.dmScope).toBe('main');
+  });
+
+  it('does not set session.dmScope on non-fresh boot', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.session?.dmScope).toBeUndefined();
+  });
+
+  it('preserves user session.dmScope on non-fresh boot', () => {
+    const existing = JSON.stringify({ session: { dmScope: 'custom' } });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.session.dmScope).toBe('custom');
+  });
+
+  it('overrides session.dmScope to main on fresh install even if previously set', () => {
+    const existing = JSON.stringify({ session: { dmScope: 'custom' } });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), KILOCLAW_FRESH_INSTALL: 'true' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.session.dmScope).toBe('main');
+  });
+
   it('preserves existing config keys not touched by the patch', () => {
     const existing = JSON.stringify({ custom: { key: 'value' }, gateway: { extra: true } });
     const { deps } = fakeDeps(existing);

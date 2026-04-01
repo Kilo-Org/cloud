@@ -37,7 +37,6 @@ const sharedFields = {
     ),
   mode: z
     .enum(['code', 'ask'])
-    .default('code')
     .describe(
       'The agent mode: "code" for making changes (creates a PR/MR), "ask" for questions and explanations about existing code.'
     ),

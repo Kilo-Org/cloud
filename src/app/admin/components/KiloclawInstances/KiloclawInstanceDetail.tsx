@@ -1625,6 +1625,21 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 )}
               </DetailField>
             </div>
+
+            <div className="flex items-center gap-2">
+              <HardDrive className="text-muted-foreground h-4 w-4 shrink-0" />
+              <DetailField label="Volume Usage">
+                {data.workerStatus?.diskUsedBytes != null &&
+                data.workerStatus?.diskTotalBytes != null ? (
+                  <span>
+                    {formatBytes(data.workerStatus.diskUsedBytes)} /{' '}
+                    {formatBytes(data.workerStatus.diskTotalBytes)}
+                  </span>
+                ) : (
+                  '—'
+                )}
+              </DetailField>
+            </div>
           </CardContent>
         </Card>
 

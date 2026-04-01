@@ -40,6 +40,8 @@ const CheckinSchema = z.object({
   bandwidthBytesIn: z.number().min(0),
   bandwidthBytesOut: z.number().min(0),
   lastExitReason: z.string().optional(),
+  diskUsedBytes: z.number().int().min(0).nullable().optional(),
+  diskTotalBytes: z.number().int().min(0).nullable().optional(),
   productTelemetry: ProductTelemetrySchema.optional(),
 });
 
@@ -193,6 +195,15 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
     })();
 
     waitUntil(telemetryPromise);
+  }
+
+  // Persist disk stats from the checkin payload into the DO (best-effort).
+  if (data.diskUsedBytes != null && data.diskTotalBytes != null) {
+    try {
+      await stub.recordDiskStats(data.diskUsedBytes, data.diskTotalBytes);
+    } catch (err) {
+      console.error('[controller] recordDiskStats failed (non-fatal):', err);
+    }
   }
 
   // Instance readiness detection: when load drops below threshold, send a

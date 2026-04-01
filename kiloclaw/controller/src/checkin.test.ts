@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   nextProductTelemetryDeadline,
+  parseDfOutput,
   parseNetDevText,
   PRODUCT_TELEMETRY_INTERVAL_MS,
   PRODUCT_TELEMETRY_JITTER_MS,
@@ -30,6 +31,27 @@ describe('nextProductTelemetryDeadline', () => {
   it('applies positive jitter when randomFn returns 1', () => {
     const deadline = nextProductTelemetryDeadline(now, () => 1);
     expect(deadline).toBe(now + PRODUCT_TELEMETRY_INTERVAL_MS + PRODUCT_TELEMETRY_JITTER_MS);
+  });
+});
+
+describe('parseDfOutput', () => {
+  it('parses valid df --output=avail,size output and derives used from total - avail', () => {
+    // avail=5368709120, size=10737418240 → used=5368709120
+    const raw = `     Avail 1K-blocks
+5368709120 10737418240`;
+    expect(parseDfOutput(raw)).toEqual({ usedBytes: 5368709120, totalBytes: 10737418240 });
+  });
+
+  it('returns null when the data line does not match the expected format', () => {
+    expect(parseDfOutput('Avail 1K-blocks\nnot-numbers here')).toBeNull();
+  });
+
+  it('returns null for empty output', () => {
+    expect(parseDfOutput('')).toBeNull();
+  });
+
+  it('returns null for output with only a header and no data line', () => {
+    expect(parseDfOutput('     Avail 1K-blocks')).toBeNull();
   });
 });
 

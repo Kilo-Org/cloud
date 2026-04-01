@@ -1137,7 +1137,7 @@ export async function drainAll(): Promise<void> {
       const hasOrigin = (await remoteCheck.exited) === 0;
 
       const gitCmd = hasOrigin
-        ? "git add -A && git commit --allow-empty -m 'WIP: container eviction save' && git push --set-upstream origin HEAD --no-verify"
+        ? "git add -A && git commit --allow-empty -m 'WIP: container eviction save' && git push --set-upstream origin HEAD"
         : "git add -A && git commit --allow-empty -m 'WIP: container eviction save'";
 
       if (!hasOrigin) {
@@ -1146,10 +1146,24 @@ export async function drainAll(): Promise<void> {
         );
       }
 
+      // Use the agent's startup env for git author/committer identity.
+      // The control-server's process.env may not have GIT_AUTHOR_NAME set,
+      // but the agent's startupEnv (captured at spawn time) does.
+      const gitEnv: Record<string, string | undefined> = { ...process.env };
+      const authorName =
+        agent.startupEnv?.GIT_AUTHOR_NAME ?? process.env.GASTOWN_GIT_AUTHOR_NAME ?? 'Gastown';
+      const authorEmail =
+        agent.startupEnv?.GIT_AUTHOR_EMAIL ?? process.env.GASTOWN_GIT_AUTHOR_EMAIL ?? 'gastown@kilo.ai';
+      gitEnv.GIT_AUTHOR_NAME = authorName;
+      gitEnv.GIT_COMMITTER_NAME = authorName;
+      gitEnv.GIT_AUTHOR_EMAIL = authorEmail;
+      gitEnv.GIT_COMMITTER_EMAIL = authorEmail;
+
       const proc = Bun.spawn(['bash', '-c', gitCmd], {
         cwd: agent.workdir,
         stdout: 'pipe',
         stderr: 'pipe',
+        env: gitEnv,
       });
       const exitCode = await proc.exited;
       const stdout = await new Response(proc.stdout).text();

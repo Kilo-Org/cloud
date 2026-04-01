@@ -57,7 +57,8 @@ import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerStub } from './TownContainer.do';
 
-import { verifyKiloToken } from '@kilocode/worker-utils';
+import { verifyKiloToken, kiloTokenPayload } from '@kilocode/worker-utils';
+import { jwtVerify } from 'jose';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
 import { writeEvent, type GastownEventData } from '../util/analytics.util';
@@ -1679,17 +1680,23 @@ export class TownDO extends DurableObject<Env> {
       switch (action) {
         case 'RESTART':
         case 'RESTART_WITH_BACKOFF': {
-          // Stop the agent in the container, reset to idle so the
-          // scheduler picks it up again on the next alarm cycle.
-          if (targetAgent?.status === 'working' || targetAgent?.status === 'stalled') {
-            dispatch.stopAgentInContainer(this.env, this.townId, targetAgentId).catch(() => {});
-          }
           if (targetAgent) {
             // Use the bead captured in the triage snapshot (not the agent's
             // current hook, which may have changed since the triage request
             // was created). Fall back to current hook for backward compat.
             const restartBeadId =
               snapshotHookedBeadId ?? targetAgent.current_hook_bead_id;
+
+            // Only stop the agent if it's still working on the snapshot bead.
+            // If it has moved on, stopping it would abort unrelated work.
+            const agentStillOnBead =
+              restartBeadId && targetAgent.current_hook_bead_id === restartBeadId;
+            if (
+              agentStillOnBead &&
+              (targetAgent.status === 'working' || targetAgent.status === 'stalled')
+            ) {
+              dispatch.stopAgentInContainer(this.env, this.townId, targetAgentId).catch(() => {});
+            }
 
             // Check if the hooked bead has exhausted its dispatch cap.
             // If so, fail it immediately instead of letting the reconciler
@@ -1706,25 +1713,28 @@ export class TownDO extends DurableObject<Env> {
                 break;
               }
             }
-            // RESTART clears last_activity_at so the scheduler picks it
-            // up immediately. RESTART_WITH_BACKOFF sets it to now() so
-            // the dispatch cooldown (DISPATCH_COOLDOWN_MS) delays the
-            // next attempt, preventing immediate restart of crash loops.
-            const activityAt = action === 'RESTART_WITH_BACKOFF' ? now() : null;
-            query(
-              this.sql,
-              /* sql */ `
-                UPDATE ${agent_metadata}
-                SET ${agent_metadata.columns.status} = 'idle',
-                    ${agent_metadata.columns.last_activity_at} = ?
-                WHERE ${agent_metadata.bead_id} = ?
-              `,
-              [activityAt, targetAgentId]
-            );
-            // Also stamp the bead's last_dispatch_attempt_at so the
-            // reconciler's exponential backoff gate fires correctly.
-            // Without this, the backoff variant allows immediate
-            // redispatch once last_dispatch_attempt_at ages out.
+            // Only reset agent state if it's still on the snapshot bead.
+            // If it moved on, let it continue its current work.
+            if (agentStillOnBead) {
+              // RESTART clears last_activity_at so the scheduler picks it
+              // up immediately. RESTART_WITH_BACKOFF sets it to now() so
+              // the dispatch cooldown (DISPATCH_COOLDOWN_MS) delays the
+              // next attempt, preventing immediate restart of crash loops.
+              const activityAt = action === 'RESTART_WITH_BACKOFF' ? now() : null;
+              query(
+                this.sql,
+                /* sql */ `
+                  UPDATE ${agent_metadata}
+                  SET ${agent_metadata.columns.status} = 'idle',
+                      ${agent_metadata.columns.last_activity_at} = ?
+                  WHERE ${agent_metadata.bead_id} = ?
+                `,
+                [activityAt, targetAgentId]
+              );
+            }
+            // Stamp the bead's last_dispatch_attempt_at regardless — even
+            // if the agent moved on, the backoff gate should still fire
+            // on the snapshot bead to prevent immediate redispatch.
             if (action === 'RESTART_WITH_BACKOFF' && restartBeadId) {
               query(
                 this.sql,
@@ -3540,9 +3550,24 @@ export class TownDO extends DurableObject<Env> {
 
     // Verify the existing token's signature before trusting its claims.
     // This prevents a forged token from being re-signed with real credentials.
+    // Use a very large clockTolerance so that already-expired (but validly
+    // signed) tokens are still accepted — this alarm is the recovery path
+    // for expired tokens, so rejecting them on exp would leave the town
+    // permanently stuck if it missed the 7-day refresh window.
     let payload: { kiloUserId: string; apiTokenPepper?: string | null; exp?: number };
     try {
-      payload = await verifyKiloToken(token, secret);
+      const TEN_YEARS_SECONDS = 10 * 365 * 24 * 60 * 60;
+      const { payload: raw } = await jwtVerify(
+        token,
+        new TextEncoder().encode(secret),
+        { algorithms: ['HS256'], clockTolerance: TEN_YEARS_SECONDS }
+      );
+      const parsed = kiloTokenPayload.safeParse(raw);
+      if (!parsed.success) {
+        logger.warn('refreshKilocodeTokenIfExpiring: token payload failed schema validation');
+        return;
+      }
+      payload = parsed.data;
     } catch {
       // Signature invalid or token malformed — don't remint from untrusted claims.
       logger.warn('refreshKilocodeTokenIfExpiring: existing token failed signature verification');

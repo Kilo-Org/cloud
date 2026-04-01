@@ -37,17 +37,26 @@ function now(): string {
   return new Date().toISOString();
 }
 
-/** Extract the human-readable failure message from a bead event's metadata. */
+/**
+ * Extract the human-readable failure message from a bead event's metadata.
+ *
+ * Two sources:
+ *  - status_changed events store it at `metadata.failure_reason.message`
+ *  - review_completed / pr_creation_failed events store it at `metadata.message`
+ */
 function extractFailureMessage(
   status: string,
   metadata: Record<string, unknown> | null | undefined
 ): string | null {
   if (status !== 'failed' || !metadata) return null;
+  // Structured failure_reason (from status_changed events via updateBeadStatus)
   const fr = metadata.failure_reason;
   if (typeof fr === 'object' && fr !== null && 'message' in fr) {
     const msg = (fr as Record<string, unknown>).message;
     if (typeof msg === 'string') return msg;
   }
+  // Top-level message (from review_completed / pr_creation_failed events)
+  if (typeof metadata.message === 'string') return metadata.message;
   return null;
 }
 

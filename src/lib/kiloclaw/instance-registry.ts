@@ -219,6 +219,27 @@ export async function getActiveInstance(userId: string): Promise<ActiveKiloClawI
 }
 
 /**
+ * Fetch an active instance by its primary key (UUID).
+ * Used by admin endpoints that already know the instance ID.
+ * Returns null if the instance doesn't exist or is destroyed.
+ */
+export async function getInstanceById(instanceId: string): Promise<ActiveKiloClawInstance | null> {
+  const [row] = await db
+    .select({
+      id: kiloclaw_instances.id,
+      userId: kiloclaw_instances.user_id,
+      sandboxId: kiloclaw_instances.sandbox_id,
+      organizationId: kiloclaw_instances.organization_id,
+      name: kiloclaw_instances.name,
+    })
+    .from(kiloclaw_instances)
+    .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)))
+    .limit(1);
+
+  return row ?? null;
+}
+
+/**
  * Fetch the user's active org-scoped KiloClaw instance for a specific organization.
  * Returns null if no active org instance exists for this user+org pair.
  */

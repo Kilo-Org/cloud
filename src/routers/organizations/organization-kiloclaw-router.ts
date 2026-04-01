@@ -5,6 +5,7 @@ import { TRPCError } from '@trpc/server';
 import { createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import {
   ALL_SECRET_FIELD_KEYS,
@@ -23,11 +24,7 @@ import {
   kiloclaw_cli_runs,
 } from '@kilocode/db/schema';
 import { and, eq, desc, sql } from 'drizzle-orm';
-import type {
-  KiloClawDashboardStatus,
-  KiloCodeConfigResponse,
-  UserConfigResponse,
-} from '@/lib/kiloclaw/types';
+import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import {
   ensureActiveInstance,
   getActiveOrgInstance,
@@ -104,34 +101,6 @@ function handleFileOperationError(err: unknown, operation: string): never {
         ? (getKiloClawApiErrorPayload(err).message ?? `Failed to ${operation}`)
         : `Failed to ${operation}`,
   });
-}
-
-/**
- * Fetch JSON from a user-facing worker route via the /i/:instanceId proxy.
- * This ensures the request reaches the correct DO for the org instance
- * instead of falling through to `deriveSandboxId(userId)` which resolves
- * to the personal instance.
- */
-async function fetchViaInstanceProxy<T>(
-  path: string,
-  token: string,
-  instanceId: string | undefined,
-  options?: RequestInit
-): Promise<T> {
-  const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
-  const proxyPath = instanceId ? `/i/${instanceId}${path}` : path;
-  const res = await fetch(`${workerUrl}${proxyPath}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  });
-  if (!res.ok) {
-    throw new KiloClawApiError(res.status, await res.text());
-  }
-  return res.json() as Promise<T>;
 }
 
 /**
@@ -628,20 +597,19 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   getConfig: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
-    const instanceId = workerInstanceId(instance);
     const token = generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
-    return fetchViaInstanceProxy<UserConfigResponse>('/api/kiloclaw/config', token, instanceId);
+    const client = new KiloClawUserClient(token);
+    return client.getConfig({ userId: ctx.user.id, instanceId: workerInstanceId(instance) });
   }),
 
   getChannelCatalog: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
-    const instanceId = workerInstanceId(instance);
     const token = generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
-    const config = await fetchViaInstanceProxy<UserConfigResponse>(
-      '/api/kiloclaw/config',
-      token,
-      instanceId
-    );
+    const client = new KiloClawUserClient(token);
+    const config = await client.getConfig({
+      userId: ctx.user.id,
+      instanceId: workerInstanceId(instance),
+    });
     const channels = getEntriesByCategory('channel');
     return channels.map(entry => ({
       id: entry.id,
@@ -663,13 +631,12 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   getSecretCatalog: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
-    const instanceId = workerInstanceId(instance);
     const token = generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
-    const config = await fetchViaInstanceProxy<UserConfigResponse>(
-      '/api/kiloclaw/config',
-      token,
-      instanceId
-    );
+    const client = new KiloClawUserClient(token);
+    const config = await client.getConfig({
+      userId: ctx.user.id,
+      instanceId: workerInstanceId(instance),
+    });
     const tools = getEntriesByCategory('tool');
     return tools.map(entry => ({
       id: entry.id,
@@ -704,15 +671,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
-      const instanceId = workerInstanceId(instance);
       const token = generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
-
-      // restartMachine has no internal-client method — it uses the user-facing
-      // admin route. Route through the /i/:instanceId proxy so the request
-      // reaches the correct DO instead of the personal instance.
-      return fetchViaInstanceProxy('/api/admin/machine/restart', token, instanceId, {
-        method: 'POST',
-        body: input.imageTag ? JSON.stringify({ imageTag: input.imageTag }) : undefined,
+      const client = new KiloClawUserClient(token);
+      return client.restartMachine(input.imageTag ? { imageTag: input.imageTag } : undefined, {
+        userId: ctx.user.id,
+        instanceId: workerInstanceId(instance),
       });
     }),
 

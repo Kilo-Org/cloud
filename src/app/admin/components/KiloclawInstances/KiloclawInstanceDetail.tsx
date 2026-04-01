@@ -1214,6 +1214,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   } = useQuery({
     ...trpc.admin.kiloclawInstances.volumeSnapshots.queryOptions({
       userId: data?.user_id ?? '',
+      instanceId: data?.id,
     }),
     enabled: snapshotsEnabled,
   });
@@ -1241,6 +1242,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   } = useQuery({
     ...trpc.admin.kiloclawInstances.gatewayStatus.queryOptions({
       userId: data?.user_id ?? '',
+      instanceId: data?.id,
     }),
     enabled: gatewayControlsEnabled,
     refetchInterval: gatewayControlsEnabled ? 10000 : false,
@@ -1249,6 +1251,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const { data: controllerVersion } = useQuery({
     ...trpc.admin.kiloclawInstances.controllerVersion.queryOptions({
       userId: data?.user_id ?? '',
+      instanceId: data?.id,
     }),
     enabled: gatewayControlsEnabled,
     staleTime: 5 * 60_000,
@@ -1269,20 +1272,29 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
     if (awaitingRestartCompletion && status === 'running' && wasRestarting) {
       setAwaitingRestartCompletion(false);
-      if (data?.user_id) {
+      if (data?.user_id && data?.id) {
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawInstances.controllerVersion.queryKey({
             userId: data.user_id,
+            instanceId: data.id,
           }),
         });
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawInstances.gatewayStatus.queryKey({
             userId: data.user_id,
+            instanceId: data.id,
           }),
         });
       }
     }
-  }, [data?.workerStatus?.status, data?.user_id, awaitingRestartCompletion, queryClient, trpc]);
+  }, [
+    data?.workerStatus?.status,
+    data?.user_id,
+    data?.id,
+    awaitingRestartCompletion,
+    queryClient,
+    trpc,
+  ]);
 
   // Stop polling when restore completes (status transitions from 'restoring' to something else).
   // Track whether we've seen 'restoring' to avoid false positives when the mutation succeeds
@@ -1311,9 +1323,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   }, [data?.workerStatus?.status, awaitingRestoreCompletion, queryClient, trpc]);
 
   const invalidateGatewayQueries = () => {
-    if (!data?.user_id) return;
+    if (!data?.user_id || !data?.id) return;
     void queryClient.invalidateQueries({
-      queryKey: trpc.admin.kiloclawInstances.gatewayStatus.queryKey({ userId: data.user_id }),
+      queryKey: trpc.admin.kiloclawInstances.gatewayStatus.queryKey({
+        userId: data.user_id,
+        instanceId: data.id,
+      }),
     });
     void queryClient.invalidateQueries({ queryKey: trpc.admin.kiloclawInstances.get.queryKey() });
   };
@@ -1750,7 +1765,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   variant="outline"
                   size="sm"
                   disabled={machineActionPending}
-                  onClick={() => void forceRetryRecovery({ userId: data.user_id })}
+                  onClick={() =>
+                    void forceRetryRecovery({ userId: data.user_id, instanceId: data.id })
+                  }
                 >
                   {isRetryingRecovery ? (
                     <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -1981,7 +1998,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   size="sm"
                   variant="outline"
                   disabled={machineActionPending}
-                  onClick={() => void machineStart({ userId: data.user_id })}
+                  onClick={() => void machineStart({ userId: data.user_id, instanceId: data.id })}
                 >
                   {isMachineStarting ? (
                     <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -1994,7 +2011,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   size="sm"
                   variant="outline"
                   disabled={machineActionPending || !hasMachine}
-                  onClick={() => void machineStop({ userId: data.user_id })}
+                  onClick={() => void machineStop({ userId: data.user_id, instanceId: data.id })}
                 >
                   {isMachineStopping ? (
                     <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -2092,6 +2109,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   if (data?.workerStatus?.flyMachineId && data?.workerStatus?.flyAppName) {
                     void destroyFlyMachine({
                       userId: data.user_id,
+                      instanceId: data.id,
                       appName: data.workerStatus.flyAppName,
                       machineId: data.workerStatus.flyMachineId,
                     });
@@ -2184,7 +2202,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       size="sm"
                       variant="outline"
                       disabled={gatewayActionPending}
-                      onClick={() => void gatewayStart({ userId: data.user_id })}
+                      onClick={() =>
+                        void gatewayStart({ userId: data.user_id, instanceId: data.id })
+                      }
                     >
                       {isGatewayStarting ? (
                         <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -2197,7 +2217,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       size="sm"
                       variant="outline"
                       disabled={gatewayActionPending}
-                      onClick={() => void gatewayStop({ userId: data.user_id })}
+                      onClick={() =>
+                        void gatewayStop({ userId: data.user_id, instanceId: data.id })
+                      }
                     >
                       {isGatewayStopping ? (
                         <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -2210,7 +2232,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       size="sm"
                       variant="outline"
                       disabled={gatewayActionPending}
-                      onClick={() => void gatewayRestart({ userId: data.user_id })}
+                      onClick={() =>
+                        void gatewayRestart({ userId: data.user_id, instanceId: data.id })
+                      }
                     >
                       {isGatewayRestarting ? (
                         <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -2226,7 +2250,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       onClick={() => {
                         runDoctorMutation.reset();
                         setDoctorDialogOpen(true);
-                        runDoctorMutation.mutate({ userId: data.user_id });
+                        runDoctorMutation.mutate({ userId: data.user_id, instanceId: data.id });
                       }}
                     >
                       <Stethoscope className="mr-1 h-4 w-4" />
@@ -2547,9 +2571,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 variant="default"
                 disabled={isRestoring || restoreReason.length < 10 || !restoreSnapshotId}
                 onClick={() => {
-                  if (!data?.user_id || !restoreSnapshotId) return;
+                  if (!data?.user_id || !data?.id || !restoreSnapshotId) return;
                   void restoreSnapshot({
                     userId: data.user_id,
+                    instanceId: data.id,
                     snapshotId: restoreSnapshotId,
                     reason: restoreReason,
                   });
@@ -2605,7 +2630,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               </Button>
               <Button
                 variant="destructive"
-                onClick={() => restoreConfigMutation.mutate({ userId: data.user_id })}
+                onClick={() =>
+                  restoreConfigMutation.mutate({ userId: data.user_id, instanceId: data.id })
+                }
                 disabled={gatewayActionPending}
               >
                 {restoreConfigMutation.isPending ? (

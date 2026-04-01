@@ -5,8 +5,8 @@ export default async function OrgWastelandPage({ params }: { params: Promise<{ i
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization, role }) => (
-        <OrgWastelandListPageClient organizationId={organization.id} role={role} />
+      render={({ organization }) => (
+        <OrgWastelandListPageClient organizationId={organization.id} />
       )}
     />
   );

@@ -9,8 +9,16 @@ import { z } from 'zod';
 import { router, procedure, adminProcedure } from './init';
 import { resolveWastelandOwnership } from './ownership';
 import { getWastelandDOStub, type WastelandMemberResult } from '../dos/WastelandDO.stub';
+import { getWastelandContainerStub } from '../dos/WastelandContainer.do';
 import { getWastelandRegistryStub } from '../dos/WastelandRegistry.do';
-import { RpcWastelandOutput, RpcWastelandMemberOutput } from './schemas';
+import { deriveEncryptionKey, encryptToken } from '../util/crypto.util';
+import { resolveSecret } from '../util/secret.util';
+import {
+  RpcWastelandOutput,
+  RpcWastelandMemberOutput,
+  RpcWastelandConfigOutput,
+  RpcWastelandCredentialStatusOutput,
+} from './schemas';
 import type { TRPCContext } from './init';
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
 
@@ -318,6 +326,121 @@ export const wastelandRouter = router({
       }
 
       return updated;
+    }),
+
+  // ── Config Update ──────────────────────────────────────────────────
+
+  updateWastelandConfig: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        name: z.string().min(1).max(128).optional(),
+        visibility: z.enum(['public', 'private']).optional(),
+        dolthubUpstream: z.string().optional(),
+      })
+    )
+    .output(RpcWastelandConfigOutput)
+    .mutation(async ({ ctx, input }) => {
+      // Owner or org admin only
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+
+      const stub = getWastelandDOStub(ctx.env, input.wastelandId);
+      const config = await stub.updateConfig({
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
+        ...(input.dolthubUpstream !== undefined
+          ? { dolthub_upstream: input.dolthubUpstream }
+          : {}),
+      });
+
+      return config;
+    }),
+
+  // ── Credential: Store ──────────────────────────────────────────────
+
+  storeCredential: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        dolthubToken: z.string().min(1),
+        dolthubOrg: z.string().min(1),
+        rigHandle: z.string().optional(),
+      })
+    )
+    .output(RpcWastelandCredentialStatusOutput)
+    .mutation(async ({ ctx, input }) => {
+      // Any member can store their own credential
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+
+      // Derive encryption key from WASTELAND_ENCRYPTION_KEY secret
+      const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
+      if (!rawKey) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Encryption key unavailable',
+        });
+      }
+      const cryptoKey = await deriveEncryptionKey(rawKey);
+      const encryptedToken = await encryptToken(input.dolthubToken, cryptoKey);
+
+      const stub = getWastelandDOStub(ctx.env, input.wastelandId);
+      const credential = await stub.storeCredential(
+        ctx.userId,
+        encryptedToken,
+        input.dolthubOrg,
+        input.rigHandle
+      );
+
+      // If the caller is the wasteland owner, inject the token into
+      // the container so it's available in the OS environment.
+      const config = await stub.getConfig();
+      if (config && config.owner_user_id === ctx.userId) {
+        const container = getWastelandContainerStub(ctx.env, input.wastelandId);
+        await container.setEnvVar('DOLTHUB_TOKEN', input.dolthubToken);
+      }
+
+      return {
+        user_id: credential.user_id,
+        dolthub_org: credential.dolthub_org,
+        rig_handle: credential.rig_handle,
+        connected_at: credential.connected_at,
+      };
+    }),
+
+  // ── Credential: Get Status ─────────────────────────────────────────
+
+  getCredentialStatus: procedure
+    .input(z.object({ wastelandId: z.string().uuid() }))
+    .output(RpcWastelandCredentialStatusOutput.nullable())
+    .query(async ({ ctx, input }) => {
+      // Any member can check their own credential status
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+
+      const stub = getWastelandDOStub(ctx.env, input.wastelandId);
+      const credential = await stub.getCredential(ctx.userId);
+
+      if (!credential) return null;
+
+      // Never expose the encrypted token
+      return {
+        user_id: credential.user_id,
+        dolthub_org: credential.dolthub_org,
+        rig_handle: credential.rig_handle,
+        connected_at: credential.connected_at,
+      };
+    }),
+
+  // ── Credential: Delete ─────────────────────────────────────────────
+
+  deleteCredential: procedure
+    .input(z.object({ wastelandId: z.string().uuid() }))
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      // Users can only delete their own credentials — no ownership
+      // check needed beyond auth (userId comes from the JWT).
+      const stub = getWastelandDOStub(ctx.env, input.wastelandId);
+      await stub.deleteCredential(ctx.userId);
+      return { success: true };
     }),
 });
 

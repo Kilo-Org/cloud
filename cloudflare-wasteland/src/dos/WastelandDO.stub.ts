@@ -42,6 +42,15 @@ export type UpdateWastelandConfigInput = {
   status?: 'active' | 'deleted';
 };
 
+/** Shape returned by WastelandDO credential RPCs — matches the wasteland_credentials table. */
+export type WastelandCredentialResult = {
+  user_id: string;
+  encrypted_token: string;
+  dolthub_org: string;
+  rig_handle: string | null;
+  connected_at: string;
+};
+
 /**
  * Stub WastelandDO — placeholder until the full implementation lands.
  * Provides the class export that wrangler.jsonc requires for the
@@ -90,6 +99,25 @@ export class WastelandDO extends DurableObject<Env> {
     _memberId: string,
     _update: { role?: string; trust_level?: number }
   ): Promise<WastelandMemberResult | null> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
+  // ── Credential management RPCs ──────────────────────────────────────
+
+  async storeCredential(
+    _userId: string,
+    _encryptedToken: string,
+    _dolthubOrg: string,
+    _rigHandle?: string
+  ): Promise<WastelandCredentialResult> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
+  async getCredential(_userId: string): Promise<WastelandCredentialResult | null> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
+  async deleteCredential(_userId: string): Promise<void> {
     throw new Error('WastelandDO not yet implemented');
   }
 }

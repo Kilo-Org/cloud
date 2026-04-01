@@ -32,7 +32,7 @@
     "test:e2e:debug": "playwright test --debug",
     "promo": "pnpm -s script src/scripts/encrypt-promo-codes.ts",
     "dev:discord-gateway-cron": "tsx dev/discord-gateway-cron.ts",
-    "worktree:prepare": "bash scripts/worktree-prepare.sh"
+    "worktree:prepare": "bash scripts/worktree-prepare.sh",
     "dev:start": "tsx --tsconfig tsconfig.scripts.json dev/local/cli.ts up",
     "dev:stop": "tsx --tsconfig tsconfig.scripts.json dev/local/cli.ts stop",
     "dev:env": "tsx --tsconfig tsconfig.scripts.json dev/local/cli.ts env"

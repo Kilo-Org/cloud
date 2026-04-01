@@ -83,8 +83,8 @@ async function issueYearlyCadenceMonthlyBaseOnce(
     .orderBy(desc(kilo_pass_issuances.issue_month))
     .limit(1);
 
-  if (lastInvoiceIssuance.length > 0) {
-    const periodStartMonth = lastInvoiceIssuance[0]!.issueMonth;
+  const periodStartMonth = lastInvoiceIssuance[0]?.issueMonth;
+  if (periodStartMonth) {
     const totalIssuances = await tx
       .select({ count: sql<number>`count(*)::int` })
       .from(kilo_pass_issuances)

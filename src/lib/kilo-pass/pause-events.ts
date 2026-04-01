@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, isNull, lte } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { kilo_pass_pause_events } from '@kilocode/db/schema';
 import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
 import { getPreviousIssueMonth } from '@/lib/kilo-pass/stripe-handlers-utils';
@@ -85,7 +85,7 @@ export async function getOpenPauseEvent(
   params: {
     kiloPassSubscriptionId: string;
   }
-): Promise<(typeof kilo_pass_pause_events.$inferSelect) | null> {
+): Promise<typeof kilo_pass_pause_events.$inferSelect | null> {
   const rows = await dbOrTx
     .select()
     .from(kilo_pass_pause_events)

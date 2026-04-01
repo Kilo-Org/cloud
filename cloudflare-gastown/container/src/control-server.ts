@@ -10,6 +10,7 @@ import {
   activeServerCount,
   getUptime,
   stopAll,
+  drainAll,
   getAgentEvents,
   registerEventSink,
 } from './process-manager';
@@ -751,7 +752,7 @@ export function startControlServer(): void {
     startHeartbeat(apiUrl, authToken);
   }
 
-  // Handle graceful shutdown
+  // Handle graceful shutdown (immediate, no drain — used by SIGINT for dev)
   const shutdown = async () => {
     console.log('Shutting down control server...');
     stopHeartbeat();
@@ -759,7 +760,14 @@ export function startControlServer(): void {
     process.exit(0);
   };
 
-  process.on('SIGTERM', () => void shutdown());
+  process.on('SIGTERM', () => void (async () => {
+    console.log('[control-server] SIGTERM received — starting graceful drain...');
+    stopHeartbeat();
+    await drainAll();
+    await stopAll();
+    process.exit(0);
+  })());
+
   process.on('SIGINT', () => void shutdown());
 
   // Track connected WebSocket clients with optional agent filter

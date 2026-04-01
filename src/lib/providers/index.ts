@@ -146,15 +146,19 @@ export async function getProvider(
     }
   }
 
-  if (await shouldRouteToVercel(requestedModel, request, taskId || user.id)) {
+  const kiloFreeModel = kiloFreeModels.find(m => m.public_id === requestedModel);
+  const defaultProvider =
+    Object.values(PROVIDERS).find(p => p.id === kiloFreeModel?.gateway) ?? PROVIDERS.OPENROUTER;
+
+  if (
+    defaultProvider.id === 'openrouter' &&
+    (await shouldRouteToVercel(requestedModel, request, taskId || user.id))
+  ) {
     return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, bypassAccessCheck: false };
   }
 
-  const kiloFreeModel = kiloFreeModels.find(m => m.public_id === requestedModel);
-  const freeModelProvider = Object.values(PROVIDERS).find(p => p.id === kiloFreeModel?.gateway);
-
   return {
-    provider: freeModelProvider ?? PROVIDERS.OPENROUTER,
+    provider: defaultProvider,
     userByok: null,
     bypassAccessCheck: false,
   };

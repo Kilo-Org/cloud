@@ -137,6 +137,20 @@ async function processKiloclawChatMessage(
   }
   const userId = triggerConfig.userId;
 
+  // Mark as inprogress before sending to prevent duplicate delivery on retry.
+  // On retry, the outer guard in processWebhookMessage sees processStatus === 'inprogress'
+  // without a cloudAgentSessionId, which falls into the `processStatus !== 'captured'` branch
+  // and acks the message without re-sending.
+  await withDORetry(
+    () => stub,
+    doStub =>
+      doStub.updateRequest(webhook.requestId, {
+        process_status: 'inprogress',
+        started_at: new Date().toISOString(),
+      }),
+    'updateRequest'
+  );
+
   const renderedPrompt = renderPromptTemplate(triggerConfig.promptTemplate, {
     body: request.body,
     method: request.method,

@@ -152,9 +152,9 @@ export function WebhookIntegrationSection() {
     if (!clawTrigger || !instanceId) return;
     // If auth is enabled, the secret must be re-entered since rotation creates a new trigger
     // and the existing secret hash can't be carried forward
-    if (authEnabled && authHeader && !authSecret) {
+    if (authEnabled && (!authHeader || !authSecret)) {
       toast.error(
-        'Please re-enter the shared secret before rotating — the new URL needs a fresh secret'
+        'Both header name and secret are required when authentication is enabled — the new URL needs a fresh secret'
       );
       setConfirmRotateOpen(false);
       return;
@@ -342,6 +342,7 @@ export function WebhookIntegrationSection() {
                       setPromptDirty(true);
                     }}
                     rows={5}
+                    maxLength={10000}
                     className="font-mono text-xs"
                     placeholder="Enter your prompt template..."
                   />

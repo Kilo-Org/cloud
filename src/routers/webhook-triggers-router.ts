@@ -10,7 +10,7 @@ import {
   kiloclaw_instances,
 } from '@kilocode/db/schema';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
-import { triggerIdSchema } from '@/lib/webhook-trigger-validation';
+import { triggerIdSchema, triggerIdCreateSchema } from '@/lib/webhook-trigger-validation';
 import {
   createWorkerTrigger,
   getWorkerTrigger,
@@ -24,7 +24,7 @@ import {
 // Input schemas
 const WebhookTriggerCreateInput = z
   .object({
-    triggerId: triggerIdSchema,
+    triggerId: triggerIdCreateSchema,
     organizationId: z.string().uuid().optional(),
     targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
     // KiloClaw Chat target fields
@@ -35,7 +35,10 @@ const WebhookTriggerCreateInput = z
     model: z.string().min(1, 'Model is required').optional(),
     profileId: z.string().uuid().optional(),
     // Shared fields
-    promptTemplate: z.string().min(1, 'Prompt template is required'),
+    promptTemplate: z
+      .string()
+      .min(1, 'Prompt template is required')
+      .max(10000, 'Prompt template must be 10,000 characters or less'),
     autoCommit: z.boolean().optional(),
     condenseOnComplete: z.boolean().optional(),
     webhookAuth: z
@@ -72,7 +75,7 @@ const WebhookTriggerUpdateInput = z.object({
   organizationId: z.string().uuid().optional(),
   mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
   model: z.string().min(1).optional(),
-  promptTemplate: z.string().min(1).optional(),
+  promptTemplate: z.string().min(1).max(10000).optional(),
   profileId: z.string().uuid().optional(),
   autoCommit: z.boolean().nullable().optional(),
   condenseOnComplete: z.boolean().nullable().optional(),

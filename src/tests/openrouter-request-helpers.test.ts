@@ -25,9 +25,10 @@ describe('addCacheBreakpoints', () => {
 
     addCacheBreakpoints(request);
 
-    const lastMessage = request.body.messages.at(-1);
-    expect(Array.isArray(lastMessage?.content)).toBe(true);
-    expect(lastMessage?.content.at(-1)).toMatchObject({
+    const lastContent = request.body.messages.at(-1)?.content;
+    expect(Array.isArray(lastContent)).toBe(true);
+    if (!Array.isArray(lastContent)) return;
+    expect(lastContent.at(-1)).toMatchObject({
       type: 'text',
       text: 'Latest detail',
       cache_control: { type: 'ephemeral' },
@@ -43,7 +44,14 @@ describe('addCacheBreakpoints', () => {
           { role: 'system', content: 'You are helpful.' },
           {
             role: 'user',
-            content: [{ type: 'text', text: 'First prompt', cache_control: { type: 'ephemeral' } }],
+            content: [
+              {
+                type: 'text',
+                text: 'First prompt',
+                // @ts-expect-error non-standard cache_control extension
+                cache_control: { type: 'ephemeral' },
+              },
+            ],
           },
           { role: 'assistant', content: 'First response' },
           {
@@ -59,14 +67,11 @@ describe('addCacheBreakpoints', () => {
 
     addCacheBreakpoints(request);
 
-    const lastMessage = request.body.messages.at(-1);
-    expect(lastMessage).toMatchObject({
-      role: 'user',
-      content: [
-        { type: 'text', text: 'Latest prompt' },
-        { type: 'text', text: 'Latest detail' },
-      ],
-    });
+    const lastContent = request.body.messages.at(-1)?.content;
+    expect(lastContent).toEqual([
+      { type: 'text', text: 'Latest prompt' },
+      { type: 'text', text: 'Latest detail' },
+    ]);
   });
 
   test('does nothing for responses requests when any cache_control is already present', () => {
@@ -79,7 +84,12 @@ describe('addCacheBreakpoints', () => {
             type: 'message',
             role: 'user',
             content: [
-              { type: 'input_text', text: 'First prompt', cache_control: { type: 'ephemeral' } },
+              {
+                type: 'input_text',
+                text: 'First prompt',
+                // @ts-expect-error non-standard cache_control extension
+                cache_control: { type: 'ephemeral' },
+              },
             ],
           },
           {
@@ -104,5 +114,55 @@ describe('addCacheBreakpoints', () => {
         { type: 'input_text', text: 'Tool detail' },
       ],
     });
+  });
+
+  test('adds top-level cache_control on messages request when none is present', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4-5',
+        max_tokens: 1024,
+        messages: [
+          { role: 'user', content: 'First prompt' },
+          { role: 'assistant', content: 'First response' },
+          { role: 'user', content: 'Latest prompt' },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    // @ts-expect-error non-standard top-level cache_control extension
+    expect(request.body.cache_control).toEqual({ type: 'ephemeral' });
+  });
+
+  test('does nothing for messages request when any cache_control is already present', () => {
+    const request: GatewayRequest = {
+      kind: 'messages',
+      body: {
+        model: 'anthropic/claude-sonnet-4-5',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'First prompt',
+                // @ts-expect-error non-standard cache_control extension
+                cache_control: { type: 'ephemeral' },
+              },
+            ],
+          },
+          { role: 'assistant', content: 'First response' },
+          { role: 'user', content: 'Latest prompt' },
+        ],
+      },
+    };
+
+    addCacheBreakpoints(request);
+
+    // @ts-expect-error non-standard top-level cache_control extension
+    expect(request.body.cache_control).toBeUndefined();
   });
 });

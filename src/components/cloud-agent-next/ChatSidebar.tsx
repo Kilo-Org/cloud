@@ -1,9 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '@/components/Button';
 import {
-  Plus,
+  SquarePen,
   Search,
   SlidersHorizontal,
   MoreHorizontal,
@@ -12,6 +11,7 @@ import {
   X,
   Pencil,
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import { usePathname, useRouter } from 'next/navigation';
 import { isToday, isYesterday, startOfDay, differenceInCalendarDays, format } from 'date-fns';
@@ -358,21 +358,30 @@ export function ChatSidebar({
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className={cn('flex items-center gap-2 border-b px-3 py-2.5', isInSheet && 'pt-14')}>
-        <Button onClick={handleNewSession} className="flex-1" variant="primary" size="sm">
-          <Plus className="mr-2 h-4 w-4" />
-          New Session
-        </Button>
-        <button
-          onClick={toggleSearch}
-          className={cn(
-            'hover:bg-accent rounded-md p-1.5 transition-colors',
-            showSearch && 'bg-accent'
-          )}
-        >
-          <Search className="text-muted-foreground h-4 w-4" />
-        </button>
-        {(onPlatformChange || onProjectChange) && (
-          <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={handleNewSession}
+              className="hover:bg-accent rounded-md p-1.5 transition-colors"
+              aria-label="New session"
+            >
+              <SquarePen className="text-muted-foreground h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">New session</TooltipContent>
+        </Tooltip>
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            onClick={toggleSearch}
+            className={cn(
+              'hover:bg-accent rounded-md p-1.5 transition-colors',
+              showSearch && 'bg-accent'
+            )}
+          >
+            <Search className="text-muted-foreground h-4 w-4" />
+          </button>
+          {(onPlatformChange || onProjectChange) && (
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 className={cn(
@@ -433,8 +442,9 @@ export function ChatSidebar({
                 </>
               )}
             </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       {/* Collapsible search */}

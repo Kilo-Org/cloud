@@ -407,6 +407,9 @@ export function createConnectionManager(
         }
 
         logToFile('SDK event subscription started');
+        // Arm the transport timer immediately so a stalled initial
+        // SSE handshake (no server.connected event) is detected.
+        callbacks.onSseEvent?.();
 
         for await (const event of result.stream) {
           if (abortController.signal.aborted || myGeneration !== eventSubscriptionGeneration) break;

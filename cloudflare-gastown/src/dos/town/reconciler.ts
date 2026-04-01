@@ -2009,6 +2009,7 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
   const violations: Violation[] = [];
 
   // Invariant 7: Working agents must have hooks
+  // Mayors are always 'working' and intentionally have no hook — exclude them.
   const unhookedWorkers = z
     .object({ bead_id: z.string() })
     .array()
@@ -2020,6 +2021,7 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
         FROM ${agent_metadata}
         WHERE ${agent_metadata.status} = 'working'
           AND ${agent_metadata.current_hook_bead_id} IS NULL
+          AND ${agent_metadata.role} != 'mayor'
       `,
         []
       ),
@@ -2031,26 +2033,27 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
     });
   }
 
-  // Invariant 5: Convoy beads should not be in_progress
-  const inProgressConvoys = z
-    .object({ bead_id: z.string() })
+  // Invariant 5: Convoy beads should not be in unexpected states.
+  // Valid transient states: open, in_progress, in_review, closed.
+  const badStateConvoys = z
+    .object({ bead_id: z.string(), status: z.string() })
     .array()
     .parse([
       ...query(
         sql,
         /* sql */ `
-        SELECT ${beads.bead_id}
+        SELECT ${beads.bead_id}, ${beads.status}
         FROM ${beads}
         WHERE ${beads.type} = 'convoy'
-          AND ${beads.status} = 'in_progress'
+          AND ${beads.status} NOT IN ('open', 'in_progress', 'in_review', 'closed')
       `,
         []
       ),
     ]);
-  for (const c of inProgressConvoys) {
+  for (const c of badStateConvoys) {
     violations.push({
       invariant: 5,
-      message: `Convoy bead ${c.bead_id} is in_progress (should only be open or closed)`,
+      message: `Convoy bead ${c.bead_id} is in unexpected state '${c.status}'`,
     });
   }
 

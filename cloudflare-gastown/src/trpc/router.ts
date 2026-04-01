@@ -1071,11 +1071,26 @@ export const gastownRouter = router({
           message: 'Admins cannot restart containers for towns they do not own',
         });
       }
-      // Use stop() (SIGTERM) instead of destroy() (SIGKILL) so the
-      // container's SIGTERM handler can run drainAll() — nudging agents
-      // to commit/push WIP before the process exits.
+      // stop() sends SIGTERM so the container's drain handler can run
+      // drainAll() — nudging agents to commit/push WIP before exiting.
       const containerStub = getTownContainerStub(ctx.env, input.townId);
       await containerStub.stop();
+    }),
+
+  destroyContainer: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot destroy containers for towns they do not own',
+        });
+      }
+      // destroy() sends SIGKILL — the container dies immediately with
+      // no graceful drain. Use when the container is stuck or unresponsive.
+      const containerStub = getTownContainerStub(ctx.env, input.townId);
+      await containerStub.destroy();
     }),
 
   // ── Events ──────────────────────────────────────────────────────────

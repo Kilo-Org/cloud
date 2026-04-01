@@ -604,6 +604,13 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       output: void;
       meta: object;
     }>;
+    destroyContainer: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        townId: string;
+      };
+      output: void;
+      meta: object;
+    }>;
     getBeadEvents: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         rigId: string;
@@ -1877,6 +1884,13 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
           meta: object;
         }>;
         forceRestartContainer: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            townId: string;
+          };
+          output: void;
+          meta: object;
+        }>;
+        destroyContainer: import('@trpc/server').TRPCMutationProcedure<{
           input: {
             townId: string;
           };

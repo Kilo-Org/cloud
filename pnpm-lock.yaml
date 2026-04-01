@@ -1335,6 +1335,9 @@ importers:
       '@cloudflare/containers':
         specifier: ^0.1.0
         version: 0.1.1
+      '@hono/trpc-server':
+        specifier: ^0.4.2
+        version: 0.4.2(@trpc/server@11.13.0(typescript@5.9.3))(hono@4.12.8)
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../packages/worker-utils

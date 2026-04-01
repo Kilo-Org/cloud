@@ -43,6 +43,7 @@
     "bindings": [
       { "name": "WASTELAND", "class_name": "WastelandDO" },
       { "name": "WASTELAND_CONTAINER", "class_name": "WastelandContainerDO" },
+      { "name": "WASTELAND_REGISTRY", "class_name": "WastelandRegistryDO" },
     ],
   },
 
@@ -50,6 +51,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["WastelandDO", "WastelandContainerDO"],
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["WastelandRegistryDO"],
     },
   ],
 
@@ -104,6 +109,7 @@
         "bindings": [
           { "name": "WASTELAND", "class_name": "WastelandDO" },
           { "name": "WASTELAND_CONTAINER", "class_name": "WastelandContainerDO" },
+          { "name": "WASTELAND_REGISTRY", "class_name": "WastelandRegistryDO" },
         ],
       },
       "analytics_engine_datasets": [{ "binding": "WASTELAND_AE", "dataset": "wasteland_events" }],

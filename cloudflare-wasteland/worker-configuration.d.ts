@@ -3,7 +3,7 @@
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./src/wasteland.worker");
-		durableNamespaces: "WastelandDO" | "WastelandContainerDO";
+		durableNamespaces: "WastelandDO" | "WastelandContainerDO" | "WastelandRegistryDO";
 	}
 	interface DevEnv {
 		WASTELAND_AE: AnalyticsEngineDataset;
@@ -15,6 +15,7 @@ declare namespace Cloudflare {
 		WASTELAND_API_URL: "http://192.168.65.254:8787";
 		WASTELAND: DurableObjectNamespace<import("./src/wasteland.worker").WastelandDO>;
 		WASTELAND_CONTAINER: DurableObjectNamespace<import("./src/wasteland.worker").WastelandContainerDO>;
+		WASTELAND_REGISTRY: DurableObjectNamespace<import("./src/wasteland.worker").WastelandRegistryDO>;
 	}
 	interface Env {
 		WASTELAND_AE: AnalyticsEngineDataset;
@@ -26,6 +27,7 @@ declare namespace Cloudflare {
 		WASTELAND_API_URL: "http://192.168.65.254:8787" | "https://wasteland.kiloapps.io";
 		WASTELAND: DurableObjectNamespace<import("./src/wasteland.worker").WastelandDO>;
 		WASTELAND_CONTAINER: DurableObjectNamespace<import("./src/wasteland.worker").WastelandContainerDO>;
+		WASTELAND_REGISTRY: DurableObjectNamespace<import("./src/wasteland.worker").WastelandRegistryDO>;
 		CF_VERSION_METADATA?: WorkerVersionMetadata;
 		SENTRY_DSN?: string; // worker secret
 		SENTRY_RELEASE?: string; // deploy-time --var

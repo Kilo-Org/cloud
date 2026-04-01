@@ -1,12 +1,10 @@
-import type { NextRequest } from 'next/server';
+import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
 import { and, gte, lte, eq, asc } from 'drizzle-orm';
 import archiver from 'archiver';
 import { PassThrough } from 'node:stream';
-
-export const dynamic = 'force-dynamic';
 
 function formatTimestamp(isoString: string): string {
   return isoString.replace(/[:.]/g, '-').replace('T', '_').replace('Z', '');
@@ -57,6 +55,8 @@ function jsonError(message: string, status: number) {
 }
 
 export async function GET(request: NextRequest) {
+  await connection();
+
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) {
     return authFailedResponse;

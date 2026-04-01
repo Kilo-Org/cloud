@@ -771,10 +771,9 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
     // Rule 1: PR-strategy MR beads in_progress need polling.
     // Rate-limit: skip if polled less than PR_POLL_INTERVAL_MS ago (#1632).
     if (mr.status === 'in_progress' && mr.pr_url) {
-      const lastPollAt = mr.metadata?.last_poll_at;
-      const msSinceLastPoll = typeof lastPollAt === 'string'
-        ? Date.now() - new Date(lastPollAt).getTime()
-        : Infinity;
+      const lastPollAt: unknown = mr.metadata?.last_poll_at;
+      const msSinceLastPoll =
+        typeof lastPollAt === 'string' ? Date.now() - new Date(lastPollAt).getTime() : Infinity;
 
       if (msSinceLastPoll >= PR_POLL_INTERVAL_MS) {
         actions.push({

@@ -37,8 +37,11 @@ const gmailPushWorkerUrl = gmailPushWorkerUrlArg
   ? gmailPushWorkerUrlArg.substring(gmailPushWorkerUrlArg.indexOf('=') + 1)
   : 'https://kiloclaw-gmail.kiloapps.io';
 
+const instanceIdArg = args.find(a => a.startsWith('--instance-id='));
+const instanceId = instanceIdArg?.substring(instanceIdArg.indexOf('=') + 1);
+
 if (!token) {
-  console.error('Usage: docker run -it ghcr.io/kilo-org/google-setup --token=<session-jwt>');
+  console.error('Usage: docker run -it ghcr.io/kilo-org/google-setup --token=<session-jwt> [--instance-id=<id>]');
   process.exit(1);
 }
 
@@ -64,6 +67,13 @@ const authHeaders = {
   authorization: `Bearer ${token}`,
   'content-type': 'application/json',
 };
+
+/** Build a worker URL, appending ?instanceId= when an instance ID was provided. */
+function workerApiUrl(path) {
+  const url = new URL(path, workerUrl);
+  if (instanceId) url.searchParams.set('instanceId', instanceId);
+  return url.toString();
+}
 
 // APIs to enable in the GCP project
 const GCP_APIS = [
@@ -125,7 +135,7 @@ if (!validateRes.ok) {
   process.exit(1);
 }
 
-const authCheckRes = await fetch(`${workerUrl}/api/admin/google-credentials`, {
+const authCheckRes = await fetch(workerApiUrl('/api/admin/google-credentials'), {
   headers: authHeaders,
 });
 
@@ -688,7 +698,7 @@ const encryptedBundle = {
 
 console.log('Sending credentials to your kiloclaw instance...');
 
-const postRes = await fetch(`${workerUrl}/api/admin/google-credentials`, {
+const postRes = await fetch(workerApiUrl('/api/admin/google-credentials'), {
   method: 'POST',
   headers: authHeaders,
   body: JSON.stringify({ googleCredentials: encryptedBundle }),

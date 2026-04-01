@@ -17,6 +17,14 @@ Docker image that guides users through connecting their Google account to KiloCl
 docker run -it ghcr.io/kilo-org/google-setup --token="YOUR_SESSION_JWT"
 ```
 
+For multi-instance setups, pass the instance ID so credentials are stored on the correct instance:
+
+```bash
+docker run -it ghcr.io/kilo-org/google-setup \
+  --token="YOUR_SESSION_JWT" \
+  --instance-id="YOUR_INSTANCE_ID"
+```
+
 For local development against a local worker:
 
 ```bash

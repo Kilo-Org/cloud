@@ -760,13 +760,17 @@ export function startControlServer(): void {
     process.exit(0);
   };
 
-  process.on('SIGTERM', () => void (async () => {
-    console.log('[control-server] SIGTERM received — starting graceful drain...');
-    stopHeartbeat();
-    await drainAll();
-    await stopAll();
-    process.exit(0);
-  })());
+  process.on(
+    'SIGTERM',
+    () =>
+      void (async () => {
+        console.log('[control-server] SIGTERM received — starting graceful drain...');
+        stopHeartbeat();
+        await drainAll();
+        await stopAll();
+        process.exit(0);
+      })()
+  );
 
   process.on('SIGINT', () => void shutdown());
 

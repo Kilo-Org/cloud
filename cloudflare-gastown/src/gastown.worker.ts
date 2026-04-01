@@ -501,9 +501,7 @@ app.post('/api/towns/:townId/container-ready', c =>
 );
 
 app.get('/api/towns/:townId/drain-status', c =>
-  instrumented(c, 'GET /api/towns/:townId/drain-status', () =>
-    handleDrainStatus(c, c.req.param())
-  )
+  instrumented(c, 'GET /api/towns/:townId/drain-status', () => handleDrainStatus(c, c.req.param()))
 );
 
 // ── Kilo User Auth ──────────────────────────────────────────────────────

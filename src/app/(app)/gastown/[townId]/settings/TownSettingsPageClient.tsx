@@ -241,7 +241,8 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
 
   const restartContainer = useMutation(
     trpc.gastown.forceRestartContainer.mutationOptions({
-      onSuccess: () => toast.success('Container restarting — it will be back shortly'),
+      onSuccess: () =>
+        toast.success('Container stopping gracefully — agents will save work before exiting'),
       onError: err => toast.error(`Container restart failed: ${err.message}`),
     })
   );

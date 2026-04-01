@@ -1071,8 +1071,11 @@ export const gastownRouter = router({
           message: 'Admins cannot restart containers for towns they do not own',
         });
       }
+      // Use stop() (SIGTERM) instead of destroy() (SIGKILL) so the
+      // container's SIGTERM handler can run drainAll() — nudging agents
+      // to commit/push WIP before the process exits.
       const containerStub = getTownContainerStub(ctx.env, input.townId);
-      await containerStub.destroy();
+      await containerStub.stop();
     }),
 
   // ── Events ──────────────────────────────────────────────────────────

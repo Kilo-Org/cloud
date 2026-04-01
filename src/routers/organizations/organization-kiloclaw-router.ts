@@ -879,7 +879,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
     }),
 
   getMyPin: organizationMemberProcedure.query(async ({ ctx, input }) => {
-    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+    const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+    if (!instance) return null;
 
     const [result] = await db
       .select({

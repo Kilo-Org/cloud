@@ -24,11 +24,16 @@ const mockSession = {
   canSend: true,
   canInterrupt: true,
   state: {
-    subscribe: jest.fn(() => () => {}),
+    subscribe: jest.fn(callback => {
+      callback();
+      return () => {};
+    }),
     getActivity: jest.fn(() => ({ type: 'idle' as const })),
     getStatus: jest.fn(() => ({ type: 'idle' as const })),
+    getCloudStatus: jest.fn(() => null),
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
+    getPermission: jest.fn(() => null),
   },
   storage: {},
 };
@@ -129,7 +134,10 @@ describe('createSessionManager', () => {
     mockSession.respondToPermission.mockClear();
     mockSession.canSend = true;
     mockSession.canInterrupt = true;
-    mockSession.state.subscribe.mockImplementation(() => () => {});
+    mockSession.state.subscribe.mockImplementation(callback => {
+      callback();
+      return () => {};
+    });
     mockSessionCallbacks.onQuestionAsked = undefined;
     mockSessionCallbacks.onQuestionResolved = undefined;
     mockSessionCallbacks.onPermissionAsked = undefined;
@@ -608,6 +616,56 @@ describe('createSessionManager', () => {
       await mgr.interrupt();
 
       expect(mockSession.interrupt).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call session.disconnect after interrupt', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.interrupt();
+
+      expect(mockSession.disconnect).not.toHaveBeenCalled();
+    });
+
+    it('disables canSendAtom immediately on interrupt', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      // Verify canSend is true before interrupt
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+
+      // Call interrupt without awaiting — check synchronously after call
+      void mgr.interrupt();
+      // After calling interrupt (even before it resolves), canSend should be false
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+    });
+
+    it('disables canInterruptAtom immediately on interrupt', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue<boolean>(config.store, mgr.atoms.canInterrupt)).toBe(true);
+
+      void mgr.interrupt();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canInterrupt)).toBe(false);
+    });
+
+    it('session remains usable after interrupt — send does not throw', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.interrupt();
+
+      // After interrupt, send should NOT throw — transport should still be alive
+      mockSession.send.mockResolvedValue({});
+      await expect(
+        mgr.send({ prompt: 'follow-up message', mode: 'code', model: 'claude-3-5-sonnet' })
+      ).resolves.not.toThrow();
+      expect(mockSession.send).toHaveBeenCalledTimes(1);
     });
   });
 

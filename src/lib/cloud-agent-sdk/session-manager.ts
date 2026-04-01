@@ -601,11 +601,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   async function interrupt(): Promise<void> {
     if (!currentSession) return;
+    // Eagerly disable send/interrupt to prevent the user from sending a
+    // message while the async interrupt HTTP call is in flight. We do NOT
+    // call disconnect() — interrupt stops the agent but keeps the transport
+    // alive so the user can continue the session.
+    store.set(canSendAtom, false);
+    store.set(canInterruptAtom, false);
     try {
       if (currentSession.canInterrupt) {
         await currentSession.interrupt();
       }
-      currentSession.disconnect();
       setIndicator({ type: 'info', message: 'Session stopped', timestamp: Date.now() });
     } catch {
       store.set(errorAtom, 'Failed to stop execution');

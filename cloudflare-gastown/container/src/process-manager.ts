@@ -1019,8 +1019,12 @@ export async function drainAll(): Promise<void> {
   }
 
   // ── Phase 2: Nudge running agents to save ───────────────────────────
-  const runningAgents = [...agents.values()].filter(a => a.status === 'running');
-  console.log(`${DRAIN_LOG} Phase 2: nudging ${runningAgents.length} running agents`);
+  const allAgents = [...agents.values()];
+  const runningAgents = allAgents.filter(a => a.status === 'running');
+  console.log(
+    `${DRAIN_LOG} Phase 2: ${runningAgents.length} running of ${allAgents.length} total agents. ` +
+      `All statuses: ${allAgents.map(a => `${a.role}:${a.agentId.slice(0, 8)}=${a.status}`).join(', ')}`
+  );
 
   for (const agent of runningAgents) {
     try {
@@ -1040,13 +1044,22 @@ export async function drainAll(): Promise<void> {
         // already idle, the timer could fire mid-nudge and exit the
         // agent before it processes the eviction message.
         clearIdleTimer(agent.agentId);
-        console.log(`${DRAIN_LOG} Phase 2: nudging ${agent.role} agent ${agent.agentId}`);
+        const hasInstance = sdkInstances.has(agent.workdir);
+        console.log(
+          `${DRAIN_LOG} Phase 2: nudging ${agent.role} agent ${agent.agentId} ` +
+            `(session=${agent.sessionId}, sdkInstance=${hasInstance})`
+        );
         await sendMessage(agent.agentId, nudgeMessage);
+        console.log(`${DRAIN_LOG} Phase 2: nudge delivered to ${agent.agentId}`);
+      } else {
+        console.log(
+          `${DRAIN_LOG} Phase 2: skipping ${agent.role} agent ${agent.agentId} (no nudge for this role)`
+        );
       }
     } catch (err) {
       console.warn(
         `${DRAIN_LOG} Phase 2: failed to nudge agent ${agent.agentId} (${agent.role}):`,
-        err
+        err instanceof Error ? err.message : err
       );
     }
   }

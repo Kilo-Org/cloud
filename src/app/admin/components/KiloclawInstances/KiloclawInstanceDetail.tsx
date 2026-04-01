@@ -1145,6 +1145,16 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     refetchInterval: awaitingRestartCompletion || awaitingRestoreCompletion ? 3000 : false,
   });
 
+  const userId = data?.user_id;
+  const orgId = data?.organization_id;
+  const { data: registryData } = useQuery({
+    ...trpc.admin.kiloclawInstances.registryEntries.queryOptions({
+      userId: userId ?? '',
+      orgId: orgId ?? undefined,
+    }),
+    enabled: !!userId,
+  });
+
   const { mutateAsync: destroyInstance, isPending: isDestroying } = useMutation(
     trpc.admin.kiloclawInstances.destroy.mutationOptions({
       onSuccess: () => {
@@ -1620,6 +1630,82 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
           </CardContent>
         </Card>
 
+        {/* Registry Status */}
+        {registryData?.registries.map(registry => (
+          <Card key={registry.registryKey}>
+            <CardHeader>
+              <CardTitle>Registry Status</CardTitle>
+              <CardDescription>
+                <code className="text-xs">{registry.registryKey}</code>
+                {' · '}
+                <span className="text-xs">
+                  {registry.migrated ? 'migrated' : 'pending migration'}
+                </span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {registry.entries.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No registry entries</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-2 pr-4">Instance ID</th>
+                        <th className="pb-2 pr-4">DO Key</th>
+                        <th className="pb-2 pr-4">Created</th>
+                        <th className="pb-2 pr-4">Destroyed</th>
+                        <th className="pb-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {registry.entries.map(entry => {
+                        const isCurrent = entry.instanceId === data?.id;
+                        const isDestroyed = entry.destroyedAt !== null;
+                        return (
+                          <tr
+                            key={entry.instanceId}
+                            className={`border-b ${isCurrent ? 'bg-blue-500/10' : ''}`}
+                          >
+                            <td className="py-2 pr-4">
+                              <code className="text-xs">{entry.instanceId.slice(0, 8)}...</code>
+                              {isCurrent && (
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  current
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="py-2 pr-4">
+                              <code className="text-xs">
+                                {entry.doKey === entry.instanceId
+                                  ? 'instanceId'
+                                  : entry.doKey.slice(0, 8) + '...'}
+                              </code>
+                            </td>
+                            <td className="py-2 pr-4 text-xs text-muted-foreground">
+                              {new Date(entry.createdAt).toLocaleString()}
+                            </td>
+                            <td className="py-2 pr-4 text-xs text-muted-foreground">
+                              {entry.destroyedAt
+                                ? new Date(entry.destroyedAt).toLocaleString()
+                                : '—'}
+                            </td>
+                            <td className="py-2">
+                              <Badge variant={isDestroyed ? 'secondary' : 'default'}>
+                                {isDestroyed ? 'Destroyed' : 'Active'}
+                              </Badge>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
@@ -1663,6 +1749,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
                 <DetailField label="DO Sandbox ID">
                   <code className="text-xs">{data.workerStatus.sandboxId ?? '—'}</code>
+                </DetailField>
+
+                <DetailField label="DO Org ID">
+                  <code className="text-xs">{data.workerStatus.orgId ?? '—'}</code>
                 </DetailField>
 
                 <div className="flex items-center gap-2">

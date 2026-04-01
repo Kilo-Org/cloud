@@ -31,6 +31,10 @@
         "class_name": "KiloClawApp",
         "name": "KILOCLAW_APP",
       },
+      {
+        "class_name": "KiloClawRegistry",
+        "name": "KILOCLAW_REGISTRY",
+      },
     ],
   },
   "migrations": [
@@ -49,6 +53,10 @@
     {
       "new_sqlite_classes": ["KiloClawApp"],
       "tag": "v5",
+    },
+    {
+      "new_sqlite_classes": ["KiloClawRegistry"],
+      "tag": "v6",
     },
   ],
   "kv_namespaces": [

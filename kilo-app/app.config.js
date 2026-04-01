@@ -1,6 +1,6 @@
 /** @type {import('expo/config').ExpoConfig} */
 const config = {
-  name: 'Kilo',
+  name: 'KiloClaw',
   owner: 'kilocode',
   slug: 'kilo-app',
   version: '1.0.0',
@@ -13,6 +13,13 @@ const config = {
     bundleIdentifier: 'com.kilocode.kiloapp',
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      NSMicrophoneUsageDescription:
+        'Allow $(PRODUCT_NAME) to access your microphone to record audio messages.',
+      NSPhotoLibraryUsageDescription:
+        'Allow $(PRODUCT_NAME) to access your photos to share images in chat.',
+      NSPhotoLibraryAddUsageDescription: 'Allow $(PRODUCT_NAME) to save photos to your library.',
+      NSCameraUsageDescription:
+        'Allow $(PRODUCT_NAME) to access your camera to take photos for chat.',
     },
   },
   splash: {
@@ -59,6 +66,30 @@ const config = {
         imageWidth: 100,
       },
     ],
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'Allow $(PRODUCT_NAME) to access your photos to share images in chat.',
+        cameraPermission: 'Allow $(PRODUCT_NAME) to access your camera to take photos for chat.',
+      },
+    ],
+    [
+      'expo-media-library',
+      {
+        photosPermission: 'Allow $(PRODUCT_NAME) to access your photos to save and share media.',
+        savePhotosPermission: 'Allow $(PRODUCT_NAME) to save photos to your library.',
+      },
+    ],
+    [
+      'expo-document-picker',
+      {
+        iCloudContainerEnvironment: 'Production',
+      },
+    ],
+    'expo-audio',
+    'expo-sharing',
+    'expo-video',
+    'expo-asset',
   ],
   experiments: {
     typedRoutes: true,

@@ -42,6 +42,7 @@ type CloudAgentSessionConfig = {
   ) => void;
   onPermissionResolved?: (requestId: string) => void;
   onBranchChanged?: (branch: string) => void;
+  onResolved?: (resolved: ResolvedSession) => void;
   onSessionCreated?: (info: SessionInfo) => void;
   onSessionUpdated?: (info: SessionInfo) => void;
   onEvent?: (event: NormalizedEvent) => void;
@@ -225,6 +226,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     if (expectedGeneration !== connectGeneration) return;
 
     console.log('[cli-debug] resolveAndConnect: resolved=%o', resolved);
+    config.onResolved?.(resolved);
 
     let factory: TransportFactory;
     try {

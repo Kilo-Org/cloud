@@ -161,20 +161,23 @@ All tests should pass against the local PostgreSQL database.
 
 ## Common Development Commands
 
-| Command                 | Description                                                                    |
-| ----------------------- | ------------------------------------------------------------------------------ |
-| `pnpm dev`              | Start the Next.js dev server (Turbopack)                                       |
-| `pnpm test`             | Run the Jest test suite                                                        |
-| `pnpm typecheck`        | Run the TypeScript type checker                                                |
-| `pnpm lint`             | Lint all source files                                                          |
-| `pnpm lint:changed`     | Lint only files changed since `main`                                           |
-| `pnpm format`           | Format all supported files with oxfmt                                          |
-| `pnpm format:changed`   | Format only files changed since `main`                                         |
-| `pnpm validate`         | Run typecheck, lint changed, format changed, tests, and dependency cycle check |
-| `pnpm drizzle migrate`  | Apply pending database migrations                                              |
-| `pnpm drizzle generate` | Generate a new migration after schema changes                                  |
-| `pnpm stripe`           | Start Stripe webhook forwarding to localhost                                   |
-| `pnpm test:e2e`         | Run Playwright end-to-end tests                                                |
+| Command                 | Description                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------- |
+| `pnpm dev`              | Start the Next.js dev server (Turbopack)                                                          |
+| `pnpm dev:start`        | Start all local services in a tmux dashboard                                                      |
+| `pnpm dev:stop`         | Stop the tmux session and all services                                                            |
+| `pnpm dev:env`          | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
+| `pnpm test`             | Run the Jest test suite                                                                           |
+| `pnpm typecheck`        | Run the TypeScript type checker                                                                   |
+| `pnpm lint`             | Lint all source files                                                                             |
+| `pnpm lint:changed`     | Lint only files changed since `main`                                                              |
+| `pnpm format`           | Format all supported files with oxfmt                                                             |
+| `pnpm format:changed`   | Format only files changed since `main`                                                            |
+| `pnpm validate`         | Run typecheck, lint changed, format changed, tests, and dependency cycle check                    |
+| `pnpm drizzle migrate`  | Apply pending database migrations                                                                 |
+| `pnpm drizzle generate` | Generate a new migration after schema changes                                                     |
+| `pnpm stripe`           | Start Stripe webhook forwarding to localhost                                                      |
+| `pnpm test:e2e`         | Run Playwright end-to-end tests                                                                   |
 
 ## Git Workflow
 
@@ -300,30 +303,66 @@ AI inference works locally without any extra services. The Next.js app includes 
 
 ### Running workers locally
 
-Each worker in the workspace can be started individually with `wrangler dev` (or `pnpm dev`) from its directory. Workers communicate with Next.js over HTTP using env vars like `CLOUD_AGENT_API_URL`, `CODE_REVIEW_WORKER_URL`, etc.
+Each worker in the workspace can be started individually with `wrangler dev` (or `pnpm dev`) from its directory. Workers communicate with Next.js over HTTP using env vars like `CLOUD_AGENT_API_URL`, `CODE_REVIEW_WORKER_URL`, etc. Dev ports are defined in each worker's `wrangler.jsonc`.
 
-| Worker                            | Dev Port | Env Var                     | What it does                                           |
-| --------------------------------- | -------- | --------------------------- | ------------------------------------------------------ |
-| `cloud-agent`                     | 8788     | `CLOUD_AGENT_API_URL`       | CLI agent orchestration (Durable Objects + Containers) |
-| `cloud-agent-next`                | 8794     | `CLOUD_AGENT_NEXT_API_URL`  | Next-gen CLI agent orchestration                       |
-| `cloudflare-session-ingest`       | 8787     | `SESSION_INGEST_WORKER_URL` | Session data ingestion                                 |
-| `cloudflare-code-review-infra`    | 8789     | `CODE_REVIEW_WORKER_URL`    | Automated code reviews                                 |
-| `cloudflare-app-builder`          | 8790     | `APP_BUILDER_URL`           | App Builder sandbox                                    |
-| `cloudflare-auto-triage-infra`    | 8791     | `AUTO_TRIAGE_URL`           | Auto-triage for security findings                      |
-| `cloudflare-auto-fix-infra`       | 8792     | `AUTO_FIX_URL`              | Auto-fix for security findings                         |
-| `cloudflare-webhook-agent-ingest` | 8793     | `WEBHOOK_AGENT_URL`         | Incoming webhook processing                            |
-| `kiloclaw`                        | 8795     | `KILOCLAW_API_URL`          | OpenClaw AI assistant (proxies to Fly.io)              |
+The easiest way to run workers is with `pnpm dev:start` (see [Common Development Commands](#common-development-commands)), which starts groups of related services in a tmux dashboard.
+
+### Worker `.dev.vars` setup
+
+Most workers require a `.dev.vars` file with secrets like `NEXTAUTH_SECRET` and `INTERNAL_API_SECRET`. A script automates this:
+
+```bash
+pnpm dev:env
+```
+
+The script (`dev/local/env-sync/`) scans every `.dev.vars.example` in the repo, resolves each variable's value, and writes (or patches) the corresponding `.dev.vars` file. Before applying, it shows a diff of what will change and asks for confirmation.
+
+Values are resolved using annotations in `.dev.vars.example` comment lines:
+
+| Annotation         | What it does                                                                       | Example                                   |
+| ------------------ | ---------------------------------------------------------------------------------- | ----------------------------------------- |
+| _(none)_           | Copies the value from `.env.local` if the key matches, otherwise keeps the default | `INTERNAL_API_SECRET=your-secret-here`    |
+| `# @url <service>` | Builds `http://localhost:<port>` from the service's dev port in `wrangler.jsonc`   | `# @url nextjs` → `http://localhost:3000` |
+| `# @from <KEY>`    | Copies the value of a _different_ key from `.env.local`                            | `# @from CODE_REVIEW_WORKER_AUTH_TOKEN`   |
+| `# @pkcs8`         | Copies from `.env.local` and converts PKCS#1 PEM keys to PKCS#8 format             | `# @pkcs8` above a private key var        |
+
+For example, in a `.dev.vars.example`:
+
+```bash
+# @url nextjs
+API_URL=http://localhost:3000
+
+# @from CODE_REVIEW_WORKER_AUTH_TOKEN
+BACKEND_AUTH_TOKEN=your-backend-auth-token
+```
+
+The `@url` annotation accepts multiple comma-separated services (e.g., `# @url svc-a,svc-b`) and appends path suffixes (e.g., `# @url nextjs/api/events`).
+
+Run `pnpm dev:env` again after pulling changes that add new env vars to any `.dev.vars.example`.
 
 ### Limitations in local dev
 
 - **Service bindings** between workers don't function in local `wrangler dev`. This affects chains like session-ingest → o11y, webhook-agent → cloud-agent, and app-builder → db-proxy/git-token-service.
 - **Cloudflare Containers** (used by cloud-agent, cloud-agent-next, app-builder) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
 - **Cloudflare-specific features** like Analytics Engine, Pipelines, and dispatch namespaces don't work locally.
-- Most workers require a `.dev.vars` file (created from `.dev.vars.example` in each worker directory) with secrets like `NEXTAUTH_SECRET` and `INTERNAL_API_SECRET`.
 
 ### What works without running any workers
 
 The core Next.js app handles profiles, organizations, usage tracking, billing, and the OpenRouter inference proxy without any workers. Features that require a specific worker (e.g., Cloud Agent sessions, code reviews, app builder) will fail gracefully or show connection errors if that worker isn't running.
+
+### Multi-worktree support
+
+If you use `git worktree` to run multiple checkouts simultaneously, set the `KILO_PORT_OFFSET` environment variable to avoid port collisions between worktrees:
+
+```bash
+# Automatic offset derived from the worktree directory name (0 for the primary worktree):
+export KILO_PORT_OFFSET=auto
+
+# Or a fixed numeric offset (added to every service port):
+export KILO_PORT_OFFSET=100
+```
+
+With `auto`, the primary worktree gets offset 0 (default ports), and secondary worktrees get a deterministic offset based on the directory name. The offset is added to the Next.js port (3000), all worker dev ports, and the URLs generated by `pnpm dev:env`.
 
 ## Troubleshooting
 

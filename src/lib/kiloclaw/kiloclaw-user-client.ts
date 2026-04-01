@@ -9,11 +9,15 @@ import type {
   ChatCredentials,
 } from './types';
 
-type RequestContext = { userId: string };
+type RequestContext = { userId: string; instanceId?: string };
 
 /**
  * KiloClaw worker client for user-facing routes.
  * Uses Bearer JWT auth (forwarding the user's token). Server-only.
+ *
+ * When `instanceId` is provided in RequestContext, it is appended as a
+ * query parameter so the worker resolves the correct DO (instance-keyed
+ * vs legacy userId-keyed).
  */
 export class KiloClawUserClient {
   private authToken: string;
@@ -28,7 +32,10 @@ export class KiloClawUserClient {
   }
 
   private async request<T>(path: string, options?: RequestInit, ctx?: RequestContext): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const url = ctx?.instanceId
+      ? `${this.baseUrl}${path}?instanceId=${encodeURIComponent(ctx.instanceId)}`
+      : `${this.baseUrl}${path}`;
+    const res = await fetch(url, {
       ...options,
       headers: {
         Authorization: `Bearer ${this.authToken}`,

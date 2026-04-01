@@ -65,6 +65,12 @@ minimumReleaseAgeExclude:
   - '@kilocode/plugin'
   - '@kilocode/sdk'
   - '@typescript/native-preview*'
+  - 'expo'
+  - 'expo-*'
+  - '@expo/*'
+  - 'babel-preset-expo'
+  - 'react-native'
+  - 'react-native-*'
 
 onlyBuiltDependencies:
   - '@swc/core'

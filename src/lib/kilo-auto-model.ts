@@ -223,18 +223,8 @@ export const AUTO_MODELS = [
 ];
 
 export function isKiloAutoModel(model: string) {
-  return (
-    AUTO_MODELS.some(m => m.id === model) ||
-    (Object.hasOwn(legacyMapping, model) && legacyMapping[model] !== undefined)
-  );
+  return AUTO_MODELS.some(m => m.id === model);
 }
-
-export const KILO_AUTO_FREE_MODEL_DEPRECATED = 'kilo/auto-free';
-
-const legacyMapping: Record<string, AutoModel | undefined> = {
-  'kilo/auto': KILO_AUTO_FRONTIER_MODEL,
-  [KILO_AUTO_FREE_MODEL_DEPRECATED]: KILO_AUTO_FREE_MODEL,
-};
 
 export async function resolveAutoModel(
   model: string,
@@ -242,19 +232,17 @@ export async function resolveAutoModel(
   balancePromise: Promise<number>,
   hasImages: boolean
 ): Promise<ResolvedAutoModel> {
-  const mappedModel =
-    (Object.hasOwn(legacyMapping, model) ? legacyMapping[model] : null)?.id ?? model;
-  if (mappedModel === KILO_AUTO_FREE_MODEL.id) {
+  if (model === KILO_AUTO_FREE_MODEL.id) {
     return { model: mimo_v2_pro_free_model.public_id };
   }
-  if (mappedModel === KILO_AUTO_SMALL_MODEL.id) {
+  if (model === KILO_AUTO_SMALL_MODEL.id) {
     return {
       model: (await balancePromise) > 0 ? GPT_5_NANO_ID : gpt_oss_20b_free_model.public_id,
     };
   }
   const modeResult = modeSchema.safeParse(modeHeader?.trim() ?? '');
   const mode = modeResult.success ? modeResult.data : null;
-  if (mappedModel === KILO_AUTO_BALANCED_MODEL.id) {
+  if (model === KILO_AUTO_BALANCED_MODEL.id) {
     if (hasImages) {
       return BALANCED_IMAGE_MODEL;
     }

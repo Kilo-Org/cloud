@@ -473,6 +473,7 @@
         ]
       },
       "opencode": {
+        "ai_sdk_provider": "openai",
         "variants": {
           "none": {
             "reasoning": {

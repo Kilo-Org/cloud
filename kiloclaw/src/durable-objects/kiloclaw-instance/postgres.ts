@@ -1,6 +1,11 @@
 import type { KiloClawEnv } from '../../types';
 import type { EncryptedEnvelope } from '../../schemas/instance-config';
-import { getWorkerDb, getActiveInstance, markInstanceDestroyed } from '../../db';
+import {
+  getWorkerDb,
+  getActiveInstance,
+  getInstanceBySandboxId,
+  markInstanceDestroyed,
+} from '../../db';
 import { appNameFromUserId } from '../../fly/apps';
 import type { InstanceMutableState } from './types';
 import { getFlyConfig } from './types';
@@ -8,14 +13,24 @@ import { storageUpdate } from './state';
 import { attemptMetadataRecovery } from './reconcile';
 import { doError, doWarn, toLoggable, createReconcileContext } from './log';
 
+type RestoreOpts = {
+  /** If the DO has a stored sandboxId, use it for precise lookup. */
+  sandboxId?: string | null;
+};
+
 /**
  * Restore DO state from Postgres backup if SQLite was wiped.
+ *
+ * Lookup priority:
+ * 1. If opts.sandboxId is provided, look up by sandbox_id (precise, multi-instance safe).
+ * 2. Otherwise, fall back to getActiveInstance(db, userId) (legacy single-instance).
  */
 export async function restoreFromPostgres(
   env: KiloClawEnv,
   ctx: DurableObjectState,
   state: InstanceMutableState,
-  userId: string
+  userId: string,
+  opts?: RestoreOpts
 ): Promise<void> {
   const connectionString = env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
@@ -25,7 +40,11 @@ export async function restoreFromPostgres(
 
   try {
     const db = getWorkerDb(connectionString);
-    const instance = await getActiveInstance(db, userId);
+
+    // Prefer sandboxId lookup (multi-instance safe) over userId lookup (ambiguous).
+    const instance = opts?.sandboxId
+      ? await getInstanceBySandboxId(db, opts.sandboxId)
+      : await getActiveInstance(db, userId);
 
     if (!instance) {
       doWarn(state, 'No active instance found in Postgres', { userId });

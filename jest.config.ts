@@ -48,6 +48,7 @@ const config: Config = {
     '<rootDir>/kiloclaw/',
     '<rootDir>/packages/encryption/',
     '<rootDir>/packages/worker-utils/',
+    '<rootDir>/src/scripts/',
     '<rootDir>/.worktrees/',
   ],
   modulePathIgnorePatterns: ['<rootDir>/.worktrees/'],

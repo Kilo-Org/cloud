@@ -40,6 +40,9 @@ function makeEnv(options?: {
   const getConfig = vi.fn().mockResolvedValue({
     kilocodeApiKey: options?.kilocodeApiKey ?? 'kilo-key-1',
   });
+  const getStatus = vi.fn().mockResolvedValue({
+    userId: 'user-1',
+  });
   const tryMarkInstanceReady =
     options?.tryMarkInstanceReady ??
     vi.fn().mockResolvedValue({ shouldNotify: false, userId: null });
@@ -50,7 +53,7 @@ function makeEnv(options?: {
     INTERNAL_API_SECRET: options?.internalApiSecret,
     KILOCLAW_INSTANCE: {
       idFromName: (userId: string) => userId,
-      get: () => ({ getConfig, tryMarkInstanceReady }),
+      get: () => ({ getConfig, getStatus, tryMarkInstanceReady }),
     },
     KILOCLAW_CONTROLLER_AE: options?.writeDataPoint
       ? {

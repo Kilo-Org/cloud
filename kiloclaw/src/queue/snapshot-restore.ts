@@ -54,8 +54,9 @@ export async function handleSnapshotRestoreQueue(
       continue;
     }
 
-    const { userId, snapshotId, previousVolumeId, region } = parsed.data;
-    const stub = env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(userId));
+    const { userId, snapshotId, previousVolumeId, region, instanceId } = parsed.data;
+    const doKey = instanceId ?? userId;
+    const stub = env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(doKey));
 
     try {
       // Step 0: Idempotency check — has the volume already been swapped?

@@ -10,7 +10,7 @@ INTERNAL_API_SECRET=your-internal-api-secret-here
 # Affects:
 #   - Session environment variables (KILOCODE_TOKEN and KILOCODE_ORG_ID)
 # 
-# Note: With the introduction of server backed sessionsthese should probably not be used any more, 
+# Note: With the introduction of server-backed sessions, these should probably not be used any more, 
 # you should set KILOCODE_BACKEND_BASE_URL instead and use local dev only.
 #KILOCODE_TOKEN_OVERRIDE=your-override-token-here
 #KILOCODE_ORG_ID_OVERRIDE=your-override-org-id-here
@@ -21,10 +21,12 @@ INTERNAL_API_SECRET=your-internal-api-secret-here
 # For local development, point to your local kilocode-backend
 # Note: you wanna use your actual privatenet address here and not "localhost"
 # pnpm run dev of kilocode-backend usually gives you both addrs on boot.
+# @url nextjs
 KILOCODE_BACKEND_BASE_URL=http://192.168.200.70:3000
 
 # Worker base URL used by the wrapper to connect to /ingest.
 # Use a host-reachable IP (not localhost) so sandbox containers can connect back.
+# @url cloud-agent
 WORKER_URL=http://192.168.200.72:8788
 
 # Timeout overrides (optional)
@@ -48,11 +50,13 @@ GITHUB_APP_BOT_USER_ID=242397087
 # GITHUB_APP_PRIVATE_KEY: The raw PKCS#8 private key (use \n for newlines in env var)
 # Note that the nextjs app uses PKCS#1 but the worker uses WebCrypto and requires a PKCS#8
 GITHUB_APP_ID=2245043
+# @pkcs8
 GITHUB_APP_PRIVATE_KEY=
 
 # GitHub Lite App credentials (for OSS organizations with read-only permissions)
 # Same format as standard app credentials above
 GITHUB_LITE_APP_ID=
+# @pkcs8
 GITHUB_LITE_APP_PRIVATE_KEY=
 
 # Agent Environment Profile Secrets Decryption
@@ -70,4 +74,5 @@ R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID=""
 R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY=""
 
 # Local dev worker origins allowed to connect to /stream
+# @url nextjs,cloud-agent
 WS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8788

@@ -40,6 +40,7 @@ type SessionConfig = {
   model: string;
   variant?: string | null;
 };
+type ActiveSessionType = 'cloud-agent' | 'cli';
 type StandaloneQuestion = { requestId: string; questions: QuestionInfo[] };
 type StandalonePermission = {
   requestId: string;
@@ -95,6 +96,8 @@ type SessionManagerConfig = {
   onComplete?: () => void;
   onBranchChanged?: (branch: string) => void;
   onSendFailed?: (messageText: string) => void;
+  onRemoteSessionOpened?: (data: { kiloSessionId: KiloSessionId }) => void;
+  onRemoteSessionMessageSent?: (data: { kiloSessionId: KiloSessionId }) => void;
 };
 
 // Writable/read-only atom aliases for the public atoms record
@@ -299,6 +302,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // Private mutable state
   let activeSessionId: KiloSessionId | null = null;
   let currentSession: CloudAgentSession | null = null;
+  let activeSessionType: ActiveSessionType | null = null;
   let stateUnsub: (() => void) | null = null;
   let indicatorTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -418,6 +422,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
     activeSessionId = kiloSessionId;
+    activeSessionType = null;
     stateUnsub?.();
     stateUnsub = null;
     currentSession?.destroy();
@@ -500,6 +505,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         const ap = store.get(activePermissionAtom);
         if (ap?.requestId === requestId) store.set(activePermissionAtom, null);
       },
+      onResolved: resolved => {
+        if (resolved.cloudAgentSessionId) activeSessionType = 'cloud-agent';
+        else if (resolved.isLive) activeSessionType = 'cli';
+      },
       onBranchChanged: branch => {
         const currentFetched = store.get(fetchedSessionDataAtom);
         if (currentFetched) {
@@ -538,6 +547,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // Fallback: clear loading when events flow even if no root
         // session.created was replayed (e.g. CLI snapshot failure).
         store.set(isLoadingAtom, false);
+        if (activeSessionType === 'cli') {
+          config.onRemoteSessionOpened?.({ kiloSessionId });
+        }
       },
     });
     session.connect();
@@ -567,12 +579,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     } satisfies StoredMessage);
     try {
       if (!currentSession) throw new Error('No active session');
+      // Snapshot before await — switchSession() can overwrite these while send is in flight.
+      const sessionType = activeSessionType;
+      const kiloSessionId = activeSessionId;
       await currentSession.send({
         prompt: payload.prompt,
         mode: payload.mode,
         model: payload.model,
         variant: payload.variant,
       });
+      if (sessionType === 'cli' && kiloSessionId) {
+        config.onRemoteSessionMessageSent?.({ kiloSessionId });
+      }
     } catch (err) {
       store.set(optimisticMessageAtom, null);
       store.set(failedPromptAtom, payload.prompt);
@@ -635,6 +653,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
     clearAllAtoms();
     activeSessionId = null;
+    activeSessionType = null;
   }
 
   return {

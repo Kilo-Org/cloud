@@ -22,6 +22,10 @@ import { DEFAULT_INSTANCE_FEATURES } from '../../schemas/instance-config';
 import type { FlyVolume, FlyVolumeSnapshot } from '../../fly/types';
 import * as fly from '../../fly/client';
 import { sandboxIdFromUserId, sandboxIdFromInstanceId } from '../../auth/sandbox-id';
+import {
+  isInstanceKeyedSandboxId,
+  instanceIdFromSandboxId,
+} from '@kilocode/worker-utils/instance-id';
 import { resolveLatestVersion, resolveVersionByTag } from '../../lib/image-version';
 import { lookupCatalogVersion } from '../../lib/catalog-registration';
 import { ImageVariantSchema } from '../../schemas/image-version';
@@ -927,7 +931,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (!this.s.userId || !this.s.sandboxId) {
       const restoreUserId = userId ?? this.s.userId;
       if (restoreUserId) {
-        await restoreFromPostgres(this.env, this.ctx, this.s, restoreUserId);
+        await restoreFromPostgres(this.env, this.ctx, this.s, restoreUserId, {
+          sandboxId: this.s.sandboxId,
+        });
       }
     }
 
@@ -1300,6 +1306,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await tryDeleteMachine(flyConfig, this.ctx, this.s, destroyRctx);
     await tryDeleteVolume(flyConfig, this.ctx, this.s, destroyRctx);
 
+    // Capture identity before finalization wipes state
+    const preDestroyUserId = this.s.userId;
+    const preDestroyOrgId = this.s.orgId;
+    const preDestroySandboxId = this.s.sandboxId;
+
     const finalized = await finalizeDestroyIfComplete(
       this.ctx,
       this.s,
@@ -1307,6 +1318,57 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       (userId, sandboxId) =>
         markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
     );
+
+    // Clean up registry entry on finalization. This covers both platform-initiated
+    // and alarm-initiated destroys. The platform route's registry cleanup is
+    // redundant but harmless (destroyInstance is idempotent on already-destroyed entries).
+    if (finalized.finalized && preDestroyUserId && preDestroySandboxId) {
+      try {
+        const registryInstanceId = isInstanceKeyedSandboxId(preDestroySandboxId)
+          ? instanceIdFromSandboxId(preDestroySandboxId)
+          : null;
+
+        const registryKeys = [`user:${preDestroyUserId}`];
+        if (preDestroyOrgId) registryKeys.push(`org:${preDestroyOrgId}`);
+
+        for (const registryKey of registryKeys) {
+          const registryStub = this.env.KILOCLAW_REGISTRY.get(
+            this.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+          );
+          if (registryInstanceId) {
+            await registryStub.destroyInstance(registryKey, registryInstanceId);
+            console.log('[DO] Registry entry destroyed on finalization:', {
+              registryKey,
+              instanceId: registryInstanceId,
+            });
+          } else {
+            // Legacy: find active entry by doKey=userId
+            const entries = await registryStub.listInstances(registryKey);
+            const legacyEntry = entries.find(e => e.doKey === preDestroyUserId);
+            if (legacyEntry) {
+              await registryStub.destroyInstance(registryKey, legacyEntry.instanceId);
+              console.log('[DO] Registry entry destroyed on finalization (legacy):', {
+                registryKey,
+                instanceId: legacyEntry.instanceId,
+                doKey: preDestroyUserId,
+              });
+            } else {
+              console.log(
+                '[DO] Registry cleanup: no active entry found (already cleaned or never existed):',
+                {
+                  registryKey,
+                  doKey: preDestroyUserId,
+                  activeEntryCount: entries.length,
+                }
+              );
+            }
+          }
+        }
+      } catch (registryErr) {
+        console.error('[DO] Registry cleanup on finalization failed (non-fatal):', registryErr);
+      }
+    }
+
     if (!finalized.finalized) {
       doWarn(this.s, 'Destroy incomplete, alarm will retry', {
         pendingMachineId: this.s.pendingDestroyMachineId,
@@ -1707,6 +1769,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         snapshotId,
         previousVolumeId,
         region: this.s.flyRegion,
+        instanceId:
+          this.s.sandboxId && isInstanceKeyedSandboxId(this.s.sandboxId)
+            ? instanceIdFromSandboxId(this.s.sandboxId)
+            : undefined,
       });
     } catch (err) {
       this.s.status = previousStatus;

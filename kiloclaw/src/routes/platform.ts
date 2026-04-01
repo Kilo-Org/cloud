@@ -300,8 +300,9 @@ platform.post('/provision', async c => {
     pinnedImageTag,
   } = result.data;
 
+  let provision;
   try {
-    const provision = await withDORetry(
+    provision = await withDORetry(
       instanceStubFactory(c.env, userId, instanceId),
       stub =>
         stub.provision(
@@ -321,7 +322,6 @@ platform.post('/provision', async c => {
         ),
       'provision'
     );
-    return c.json(provision, 201);
   } catch (err) {
     const raw = err instanceof Error ? err.message : 'Unknown error';
     if (raw.includes('duplicate key') || raw.includes('unique constraint')) {
@@ -331,6 +331,29 @@ platform.post('/provision', async c => {
     const { message, status } = sanitizeError(err, 'provision');
     return jsonError(message, status);
   }
+
+  // Record the instance in the appropriate registry (best-effort).
+  // instanceId is always provided by Next.js (the Postgres row UUID).
+  if (instanceId) {
+    try {
+      const registryKey = orgId ? `org:${orgId}` : `user:${userId}`;
+      const registryStub = c.env.KILOCLAW_REGISTRY.get(
+        c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+      );
+      // doKey = instanceId: all new provisions create DOs keyed by instanceId.
+      // For lazy-migrated legacy instances, doKey = userId (set in lazyMigrate).
+      await registryStub.createInstance(registryKey, userId, instanceId, instanceId);
+      console.log('[platform] Registry entry created:', {
+        registryKey,
+        instanceId,
+        doKey: instanceId,
+      });
+    } catch (registryErr) {
+      console.error('[platform] Registry create failed (non-fatal):', registryErr);
+    }
+  }
+
+  return c.json(provision, 201);
 });
 
 // PATCH /api/platform/kilocode-config
@@ -338,11 +361,14 @@ platform.patch('/kilocode-config', async c => {
   const result = await parseBody(c, KiloCodeConfigPatchSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { userId, kilocodeApiKey, kilocodeApiKeyExpiresAt, kilocodeDefaultModel } = result.data;
 
   try {
     const updated = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub =>
         stub.updateKiloCodeConfig({
           kilocodeApiKey,
@@ -363,11 +389,14 @@ platform.patch('/channels', async c => {
   const result = await parseBody(c, ChannelsPatchSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { userId, channels } = result.data;
 
   try {
     const updated = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.updateChannels(channels),
       'updateChannels'
     );
@@ -389,11 +418,14 @@ platform.patch('/exec-preset', async c => {
   const result = await parseBody(c, ExecPresetPatchSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { userId, security, ask } = result.data;
 
   try {
     const updated = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.updateExecPreset({ security, ask }),
       'updateExecPreset'
     );
@@ -414,11 +446,14 @@ platform.post('/google-credentials', async c => {
   const result = await parseBody(c, GoogleCredentialsPatchSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { userId, googleCredentials } = result.data;
 
   try {
     const updated = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.updateGoogleCredentials(googleCredentials),
       'updateGoogleCredentials'
     );
@@ -434,9 +469,12 @@ platform.delete('/google-credentials', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const updated = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.clearGoogleCredentials(),
       'clearGoogleCredentials'
     );
@@ -452,11 +490,14 @@ platform.post('/gmail-notifications', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { userId } = result.data;
 
   try {
     const updated = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.updateGmailNotifications(true),
       'enableGmailNotifications'
     );
@@ -472,9 +513,12 @@ platform.delete('/gmail-notifications', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const updated = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.updateGmailNotifications(false),
       'disableGmailNotifications'
     );
@@ -490,11 +534,14 @@ platform.post('/gmail-history-id', async c => {
   const result = await parseBody(c, GmailHistoryIdSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { userId, historyId } = result.data;
 
   try {
     await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.updateGmailHistoryId(historyId),
       'updateGmailHistoryId'
     );
@@ -511,9 +558,12 @@ platform.get('/gmail-oidc-email', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const result = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.getGmailOidcEmail(),
       'getGmailOidcEmail'
     );
@@ -529,11 +579,14 @@ platform.patch('/secrets', async c => {
   const result = await parseBody(c, SecretsPatchSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { userId, secrets, meta } = result.data;
 
   try {
     const updated = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.updateSecrets(secrets, meta),
       'updateSecrets'
     );
@@ -549,11 +602,14 @@ platform.get('/pairing', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const forceRefresh = c.req.query('refresh') === 'true';
 
   try {
     const pairing = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.listPairingRequests(forceRefresh),
       'listPairingRequests'
     );
@@ -575,11 +631,14 @@ platform.post('/pairing/approve', async c => {
   const result = await parseBody(c, PairingApproveSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { userId, channel, code } = result.data;
 
   try {
     const approved = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.approvePairingRequest(channel, code),
       'approvePairingRequest'
     );
@@ -595,11 +654,14 @@ platform.get('/device-pairing', async c => {
   const userId = setValidatedQueryUserId(c);
   if (!userId) return c.json({ error: 'userId is required' }, 400);
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const forceRefresh = c.req.query('refresh') === 'true';
 
   try {
     const pairing = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.listDevicePairingRequests(forceRefresh),
       'listDevicePairingRequests'
     );
@@ -620,11 +682,14 @@ platform.post('/device-pairing/approve', async c => {
   const result = await parseBody(c, DevicePairingApproveSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { userId, requestId } = result.data;
 
   try {
     const approved = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.approveDevicePairingRequest(requestId),
       'approveDevicePairingRequest'
     );
@@ -642,9 +707,12 @@ platform.get('/gateway/status', async c => {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const gatewayStatus = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.getGatewayProcessStatus(),
       'getGatewayProcessStatus'
     );
@@ -664,9 +732,12 @@ platform.get('/gateway/ready', async c => {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const result = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.getGatewayReady(),
       'getGatewayReady'
     );
@@ -684,9 +755,12 @@ platform.get('/controller-version', async c => {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const result = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.getControllerVersion(),
       'getControllerVersion'
     );
@@ -705,9 +779,12 @@ platform.post('/gateway/start', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId),
+      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
       stub => stub.startGatewayProcess(),
       'startGatewayProcess'
     );
@@ -723,9 +800,12 @@ platform.post('/gateway/stop', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId),
+      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
       stub => stub.stopGatewayProcess(),
       'stopGatewayProcess'
     );
@@ -741,9 +821,12 @@ platform.post('/gateway/restart', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId),
+      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
       stub => stub.restartGatewayProcess(),
       'restartGatewayProcess'
     );
@@ -764,11 +847,14 @@ platform.post('/config/restore', async c => {
   const result = await parseBody(c, ConfigRestoreSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { userId, version } = result.data;
 
   try {
     const response = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.restoreConfig(version),
       'restoreConfig'
     );
@@ -789,9 +875,12 @@ platform.get('/openclaw-config', async c => {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const config = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.getOpenclawConfig(),
       'getOpenclawConfig'
     );
@@ -817,11 +906,14 @@ platform.post('/openclaw-config', async c => {
   const result = await parseBody(c, ReplaceOpenclawConfigSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { userId, config, etag } = result.data;
 
   try {
     const response = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.replaceConfigOnMachine(config, etag),
       'replaceConfigOnMachine'
     );
@@ -846,11 +938,14 @@ platform.patch('/openclaw-config', async c => {
   const result = await parseBody(c, PatchOpenclawConfigSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { userId, patch } = result.data;
 
   try {
     const response = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.patchOpenclawConfig(patch),
       'patchOpenclawConfig'
     );
@@ -867,9 +962,13 @@ platform.get('/files/tree', async c => {
   if (!userId) {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const result = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.getFileTree(),
       'getFileTree'
     );
@@ -897,9 +996,13 @@ platform.get('/files/read', async c => {
   if (!filePath) {
     return c.json({ error: 'path query parameter is required' }, 400);
   }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const result = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.readFile(filePath),
       'readFile'
     );
@@ -928,10 +1031,14 @@ const WriteFileSchema = z.object({
 platform.post('/files/write', async c => {
   const result = await parseBody(c, WriteFileSchema);
   if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { userId, path: filePath, content, etag } = result.data;
   try {
     const response = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.writeFile(filePath, content, etag),
       'writeFile'
     );
@@ -954,9 +1061,12 @@ platform.post('/doctor', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const doctor = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId),
+      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
       stub => stub.runDoctor(),
       'runDoctor'
     );
@@ -978,10 +1088,12 @@ const KiloCliRunStartSchema = z.object({
 platform.post('/kilo-cli-run/start', async c => {
   const result = await parseBody(c, KiloCliRunStartSchema);
   if ('error' in result) return result.error;
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
 
   try {
     const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId),
+      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
       stub => stub.startKiloCliRun(result.data.prompt),
       'startKiloCliRun'
     );
@@ -996,10 +1108,12 @@ platform.post('/kilo-cli-run/start', async c => {
 platform.get('/kilo-cli-run/status', async c => {
   const userId = c.req.query('userId');
   if (!userId) return jsonError('Missing userId', 400);
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
 
   try {
     const response = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.getKiloCliRunStatus(),
       'getKiloCliRunStatus'
     );
@@ -1014,10 +1128,12 @@ platform.get('/kilo-cli-run/status', async c => {
 platform.post('/kilo-cli-run/cancel', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
 
   try {
     const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId),
+      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
       stub => stub.cancelKiloCliRun(),
       'cancelKiloCliRun'
     );
@@ -1077,11 +1193,15 @@ platform.post('/start', async c => {
 platform.post('/force-retry-recovery', async c => {
   const result = await parseBody(c, UserIdRequestSchema);
   if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const startedAt = performance.now();
 
   try {
     const { ok } = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId),
+      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
       stub => stub.forceRetryRecovery(),
       'forceRetryRecovery'
     );
@@ -1138,12 +1258,72 @@ platform.post('/destroy', async c => {
   if ('error' in iidResult) return iidResult.error;
   const { instanceId } = iidResult;
 
+  const { userId } = result.data;
+
+  // Read the instance's orgId before destroying so we can update the correct registry.
+  let orgId: string | null = null;
+  if (instanceId) {
+    try {
+      const statusStub = instanceStubFactory(c.env, userId, instanceId)();
+      const status = await statusStub.getStatus();
+      orgId = status.orgId;
+    } catch {
+      // Can't determine orgId. We'll clean up the user registry below; if the
+      // instance was org-owned, its org registry entry becomes stale but harmless
+      // (points to a destroyed DO that returns no machineId).
+      console.warn(
+        '[platform] Could not read orgId before destroy, org registry entry may be stale'
+      );
+    }
+  }
+
   try {
     await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, instanceId),
+      instanceStubFactory(c.env, userId, instanceId),
       stub => stub.destroy(),
       'destroy'
     );
+
+    // Remove the instance from the registry (best-effort).
+    // When instanceId is provided, destroy by instanceId directly.
+    // When absent (legacy destroy), find the entry with doKey=userId
+    // and destroy it by its instanceId from the registry.
+    // Note: The Instance DO also cleans up on finalization (belt-and-suspenders).
+    try {
+      const registryKeys = [`user:${userId}`];
+      if (orgId) registryKeys.push(`org:${orgId}`);
+      for (const registryKey of registryKeys) {
+        const registryStub = c.env.KILOCLAW_REGISTRY.get(
+          c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+        );
+        if (instanceId) {
+          await registryStub.destroyInstance(registryKey, instanceId);
+          console.log('[platform] Registry entry destroyed:', { registryKey, instanceId });
+        } else {
+          // Legacy destroy (no instanceId): the DO was keyed by userId,
+          // so find the registry entry with doKey=userId.
+          const entries = await registryStub.listInstances(registryKey);
+          const legacyEntry = entries.find(e => e.doKey === userId);
+          if (legacyEntry) {
+            await registryStub.destroyInstance(registryKey, legacyEntry.instanceId);
+            console.log('[platform] Registry entry destroyed (legacy):', {
+              registryKey,
+              instanceId: legacyEntry.instanceId,
+              doKey: userId,
+            });
+          } else {
+            console.log('[platform] No registry entry found for legacy destroy:', {
+              registryKey,
+              doKey: userId,
+              entriesCount: entries.length,
+            });
+          }
+        }
+      }
+    } catch (registryErr) {
+      console.error('[platform] Registry destroy failed (non-fatal):', registryErr);
+    }
+
     return c.json({ ok: true });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'destroy');
@@ -1267,6 +1447,48 @@ platform.get('/debug-status', async c => {
   }
 });
 
+// GET /api/platform/registry-entries?userId=...&orgId=...
+// Returns all registry entries (including destroyed) for admin inspection.
+// Queries the personal registry and optionally the org registry.
+platform.get('/registry-entries', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) return c.json({ error: 'userId query parameter is required' }, 400);
+  const orgId = c.req.query('orgId') ?? null;
+
+  const results: Array<{
+    registryKey: string;
+    entries: Array<{
+      instanceId: string;
+      doKey: string;
+      assignedUserId: string;
+      createdAt: string;
+      destroyedAt: string | null;
+    }>;
+    migrated: boolean;
+  }> = [];
+
+  try {
+    // Always query the personal registry
+    const userKey = `user:${userId}`;
+    const userStub = c.env.KILOCLAW_REGISTRY.get(c.env.KILOCLAW_REGISTRY.idFromName(userKey));
+    const userResult = await userStub.listAllInstances(userKey);
+    results.push({ registryKey: userKey, ...userResult });
+
+    // If orgId is provided, also query the org registry
+    if (orgId) {
+      const orgKey = `org:${orgId}`;
+      const orgStub = c.env.KILOCLAW_REGISTRY.get(c.env.KILOCLAW_REGISTRY.idFromName(orgKey));
+      const orgResult = await orgStub.listAllInstances(orgKey);
+      results.push({ registryKey: orgKey, ...orgResult });
+    }
+
+    return c.json({ registries: results });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'registry-entries');
+    return jsonError(message, status);
+  }
+});
+
 // GET /api/platform/gateway-token?userId=...&instanceId=...
 // Returns the derived gateway token for a user's sandbox. The Next.js
 // dashboard calls this so it never needs GATEWAY_TOKEN_SECRET directly.
@@ -1310,9 +1532,12 @@ platform.get('/volume-snapshots', async c => {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const snapshots = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.listVolumeSnapshots(),
       'listVolumeSnapshots'
     );
@@ -1331,9 +1556,12 @@ platform.get('/candidate-volumes', async c => {
     return c.json({ error: 'userId query parameter is required' }, 400);
   }
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const result = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
       stub => stub.listCandidateVolumes(),
       'listCandidateVolumes'
     );
@@ -1356,9 +1584,12 @@ platform.post('/reassociate-volume', async c => {
   const result = await parseBody(c, ReassociateVolumeSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId),
+      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
       stub => stub.reassociateVolume(result.data.newVolumeId, result.data.reason),
       'reassociateVolume'
     );
@@ -1380,9 +1611,12 @@ platform.post('/restore-volume-snapshot', async c => {
   const result = await parseBody(c, RestoreVolumeSnapshotSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   try {
     const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId),
+      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
       stub => stub.enqueueSnapshotRestore(result.data.snapshotId),
       'enqueueSnapshotRestore'
     );
@@ -1566,6 +1800,9 @@ platform.post('/destroy-fly-machine', async c => {
   const result = await parseBody(c, DestroyFlyMachineSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { userId, appName, machineId } = result.data;
   const apiToken = c.env.FLY_API_TOKEN;
   if (!apiToken) {
@@ -1593,7 +1830,7 @@ platform.post('/destroy-fly-machine', async c => {
     // Trigger immediate reconcile so the DO discovers the machine is gone.
     try {
       await withDORetry(
-        instanceStubFactory(c.env, userId),
+        instanceStubFactory(c.env, userId, iidResult.instanceId),
         stub => stub.forceRetryRecovery(),
         'forceRetryRecovery'
       );

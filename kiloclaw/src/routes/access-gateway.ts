@@ -6,6 +6,8 @@ import { getWorkerDb, validateAndRedeemAccessCode, findPepperByUserId } from '..
 import { signKiloToken, validateKiloToken } from '../auth/jwt';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
+import { sandboxIdFromInstanceId, isValidInstanceId } from '@kilocode/worker-utils/instance-id';
+import type { KiloClawEnv } from '../types';
 
 /**
  * Access gateway routes — unauthenticated.
@@ -38,13 +40,43 @@ const BASE_STYLES = /* css */ `
  * Derive the redirect URL with the gateway token hash fragment.
  * The token is computed server-side from the userId — never touches the client.
  */
-async function buildRedirectUrl(
-  userId: string,
-  gatewayTokenSecret: string | undefined
-): Promise<string> {
-  if (!gatewayTokenSecret) return '/';
-  const sandboxId = sandboxIdFromUserId(userId);
-  const token = await deriveGatewayToken(sandboxId, gatewayTokenSecret);
+/**
+ * Resolve the DO's authoritative sandboxId for gateway token derivation.
+ * For instance-keyed DOs this is the ki_ value; for legacy DOs it's the
+ * userId-derived base64url value. Falls back to sandboxIdFromUserId if
+ * the DO can't be reached (e.g. not provisioned yet).
+ */
+async function resolveSandboxId(userId: string, env: KiloClawEnv): Promise<string> {
+  try {
+    const registryKey = `user:${userId}`;
+    const registryStub = env.KILOCLAW_REGISTRY.get(env.KILOCLAW_REGISTRY.idFromName(registryKey));
+    const entries = await registryStub.listInstances(registryKey);
+    if (entries.length > 0) {
+      const entry = entries[0];
+      // Try the DO's authoritative sandboxId first.
+      try {
+        const stub = env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(entry.doKey));
+        const status = await stub.getStatus();
+        if (status.sandboxId) return status.sandboxId;
+      } catch {
+        // DO unreachable — derive from the registry entry's doKey.
+        // If doKey is a UUID (instance-keyed), derive ki_ sandboxId from it.
+        // If doKey is a userId (legacy), fall through to sandboxIdFromUserId.
+        if (isValidInstanceId(entry.doKey)) {
+          return sandboxIdFromInstanceId(entry.doKey);
+        }
+      }
+    }
+  } catch {
+    // Registry unreachable — fall back to legacy derivation
+  }
+  return sandboxIdFromUserId(userId);
+}
+
+async function buildRedirectUrl(userId: string, env: KiloClawEnv): Promise<string> {
+  if (!env.GATEWAY_TOKEN_SECRET) return '/';
+  const sandboxId = await resolveSandboxId(userId, env);
+  const token = await deriveGatewayToken(sandboxId, env.GATEWAY_TOKEN_SECRET);
   return `/#token=${token}`;
 }
 
@@ -210,7 +242,7 @@ async function redeemCodeAndSetCookie(
     maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
   });
 
-  const redirectUrl = await buildRedirectUrl(redeemedUserId, c.env.GATEWAY_TOKEN_SECRET);
+  const redirectUrl = await buildRedirectUrl(redeemedUserId, c.env);
   return { redirectUrl };
 }
 
@@ -225,7 +257,7 @@ accessGatewayRoutes.get('/kilo-access-gateway', async c => {
   if (secret) {
     const cookie = getCookie(c, KILOCLAW_AUTH_COOKIE);
     if (await hasValidCookie(cookie, userId, secret, c.env.WORKER_ENV)) {
-      const redirectUrl = await buildRedirectUrl(userId, c.env.GATEWAY_TOKEN_SECRET);
+      const redirectUrl = await buildRedirectUrl(userId, c.env);
       return c.redirect(redirectUrl);
     }
   }

@@ -463,6 +463,13 @@
       "when": 1774879757906,
       "tag": "0065_low_mad_thinker",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1774966268866,
+      "tag": "0066_ambitious_jean_grey",
+      "breakpoints": true
     }
   ]
 }

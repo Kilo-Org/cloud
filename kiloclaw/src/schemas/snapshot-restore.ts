@@ -9,6 +9,7 @@ export const SnapshotRestoreMessageSchema = z.object({
   snapshotId: z.string(),
   previousVolumeId: z.string(),
   region: z.string(),
+  instanceId: z.string().optional(),
 });
 
 export type SnapshotRestoreMessage = z.infer<typeof SnapshotRestoreMessageSchema>;

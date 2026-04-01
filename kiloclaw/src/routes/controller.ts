@@ -4,6 +4,10 @@ import { z } from 'zod';
 import { timingSafeEqual } from '@kilocode/encryption';
 import type { AppEnv } from '../types';
 import { userIdFromSandboxId } from '../auth/sandbox-id';
+import {
+  isInstanceKeyedSandboxId,
+  instanceIdFromSandboxId,
+} from '@kilocode/worker-utils/instance-id';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { waitUntil } from 'cloudflare:workers';
 import { getWorkerDb, findEmailByUserId } from '../db';
@@ -103,18 +107,30 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
     return c.json({ error: 'Forbidden' }, 403);
   }
 
-  let userId: string;
-  try {
-    userId = userIdFromSandboxId(data.sandboxId);
-  } catch {
-    return c.json({ error: 'Invalid sandboxId' }, 400);
+  // For instance-keyed sandboxIds (ki_ prefix), the DO key is the instanceId.
+  // For legacy sandboxIds (base64url), the DO key is the userId.
+  let doKey: string;
+  if (isInstanceKeyedSandboxId(data.sandboxId)) {
+    doKey = instanceIdFromSandboxId(data.sandboxId);
+  } else {
+    try {
+      doKey = userIdFromSandboxId(data.sandboxId);
+    } catch {
+      return c.json({ error: 'Invalid sandboxId' }, 400);
+    }
   }
 
-  const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
+  const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
   const config = await stub.getConfig().catch(() => null);
   if (!config?.kilocodeApiKey || !timingSafeEqual(apiKey, config.kilocodeApiKey)) {
     return c.json({ error: 'Forbidden' }, 403);
   }
+
+  // Resolve the real userId from the DO — needed for PostHog attribution and
+  // instance-ready emails. For legacy DOs, doKey IS the userId. For instance-keyed
+  // DOs, doKey is the instanceId and the DO stores the actual userId.
+  const status = await stub.getStatus();
+  const userId = status.userId ?? doKey;
 
   try {
     const flyRegion = c.req.header('fly-region') ?? '';

@@ -29,9 +29,7 @@ function extractWastelandId(pathname: string): string | null {
 }
 
 /** Extract {orgId, wastelandId} from an /organizations/[id]/wasteland/[wastelandId] pathname, or null. */
-function extractOrgWastelandId(
-  pathname: string
-): { orgId: string; wastelandId: string } | null {
+function extractOrgWastelandId(pathname: string): { orgId: string; wastelandId: string } | null {
   const match = pathname.match(new RegExp(`^/organizations/(${UUID})/wasteland/(${UUID})`));
   return match ? { orgId: match[1], wastelandId: match[2] } : null;
 }

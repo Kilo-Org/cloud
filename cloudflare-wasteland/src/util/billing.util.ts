@@ -23,12 +23,7 @@ export type BillableEvent =
  * Write operations (mutations that modify DoltHub state) are metered
  * individually; reads are not metered today.
  */
-export type BillingOperationKind =
-  | 'claim'
-  | 'done'
-  | 'post'
-  | 'config_update'
-  | 'member_update';
+export type BillingOperationKind = 'claim' | 'done' | 'post' | 'config_update' | 'member_update';
 
 type BillingEnv = { WASTELAND_AE?: AnalyticsEngineDataset };
 

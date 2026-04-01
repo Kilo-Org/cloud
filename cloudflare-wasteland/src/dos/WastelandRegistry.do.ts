@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { z } from 'zod';
 import { query } from '../util/query.util';
 import {
   createTableWastelandRegistry,
@@ -7,6 +8,7 @@ import {
 } from '../db/tables/wasteland-registry.table';
 
 const LOG = '[WastelandRegistry.do]';
+const CountResult = z.object({ cnt: z.coerce.number() });
 
 /**
  * WastelandRegistryDO — singleton registry that indexes wasteland ownership.
@@ -137,6 +139,15 @@ export class WastelandRegistryDO extends DurableObject<Env> {
       ),
     ];
     return WastelandRegistryRecord.array().parse(rows);
+  }
+
+  /** Return the total number of registered (active) wastelands. */
+  async countAll(): Promise<number> {
+    await this.ensureInitialized();
+    const rows = [
+      ...query(this.sql, /* sql */ `SELECT COUNT(*) AS cnt FROM ${wasteland_registry}`, []),
+    ];
+    return CountResult.parse(rows[0]).cnt;
   }
 }
 

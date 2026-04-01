@@ -75,14 +75,11 @@ export function MembersClient({ wastelandId }: { wastelandId: string }) {
   const queryClient = useQueryClient();
   const { data: currentUser } = useUser();
 
-  const membersQuery = useQuery(
-    trpc.wasteland.listMembers.queryOptions({ wastelandId })
-  );
+  const membersQuery = useQuery(trpc.wasteland.listMembers.queryOptions({ wastelandId }));
   const members = membersQuery.data ?? [];
 
   const currentUserMember = members.find(m => m.user_id === currentUser?.id);
-  const isOwnerOrAdmin =
-    currentUserMember?.role === 'owner' || currentUser?.is_admin === true;
+  const isOwnerOrAdmin = currentUserMember?.role === 'owner' || currentUser?.is_admin === true;
 
   const memberQueryKey = trpc.wasteland.listMembers.queryKey({ wastelandId });
 
@@ -92,12 +89,8 @@ export function MembersClient({ wastelandId }: { wastelandId: string }) {
       <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-3">
         <div className="flex items-center gap-2">
           <Users className="size-4 text-[color:oklch(70%_0.15_30_/_0.6)]" />
-          <h2 className="text-lg font-semibold tracking-tight text-white/90">
-            Members
-          </h2>
-          <span className="ml-1 font-mono text-xs text-white/30">
-            {members.length}
-          </span>
+          <h2 className="text-lg font-semibold tracking-tight text-white/90">Members</h2>
+          <span className="ml-1 font-mono text-xs text-white/30">{members.length}</span>
         </div>
         {isOwnerOrAdmin && (
           <AddMemberDialog
@@ -129,9 +122,7 @@ export function MembersClient({ wastelandId }: { wastelandId: string }) {
                 <TableHead className="text-white/40">Trust</TableHead>
                 <TableHead className="text-white/40">Joined</TableHead>
                 {isOwnerOrAdmin && (
-                  <TableHead className="w-24 text-right text-white/40">
-                    Actions
-                  </TableHead>
+                  <TableHead className="w-24 text-right text-white/40">Actions</TableHead>
                 )}
               </TableRow>
             </TableHeader>
@@ -178,15 +169,10 @@ function MemberRow({
   return (
     <TableRow className="border-white/[0.04] hover:bg-white/[0.02]">
       <TableCell>
-        <span className="font-mono text-xs text-white/70">
-          {member.user_id}
-        </span>
+        <span className="font-mono text-xs text-white/70">{member.user_id}</span>
       </TableCell>
       <TableCell>
-        <Badge
-          variant="outline"
-          className={ROLE_STYLES[member.role] ?? 'text-white/50'}
-        >
+        <Badge variant="outline" className={ROLE_STYLES[member.role] ?? 'text-white/50'}>
           {member.role}
         </Badge>
       </TableCell>
@@ -194,9 +180,7 @@ function MemberRow({
         <TrustStars level={member.trust_level} />
       </TableCell>
       <TableCell>
-        <span className="text-xs text-white/40">
-          {formatTimestamp(member.joined_at)}
-        </span>
+        <span className="text-xs text-white/40">{formatTimestamp(member.joined_at)}</span>
       </TableCell>
       {isOwnerOrAdmin && (
         <TableCell className="text-right">
@@ -239,9 +223,7 @@ function AddMemberDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [userId, setUserId] = useState('');
-  const [role, setRole] = useState<'contributor' | 'maintainer' | 'owner'>(
-    'contributor'
-  );
+  const [role, setRole] = useState<'contributor' | 'maintainer' | 'owner'>('contributor');
   const [trustLevel, setTrustLevel] = useState('1');
 
   const addMember = useMutation({
@@ -291,9 +273,7 @@ function AddMemberDialog({
             <Label className="text-xs text-white/55">Role</Label>
             <Select
               value={role}
-              onValueChange={v =>
-                setRole(v as 'contributor' | 'maintainer' | 'owner')
-              }
+              onValueChange={v => setRole(v as 'contributor' | 'maintainer' | 'owner')}
             >
               <SelectTrigger className="border-white/[0.08] bg-white/[0.03] text-white/85">
                 <SelectValue />
@@ -424,9 +404,7 @@ function EditMemberDialog({
             <Label className="text-xs text-white/55">Role</Label>
             <Select
               value={role}
-              onValueChange={v =>
-                setRole(v as 'contributor' | 'maintainer' | 'owner')
-              }
+              onValueChange={v => setRole(v as 'contributor' | 'maintainer' | 'owner')}
             >
               <SelectTrigger className="border-white/[0.08] bg-white/[0.03] text-white/85">
                 <SelectValue />
@@ -531,13 +509,10 @@ function RemoveMemberDialog({
       </AlertDialogTrigger>
       <AlertDialogContent className="border-white/[0.08] bg-[oklch(0.13_0_0)] sm:max-w-md">
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-white/90">
-            Remove member?
-          </AlertDialogTitle>
+          <AlertDialogTitle className="text-white/90">Remove member?</AlertDialogTitle>
           <AlertDialogDescription className="text-white/50">
-            This will remove{' '}
-            <span className="font-mono text-white/70">{member.user_id}</span>{' '}
-            from this wasteland. They will lose all access.
+            This will remove <span className="font-mono text-white/70">{member.user_id}</span> from
+            this wasteland. They will lose all access.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

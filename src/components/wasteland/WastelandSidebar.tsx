@@ -14,14 +14,7 @@ import {
   SidebarMenuButton,
   SidebarFooter,
 } from '@/components/ui/sidebar';
-import {
-  ArrowLeft,
-  ScrollText,
-  ClipboardCheck,
-  Users,
-  Settings,
-  Skull,
-} from 'lucide-react';
+import { ArrowLeft, ScrollText, ClipboardCheck, Users, Settings, Skull } from 'lucide-react';
 import { motion } from 'motion/react';
 
 type WastelandSidebarProps = {

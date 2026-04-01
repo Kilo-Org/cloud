@@ -207,9 +207,7 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
               disabled={refreshMutation.isPending}
               className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-50"
             >
-              <RefreshCw
-                className={`size-3 ${refreshMutation.isPending ? 'animate-spin' : ''}`}
-              />
+              <RefreshCw className={`size-3 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
               Refresh
             </button>
           </div>
@@ -402,16 +400,10 @@ function WantedDetailPanel({
 
           {/* Status + priority + type row */}
           <div className="flex flex-wrap items-center gap-2">
-            <Badge
-              variant="outline"
-              className={STATUS_COLORS[item.status] ?? ''}
-            >
+            <Badge variant="outline" className={STATUS_COLORS[item.status] ?? ''}>
               {item.status}
             </Badge>
-            <Badge
-              variant="outline"
-              className={TYPE_COLORS[item.type] ?? TYPE_COLORS.other}
-            >
+            <Badge variant="outline" className={TYPE_COLORS[item.type] ?? TYPE_COLORS.other}>
               {item.type}
             </Badge>
             <span
@@ -520,7 +512,7 @@ function ClaimDialog({
       onSuccess();
       onClose();
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(err.message || 'Failed to claim item');
     },
   });
@@ -528,7 +520,12 @@ function ClaimDialog({
   useSlowOperationToast(claimMutation.isPending);
 
   return (
-    <Dialog open={item !== null} onOpenChange={open => { if (!open) onClose(); }}>
+    <Dialog
+      open={item !== null}
+      onOpenChange={open => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="border-white/10 bg-[color:oklch(0.155_0_0)]">
         <DialogHeader>
           <DialogTitle className="text-white/90">Claim wanted item</DialogTitle>
@@ -593,7 +590,7 @@ function MarkDoneDialog({
       onSuccess();
       handleClose();
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(err.message || 'Failed to mark item as done');
     },
   });
@@ -616,7 +613,12 @@ function MarkDoneDialog({
   );
 
   return (
-    <Dialog open={item !== null} onOpenChange={open => { if (!open) handleClose(); }}>
+    <Dialog
+      open={item !== null}
+      onOpenChange={open => {
+        if (!open) handleClose();
+      }}
+    >
       <DialogContent className="border-white/10 bg-[color:oklch(0.155_0_0)]">
         <DialogHeader>
           <DialogTitle className="text-white/90">Mark as done</DialogTitle>
@@ -700,7 +702,7 @@ function PostWantedItemDialog({
       onSuccess();
       handleClose();
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(err.message || 'Failed to post wanted item');
     },
   });
@@ -732,7 +734,12 @@ function PostWantedItemDialog({
   );
 
   return (
-    <Dialog open={open} onOpenChange={openState => { if (!openState) handleClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={openState => {
+        if (!openState) handleClose();
+      }}
+    >
       <DialogContent className="border-white/10 bg-[color:oklch(0.155_0_0)]">
         <DialogHeader>
           <DialogTitle className="text-white/90">Post wanted item</DialogTitle>
@@ -841,15 +848,7 @@ function PostWantedItemDialog({
 
 // ── Shared sub-components ─────────────────────────────────────────────────
 
-function DetailRow({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
+function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-center justify-between text-xs">
       <span className="text-white/30">{label}</span>

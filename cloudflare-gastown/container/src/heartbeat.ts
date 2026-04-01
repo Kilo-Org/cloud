@@ -1,5 +1,19 @@
+import { z } from 'zod';
 import { listAgents } from './process-manager';
 import type { HeartbeatPayload } from './types';
+
+const ContainerReadyResponse = z.object({
+  data: z.object({ cleared: z.boolean() }),
+});
+
+const DrainStatusResponse = z.object({
+  data: z.object({ draining: z.boolean(), drainNonce: z.string().nullable() }),
+});
+
+/** Heartbeat response may optionally include a drain nonce. */
+const HeartbeatResponse = z.object({
+  data: z.object({ drainNonce: z.string().optional() }).passthrough(),
+});
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
@@ -70,16 +84,54 @@ async function acknowledgeContainerReady(townId: string, drainNonce: string): Pr
       },
       body: JSON.stringify({ nonce: drainNonce }),
     });
-    if (response.ok) {
-      containerReadyAcknowledged = true;
-      console.log(`[heartbeat] container-ready acknowledged for town=${townId}`);
-    } else {
+    if (!response.ok) {
       console.warn(
         `[heartbeat] container-ready failed for town=${townId}: ${response.status} ${response.statusText}`
       );
+      return;
+    }
+
+    const parsed = ContainerReadyResponse.safeParse(await response.json());
+    if (!parsed.success) {
+      console.warn(`[heartbeat] container-ready unexpected response for town=${townId}`);
+      return;
+    }
+
+    if (parsed.data.data.cleared) {
+      containerReadyAcknowledged = true;
+      console.log(`[heartbeat] container-ready acknowledged for town=${townId}`);
+    } else {
+      console.warn(`[heartbeat] container-ready nonce rejected for town=${townId}, will retry`);
     }
   } catch (err) {
     console.warn(`[heartbeat] container-ready error for town=${townId}:`, err);
+  }
+}
+
+/**
+ * Poll GET /drain-status to discover whether the TownDO is draining.
+ * If a drain nonce is present, immediately call /container-ready to
+ * clear the drain. Runs on every heartbeat tick regardless of active
+ * agent count so idle replacement containers can unblock dispatch.
+ */
+async function pollDrainStatus(apiUrl: string, token: string): Promise<void> {
+  const townId = process.env.GASTOWN_TOWN_ID;
+  if (!townId) return;
+
+  try {
+    const response = await fetch(`${apiUrl}/api/towns/${townId}/drain-status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return;
+
+    const parsed = DrainStatusResponse.safeParse(await response.json());
+    if (!parsed.success) return;
+
+    if (parsed.data.data.drainNonce) {
+      await acknowledgeContainerReady(townId, parsed.data.data.drainNonce);
+    }
+  } catch {
+    // Network error — will retry on next heartbeat tick
   }
 }
 
@@ -89,12 +141,13 @@ async function sendHeartbeats(): Promise<void> {
   const currentToken = process.env.GASTOWN_CONTAINER_TOKEN ?? sessionToken;
   if (!gastownApiUrl || !currentToken) return;
 
-  const active = listAgents().filter(a => a.status === 'running' || a.status === 'starting');
+  // Poll drain status on every tick so idle containers (zero agents)
+  // can discover the nonce and clear the drain flag promptly.
+  if (!containerReadyAcknowledged) {
+    await pollDrainStatus(gastownApiUrl, currentToken);
+  }
 
-  // When no agents are active, the per-agent heartbeat loop has
-  // nothing to send. Idle container drain acknowledgment is handled
-  // by the /health endpoint instead (the TownDO passes the nonce via
-  // X-Drain-Nonce headers in ensureContainerReady).
+  const active = listAgents().filter(a => a.status === 'running' || a.status === 'starting');
   if (active.length === 0) return;
 
   for (const agent of active) {
@@ -132,8 +185,8 @@ async function sendHeartbeats(): Promise<void> {
         // If the TownDO is draining, the heartbeat response includes a
         // drainNonce. Use it to call /container-ready and clear drain.
         try {
-          const body = (await response.json()) as { data?: { drainNonce?: string } };
-          const nonce = body?.data?.drainNonce;
+          const parsed = HeartbeatResponse.safeParse(await response.json());
+          const nonce = parsed.success ? parsed.data.data.drainNonce : null;
           if (nonce) {
             void acknowledgeContainerReady(agent.townId, nonce);
           }

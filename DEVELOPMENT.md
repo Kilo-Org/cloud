@@ -305,7 +305,7 @@ AI inference works locally without any extra services. The Next.js app includes 
 
 Each worker in the workspace can be started individually with `wrangler dev` (or `pnpm dev`) from its directory. Workers communicate with Next.js over HTTP using env vars like `CLOUD_AGENT_API_URL`, `CODE_REVIEW_WORKER_URL`, etc. Dev ports are defined in each worker's `wrangler.jsonc`.
 
-The easiest way to run workers is with the unified dev runner (see [Unified Dev Runner](#unified-dev-runner) below), which starts groups of related services in a tmux dashboard.
+The easiest way to run workers is with `pnpm dev:start` (see [Common Development Commands](#common-development-commands)), which starts groups of related services in a tmux dashboard.
 
 ### Worker `.dev.vars` setup
 

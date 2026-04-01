@@ -32,4 +32,4 @@ DEV_MODE=true
 
 # URL of the DB proxy worker for database provisioning
 # @url cloudflare-db-proxy
-DB_PROXY_URL=http://localhost:8797
+DB_PROXY_URL=http://localhost:8798

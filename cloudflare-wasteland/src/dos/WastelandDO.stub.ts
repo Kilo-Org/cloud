@@ -51,6 +51,14 @@ export type WastelandCredentialResult = {
   connected_at: string;
 };
 
+/** Shape returned by WastelandDO connected-town RPCs — matches the wasteland_connected_towns table. */
+export type ConnectedTownResult = {
+  town_id: string;
+  wasteland_id: string;
+  connected_by: string;
+  connected_at: string;
+};
+
 /** Shape for a wanted board item returned from the DoltHub-backed cache. */
 export type WantedItemResult = {
   item_id: string;
@@ -132,6 +140,20 @@ export class WastelandDO extends DurableObject<Env> {
   }
 
   async deleteCredential(_userId: string): Promise<void> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
+  // ── Connected towns RPCs ─────────────────────────────────────────────
+
+  async connectTown(_townId: string, _userId: string): Promise<ConnectedTownResult> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
+  async disconnectTown(_townId: string): Promise<void> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
+  async listConnectedTowns(): Promise<ConnectedTownResult[]> {
     throw new Error('WastelandDO not yet implemented');
   }
 

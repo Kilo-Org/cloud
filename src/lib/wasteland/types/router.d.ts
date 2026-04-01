@@ -209,6 +209,41 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       meta: object;
     }>;
+    connectKiloTown: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        townId: string;
+      };
+      output: {
+        town_id: string;
+        wasteland_id: string;
+        connected_by: string;
+        connected_at: string;
+      };
+      meta: object;
+    }>;
+    disconnectKiloTown: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+        townId: string;
+      };
+      output: {
+        success: boolean;
+      };
+      meta: object;
+    }>;
+    listConnectedTowns: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        wastelandId: string;
+      };
+      output: {
+        town_id: string;
+        wasteland_id: string;
+        connected_by: string;
+        connected_at: string;
+      }[];
+      meta: object;
+    }>;
     browseWantedBoard: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         wastelandId: string;

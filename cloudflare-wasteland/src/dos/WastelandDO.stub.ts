@@ -1,9 +1,24 @@
 import { DurableObject } from 'cloudflare:workers';
 
+/** Shape returned by WastelandDO.getConfig() — matches the wasteland_config table. */
+export type WastelandConfigResult = {
+  wasteland_id: string;
+  name: string;
+  owner_type: 'user' | 'org';
+  owner_user_id: string | null;
+  organization_id: string | null;
+  dolthub_upstream: string | null;
+  visibility: 'public' | 'private';
+  status: 'active' | 'deleted';
+  created_at: string;
+  updated_at: string;
+};
+
 /**
  * Stub WastelandDO — placeholder until the full implementation lands.
  * Provides the class export that wrangler.jsonc requires for the
- * WASTELAND durable_objects binding.
+ * WASTELAND durable_objects binding, plus RPC method signatures that
+ * downstream tRPC code depends on.
  */
 export class WastelandDO extends DurableObject<Env> {
   async fetch(): Promise<Response> {
@@ -11,6 +26,10 @@ export class WastelandDO extends DurableObject<Env> {
       status: 501,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  async getConfig(): Promise<WastelandConfigResult | null> {
+    throw new Error('WastelandDO not yet implemented');
   }
 }
 

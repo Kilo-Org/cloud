@@ -135,6 +135,10 @@ export type ManagedAgent = {
   model: string | null;
   /** Full env dict from buildAgentEnv, stored so model hot-swap can replay it. */
   startupEnv: Record<string, string>;
+  /** AbortController for the in-flight startup sequence. Aborted when a
+   *  restart is requested while the agent is still in 'starting' status,
+   *  preventing orphaned sessions from leaking. */
+  startupAbortController: AbortController | null;
 };
 
 export type AgentStatusResponse = {

@@ -2,6 +2,7 @@ import { updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
+import { emoji } from 'chat';
 
 export async function processMessage({
   thread,
@@ -35,7 +36,9 @@ export async function processMessage({
     }
 
     if (!result.startedCloudAgentSession) {
+      const received = thread.createSentMessageFromMessage(message);
       await thread.post({ markdown: result.finalText });
+      await Promise.all([received.removeReaction(emoji.eyes), received.addReaction(emoji.check)]);
     }
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);

@@ -1153,7 +1153,9 @@ export async function drainAll(): Promise<void> {
       const authorName =
         agent.startupEnv?.GIT_AUTHOR_NAME ?? process.env.GASTOWN_GIT_AUTHOR_NAME ?? 'Gastown';
       const authorEmail =
-        agent.startupEnv?.GIT_AUTHOR_EMAIL ?? process.env.GASTOWN_GIT_AUTHOR_EMAIL ?? 'gastown@kilo.ai';
+        agent.startupEnv?.GIT_AUTHOR_EMAIL ??
+        process.env.GASTOWN_GIT_AUTHOR_EMAIL ??
+        'gastown@kilo.ai';
       gitEnv.GIT_AUTHOR_NAME = authorName;
       gitEnv.GIT_COMMITTER_NAME = authorName;
       gitEnv.GIT_AUTHOR_EMAIL = authorEmail;

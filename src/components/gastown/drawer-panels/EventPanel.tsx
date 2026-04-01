@@ -146,7 +146,12 @@ export function EventPanel({
   // Extract structured failure reason from status_changed → failed events
   const failureReason =
     typeof meta.failure_reason === 'object' && meta.failure_reason !== null
-      ? (meta.failure_reason as { code?: string; message?: string; details?: string; source?: string })
+      ? (meta.failure_reason as {
+          code?: string;
+          message?: string;
+          details?: string;
+          source?: string;
+        })
       : null;
 
   // Metadata entries excluding the ones we render in context sections

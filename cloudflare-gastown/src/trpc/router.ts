@@ -1036,6 +1036,12 @@ export const gastownRouter = router({
           tokenUser = userFromCtx(ctx);
         } else if (ownerId) {
           // Different org member — look up the owner's pepper from the DB
+          if (!ctx.env.HYPERDRIVE) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'HYPERDRIVE binding not configured — cannot resolve town owner',
+            });
+          }
           const { findUserById } = await import('../util/user-db.util');
           const ownerUser = await findUserById(ctx.env.HYPERDRIVE.connectionString, ownerId);
           if (!ownerUser) {

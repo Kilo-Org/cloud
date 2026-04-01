@@ -57,7 +57,7 @@ import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerStub } from './TownContainer.do';
 
-import { verifyKiloToken, kiloTokenPayload } from '@kilocode/worker-utils';
+import { kiloTokenPayload } from '@kilocode/worker-utils';
 import { jwtVerify } from 'jose';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
@@ -1684,8 +1684,7 @@ export class TownDO extends DurableObject<Env> {
             // Use the bead captured in the triage snapshot (not the agent's
             // current hook, which may have changed since the triage request
             // was created). Fall back to current hook for backward compat.
-            const restartBeadId =
-              snapshotHookedBeadId ?? targetAgent.current_hook_bead_id;
+            const restartBeadId = snapshotHookedBeadId ?? targetAgent.current_hook_bead_id;
 
             // Only stop the agent if it's still working on the snapshot bead.
             // If it has moved on, stopping it would abort unrelated work.
@@ -3557,11 +3556,10 @@ export class TownDO extends DurableObject<Env> {
     let payload: { kiloUserId: string; apiTokenPepper?: string | null; exp?: number };
     try {
       const TEN_YEARS_SECONDS = 10 * 365 * 24 * 60 * 60;
-      const { payload: raw } = await jwtVerify(
-        token,
-        new TextEncoder().encode(secret),
-        { algorithms: ['HS256'], clockTolerance: TEN_YEARS_SECONDS }
-      );
+      const { payload: raw } = await jwtVerify(token, new TextEncoder().encode(secret), {
+        algorithms: ['HS256'],
+        clockTolerance: TEN_YEARS_SECONDS,
+      });
       const parsed = kiloTokenPayload.safeParse(raw);
       if (!parsed.success) {
         logger.warn('refreshKilocodeTokenIfExpiring: token payload failed schema validation');

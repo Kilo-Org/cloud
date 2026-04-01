@@ -838,8 +838,8 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                     <div>
                       <p className="text-sm text-white/70">Restart Container</p>
                       <p className="text-[11px] text-white/30">
-                        Destroys the running container and lets it restart fresh. All running
-                        agents will be interrupted but will resume on the next dispatch cycle.
+                        Destroys the running container and lets it restart fresh. All running agents
+                        will be interrupted but will resume on the next dispatch cycle.
                       </p>
                     </div>
                     <Button

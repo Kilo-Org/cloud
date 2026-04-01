@@ -331,7 +331,7 @@ async function provisionInstance(
   const [pin] = await db
     .select({ image_tag: kiloclaw_version_pins.image_tag })
     .from(kiloclaw_version_pins)
-    .where(eq(kiloclaw_version_pins.user_id, user.id))
+    .where(eq(kiloclaw_version_pins.instance_id, instanceRow.id))
     .limit(1);
   const pinnedImageTag = pin?.image_tag;
 
@@ -1464,6 +1464,9 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   getMyPin: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    if (!instance) return null;
+
     const [result] = await db
       .select({
         pin: kiloclaw_version_pins,
@@ -1476,7 +1479,7 @@ export const kiloclawRouter = createTRPCRouter({
         eq(kiloclaw_version_pins.image_tag, kiloclaw_image_catalog.image_tag)
       )
       // Intentionally not joining pinned_by user — avoid leaking admin email to end users
-      .where(eq(kiloclaw_version_pins.user_id, ctx.user.id))
+      .where(eq(kiloclaw_version_pins.instance_id, instance.id))
       .limit(1);
 
     if (!result) return null;
@@ -1496,6 +1499,11 @@ export const kiloclawRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+      if (!instance) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'No active KiloClaw instance found' });
+      }
+
       // Verify the version exists and is available
       // Note: There is a small TOCTOU window between this check and the insert below.
       // Worst case: a user pins to a version disabled milliseconds before. The FK constraint
@@ -1524,7 +1532,7 @@ export const kiloclawRouter = createTRPCRouter({
       const [existingPin] = await db
         .select({ pinned_by: kiloclaw_version_pins.pinned_by })
         .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.user_id, ctx.user.id))
+        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
         .limit(1);
 
       if (existingPin && existingPin.pinned_by !== ctx.user.id) {
@@ -1540,13 +1548,13 @@ export const kiloclawRouter = createTRPCRouter({
         [result] = await db
           .insert(kiloclaw_version_pins)
           .values({
-            user_id: ctx.user.id,
+            instance_id: instance.id,
             image_tag: input.imageTag,
             pinned_by: ctx.user.id,
             reason: input.reason ?? null,
           })
           .onConflictDoUpdate({
-            target: kiloclaw_version_pins.user_id,
+            target: kiloclaw_version_pins.instance_id,
             set: {
               image_tag: input.imageTag,
               pinned_by: ctx.user.id,
@@ -1574,13 +1582,18 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   removeMyPin: clawAccessProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    if (!instance) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'No active KiloClaw instance found' });
+    }
+
     // Atomically delete only self-set pins — the WHERE clause enforces the admin-pin guard
     // so there's no TOCTOU race between checking pinned_by and deleting.
     const [deleted] = await db
       .delete(kiloclaw_version_pins)
       .where(
         and(
-          eq(kiloclaw_version_pins.user_id, ctx.user.id),
+          eq(kiloclaw_version_pins.instance_id, instance.id),
           eq(kiloclaw_version_pins.pinned_by, ctx.user.id)
         )
       )
@@ -1591,7 +1604,7 @@ export const kiloclawRouter = createTRPCRouter({
       const [existingPin] = await db
         .select({ pinned_by: kiloclaw_version_pins.pinned_by })
         .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.user_id, ctx.user.id))
+        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
         .limit(1);
 
       if (existingPin) {

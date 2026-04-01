@@ -364,7 +364,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const [pin] = await db
         .select({ image_tag: kiloclaw_version_pins.image_tag })
         .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.user_id, ctx.user.id))
+        .where(eq(kiloclaw_version_pins.instance_id, instanceRow.id))
         .limit(1);
 
       const client = new KiloClawInternalClient();
@@ -426,7 +426,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const [pin] = await db
         .select({ image_tag: kiloclaw_version_pins.image_tag })
         .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.user_id, ctx.user.id))
+        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
         .limit(1);
 
       const client = new KiloClawInternalClient();
@@ -878,7 +878,9 @@ export const organizationKiloclawRouter = createTRPCRouter({
       };
     }),
 
-  getMyPin: organizationMemberProcedure.query(async ({ ctx }) => {
+  getMyPin: organizationMemberProcedure.query(async ({ ctx, input }) => {
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+
     const [result] = await db
       .select({
         pin: kiloclaw_version_pins,
@@ -890,7 +892,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
         kiloclaw_image_catalog,
         eq(kiloclaw_version_pins.image_tag, kiloclaw_image_catalog.image_tag)
       )
-      .where(eq(kiloclaw_version_pins.user_id, ctx.user.id))
+      .where(eq(kiloclaw_version_pins.instance_id, instance.id))
       .limit(1);
 
     if (!result) return null;
@@ -910,6 +912,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+
       const [version] = await db
         .select()
         .from(kiloclaw_image_catalog)
@@ -933,7 +937,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const [existingPin] = await db
         .select({ pinned_by: kiloclaw_version_pins.pinned_by })
         .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.user_id, ctx.user.id))
+        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
         .limit(1);
 
       if (existingPin && existingPin.pinned_by !== ctx.user.id) {
@@ -949,13 +953,13 @@ export const organizationKiloclawRouter = createTRPCRouter({
         [result] = await db
           .insert(kiloclaw_version_pins)
           .values({
-            user_id: ctx.user.id,
+            instance_id: instance.id,
             image_tag: input.imageTag,
             pinned_by: ctx.user.id,
             reason: input.reason ?? null,
           })
           .onConflictDoUpdate({
-            target: kiloclaw_version_pins.user_id,
+            target: kiloclaw_version_pins.instance_id,
             set: {
               image_tag: input.imageTag,
               pinned_by: ctx.user.id,
@@ -982,12 +986,14 @@ export const organizationKiloclawRouter = createTRPCRouter({
       return result;
     }),
 
-  removeMyPin: organizationMemberMutationProcedure.mutation(async ({ ctx }) => {
+  removeMyPin: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+
     const [deleted] = await db
       .delete(kiloclaw_version_pins)
       .where(
         and(
-          eq(kiloclaw_version_pins.user_id, ctx.user.id),
+          eq(kiloclaw_version_pins.instance_id, instance.id),
           eq(kiloclaw_version_pins.pinned_by, ctx.user.id)
         )
       )
@@ -997,7 +1003,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const [existingPin] = await db
         .select({ pinned_by: kiloclaw_version_pins.pinned_by })
         .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.user_id, ctx.user.id))
+        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
         .limit(1);
 
       if (existingPin) {

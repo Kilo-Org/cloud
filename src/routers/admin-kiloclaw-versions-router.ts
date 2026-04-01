@@ -1,6 +1,11 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { kiloclaw_image_catalog, kiloclaw_version_pins, kilocode_users } from '@kilocode/db/schema';
+import {
+  kiloclaw_image_catalog,
+  kiloclaw_instances,
+  kiloclaw_version_pins,
+  kilocode_users,
+} from '@kilocode/db/schema';
 import { eq, desc, sql, or, ilike, inArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { TRPCError } from '@trpc/server';
@@ -24,17 +29,17 @@ const ListPinsSchema = z.object({
 });
 
 const GetUserPinSchema = z.object({
-  userId: z.string().min(1),
+  instanceId: z.uuid(),
 });
 
 const SetPinSchema = z.object({
-  userId: z.string().min(1),
+  instanceId: z.uuid(),
   imageTag: z.string().min(1),
   reason: z.string().optional(),
 });
 
 const RemovePinSchema = z.object({
-  userId: z.string().min(1),
+  instanceId: z.uuid(),
 });
 
 export const adminKiloclawVersionsRouter = createTRPCRouter({
@@ -167,13 +172,15 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       db
         .select({
           pin: kiloclaw_version_pins,
+          instance_id: kiloclaw_instances.id,
           user_email: kilocode_users.google_user_email,
           openclaw_version: kiloclaw_image_catalog.openclaw_version,
           variant: kiloclaw_image_catalog.variant,
           pinned_by_email: pinnedByUser.google_user_email,
         })
         .from(kiloclaw_version_pins)
-        .leftJoin(kilocode_users, eq(kiloclaw_version_pins.user_id, kilocode_users.id))
+        .leftJoin(kiloclaw_instances, eq(kiloclaw_version_pins.instance_id, kiloclaw_instances.id))
+        .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
         .leftJoin(
           kiloclaw_image_catalog,
           eq(kiloclaw_version_pins.image_tag, kiloclaw_image_catalog.image_tag)
@@ -190,6 +197,7 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
     return {
       items: items.map(row => ({
         ...row.pin,
+        instance_id: row.instance_id,
         user_email: row.user_email,
         openclaw_version: row.openclaw_version,
         variant: row.variant,
@@ -219,7 +227,7 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
         eq(kiloclaw_version_pins.image_tag, kiloclaw_image_catalog.image_tag)
       )
       .leftJoin(pinnedByUser, eq(kiloclaw_version_pins.pinned_by, pinnedByUser.id))
-      .where(eq(kiloclaw_version_pins.user_id, input.userId))
+      .where(eq(kiloclaw_version_pins.instance_id, input.instanceId))
       .limit(1);
 
     if (!result) return null;
@@ -238,13 +246,13 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       [result] = await db
         .insert(kiloclaw_version_pins)
         .values({
-          user_id: input.userId,
+          instance_id: input.instanceId,
           image_tag: input.imageTag,
           pinned_by: ctx.user.id,
           reason: input.reason ?? null,
         })
         .onConflictDoUpdate({
-          target: kiloclaw_version_pins.user_id,
+          target: kiloclaw_version_pins.instance_id,
           set: {
             image_tag: input.imageTag,
             pinned_by: ctx.user.id,
@@ -274,7 +282,7 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
   removePin: adminProcedure.input(RemovePinSchema).mutation(async ({ input }) => {
     const [deleted] = await db
       .delete(kiloclaw_version_pins)
-      .where(eq(kiloclaw_version_pins.user_id, input.userId))
+      .where(eq(kiloclaw_version_pins.instance_id, input.instanceId))
       .returning();
 
     if (!deleted) {

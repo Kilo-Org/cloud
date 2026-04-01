@@ -38,9 +38,7 @@ export function VersionPinCard({
   const isPinning = mutations.setMyPin.isPending;
   const isUnpinning = mutations.removeMyPin.isPending;
 
-  // Self-pin: pinned_by matches the pin's user_id (the user pinned themselves)
-  // Admin-pin: pinned_by differs from user_id (an admin pinned this user)
-  const pinnedBySelf = myPin && myPin.pinned_by === myPin.user_id;
+  const pinnedBySelf = myPin?.reason == null;
   const pinnedByLabel = pinnedBySelf ? 'You' : 'Kilo Admin';
 
   const handlePin = async () => {

@@ -3,7 +3,11 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { kiloclaw_image_catalog, kiloclaw_version_pins } from '@kilocode/db/schema';
+import {
+  kiloclaw_image_catalog,
+  kiloclaw_instances,
+  kiloclaw_version_pins,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
 // Mock KiloClawInternalClient so tests don't require KILOCLAW_API_URL.
@@ -25,6 +29,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
 let regularUser: User;
 let adminUser: User;
 let targetUser: User;
+let targetInstanceId: string;
 
 const catalogEntry = {
   openclaw_version: '2026.2.9',
@@ -58,12 +63,22 @@ beforeAll(async () => {
     is_admin: false,
   });
 
+  const [instance] = await db
+    .insert(kiloclaw_instances)
+    .values({
+      user_id: targetUser.id,
+      sandbox_id: `test-admin-pin-${Date.now()}`,
+    })
+    .returning({ id: kiloclaw_instances.id });
+  targetInstanceId = instance.id;
+
   await db.insert(kiloclaw_image_catalog).values([catalogEntry, catalogEntry2]);
 });
 
 afterAll(async () => {
   try {
     await db.delete(kiloclaw_version_pins);
+    await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, targetInstanceId));
     await db
       .delete(kiloclaw_image_catalog)
       .where(eq(kiloclaw_image_catalog.image_tag, catalogEntry.image_tag));
@@ -154,7 +169,7 @@ describe('admin.kiloclawVersions pin operations', () => {
       const caller = await createCallerForUser(regularUser.id);
       await expect(
         caller.admin.kiloclawVersions.setPin({
-          userId: targetUser.id,
+          instanceId: targetInstanceId,
           imageTag: catalogEntry.image_tag,
         })
       ).rejects.toThrow('Admin access required');
@@ -163,12 +178,12 @@ describe('admin.kiloclawVersions pin operations', () => {
     it('creates a pin for a user', async () => {
       const caller = await createCallerForUser(adminUser.id);
       const result = await caller.admin.kiloclawVersions.setPin({
-        userId: targetUser.id,
+        instanceId: targetInstanceId,
         imageTag: catalogEntry.image_tag,
         reason: 'Testing older version',
       });
 
-      expect(result.user_id).toBe(targetUser.id);
+      expect(result.instance_id).toBe(targetInstanceId);
       expect(result.image_tag).toBe(catalogEntry.image_tag);
       expect(result.pinned_by).toBe(adminUser.id);
       expect(result.reason).toBe('Testing older version');
@@ -178,13 +193,13 @@ describe('admin.kiloclawVersions pin operations', () => {
       const caller = await createCallerForUser(adminUser.id);
 
       await caller.admin.kiloclawVersions.setPin({
-        userId: targetUser.id,
+        instanceId: targetInstanceId,
         imageTag: catalogEntry.image_tag,
         reason: 'First pin',
       });
 
       const updated = await caller.admin.kiloclawVersions.setPin({
-        userId: targetUser.id,
+        instanceId: targetInstanceId,
         imageTag: catalogEntry2.image_tag,
         reason: 'Updated pin',
       });
@@ -201,7 +216,7 @@ describe('admin.kiloclawVersions pin operations', () => {
       const caller = await createCallerForUser(adminUser.id);
       await expect(
         caller.admin.kiloclawVersions.setPin({
-          userId: targetUser.id,
+          instanceId: targetInstanceId,
           imageTag: 'nonexistent-tag',
         })
       ).rejects.toThrow();
@@ -211,7 +226,9 @@ describe('admin.kiloclawVersions pin operations', () => {
   describe('getUserPin', () => {
     it('returns null when user has no pin', async () => {
       const caller = await createCallerForUser(adminUser.id);
-      const result = await caller.admin.kiloclawVersions.getUserPin({ userId: targetUser.id });
+      const result = await caller.admin.kiloclawVersions.getUserPin({
+        instanceId: targetInstanceId,
+      });
       expect(result).toBeNull();
     });
 
@@ -219,13 +236,15 @@ describe('admin.kiloclawVersions pin operations', () => {
       const caller = await createCallerForUser(adminUser.id);
 
       await caller.admin.kiloclawVersions.setPin({
-        userId: targetUser.id,
+        instanceId: targetInstanceId,
         imageTag: catalogEntry.image_tag,
       });
 
-      const result = await caller.admin.kiloclawVersions.getUserPin({ userId: targetUser.id });
+      const result = await caller.admin.kiloclawVersions.getUserPin({
+        instanceId: targetInstanceId,
+      });
       expect(result).not.toBeNull();
-      expect(result!.user_id).toBe(targetUser.id);
+      expect(result!.instance_id).toBe(targetInstanceId);
       expect(result!.image_tag).toBe(catalogEntry.image_tag);
       expect(result!.openclaw_version).toBe(catalogEntry.openclaw_version);
       expect(result!.variant).toBe(catalogEntry.variant);
@@ -238,7 +257,7 @@ describe('admin.kiloclawVersions pin operations', () => {
       const caller = await createCallerForUser(adminUser.id);
 
       await caller.admin.kiloclawVersions.setPin({
-        userId: targetUser.id,
+        instanceId: targetInstanceId,
         imageTag: catalogEntry.image_tag,
         reason: 'Test reason',
       });
@@ -248,6 +267,7 @@ describe('admin.kiloclawVersions pin operations', () => {
       expect(result.pagination.totalCount).toBe(1);
 
       const pin = result.items[0];
+      expect(pin.instance_id).toBe(targetInstanceId);
       expect(pin.user_email).toBe(targetUser.google_user_email);
       expect(pin.openclaw_version).toBe(catalogEntry.openclaw_version);
       expect(pin.pinned_by_email).toBe(adminUser.google_user_email);
@@ -260,21 +280,23 @@ describe('admin.kiloclawVersions pin operations', () => {
       const caller = await createCallerForUser(adminUser.id);
 
       await caller.admin.kiloclawVersions.setPin({
-        userId: targetUser.id,
+        instanceId: targetInstanceId,
         imageTag: catalogEntry.image_tag,
       });
 
-      const result = await caller.admin.kiloclawVersions.removePin({ userId: targetUser.id });
+      const result = await caller.admin.kiloclawVersions.removePin({
+        instanceId: targetInstanceId,
+      });
       expect(result.success).toBe(true);
 
-      const pin = await caller.admin.kiloclawVersions.getUserPin({ userId: targetUser.id });
+      const pin = await caller.admin.kiloclawVersions.getUserPin({ instanceId: targetInstanceId });
       expect(pin).toBeNull();
     });
 
     it('throws NOT_FOUND when no pin exists', async () => {
       const caller = await createCallerForUser(adminUser.id);
       await expect(
-        caller.admin.kiloclawVersions.removePin({ userId: targetUser.id })
+        caller.admin.kiloclawVersions.removePin({ instanceId: targetInstanceId })
       ).rejects.toThrow('No pin found for this user');
     });
   });
@@ -305,5 +327,16 @@ describe('admin.kiloclawVersions.searchUsers', () => {
     });
 
     expect(result.some(u => u.id === targetUser.id)).toBe(true);
+  });
+});
+
+describe('admin.kiloclawVersions instance-based search', () => {
+  it('finds instances by exact id', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawVersions.searchUsers({
+      query: targetInstanceId,
+    });
+
+    expect(result).toHaveLength(0);
   });
 });

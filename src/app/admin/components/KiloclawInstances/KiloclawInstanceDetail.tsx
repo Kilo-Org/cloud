@@ -162,14 +162,14 @@ function DetailField({ label, children }: { label: string; children: React.React
   );
 }
 
-function VersionPinCard({ userId }: { userId: string }) {
+function VersionPinCard({ instanceId }: { instanceId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [selectedTag, setSelectedTag] = useState<string>('');
   const [reason, setReason] = useState('');
 
   const { data: pinData, isLoading: pinLoading } = useQuery(
-    trpc.admin.kiloclawVersions.getUserPin.queryOptions({ userId })
+    trpc.admin.kiloclawVersions.getUserPin.queryOptions({ instanceId })
   );
 
   const { data: versionsData } = useQuery(
@@ -267,7 +267,11 @@ function VersionPinCard({ userId }: { userId: string }) {
                   <Button
                     size="sm"
                     onClick={() =>
-                      void setPin({ userId, imageTag: selectedTag, reason: reason || undefined })
+                      void setPin({
+                        instanceId,
+                        imageTag: selectedTag,
+                        reason: reason || undefined,
+                      })
                     }
                     disabled={isPinning}
                   >
@@ -277,7 +281,7 @@ function VersionPinCard({ userId }: { userId: string }) {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => void removePin({ userId })}
+                  onClick={() => void removePin({ instanceId })}
                   disabled={isUnpinning}
                 >
                   {isUnpinning ? 'Unpinning...' : 'Unpin'}
@@ -315,7 +319,7 @@ function VersionPinCard({ userId }: { userId: string }) {
                 <Button
                   size="sm"
                   onClick={() =>
-                    void setPin({ userId, imageTag: selectedTag, reason: reason || undefined })
+                    void setPin({ instanceId, imageTag: selectedTag, reason: reason || undefined })
                   }
                   disabled={!selectedTag || isPinning}
                 >
@@ -2436,7 +2440,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         )}
 
         {/* Version Pin Card */}
-        {data.user_id && <VersionPinCard userId={data.user_id} />}
+        <VersionPinCard instanceId={data.id} />
 
         {/* Workspace File Editor */}
         {!data.destroyed_at && (

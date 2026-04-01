@@ -601,6 +601,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   async function interrupt(): Promise<void> {
     if (!currentSession) return;
+    // Snapshot before await — switchSession()/destroy() can swap currentSession while in flight.
+    const session = currentSession;
     // Eagerly disable send/interrupt to prevent the user from sending a
     // message while the async interrupt HTTP call is in flight. We do NOT
     // call disconnect() — interrupt stops the agent but keeps the transport
@@ -608,16 +610,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(canSendAtom, false);
     store.set(canInterruptAtom, false);
     try {
-      if (currentSession.canInterrupt) {
-        await currentSession.interrupt();
+      if (session.canInterrupt) {
+        await session.interrupt();
       }
       setIndicator({ type: 'info', message: 'Session stopped', timestamp: Date.now() });
     } catch {
-      // Restore atoms from the session's actual state so the UI isn't stuck.
-      store.set(canInterruptAtom, currentSession.canInterrupt);
-      const cs = store.get(cloudStatusAtom);
-      const cloudReady = cs === null || cs.type === 'ready';
-      store.set(canSendAtom, currentSession.canSend && cloudReady);
+      // Only restore atoms if the session wasn't swapped during the await.
+      if (currentSession === session) {
+        store.set(canInterruptAtom, session.canInterrupt);
+        const cs = store.get(cloudStatusAtom);
+        const cloudReady = cs === null || cs.type === 'ready';
+        store.set(canSendAtom, session.canSend && cloudReady);
+      }
       store.set(errorAtom, 'Failed to stop execution');
     }
   }

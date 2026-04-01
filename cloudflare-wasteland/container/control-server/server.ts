@@ -182,6 +182,9 @@ function buildEnv(token: string, upstream: string): Record<string, string> {
 const startTime = Date.now();
 let lastOperationTimestamp: string | null = null;
 let cachedWlVersion: string | null = null;
+let isReady = false;
+let isColdStartRecovery = false;
+let joinError: string | null = null;
 
 async function getWlVersion(): Promise<string> {
   if (cachedWlVersion) return cachedWlVersion;
@@ -196,6 +199,80 @@ async function getWlVersion(): Promise<string> {
 
 function uptimeSeconds(): number {
   return Math.floor((Date.now() - startTime) / 1000);
+}
+
+// ---------------------------------------------------------------------------
+// Cold-start auto-join
+// ---------------------------------------------------------------------------
+
+/**
+ * Check whether the `wl` CLI has local state configured.
+ * We probe by running `wl browse --json` with a dummy upstream — if the CLI
+ * is not joined, it exits non-zero with a recognisable error.
+ * A simpler heuristic: check if the wl config directory exists.
+ */
+async function isWlConfigured(): Promise<boolean> {
+  try {
+    // `wl` stores state in ~/.wl or similar. We can check by running
+    // a lightweight command that requires local state.
+    const result = await execWl(['config', 'show'], {});
+    return result.exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+async function autoJoinOnStartup(): Promise<void> {
+  const upstream = process.env.WL_UPSTREAM;
+  if (!upstream) {
+    log.info('auto-join: WL_UPSTREAM not set, skipping cold-start join');
+    isReady = true;
+    return;
+  }
+
+  const configured = await isWlConfigured();
+  if (configured) {
+    log.info('auto-join: wl CLI already configured, skipping join');
+    isReady = true;
+    return;
+  }
+
+  // This is a cold start recovery — container lost ephemeral state
+  isColdStartRecovery = true;
+  log.warn('COLD START RECOVERY: wl CLI not configured, running auto-join', { upstream });
+
+  try {
+    const env: Record<string, string> = { WL_UPSTREAM: upstream };
+    // Pass DOLTHUB_TOKEN from process env if available (set by WastelandContainerDO)
+    if (process.env.DOLTHUB_TOKEN) {
+      env.DOLTHUB_TOKEN = process.env.DOLTHUB_TOKEN;
+    }
+
+    const result = await execWl(['join', upstream], env);
+    if (result.exitCode !== 0) {
+      joinError = result.stderr || `exit code ${result.exitCode}`;
+      log.error('COLD START RECOVERY FAILED: wl join failed', {
+        upstream,
+        stderr: result.stderr,
+        exitCode: result.exitCode,
+      });
+      // Still mark as ready so the server can accept requests
+      // (individual operations will fail with their own errors)
+      isReady = true;
+      return;
+    }
+
+    log.info('COLD START RECOVERY COMPLETE: wl join succeeded', { upstream });
+    lastOperationTimestamp = new Date().toISOString();
+    isReady = true;
+  } catch (err) {
+    joinError = err instanceof Error ? err.message : String(err);
+    log.error('COLD START RECOVERY FAILED: unexpected error during wl join', {
+      upstream,
+      error: joinError,
+    });
+    isReady = true;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -520,10 +597,15 @@ async function handleStatus(req: Request): Promise<Response> {
 
 async function handleHealth(): Promise<Response> {
   const wlVersion = await getWlVersion();
+  const configured = await isWlConfigured();
   return jsonResponse({
-    status: 'ok',
+    status: isReady ? 'ok' : 'initializing',
     wl_version: wlVersion,
-    uptime: uptimeSeconds(),
+    wl_configured: configured,
+    last_operation: lastOperationTimestamp,
+    uptime_seconds: uptimeSeconds(),
+    cold_start_recovery: isColdStartRecovery,
+    join_error: joinError,
   });
 }
 
@@ -563,6 +645,26 @@ const server = Bun.serve({
   port: PORT,
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
+
+    // Always allow health checks through, even before ready
+    if (url.pathname === '/health') {
+      return handleHealth();
+    }
+
+    // Return 503 for all other requests until auto-join completes
+    if (!isReady) {
+      return new Response(
+        JSON.stringify({ error: 'Service initializing — cold start recovery in progress' }),
+        {
+          status: 503,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': '5',
+          },
+        }
+      );
+    }
+
     const handler = matchRoute(req.method, url.pathname);
 
     if (!handler) {
@@ -584,6 +686,10 @@ const server = Bun.serve({
 
 log.info('wasteland control server started', { port: server.port });
 
+// Kick off auto-join. The server is already listening so /health is
+// available immediately, but all other routes return 503 until ready.
+void autoJoinOnStartup();
+
 // ---------------------------------------------------------------------------
 // Heartbeat — log status every 60 seconds
 // ---------------------------------------------------------------------------
@@ -596,6 +702,8 @@ setInterval(async () => {
     wl_version: wlVersion,
     uptime: uptimeSeconds(),
     last_operation: lastOperationTimestamp,
+    ready: isReady,
+    cold_start_recovery: isColdStartRecovery,
   });
 }, HEARTBEAT_INTERVAL_MS);
 

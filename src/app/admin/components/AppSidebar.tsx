@@ -23,6 +23,7 @@ import {
   Bell,
   Server,
   Network,
+  RefreshCw,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -149,6 +150,11 @@ const productEngineeringItems: MenuItem[] = [
     title: () => 'Gas Town',
     url: '/admin/gastown',
     icon: () => <Network />,
+  },
+  {
+    title: () => 'Sync Providers',
+    url: '/admin/sync-providers',
+    icon: () => <RefreshCw />,
   },
 ];
 

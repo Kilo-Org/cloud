@@ -5,7 +5,7 @@ import * as z from 'zod';
 import { db, readDb } from '@/lib/drizzle';
 import {
   byok_api_keys,
-  MODELS_BY_PROVIDER_SCRIPT_NAME,
+  MODELS_BY_PROVIDER_ADMIN_URL,
   modelsByProvider,
 } from '@kilocode/db/schema';
 import { desc, eq } from 'drizzle-orm';
@@ -50,7 +50,7 @@ const fetchSupportedModels = unstable_cache(
 
     if (!modelMetadataRaw) {
       throw new Error(
-        'No Vercel model metadata in the database, run ' + MODELS_BY_PROVIDER_SCRIPT_NAME
+        'No Vercel model metadata in the database, use the admin panel at ' + MODELS_BY_PROVIDER_ADMIN_URL
       );
     }
 

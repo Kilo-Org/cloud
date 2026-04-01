@@ -86,6 +86,8 @@ const PostBodySchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
   bounty: z.number().optional(),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+  type: z.enum(['feature', 'bug', 'docs', 'other']).optional(),
 });
 
 const SyncBodySchema = z.object({
@@ -399,6 +401,12 @@ async function handlePost(req: Request): Promise<Response> {
     const args = ['post', '--title', body.data.title, '--description', body.data.description];
     if (body.data.bounty !== undefined) {
       args.push('--bounty', String(body.data.bounty));
+    }
+    if (body.data.priority !== undefined) {
+      args.push('--priority', body.data.priority);
+    }
+    if (body.data.type !== undefined) {
+      args.push('--type', body.data.type);
     }
     args.push('--json');
     const result = await execWl(args, env);

@@ -142,14 +142,13 @@ export const wastelandRouter = router({
     .query(async ({ ctx, input }) => {
       const registryStub = getWastelandRegistryStub(ctx.env);
 
-      const entries = input.organizationId
-        ? await registryStub.listByOrg(input.organizationId)
-        : await registryStub.listByUser(ctx.userId);
-
-      // If listing org wastelands, verify the user has org membership
       if (input.organizationId) {
         verifyOrgAccess(ctx, input.organizationId);
       }
+
+      const entries = input.organizationId
+        ? await registryStub.listByOrg(input.organizationId)
+        : await registryStub.listByUser(ctx.userId);
 
       // Resolve each wasteland's full config from its DO
       const results = await Promise.all(

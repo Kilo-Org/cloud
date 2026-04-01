@@ -80,6 +80,8 @@ export const UpdateAgentModelRequest = z.object({
   smallModel: z.string().optional(),
   /** Pre-formatted conversation history to inject into the new session prompt. */
   conversationHistory: z.string().optional(),
+  /** Organization ID — ensures org billing context is preserved across model changes. */
+  organizationId: z.string().optional(),
 });
 export type UpdateAgentModelRequest = z.infer<typeof UpdateAgentModelRequest>;
 

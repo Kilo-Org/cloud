@@ -2067,6 +2067,11 @@ export class TownDO extends DurableObject<Env> {
       // before restarting the SDK server (tokens, git identity, etc.).
       const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
 
+      // Resolve townConfig to thread the organization_id into the request body
+      // (belt-and-suspenders: ensures org billing survives even if X-Town-Config
+      // header parsing fails on the container side).
+      const townConfig = await config.getTownConfig(this.ctx.storage);
+
       const updated = await dispatch.updateAgentModelInContainer(
         this.env,
         townId,
@@ -2074,7 +2079,8 @@ export class TownDO extends DurableObject<Env> {
         model,
         smallModel,
         conversationHistory || undefined,
-        containerConfig
+        containerConfig,
+        townConfig.organization_id
       );
       if (updated) {
         console.log(

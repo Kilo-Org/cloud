@@ -142,6 +142,11 @@ app.post('/agents/start', async c => {
     return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
   }
 
+  // Persist the organization ID as a standalone env var so it survives
+  // config rebuilds (e.g. model hot-swap). The env var is the primary
+  // source of truth; KILO_CONFIG_CONTENT extraction is the fallback.
+  process.env.GASTOWN_ORGANIZATION_ID = parsed.data.organizationId ?? '';
+
   console.log(
     `[control-server] /agents/start: role=${parsed.data.role} name=${parsed.data.name} rigId=${parsed.data.rigId} agentId=${parsed.data.agentId}`
   );
@@ -211,6 +216,11 @@ app.patch('/agents/:agentId/model', async c => {
     return c.json({ error: 'Invalid request body', issues: parsed.error.issues }, 400);
   }
 
+  // Update org billing context from the request body if provided.
+  if (parsed.data.organizationId) {
+    process.env.GASTOWN_ORGANIZATION_ID = parsed.data.organizationId;
+  }
+
   // Sync config-derived env vars from X-Town-Config into process.env so
   // the SDK server restart picks up fresh tokens and git identity.
   // The middleware already parsed the header into lastKnownTownConfig.
@@ -251,6 +261,12 @@ app.patch('/agents/:agentId/model', async c => {
       process.env.GASTOWN_DISABLE_AI_COAUTHOR = '1';
     } else {
       delete process.env.GASTOWN_DISABLE_AI_COAUTHOR;
+    }
+    // organization_id — keep the standalone env var in sync with the
+    // town config so org billing context is never lost.
+    const orgId = cfg.organization_id;
+    if (typeof orgId === 'string' && orgId) {
+      process.env.GASTOWN_ORGANIZATION_ID = orgId;
     }
   }
 

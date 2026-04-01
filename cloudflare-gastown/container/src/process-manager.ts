@@ -750,6 +750,12 @@ export async function sendMessage(agentId: string, prompt: string): Promise<void
  * by `buildKiloConfigContent` at agent startup.
  */
 function extractOrganizationId(): string | undefined {
+  // Primary source: standalone env var set by control-server on /agents/start
+  // and updated on every PATCH /model via X-Town-Config.
+  const envOrgId = process.env.GASTOWN_ORGANIZATION_ID;
+  if (envOrgId) return envOrgId;
+
+  // Fallback: extract from KILO_CONFIG_CONTENT (legacy path)
   const raw = process.env.KILO_CONFIG_CONTENT;
   if (!raw) return undefined;
   try {

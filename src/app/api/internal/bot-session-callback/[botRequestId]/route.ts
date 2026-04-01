@@ -131,8 +131,9 @@ async function postSlackThreadMessage(params: {
     platformIntegrationId: params.platformIntegrationId,
   });
 
-  const posted = await slackAdapter.withBotToken(botToken, async () =>
-    await slackAdapter.postMessage(params.threadId, { markdown: params.markdown })
+  const posted = await slackAdapter.withBotToken(
+    botToken,
+    async () => await slackAdapter.postMessage(params.threadId, { markdown: params.markdown })
   );
   logCallback('Slack thread message posted', {
     threadId: params.threadId,

@@ -2,10 +2,7 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  WastelandTRPCProvider,
-  createWastelandTRPCClient,
-} from '@/lib/wasteland/trpc';
+import { WastelandTRPCProvider, createWastelandTRPCClient } from '@/lib/wasteland/trpc';
 import { WastelandDashboardHeader } from './WastelandDashboardHeader';
 
 export default function WastelandLayout({ children }: { children: React.ReactNode }) {

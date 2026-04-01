@@ -385,9 +385,7 @@ export const wastelandRouter = router({
       const config = await stub.updateConfig({
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
-        ...(input.dolthubUpstream !== undefined
-          ? { dolthub_upstream: input.dolthubUpstream }
-          : {}),
+        ...(input.dolthubUpstream !== undefined ? { dolthub_upstream: input.dolthubUpstream } : {}),
       });
 
       meterEvent(ctx.env, {
@@ -627,7 +625,10 @@ export const wastelandRouter = router({
 
       const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
       if (!rawKey) {
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Encryption key unavailable' });
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Encryption key unavailable',
+        });
       }
       const cryptoKey = await deriveEncryptionKey(rawKey);
       const token = await decryptToken(credential.encrypted_token, cryptoKey);
@@ -699,7 +700,10 @@ export const wastelandRouter = router({
 
       const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
       if (!rawKey) {
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Encryption key unavailable' });
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Encryption key unavailable',
+        });
       }
       const cryptoKey = await deriveEncryptionKey(rawKey);
       const token = await decryptToken(credential.encrypted_token, cryptoKey);
@@ -771,7 +775,10 @@ export const wastelandRouter = router({
 
       const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
       if (!rawKey) {
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Encryption key unavailable' });
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Encryption key unavailable',
+        });
       }
       const cryptoKey = await deriveEncryptionKey(rawKey);
       const token = await decryptToken(credential.encrypted_token, cryptoKey);

@@ -9,7 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { GastownBackdrop } from '@/components/gastown/GastownBackdrop';
 import { Plus, Skull } from 'lucide-react';
-import { WastelandCard, WastelandListSkeleton } from '@/app/(app)/wasteland/_components/WastelandListComponents';
+import {
+  WastelandCard,
+  WastelandListSkeleton,
+} from '@/app/(app)/wasteland/_components/WastelandListComponents';
 
 type OrgWastelandListPageClientProps = {
   organizationId: string;
@@ -110,9 +113,7 @@ export function OrgWastelandListPageClient({ organizationId }: OrgWastelandListP
               key={wasteland.wasteland_id}
               wasteland={wasteland}
               onClick={() =>
-                router.push(
-                  `/organizations/${organizationId}/wasteland/${wasteland.wasteland_id}`
-                )
+                router.push(`/organizations/${organizationId}/wasteland/${wasteland.wasteland_id}`)
               }
             />
           ))}

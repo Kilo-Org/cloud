@@ -68,12 +68,12 @@ Monitor this endpoint for availability and to detect configuration drift
 
 Per-user rate limits are enforced at the tRPC middleware layer:
 
-| Operation             | Limit     |
-|-----------------------|-----------|
-| `claimWantedItem`     | 10/min    |
-| `markWantedItemDone`  | 10/min    |
-| `postWantedItem`      | 5/min     |
-| `browseWantedBoard`   | 60/min    |
+| Operation            | Limit  |
+| -------------------- | ------ |
+| `claimWantedItem`    | 10/min |
+| `markWantedItemDone` | 10/min |
+| `postWantedItem`     | 5/min  |
+| `browseWantedBoard`  | 60/min |
 
 Rate limit violations return HTTP 429 (`TOO_MANY_REQUESTS`). Monitor the
 rate of 429 responses to detect abuse or misconfigured clients.
@@ -81,6 +81,7 @@ rate of 429 responses to detect abuse or misconfigured clients.
 ## Sentry Integration
 
 Error tracking is configured with:
+
 - Custom tags: `operation`, `userId`, `wastelandId`
 - Breadcrumbs for key operations: create, claim, done, post, delete, storeCredential
 - Trace sampling at 10% (`tracesSampleRate: 0.1`)
@@ -91,6 +92,7 @@ All non-TRPCError exceptions are captured automatically. TRPCErrors
 ## Analytics Engine Events
 
 All tRPC procedures emit analytics events with:
+
 - `event`: procedure path (e.g. `wasteland.claimWantedItem`)
 - `delivery`: `trpc` or `http`
 - `userId`, `wastelandId`: for filtering

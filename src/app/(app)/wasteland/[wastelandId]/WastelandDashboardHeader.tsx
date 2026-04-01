@@ -25,9 +25,7 @@ export function WastelandDashboardHeader() {
   const pathname = usePathname();
   const trpc = useWastelandTRPC();
 
-  const wastelandQuery = useQuery(
-    trpc.wasteland.getWasteland.queryOptions({ wastelandId })
-  );
+  const wastelandQuery = useQuery(trpc.wasteland.getWasteland.queryOptions({ wastelandId }));
   const wasteland = wastelandQuery.data;
 
   // Derive the base path by stripping the tab segment — handles both
@@ -70,10 +68,7 @@ export function WastelandDashboardHeader() {
                 >
                   {wasteland.status}
                 </Badge>
-                <Badge
-                  variant="outline"
-                  className="gap-1 border-white/10 text-white/50"
-                >
+                <Badge variant="outline" className="gap-1 border-white/10 text-white/50">
                   {wasteland.visibility === 'public' ? (
                     <Globe className="size-3" />
                   ) : (

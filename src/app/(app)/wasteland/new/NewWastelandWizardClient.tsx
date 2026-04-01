@@ -52,10 +52,10 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
 
   const createMutation = useMutation(
     trpc.wasteland.createWasteland.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: data => {
         router.push(`/wasteland/${data.wasteland_id}`);
       },
-      onError: (err) => {
+      onError: err => {
         toast.error(err.message);
       },
     })
@@ -96,7 +96,7 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
             id="wasteland-name"
             placeholder="My Wasteland"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={e => setName(e.target.value)}
             maxLength={NAME_MAX_LENGTH}
             autoFocus
           />
@@ -108,7 +108,7 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
           <Label>Ownership</Label>
           <RadioGroup
             value={ownership}
-            onValueChange={(v) => {
+            onValueChange={v => {
               if (lockedOrgId) return;
               setOwnership(v as OwnershipType);
               if (v === 'personal') setSelectedOrgId('');
@@ -121,11 +121,7 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
               </Label>
             </div>
             <div className="flex items-center gap-2">
-              <RadioGroupItem
-                value="organization"
-                id="ownership-org"
-                disabled={!!lockedOrgId}
-              />
+              <RadioGroupItem value="organization" id="ownership-org" disabled={!!lockedOrgId} />
               <Label htmlFor="ownership-org" className="font-normal cursor-pointer">
                 Organization
               </Label>
@@ -138,7 +134,7 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
                 <p className="text-sm text-muted-foreground">
                   Organization:{' '}
                   <span className="text-foreground font-medium">
-                    {orgsQuery.data?.find((o) => o.organizationId === lockedOrgId)
+                    {orgsQuery.data?.find(o => o.organizationId === lockedOrgId)
                       ?.organizationName ?? lockedOrgId}
                   </span>
                 </p>
@@ -154,17 +150,18 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
                       </SelectItem>
                     )}
                     {orgsQuery.data
-                      ?.filter((o) => o.role !== 'billing_manager')
-                      .map((org) => (
+                      ?.filter(o => o.role !== 'billing_manager')
+                      .map(org => (
                         <SelectItem key={org.organizationId} value={org.organizationId}>
                           {org.organizationName}
                         </SelectItem>
                       ))}
-                    {orgsQuery.data && orgsQuery.data.filter((o) => o.role !== 'billing_manager').length === 0 && (
-                      <SelectItem value="__none" disabled>
-                        No organizations available
-                      </SelectItem>
-                    )}
+                    {orgsQuery.data &&
+                      orgsQuery.data.filter(o => o.role !== 'billing_manager').length === 0 && (
+                        <SelectItem value="__none" disabled>
+                          No organizations available
+                        </SelectItem>
+                      )}
                   </SelectContent>
                 </Select>
               )}
@@ -176,14 +173,13 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
         {/* DoltHub Upstream */}
         <div className="space-y-2">
           <Label htmlFor="dolthub-upstream">
-            DoltHub upstream{' '}
-            <span className="text-muted-foreground font-normal">(optional)</span>
+            DoltHub upstream <span className="text-muted-foreground font-normal">(optional)</span>
           </Label>
           <Input
             id="dolthub-upstream"
             placeholder="org/repo"
             value={dolthubUpstream}
-            onChange={(e) => setDolthubUpstream(e.target.value)}
+            onChange={e => setDolthubUpstream(e.target.value)}
           />
           <p className="text-muted-foreground text-xs">
             The DoltHub repository path. Can be configured later in settings.
@@ -194,10 +190,7 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
         {/* Visibility */}
         <div className="space-y-2">
           <Label>Visibility</Label>
-          <RadioGroup
-            value={visibility}
-            onValueChange={(v) => setVisibility(v as Visibility)}
-          >
+          <RadioGroup value={visibility} onValueChange={v => setVisibility(v as Visibility)}>
             <div className="flex items-center gap-2">
               <RadioGroupItem value="private" id="visibility-private" />
               <Label htmlFor="visibility-private" className="font-normal cursor-pointer">
@@ -237,7 +230,8 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
 function getNameError(name: string): string | null {
   if (name.length === 0) return null;
   if (name.trim().length === 0) return 'Name cannot be blank';
-  if (name.trim().length > NAME_MAX_LENGTH) return `Name must be ${NAME_MAX_LENGTH} characters or fewer`;
+  if (name.trim().length > NAME_MAX_LENGTH)
+    return `Name must be ${NAME_MAX_LENGTH} characters or fewer`;
   return null;
 }
 
@@ -256,7 +250,7 @@ function getOrgError(
 ): string | null {
   if (ownership !== 'organization') return null;
   if (!selectedOrgId) return 'Please select an organization';
-  if (orgs && !orgs.find((o) => o.organizationId === selectedOrgId && o.role !== 'billing_manager')) {
+  if (orgs && !orgs.find(o => o.organizationId === selectedOrgId && o.role !== 'billing_manager')) {
     return 'You do not have access to this organization';
   }
   return null;

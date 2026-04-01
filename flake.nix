@@ -2,7 +2,7 @@
   description = "Kilo Code Backend development environment";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
   };
 
   outputs =
@@ -35,9 +35,10 @@
             _1password-cli
             postgresql_18
             wrangler
-            nodePackages.vercel
             flyctl
             cloudflared
+            stripe-cli
+            tmux
           ];
 
           env = {
@@ -57,6 +58,16 @@
             ${pkgs.lib.optionalString pkgs.stdenv.isLinux ''
               export SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
             ''}
+
+            # vercel CLI was removed from nixpkgs; install it via npm into a
+            # local prefix so it's available in the dev shell without polluting
+            # the global node_modules.
+            export VERCEL_PREFIX="$HOME/.cache/nix-vercel"
+            if ! command -v vercel &>/dev/null && [ ! -x "$VERCEL_PREFIX/bin/vercel" ]; then
+              echo "Installing vercel CLI into $VERCEL_PREFIX …"
+              npm install --global --prefix "$VERCEL_PREFIX" vercel
+            fi
+            export PATH="$VERCEL_PREFIX/bin:$PATH"
           '';
         };
     in

@@ -65,7 +65,9 @@ import {
 } from '@/lib/kiloclaw/constants';
 import {
   enrollWithCredits as enrollWithCreditsImpl,
+  getEffectiveCreditBalancePreview,
   KILOCLAW_PLAN_COST_MICRODOLLARS,
+  KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS,
 } from '@/lib/kiloclaw/credit-billing';
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
 import PostHogClient from '@/lib/posthog';
@@ -1821,15 +1823,12 @@ export const kiloclawRouter = createTRPCRouter({
       sub.status !== 'trialing' &&
       (sub.stripe_subscription_id || sub.payment_source === 'credits');
 
-    // Compute Stripe-funding indicator and conversion prompt.
+    // Compute Stripe-funding indicator and Kilo Pass state.
     // See Billing Status Reporting rules 6-7.
     const hasStripeFunding = hasPaidSubscription ? !!sub.stripe_subscription_id : false;
-
-    let showConversionPrompt = false;
-    if (hasStripeFunding) {
-      const kiloPassState = await getKiloPassStateForUser(db, ctx.user.id);
-      showConversionPrompt = !!kiloPassState && !isStripeSubscriptionEnded(kiloPassState.status);
-    }
+    const kiloPassState = await getKiloPassStateForUser(db, ctx.user.id);
+    const hasActiveKiloPass = !!kiloPassState && !isStripeSubscriptionEnded(kiloPassState.status);
+    const showConversionPrompt = hasStripeFunding && hasActiveKiloPass;
 
     // Renewal cost for the next billing period.
     // For hybrid subscriptions the actual amount is Stripe-determined; report
@@ -1878,12 +1877,31 @@ export const kiloclawRouter = createTRPCRouter({
       };
     }
 
-    // Credit balance: microdollars available for credit enrollment
-    const creditBalanceMicrodollars =
-      ctx.user.total_microdollars_acquired - ctx.user.microdollars_used;
-
     // First-month credit discount eligibility (spec Credit Enrollment rule 3).
     const creditIntroEligible = !(await hadPriorPaidSubscription(ctx.user.id));
+    const creditBalanceMicrodollars =
+      ctx.user.total_microdollars_acquired - ctx.user.microdollars_used;
+    const standardCreditCostMicrodollars = creditIntroEligible
+      ? KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS
+      : KILOCLAW_PLAN_COST_MICRODOLLARS.standard;
+    const [standardCreditEnrollmentPreview, commitCreditEnrollmentPreview] = await Promise.all([
+      getEffectiveCreditBalancePreview({
+        userId: ctx.user.id,
+        balanceMicrodollars: creditBalanceMicrodollars,
+        microdollarsUsed: ctx.user.microdollars_used,
+        kiloPassThreshold: ctx.user.kilo_pass_threshold,
+        costMicrodollars: standardCreditCostMicrodollars,
+        subscription: kiloPassState,
+      }),
+      getEffectiveCreditBalancePreview({
+        userId: ctx.user.id,
+        balanceMicrodollars: creditBalanceMicrodollars,
+        microdollarsUsed: ctx.user.microdollars_used,
+        kiloPassThreshold: ctx.user.kilo_pass_threshold,
+        costMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
+        subscription: kiloPassState,
+      }),
+    ]);
 
     return {
       hasAccess,
@@ -1891,6 +1909,17 @@ export const kiloclawRouter = createTRPCRouter({
       trialEligible: !activeInstance && !sub && !earlybird,
       creditBalanceMicrodollars,
       creditIntroEligible,
+      hasActiveKiloPass,
+      creditEnrollmentPreview: {
+        standard: {
+          costMicrodollars: standardCreditCostMicrodollars,
+          ...standardCreditEnrollmentPreview,
+        },
+        commit: {
+          costMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
+          ...commitCreditEnrollmentPreview,
+        },
+      },
       trial: trialData,
       subscription: subscriptionData,
       earlybird: earlybirdData,

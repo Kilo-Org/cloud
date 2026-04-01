@@ -98,14 +98,11 @@ function containsCacheControl(value: unknown): boolean {
 }
 
 export function addCacheBreakpoints(request: GatewayRequest) {
-  if (containsCacheControl(request.body)) {
-    console.debug('[addCacheBreakpoints] skipping because cache_control is already present');
-    return;
-  }
   if (
     request.kind === 'chat_completions' &&
     Array.isArray(request.body.messages) &&
-    request.body.messages.length > 1
+    request.body.messages.length > 1 &&
+    !containsCacheControl(request.body.messages)
   ) {
     const lastMessage = request.body.messages.findLast(
       msg => msg.role === 'user' || msg.role === 'tool'
@@ -119,7 +116,8 @@ export function addCacheBreakpoints(request: GatewayRequest) {
   } else if (
     request.kind === 'responses' &&
     Array.isArray(request.body.input) &&
-    request.body.input.length > 1
+    request.body.input.length > 1 &&
+    !containsCacheControl(request.body.input)
   ) {
     const lastMessage = request.body.input.findLast(
       msg => (msg.type === 'message' && msg.role === 'user') || msg.type === 'function_call_output'

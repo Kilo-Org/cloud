@@ -20,7 +20,6 @@ import type {
 } from '@/lib/providers/openrouter/types';
 import {
   type FraudDetectionHeaders,
-  getFraudDetectionHeaders,
   isRooCodeBasedClient,
   toMicrodollars,
 } from '@/lib/utils';
@@ -121,10 +120,10 @@ export function dataCollectionRequiredResponse() {
 export function apiKindNotSupportedResponse(
   apiKind: GatewayChatApiKind,
   supportedApiKinds: ReadonlyArray<GatewayChatApiKind>,
-  fraudHeaders?: FraudDetectionHeaders
+  fraudHeaders: FraudDetectionHeaders
 ) {
-  const error = isRooCodeBasedClient(fraudHeaders ?? getFraudDetectionHeaders(new Headers()))
-    ? 'This Kilo version is too old for this model. Please upgrade Kilo and try again.'
+  const error = isRooCodeBasedClient(fraudHeaders)
+    ? 'This model requires Kilo v7 or newer. Please upgrade Kilo and try again.'
     : `This model does not support the ${apiKind} API, please use any of: ${supportedApiKinds.join()}`;
   return NextResponse.json({ error, message: error }, { status: 400 });
 }

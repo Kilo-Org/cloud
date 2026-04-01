@@ -209,6 +209,7 @@ export const kilocode_users = pgTable(
     github_url: text(),
     discord_server_membership_verified_at: timestamp({ withTimezone: true, mode: 'string' }),
     openrouter_upstream_safety_identifier: text(),
+    vercel_downstream_safety_identifier: text(),
     customer_source: text(),
   },
   table => [
@@ -218,6 +219,9 @@ export const kilocode_users = pgTable(
     uniqueIndex('UQ_kilocode_users_openrouter_upstream_safety_identifier')
       .on(table.openrouter_upstream_safety_identifier)
       .where(sql`${table.openrouter_upstream_safety_identifier} IS NOT NULL`),
+    uniqueIndex('UQ_kilocode_users_vercel_downstream_safety_identifier')
+      .on(table.vercel_downstream_safety_identifier)
+      .where(sql`${table.vercel_downstream_safety_identifier} IS NOT NULL`),
   ]
 );
 

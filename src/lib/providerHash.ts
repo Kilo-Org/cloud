@@ -25,6 +25,10 @@ export function generateProviderSpecificHash(payload: string, provider: Provider
     .digest('base64');
 }
 
+export function generateVercelDownstreamSafetyIdentifier(userId: string): string {
+  return generateProviderSpecificHash(userId, PROVIDERS.VERCEL_AI_GATEWAY);
+}
+
 export function generateOpenRouterUpstreamSafetyIdentifier(userId: string): string | null {
   const orgId = getEnvVariable('OPENROUTER_ORG_ID');
   if (!orgId) {

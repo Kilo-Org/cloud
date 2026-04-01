@@ -396,6 +396,11 @@ export function createConnectionManager(
 
     void (async () => {
       try {
+        // Arm the transport timer before subscribe() so a hung HTTP
+        // request (or a stalled initial SSE handshake) is detected
+        // within SSE_TRANSPORT_TIMEOUT_MS.
+        callbacks.onSseEvent?.();
+
         const result = await config.kiloClient.sdkClient.event.subscribe({
           signal: abortController.signal,
         });
@@ -407,9 +412,6 @@ export function createConnectionManager(
         }
 
         logToFile('SDK event subscription started');
-        // Arm the transport timer immediately so a stalled initial
-        // SSE handshake (no server.connected event) is detected.
-        callbacks.onSseEvent?.();
 
         for await (const event of result.stream) {
           if (abortController.signal.aborted || myGeneration !== eventSubscriptionGeneration) break;

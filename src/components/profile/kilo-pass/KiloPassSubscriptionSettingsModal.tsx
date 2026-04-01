@@ -286,6 +286,9 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
       // If Churnkey SDK fails to load, fall back to direct cancellation
       const message = error instanceof Error ? error.message : 'Failed to open cancel flow';
       toast.error(message);
+      if (window.confirm('Are you sure you want to cancel your Kilo Pass subscription?')) {
+        actions.cancelSubscription();
+      }
     }
   }, [actions, queryClient, subscription.stripeSubscriptionId, trpc, trpcClient]);
 

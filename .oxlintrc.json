@@ -194,6 +194,7 @@
         "cloud-agent/src/session/queries/*.ts",
         "cloud-agent-next/src/session/queries/*.ts",
         "cloudflare-gastown/**/*.ts",
+        "cloudflare-wasteland/**/*.ts",
         "cloudflare-webhook-agent-ingest/**/*.ts",
         "kiloclaw/**/*.ts"
       ],

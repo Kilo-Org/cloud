@@ -620,23 +620,23 @@ export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): 
     ...query(
       sql,
       /* sql */ `
-        SELECT b.${beads.columns.bead_id}, b.${beads.columns.type},
-               b.${beads.columns.status}, b.${beads.columns.rig_id},
-               b.${beads.columns.assignee_agent_bead_id},
-               b.${beads.columns.updated_at},
-               b.${beads.columns.labels},
-               b.${beads.columns.created_by},
-               b.${beads.columns.dispatch_attempts},
-               b.${beads.columns.last_dispatch_attempt_at}
-        FROM ${beads} b
-        WHERE b.${beads.columns.type} = 'issue'
-          AND b.${beads.columns.status} = 'open'
-          AND b.${beads.columns.assignee_agent_bead_id} IS NOT NULL
-          AND b.${beads.columns.rig_id} IS NOT NULL
+        SELECT ${beads.bead_id}, ${beads.type},
+               ${beads.status}, ${beads.rig_id},
+               ${beads.assignee_agent_bead_id},
+               ${beads.updated_at},
+               ${beads.labels},
+               ${beads.created_by},
+               ${beads.dispatch_attempts},
+               ${beads.last_dispatch_attempt_at}
+        FROM ${beads}
+        WHERE ${beads.type} = 'issue'
+          AND ${beads.status} = 'open'
+          AND ${beads.assignee_agent_bead_id} IS NOT NULL
+          AND ${beads.rig_id} IS NOT NULL
           AND NOT EXISTS (
-            SELECT 1 FROM ${agent_metadata} am
-            WHERE am.${agent_metadata.columns.bead_id} = b.${beads.columns.assignee_agent_bead_id}
-              AND am.${agent_metadata.columns.current_hook_bead_id} = b.${beads.columns.bead_id}
+            SELECT 1 FROM ${agent_metadata}
+            WHERE ${agent_metadata.bead_id} = ${beads.assignee_agent_bead_id}
+              AND ${agent_metadata.current_hook_bead_id} = ${beads.bead_id}
           )
       `,
       []

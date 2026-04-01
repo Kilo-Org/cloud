@@ -327,7 +327,7 @@ async function handleClaim(req: Request): Promise<Response> {
       token,
       body.data.upstream,
       body.data.itemId,
-      item => item.claimedBy === body.data.userId || item.status === 'claimed'
+      item => item.claimedBy === body.data.userId
     );
     if (!verification.verified) {
       log.warn('claim verification failed — mutation may be a no-op', { itemId: body.data.itemId });

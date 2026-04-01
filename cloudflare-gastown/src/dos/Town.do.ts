@@ -3179,18 +3179,13 @@ export class TownDO extends DurableObject<Env> {
     logger.setTags({ townId });
     logger.info('alarm: fired');
 
-    // Call once per tick — threaded to ensureContainerReady, maybeDispatchTriageAgent, getAlarmStatus
+    // Call once per tick — threaded to ensureContainerReady, maybeDispatchTriageAgent, and getAlarmStatus
     const rigList = rigs.listRigs(this.sql);
     const hasRigs = rigList.length > 0;
 
-    // Call once per tick — used by ensureContainerReady, re-arm, getAlarmStatus.
-    // Computed before the reconciler so ensureContainerReady gets a fresh read;
-    // the re-arm decision tolerates one-tick staleness (5s in active mode).
-    const activeWork = this.hasActiveWork();
-
     if (hasRigs) {
       try {
-        await this.ensureContainerReady(rigList, activeWork);
+        await this.ensureContainerReady(rigList);
       } catch (err) {
         logger.warn('alarm: container health check failed', {
           error: err instanceof Error ? err.message : String(err),
@@ -3452,6 +3447,11 @@ export class TownDO extends DurableObject<Env> {
       double8: metrics.pendingEventCount,
       label: JSON.stringify(metrics.actionsByType),
     });
+
+    // ── Post-reconciliation: cache activity snapshot ────────────────
+    // Computed after Phases 0-2 so re-arm and getAlarmStatus reflect
+    // any work created during reconciliation (hooks, dispatches, triage).
+    const activeWork = this.hasActiveWork();
 
     // ── Phase 3: Housekeeping (independent, all parallelizable) ────
 

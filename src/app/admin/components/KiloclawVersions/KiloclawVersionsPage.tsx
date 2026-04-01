@@ -425,7 +425,7 @@ export function PinsTab() {
                 selectedUserId &&
                 pinImageTag &&
                 void setPin({
-                  instanceId: selectedUserId,
+                  userId: selectedUserId,
                   imageTag: pinImageTag,
                   reason: pinReason || undefined,
                 })

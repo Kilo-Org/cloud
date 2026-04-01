@@ -162,14 +162,14 @@ function DetailField({ label, children }: { label: string; children: React.React
   );
 }
 
-function VersionPinCard({ instanceId }: { instanceId: string }) {
+function VersionPinCard({ userId, instanceId }: { userId: string; instanceId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [selectedTag, setSelectedTag] = useState<string>('');
   const [reason, setReason] = useState('');
 
   const { data: pinData, isLoading: pinLoading } = useQuery(
-    trpc.admin.kiloclawVersions.getUserPin.queryOptions({ instanceId })
+    trpc.admin.kiloclawVersions.getUserPin.queryOptions({ userId })
   );
 
   const { data: versionsData } = useQuery(
@@ -268,7 +268,7 @@ function VersionPinCard({ instanceId }: { instanceId: string }) {
                     size="sm"
                     onClick={() =>
                       void setPin({
-                        instanceId,
+                        userId,
                         imageTag: selectedTag,
                         reason: reason || undefined,
                       })
@@ -319,7 +319,7 @@ function VersionPinCard({ instanceId }: { instanceId: string }) {
                 <Button
                   size="sm"
                   onClick={() =>
-                    void setPin({ instanceId, imageTag: selectedTag, reason: reason || undefined })
+                    void setPin({ userId, imageTag: selectedTag, reason: reason || undefined })
                   }
                   disabled={!selectedTag || isPinning}
                 >
@@ -2440,7 +2440,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         )}
 
         {/* Version Pin Card */}
-        <VersionPinCard instanceId={data.id} />
+        <VersionPinCard userId={data.user_id} instanceId={data.id} />
 
         {/* Workspace File Editor */}
         {!data.destroyed_at && (

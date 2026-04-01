@@ -6,6 +6,7 @@ import type {
   ProvisionInput,
   PlatformStatusResponse,
   PlatformDebugStatusResponse,
+  RegistryEntriesResponse,
   KiloCodeConfigPatchInput,
   KiloCodeConfigResponse,
   ChannelsPatchInput,
@@ -222,12 +223,22 @@ export class KiloClawInternalClient {
     return this.request(`/api/platform/debug-status?${params.toString()}`, undefined, { userId });
   }
 
+  async getRegistryEntries(userId: string, orgId?: string): Promise<RegistryEntriesResponse> {
+    const params = new URLSearchParams({ userId });
+    if (orgId) params.set('orgId', orgId);
+    return this.request(`/api/platform/registry-entries?${params.toString()}`, undefined, {
+      userId,
+    });
+  }
+
   async patchKiloCodeConfig(
     userId: string,
-    patch: KiloCodeConfigPatchInput
+    patch: KiloCodeConfigPatchInput,
+    instanceId?: string
   ): Promise<KiloCodeConfigResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/kilocode-config',
+      `/api/platform/kilocode-config${params}`,
       {
         method: 'PATCH',
         body: JSON.stringify({ userId, ...patch }),
@@ -236,9 +247,14 @@ export class KiloClawInternalClient {
     );
   }
 
-  async patchChannels(userId: string, input: ChannelsPatchInput): Promise<ChannelsPatchResponse> {
+  async patchChannels(
+    userId: string,
+    input: ChannelsPatchInput,
+    instanceId?: string
+  ): Promise<ChannelsPatchResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/channels',
+      `/api/platform/channels${params}`,
       {
         method: 'PATCH',
         body: JSON.stringify({ userId, ...input }),
@@ -249,10 +265,12 @@ export class KiloClawInternalClient {
 
   async patchExecPreset(
     userId: string,
-    patch: { security?: string; ask?: string }
+    patch: { security?: string; ask?: string },
+    instanceId?: string
   ): Promise<{ execSecurity: string | null; execAsk: string | null }> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/exec-preset',
+      `/api/platform/exec-preset${params}`,
       {
         method: 'PATCH',
         body: JSON.stringify({ userId, ...patch }),
@@ -261,9 +279,14 @@ export class KiloClawInternalClient {
     );
   }
 
-  async patchSecrets(userId: string, input: SecretsPatchInput): Promise<SecretsPatchResponse> {
+  async patchSecrets(
+    userId: string,
+    input: SecretsPatchInput,
+    instanceId?: string
+  ): Promise<SecretsPatchResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/secrets',
+      `/api/platform/secrets${params}`,
       {
         method: 'PATCH',
         body: JSON.stringify({ userId, ...input }),
@@ -272,27 +295,34 @@ export class KiloClawInternalClient {
     );
   }
 
-  async listVolumeSnapshots(userId: string): Promise<VolumeSnapshotsResponse> {
-    return this.request(
-      `/api/platform/volume-snapshots?userId=${encodeURIComponent(userId)}`,
-      undefined,
-      { userId }
-    );
+  async listVolumeSnapshots(userId: string, instanceId?: string): Promise<VolumeSnapshotsResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(`/api/platform/volume-snapshots?${params.toString()}`, undefined, {
+      userId,
+    });
   }
 
-  async listPairingRequests(userId: string, refresh = false): Promise<PairingListResponse> {
+  async listPairingRequests(
+    userId: string,
+    refresh = false,
+    instanceId?: string
+  ): Promise<PairingListResponse> {
     const params = new URLSearchParams({ userId });
     if (refresh) params.set('refresh', 'true');
+    if (instanceId) params.set('instanceId', instanceId);
     return this.request(`/api/platform/pairing?${params.toString()}`, undefined, { userId });
   }
 
   async approvePairingRequest(
     userId: string,
     channel: string,
-    code: string
+    code: string,
+    instanceId?: string
   ): Promise<PairingApproveResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/pairing/approve',
+      `/api/platform/pairing/approve${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId, channel, code }),
@@ -303,19 +333,23 @@ export class KiloClawInternalClient {
 
   async listDevicePairingRequests(
     userId: string,
-    refresh = false
+    refresh = false,
+    instanceId?: string
   ): Promise<DevicePairingListResponse> {
     const params = new URLSearchParams({ userId });
     if (refresh) params.set('refresh', 'true');
+    if (instanceId) params.set('instanceId', instanceId);
     return this.request(`/api/platform/device-pairing?${params.toString()}`, undefined, { userId });
   }
 
   async approveDevicePairingRequest(
     userId: string,
-    requestId: string
+    requestId: string,
+    instanceId?: string
   ): Promise<DevicePairingApproveResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/device-pairing/approve',
+      `/api/platform/device-pairing/approve${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId, requestId }),
@@ -324,9 +358,10 @@ export class KiloClawInternalClient {
     );
   }
 
-  async runDoctor(userId: string): Promise<DoctorResponse> {
+  async runDoctor(userId: string, instanceId?: string): Promise<DoctorResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/doctor',
+      `/api/platform/doctor${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
@@ -335,9 +370,14 @@ export class KiloClawInternalClient {
     );
   }
 
-  async startKiloCliRun(userId: string, prompt: string): Promise<KiloCliRunStartResponse> {
+  async startKiloCliRun(
+    userId: string,
+    prompt: string,
+    instanceId?: string
+  ): Promise<KiloCliRunStartResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/kilo-cli-run/start',
+      `/api/platform/kilo-cli-run/start${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId, prompt }),
@@ -346,17 +386,21 @@ export class KiloClawInternalClient {
     );
   }
 
-  async getKiloCliRunStatus(userId: string): Promise<KiloCliRunStatusResponse> {
-    return this.request(
-      `/api/platform/kilo-cli-run/status?userId=${encodeURIComponent(userId)}`,
-      undefined,
-      { userId }
-    );
+  async getKiloCliRunStatus(
+    userId: string,
+    instanceId?: string
+  ): Promise<KiloCliRunStatusResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(`/api/platform/kilo-cli-run/status?${params.toString()}`, undefined, {
+      userId,
+    });
   }
 
-  async cancelKiloCliRun(userId: string): Promise<{ ok: boolean }> {
+  async cancelKiloCliRun(userId: string, instanceId?: string): Promise<{ ok: boolean }> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/kilo-cli-run/cancel',
+      `/api/platform/kilo-cli-run/cancel${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
@@ -365,33 +409,36 @@ export class KiloClawInternalClient {
     );
   }
 
-  async getGatewayStatus(userId: string): Promise<GatewayProcessStatusResponse> {
-    return this.request(
-      `/api/platform/gateway/status?userId=${encodeURIComponent(userId)}`,
-      undefined,
-      { userId }
-    );
+  async getGatewayStatus(
+    userId: string,
+    instanceId?: string
+  ): Promise<GatewayProcessStatusResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(`/api/platform/gateway/status?${params.toString()}`, undefined, { userId });
   }
 
-  async getGatewayReady(userId: string): Promise<GatewayReadyResponse> {
-    return this.request(
-      `/api/platform/gateway/ready?userId=${encodeURIComponent(userId)}`,
-      undefined,
-      { userId }
-    );
+  async getGatewayReady(userId: string, instanceId?: string): Promise<GatewayReadyResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(`/api/platform/gateway/ready?${params.toString()}`, undefined, { userId });
   }
 
-  async getControllerVersion(userId: string): Promise<ControllerVersionResponse> {
-    return this.request(
-      `/api/platform/controller-version?userId=${encodeURIComponent(userId)}`,
-      undefined,
-      { userId }
-    );
+  async getControllerVersion(
+    userId: string,
+    instanceId?: string
+  ): Promise<ControllerVersionResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(`/api/platform/controller-version?${params.toString()}`, undefined, {
+      userId,
+    });
   }
 
-  async startGateway(userId: string): Promise<GatewayProcessActionResponse> {
+  async startGateway(userId: string, instanceId?: string): Promise<GatewayProcessActionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/gateway/start',
+      `/api/platform/gateway/start${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
@@ -400,9 +447,10 @@ export class KiloClawInternalClient {
     );
   }
 
-  async stopGateway(userId: string): Promise<GatewayProcessActionResponse> {
+  async stopGateway(userId: string, instanceId?: string): Promise<GatewayProcessActionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/gateway/stop',
+      `/api/platform/gateway/stop${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
@@ -411,9 +459,13 @@ export class KiloClawInternalClient {
     );
   }
 
-  async restartGatewayProcess(userId: string): Promise<GatewayProcessActionResponse> {
+  async restartGatewayProcess(
+    userId: string,
+    instanceId?: string
+  ): Promise<GatewayProcessActionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/gateway/restart',
+      `/api/platform/gateway/restart${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
@@ -422,9 +474,14 @@ export class KiloClawInternalClient {
     );
   }
 
-  async restoreConfig(userId: string, version = 'base'): Promise<ConfigRestoreResponse> {
+  async restoreConfig(
+    userId: string,
+    version = 'base',
+    instanceId?: string
+  ): Promise<ConfigRestoreResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/config/restore',
+      `/api/platform/config/restore${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId, version }),
@@ -433,21 +490,23 @@ export class KiloClawInternalClient {
     );
   }
 
-  async getOpenclawConfig(userId: string): Promise<OpenclawConfigResponse> {
-    return this.request(
-      `/api/platform/openclaw-config?userId=${encodeURIComponent(userId)}`,
-      undefined,
-      { userId }
-    );
+  async getOpenclawConfig(userId: string, instanceId?: string): Promise<OpenclawConfigResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(`/api/platform/openclaw-config?${params.toString()}`, undefined, {
+      userId,
+    });
   }
 
   async replaceOpenclawConfig(
     userId: string,
     config: Record<string, unknown>,
-    etag?: string
+    etag?: string,
+    instanceId?: string
   ): Promise<{ ok: true }> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/openclaw-config',
+      `/api/platform/openclaw-config${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId, config, ...(etag !== undefined && { etag }) }),
@@ -458,10 +517,12 @@ export class KiloClawInternalClient {
 
   async patchOpenclawConfig(
     userId: string,
-    patch: Record<string, unknown>
+    patch: Record<string, unknown>,
+    instanceId?: string
   ): Promise<{ ok: boolean }> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/openclaw-config',
+      `/api/platform/openclaw-config${params}`,
       {
         method: 'PATCH',
         body: JSON.stringify({ userId, patch }),
@@ -470,13 +531,19 @@ export class KiloClawInternalClient {
     );
   }
 
-  async getFileTree(userId: string): Promise<{ tree: FileNode[] }> {
+  async getFileTree(userId: string, instanceId?: string): Promise<{ tree: FileNode[] }> {
     const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
     return this.request(`/api/platform/files/tree?${params.toString()}`);
   }
 
-  async readFile(userId: string, filePath: string): Promise<{ content: string; etag: string }> {
+  async readFile(
+    userId: string,
+    filePath: string,
+    instanceId?: string
+  ): Promise<{ content: string; etag: string }> {
     const params = new URLSearchParams({ userId, path: filePath });
+    if (instanceId) params.set('instanceId', instanceId);
     return this.request(`/api/platform/files/read?${params.toString()}`);
   }
 
@@ -484,9 +551,11 @@ export class KiloClawInternalClient {
     userId: string,
     filePath: string,
     content: string,
-    etag?: string
+    etag?: string,
+    instanceId?: string
   ): Promise<{ etag: string }> {
-    return this.request('/api/platform/files/write', {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(`/api/platform/files/write${params}`, {
       method: 'POST',
       body: JSON.stringify({ userId, path: filePath, content, etag }),
     });
@@ -494,10 +563,12 @@ export class KiloClawInternalClient {
 
   async updateGoogleCredentials(
     userId: string,
-    input: GoogleCredentialsInput
+    input: GoogleCredentialsInput,
+    instanceId?: string
   ): Promise<GoogleCredentialsResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/google-credentials',
+      `/api/platform/google-credentials${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId, ...input }),
@@ -506,9 +577,14 @@ export class KiloClawInternalClient {
     );
   }
 
-  async clearGoogleCredentials(userId: string): Promise<GoogleCredentialsResponse> {
+  async clearGoogleCredentials(
+    userId: string,
+    instanceId?: string
+  ): Promise<GoogleCredentialsResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
     return this.request(
-      `/api/platform/google-credentials?userId=${encodeURIComponent(userId)}`,
+      `/api/platform/google-credentials?${params.toString()}`,
       {
         method: 'DELETE',
       },
@@ -516,9 +592,13 @@ export class KiloClawInternalClient {
     );
   }
 
-  async enableGmailNotifications(userId: string): Promise<GmailNotificationsResponse> {
+  async enableGmailNotifications(
+    userId: string,
+    instanceId?: string
+  ): Promise<GmailNotificationsResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/gmail-notifications',
+      `/api/platform/gmail-notifications${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
@@ -527,9 +607,14 @@ export class KiloClawInternalClient {
     );
   }
 
-  async disableGmailNotifications(userId: string): Promise<GmailNotificationsResponse> {
+  async disableGmailNotifications(
+    userId: string,
+    instanceId?: string
+  ): Promise<GmailNotificationsResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
     return this.request(
-      `/api/platform/gmail-notifications?userId=${encodeURIComponent(userId)}`,
+      `/api/platform/gmail-notifications?${params.toString()}`,
       {
         method: 'DELETE',
       },
@@ -537,9 +622,10 @@ export class KiloClawInternalClient {
     );
   }
 
-  async forceRetryRecovery(userId: string): Promise<{ ok: true }> {
+  async forceRetryRecovery(userId: string, instanceId?: string): Promise<{ ok: true }> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/force-retry-recovery',
+      `/api/platform/force-retry-recovery${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId }),
@@ -548,21 +634,26 @@ export class KiloClawInternalClient {
     );
   }
 
-  async listCandidateVolumes(userId: string): Promise<CandidateVolumesResponse> {
-    return this.request(
-      `/api/platform/candidate-volumes?userId=${encodeURIComponent(userId)}`,
-      undefined,
-      { userId }
-    );
+  async listCandidateVolumes(
+    userId: string,
+    instanceId?: string
+  ): Promise<CandidateVolumesResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(`/api/platform/candidate-volumes?${params.toString()}`, undefined, {
+      userId,
+    });
   }
 
   async reassociateVolume(
     userId: string,
     newVolumeId: string,
-    reason: string
+    reason: string,
+    instanceId?: string
   ): Promise<ReassociateVolumeResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/reassociate-volume',
+      `/api/platform/reassociate-volume${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId, newVolumeId, reason }),
@@ -573,10 +664,12 @@ export class KiloClawInternalClient {
 
   async restoreVolumeFromSnapshot(
     userId: string,
-    snapshotId: string
+    snapshotId: string,
+    instanceId?: string
   ): Promise<RestoreVolumeSnapshotResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/restore-volume-snapshot',
+      `/api/platform/restore-volume-snapshot${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId, snapshotId }),
@@ -588,10 +681,12 @@ export class KiloClawInternalClient {
   async destroyFlyMachine(
     userId: string,
     appName: string,
-    machineId: string
+    machineId: string,
+    instanceId?: string
   ): Promise<{ ok: true }> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
-      '/api/platform/destroy-fly-machine',
+      `/api/platform/destroy-fly-machine${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId, appName, machineId }),

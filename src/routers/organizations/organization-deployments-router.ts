@@ -1,7 +1,7 @@
 import 'server-only';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import * as z from 'zod';
-import { organizationMemberProcedure } from './utils';
+import { organizationMemberProcedure, organizationMemberMutationProcedure } from './utils';
 import { branchSchema, repoNameSchema, slugSchema } from '@/lib/user-deployments/validation';
 import * as deploymentsService from '@/lib/user-deployments/deployments-service';
 import * as envVarsService from '@/lib/user-deployments/env-vars-service';
@@ -62,7 +62,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
     }),
 
   // Mutations
-  deleteDeployment: organizationMemberProcedure
+  deleteDeployment: organizationMemberMutationProcedure
     .input(
       z.object({
         organizationId: z.string().uuid(),
@@ -76,7 +76,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       });
     }),
 
-  cancelBuild: organizationMemberProcedure
+  cancelBuild: organizationMemberMutationProcedure
     .input(
       z.object({
         organizationId: z.string().uuid(),
@@ -91,7 +91,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       });
     }),
 
-  redeploy: organizationMemberProcedure
+  redeploy: organizationMemberMutationProcedure
     .input(
       z.object({
         organizationId: z.string().uuid(),
@@ -105,7 +105,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       });
     }),
 
-  createDeployment: organizationMemberProcedure
+  createDeployment: organizationMemberMutationProcedure
     .input(
       z.object({
         organizationId: z.string().uuid(),
@@ -141,7 +141,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       return deploymentsService.checkSlugAvailability(input.slug);
     }),
 
-  renameDeployment: organizationMemberProcedure
+  renameDeployment: organizationMemberMutationProcedure
     .input(
       z.object({
         organizationId: z.string().uuid(),
@@ -156,7 +156,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       });
     }),
 
-  setEnvVar: organizationMemberProcedure
+  setEnvVar: organizationMemberMutationProcedure
     .input(
       baseEnvVarSchema.extend({
         organizationId: z.string().uuid(),
@@ -174,7 +174,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       });
     }),
 
-  deleteEnvVar: organizationMemberProcedure
+  deleteEnvVar: organizationMemberMutationProcedure
     .input(
       z.object({
         organizationId: z.string().uuid(),
@@ -203,7 +203,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       });
     }),
 
-  renameEnvVar: organizationMemberProcedure
+  renameEnvVar: organizationMemberMutationProcedure
     .input(
       z.object({
         organizationId: z.string().uuid(),
@@ -237,7 +237,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       return dispatcherClient.getPasswordStatus(deployment.internal_worker_name);
     }),
 
-  setPassword: organizationMemberProcedure
+  setPassword: organizationMemberMutationProcedure
     .input(
       z.object({
         organizationId: z.string().uuid(),
@@ -255,7 +255,7 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       return dispatcherClient.setPassword(deployment.internal_worker_name, input.password);
     }),
 
-  removePassword: organizationMemberProcedure
+  removePassword: organizationMemberMutationProcedure
     .input(
       z.object({
         organizationId: z.string().uuid(),

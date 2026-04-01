@@ -17,6 +17,7 @@ import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import type { AgentMode } from '@/components/cloud-agent/types';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Webhook, ExternalLink, RefreshCw } from 'lucide-react';
 
 type EditWebhookTriggerContentProps = {
@@ -90,9 +91,9 @@ export function EditWebhookTriggerContent({
     if (!triggerData) return undefined;
     return {
       triggerId: triggerData.triggerId,
-      githubRepo: triggerData.githubRepo,
-      mode: triggerData.mode as AgentMode,
-      model: triggerData.model,
+      githubRepo: triggerData.githubRepo ?? '',
+      mode: (triggerData.mode ?? 'code') as AgentMode,
+      model: triggerData.model ?? '',
       promptTemplate: triggerData.promptTemplate,
       profileId: triggerData.profileId ?? undefined,
       autoCommit: triggerData.autoCommit ?? undefined,
@@ -251,6 +252,8 @@ export function EditWebhookTriggerContent({
     );
   }
 
+  const isKiloclawChat = triggerData?.targetType === 'kiloclaw_chat';
+
   return (
     <>
       {/* Header */}
@@ -265,39 +268,107 @@ export function EditWebhookTriggerContent({
         </div>
         <div className="flex items-center gap-3">
           <Webhook className="h-8 w-8" />
-          <h1 className="text-3xl font-bold">Edit: {triggerId}</h1>
+          <h1 className="text-3xl font-bold">
+            {isKiloclawChat ? '' : 'Edit: '}
+            {triggerId}
+          </h1>
+          {isKiloclawChat && (
+            <Badge variant="outline" className="border-blue-500/30 bg-blue-500/15 text-blue-400">
+              KiloClaw Chat
+            </Badge>
+          )}
         </div>
         <p className="text-muted-foreground mt-2">
-          Update the configuration for this webhook trigger.
+          {isKiloclawChat
+            ? 'This webhook sends messages to your KiloClaw Chat instance. Manage it in KiloClaw Settings.'
+            : 'Update the configuration for this webhook trigger.'}
         </p>
 
         {/* Link to view captured requests */}
-        <div className="mt-4">
+        <div className="mt-4 flex gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link href={routes.requests(triggerId)}>
               <ExternalLink className="mr-2 h-4 w-4" />
               View Captured Requests
             </Link>
           </Button>
+          {isKiloclawChat && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/claw#settings">Manage in KiloClaw Settings</Link>
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Form */}
-      <TriggerForm
-        mode="edit"
-        organizationId={organizationId}
-        initialData={initialData}
-        repositories={repositories}
-        isLoadingRepositories={isLoadingRepos}
-        repositoriesError={repoError?.message}
-        models={modelOptions}
-        isLoadingModels={isLoadingModels}
-        onSubmit={handleSubmit}
-        onCancel={handleCancel}
-        onDelete={handleDelete}
-        isLoading={isUpdatePending || isDeletePending}
-        inboundUrl={triggerData?.inboundUrl}
-      />
+      {isKiloclawChat ? (
+        // KiloClaw Chat triggers — read-only summary, managed in KiloClaw Settings
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Trigger Details</CardTitle>
+            <CardDescription className="text-blue-400">
+              This trigger is managed from KiloClaw Settings. Use the link above to edit the prompt
+              template, pause/resume, or rotate the URL.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-muted-foreground text-xs font-medium uppercase">Webhook URL</p>
+              <code className="bg-muted mt-1 block truncate rounded-md px-3 py-2 text-xs">
+                {triggerData?.inboundUrl}
+              </code>
+            </div>
+            <div className="flex gap-8">
+              <div>
+                <p className="text-muted-foreground text-xs font-medium uppercase">Status</p>
+                <p className="mt-1 text-sm">
+                  {triggerData?.isActive ? (
+                    <Badge
+                      variant="outline"
+                      className="border-green-500/30 bg-green-500/15 text-green-400"
+                    >
+                      Active
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="border-amber-500/30 bg-amber-500/15 text-amber-400"
+                    >
+                      Paused
+                    </Badge>
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs font-medium uppercase">Target Type</p>
+                <p className="mt-1 text-sm">KiloClaw Chat</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs font-medium uppercase">Prompt Template</p>
+              <pre className="bg-muted mt-1 whitespace-pre-wrap rounded-md px-3 py-2 text-xs">
+                {triggerData?.promptTemplate}
+              </pre>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        // Cloud Agent triggers — full editable form
+        <TriggerForm
+          mode="edit"
+          organizationId={organizationId}
+          initialData={initialData}
+          repositories={repositories}
+          isLoadingRepositories={isLoadingRepos}
+          repositoriesError={repoError?.message}
+          models={modelOptions}
+          isLoadingModels={isLoadingModels}
+          onSubmit={handleSubmit}
+          onCancel={handleCancel}
+          onDelete={handleDelete}
+          isLoading={isUpdatePending || isDeletePending}
+          inboundUrl={triggerData?.inboundUrl}
+        />
+      )}
     </>
   );
 }

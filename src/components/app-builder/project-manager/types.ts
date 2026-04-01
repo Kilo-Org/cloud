@@ -27,6 +27,8 @@ export type ProjectState = {
   gitRepoFullName: string | null;
   /** Session objects — each owns its own messages and streaming state */
   sessions: AppBuilderSession[];
+  /** True while the user has clicked "New Chat" but hasn't sent the first message yet */
+  pendingNewSession: boolean;
 };
 
 export type StateListener = () => void;

@@ -1,6 +1,7 @@
 import { PRIMARY_DEFAULT_MODEL, preferredModels } from '@/lib/models';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
+import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
 /**
  * Get a default model that is allowed for an organization.
@@ -15,8 +16,7 @@ export async function getDefaultAllowedModel(
     return globalDefault;
   }
 
-  const modelDenyList = organization.settings?.model_deny_list || [];
-  const providerDenyList = organization.settings?.provider_deny_list || [];
+  const { modelDenyList, providerDenyList } = getEffectiveModelRestrictions(organization);
 
   // If no restrictions, use global default
   if (modelDenyList.length === 0 && providerDenyList.length === 0) {

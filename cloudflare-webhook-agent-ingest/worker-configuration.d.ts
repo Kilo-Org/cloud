@@ -11,6 +11,7 @@ declare namespace Cloudflare {
     ENVIRONMENT: 'production' | 'development';
     KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai' | 'http://localhost:3000';
     WEBHOOK_AGENT_URL: string;
+    KILOCLAW_API_URL: string;
     TRIGGER_DO: DurableObjectNamespace<import('./src/index').TriggerDO>;
     INTERNAL_API_SECRET: SecretsStoreSecret;
     NEXTAUTH_SECRET: SecretsStoreSecret;

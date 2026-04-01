@@ -21,6 +21,15 @@ export const STARTUP_TIMEOUT_SECONDS = 60;
 /** Cookie name for worker auth token (set by worker after access code redemption) */
 export const KILOCLAW_AUTH_COOKIE = 'kiloclaw-auth';
 
+/**
+ * Cookie that tracks which instance the user is currently accessing.
+ * Set by the access gateway when opening an instance-keyed instance.
+ * Read by the catch-all proxy to route WebSocket/HTTP traffic to the
+ * correct instance (the OpenClaw Control UI connects to `/` without
+ * the `/i/{instanceId}/` prefix).
+ */
+export const KILOCLAW_ACTIVE_INSTANCE_COOKIE = 'kiloclaw-active-instance';
+
 /** Cookie max age: 24 hours */
 export const KILOCLAW_AUTH_COOKIE_MAX_AGE = 60 * 60 * 24;
 

@@ -127,3 +127,27 @@
 .claw-chat-wrapper .str-chat__message-simple-name {
   display: none;
 }
+
+/* ── Thinking indicator ────────────────────────────────────────────────────── */
+.claw-thinking-message {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+}
+
+.claw-thinking-text {
+  font-style: italic;
+  font: var(--str-chat__body-text);
+  color: oklch(0.708 0 0);
+  animation: claw-thinking-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes claw-thinking-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}

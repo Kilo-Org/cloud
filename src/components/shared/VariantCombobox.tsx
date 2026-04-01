@@ -49,7 +49,7 @@ export function VariantCombobox({
           className={cn('h-9 justify-between gap-1.5', className)}
         >
           <Brain className="h-3.5 w-3.5 shrink-0 opacity-70" />
-          <span className="truncate">{selectedLabel}</span>
+          <span className="flex-1 truncate text-left">{selectedLabel}</span>
           <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>

@@ -73,6 +73,16 @@ export function temporarilyUnavailableResponse() {
   );
 }
 
+export function upgradeRequiredResponse() {
+  return NextResponse.json(
+    {
+      error: 'upgrade_required',
+      message: 'Please upgrade your Kilo extension to the latest version.',
+    },
+    { status: 426 }
+  );
+}
+
 export async function usageLimitExceededResponse(user: User, balance?: number) {
   const payments = await summarizeUserPayments(user.id);
 
@@ -110,9 +120,12 @@ export function dataCollectionRequiredResponse() {
 
 export function apiKindNotSupportedResponse(
   apiKind: GatewayChatApiKind,
-  supportedApiKinds: ReadonlyArray<GatewayChatApiKind>
+  supportedApiKinds: ReadonlyArray<GatewayChatApiKind>,
+  fraudHeaders: FraudDetectionHeaders
 ) {
-  const error = `This model does not support the ${apiKind} API, please use any of: ${supportedApiKinds.join()}`;
+  const error = isRooCodeBasedClient(fraudHeaders)
+    ? 'This model requires Kilo v7 or newer. Please upgrade Kilo and try again.'
+    : `This model does not support the ${apiKind} API, please use any of: ${supportedApiKinds.join()}`;
   return NextResponse.json({ error, message: error }, { status: 400 });
 }
 
@@ -137,16 +150,32 @@ function estimateTokenCount(request: GatewayRequest) {
   return Math.round(JSON.stringify(request).length / 4 + (getMaxTokens(request) ?? 0));
 }
 
+function hasProviderRestrictions(request: GatewayRequest): boolean {
+  const provider = request.body.provider;
+  const providerOptions = request.body.providerOptions;
+  return !!(
+    provider?.ignore?.length ||
+    provider?.only?.length ||
+    provider?.data_collection === 'deny' ||
+    provider?.zdr ||
+    providerOptions?.gateway?.zeroDataRetention
+  );
+}
+
 export async function makeErrorReadable({
   requestedModel,
   request,
   response,
   isUserByok,
+  feature,
+  balance,
 }: {
   requestedModel: string;
   request: GatewayRequest;
   response: Response;
   isUserByok: boolean;
+  feature: FeatureValue | null;
+  balance: number;
 }) {
   if (response.status < 400) {
     return undefined;
@@ -161,6 +190,21 @@ export async function makeErrorReadable({
         { status: response.status }
       );
     }
+  }
+
+  if (
+    (response.status === 404 ||
+      (response.status === 400 &&
+        requestedModel === 'kilo/auto-frontier')) /*discontinued variant of kilo-auto/frontier*/ &&
+    !hasProviderRestrictions(request)
+  ) {
+    const recommendedModel = balance <= 0 ? KILO_AUTO_FREE_MODEL : KILO_AUTO_BALANCED_MODEL;
+    const recommendation =
+      feature === 'kiloclaw' || feature === 'openclaw'
+        ? `The model "${requestedModel}" does not exist or is no longer available. We recommend switching to ${recommendedModel.name}: /model kilocode/${recommendedModel.id}`
+        : `The model "${requestedModel}" does not exist or is no longer available. We recommend switching to ${recommendedModel.id}.`;
+    warnExceptInTest(`Responding with 404 ${recommendation}`);
+    return NextResponse.json({ error: recommendation, message: recommendation }, { status: 404 });
   }
 
   // Sometimes we get generic or nonsensical errors when the context length is exceeded

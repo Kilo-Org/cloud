@@ -5,11 +5,10 @@ import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
 import { Check, MessageSquare, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
-import {
-  useKiloClawGatewayStatus,
-  useKiloClawMutations,
-  useKiloClawServiceDegraded,
-} from '@/hooks/useKiloClaw';
+import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
+import { useClawServiceDegraded } from '../hooks/useClawHooks';
+import { ClawContextProvider, useClawContext } from './ClawContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -29,6 +28,19 @@ import { PermissionStep } from './PermissionStep';
 import { ProvisioningStep } from './ProvisioningStep';
 import type { ExecPreset } from './claw.types';
 import { BillingWrapper } from './billing/BillingWrapper';
+
+function MaybeBillingWrapper({
+  skip,
+  hideBanners,
+  children,
+}: {
+  skip: boolean;
+  hideBanners: boolean;
+  children: React.ReactNode;
+}) {
+  if (skip) return <>{children}</>;
+  return <BillingWrapper hideBanners={hideBanners}>{children}</BillingWrapper>;
+}
 
 // Lazy-load the Chat tab so the stream-chat-react bundle (~200KB) only loads
 // when the user opens that tab, not on every /claw page visit.
@@ -54,22 +66,59 @@ export function ClawDashboard({
   status,
   isNewSetup,
   onNewSetupChange,
+  organizationId,
+}: {
+  status: KiloClawDashboardStatus | undefined;
+  isNewSetup: boolean;
+  onNewSetupChange: (v: boolean) => void;
+  organizationId?: string;
+}) {
+  return (
+    <ClawContextProvider organizationId={organizationId}>
+      <ClawDashboardInner
+        status={status}
+        isNewSetup={isNewSetup}
+        onNewSetupChange={onNewSetupChange}
+      />
+    </ClawContextProvider>
+  );
+}
+
+function ClawDashboardInner({
+  status,
+  isNewSetup,
+  onNewSetupChange,
 }: {
   status: KiloClawDashboardStatus | undefined;
   isNewSetup: boolean;
   onNewSetupChange: (v: boolean) => void;
 }) {
-  const mutations = useKiloClawMutations();
+  const { organizationId } = useClawContext();
+
+  // Hook calls are unconditional — both personal and org variants are called,
+  // but only the appropriate one is enabled. This satisfies React hook rules.
+  // useOrgKiloClawMutations wraps org mutations to match the personal type
+  // signature (pre-binds organizationId into each mutation's mutate/mutateAsync).
+  const personalMutations = useKiloClawMutations();
+  const orgMutations = useOrgKiloClawMutations(organizationId ?? '');
+  const mutations = organizationId ? orgMutations : personalMutations;
+
   const gatewayUrl = useGatewayUrl(status);
   const instanceStatus = hasPopulatedStatus(status) ? status : null;
   const isRunning = instanceStatus?.status === 'running';
+
+  const personalGateway = useKiloClawGatewayStatus(!organizationId && isRunning);
+  const orgGateway = useOrgKiloClawGatewayStatus(
+    organizationId ?? '',
+    !!organizationId && isRunning
+  );
   const {
     data: gatewayStatus,
     isLoading: gatewayLoading,
     error: gatewayError,
-  } = useKiloClawGatewayStatus(isRunning);
+  } = organizationId ? orgGateway : personalGateway;
 
-  const { data: isServiceDegraded } = useKiloClawServiceDegraded();
+  const { data: isServiceDegraded } = useClawServiceDegraded();
 
   const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
   const instanceYoung =
@@ -91,7 +140,8 @@ export function ClawDashboard({
 
   function handleTabChange(value: string) {
     setActiveTab(value as TabValue);
-    window.history.replaceState(null, '', value === 'instance' ? '/claw' : `#${value}`);
+    const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
+    window.history.replaceState(null, '', value === 'instance' ? basePath : `${basePath}#${value}`);
   }
 
   useEffect(() => {
@@ -201,7 +251,7 @@ export function ClawDashboard({
         </Alert>
       )}
 
-      {configServiceNudgeVisible && !isNewSetup && (
+      {configServiceNudgeVisible && !isNewSetup && !organizationId && (
         <div className="border-violet-500/30 bg-violet-500/10 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <Zap className="text-violet-400 mt-0.5 h-5 w-5 shrink-0" />
@@ -226,7 +276,7 @@ export function ClawDashboard({
         </div>
       )}
 
-      <BillingWrapper hideBanners={isNewSetup}>
+      <MaybeBillingWrapper skip={!!organizationId} hideBanners={isNewSetup}>
         {!instanceStatus ? (
           <CreateInstanceCard
             mutations={mutations}
@@ -353,9 +403,11 @@ export function ClawDashboard({
                   <TabsTrigger value="settings" className={tabTriggerClass}>
                     Settings
                   </TabsTrigger>
-                  <TabsTrigger value="subscription" className={tabTriggerClass}>
-                    Subscription
-                  </TabsTrigger>
+                  {!organizationId && (
+                    <TabsTrigger value="subscription" className={tabTriggerClass}>
+                      Subscription
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger value="changelog" className={tabTriggerClass}>
                     What&apos;s New <Sparkles className="ml-1 inline h-3 w-3 text-amber-400" />
                   </TabsTrigger>
@@ -394,7 +446,7 @@ export function ClawDashboard({
             </Tabs>
           </Card>
         )}
-      </BillingWrapper>
+      </MaybeBillingWrapper>
     </div>
   );
 }

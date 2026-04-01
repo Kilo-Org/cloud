@@ -85,6 +85,8 @@ export type KiloClawEventData = {
   label?: string;
   durationMs?: number;
   value?: number;
+  instanceId?: string;
+  channelId?: string;
 };
 
 /**

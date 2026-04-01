@@ -171,6 +171,7 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.config.restore',
   'kiloclaw.doctor.run',
   'kiloclaw.machine.destroy_fly',
+  'kiloclaw.subscription.bulk_trial_grant',
 ]);
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
@@ -833,10 +834,10 @@ export const ReasoningEffortSchema = z.enum(['none', 'minimal', 'low', 'medium',
 export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
 
 export const CustomLlmProviderSchema = z.enum([
-  'anthropic',
-  'openai',
-  'openai-compatible',
-  'openrouter',
+  'anthropic', // uses Messages API
+  'openai', // uses Responses API
+  'openai-compatible', // uses Chat Completions API with reasoning_content
+  'openrouter', // uses Chat Completions API with reasoning_details
 ]);
 
 export type CustomLlmProvider = z.infer<typeof CustomLlmProviderSchema>;
@@ -873,6 +874,25 @@ export type CustomLlmExtraBody = z.infer<typeof CustomLlmExtraBodySchema>;
 export const CustomLlmExtraHeadersSchema = z.record(z.string(), z.string());
 
 export type CustomLlmExtraHeaders = z.infer<typeof CustomLlmExtraHeadersSchema>;
+
+export const CustomLlmDefinitionSchema = z
+  .object({
+    internal_id: z.string(),
+    display_name: z.string(),
+    context_length: z.number(),
+    max_completion_tokens: z.number(),
+    base_url: z.string(),
+    api_key: z.string(),
+    organization_ids: z.array(z.string()),
+    supports_image_input: z.boolean().optional(),
+    extra_headers: CustomLlmExtraHeadersSchema.optional(),
+    extra_body: CustomLlmExtraBodySchema.optional(),
+    remove_from_body: z.array(z.string()).optional(),
+    opencode_settings: OpenCodeSettingsSchema.optional(),
+  })
+  .strict();
+
+export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
 // --- StoredModel ---
 

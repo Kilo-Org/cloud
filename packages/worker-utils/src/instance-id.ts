@@ -34,3 +34,20 @@ export function sandboxIdFromInstanceId(instanceId: string): string {
   }
   return prefixed;
 }
+
+/** Returns true if the sandboxId uses the `ki_` instance-keyed format. */
+export function isInstanceKeyedSandboxId(sandboxId: string): boolean {
+  return sandboxId.startsWith('ki_') && sandboxId.length === 35;
+}
+
+/**
+ * Recover the instanceId (UUID with dashes) from a `ki_`-prefixed sandboxId.
+ * Throws if the sandboxId is not in the expected format.
+ */
+export function instanceIdFromSandboxId(sandboxId: string): string {
+  if (!isInstanceKeyedSandboxId(sandboxId)) {
+    throw new Error('Not an instance-keyed sandboxId (expected ki_ prefix, 35 chars)');
+  }
+  const hex = sandboxId.slice(3); // strip "ki_"
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}

@@ -1,5 +1,6 @@
 import type { KiloClawInstance } from './durable-objects/kiloclaw-instance';
 import type { KiloClawApp } from './durable-objects/kiloclaw-app';
+import type { KiloClawRegistry } from './durable-objects/kiloclaw-registry';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 
 /**
@@ -8,6 +9,7 @@ import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 export type KiloClawEnv = {
   KILOCLAW_INSTANCE: DurableObjectNamespace<KiloClawInstance>;
   KILOCLAW_APP: DurableObjectNamespace<KiloClawApp>;
+  KILOCLAW_REGISTRY: DurableObjectNamespace<KiloClawRegistry>;
   KILOCLAW_AE?: AnalyticsEngineDataset;
   KILOCLAW_CONTROLLER_AE: AnalyticsEngineDataset;
   HYPERDRIVE?: Hyperdrive;

@@ -65,6 +65,7 @@ import {
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
+import { handleRequestLogging } from '@/lib/handleRequestLogging';
 import { classifyAbuse } from '@/lib/abuse-service';
 import {
   emitApiMetricsForResponse,
@@ -172,9 +173,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestBodyParsed = { kind: 'chat_completions', body };
     } else if (path === '/messages') {
       const body: GatewayMessagesRequest = JSON.parse(requestBodyText);
-      if (!body.cache_control && body.messages.length > 1) {
-        body.cache_control = { type: 'ephemeral' };
-      }
       requestBodyParsed = { kind: 'messages', body };
     } else {
       const body: GatewayResponsesRequest = JSON.parse(requestBodyText);
@@ -345,7 +343,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     taskId
   );
   if (!provider.supportedChatApis.includes(requestBodyParsed.kind)) {
-    return apiKindNotSupportedResponse(requestBodyParsed.kind, provider.supportedChatApis);
+    return apiKindNotSupportedResponse(
+      requestBodyParsed.kind,
+      provider.supportedChatApis,
+      fraudHeaders
+    );
   }
 
   console.debug(`Routing request to ${provider.id}`);
@@ -575,7 +577,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
-  /* disabled pending migration
   handleRequestLogging({
     clonedResponse: response.clone(),
     user: maybeUser,
@@ -584,7 +585,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     model: originalModelIdLowerCased,
     request: requestBodyParsed,
   });
-  */
 
   {
     const errorResponse = await makeErrorReadable({
@@ -592,6 +592,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       request: requestBodyParsed,
       response,
       isUserByok: !!userByok,
+      feature,
+      balance: (await balanceAndSettingsPromise).balance,
     });
     if (errorResponse) {
       return errorResponse;

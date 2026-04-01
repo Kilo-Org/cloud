@@ -29,7 +29,8 @@ import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
   organizationMemberProcedure,
-  organizationOwnerProcedure,
+  organizationBillingProcedure,
+  organizationBillingMutationProcedure,
 } from '@/routers/organizations/utils';
 import { organizationsMembersRouter } from '@/routers/organizations/organization-members-router';
 import { organizationsSubscriptionRouter } from '@/routers/organizations/organization-subscription-router';
@@ -59,6 +60,7 @@ import { organizationSecurityAuditLogRouter } from '@/routers/organizations/orga
 import { organizationAutoTriageRouter } from '@/routers/organizations/organization-auto-triage-router';
 import { organizationAutoFixRouter } from '@/routers/organizations/organization-auto-fix-router';
 import { organizationAutoTopUpRouter } from '@/routers/organizations/organization-auto-top-up-router';
+import { organizationKiloclawRouter } from '@/routers/organizations/organization-kiloclaw-router';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
   name: OrganizationNameSchema,
@@ -113,6 +115,7 @@ export const organizationsRouter = createTRPCRouter({
   autoTriage: organizationAutoTriageRouter,
   autoFix: organizationAutoFixRouter,
   autoTopUp: organizationAutoTopUpRouter,
+  kiloclaw: organizationKiloclawRouter,
 
   list: baseProcedure.query(async opts => {
     const { user } = opts.ctx;
@@ -144,7 +147,8 @@ export const organizationsRouter = createTRPCRouter({
       opts.input.name,
       user.id,
       opts.input.autoAddCreator,
-      opts.input.company_domain ?? undefined
+      opts.input.company_domain ?? undefined,
+      'enterprise'
     );
     await getOrCreateStripeCustomerIdForOrganization(org.id);
 
@@ -154,7 +158,7 @@ export const organizationsRouter = createTRPCRouter({
       distinctId: user.google_user_email,
       properties: {
         organizationId: org.id,
-        product: opts.input.plan,
+        product: 'enterprise',
       },
     });
 
@@ -167,17 +171,10 @@ export const organizationsRouter = createTRPCRouter({
       message: `Organization ${org.name} created`,
     });
 
-    if (opts.input.plan === 'enterprise') {
-      await db
-        .update(organizations)
-        .set({ plan: 'enterprise' })
-        .where(eq(organizations.id, org.id));
-    }
-
     return { organization: org };
   }),
 
-  updateCompanyDomain: organizationOwnerProcedure
+  updateCompanyDomain: organizationBillingMutationProcedure
     .input(
       OrganizationIdInputSchema.extend({
         company_domain: CompanyDomainSchema.nullable(),
@@ -230,18 +227,20 @@ export const organizationsRouter = createTRPCRouter({
     };
   }),
 
-  update: organizationOwnerProcedure.input(OrganizationUpdateSchema).mutation(async opts => {
-    await db
-      .update(organizations)
-      .set({ name: opts.input.name })
-      .where(eq(organizations.id, opts.input.organizationId));
-    return {
-      organization: {
-        id: opts.input.organizationId,
-        name: opts.input.name,
-      },
-    };
-  }),
+  update: organizationBillingMutationProcedure
+    .input(OrganizationUpdateSchema)
+    .mutation(async opts => {
+      await db
+        .update(organizations)
+        .set({ name: opts.input.name })
+        .where(eq(organizations.id, opts.input.organizationId));
+      return {
+        organization: {
+          id: opts.input.organizationId,
+          name: opts.input.name,
+        },
+      };
+    }),
 
   // this is an admin only proceedure until we do https://github.com/Kilo-Org/kilocode-backend/issues/2846
   updatePlan: adminProcedure
@@ -356,23 +355,25 @@ export const organizationsRouter = createTRPCRouter({
     return { seatPurchases };
   }),
 
-  invoices: organizationOwnerProcedure.input(OrganizationInvoicesInputSchema).query(async opts => {
-    const organization = await getOrganizationById(opts.input.organizationId);
-    if (!organization) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Organization not found',
-      });
-    }
+  invoices: organizationBillingProcedure
+    .input(OrganizationInvoicesInputSchema)
+    .query(async opts => {
+      const organization = await getOrganizationById(opts.input.organizationId);
+      if (!organization) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
 
-    const dateThreshold = getDateThreshold(opts.input.period);
+      const dateThreshold = getDateThreshold(opts.input.period);
 
-    let stripeId = organization.stripe_customer_id;
-    if (!stripeId) {
-      stripeId = await getOrCreateStripeCustomerIdForOrganization(opts.input.organizationId);
-    }
+      let stripeId = organization.stripe_customer_id;
+      if (!stripeId) {
+        stripeId = await getOrCreateStripeCustomerIdForOrganization(opts.input.organizationId);
+      }
 
-    const invoices = await getStripeInvoices(stripeId, dateThreshold);
-    return invoices;
-  }),
+      const invoices = await getStripeInvoices(stripeId, dateThreshold);
+      return invoices;
+    }),
 });

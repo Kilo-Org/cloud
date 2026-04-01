@@ -243,9 +243,20 @@ const GastownApiResponseSchema = z.union([
   z.object({ success: z.literal(false), error: z.string() }),
 ]);
 
+function requireGastownUrl(): string {
+  if (!GASTOWN_SERVICE_URL) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'GASTOWN_SERVICE_URL is not configured',
+    });
+  }
+  return GASTOWN_SERVICE_URL;
+}
+
 /** GET request to the Gastown worker, parsing the response with the given schema. */
 async function gastownGet<T>(adminUser: User, path: string, schema: z.ZodType<T>): Promise<T> {
-  const response = await fetch(`${GASTOWN_SERVICE_URL}${path}`, {
+  const baseUrl = requireGastownUrl();
+  const response = await fetch(`${baseUrl}${path}`, {
     method: 'GET',
     headers: buildAdminHeaders(adminUser),
   });
@@ -272,7 +283,8 @@ async function gastownPatch<T>(
   body: unknown,
   schema: z.ZodType<T>
 ): Promise<T> {
-  const response = await fetch(`${GASTOWN_SERVICE_URL}${path}`, {
+  const baseUrl = requireGastownUrl();
+  const response = await fetch(`${baseUrl}${path}`, {
     method: 'PATCH',
     headers: buildAdminHeaders(adminUser),
     body: JSON.stringify(body),
@@ -305,8 +317,9 @@ async function gastownTrpcGet<T>(
   input: unknown,
   schema: z.ZodType<T>
 ): Promise<T | null> {
+  const baseUrl = requireGastownUrl();
   const headers = buildAdminHeaders(adminUser);
-  const url = `${GASTOWN_SERVICE_URL}/trpc/${procedure}?input=${encodeURIComponent(JSON.stringify(input))}`;
+  const url = `${baseUrl}/trpc/${procedure}?input=${encodeURIComponent(JSON.stringify(input))}`;
   const response = await fetch(url, { headers });
   if (!response.ok) {
     if (response.status === 404) return null;
@@ -330,8 +343,9 @@ async function gastownTrpcMutate<T>(
   input: unknown,
   schema: z.ZodType<T>
 ): Promise<T | null> {
+  const baseUrl = requireGastownUrl();
   const headers = buildAdminHeaders(adminUser);
-  const url = `${GASTOWN_SERVICE_URL}/trpc/${procedure}`;
+  const url = `${baseUrl}/trpc/${procedure}`;
   const response = await fetch(url, {
     method: 'POST',
     headers,

@@ -1,21 +1,36 @@
 import type { KiloClawEnv } from '../../types';
 import type { EncryptedEnvelope } from '../../schemas/instance-config';
-import { getWorkerDb, getActiveInstance, markInstanceDestroyed } from '../../db';
-import { appNameFromUserId } from '../../fly/apps';
+import {
+  getWorkerDb,
+  getActiveInstance,
+  getInstanceBySandboxId,
+  markInstanceDestroyed,
+} from '../../db';
+import { appNameFromUserId, appNameFromInstanceId } from '../../fly/apps';
 import type { InstanceMutableState } from './types';
-import { getFlyConfig } from './types';
+import { getAppKey, getFlyConfig } from './types';
 import { storageUpdate } from './state';
 import { attemptMetadataRecovery } from './reconcile';
 import { doError, doWarn, toLoggable, createReconcileContext } from './log';
 
+type RestoreOpts = {
+  /** If the DO has a stored sandboxId, use it for precise lookup. */
+  sandboxId?: string | null;
+};
+
 /**
  * Restore DO state from Postgres backup if SQLite was wiped.
+ *
+ * Lookup priority:
+ * 1. If opts.sandboxId is provided, look up by sandbox_id (precise, multi-instance safe).
+ * 2. Otherwise, fall back to getActiveInstance(db, userId) (legacy single-instance).
  */
 export async function restoreFromPostgres(
   env: KiloClawEnv,
   ctx: DurableObjectState,
   state: InstanceMutableState,
-  userId: string
+  userId: string,
+  opts?: RestoreOpts
 ): Promise<void> {
   const connectionString = env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
@@ -25,7 +40,11 @@ export async function restoreFromPostgres(
 
   try {
     const db = getWorkerDb(connectionString);
-    const instance = await getActiveInstance(db, userId);
+
+    // Prefer sandboxId lookup (multi-instance safe) over userId lookup (ambiguous).
+    const instance = opts?.sandboxId
+      ? await getInstanceBySandboxId(db, opts.sandboxId)
+      : await getActiveInstance(db, userId);
 
     if (!instance) {
       doWarn(state, 'No active instance found in Postgres', { userId });
@@ -39,15 +58,22 @@ export async function restoreFromPostgres(
     const channels = null;
 
     // Recover flyAppName from the App DO or derive deterministically.
-    const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(userId));
+    // Instance-keyed DOs (ki_ sandboxId) have per-instance apps (inst-{hash}),
+    // legacy DOs have per-user apps (acct-{hash}).
+    const appKey = getAppKey({ userId, sandboxId: instance.sandboxId });
+    const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(appKey));
     const prefix = env.WORKER_ENV === 'development' ? 'dev' : undefined;
-    const recoveredAppName =
-      (await appStub.getAppName()) ?? (await appNameFromUserId(userId, prefix));
+    const isInstanceKeyed = appKey !== userId;
+    const fallbackAppName = isInstanceKeyed
+      ? await appNameFromInstanceId(appKey, prefix)
+      : await appNameFromUserId(userId, prefix);
+    const recoveredAppName = (await appStub.getAppName()) ?? fallbackAppName;
 
     await ctx.storage.put(
       storageUpdate({
         userId,
         sandboxId: instance.sandboxId,
+        orgId: instance.orgId ?? null,
         status: 'provisioned',
         envVars,
         encryptedSecrets,
@@ -73,6 +99,7 @@ export async function restoreFromPostgres(
 
     state.userId = userId;
     state.sandboxId = instance.sandboxId;
+    state.orgId = instance.orgId ?? null;
     state.status = 'provisioned';
     state.envVars = envVars;
     state.encryptedSecrets = encryptedSecrets;

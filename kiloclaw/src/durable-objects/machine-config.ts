@@ -9,6 +9,7 @@ import { OPENCLAW_PORT, DEFAULT_MACHINE_GUEST } from '../config';
 
 export const METADATA_KEY_USER_ID = 'kiloclaw_user_id';
 export const METADATA_KEY_SANDBOX_ID = 'kiloclaw_sandbox_id';
+export const METADATA_KEY_ORG_ID = 'kiloclaw_org_id';
 export const METADATA_KEY_OPENCLAW_VERSION = 'kiloclaw_openclaw_version';
 export const METADATA_KEY_IMAGE_VARIANT = 'kiloclaw_image_variant';
 
@@ -19,6 +20,7 @@ export const METADATA_KEY_IMAGE_VARIANT = 'kiloclaw_image_variant';
 export type MachineIdentity = {
   userId: string;
   sandboxId: string;
+  orgId: string | null;
   openclawVersion: string | null;
   imageVariant: string | null;
 };
@@ -59,6 +61,7 @@ export function buildMachineConfig(
     metadata: {
       [METADATA_KEY_USER_ID]: identity.userId,
       [METADATA_KEY_SANDBOX_ID]: identity.sandboxId,
+      ...(identity.orgId && { [METADATA_KEY_ORG_ID]: identity.orgId }),
       ...(identity.openclawVersion && {
         [METADATA_KEY_OPENCLAW_VERSION]: identity.openclawVersion,
       }),

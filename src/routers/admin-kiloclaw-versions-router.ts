@@ -1,10 +1,40 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
-import { kiloclaw_image_catalog, kiloclaw_version_pins, kilocode_users } from '@kilocode/db/schema';
-import { eq, desc, sql, or, ilike, inArray } from 'drizzle-orm';
+import {
+  kiloclaw_image_catalog,
+  kiloclaw_instances,
+  kiloclaw_version_pins,
+  kilocode_users,
+} from '@kilocode/db/schema';
+import { eq, desc, sql, or, ilike, inArray, and, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { TRPCError } from '@trpc/server';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+
+/**
+ * Resolve a user's active personal instance, throwing NOT_FOUND if none exists.
+ * Used by admin pin operations that accept userId and need an instanceId.
+ */
+async function requireActivePersonalInstance(userId: string) {
+  const [instance] = await db
+    .select({ id: kiloclaw_instances.id })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        isNull(kiloclaw_instances.organization_id),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .limit(1);
+  if (!instance) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'User has no active personal KiloClaw instance',
+    });
+  }
+  return instance;
+}
 import * as z from 'zod';
 
 const ListVersionsSchema = z.object({
@@ -25,16 +55,18 @@ const ListPinsSchema = z.object({
 
 const GetUserPinSchema = z.object({
   userId: z.string().min(1),
+  instanceId: z.uuid().optional(),
 });
 
 const SetPinSchema = z.object({
   userId: z.string().min(1),
+  instanceId: z.uuid().optional(),
   imageTag: z.string().min(1),
   reason: z.string().optional(),
 });
 
 const RemovePinSchema = z.object({
-  userId: z.string().min(1),
+  instanceId: z.uuid(),
 });
 
 export const adminKiloclawVersionsRouter = createTRPCRouter({
@@ -167,13 +199,15 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       db
         .select({
           pin: kiloclaw_version_pins,
+          instance_id: kiloclaw_instances.id,
           user_email: kilocode_users.google_user_email,
           openclaw_version: kiloclaw_image_catalog.openclaw_version,
           variant: kiloclaw_image_catalog.variant,
           pinned_by_email: pinnedByUser.google_user_email,
         })
         .from(kiloclaw_version_pins)
-        .leftJoin(kilocode_users, eq(kiloclaw_version_pins.user_id, kilocode_users.id))
+        .leftJoin(kiloclaw_instances, eq(kiloclaw_version_pins.instance_id, kiloclaw_instances.id))
+        .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
         .leftJoin(
           kiloclaw_image_catalog,
           eq(kiloclaw_version_pins.image_tag, kiloclaw_image_catalog.image_tag)
@@ -190,6 +224,7 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
     return {
       items: items.map(row => ({
         ...row.pin,
+        instance_id: row.instance_id,
         user_email: row.user_email,
         openclaw_version: row.openclaw_version,
         variant: row.variant,
@@ -205,6 +240,8 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
   }),
 
   getUserPin: adminProcedure.input(GetUserPinSchema).query(async ({ input }) => {
+    const resolvedInstanceId =
+      input.instanceId ?? (await requireActivePersonalInstance(input.userId)).id;
     const pinnedByUser = alias(kilocode_users, 'pinned_by_user');
     const [result] = await db
       .select({
@@ -219,7 +256,7 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
         eq(kiloclaw_version_pins.image_tag, kiloclaw_image_catalog.image_tag)
       )
       .leftJoin(pinnedByUser, eq(kiloclaw_version_pins.pinned_by, pinnedByUser.id))
-      .where(eq(kiloclaw_version_pins.user_id, input.userId))
+      .where(eq(kiloclaw_version_pins.instance_id, resolvedInstanceId))
       .limit(1);
 
     if (!result) return null;
@@ -233,18 +270,20 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
   }),
 
   setPin: adminProcedure.input(SetPinSchema).mutation(async ({ input, ctx }) => {
+    const resolvedInstanceId =
+      input.instanceId ?? (await requireActivePersonalInstance(input.userId)).id;
     let result;
     try {
       [result] = await db
         .insert(kiloclaw_version_pins)
         .values({
-          user_id: input.userId,
+          instance_id: resolvedInstanceId,
           image_tag: input.imageTag,
           pinned_by: ctx.user.id,
           reason: input.reason ?? null,
         })
         .onConflictDoUpdate({
-          target: kiloclaw_version_pins.user_id,
+          target: kiloclaw_version_pins.instance_id,
           set: {
             image_tag: input.imageTag,
             pinned_by: ctx.user.id,
@@ -274,7 +313,7 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
   removePin: adminProcedure.input(RemovePinSchema).mutation(async ({ input }) => {
     const [deleted] = await db
       .delete(kiloclaw_version_pins)
-      .where(eq(kiloclaw_version_pins.user_id, input.userId))
+      .where(eq(kiloclaw_version_pins.instance_id, input.instanceId))
       .returning();
 
     if (!deleted) {

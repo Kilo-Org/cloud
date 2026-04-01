@@ -162,14 +162,14 @@ function DetailField({ label, children }: { label: string; children: React.React
   );
 }
 
-function VersionPinCard({ userId }: { userId: string }) {
+function VersionPinCard({ userId, instanceId }: { userId: string; instanceId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [selectedTag, setSelectedTag] = useState<string>('');
   const [reason, setReason] = useState('');
 
   const { data: pinData, isLoading: pinLoading } = useQuery(
-    trpc.admin.kiloclawVersions.getUserPin.queryOptions({ userId })
+    trpc.admin.kiloclawVersions.getUserPin.queryOptions({ userId, instanceId })
   );
 
   const { data: versionsData } = useQuery(
@@ -267,7 +267,12 @@ function VersionPinCard({ userId }: { userId: string }) {
                   <Button
                     size="sm"
                     onClick={() =>
-                      void setPin({ userId, imageTag: selectedTag, reason: reason || undefined })
+                      void setPin({
+                        userId,
+                        instanceId,
+                        imageTag: selectedTag,
+                        reason: reason || undefined,
+                      })
                     }
                     disabled={isPinning}
                   >
@@ -277,7 +282,7 @@ function VersionPinCard({ userId }: { userId: string }) {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => void removePin({ userId })}
+                  onClick={() => void removePin({ instanceId })}
                   disabled={isUnpinning}
                 >
                   {isUnpinning ? 'Unpinning...' : 'Unpin'}
@@ -315,7 +320,12 @@ function VersionPinCard({ userId }: { userId: string }) {
                 <Button
                   size="sm"
                   onClick={() =>
-                    void setPin({ userId, imageTag: selectedTag, reason: reason || undefined })
+                    void setPin({
+                      userId,
+                      instanceId,
+                      imageTag: selectedTag,
+                      reason: reason || undefined,
+                    })
                   }
                   disabled={!selectedTag || isPinning}
                 >
@@ -1145,6 +1155,16 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     refetchInterval: awaitingRestartCompletion || awaitingRestoreCompletion ? 3000 : false,
   });
 
+  const userId = data?.user_id;
+  const orgId = data?.organization_id;
+  const { data: registryData } = useQuery({
+    ...trpc.admin.kiloclawInstances.registryEntries.queryOptions({
+      userId: userId ?? '',
+      orgId: orgId ?? undefined,
+    }),
+    enabled: !!userId,
+  });
+
   const { mutateAsync: destroyInstance, isPending: isDestroying } = useMutation(
     trpc.admin.kiloclawInstances.destroy.mutationOptions({
       onSuccess: () => {
@@ -1194,6 +1214,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   } = useQuery({
     ...trpc.admin.kiloclawInstances.volumeSnapshots.queryOptions({
       userId: data?.user_id ?? '',
+      instanceId: data?.id,
     }),
     enabled: snapshotsEnabled,
   });
@@ -1221,6 +1242,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   } = useQuery({
     ...trpc.admin.kiloclawInstances.gatewayStatus.queryOptions({
       userId: data?.user_id ?? '',
+      instanceId: data?.id,
     }),
     enabled: gatewayControlsEnabled,
     refetchInterval: gatewayControlsEnabled ? 10000 : false,
@@ -1229,6 +1251,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const { data: controllerVersion } = useQuery({
     ...trpc.admin.kiloclawInstances.controllerVersion.queryOptions({
       userId: data?.user_id ?? '',
+      instanceId: data?.id,
     }),
     enabled: gatewayControlsEnabled,
     staleTime: 5 * 60_000,
@@ -1249,20 +1272,29 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
     if (awaitingRestartCompletion && status === 'running' && wasRestarting) {
       setAwaitingRestartCompletion(false);
-      if (data?.user_id) {
+      if (data?.user_id && data?.id) {
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawInstances.controllerVersion.queryKey({
             userId: data.user_id,
+            instanceId: data.id,
           }),
         });
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawInstances.gatewayStatus.queryKey({
             userId: data.user_id,
+            instanceId: data.id,
           }),
         });
       }
     }
-  }, [data?.workerStatus?.status, data?.user_id, awaitingRestartCompletion, queryClient, trpc]);
+  }, [
+    data?.workerStatus?.status,
+    data?.user_id,
+    data?.id,
+    awaitingRestartCompletion,
+    queryClient,
+    trpc,
+  ]);
 
   // Stop polling when restore completes (status transitions from 'restoring' to something else).
   // Track whether we've seen 'restoring' to avoid false positives when the mutation succeeds
@@ -1291,9 +1323,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   }, [data?.workerStatus?.status, awaitingRestoreCompletion, queryClient, trpc]);
 
   const invalidateGatewayQueries = () => {
-    if (!data?.user_id) return;
+    if (!data?.user_id || !data?.id) return;
     void queryClient.invalidateQueries({
-      queryKey: trpc.admin.kiloclawInstances.gatewayStatus.queryKey({ userId: data.user_id }),
+      queryKey: trpc.admin.kiloclawInstances.gatewayStatus.queryKey({
+        userId: data.user_id,
+        instanceId: data.id,
+      }),
     });
     void queryClient.invalidateQueries({ queryKey: trpc.admin.kiloclawInstances.get.queryKey() });
   };
@@ -1603,9 +1638,31 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             <DetailField label="Instance ID">
               <code className="text-sm">{data.id}</code>
             </DetailField>
+            <DetailField label="Type">
+              {data.organization_id ? (
+                <Badge
+                  variant="outline"
+                  className="border-blue-500/30 bg-blue-500/15 text-blue-400"
+                >
+                  Org
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="border-gray-500/30 bg-gray-500/10 text-gray-400"
+                >
+                  Personal
+                </Badge>
+              )}
+            </DetailField>
             <DetailField label="User ID">
               <code className="text-sm">{data.user_id}</code>
             </DetailField>
+            {data.organization_id && (
+              <DetailField label="Organization ID">
+                <code className="text-sm">{data.organization_id}</code>
+              </DetailField>
+            )}
             <DetailField label="Derived Fly App">
               <a
                 href={`https://fly.io/apps/${data.derived_fly_app_name}`}
@@ -1620,6 +1677,82 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
           </CardContent>
         </Card>
 
+        {/* Registry Status */}
+        {registryData?.registries.map(registry => (
+          <Card key={registry.registryKey}>
+            <CardHeader>
+              <CardTitle>Registry Status</CardTitle>
+              <CardDescription>
+                <code className="text-xs">{registry.registryKey}</code>
+                {' · '}
+                <span className="text-xs">
+                  {registry.migrated ? 'migrated' : 'pending migration'}
+                </span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {registry.entries.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No registry entries</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-2 pr-4">Instance ID</th>
+                        <th className="pb-2 pr-4">DO Key</th>
+                        <th className="pb-2 pr-4">Created</th>
+                        <th className="pb-2 pr-4">Destroyed</th>
+                        <th className="pb-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {registry.entries.map(entry => {
+                        const isCurrent = entry.instanceId === data?.id;
+                        const isDestroyed = entry.destroyedAt !== null;
+                        return (
+                          <tr
+                            key={entry.instanceId}
+                            className={`border-b ${isCurrent ? 'bg-blue-500/10' : ''}`}
+                          >
+                            <td className="py-2 pr-4">
+                              <code className="text-xs">{entry.instanceId.slice(0, 8)}...</code>
+                              {isCurrent && (
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  current
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="py-2 pr-4">
+                              <code className="text-xs">
+                                {entry.doKey === entry.instanceId
+                                  ? 'instanceId'
+                                  : entry.doKey.slice(0, 8) + '...'}
+                              </code>
+                            </td>
+                            <td className="py-2 pr-4 text-xs text-muted-foreground">
+                              {new Date(entry.createdAt).toLocaleString()}
+                            </td>
+                            <td className="py-2 pr-4 text-xs text-muted-foreground">
+                              {entry.destroyedAt
+                                ? new Date(entry.destroyedAt).toLocaleString()
+                                : '—'}
+                            </td>
+                            <td className="py-2">
+                              <Badge variant={isDestroyed ? 'secondary' : 'default'}>
+                                {isDestroyed ? 'Destroyed' : 'Active'}
+                              </Badge>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
@@ -1632,7 +1765,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   variant="outline"
                   size="sm"
                   disabled={machineActionPending}
-                  onClick={() => void forceRetryRecovery({ userId: data.user_id })}
+                  onClick={() =>
+                    void forceRetryRecovery({ userId: data.user_id, instanceId: data.id })
+                  }
                 >
                   {isRetryingRecovery ? (
                     <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -1663,6 +1798,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
                 <DetailField label="DO Sandbox ID">
                   <code className="text-xs">{data.workerStatus.sandboxId ?? '—'}</code>
+                </DetailField>
+
+                <DetailField label="DO Org ID">
+                  <code className="text-xs">{data.workerStatus.orgId ?? '—'}</code>
                 </DetailField>
 
                 <div className="flex items-center gap-2">
@@ -1859,7 +1998,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   size="sm"
                   variant="outline"
                   disabled={machineActionPending}
-                  onClick={() => void machineStart({ userId: data.user_id })}
+                  onClick={() => void machineStart({ userId: data.user_id, instanceId: data.id })}
                 >
                   {isMachineStarting ? (
                     <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -1872,7 +2011,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   size="sm"
                   variant="outline"
                   disabled={machineActionPending || !hasMachine}
-                  onClick={() => void machineStop({ userId: data.user_id })}
+                  onClick={() => void machineStop({ userId: data.user_id, instanceId: data.id })}
                 >
                   {isMachineStopping ? (
                     <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -1970,6 +2109,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   if (data?.workerStatus?.flyMachineId && data?.workerStatus?.flyAppName) {
                     void destroyFlyMachine({
                       userId: data.user_id,
+                      instanceId: data.id,
                       appName: data.workerStatus.flyAppName,
                       machineId: data.workerStatus.flyMachineId,
                     });
@@ -2062,7 +2202,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       size="sm"
                       variant="outline"
                       disabled={gatewayActionPending}
-                      onClick={() => void gatewayStart({ userId: data.user_id })}
+                      onClick={() =>
+                        void gatewayStart({ userId: data.user_id, instanceId: data.id })
+                      }
                     >
                       {isGatewayStarting ? (
                         <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -2075,7 +2217,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       size="sm"
                       variant="outline"
                       disabled={gatewayActionPending}
-                      onClick={() => void gatewayStop({ userId: data.user_id })}
+                      onClick={() =>
+                        void gatewayStop({ userId: data.user_id, instanceId: data.id })
+                      }
                     >
                       {isGatewayStopping ? (
                         <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -2088,7 +2232,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       size="sm"
                       variant="outline"
                       disabled={gatewayActionPending}
-                      onClick={() => void gatewayRestart({ userId: data.user_id })}
+                      onClick={() =>
+                        void gatewayRestart({ userId: data.user_id, instanceId: data.id })
+                      }
                     >
                       {isGatewayRestarting ? (
                         <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -2104,7 +2250,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       onClick={() => {
                         runDoctorMutation.reset();
                         setDoctorDialogOpen(true);
-                        runDoctorMutation.mutate({ userId: data.user_id });
+                        runDoctorMutation.mutate({ userId: data.user_id, instanceId: data.id });
                       }}
                     >
                       <Stethoscope className="mr-1 h-4 w-4" />
@@ -2324,7 +2470,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         )}
 
         {/* Version Pin Card */}
-        {data.user_id && <VersionPinCard userId={data.user_id} />}
+        <VersionPinCard userId={data.user_id} instanceId={data.id} />
 
         {/* Workspace File Editor */}
         {!data.destroyed_at && (
@@ -2425,9 +2571,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 variant="default"
                 disabled={isRestoring || restoreReason.length < 10 || !restoreSnapshotId}
                 onClick={() => {
-                  if (!data?.user_id || !restoreSnapshotId) return;
+                  if (!data?.user_id || !data?.id || !restoreSnapshotId) return;
                   void restoreSnapshot({
                     userId: data.user_id,
+                    instanceId: data.id,
                     snapshotId: restoreSnapshotId,
                     reason: restoreReason,
                   });
@@ -2483,7 +2630,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               </Button>
               <Button
                 variant="destructive"
-                onClick={() => restoreConfigMutation.mutate({ userId: data.user_id })}
+                onClick={() =>
+                  restoreConfigMutation.mutate({ userId: data.user_id, instanceId: data.id })
+                }
                 disabled={gatewayActionPending}
               >
                 {restoreConfigMutation.isPending ? (

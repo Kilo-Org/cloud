@@ -13,6 +13,7 @@
 
 import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
+import { getCookie, deleteCookie } from 'hono/cookie';
 
 import type { AppEnv, KiloClawEnv } from './types';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
@@ -22,15 +23,19 @@ import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
 import { InstanceIdParam } from './schemas/instance-config';
+import { isValidInstanceId } from '@kilocode/worker-utils/instance-id';
 import { registerVersionIfNeeded } from './lib/image-version';
 import { startingUpPage } from './pages/starting-up';
 import { buildForwardHeaders } from './utils/proxy-headers';
+import { KILOCLAW_ACTIVE_INSTANCE_COOKIE } from './config';
 import { timingMiddleware } from './middleware/analytics';
 import { writeEvent } from './utils/analytics';
+import type { RegistryEntry } from './durable-objects/kiloclaw-registry';
 
 // Export DOs (match wrangler.jsonc class_name bindings)
 export { KiloClawInstance } from './durable-objects/kiloclaw-instance';
 export { KiloClawApp } from './durable-objects/kiloclaw-app';
+export { KiloClawRegistry } from './durable-objects/kiloclaw-registry';
 
 // =============================================================================
 // Helpers
@@ -211,6 +216,9 @@ app.all('/i/:instanceId/*', async c => {
   if (status.status === 'destroying') {
     return c.json({ error: 'Instance is being destroyed' }, 409);
   }
+  if (status.status === 'restoring') {
+    return c.json({ error: 'Instance is restoring from a snapshot' }, 409);
+  }
   if (!status.flyMachineId) {
     return c.json({ error: 'Instance not provisioned' }, 404);
   }
@@ -314,6 +322,50 @@ app.all('/i/:instanceId/*', async c => {
 // =============================================================================
 
 /**
+ * Resolve the user's default personal instance DO stub via the registry.
+ * Returns the stub and its DO key, or null if no instance exists.
+ * Triggers lazy migration on first access.
+ *
+ * Falls back to legacy direct userId-keyed DO lookup if the Registry DO
+ * is unavailable (e.g., migration error, transient failure). This ensures
+ * proxy access is preserved even when the registry is unhealthy.
+ */
+async function resolveRegistryEntry(c: Context<AppEnv>) {
+  const userId = c.get('userId');
+  if (!userId) return null;
+
+  try {
+    const registryKey = `user:${userId}`;
+    const registryStub = c.env.KILOCLAW_REGISTRY.get(
+      c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+    );
+    const entries = await registryStub.listInstances(registryKey);
+    if (entries.length === 0) return null;
+
+    const entry = entries[0];
+    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(entry.doKey));
+    return { stub, entry };
+  } catch (err) {
+    // Registry DO failed. Fall back to the legacy userId-keyed DO.
+    // Only preserves access for legacy instances (doKey = userId).
+    // For instance-keyed DOs (doKey = instanceId), this hits the wrong
+    // (empty) DO — the user sees "not provisioned" until the registry
+    // recovers. Acceptable: a broken registry is transient, and silently
+    // routing to the wrong DO would be worse.
+    console.error('[PROXY] Registry lookup failed, falling back to legacy DO:', err);
+    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
+    const fallbackEntry: RegistryEntry = {
+      doKey: userId,
+      instanceId: '',
+      assignedUserId: userId,
+      createdAt: '',
+      destroyedAt: null,
+    };
+    return { stub, entry: fallbackEntry };
+  }
+}
+
+/**
  * Attempt crash recovery: if the user's instance has status 'running' but
  * the machine is dead, call start() to restart it transparently.
  */
@@ -323,7 +375,9 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
   const startedAt = performance.now();
 
   try {
-    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
+    const resolved = await resolveRegistryEntry(c);
+    if (!resolved) return false;
+    const { stub } = resolved;
     const status = await stub.getStatus();
 
     if (status.status !== 'running') {
@@ -339,7 +393,7 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
         event: 'instance.crash_recovery_succeeded',
         delivery: 'http',
         userId,
-        sandboxId: c.get('sandboxId') ?? undefined,
+        sandboxId: freshStatus.sandboxId ?? undefined,
         flyMachineId: freshStatus.flyMachineId ?? undefined,
         flyAppName: freshStatus.flyAppName ?? undefined,
         status: freshStatus.status ?? undefined,
@@ -362,36 +416,175 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
 }
 
 /**
- * Resolve the flyMachineId, flyAppName, and status for the current user from their DO.
+ * Resolve the flyMachineId, flyAppName, sandboxId, and status for the current user from their DO.
  * Returns null machineId if the instance is destroying (blocks proxy during teardown).
+ * Routes through the user registry, which triggers lazy migration on first access.
+ *
+ * The returned sandboxId is the DO's authoritative value — it may differ from the
+ * middleware-derived `c.get('sandboxId')` for instance-keyed DOs (which use `ki_` prefix).
+ * Callers MUST use the returned sandboxId for gateway token derivation.
  */
 async function resolveInstance(c: Context<AppEnv>): Promise<{
   machineId: string | null;
   flyAppName: string | null;
+  sandboxId: string | null;
   status: string | null;
 }> {
-  const userId = c.get('userId');
-  if (!userId) return { machineId: null, flyAppName: null, status: null };
+  const resolved = await resolveRegistryEntry(c);
+  if (!resolved) return { machineId: null, flyAppName: null, sandboxId: null, status: null };
 
-  const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
-  const s = await stub.getStatus();
+  const s = await resolved.stub.getStatus();
 
-  if (s.status === 'destroying') return { machineId: null, flyAppName: null, status: 'destroying' };
-  if (s.status === 'restoring') return { machineId: null, flyAppName: null, status: 'restoring' };
+  if (s.status === 'destroying')
+    return { machineId: null, flyAppName: null, sandboxId: null, status: 'destroying' };
+  if (s.status === 'restoring')
+    return { machineId: null, flyAppName: null, sandboxId: null, status: 'restoring' };
 
-  return { machineId: s.flyMachineId, flyAppName: s.flyAppName, status: s.status };
+  return {
+    machineId: s.flyMachineId,
+    flyAppName: s.flyAppName,
+    sandboxId: s.sandboxId,
+    status: s.status,
+  };
 }
 
 app.all('*', async c => {
-  const sandboxId = c.get('sandboxId');
-  if (!sandboxId) {
+  // Auth gate: middleware-derived sandboxId proves the user is authenticated.
+  if (!c.get('sandboxId')) {
     return c.json(
       { error: 'Authentication required', hint: 'No active session. Please log in.' },
       401
     );
   }
 
-  const { machineId, flyAppName, status } = await resolveInstance(c);
+  // Cookie-based instance routing: when the user opened an instance-keyed
+  // instance via the access gateway, the active-instance cookie is set.
+  // The OpenClaw Control UI connects WebSockets to `/` (not `/i/{instanceId}/`),
+  // so this cookie tells the catch-all which instance to route to.
+  const activeInstanceId = getCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE);
+  if (activeInstanceId && isValidInstanceId(activeInstanceId)) {
+    const userId = c.get('userId');
+    if (userId) {
+      const stub = c.env.KILOCLAW_INSTANCE.get(
+        c.env.KILOCLAW_INSTANCE.idFromName(activeInstanceId)
+      );
+      const instanceStatus = await stub.getStatus();
+
+      // Ownership mismatch — cookie is stale (e.g. from another user session).
+      // Fall through to default personal resolution.
+      if (instanceStatus.userId !== userId) {
+        // Clear the stale cookie so subsequent requests don't repeat this check
+        deleteCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE);
+      } else {
+        // Cookie points to an instance owned by this user. Return explicit errors
+        // for non-proxyable states instead of silently falling through to the
+        // personal instance.
+        if (instanceStatus.status === 'destroying') {
+          return c.json(
+            { error: 'Instance is being destroyed', hint: 'This instance is being torn down.' },
+            409
+          );
+        }
+        if (instanceStatus.status === 'restoring') {
+          return c.json(
+            {
+              error: 'Instance is restoring',
+              hint: 'This instance is being restored from a snapshot. Please wait.',
+            },
+            409
+          );
+        }
+        if (!instanceStatus.flyMachineId) {
+          return c.json(
+            { error: 'Instance not provisioned', hint: 'The instance has no running machine.' },
+            404
+          );
+        }
+
+        const appName = instanceStatus.flyAppName ?? c.env.FLY_APP_NAME;
+        if (appName && instanceStatus.sandboxId) {
+          console.log(
+            '[PROXY] Cookie-routed to instance:',
+            activeInstanceId,
+            'machine:',
+            instanceStatus.flyMachineId
+          );
+          const request = c.req.raw;
+          const url = new URL(request.url);
+          const targetUrl = flyProxyUrl(appName, url);
+
+          if (!c.env.GATEWAY_TOKEN_SECRET) {
+            return c.json({ error: 'Configuration error' }, 503);
+          }
+
+          const forwardHeaders = await buildForwardHeaders({
+            requestHeaders: request.headers,
+            machineId: instanceStatus.flyMachineId,
+            sandboxId: instanceStatus.sandboxId,
+            gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+          });
+
+          const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
+
+          if (isWebSocketRequest) {
+            let containerResponse: Response;
+            try {
+              containerResponse = await fetch(targetUrl, { headers: forwardHeaders });
+            } catch (err) {
+              console.error('[PROXY] Cookie-routed WS fetch failed:', err);
+              return c.json({ error: 'Instance not reachable' }, 503);
+            }
+            const containerWs = containerResponse.webSocket;
+            if (!containerWs) {
+              return c.json({ error: 'WebSocket upgrade failed' }, 502);
+            }
+            containerWs.accept();
+            const [clientWs, serverWs] = Object.values(new WebSocketPair());
+            serverWs.accept();
+            serverWs.addEventListener('message', event => {
+              if (containerWs.readyState === WebSocket.OPEN) {
+                containerWs.send(event.data as string | ArrayBuffer);
+              }
+            });
+            containerWs.addEventListener('message', event => {
+              if (serverWs.readyState === WebSocket.OPEN) {
+                serverWs.send(event.data as string | ArrayBuffer);
+              }
+            });
+            serverWs.addEventListener('close', event =>
+              containerWs.close(event.code, event.reason)
+            );
+            containerWs.addEventListener('close', event =>
+              serverWs.close(event.code, event.reason)
+            );
+            serverWs.addEventListener('error', () => containerWs.close(1011, 'Client error'));
+            containerWs.addEventListener('error', () => serverWs.close(1011, 'Container error'));
+            return new Response(null, { status: 101, webSocket: clientWs });
+          }
+
+          // HTTP proxy
+          const requestBody = request.body ? await request.arrayBuffer() : null;
+          try {
+            const httpResponse = await fetch(targetUrl, {
+              method: request.method,
+              headers: forwardHeaders,
+              body: requestBody,
+            });
+            if (httpResponse.status === 502) {
+              return startingUpPage();
+            }
+            return httpResponse;
+          } catch (err) {
+            console.error('[PROXY] Cookie-routed HTTP fetch failed:', err);
+            return c.json({ error: 'Instance not reachable' }, 503);
+          }
+        }
+      }
+    }
+    // Cookie invalid/stale — fall through to default personal resolution
+  }
+
+  const { machineId, flyAppName, sandboxId, status } = await resolveInstance(c);
   if (status === 'destroying') {
     return c.json(
       { error: 'Instance is being destroyed', hint: 'This instance is being torn down.' },
@@ -416,6 +609,9 @@ app.all('*', async c => {
       404
     );
   }
+  if (!sandboxId) {
+    return c.json({ error: 'Instance has no sandboxId' }, 500);
+  }
 
   // Per-user app name, with legacy fallback for existing instances
   const appName = flyAppName ?? c.env.FLY_APP_NAME;
@@ -436,6 +632,10 @@ app.all('*', async c => {
     return c.json({ error: 'Configuration error' }, 503);
   }
 
+  // Use the DO's authoritative sandboxId for gateway token derivation.
+  // This is critical: instance-keyed DOs derive sandboxId from instanceId (ki_ prefix),
+  // which differs from the middleware-derived value (sandboxIdFromUserId). The gateway
+  // token must match what the machine expects.
   const forwardHeaders = await buildForwardHeaders({
     requestHeaders: request.headers,
     machineId,

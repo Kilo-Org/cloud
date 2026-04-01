@@ -2,7 +2,7 @@ import * as z from 'zod';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
-  organizationOwnerProcedure,
+  organizationBillingProcedure,
 } from '@/routers/organizations/utils';
 import { security_audit_log } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
@@ -53,7 +53,7 @@ const ExportInputSchema = OrganizationIdInputSchema.extend({
 });
 
 export const organizationSecurityAuditLogRouter = createTRPCRouter({
-  list: organizationOwnerProcedure
+  list: organizationBillingProcedure
     .input(ListSecurityAuditLogsInputSchema)
     .query(async ({ input, ctx }) => {
       const {
@@ -145,11 +145,11 @@ export const organizationSecurityAuditLogRouter = createTRPCRouter({
       };
     }),
 
-  getActionTypes: organizationOwnerProcedure.input(OrganizationIdInputSchema).query(async () => {
+  getActionTypes: organizationBillingProcedure.input(OrganizationIdInputSchema).query(async () => {
     return Object.values(SecurityAuditLogAction);
   }),
 
-  getSummary: organizationOwnerProcedure
+  getSummary: organizationBillingProcedure
     .input(OrganizationIdInputSchema)
     .query(async ({ input }) => {
       const { organizationId } = input;
@@ -170,7 +170,7 @@ export const organizationSecurityAuditLogRouter = createTRPCRouter({
       };
     }),
 
-  export: organizationOwnerProcedure.input(ExportInputSchema).mutation(async ({ input, ctx }) => {
+  export: organizationBillingProcedure.input(ExportInputSchema).mutation(async ({ input, ctx }) => {
     const { organizationId, format, startTime, endTime, action } = input;
 
     const whereConditions = [eq(security_audit_log.owned_by_organization_id, organizationId)];

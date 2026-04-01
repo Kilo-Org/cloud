@@ -13,6 +13,7 @@ import {
   type CloudAgentSessionId,
 } from '@/lib/cloud-agent-sdk';
 import { SESSION_INGEST_WS_URL } from '@/lib/constants';
+import { usePostHog } from 'posthog-js/react';
 
 const ManagerContext = createContext<SessionManager | null>(null);
 
@@ -24,6 +25,9 @@ type CloudAgentProviderProps = {
 export function CloudAgentProvider({ children, organizationId }: CloudAgentProviderProps) {
   const storeRef = useRef(createStore());
   const trpcClient = useRawTRPCClient();
+  const posthog = usePostHog();
+  const posthogRef = useRef(posthog);
+  posthogRef.current = posthog;
 
   // Create manager once per provider instance.
   // trpcClient is stable (from context); organizationId is stable per provider mount.
@@ -258,6 +262,19 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           url.searchParams.set('sessionId', kiloSessionId);
           window.history.replaceState(window.history.state, '', url.toString());
         }
+      },
+
+      onRemoteSessionOpened: ({ kiloSessionId }) => {
+        posthogRef.current?.capture('remote_session_opened', {
+          feature: 'remote-session',
+          kilo_session_id: kiloSessionId,
+        });
+      },
+      onRemoteSessionMessageSent: ({ kiloSessionId }) => {
+        posthogRef.current?.capture('remote_session_message_sent', {
+          feature: 'remote-session',
+          kilo_session_id: kiloSessionId,
+        });
       },
     });
   }

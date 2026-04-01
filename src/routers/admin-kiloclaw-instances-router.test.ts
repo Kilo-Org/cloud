@@ -95,8 +95,13 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
     });
 
     expect(result).toEqual({ ok: true });
-    expect(mockGetDebugStatus).toHaveBeenCalledWith(testUserId);
-    expect(mockDestroyFlyMachine).toHaveBeenCalledWith(testUserId, testAppName, testMachineId);
+    expect(mockGetDebugStatus).toHaveBeenCalledWith(testUserId, undefined);
+    expect(mockDestroyFlyMachine).toHaveBeenCalledWith(
+      testUserId,
+      testAppName,
+      testMachineId,
+      undefined
+    );
   });
 
   it('throws BAD_REQUEST when appName does not match DO state', async () => {

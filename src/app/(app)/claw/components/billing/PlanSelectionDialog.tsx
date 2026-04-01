@@ -13,7 +13,6 @@ import { useTRPC } from '@/lib/trpc/utils';
 import {
   COMMIT_PERIOD_MONTHS,
   formatMicrodollars,
-  PLAN_COST_MICRODOLLARS,
   PLAN_DISPLAY,
   planPriceLabel,
   STANDARD_FIRST_MONTH_DOLLARS,
@@ -337,23 +336,26 @@ function CreditsHowItWorks() {
 
 function CreditEnrollmentSection({
   selectedPlan,
-  creditBalanceMicrodollars,
-  creditIntroEligible,
+  rawCreditBalanceMicrodollars,
+  effectiveBalanceMicrodollars,
+  projectedKiloPassBonusMicrodollars,
+  costMicrodollars,
   onEnroll,
   isPending,
 }: {
   selectedPlan: ClawPlan;
-  creditBalanceMicrodollars: number;
-  creditIntroEligible: boolean;
+  rawCreditBalanceMicrodollars: number;
+  effectiveBalanceMicrodollars: number;
+  projectedKiloPassBonusMicrodollars: number;
+  costMicrodollars: number;
   onEnroll: () => void;
   isPending: boolean;
 }) {
-  const isIntro = selectedPlan === 'standard' && creditIntroEligible;
-  const planCost = isIntro
-    ? STANDARD_FIRST_MONTH_MICRODOLLARS
-    : PLAN_COST_MICRODOLLARS[selectedPlan];
-  const hasSufficientBalance = creditBalanceMicrodollars >= planCost;
-  const shortfall = planCost - creditBalanceMicrodollars;
+  const isIntro =
+    selectedPlan === 'standard' && costMicrodollars === STANDARD_FIRST_MONTH_MICRODOLLARS;
+  const hasProjectedBonus = projectedKiloPassBonusMicrodollars > 0;
+  const hasSufficientBalance = effectiveBalanceMicrodollars >= costMicrodollars;
+  const shortfall = Math.max(0, costMicrodollars - effectiveBalanceMicrodollars);
   const planLabel = selectedPlan === 'commit' ? 'Commit' : 'Standard';
   const priceLabel = isIntro
     ? `$${STANDARD_FIRST_MONTH_DOLLARS} first month, then ${planPriceLabel(selectedPlan)}`
@@ -369,16 +371,27 @@ function CreditEnrollmentSection({
         <p className="text-muted-foreground mb-1 text-sm">
           {planLabel} Plan — {priceLabel} from your credit balance
         </p>
-        <p className="mb-3 text-xs text-emerald-400/80">
-          Balance: {formatMicrodollars(creditBalanceMicrodollars)}
-        </p>
+        {hasProjectedBonus ? (
+          <div className="mb-3 space-y-1 text-xs text-emerald-400/80">
+            <p>Current balance: {formatMicrodollars(rawCreditBalanceMicrodollars)}</p>
+            <p>
+              Projected Kilo Pass bonus for this charge:{' '}
+              {formatMicrodollars(projectedKiloPassBonusMicrodollars)}
+            </p>
+            <p>Effective balance: {formatMicrodollars(effectiveBalanceMicrodollars)}</p>
+          </div>
+        ) : (
+          <p className="mb-3 text-xs text-emerald-400/80">
+            Balance: {formatMicrodollars(rawCreditBalanceMicrodollars)}
+          </p>
+        )}
         <Button
           onClick={onEnroll}
           disabled={isPending}
           variant="primary"
           className="w-full py-3 font-semibold"
         >
-          {isPending ? 'Activating…' : `Pay ${formatMicrodollars(planCost)} with Credits`}
+          {isPending ? 'Activating…' : `Pay ${formatMicrodollars(costMicrodollars)} with Credits`}
         </Button>
       </div>
     );
@@ -393,13 +406,31 @@ function CreditEnrollmentSection({
       <div className="text-muted-foreground space-y-1 text-sm">
         <div className="flex justify-between">
           <span>Balance</span>
-          <span className="text-foreground">{formatMicrodollars(creditBalanceMicrodollars)}</span>
+          <span className="text-foreground">
+            {formatMicrodollars(rawCreditBalanceMicrodollars)}
+          </span>
         </div>
+        {hasProjectedBonus && (
+          <div className="flex justify-between">
+            <span>Projected Kilo Pass bonus</span>
+            <span className="text-foreground">
+              {formatMicrodollars(projectedKiloPassBonusMicrodollars)}
+            </span>
+          </div>
+        )}
+        {hasProjectedBonus && (
+          <div className="flex justify-between">
+            <span>Effective balance</span>
+            <span className="text-foreground">
+              {formatMicrodollars(effectiveBalanceMicrodollars)}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span>
             {planLabel} plan cost{isIntro ? ' (first month)' : ''}
           </span>
-          <span className="text-foreground">{formatMicrodollars(planCost)}</span>
+          <span className="text-foreground">{formatMicrodollars(costMicrodollars)}</span>
         </div>
         <div className="flex justify-between border-t border-amber-500/20 pt-1 font-medium text-amber-400">
           <span>Shortfall</span>
@@ -455,6 +486,13 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
   const creditBalance = billing?.creditBalanceMicrodollars ?? null;
   const hasCredits = creditBalance !== null && creditBalance > 0;
   const creditIntroEligible = billing?.creditIntroEligible ?? false;
+  const hasActiveKiloPass = billing?.hasActiveKiloPass ?? false;
+  const creditEnrollmentPreview = billing?.creditEnrollmentPreview ?? null;
+  const showKiloPassUpsell = !hasActiveKiloPass;
+  const selectedCreditEnrollmentPreview =
+    hostingOnlyPlan !== null ? (creditEnrollmentPreview?.[hostingOnlyPlan] ?? null) : null;
+  const showCreditEnrollment =
+    !!selectedCreditEnrollmentPreview && (hasCredits || hasActiveKiloPass);
 
   const hostingOnlyActive = hostingOnlyPlan !== null;
   const commitDisabled = !isCommitAvailable(selectedTier, cadence);
@@ -534,6 +572,11 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
   const hostingOnlyLabel = hostingOnlyPlan
     ? `Subscribe to ${hostingOnlyPlan === 'commit' ? 'Commit' : 'Standard'} Plan – $${hostingOnlyPlan === 'commit' ? PLAN_DISPLAY.commit.totalDollars : PLAN_DISPLAY.standard.monthlyDollars}`
     : 'Select a plan above';
+  const hostingSectionTitle = hasActiveKiloPass ? 'Choose a Hosting Plan' : 'Hosting Only';
+  const hostingSectionDescription = hasActiveKiloPass
+    ? 'You already have Kilo Pass. Choose a hosting plan and fund it from your credit balance or pay directly via Stripe.'
+    : 'Pay for hosting directly via Stripe. You can buy credits separately for AI inference.';
+  const highlightHostingSection = hasActiveKiloPass || hostingOnlyActive;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -548,102 +591,104 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
             </p>
           </div>
 
-          {/* Section 1: Kilo Pass (Recommended) */}
+          {showKiloPassUpsell && (
+            <>
+              {/* Section 1: Kilo Pass (Recommended) */}
+              <div
+                className={cn(
+                  'rounded-xl border p-5 transition-all',
+                  'border-blue-500/30 bg-gradient-to-b from-blue-500/[0.04] to-transparent shadow-[0_0_0_1px_rgba(59,130,246,0.08)]'
+                )}
+              >
+                <div className="mb-3 flex items-center gap-2.5">
+                  <Crown className="h-5 w-5 text-amber-400" />
+                  <h3 className="flex-1 text-base font-semibold">Activate with Kilo Pass</h3>
+                  <Badge className="rounded-full border-transparent bg-blue-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-blue-300 ring-1 ring-blue-500/30">
+                    Recommended
+                  </Badge>
+                </div>
+
+                <p className="text-muted-foreground mb-4 text-[13px]">
+                  Credits for KiloClaw hosting + AI inference. Earn up to{' '}
+                  <span className="text-emerald-300">50% free bonus credits</span>.
+                </p>
+
+                <CadenceToggle cadence={cadence} onChange={handleCadenceChange} />
+
+                {/* Tier cards */}
+                <div className="mb-3.5 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-2.5">
+                  {TIERS.map(tier => (
+                    <TierCard
+                      key={tier}
+                      tier={tier}
+                      cadence={cadence}
+                      isSelected={selectedTier === tier}
+                      onSelect={() => handleTierSelect(tier)}
+                    />
+                  ))}
+                </div>
+
+                <CreditsHowItWorks />
+
+                {/* Warning */}
+                <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
+                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                  <p className="text-xs leading-relaxed text-amber-300">
+                    Kilo Pass is a <strong className="font-normal">credits subscription</strong>.
+                    Hosting is charged as a credit deduction from your balance. Cancelling Kilo Pass
+                    does <strong className="font-normal">not</strong> cancel KiloClaw hosting.
+                  </p>
+                </div>
+
+                {/* Hosting plan radios */}
+                {selectedTier && (
+                  <HostingRadioGroup
+                    hostingPlan={hostingPlan}
+                    onSelect={handleHostingPlanSelect}
+                    commitDisabled={commitDisabled}
+                    creditIntroEligible={creditIntroEligible}
+                  />
+                )}
+
+                <Button
+                  onClick={handleKiloPassCheckout}
+                  disabled={!kiloPassReady || kiloPassUpsell.isPending}
+                  variant="primary"
+                  className="w-full py-3.5 text-base font-semibold"
+                >
+                  {kiloPassUpsell.isPending ? 'Redirecting to Stripe…' : kiloPassButtonLabel}
+                </Button>
+                <p className="text-muted-foreground mt-2 text-center text-xs">
+                  You&apos;ll be redirected to Stripe to pay for Kilo Pass
+                </p>
+              </div>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3">
+                <div className="bg-border h-px flex-1" />
+                <span className="text-muted-foreground text-xs uppercase tracking-wider">
+                  or pay for KiloClaw hosting only
+                </span>
+                <div className="bg-border h-px flex-1" />
+              </div>
+            </>
+          )}
+
+          {/* Section 2: Hosting selection / standalone checkout */}
           <div
             className={cn(
               'rounded-xl border p-5 transition-all',
-              'border-blue-500/30 bg-gradient-to-b from-blue-500/[0.04] to-transparent shadow-[0_0_0_1px_rgba(59,130,246,0.08)]'
-            )}
-          >
-            <div className="mb-3 flex items-center gap-2.5">
-              <Crown className="h-5 w-5 text-amber-400" />
-              <h3 className="flex-1 text-base font-semibold">Activate with Kilo Pass</h3>
-              <Badge className="rounded-full bg-blue-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-blue-300 ring-1 ring-blue-500/30 border-transparent">
-                Recommended
-              </Badge>
-            </div>
-
-            <p className="text-muted-foreground mb-4 text-[13px]">
-              Credits for KiloClaw hosting + AI inference. Earn up to{' '}
-              <span className="text-emerald-300">50% free bonus credits</span>.
-            </p>
-
-            <CadenceToggle cadence={cadence} onChange={handleCadenceChange} />
-
-            {/* Tier cards */}
-            <div className="mb-3.5 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-2.5">
-              {TIERS.map(tier => (
-                <TierCard
-                  key={tier}
-                  tier={tier}
-                  cadence={cadence}
-                  isSelected={selectedTier === tier}
-                  onSelect={() => handleTierSelect(tier)}
-                />
-              ))}
-            </div>
-
-            <CreditsHowItWorks />
-
-            {/* Warning */}
-            <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
-              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-              <p className="text-xs leading-relaxed text-amber-300">
-                Kilo Pass is a <strong className="font-normal">credits subscription</strong>.
-                Hosting is charged as a credit deduction from your balance. Cancelling Kilo Pass
-                does <strong className="font-normal">not</strong> cancel KiloClaw hosting.
-              </p>
-            </div>
-
-            {/* Hosting plan radios */}
-            {selectedTier && (
-              <HostingRadioGroup
-                hostingPlan={hostingPlan}
-                onSelect={handleHostingPlanSelect}
-                commitDisabled={commitDisabled}
-                creditIntroEligible={creditIntroEligible}
-              />
-            )}
-
-            <Button
-              onClick={handleKiloPassCheckout}
-              disabled={!kiloPassReady || kiloPassUpsell.isPending}
-              variant="primary"
-              className="w-full py-3.5 text-base font-semibold"
-            >
-              {kiloPassUpsell.isPending ? 'Redirecting to Stripe…' : kiloPassButtonLabel}
-            </Button>
-            <p className="text-muted-foreground mt-2 text-center text-xs">
-              You&apos;ll be redirected to Stripe to pay for Kilo Pass
-            </p>
-          </div>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3">
-            <div className="bg-border h-px flex-1" />
-            <span className="text-muted-foreground text-xs uppercase tracking-wider">
-              or pay for KiloClaw hosting only
-            </span>
-            <div className="bg-border h-px flex-1" />
-          </div>
-
-          {/* Section 2: Hosting Only (Secondary) */}
-          <div
-            className={cn(
-              'rounded-xl border p-5 transition-all',
-              hostingOnlyActive
+              highlightHostingSection
                 ? 'border-border opacity-100'
                 : 'border-border/50 opacity-70 hover:opacity-90 hover:border-border'
             )}
           >
             <div className="mb-3 flex items-center gap-2.5">
               <Server className="text-muted-foreground h-[18px] w-[18px]" />
-              <h3 className="text-base font-semibold">Hosting Only</h3>
+              <h3 className="text-base font-semibold">{hostingSectionTitle}</h3>
             </div>
 
-            <p className="text-muted-foreground mb-3.5 text-[13px]">
-              Pay for hosting directly via Stripe. You can buy credits separately for AI inference.
-            </p>
+            <p className="text-muted-foreground mb-3.5 text-[13px]">{hostingSectionDescription}</p>
 
             <div className="mb-4 grid grid-cols-2 gap-2">
               <HostingOnlyPlanCard
@@ -660,13 +705,19 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
               />
             </div>
 
-            {/* Credit enrollment option — shown when user has credits and a hosting-only plan is selected */}
-            {hasCredits && hostingOnlyPlan && (
+            {/* Credit enrollment option — shown when a hosting plan is selected and credits are available or Kilo Pass is active */}
+            {showCreditEnrollment && hostingOnlyPlan && (
               <>
                 <CreditEnrollmentSection
                   selectedPlan={hostingOnlyPlan}
-                  creditBalanceMicrodollars={creditBalance}
-                  creditIntroEligible={creditIntroEligible}
+                  rawCreditBalanceMicrodollars={creditBalance ?? 0}
+                  effectiveBalanceMicrodollars={
+                    selectedCreditEnrollmentPreview.effectiveBalanceMicrodollars
+                  }
+                  projectedKiloPassBonusMicrodollars={
+                    selectedCreditEnrollmentPreview.projectedKiloPassBonusMicrodollars
+                  }
+                  costMicrodollars={selectedCreditEnrollmentPreview.costMicrodollars}
                   onEnroll={handleEnrollWithCredits}
                   isPending={enrollWithCredits.isPending}
                 />

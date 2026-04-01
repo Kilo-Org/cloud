@@ -1,24 +1,11 @@
-import { custom_llm } from '@kilocode/db/schema';
+import { custom_llm2 } from '@kilocode/db/schema';
 import { readDb } from '@/lib/drizzle';
-import { OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
+import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
 
-const listColumns = {
-  public_id: custom_llm.public_id,
-  display_name: custom_llm.display_name,
-  context_length: custom_llm.context_length,
-  max_completion_tokens: custom_llm.max_completion_tokens,
-  provider: custom_llm.provider,
-  organization_ids: custom_llm.organization_ids,
-  supports_image_input: custom_llm.supports_image_input,
-  opencode_settings: custom_llm.opencode_settings,
-};
-
-type ListRow = { [K in keyof typeof listColumns]: (typeof custom_llm.$inferSelect)[K] };
-
-export function convert(model: ListRow) {
+function convert(publicId: string, model: CustomLlmDefinition) {
   return {
-    id: model.public_id,
-    canonical_slug: model.public_id,
+    id: publicId,
+    canonical_slug: publicId,
     hugging_face_id: '',
     name: model.display_name,
     created: 1756238927,
@@ -48,14 +35,21 @@ export function convert(model: ListRow) {
     per_request_limits: null,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
-    opencode: {
-      ...OpenCodeSettingsSchema.safeParse(model.opencode_settings).data,
-      ai_sdk_provider: model.provider,
-    },
+    opencode: model.opencode_settings,
   };
 }
 
 export async function listAvailableCustomLlms(organizationId: string) {
-  const rows = await readDb.select(listColumns).from(custom_llm);
-  return rows.filter(row => row.organization_ids.includes(organizationId)).map(convert);
+  const rows = await readDb.select().from(custom_llm2);
+  return rows
+    .map(row => {
+      const parsed = CustomLlmDefinitionSchema.safeParse(row.definition);
+      if (!parsed.success) {
+        console.log('Failed to parse custom llm definition', parsed.error);
+      }
+      return parsed.success ? { public_id: row.public_id, definition: parsed.data } : null;
+    })
+    .filter(row => row !== null)
+    .filter(row => row.definition.organization_ids.includes(organizationId))
+    .map(row => convert(row.public_id, row.definition));
 }

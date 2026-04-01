@@ -20,7 +20,7 @@ import React, {
   useCallback,
   useSyncExternalStore,
 } from 'react';
-import { User, ArrowDown, ChevronRight, ChevronDown } from 'lucide-react';
+import { User, ArrowDown, ChevronRight, ChevronDown, SquarePen } from 'lucide-react';
 import { format } from 'date-fns';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import AssistantLogo from '@/components/AssistantLogo';
@@ -449,7 +449,7 @@ function SessionMessages({
 export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
   // Get state and manager from ProjectSession context
   const { manager, state } = useProject();
-  const { isStreaming, isInterrupting, model: projectModel, sessions } = state;
+  const { isStreaming, isInterrupting, model: projectModel, sessions, pendingNewSession } = state;
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -461,12 +461,26 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
   // Track the initial projectModel to detect when a new project loads
   const initialProjectModelRef = useRef(projectModel);
   const [visibleSessionCount, setVisibleSessionCount] = useState(DEFAULT_VISIBLE_SESSIONS);
+  // Tracks the session count at the moment a new-session submit is fired so we
+  // can keep the "new chat" placeholder visible until the new session appears.
+  const [sessionCountAtSubmit, setSessionCountAtSubmit] = useState<number | null>(null);
+  const awaitingNewSession = sessionCountAtSubmit !== null;
+
   const trpc = useTRPC();
 
   // Reset pagination when project/manager changes
   useEffect(() => {
     setVisibleSessionCount(DEFAULT_VISIBLE_SESSIONS);
   }, [manager]);
+
+  // Clear the submit-count once the awaited new session has arrived, or if
+  // the request failed (isStreaming drops back to false with no new session).
+  useEffect(() => {
+    if (sessionCountAtSubmit === null) return;
+    if (sessions.length > sessionCountAtSubmit || !isStreaming) {
+      setSessionCountAtSubmit(null);
+    }
+  }, [sessions.length, sessionCountAtSubmit, isStreaming]);
 
   // Fetch eligibility to check if user can use App Builder
   const personalEligibilityQuery = useQuery({
@@ -606,11 +620,16 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
   // Handle send message using ProjectManager
   const handleSendMessage = useCallback(
     async (value: string, images?: Images): Promise<void> => {
+      if (pendingNewSession) {
+        // Record current session count so we can keep the placeholder visible
+        // until the new session object actually arrives in state.
+        setSessionCountAtSubmit(sessions.length);
+      }
       manager.sendMessage(value, images, selectedModel || undefined);
       // PromptInput clears itself internally after successful submit
       setMessageUuid(crypto.randomUUID());
     },
-    [manager, selectedModel]
+    [manager, selectedModel, pendingNewSession, sessions.length]
   );
 
   // Handle model change - stable callback for PromptInput memoization
@@ -636,12 +655,41 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
   // Check if input should be disabled (no messages in any session yet)
   const hasAnyMessages = activeSessionMessages.length > 0;
 
+  const handleNewChatToggle = useCallback(() => {
+    if (pendingNewSession) {
+      setSessionCountAtSubmit(null);
+      manager.cancelNewSession();
+    } else {
+      manager.requestNewSession();
+    }
+  }, [pendingNewSession, manager]);
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex h-12 items-center justify-between gap-4 border-b px-4">
         <h2 className="shrink-0 text-sm font-medium">Chat</h2>
-        <FeedbackDialog disabled={isStreaming} organizationId={organizationId} />
+        <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={handleNewChatToggle}
+                disabled={isStreaming}
+                className={pendingNewSession ? 'text-primary bg-primary/10 h-8 w-8' : 'h-8 w-8'}
+                aria-label="New chat"
+              >
+                <SquarePen className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {pendingNewSession ? 'Cancel new chat' : 'New chat'}
+            </TooltipContent>
+          </Tooltip>
+          <FeedbackDialog organizationId={organizationId} />
+        </div>
       </div>
 
       {/* Blocked Banner - show when user cannot use App Builder at all */}
@@ -663,7 +711,27 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
           onScroll={handleScroll}
           className="absolute inset-0 overflow-x-hidden overflow-y-auto p-4"
         >
-          {sessions.length === 0 || (!hasAnyMessages && !isStreaming) ? (
+          {pendingNewSession || awaitingNewSession ? (
+            <>
+              {sessions.map(session => (
+                <ExpandableSessionBlock
+                  key={session.info.id}
+                  session={session}
+                  visibleSessionCount={visibleSessionCount}
+                  onLoadMore={handleLoadMore}
+                  organizationId={organizationId}
+                />
+              ))}
+              <div className="flex h-32 items-center justify-center">
+                <div className="text-center text-gray-400">
+                  <p className="text-sm">New chat session</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Your code is preserved — the AI starts with fresh context
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : sessions.length === 0 || (!hasAnyMessages && !isStreaming) ? (
             <div className="flex h-full items-center justify-center">
               <div className="text-center text-gray-400">
                 <p className="text-sm">Start building your app</p>
@@ -702,8 +770,14 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
         onSubmit={handleSendMessage}
         messageUuid={messageUuid}
         organizationId={organizationId}
-        placeholder={isStreaming ? 'Building...' : 'Describe changes to your app...'}
-        disabled={!hasAnyMessages || isBlocked}
+        placeholder={
+          isStreaming
+            ? 'Building...'
+            : pendingNewSession
+              ? 'What would you like to change?'
+              : 'Describe changes to your app...'
+        }
+        disabled={(!hasAnyMessages && !pendingNewSession) || isBlocked}
         isSubmitting={isStreaming}
         onInterrupt={handleInterrupt}
         isInterrupting={isInterrupting}

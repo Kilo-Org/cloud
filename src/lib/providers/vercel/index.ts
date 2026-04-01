@@ -5,7 +5,7 @@ import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
 import { isGeminiModel } from '@/lib/providers/google';
 import { isMinimaxModel } from '@/lib/providers/minimax';
 import { isMoonshotModel } from '@/lib/providers/moonshotai';
-import { isOpenAiOssModel } from '@/lib/providers/openai';
+import { isOpenAiModel, isOpenAiOssModel } from '@/lib/providers/openai';
 import type { VercelUserByokInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import {
   DirectUserByokInferenceProviderIdSchema,
@@ -20,7 +20,7 @@ import type {
   VercelProviderConfig,
 } from '@/lib/providers/openrouter/types';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
-import { isXaiModel } from '@/lib/providers/xai';
+import { mimo_v2_pro_free_model } from '@/lib/providers/xiaomi';
 import { isZaiModel } from '@/lib/providers/zai';
 import * as crypto from 'crypto';
 
@@ -91,13 +91,13 @@ export async function shouldRouteToVercel(
   }
 
   if (
-    !requestedModel.startsWith('arcee-ai/') &&
     !isAnthropicModel(requestedModel) &&
     !isGeminiModel(requestedModel) &&
     !isMinimaxModel(requestedModel) &&
     !isMoonshotModel(requestedModel) &&
+    !isOpenAiModel(requestedModel) &&
     !isOpenAiOssModel(requestedModel) &&
-    !isXaiModel(requestedModel) &&
+    requestedModel !== mimo_v2_pro_free_model.public_id &&
     !isZaiModel(requestedModel)
   ) {
     console.debug(`[shouldRouteToVercel] model family not allowed for randomized Vercel routing`);

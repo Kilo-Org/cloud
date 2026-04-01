@@ -46,6 +46,7 @@ export const KNOWN_PLATFORMS = [
   'cli',
   'agent-manager',
   'app-builder',
+  'slack',
 ] as const;
 
 const PAGE_SIZE = 10;

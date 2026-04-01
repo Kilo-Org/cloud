@@ -24,6 +24,7 @@ import {
   Wrench,
   Webhook,
   Factory,
+  Skull,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import HeaderLogo from '@/components/HeaderLogo';
@@ -41,6 +42,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isGastownEnabled = useFeatureFlagEnabled('gastown-access');
+  const isWastelandEnabled = useFeatureFlagEnabled('wasteland-access');
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Dashboard group
@@ -132,6 +134,15 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
             title: 'Gas Town',
             icon: Factory,
             url: '/gastown',
+          },
+        ]
+      : []),
+    ...(isWastelandEnabled || isDevelopment
+      ? [
+          {
+            title: 'Wastelands',
+            icon: Skull,
+            url: '/wasteland',
           },
         ]
       : []),

@@ -1123,18 +1123,33 @@ export async function drainAll(): Promise<void> {
   for (const agent of frozen) {
     try {
       console.log(`${DRAIN_LOG} Phase 4: force-saving agent ${agent.agentId} in ${agent.workdir}`);
-      const proc = Bun.spawn(
-        [
-          'bash',
-          '-c',
-          "git add -A && git commit --allow-empty -m 'WIP: container eviction save' && git push --set-upstream origin HEAD --no-verify",
-        ],
-        {
-          cwd: agent.workdir,
-          stdout: 'pipe',
-          stderr: 'pipe',
-        }
-      );
+
+      // Check whether a remote named "origin" exists. Lightweight
+      // workspaces (mayor/triage) are created with `git init` and
+      // never add a remote, so pushing would fail with
+      // "fatal: 'origin' does not appear to be a git repository".
+      const remoteCheck = Bun.spawn(['git', 'remote', 'get-url', 'origin'], {
+        cwd: agent.workdir,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      const hasOrigin = (await remoteCheck.exited) === 0;
+
+      const gitCmd = hasOrigin
+        ? "git add -A && git commit --allow-empty -m 'WIP: container eviction save' && git push --set-upstream origin HEAD --no-verify"
+        : "git add -A && git commit --allow-empty -m 'WIP: container eviction save'";
+
+      if (!hasOrigin) {
+        console.warn(
+          `${DRAIN_LOG} Phase 4: no origin remote for agent ${agent.agentId}, committing locally only (push skipped)`
+        );
+      }
+
+      const proc = Bun.spawn(['bash', '-c', gitCmd], {
+        cwd: agent.workdir,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
       const exitCode = await proc.exited;
       const stdout = await new Response(proc.stdout).text();
       const stderr = await new Response(proc.stderr).text();

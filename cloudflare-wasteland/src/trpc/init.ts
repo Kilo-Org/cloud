@@ -25,6 +25,8 @@ const BREADCRUMB_OPERATIONS = new Set([
   'wasteland.postWantedItem',
   'wasteland.deleteWasteland',
   'wasteland.storeCredential',
+  'wasteland.connectKiloTown',
+  'wasteland.disconnectKiloTown',
 ]);
 
 /**

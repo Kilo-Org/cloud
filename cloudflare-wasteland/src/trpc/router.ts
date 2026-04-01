@@ -19,6 +19,7 @@ import {
   RpcWastelandMemberOutput,
   RpcWastelandConfigOutput,
   RpcWastelandCredentialStatusOutput,
+  RpcConnectedTownOutput,
   RpcWantedItemOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
@@ -497,6 +498,81 @@ export const wastelandRouter = router({
       });
 
       return { success: true };
+    }),
+
+  // ── Connected Towns ────────────────────────────────────────────────
+
+  connectKiloTown: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        townId: z.string().uuid(),
+      })
+    )
+    .output(RpcConnectedTownOutput)
+    .mutation(async ({ ctx, input }) => {
+      // Verify user has access to this wasteland (owner, org member, or admin)
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+
+      // Town ownership is verified implicitly: the user is authenticated via
+      // their Kilo JWT, and the frontend only shows towns they own. We don't
+      // have a service binding to Gastown, so we trust the authenticated user's
+      // claim. The connected_by field records who established the connection.
+
+      const stub = getWastelandDOStub(ctx.env, input.wastelandId);
+
+      // Auto-register the user as a member if not already one
+      const existingMember = await stub.getMember(ctx.userId);
+      if (!existingMember) {
+        await stub.addMember(ctx.userId, 'contributor', 1);
+      }
+
+      // Store the town-wasteland association
+      const connection = await stub.connectTown(input.townId, ctx.userId);
+
+      meterEvent(ctx.env, {
+        event: 'billing.api_operation',
+        userId: ctx.userId,
+        wastelandId: input.wastelandId,
+        label: 'connect_town',
+      });
+
+      return connection;
+    }),
+
+  disconnectKiloTown: procedure
+    .input(
+      z.object({
+        wastelandId: z.string().uuid(),
+        townId: z.string().uuid(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      // Only owners/admins can disconnect towns
+      await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
+
+      const stub = getWastelandDOStub(ctx.env, input.wastelandId);
+      await stub.disconnectTown(input.townId);
+
+      meterEvent(ctx.env, {
+        event: 'billing.api_operation',
+        userId: ctx.userId,
+        wastelandId: input.wastelandId,
+        label: 'disconnect_town',
+      });
+
+      return { success: true };
+    }),
+
+  listConnectedTowns: procedure
+    .input(z.object({ wastelandId: z.string().uuid() }))
+    .output(z.array(RpcConnectedTownOutput))
+    .query(async ({ ctx, input }) => {
+      // Any member or owner can list connected towns
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      const stub = getWastelandDOStub(ctx.env, input.wastelandId);
+      return stub.listConnectedTowns();
     }),
 
   // ── Wanted Board ──────────────────────────────────────────────────

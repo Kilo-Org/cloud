@@ -39,9 +39,17 @@ export const WastelandMemberOutput = z.object({
   joined_at: z.string(),
 });
 
+export const ConnectedTownOutput = z.object({
+  town_id: z.string(),
+  wasteland_id: z.string(),
+  connected_by: z.string(),
+  connected_at: z.string(),
+});
+
 export type WantedItem = z.infer<typeof WantedItemOutput>;
 export type Wasteland = z.infer<typeof WastelandOutput>;
 export type WastelandMember = z.infer<typeof WastelandMemberOutput>;
+export type ConnectedTown = z.infer<typeof ConnectedTownOutput>;
 
 // ── tRPC wire format schemas ────────────────────────────────────────────
 // tRPC wraps successful responses in { result: { data: T } } and errors
@@ -249,6 +257,20 @@ export function createWastelandClient(deps: WastelandClientDeps) {
 
     listMembers(input: { wastelandId: string }) {
       return trpcQuery(deps, 'listMembers', input, WastelandMemberOutput.array());
+    },
+
+    // ── Connected Towns ─────────────────────────────────────────
+
+    connectKiloTown(input: { wastelandId: string; townId: string }) {
+      return trpcMutation(deps, 'connectKiloTown', input, ConnectedTownOutput);
+    },
+
+    disconnectKiloTown(input: { wastelandId: string; townId: string }) {
+      return trpcMutation(deps, 'disconnectKiloTown', input, z.object({ success: z.boolean() }));
+    },
+
+    listConnectedTowns(input: { wastelandId: string }) {
+      return trpcQuery(deps, 'listConnectedTowns', input, ConnectedTownOutput.array());
     },
   };
 }

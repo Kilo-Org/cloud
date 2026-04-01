@@ -58,6 +58,15 @@ export const WastelandConfigOutput = z.object({
   updated_at: z.string(),
 });
 
+// ── Connected Town ──────────────────────────────────────────────────────
+
+export const ConnectedTownOutput = z.object({
+  town_id: z.string(),
+  wasteland_id: z.string(),
+  connected_by: z.string(),
+  connected_at: z.string(),
+});
+
 // ── Wanted Board Item ───────────────────────────────────────────────────
 
 export const WantedItemOutput = z.object({
@@ -84,4 +93,5 @@ export const RpcWastelandOutput = rpcSafe(WastelandOutput);
 export const RpcWastelandMemberOutput = rpcSafe(WastelandMemberOutput);
 export const RpcWastelandCredentialStatusOutput = rpcSafe(WastelandCredentialStatusOutput);
 export const RpcWastelandConfigOutput = rpcSafe(WastelandConfigOutput);
+export const RpcConnectedTownOutput = rpcSafe(ConnectedTownOutput);
 export const RpcWantedItemOutput = rpcSafe(WantedItemOutput);

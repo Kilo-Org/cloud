@@ -432,7 +432,8 @@ export async function handleKiloPassInvoicePaid(params: {
           )
         )
         .orderBy(desc(kilo_pass_issuances.issue_month))
-        .limit(24);
+        // Must match maxIterations in the streak walk below so the set covers the full window
+        .limit(36);
 
       const issueMonthSet = new Set(issuanceMonths.map(x => x.issueMonth));
 

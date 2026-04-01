@@ -574,6 +574,14 @@ export function updateBeadFields(
   const bead = getBead(sql, beadId);
   if (!bead) throw new Error(`Bead ${beadId} not found`);
 
+  // Delegate status changes to updateBeadStatus so they produce a
+  // status_changed event (with old/new values), respect the terminal
+  // state guard, and carry structured failureReason metadata.
+  if (fields.status !== undefined && fields.status !== bead.status) {
+    updateBeadStatus(sql, beadId, fields.status, actorId);
+  }
+
+  // Build the SQL update for non-status fields only.
   const timestamp = now();
   const setClauses: string[] = [];
   const values: unknown[] = [];
@@ -594,19 +602,6 @@ export function updateBeadFields(
     setClauses.push(`${beads.columns.labels} = ?`);
     values.push(JSON.stringify(fields.labels));
   }
-  if (fields.status !== undefined) {
-    setClauses.push(`${beads.columns.status} = ?`);
-    values.push(fields.status);
-    if (fields.status === 'closed') {
-      // Set closed_at when transitioning to closed (preserve existing if already set)
-      setClauses.push(`${beads.columns.closed_at} = ?`);
-      values.push(bead.closed_at ?? timestamp);
-    } else if (bead.closed_at) {
-      // Clear closed_at when reopening a previously-closed bead
-      setClauses.push(`${beads.columns.closed_at} = ?`);
-      values.push(null);
-    }
-  }
   if (fields.metadata !== undefined) {
     setClauses.push(`${beads.columns.metadata} = ?`);
     values.push(JSON.stringify(fields.metadata));
@@ -624,31 +619,27 @@ export function updateBeadFields(
     values.push(fields.parent_bead_id);
   }
 
-  if (setClauses.length === 0) return bead;
+  if (setClauses.length > 0) {
+    setClauses.push(`${beads.columns.updated_at} = ?`);
+    values.push(timestamp);
+    values.push(beadId);
 
-  setClauses.push(`${beads.columns.updated_at} = ?`);
-  values.push(timestamp);
-  values.push(beadId);
+    sql.exec(
+      /* sql */ `UPDATE ${beads} SET ${setClauses.join(', ')} WHERE ${beads.bead_id} = ?`,
+      ...values
+    );
 
-  // Dynamic SET clause — query() can't statically verify param count here,
-  // so use sql.exec() directly. The early return above guarantees values is non-empty.
-  sql.exec(
-    /* sql */ `UPDATE ${beads} SET ${setClauses.join(', ')} WHERE ${beads.bead_id} = ?`,
-    ...values
-  );
-
-  const changedFields = Object.keys(fields);
-  logBeadEvent(sql, {
-    beadId,
-    agentId: actorId,
-    eventType: 'fields_updated',
-    newValue: changedFields.join(','),
-    metadata: { changed: changedFields, actor: actorId },
-  });
-
-  // If status was updated to a terminal value, run convoy progress logic
-  if (fields.status === 'closed' || fields.status === 'failed') {
-    updateConvoyProgress(sql, beadId, timestamp);
+    // Log fields_updated only for the non-status fields that were changed.
+    const nonStatusFields = Object.keys(fields).filter(k => k !== 'status');
+    if (nonStatusFields.length > 0) {
+      logBeadEvent(sql, {
+        beadId,
+        agentId: actorId,
+        eventType: 'fields_updated',
+        newValue: nonStatusFields.join(','),
+        metadata: { changed: nonStatusFields, actor: actorId },
+      });
+    }
   }
 
   const updated = getBead(sql, beadId);

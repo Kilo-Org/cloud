@@ -1022,6 +1022,15 @@ export class TownDO extends DurableObject<Env> {
     }>,
     actorId: string
   ): Promise<Bead> {
+    // Record terminal transitions as bead_cancelled events for the reconciler,
+    // matching the behaviour of updateBeadStatus (the dedicated status method).
+    if (fields.status === 'closed' || fields.status === 'failed') {
+      events.insertEvent(this.sql, 'bead_cancelled', {
+        bead_id: beadId,
+        payload: { cancel_status: fields.status },
+      });
+    }
+
     const bead = beadOps.updateBeadFields(this.sql, beadId, fields, actorId);
 
     // When a bead closes via field update, check for newly unblocked beads

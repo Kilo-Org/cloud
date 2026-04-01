@@ -14,6 +14,15 @@ export type WastelandConfigResult = {
   updated_at: string;
 };
 
+/** Shape returned by WastelandDO member RPCs — matches the wasteland_members table. */
+export type WastelandMemberResult = {
+  member_id: string;
+  user_id: string;
+  trust_level: number;
+  role: 'contributor' | 'maintainer' | 'owner';
+  joined_at: string;
+};
+
 /**
  * Stub WastelandDO — placeholder until the full implementation lands.
  * Provides the class export that wrangler.jsonc requires for the
@@ -29,6 +38,35 @@ export class WastelandDO extends DurableObject<Env> {
   }
 
   async getConfig(): Promise<WastelandConfigResult | null> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
+  // ── Member management RPCs ──────────────────────────────────────────
+
+  async listMembers(): Promise<WastelandMemberResult[]> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
+  async addMember(
+    _userId: string,
+    _role: string,
+    _trustLevel: number
+  ): Promise<string> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
+  async removeMember(_memberId: string): Promise<void> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
+  async getMember(_userId: string): Promise<WastelandMemberResult | null> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
+  async updateMember(
+    _memberId: string,
+    _update: { role?: string; trust_level?: number }
+  ): Promise<WastelandMemberResult | null> {
     throw new Error('WastelandDO not yet implemented');
   }
 }

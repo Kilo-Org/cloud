@@ -34,7 +34,6 @@ import {
 
 import { useDefaultModelSelection } from '../hooks/useDefaultModelSelection';
 import { getSettingsModelOptions } from './modelSupport';
-import { useClawContext } from './ClawContext';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

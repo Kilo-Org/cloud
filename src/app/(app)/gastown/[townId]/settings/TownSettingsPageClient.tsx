@@ -823,7 +823,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                     </div>
                     <Button
                       onClick={() => refreshToken.mutate({ townId })}
-                      disabled={refreshToken.isPending}
+                      disabled={refreshToken.isPending || effectiveReadOnly}
                       variant="secondary"
                       size="sm"
                       className="ml-4 shrink-0 gap-1.5"
@@ -844,7 +844,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                     </div>
                     <Button
                       onClick={() => restartContainer.mutate({ townId })}
-                      disabled={restartContainer.isPending}
+                      disabled={restartContainer.isPending || effectiveReadOnly}
                       variant="secondary"
                       size="sm"
                       className="ml-4 shrink-0 gap-1.5"

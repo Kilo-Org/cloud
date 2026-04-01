@@ -11,43 +11,55 @@ function flatten(data?: unknown): Record<string, unknown> {
 
 const log = {
   info: (msg: string, data?: unknown) =>
-    console.log(JSON.stringify({ level: 'info', msg, ...flatten(data), ts: new Date().toISOString() })),
+    console.log(
+      JSON.stringify({ level: 'info', msg, ...flatten(data), ts: new Date().toISOString() })
+    ),
   warn: (msg: string, data?: unknown) =>
-    console.warn(JSON.stringify({ level: 'warn', msg, ...flatten(data), ts: new Date().toISOString() })),
+    console.warn(
+      JSON.stringify({ level: 'warn', msg, ...flatten(data), ts: new Date().toISOString() })
+    ),
   error: (msg: string, data?: unknown) =>
-    console.error(JSON.stringify({ level: 'error', msg, ...flatten(data), ts: new Date().toISOString() })),
+    console.error(
+      JSON.stringify({ level: 'error', msg, ...flatten(data), ts: new Date().toISOString() })
+    ),
 };
 
 // ---------------------------------------------------------------------------
 // Zod schemas for wl CLI output
 // ---------------------------------------------------------------------------
 
-const WantedItemSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  description: z.string().optional(),
-  bounty: z.number().optional(),
-  status: z.string().optional(),
-  claimedBy: z.string().optional(),
-  claimId: z.string().optional(),
-  evidence: z.string().optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
-}).passthrough();
+const WantedItemSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().optional(),
+    bounty: z.number().optional(),
+    status: z.string().optional(),
+    claimedBy: z.string().optional(),
+    claimId: z.string().optional(),
+    evidence: z.string().optional(),
+    createdAt: z.string().optional(),
+    updatedAt: z.string().optional(),
+  })
+  .passthrough();
 
 type WantedItem = z.infer<typeof WantedItemSchema>;
 
 const BrowseOutputSchema = z.array(WantedItemSchema);
 
-const ClaimOutputSchema = z.object({
-  success: z.boolean().optional(),
-  claimId: z.string().optional(),
-}).passthrough();
+const ClaimOutputSchema = z
+  .object({
+    success: z.boolean().optional(),
+    claimId: z.string().optional(),
+  })
+  .passthrough();
 
-const PostOutputSchema = z.object({
-  success: z.boolean().optional(),
-  itemId: z.string().optional(),
-}).passthrough();
+const PostOutputSchema = z
+  .object({
+    success: z.boolean().optional(),
+    itemId: z.string().optional(),
+  })
+  .passthrough();
 
 // ---------------------------------------------------------------------------
 // Request body schemas
@@ -103,7 +115,7 @@ function createMutex() {
         locked = true;
         return;
       }
-      await new Promise<void>((resolve) => {
+      await new Promise<void>(resolve => {
         waiting.push(resolve);
       });
     },
@@ -132,10 +144,7 @@ type ExecResult = {
   exitCode: number;
 };
 
-async function execWl(
-  args: string[],
-  env: Record<string, string>,
-): Promise<ExecResult> {
+async function execWl(args: string[], env: Record<string, string>): Promise<ExecResult> {
   const proc = Bun.spawn(['wl', ...args], {
     env: { ...process.env, ...env },
     stdout: 'pipe',
@@ -206,7 +215,10 @@ function extractToken(req: Request): string | null {
   return req.headers.get('DOLTHUB_TOKEN') ?? req.headers.get('dolthub_token');
 }
 
-async function parseBody<T>(req: Request, schema: z.ZodType<T>): Promise<{ data: T } | { error: Response }> {
+async function parseBody<T>(
+  req: Request,
+  schema: z.ZodType<T>
+): Promise<{ data: T } | { error: Response }> {
   let raw: unknown;
   try {
     raw = await req.json();
@@ -215,7 +227,11 @@ async function parseBody<T>(req: Request, schema: z.ZodType<T>): Promise<{ data:
   }
   const parsed = schema.safeParse(raw);
   if (!parsed.success) {
-    return { error: errorResponse(`Validation error: ${parsed.error.issues.map((i) => i.message).join(', ')}`) };
+    return {
+      error: errorResponse(
+        `Validation error: ${parsed.error.issues.map(i => i.message).join(', ')}`
+      ),
+    };
   }
   return { data: parsed.data };
 }
@@ -228,7 +244,7 @@ async function verifyItemState(
   token: string,
   upstream: string,
   itemId: string,
-  expectedCheck: (item: WantedItem) => boolean,
+  expectedCheck: (item: WantedItem) => boolean
 ): Promise<{ verified: boolean; item?: WantedItem }> {
   const env = buildEnv(token, upstream);
   const result = await execWl(['status', itemId, '--json'], env);
@@ -290,7 +306,11 @@ async function handleClaim(req: Request): Promise<Response> {
     const result = await execWl(['claim', body.data.itemId, '--json'], env);
 
     if (result.exitCode !== 0) {
-      log.error('wl claim failed', { stderr: result.stderr, exitCode: result.exitCode, itemId: body.data.itemId });
+      log.error('wl claim failed', {
+        stderr: result.stderr,
+        exitCode: result.exitCode,
+        itemId: body.data.itemId,
+      });
       return errorResponse(`wl claim failed: ${result.stderr}`, 502);
     }
 
@@ -307,7 +327,7 @@ async function handleClaim(req: Request): Promise<Response> {
       token,
       body.data.upstream,
       body.data.itemId,
-      (item) => item.claimedBy === body.data.userId || item.status === 'claimed',
+      item => item.claimedBy === body.data.userId || item.status === 'claimed'
     );
     if (!verification.verified) {
       log.warn('claim verification failed — mutation may be a no-op', { itemId: body.data.itemId });
@@ -332,10 +352,17 @@ async function handleDone(req: Request): Promise<Response> {
   await mutationMutex.acquire();
   try {
     const env = buildEnv(token, body.data.upstream);
-    const result = await execWl(['done', body.data.itemId, '--evidence', body.data.evidence, '--json'], env);
+    const result = await execWl(
+      ['done', body.data.itemId, '--evidence', body.data.evidence, '--json'],
+      env
+    );
 
     if (result.exitCode !== 0) {
-      log.error('wl done failed', { stderr: result.stderr, exitCode: result.exitCode, itemId: body.data.itemId });
+      log.error('wl done failed', {
+        stderr: result.stderr,
+        exitCode: result.exitCode,
+        itemId: body.data.itemId,
+      });
       return errorResponse(`wl done failed: ${result.stderr}`, 502);
     }
 
@@ -344,7 +371,7 @@ async function handleDone(req: Request): Promise<Response> {
       token,
       body.data.upstream,
       body.data.itemId,
-      (item) => item.status === 'done' || item.status === 'completed',
+      item => item.status === 'done' || item.status === 'completed'
     );
     if (!verification.verified) {
       log.warn('done verification failed — mutation may be a no-op', { itemId: body.data.itemId });
@@ -395,7 +422,7 @@ async function handlePost(req: Request): Promise<Response> {
         token,
         body.data.upstream,
         parsed.itemId,
-        (item) => item.title === body.data.title,
+        item => item.title === body.data.title
       );
       if (!verification.verified) {
         log.warn('post verification failed — mutation may be a no-op', { itemId: parsed.itemId });
@@ -462,7 +489,11 @@ async function handleStatus(req: Request): Promise<Response> {
   const result = await execWl(['status', body.data.itemId, '--json'], env);
 
   if (result.exitCode !== 0) {
-    log.error('wl status failed', { stderr: result.stderr, exitCode: result.exitCode, itemId: body.data.itemId });
+    log.error('wl status failed', {
+      stderr: result.stderr,
+      exitCode: result.exitCode,
+      itemId: body.data.itemId,
+    });
     return errorResponse(`wl status failed: ${result.stderr}`, 502);
   }
 

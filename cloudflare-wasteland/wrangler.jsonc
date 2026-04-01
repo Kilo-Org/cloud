@@ -49,10 +49,7 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": [
-        "WastelandDO",
-        "WastelandContainerDO",
-      ],
+      "new_sqlite_classes": ["WastelandDO", "WastelandContainerDO"],
     },
   ],
 

@@ -1,3 +1,5 @@
+import { DurableObject } from 'cloudflare:workers';
+
 /**
  * Stub WastelandDO — placeholder until the full implementation lands.
  * Provides the class export that wrangler.jsonc requires for the

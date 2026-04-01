@@ -1,9 +1,11 @@
 import { describe, it, expect } from '@jest/globals';
 import {
+  apiKindNotSupportedResponse,
   checkOrganizationModelRestrictions,
   extractEmbeddingPromptInfo,
   parseEmbeddingUsageFromResponse,
 } from './llm-proxy-helpers';
+import { EmptyFraudDetectionHeaders, getFraudDetectionHeaders } from './utils';
 
 describe('checkOrganizationModelRestrictions', () => {
   describe('enterprise plan - model deny list restrictions', () => {
@@ -268,6 +270,30 @@ describe('extractEmbeddingPromptInfo', () => {
 
     expect(result.system_prompt_prefix).toBe('');
     expect(result.system_prompt_length).toBe(0);
+  });
+});
+
+describe('apiKindNotSupportedResponse', () => {
+  it('tells Roo Code based clients to upgrade Kilo', async () => {
+    const response = apiKindNotSupportedResponse(
+      'responses',
+      ['chat_completions'],
+      getFraudDetectionHeaders(new Headers({ 'user-agent': 'Kilo-Code/4.65.3' }))
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      error: 'This Kilo version is too old for this model. Please upgrade Kilo and try again.',
+      message: 'This Kilo version is too old for this model. Please upgrade Kilo and try again.',
+    });
+  });
+
+  it('keeps the generic unsupported API message for other clients', async () => {
+    const response = apiKindNotSupportedResponse('responses', ['chat_completions'], EmptyFraudDetectionHeaders);
+
+    await expect(response.json()).resolves.toEqual({
+      error: 'This model does not support the responses API, please use any of: chat_completions',
+      message: 'This model does not support the responses API, please use any of: chat_completions',
+    });
   });
 });
 

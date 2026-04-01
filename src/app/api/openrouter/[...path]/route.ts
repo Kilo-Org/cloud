@@ -346,7 +346,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     taskId
   );
   if (!provider.supportedChatApis.includes(requestBodyParsed.kind)) {
-    return apiKindNotSupportedResponse(requestBodyParsed.kind, provider.supportedChatApis);
+    return apiKindNotSupportedResponse(
+      requestBodyParsed.kind,
+      provider.supportedChatApis,
+      fraudHeaders
+    );
   }
 
   console.debug(`Routing request to ${provider.id}`);

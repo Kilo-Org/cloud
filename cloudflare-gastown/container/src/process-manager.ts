@@ -775,6 +775,17 @@ export async function startAgent(
       if (sessionCounted) {
         const instance = sdkInstances.get(workdir);
         if (instance) {
+          // Abort the orphaned session if one was created before the abort
+          if (agent.sessionId) {
+            try {
+              await instance.client.session.abort({ path: { id: agent.sessionId } });
+            } catch (abortErr) {
+              console.error(
+                `${MANAGER_LOG} startAgent: failed to abort orphaned session ${agent.sessionId}:`,
+                abortErr
+              );
+            }
+          }
           instance.sessionCount--;
           if (instance.sessionCount <= 0) {
             instance.server.close();
@@ -782,7 +793,9 @@ export async function startAgent(
           }
         }
       }
-      agents.delete(request.agentId);
+      if (agents.get(request.agentId) === agent) {
+        agents.delete(request.agentId);
+      }
       throw err;
     }
 

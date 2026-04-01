@@ -38,7 +38,7 @@ const ListSessionsInputSchema = z.object({
   orderBy: z.enum(['created_at', 'updated_at']).optional().default('created_at'),
   organizationId: z.uuid().nullable().optional(),
   includeSubSessions: z.boolean().optional().default(false),
-  gitUrl: z.string().optional(),
+  gitUrl: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
   updatedSince: z.iso.datetime().optional(),
 });
 
@@ -51,7 +51,7 @@ const SearchInputSchema = z.object({
     .optional(),
   organizationId: z.uuid().nullable().optional(),
   includeSubSessions: z.boolean().optional().default(false),
-  gitUrl: z.string().optional(),
+  gitUrl: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
 });
 
 /**
@@ -65,7 +65,7 @@ function buildScopeFragments(
     createdOnPlatform?: string | string[];
     organizationId?: string | null;
     includeSubSessions?: boolean;
-    gitUrl?: string;
+    gitUrl?: string | string[];
   }
 ): SQL[] {
   const table = tableName === 'cli_sessions' ? cliSessions : cli_sessions_v2;
@@ -109,7 +109,17 @@ function buildScopeFragments(
   }
 
   if (opts.gitUrl) {
-    fragments.push(sql`${table.git_url} = ${opts.gitUrl}`);
+    const urls = Array.isArray(opts.gitUrl) ? opts.gitUrl : [opts.gitUrl];
+    if (urls.length === 1) {
+      fragments.push(sql`${table.git_url} = ${urls[0]}`);
+    } else {
+      fragments.push(
+        sql`${table.git_url} IN (${sql.join(
+          urls.map(u => sql`${u}`),
+          sql`, `
+        )})`
+      );
+    }
   }
 
   return fragments;

@@ -7,7 +7,6 @@ import {
   SlidersHorizontal,
   MoreHorizontal,
   Trash2,
-  Check,
   X,
   Pencil,
 } from 'lucide-react';
@@ -20,6 +19,7 @@ import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -107,11 +107,11 @@ type ChatSidebarProps = {
   activeSessions?: ActiveSession[];
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
-  platformFilter?: string;
-  onPlatformChange?: (platform: string | undefined) => void;
+  platformFilter?: string[];
+  onPlatformChange?: (platforms: string[]) => void;
   onMobileSheetOpenChange?: (open: boolean) => void;
-  projectFilter?: string;
-  onProjectChange?: (gitUrl: string | undefined) => void;
+  projectFilter?: string[];
+  onProjectChange?: (gitUrls: string[]) => void;
   recentProjects?: Array<{ gitUrl: string; displayName: string }>;
 };
 
@@ -248,12 +248,10 @@ function SessionRow({
   );
 }
 
-const PLATFORM_FILTERS = ['all', 'cloud-agent', 'cli', 'slack', 'extension'] as const;
+const PLATFORM_FILTERS = ['cloud-agent', 'cli', 'slack', 'extension'] as const;
 
-function platformFilterLabel(p: (typeof PLATFORM_FILTERS)[number]): string {
+function platformFilterLabel(p: string): string {
   switch (p) {
-    case 'all':
-      return 'All';
     case 'cloud-agent':
       return 'Cloud';
     case 'cli':
@@ -262,6 +260,8 @@ function platformFilterLabel(p: (typeof PLATFORM_FILTERS)[number]): string {
       return 'Slack';
     case 'extension':
       return 'Ext';
+    default:
+      return p;
   }
 }
 
@@ -352,7 +352,7 @@ export function ChatSidebar({
     activeS => !sessions.some(s => s.sessionId === activeS.id)
   );
 
-  const hasActiveFilter = !!platformFilter || !!projectFilter;
+  const hasActiveFilter = (platformFilter?.length ?? 0) > 0 || (projectFilter?.length ?? 0) > 0;
 
   const dateGroups = useMemo(() => groupSessionsByDate(sessions), [sessions]);
 
@@ -398,24 +398,24 @@ export function ChatSidebar({
                 {onProjectChange && recentProjects.length > 0 && (
                   <>
                     <DropdownMenuLabel>Project</DropdownMenuLabel>
-                    <DropdownMenuItem onClick={() => onProjectChange(undefined)}>
-                      <Check
-                        className={cn('mr-2 h-4 w-4', !projectFilter ? 'opacity-100' : 'opacity-0')}
-                      />
-                      All projects
-                    </DropdownMenuItem>
                     {recentProjects.map(project => {
-                      const isActive = projectFilter === project.gitUrl;
+                      const isChecked = projectFilter?.includes(project.gitUrl) ?? false;
                       return (
-                        <DropdownMenuItem
+                        <DropdownMenuCheckboxItem
                           key={project.gitUrl}
-                          onClick={() => onProjectChange(project.gitUrl)}
+                          checked={isChecked}
+                          onSelect={e => e.preventDefault()}
+                          onCheckedChange={() => {
+                            const current = projectFilter ?? [];
+                            onProjectChange(
+                              isChecked
+                                ? current.filter(u => u !== project.gitUrl)
+                                : [...current, project.gitUrl]
+                            );
+                          }}
                         >
-                          <Check
-                            className={cn('mr-2 h-4 w-4', isActive ? 'opacity-100' : 'opacity-0')}
-                          />
                           {project.displayName}
-                        </DropdownMenuItem>
+                        </DropdownMenuCheckboxItem>
                       );
                     })}
                   </>
@@ -425,20 +425,21 @@ export function ChatSidebar({
                     {onProjectChange && recentProjects.length > 0 && <DropdownMenuSeparator />}
                     <DropdownMenuLabel>Platform</DropdownMenuLabel>
                     {PLATFORM_FILTERS.map(p => {
-                      const isFilterActive = p === 'all' ? !platformFilter : platformFilter === p;
+                      const isChecked = platformFilter?.includes(p) ?? false;
                       return (
-                        <DropdownMenuItem
+                        <DropdownMenuCheckboxItem
                           key={p}
-                          onClick={() => onPlatformChange(p === 'all' ? undefined : p)}
+                          checked={isChecked}
+                          onSelect={e => e.preventDefault()}
+                          onCheckedChange={() => {
+                            const current = platformFilter ?? [];
+                            onPlatformChange(
+                              isChecked ? current.filter(f => f !== p) : [...current, p]
+                            );
+                          }}
                         >
-                          <Check
-                            className={cn(
-                              'mr-2 h-4 w-4',
-                              isFilterActive ? 'opacity-100' : 'opacity-0'
-                            )}
-                          />
                           {platformFilterLabel(p)}
-                        </DropdownMenuItem>
+                        </DropdownMenuCheckboxItem>
                       );
                     })}
                   </>
@@ -469,32 +470,26 @@ export function ChatSidebar({
       {/* Active filter chips */}
       {hasActiveFilter && (
         <div className="flex flex-wrap gap-1.5 border-b px-3 py-2">
-          {projectFilter && (
+          {projectFilter?.map(gitUrl => (
             <button
-              onClick={() => onProjectChange?.(undefined)}
+              key={gitUrl}
+              onClick={() => onProjectChange?.(projectFilter.filter(u => u !== gitUrl))}
               className="bg-muted text-foreground hover:bg-muted/70 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs transition-colors"
             >
-              {recentProjects.find(p => p.gitUrl === projectFilter)?.displayName ?? 'Project'}
+              {recentProjects.find(p => p.gitUrl === gitUrl)?.displayName ?? 'Project'}
               <X className="h-3 w-3 opacity-60" />
             </button>
-          )}
-          {platformFilter && (
+          ))}
+          {platformFilter?.map(p => (
             <button
-              onClick={() => onPlatformChange?.(undefined)}
+              key={p}
+              onClick={() => onPlatformChange?.(platformFilter.filter(f => f !== p))}
               className="bg-muted text-foreground hover:bg-muted/70 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs transition-colors"
             >
-              {platformFilter === 'cloud-agent'
-                ? 'Cloud'
-                : platformFilter === 'cli'
-                  ? 'CLI'
-                  : platformFilter === 'slack'
-                    ? 'Slack'
-                    : platformFilter === 'extension'
-                      ? 'Ext'
-                      : platformFilter}
+              {platformFilterLabel(p)}
               <X className="h-3 w-3 opacity-60" />
             </button>
-          )}
+          ))}
         </div>
       )}
 

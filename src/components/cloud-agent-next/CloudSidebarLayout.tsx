@@ -39,17 +39,24 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
   const currentSessionId = searchParams.get('sessionId') ?? undefined;
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [platformFilter, setPlatformFilter] = useState<string | undefined>('cloud-agent');
-  const [projectFilter, setProjectFilter] = useState<string | undefined>(undefined);
+  const [platformFilter, setPlatformFilter] = useState<string[]>(['cloud-agent']);
+  const [projectFilter, setProjectFilter] = useState<string[]>([]);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 30)).toISOString(), []);
+
+  const createdOnPlatform = useMemo(() => {
+    if (platformFilter.length === 0) return undefined;
+    // When 'cloud-agent' is selected, also include 'cloud-agent-web'
+    return platformFilter.flatMap(p =>
+      p === 'cloud-agent' ? ['cloud-agent', 'cloud-agent-web'] : [p]
+    );
+  }, [platformFilter]);
 
   const { sessions, refetchSessions, renameSessionLocally } = useSidebarSessions({
     organizationId: organizationId ?? null,
     searchQuery,
-    createdOnPlatform:
-      platformFilter === 'cloud-agent' ? ['cloud-agent', 'cloud-agent-web'] : platformFilter,
-    gitUrl: projectFilter,
+    createdOnPlatform,
+    gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
   });
   const { activeSessions } = useActiveSessions();
 

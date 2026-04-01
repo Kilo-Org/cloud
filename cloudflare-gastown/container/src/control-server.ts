@@ -46,6 +46,53 @@ export function getCurrentTownConfig(): Record<string, unknown> | null {
   return lastKnownTownConfig;
 }
 
+/**
+ * Sync config-derived env vars from the last-known town config into
+ * process.env. Safe to call at any time — no-ops when no config is cached.
+ */
+function syncTownConfigToProcessEnv(): void {
+  const cfg = getCurrentTownConfig();
+  if (!cfg) return;
+
+  const CONFIG_ENV_MAP: Array<[string, string]> = [
+    ['github_cli_pat', 'GITHUB_CLI_PAT'],
+    ['git_author_name', 'GASTOWN_GIT_AUTHOR_NAME'],
+    ['git_author_email', 'GASTOWN_GIT_AUTHOR_EMAIL'],
+    ['kilocode_token', 'KILOCODE_TOKEN'],
+  ];
+  for (const [cfgKey, envKey] of CONFIG_ENV_MAP) {
+    const val = cfg[cfgKey];
+    if (typeof val === 'string' && val) {
+      process.env[envKey] = val;
+    } else {
+      delete process.env[envKey];
+    }
+  }
+
+  const gitAuth = cfg.git_auth;
+  if (typeof gitAuth === 'object' && gitAuth !== null) {
+    const auth = gitAuth as Record<string, unknown>;
+    for (const [authKey, envKey] of [
+      ['github_token', 'GIT_TOKEN'],
+      ['gitlab_token', 'GITLAB_TOKEN'],
+      ['gitlab_instance_url', 'GITLAB_INSTANCE_URL'],
+    ] as const) {
+      const val = auth[authKey];
+      if (typeof val === 'string' && val) {
+        process.env[envKey] = val;
+      } else {
+        delete process.env[envKey];
+      }
+    }
+  }
+
+  if (cfg.disable_ai_coauthor) {
+    process.env.GASTOWN_DISABLE_AI_COAUTHOR = '1';
+  } else {
+    delete process.env.GASTOWN_DISABLE_AI_COAUTHOR;
+  }
+}
+
 export const app = new Hono();
 
 // Parse and validate town config from X-Town-Config header (sent by TownDO on
@@ -133,6 +180,16 @@ app.post('/refresh-token', async c => {
   return c.json({ refreshed: true });
 });
 
+// POST /sync-config
+// Push config-derived env vars from X-Town-Config into process.env on
+// the running container. Called by TownDO.syncConfigToContainer() after
+// persisting env vars to DO storage, so the live process picks up
+// changes (e.g. refreshed KILOCODE_TOKEN) without a container restart.
+app.post('/sync-config', async c => {
+  syncTownConfigToProcessEnv();
+  return c.json({ synced: true });
+});
+
 // POST /agents/start
 app.post('/agents/start', async c => {
   const body: unknown = await c.req.json().catch(() => null);
@@ -214,46 +271,7 @@ app.patch('/agents/:agentId/model', async c => {
   // Sync config-derived env vars from X-Town-Config into process.env so
   // the SDK server restart picks up fresh tokens and git identity.
   // The middleware already parsed the header into lastKnownTownConfig.
-  const cfg = getCurrentTownConfig();
-  if (cfg) {
-    const CONFIG_ENV_MAP: Array<[string, string]> = [
-      ['github_cli_pat', 'GITHUB_CLI_PAT'],
-      ['git_author_name', 'GASTOWN_GIT_AUTHOR_NAME'],
-      ['git_author_email', 'GASTOWN_GIT_AUTHOR_EMAIL'],
-      ['kilocode_token', 'KILOCODE_TOKEN'],
-    ];
-    for (const [cfgKey, envKey] of CONFIG_ENV_MAP) {
-      const val = cfg[cfgKey];
-      if (typeof val === 'string' && val) {
-        process.env[envKey] = val;
-      } else {
-        delete process.env[envKey];
-      }
-    }
-    // git_auth tokens
-    const gitAuth = cfg.git_auth;
-    if (typeof gitAuth === 'object' && gitAuth !== null) {
-      const auth = gitAuth as Record<string, unknown>;
-      for (const [authKey, envKey] of [
-        ['github_token', 'GIT_TOKEN'],
-        ['gitlab_token', 'GITLAB_TOKEN'],
-        ['gitlab_instance_url', 'GITLAB_INSTANCE_URL'],
-      ] as const) {
-        const val = auth[authKey];
-        if (typeof val === 'string' && val) {
-          process.env[envKey] = val;
-        } else {
-          delete process.env[envKey];
-        }
-      }
-    }
-    // disable_ai_coauthor
-    if (cfg.disable_ai_coauthor) {
-      process.env.GASTOWN_DISABLE_AI_COAUTHOR = '1';
-    } else {
-      delete process.env.GASTOWN_DISABLE_AI_COAUTHOR;
-    }
-  }
+  syncTownConfigToProcessEnv();
 
   await updateAgentModel(
     agentId,

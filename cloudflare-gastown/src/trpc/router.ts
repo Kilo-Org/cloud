@@ -1027,6 +1027,20 @@ export const gastownRouter = router({
       await townStub.syncConfigToContainer();
     }),
 
+  forceRestartContainer: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot restart containers for towns they do not own',
+        });
+      }
+      const containerStub = getTownContainerStub(ctx.env, input.townId);
+      await containerStub.destroy();
+    }),
+
   // ── Events ──────────────────────────────────────────────────────────
 
   getBeadEvents: gastownProcedure

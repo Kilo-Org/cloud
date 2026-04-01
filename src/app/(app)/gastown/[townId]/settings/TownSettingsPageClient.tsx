@@ -26,6 +26,7 @@ import {
   Variable,
   Layers,
   RefreshCw,
+  RotateCcw,
   Container,
   User,
   Key,
@@ -235,6 +236,13 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
     trpc.gastown.refreshContainerToken.mutationOptions({
       onSuccess: () => toast.success('Container token refreshed'),
       onError: err => toast.error(`Token refresh failed: ${err.message}`),
+    })
+  );
+
+  const restartContainer = useMutation(
+    trpc.gastown.forceRestartContainer.mutationOptions({
+      onSuccess: () => toast.success('Container restarting — it will be back shortly'),
+      onError: err => toast.error(`Container restart failed: ${err.message}`),
     })
   );
 
@@ -824,6 +832,27 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                         className={`size-3 ${refreshToken.isPending ? 'animate-spin' : ''}`}
                       />
                       {refreshToken.isPending ? 'Refreshing...' : 'Refresh Token'}
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                    <div>
+                      <p className="text-sm text-white/70">Restart Container</p>
+                      <p className="text-[11px] text-white/30">
+                        Destroys the running container and lets it restart fresh. All running
+                        agents will be interrupted but will resume on the next dispatch cycle.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => restartContainer.mutate({ townId })}
+                      disabled={restartContainer.isPending}
+                      variant="secondary"
+                      size="sm"
+                      className="ml-4 shrink-0 gap-1.5"
+                    >
+                      <RotateCcw
+                        className={`size-3 ${restartContainer.isPending ? 'animate-spin' : ''}`}
+                      />
+                      {restartContainer.isPending ? 'Restarting...' : 'Restart Container'}
                     </Button>
                   </div>
                 </div>

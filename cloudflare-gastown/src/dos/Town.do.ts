@@ -601,6 +601,10 @@ export class TownDO extends DurableObject<Env> {
    * Push config-derived env vars to the running container. Called after
    * updateTownConfig so that settings changes take effect without a
    * container restart. New agent processes inherit the updated values.
+   *
+   * Two-phase push:
+   *  1. setEnvVar — persists to DO storage for next boot
+   *  2. POST /sync-config — hot-swaps process.env on the running container
    */
   async syncConfigToContainer(): Promise<void> {
     const townId = this.townId;
@@ -608,8 +612,7 @@ export class TownDO extends DurableObject<Env> {
     const townConfig = await this.getTownConfig();
     const container = getTownContainerStub(this.env, townId);
 
-    // Map config fields to their container env var equivalents.
-    // When a value is set, push it; when cleared, remove it.
+    // Phase 1: Persist to DO storage for next boot.
     const envMapping: Array<[string, string | undefined]> = [
       ['GIT_TOKEN', townConfig.git_auth?.github_token],
       ['GITLAB_TOKEN', townConfig.git_auth?.gitlab_token],
@@ -631,6 +634,26 @@ export class TownDO extends DurableObject<Env> {
       } catch (err) {
         console.warn(`[Town.do] syncConfigToContainer: ${key} sync failed:`, err);
       }
+    }
+
+    // Phase 2: Push to the running container's process.env via the
+    // /sync-config endpoint. The X-Town-Config header delivers the
+    // full config; the endpoint applies CONFIG_ENV_MAP to process.env.
+    try {
+      const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+      await container.fetch('http://container/sync-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Town-Config': JSON.stringify(containerConfig),
+        },
+      });
+    } catch (err) {
+      // Best-effort — container may not be running yet.
+      console.warn(
+        `[Town.do] syncConfigToContainer: /sync-config push failed:`,
+        err instanceof Error ? err.message : err
+      );
     }
   }
 

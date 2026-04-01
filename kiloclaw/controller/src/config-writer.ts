@@ -402,7 +402,7 @@ export const DEFAULT_MCPORTER_CONFIG_PATH = '/root/.openclaw/workspace/config/mc
  *
  * TODO: When OpenClaw's Pi MCP bridge gains HTTP/SSE transport, migrate these
  * definitions into generateBaseConfig() using `config.mcp.servers` and remove
- * mcporter. See PR #48611 in openclaw/openclaw.
+ * mcporter.
  */
 export function writeMcporterConfig(
   env: EnvLike,

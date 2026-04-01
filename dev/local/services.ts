@@ -276,7 +276,6 @@ function buildServiceDefs(): ServiceDef[] {
         'pnpm',
         'run',
         'dev',
-        '--',
         '--port',
         String(port),
         '--inspector-port',

@@ -2079,7 +2079,7 @@ export const modelStats = pgTable(
 export type ModelStats = typeof modelStats.$inferSelect;
 export type NewModelStats = typeof modelStats.$inferInsert;
 
-export const MODELS_BY_PROVIDER_SCRIPT_NAME = 'pnpm script:run openrouter sync-providers';
+export const MODELS_BY_PROVIDER_ADMIN_URL = '/admin/sync-providers';
 
 export const modelsByProvider = pgTable('models_by_provider', {
   id: serial().notNull().primaryKey(),

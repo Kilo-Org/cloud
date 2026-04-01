@@ -58,8 +58,7 @@ type UpdateBotRequestParams = {
 
 async function performUpdate(id: string, params: UpdateBotRequestParams): Promise<void> {
   try {
-    const statusUpdate =
-      params.status === 'running' ? sql`'pending'` : params.status;
+    const statusUpdate = params.status === 'running' ? sql`'pending'` : params.status;
 
     await db
       .update(bot_requests)

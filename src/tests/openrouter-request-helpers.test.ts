@@ -78,7 +78,9 @@ describe('addCacheBreakpoints', () => {
           {
             type: 'message',
             role: 'user',
-            content: [{ type: 'input_text', text: 'First prompt', cache_control: { type: 'ephemeral' } }],
+            content: [
+              { type: 'input_text', text: 'First prompt', cache_control: { type: 'ephemeral' } },
+            ],
           },
           {
             type: 'function_call_output',

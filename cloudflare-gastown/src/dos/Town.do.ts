@@ -4013,9 +4013,24 @@ export class TownDO extends DurableObject<Env> {
     const ghMatch = prUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
     if (ghMatch) {
       const [, owner, repo, numberStr] = ghMatch;
-      const token = townConfig.git_auth.github_token;
+      // Fix 1 & 2: Token fallback chain — github_token → github_cli_pat → platform integration
+      let token = townConfig.git_auth.github_token ?? townConfig.github_cli_pat;
       if (!token) {
-        console.warn(`${TOWN_LOG} checkPRStatus: no github_token configured, cannot poll ${prUrl}`);
+        // Try resolving from GitHub App installation as final fallback
+        const integrationId = townConfig.git_auth.platform_integration_id;
+        if (integrationId && this.env.GIT_TOKEN_SERVICE) {
+          try {
+            token = await this.env.GIT_TOKEN_SERVICE.getToken(integrationId);
+          } catch (err) {
+            console.warn(
+              `${TOWN_LOG} checkPRStatus: platform integration token lookup failed for ${integrationId}`,
+              err
+            );
+          }
+        }
+      }
+      if (!token) {
+        console.warn(`${TOWN_LOG} checkPRStatus: no github token available, cannot poll ${prUrl}`);
         return null;
       }
 

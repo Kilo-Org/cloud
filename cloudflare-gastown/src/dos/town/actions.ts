@@ -291,6 +291,12 @@ export type ApplyActionContext = {
 
 const LOG = '[actions]';
 
+/** Fail MR bead after this many consecutive null poll results (#1632). */
+const PR_POLL_NULL_THRESHOLD = 10;
+
+/** Minimum interval between PR polls per MR bead (ms) (#1632). */
+export const PR_POLL_INTERVAL_MS = 60_000; // 1 minute
+
 function now(): string {
   return new Date().toISOString();
 }
@@ -576,29 +582,48 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     }
 
     case 'poll_pr': {
-      // Touch updated_at synchronously so the bead doesn't look stale
-      // to Rule 4 (orphaned PR review, 30 min timeout). Without this,
-      // active polling keeps the PR alive but updated_at was set once
-      // at PR creation and never refreshed, causing a false "orphaned"
-      // failure after 30 minutes.
+      // Touch updated_at and record last_poll_at synchronously so the bead
+      // doesn't look stale to Rule 4 (orphaned PR review, 30 min timeout).
+      // Without this, active polling keeps the PR alive but updated_at was
+      // set once at PR creation and never refreshed, causing a false
+      // "orphaned" failure after 30 minutes.
+      const timestamp = now();
       query(
         sql,
         /* sql */ `
           UPDATE ${beads}
-          SET ${beads.columns.updated_at} = ?
+          SET ${beads.columns.updated_at} = ?,
+              ${beads.columns.metadata} = json_set(
+                COALESCE(${beads.columns.metadata}, '{}'),
+                '$.last_poll_at', ?
+              )
           WHERE ${beads.bead_id} = ?
         `,
-        [now(), action.bead_id]
+        [timestamp, timestamp, action.bead_id]
       );
 
       return async () => {
         try {
           const status = await ctx.checkPRStatus(action.pr_url);
           if (status && status !== 'open') {
+            // Successful non-open status — reset null counter and emit event
+            query(
+              sql,
+              /* sql */ `
+                UPDATE ${beads}
+                SET ${beads.columns.metadata} = json_set(
+                  COALESCE(${beads.columns.metadata}, '{}'),
+                  '$.poll_null_count', 0
+                )
+                WHERE ${beads.bead_id} = ?
+              `,
+              [action.bead_id]
+            );
             ctx.insertEvent('pr_status_changed', {
               bead_id: action.bead_id,
               payload: { pr_url: action.pr_url, pr_state: status },
             });
+<<<<<<< HEAD
             return;
           }
 
@@ -736,6 +761,57 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               );
             }
           }
+          } else if (status === null) {
+            // Null result (e.g. no GitHub token) — increment consecutive null counter
+            query(
+              sql,
+              /* sql */ `
+                UPDATE ${beads}
+                SET ${beads.columns.metadata} = json_set(
+                  COALESCE(${beads.columns.metadata}, '{}'),
+                  '$.poll_null_count',
+                  COALESCE(
+                    json_extract(${beads.columns.metadata}, '$.poll_null_count'),
+                    0
+                  ) + 1
+                )
+                WHERE ${beads.bead_id} = ?
+              `,
+              [action.bead_id]
+            );
+            const rows = [
+              ...query(
+                sql,
+                /* sql */ `
+                  SELECT json_extract(${beads.columns.metadata}, '$.poll_null_count') AS null_count
+                  FROM ${beads}
+                  WHERE ${beads.bead_id} = ?
+                `,
+                [action.bead_id]
+              ),
+            ];
+            const nullCount = Number(rows[0]?.null_count ?? 0);
+            if (nullCount >= PR_POLL_NULL_THRESHOLD) {
+              console.warn(
+                `${LOG} poll_pr: ${nullCount} consecutive null results for bead=${action.bead_id}, failing`
+              );
+              beadOps.updateBeadStatus(sql, action.bead_id, 'failed', 'system');
+              query(
+                sql,
+                /* sql */ `
+                  UPDATE ${beads}
+                  SET ${beads.columns.metadata} = json_set(
+                    COALESCE(${beads.columns.metadata}, '{}'),
+                    '$.failureReason', 'no_github_token',
+                    '$.failureMessage', 'Cannot poll PR status — no GitHub token configured. Please add a token in town settings.'
+                  )
+                  WHERE ${beads.bead_id} = ?
+                `,
+                [action.bead_id]
+              );
+            }
+          }
+          // status === 'open' — no action needed, poll again next tick
         } catch (err) {
           console.warn(`${LOG} poll_pr failed: bead=${action.bead_id} url=${action.pr_url}`, err);
         }

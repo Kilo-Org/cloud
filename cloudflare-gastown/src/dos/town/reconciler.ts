@@ -30,6 +30,7 @@ import * as reviewQueue from './review-queue';
 import * as agents from './agents';
 import * as beadOps from './beads';
 import { getRig } from './rigs';
+import { PR_POLL_INTERVAL_MS } from './actions';
 import type { Action } from './actions';
 import type { TownEventRecord } from '../../db/tables/town-events.table';
 
@@ -1046,6 +1047,7 @@ export function reconcileReviewQueue(
       /* sql */ `
         SELECT b.${beads.columns.bead_id}, b.${beads.columns.status},
                b.${beads.columns.rig_id}, b.${beads.columns.updated_at},
+               b.${beads.columns.metadata},
                rm.${review_metadata.columns.pr_url},
                b.${beads.columns.assignee_agent_bead_id},
                b.${beads.columns.metadata}
@@ -1059,14 +1061,21 @@ export function reconcileReviewQueue(
   ]);
 
   for (const mr of mrBeads) {
-    // Rule 1: PR-strategy MR beads in_progress need polling
+    // Rule 1: PR-strategy MR beads in_progress need polling.
+    // Rate-limit: skip if polled less than PR_POLL_INTERVAL_MS ago (#1632).
     if (mr.status === 'in_progress' && mr.pr_url) {
-      // Always poll for status changes (merged/closed by human, etc.)
-      actions.push({
-        type: 'poll_pr',
-        bead_id: mr.bead_id,
-        pr_url: mr.pr_url,
-      });
+      // Rate-limit: skip if polled less than PR_POLL_INTERVAL_MS ago
+      const lastPollAt = mr.metadata?.last_poll_at;
+      const msSinceLastPoll =
+        typeof lastPollAt === 'string' ? Date.now() - new Date(lastPollAt).getTime() : Infinity;
+
+      if (msSinceLastPoll >= PR_POLL_INTERVAL_MS) {
+        actions.push({
+          type: 'poll_pr',
+          bead_id: mr.bead_id,
+          pr_url: mr.pr_url,
+        });
+      }
       // If auto-merge is pending, also attempt the merge
       if (mr.metadata?.auto_merge_pending) {
         actions.push({

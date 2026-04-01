@@ -180,6 +180,20 @@ export function generateBaseConfig(
     console.log(`Overriding kilocode base URL: ${env.KILOCODE_API_BASE_URL}`);
   }
 
+  // Pass org scope to KiloCode provider as request header when available.
+  // This is used by OpenClaw provider requests (not Kilo CLI).
+  // Header name matches ORGANIZATION_ID_HEADER in src/lib/constants.ts.
+  if (env.KILOCODE_ORGANIZATION_ID) {
+    config.models = config.models ?? {};
+    config.models.providers = config.models.providers ?? {};
+    config.models.providers.kilocode = config.models.providers.kilocode ?? {};
+    config.models.providers.kilocode.headers = config.models.providers.kilocode.headers ?? {};
+    config.models.providers.kilocode.headers['X-KiloCode-OrganizationId'] =
+      env.KILOCODE_ORGANIZATION_ID;
+    config.models.providers.kilocode.models = config.models.providers.kilocode.models ?? [];
+    console.log('Configured KiloCode organization header from KILOCODE_ORGANIZATION_ID');
+  }
+
   // User-selected default model override.
   if (env.KILOCODE_DEFAULT_MODEL) {
     config.agents = config.agents ?? {};

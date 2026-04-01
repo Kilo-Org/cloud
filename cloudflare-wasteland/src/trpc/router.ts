@@ -19,6 +19,7 @@ import {
   RpcWastelandMemberOutput,
   RpcWastelandConfigOutput,
   RpcWastelandCredentialStatusOutput,
+  RpcWantedItemOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
@@ -496,6 +497,26 @@ export const wastelandRouter = router({
       });
 
       return { success: true };
+    }),
+
+  // ── Wanted Board ──────────────────────────────────────────────────
+
+  browseWantedBoard: procedure
+    .input(z.object({ wastelandId: z.string().uuid() }))
+    .output(z.array(RpcWantedItemOutput))
+    .query(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      const stub = getWastelandDOStub(ctx.env, input.wastelandId);
+      return stub.getWantedBoard();
+    }),
+
+  refreshWantedBoard: procedure
+    .input(z.object({ wastelandId: z.string().uuid() }))
+    .output(z.array(RpcWantedItemOutput))
+    .mutation(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      const stub = getWastelandDOStub(ctx.env, input.wastelandId);
+      return stub.refreshWantedBoard();
     }),
 });
 

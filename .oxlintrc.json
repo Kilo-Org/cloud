@@ -22,7 +22,8 @@
     "**/.wrangler/**",
     "supabase/functions/**",
     "src/types/opencode.gen.ts",
-    "src/lib/gastown/types/**"
+    "src/lib/gastown/types/**",
+    "src/lib/wasteland/types/**"
   ],
   "rules": {
     "constructor-super": "off",

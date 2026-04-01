@@ -6,6 +6,7 @@ import {
   WastelandTRPCProvider,
   createWastelandTRPCClient,
 } from '@/lib/wasteland/trpc';
+import { WastelandDashboardHeader } from './WastelandDashboardHeader';
 
 export default function WastelandLayout({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
@@ -13,7 +14,10 @@ export default function WastelandLayout({ children }: { children: React.ReactNod
 
   return (
     <WastelandTRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
-      {children}
+      <div className="flex h-full flex-col">
+        <WastelandDashboardHeader />
+        <div className="flex-1 overflow-hidden">{children}</div>
+      </div>
     </WastelandTRPCProvider>
   );
 }

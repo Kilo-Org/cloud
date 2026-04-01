@@ -58,6 +58,21 @@ export const WastelandConfigOutput = z.object({
   updated_at: z.string(),
 });
 
+// ── Wanted Board Item ───────────────────────────────────────────────────
+
+export const WantedItemOutput = z.object({
+  item_id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  status: z.enum(['open', 'claimed', 'done']),
+  priority: z.enum(['low', 'medium', 'high', 'critical']),
+  type: z.enum(['feature', 'bug', 'docs', 'other']),
+  claimed_by: z.string().nullable(),
+  evidence: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
 // ── rpcSafe wrappers ────────────────────────────────────────────────────
 // tRPC's .output() forces TypeScript to check that the handler return type
 // is assignable to the schema's input type. When handlers return values from
@@ -69,3 +84,4 @@ export const RpcWastelandOutput = rpcSafe(WastelandOutput);
 export const RpcWastelandMemberOutput = rpcSafe(WastelandMemberOutput);
 export const RpcWastelandCredentialStatusOutput = rpcSafe(WastelandCredentialStatusOutput);
 export const RpcWastelandConfigOutput = rpcSafe(WastelandConfigOutput);
+export const RpcWantedItemOutput = rpcSafe(WantedItemOutput);

@@ -37,7 +37,6 @@ import { getSettingsModelOptions } from './modelSupport';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { RadioButtonGroup } from '@/components/ui/RadioGroup';
 import {
   Dialog,
   DialogContent,
@@ -259,14 +258,9 @@ function GoogleAccountCard({
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
-  const [os, setOs] = useState<'unix' | 'windows'>('unix');
   const isDisconnecting = mutations.disconnectGoogle.isPending;
   const rawCommand = setupData?.command;
-  const command = rawCommand
-    ? os === 'windows'
-      ? rawCommand.replace(' && ', ' ; ')
-      : rawCommand
-    : undefined;
+  const command = rawCommand ? rawCommand.replace(' && ', ' ; ') : undefined;
 
   function handleCopy() {
     if (!command) return;
@@ -332,20 +326,10 @@ function GoogleAccountCard({
             <div className="space-y-4 px-4 py-3">
               {!connected && command && (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-muted-foreground text-xs">
-                      Run this command in a terminal on your local machine to connect your Google
-                      account:
-                    </p>
-                    <RadioButtonGroup
-                      options={[
-                        { value: 'unix', label: 'Mac/Linux' },
-                        { value: 'windows', label: 'Windows' },
-                      ]}
-                      value={os}
-                      onChange={v => setOs(v as 'unix' | 'windows')}
-                    />
-                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    Run this command in a terminal on your local machine to connect your Google
+                    account:
+                  </p>
                   <div className="relative">
                     <pre className="bg-muted overflow-x-auto rounded-md p-3 pr-10 text-xs">
                       <code>{command}</code>

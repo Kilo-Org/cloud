@@ -119,6 +119,15 @@ export const wastelandRouter = router({
         visibility: input.visibility,
       });
 
+      // Inject WL_UPSTREAM into the container so cold-start auto-join works
+      if (input.dolthubUpstream) {
+        const container = getWastelandContainerStub(ctx.env, wastelandId);
+        await container.setEnvVar('WL_UPSTREAM', input.dolthubUpstream);
+      }
+
+      // Arm the periodic alarm for container health monitoring
+      await stub.armAlarm();
+
       // Register in the central wasteland registry for listing
       const registryStub = getWastelandRegistryStub(ctx.env);
       await registryStub.register({
@@ -389,6 +398,16 @@ export const wastelandRouter = router({
           : {}),
       });
 
+      // Sync WL_UPSTREAM to the container so cold-start auto-join uses the latest value
+      if (input.dolthubUpstream !== undefined) {
+        const container = getWastelandContainerStub(ctx.env, input.wastelandId);
+        if (input.dolthubUpstream) {
+          await container.setEnvVar('WL_UPSTREAM', input.dolthubUpstream);
+        } else {
+          await container.deleteEnvVar('WL_UPSTREAM');
+        }
+      }
+
       meterEvent(ctx.env, {
         event: 'billing.api_operation',
         userId: ctx.userId,
@@ -434,12 +453,15 @@ export const wastelandRouter = router({
         input.rigHandle
       );
 
-      // If the caller is the wasteland owner, inject the token into
-      // the container so it's available in the OS environment.
+      // If the caller is the wasteland owner, inject the token and upstream
+      // into the container so they're available for cold-start auto-join.
       const config = await stub.getConfig();
       if (config && config.owner_user_id === ctx.userId) {
         const container = getWastelandContainerStub(ctx.env, input.wastelandId);
         await container.setEnvVar('DOLTHUB_TOKEN', input.dolthubToken);
+        if (config.dolthub_upstream) {
+          await container.setEnvVar('WL_UPSTREAM', config.dolthub_upstream);
+        }
       }
 
       meterEvent(ctx.env, {

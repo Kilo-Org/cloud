@@ -1,4 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
+import { z } from 'zod';
+import { getWastelandContainerStub } from './WastelandContainer.do';
+import { writeEvent } from '../util/analytics.util';
+import { logger, withLogTags } from '../util/log.util';
 
 /** Shape returned by WastelandDO.getConfig() — matches the wasteland_config table. */
 export type WastelandConfigResult = {
@@ -64,6 +68,34 @@ export type WantedItemResult = {
   created_at: string;
   updated_at: string;
 };
+
+/** Health status returned from the container's /health endpoint. */
+export type ContainerHealthResult = {
+  status: 'ok' | 'initializing' | 'unreachable' | 'error';
+  wl_version?: string;
+  wl_configured?: boolean;
+  last_operation?: string | null;
+  uptime_seconds?: number;
+  cold_start_recovery?: boolean;
+  join_error?: string | null;
+  error?: string;
+};
+
+/** Zod schema for validating the container's /health JSON response at the IO boundary. */
+const ContainerHealthResponseSchema = z.object({
+  status: z.string(),
+  wl_version: z.string().optional(),
+  wl_configured: z.boolean().optional(),
+  last_operation: z.string().nullish(),
+  uptime_seconds: z.number().optional(),
+  cold_start_recovery: z.boolean().optional(),
+  join_error: z.string().nullish(),
+});
+
+const ALARM_INTERVAL_MS = 5 * 60_000; // 5 minutes
+const CONTAINER_HEALTH_TIMEOUT_MS = 10_000;
+/** Only report cold-start recovery when container uptime is below this threshold. */
+const COLD_START_REPORT_MAX_UPTIME_S = 10 * 60; // 10 minutes
 
 /**
  * Stub WastelandDO — placeholder until the full implementation lands.
@@ -143,6 +175,119 @@ export class WastelandDO extends DurableObject<Env> {
 
   async refreshWantedBoard(): Promise<WantedItemResult[]> {
     throw new Error('WastelandDO not yet implemented');
+  }
+
+  // ── Alarm: container health monitoring ─────────────────────────────
+
+  /**
+   * Arm the periodic alarm. Call this after initialization or when
+   * the alarm should be (re-)started. Idempotent — no-ops if an alarm
+   * is already scheduled.
+   */
+  async armAlarm(): Promise<void> {
+    const existing = await this.ctx.storage.getAlarm();
+    if (existing !== null) return;
+    await this.ctx.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS);
+  }
+
+  /**
+   * Alarm handler — runs every 5 minutes. Performs container health
+   * checks and reschedules itself.
+   */
+  async alarm(): Promise<void> {
+    await withLogTags({ source: 'WastelandDO.alarm' }, async () => {
+      const wastelandId = this.ctx.id.name ?? this.ctx.id.toString();
+      logger.setTags({ wastelandId });
+
+      try {
+        const health = await this.checkContainerHealth();
+
+        if (health.status === 'unreachable' || health.status === 'error') {
+          logger.warn('container health check failed', {
+            status: health.status,
+            error: health.error,
+          });
+          writeEvent(this.env, {
+            event: 'container.health_check_failed',
+            wastelandId,
+            error: health.error,
+          });
+        } else if (
+          health.cold_start_recovery &&
+          health.uptime_seconds !== undefined &&
+          health.uptime_seconds < COLD_START_REPORT_MAX_UPTIME_S
+        ) {
+          // Only report cold-start recovery once, shortly after the container boots.
+          // After uptime exceeds the threshold, this event is no longer emitted.
+          logger.info('container recovered from cold start', {
+            uptime_seconds: health.uptime_seconds,
+            join_error: health.join_error,
+          });
+          writeEvent(this.env, {
+            event: 'container.cold_start_recovery',
+            wastelandId,
+            label: health.join_error ? 'join_failed' : 'join_succeeded',
+          });
+        }
+      } catch (err) {
+        logger.error('alarm: unexpected error during container health check', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      // Reschedule
+      await this.ctx.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS);
+    });
+  }
+
+  /**
+   * Check the container's health endpoint. Returns a structured result
+   * regardless of whether the container is reachable.
+   */
+  async checkContainerHealth(): Promise<ContainerHealthResult> {
+    const wastelandId = this.ctx.id.name ?? this.ctx.id.toString();
+    try {
+      const container = getWastelandContainerStub(this.env, wastelandId);
+      const res = await container.fetch('http://container/health', {
+        signal: AbortSignal.timeout(CONTAINER_HEALTH_TIMEOUT_MS),
+      });
+
+      if (!res.ok) {
+        return {
+          status: 'error',
+          error: `HTTP ${res.status}: ${res.statusText}`,
+        };
+      }
+
+      const raw: unknown = await res.json();
+      const parsed = ContainerHealthResponseSchema.safeParse(raw);
+      if (!parsed.success) {
+        logger.warn('container health response failed validation', {
+          issues: parsed.error.issues,
+        });
+        return {
+          status: 'error',
+          error: `Invalid health response: ${parsed.error.issues.map(i => i.message).join(', ')}`,
+        };
+      }
+
+      return {
+        status: parsed.data.status === 'ok' ? 'ok' : 'initializing',
+        wl_version: parsed.data.wl_version,
+        wl_configured: parsed.data.wl_configured,
+        last_operation: parsed.data.last_operation,
+        uptime_seconds: parsed.data.uptime_seconds,
+        cold_start_recovery: parsed.data.cold_start_recovery,
+        join_error: parsed.data.join_error,
+      };
+    } catch (err) {
+      // Container not running or unreachable — not necessarily an error.
+      // The container may be sleeping (sleepAfter: 30m) which is expected.
+      return {
+        status: 'unreachable',
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   }
 }
 

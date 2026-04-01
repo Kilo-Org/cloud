@@ -9,7 +9,9 @@ FROM "kiloclaw_instances" AS i
 WHERE i."user_id" = p."instance_id"
   AND i."organization_id" IS NULL
   AND i."destroyed_at" IS NULL;--> statement-breakpoint
-DELETE FROM "kiloclaw_version_pins" WHERE "instance_id" IS NULL;--> statement-breakpoint
+DELETE FROM "kiloclaw_version_pins"
+WHERE "instance_id" IS NULL
+   OR "instance_id"::text NOT SIMILAR TO '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';--> statement-breakpoint
 ALTER TABLE "kiloclaw_version_pins" ALTER COLUMN "instance_id" TYPE uuid USING "instance_id"::uuid;--> statement-breakpoint
 ALTER TABLE "kiloclaw_version_pins" ALTER COLUMN "instance_id" SET NOT NULL;--> statement-breakpoint
 ALTER TABLE "kiloclaw_version_pins" ADD CONSTRAINT "kiloclaw_version_pins_instance_id_kiloclaw_instances_id_fk" FOREIGN KEY ("instance_id") REFERENCES "public"."kiloclaw_instances"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

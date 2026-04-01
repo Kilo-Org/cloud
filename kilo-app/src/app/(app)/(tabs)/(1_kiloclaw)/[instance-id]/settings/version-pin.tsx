@@ -71,7 +71,7 @@ export default function VersionPinScreen() {
   const latestVersion = latestVersionQuery.data;
   const versions = availableVersionsQuery.data?.items ?? [];
 
-  const isPinnedByAdmin = myPin?.reason != null;
+  const isPinnedByAdmin = myPin != null && !myPin.pinnedBySelf;
 
   function handleUnpin() {
     Alert.alert('Unpin Version', 'Switch back to the latest available version?', [

@@ -1500,6 +1500,7 @@ export const kiloclawRouter = createTRPCRouter({
 
     return {
       ...result.pin,
+      pinnedBySelf: result.pin.pinned_by === ctx.user.id,
       openclaw_version: result.openclaw_version,
       variant: result.variant,
     };

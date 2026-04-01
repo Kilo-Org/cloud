@@ -38,7 +38,7 @@ export function VersionPinCard({
   const isPinning = mutations.setMyPin.isPending;
   const isUnpinning = mutations.removeMyPin.isPending;
 
-  const pinnedBySelf = myPin?.reason == null;
+  const pinnedBySelf = myPin?.pinnedBySelf ?? false;
   const pinnedByLabel = pinnedBySelf ? 'You' : 'Kilo Admin';
 
   const handlePin = async () => {

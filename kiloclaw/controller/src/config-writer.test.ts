@@ -286,6 +286,33 @@ describe('generateBaseConfig', () => {
     expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
   });
 
+  it('removes stale org header when KILOCODE_ORGANIZATION_ID is no longer set', () => {
+    const existing = JSON.stringify({
+      models: {
+        providers: {
+          kilocode: {
+            baseUrl: 'https://tunnel.example.com/',
+            headers: {
+              'X-KiloCode-OrganizationId': 'org_old_stale',
+              'X-Custom': 'preserved',
+            },
+            models: [{ id: 'kept/model', name: 'Kept' }],
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    // No KILOCODE_ORGANIZATION_ID in env
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    // Stale org header removed
+    expect(config.models.providers.kilocode.headers['X-KiloCode-OrganizationId']).toBeUndefined();
+    // Other headers and config preserved
+    expect(config.models.providers.kilocode.headers['X-Custom']).toBe('preserved');
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://tunnel.example.com/');
+    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+  });
+
   it('removes agents.defaults.models allowlist left by openclaw onboard', () => {
     const existing = JSON.stringify({
       agents: {

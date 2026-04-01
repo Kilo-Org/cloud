@@ -192,6 +192,10 @@ export function generateBaseConfig(
       env.KILOCODE_ORGANIZATION_ID;
     config.models.providers.kilocode.models = config.models.providers.kilocode.models ?? [];
     console.log('Configured KiloCode organization header from KILOCODE_ORGANIZATION_ID');
+  } else {
+    // Remove stale org header from previous boots (e.g., instance was transferred
+    // from org to personal, or org was deleted).
+    delete config.models?.providers?.kilocode?.headers?.['X-KiloCode-OrganizationId'];
   }
 
   // User-selected default model override.

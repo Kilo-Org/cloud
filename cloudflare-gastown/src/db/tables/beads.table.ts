@@ -50,8 +50,8 @@ export const BeadRecord = z.object({
       }
     })
     .pipe(z.record(z.string(), z.any())), // z.any() needed for Rpc.Serializable compatibility
-  dispatch_attempts: z.number(),
-  last_dispatch_attempt_at: z.string().nullable(),
+  dispatch_attempts: z.number().default(0),
+  last_dispatch_attempt_at: z.string().nullable().default(null),
   created_by: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),

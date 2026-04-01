@@ -1,7 +1,7 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { after } from 'next/server';
 import { bot_requests, type BotRequestStatus, type BotRequestStep } from '@kilocode/db/schema';
 
@@ -48,7 +48,7 @@ export async function createBotRequest(
 }
 
 type UpdateBotRequestParams = {
-  status?: BotRequestStatus;
+  status?: BotRequestStatus | 'running';
   errorMessage?: string;
   modelUsed?: string;
   steps?: BotRequestStep[];
@@ -58,10 +58,13 @@ type UpdateBotRequestParams = {
 
 async function performUpdate(id: string, params: UpdateBotRequestParams): Promise<void> {
   try {
+    const statusUpdate =
+      params.status === 'running' ? sql`'pending'` : params.status;
+
     await db
       .update(bot_requests)
       .set({
-        ...(params.status !== undefined && { status: params.status }),
+        ...(params.status !== undefined && { status: statusUpdate }),
         ...(params.errorMessage !== undefined && { error_message: params.errorMessage }),
         ...(params.modelUsed !== undefined && { model_used: params.modelUsed }),
         ...(params.steps !== undefined && { steps: params.steps }),

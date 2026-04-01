@@ -3,7 +3,7 @@ import {
   type AgentMode,
   type PrepareSessionInput,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { runSessionToCompletion, type RunSessionInput } from '@/lib/cloud-agent-next/run-session';
+import type { RunSessionInput } from '@/lib/cloud-agent-next/run-session';
 import {
   getGitHubTokenForOrganization,
   getGitHubTokenForUser,
@@ -15,6 +15,8 @@ import {
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { APP_URL } from '@/lib/constants';
+import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import type { PlatformIntegration } from '@kilocode/db';
 import z from 'zod';
 
@@ -23,7 +25,8 @@ import z from 'zod';
  */
 type SpawnCloudAgentResult = {
   response: string;
-  sessionId?: string;
+  cloudAgentSessionId?: string;
+  kiloSessionId?: string;
 };
 
 const sharedFields = {
@@ -73,6 +76,7 @@ export default async function spawnCloudAgentSession(
   platformIntegration: PlatformIntegration,
   authToken: string,
   ticketUserId: string,
+  botRequestId: string | undefined,
   onSessionReady?: RunSessionInput['onSessionReady']
 ): Promise<SpawnCloudAgentResult> {
   console.log('[SlackBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
@@ -82,6 +86,12 @@ export default async function spawnCloudAgentSession(
   let prepareInput: PrepareSessionInput;
   let initiateInput: { githubToken?: string; kilocodeOrganizationId?: string };
   const mode: AgentMode = args.mode ?? 'code';
+  const callbackTarget = botRequestId
+    ? {
+        url: `${APP_URL}/api/internal/bot-session-callback/${botRequestId}`,
+        headers: { 'X-Internal-Secret': INTERNAL_API_SECRET },
+      }
+    : undefined;
 
   const isGitLab = 'gitlabProject' in args;
   const prompt =
@@ -130,6 +140,7 @@ export default async function spawnCloudAgentSession(
       platform: 'gitlab',
       kilocodeOrganizationId,
       createdOnPlatform: 'slack',
+      callbackTarget,
     };
     initiateInput = { kilocodeOrganizationId };
   } else {
@@ -154,21 +165,49 @@ export default async function spawnCloudAgentSession(
       githubToken,
       kilocodeOrganizationId,
       createdOnPlatform: 'slack',
+      callbackTarget,
     };
     initiateInput = { githubToken, kilocodeOrganizationId };
   }
 
-  const result = await runSessionToCompletion({
-    client: createCloudAgentNextClient(authToken, { skipBalanceCheck: true }),
-    prepareInput,
-    initiateInput,
-    ticketPayload: {
-      userId: ticketUserId,
-      organizationId: kilocodeOrganizationId,
-    },
-    logPrefix: '[KiloBot]',
-    onSessionReady,
-  });
+  const client = createCloudAgentNextClient(authToken, { skipBalanceCheck: true });
 
-  return { response: result.response, sessionId: result.sessionId };
+  let cloudAgentSessionId: string;
+  let kiloSessionId: string;
+
+  try {
+    const prepared = await client.prepareSession(prepareInput);
+    cloudAgentSessionId = prepared.cloudAgentSessionId;
+    kiloSessionId = prepared.kiloSessionId;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { response: `Error preparing Cloud Agent: ${message}` };
+  }
+
+  try {
+    await client.initiateFromPreparedSession({
+      cloudAgentSessionId,
+      ...initiateInput,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      response: `Error initiating Cloud Agent: ${message}`,
+      cloudAgentSessionId,
+      kiloSessionId,
+    };
+  }
+
+  try {
+    onSessionReady?.({ cloudAgentSessionId, kiloSessionId });
+  } catch (error) {
+    console.error('[KiloBot] onSessionReady callback error:', error);
+  }
+
+  const response =
+    mode === 'code'
+      ? 'Cloud Agent session started. I will post the final result back in this thread when it completes.'
+      : 'Cloud Agent session started. I will post the final response back in this thread when it completes.';
+
+  return { response, cloudAgentSessionId, kiloSessionId };
 }

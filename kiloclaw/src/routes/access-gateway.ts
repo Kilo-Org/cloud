@@ -1,7 +1,11 @@
 import { type Context, Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import type { AppEnv } from '../types';
-import { KILOCLAW_AUTH_COOKIE, KILOCLAW_AUTH_COOKIE_MAX_AGE } from '../config';
+import {
+  KILOCLAW_AUTH_COOKIE,
+  KILOCLAW_AUTH_COOKIE_MAX_AGE,
+  KILOCLAW_ACTIVE_INSTANCE_COOKIE,
+} from '../config';
 import { getWorkerDb, validateAndRedeemAccessCode, findPepperByUserId } from '../db';
 import { signKiloToken, validateKiloToken } from '../auth/jwt';
 import { deriveGatewayToken } from '../auth/gateway-token';
@@ -303,6 +307,28 @@ async function redeemCodeAndSetCookie(
     maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
   });
 
+  // Track which instance the user is accessing so the catch-all proxy
+  // routes WebSocket/HTTP traffic to the correct instance. The OpenClaw
+  // Control UI connects to `/` without the `/i/{instanceId}/` prefix.
+  if (instanceId && isValidInstanceId(instanceId)) {
+    setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, instanceId, {
+      path: '/',
+      httpOnly: true,
+      secure: c.env.WORKER_ENV !== 'development',
+      sameSite: 'Lax',
+      maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
+    });
+  } else {
+    // Clear the cookie when opening a personal (non-instance-keyed) instance
+    setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, '', {
+      path: '/',
+      httpOnly: true,
+      secure: c.env.WORKER_ENV !== 'development',
+      sameSite: 'Lax',
+      maxAge: 0,
+    });
+  }
+
   const redirectUrl = await buildRedirectUrl(redeemedUserId, c.env, instanceId);
   return { redirectUrl };
 }
@@ -326,6 +352,21 @@ accessGatewayRoutes.get('/kilo-access-gateway', async c => {
         } catch {
           return c.text('Access denied', 403);
         }
+        setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, instanceId, {
+          path: '/',
+          httpOnly: true,
+          secure: c.env.WORKER_ENV !== 'development',
+          sameSite: 'Lax',
+          maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
+        });
+      } else {
+        setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, '', {
+          path: '/',
+          httpOnly: true,
+          secure: c.env.WORKER_ENV !== 'development',
+          sameSite: 'Lax',
+          maxAge: 0,
+        });
       }
       const redirectUrl = await buildRedirectUrl(userId, c.env, instanceId);
       return c.redirect(redirectUrl);

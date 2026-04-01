@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, Loader2, RotateCw, Terminal } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import type { PlatformStatusResponse } from '@/lib/kiloclaw/types';
 import { AnimatedDots } from './AnimatedDots';
 
 function isNeedsRedeployError(error: unknown): boolean {
@@ -32,9 +33,11 @@ function isNeedsRedeployError(error: unknown): boolean {
 export function StartKiloCliRunDialog({
   open,
   onOpenChange,
+  machineStatus,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  machineStatus: PlatformStatusResponse['status'];
 }) {
   const router = useRouter();
   const [prompt, setPrompt] = useState('');
@@ -43,6 +46,16 @@ export function StartKiloCliRunDialog({
   const redeployMutation = mutations.restartMachine;
 
   const needsRedeploy = startMutation.isError && isNeedsRedeployError(startMutation.error);
+  const machineReady = machineStatus === 'running';
+
+  // Clear stale "needs redeploy" error when the machine status changes away
+  // from running (e.g. restarting after a redeploy was dispatched). This
+  // ensures reopening the dialog shows the prompt form, not the old error.
+  useEffect(() => {
+    if (needsRedeploy && machineStatus !== 'running') {
+      startMutation.reset();
+    }
+  }, [needsRedeploy, machineStatus, startMutation]);
 
   const handleStart = () => {
     const trimmed = prompt.trim();
@@ -63,8 +76,7 @@ export function StartKiloCliRunDialog({
       { imageTag: 'latest' },
       {
         onSuccess: () => {
-          toast.success('Upgrading to latest version');
-          onOpenChange(false);
+          startMutation.reset();
         },
         onError: err => toast.error(err.message, { duration: 10000 }),
       }
@@ -72,6 +84,7 @@ export function StartKiloCliRunDialog({
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && redeployMutation.isPending) return;
     if (!nextOpen) {
       setPrompt('');
       startMutation.reset();
@@ -90,7 +103,9 @@ export function StartKiloCliRunDialog({
           <DialogDescription>
             {needsRedeploy
               ? 'Your instance needs to be redeployed before the recovery agent can run.'
-              : 'If your KiloClaw instance is stuck or failing, the Kilo CLI agent can help diagnose and fix the problem. Describe the issue below and the agent will work autonomously to resolve it.'}
+              : !machineReady
+                ? 'Waiting for your instance to come back online before the recovery agent can run.'
+                : 'If your KiloClaw instance is stuck or failing, the Kilo CLI agent can help diagnose and fix the problem. Describe the issue below and the agent will work autonomously to resolve it.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -104,7 +119,11 @@ export function StartKiloCliRunDialog({
               </p>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => handleOpenChange(false)}>
+              <Button
+                variant="outline"
+                onClick={() => handleOpenChange(false)}
+                disabled={redeployMutation.isPending}
+              >
                 Cancel
               </Button>
               <Button
@@ -128,6 +147,15 @@ export function StartKiloCliRunDialog({
           </>
         ) : (
           <>
+            {!machineReady && (
+              <div className="flex items-start gap-3 rounded-md border border-blue-500/30 bg-blue-500/10 p-3">
+                <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-blue-400" />
+                <p className="text-sm text-blue-200">
+                  Your instance is restarting. The recovery agent will be available once it&apos;s
+                  back online.
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <Textarea
                 placeholder="Describe the problem you're trying to solve (e.g. &quot;I can't connect to the gateway&quot; or &quot;The bot's cron jobs aren't checking in&quot;)"
@@ -136,6 +164,7 @@ export function StartKiloCliRunDialog({
                 className="min-h-30 resize-none"
                 maxLength={10_000}
                 autoFocus
+                disabled={!machineReady}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                     e.preventDefault();
@@ -155,7 +184,7 @@ export function StartKiloCliRunDialog({
               </Button>
               <Button
                 onClick={handleStart}
-                disabled={!prompt.trim() || startMutation.isPending}
+                disabled={!machineReady || !prompt.trim() || startMutation.isPending}
                 className="bg-emerald-600 text-white hover:bg-emerald-700"
               >
                 {startMutation.isPending ? (

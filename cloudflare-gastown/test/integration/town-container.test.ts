@@ -137,23 +137,57 @@ describe('Town DO — container eviction draining lifecycle', () => {
     expect(await town.isDraining()).toBe(true);
   });
 
-  it('touchAgentHeartbeat() clears draining flag after eviction', async () => {
+  it('acknowledgeContainerReady() clears draining flag with correct nonce', async () => {
+    const id = `town-${crypto.randomUUID()}`;
+    const town = env.TOWN.get(env.TOWN.idFromName(id));
+
+    // Set draining flag and capture the nonce
+    const drainNonce = await town.recordContainerEviction();
+    expect(await town.isDraining()).toBe(true);
+
+    // Acknowledge with the correct nonce clears the drain flag
+    const cleared = await town.acknowledgeContainerReady(drainNonce);
+    expect(cleared).toBe(true);
+    expect(await town.isDraining()).toBe(false);
+  });
+
+  it('acknowledgeContainerReady() rejects wrong nonce and stays draining', async () => {
+    const id = `town-${crypto.randomUUID()}`;
+    const town = env.TOWN.get(env.TOWN.idFromName(id));
+
+    // Set draining flag
+    await town.recordContainerEviction();
+    expect(await town.isDraining()).toBe(true);
+
+    // Wrong nonce should not clear the drain flag
+    const cleared = await town.acknowledgeContainerReady('wrong-nonce');
+    expect(cleared).toBe(false);
+    expect(await town.isDraining()).toBe(true);
+  });
+
+  it('touchAgentHeartbeat() returns drainNonce during eviction', async () => {
     const id = `town-${crypto.randomUUID()}`;
     const town = env.TOWN.get(env.TOWN.idFromName(id));
 
     // Register an agent so heartbeat has a valid target
     const agent = await town.registerAgent({
       role: 'polecat',
-      name: 'drain-clear-test',
-      identity: `drain-clear-${id}`,
+      name: 'drain-nonce-test',
+      identity: `drain-nonce-${id}`,
     });
 
     // Set draining flag
-    await town.recordContainerEviction();
+    const drainNonce = await town.recordContainerEviction();
     expect(await town.isDraining()).toBe(true);
 
-    // Heartbeat should clear draining flag
-    await town.touchAgentHeartbeat(agent.id);
+    // Heartbeat returns the drainNonce (but does NOT clear draining)
+    const heartbeatResult = await town.touchAgentHeartbeat(agent.id);
+    expect(heartbeatResult.drainNonce).toBe(drainNonce);
+    expect(await town.isDraining()).toBe(true);
+
+    // Only acknowledgeContainerReady with the nonce clears it
+    const cleared = await town.acknowledgeContainerReady(drainNonce);
+    expect(cleared).toBe(true);
     expect(await town.isDraining()).toBe(false);
   });
 

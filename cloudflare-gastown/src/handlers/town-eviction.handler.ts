@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { z } from 'zod';
 import { extractBearerToken } from '@kilocode/worker-utils';
 import type { GastownEnv } from '../gastown.worker';
 import { getTownDOStub } from '../dos/Town.do';
@@ -125,24 +126,13 @@ export async function handleContainerReady(
     return c.json(resError('Cross-town access denied'), 403);
   }
 
-  let nonce: string | undefined;
-  try {
-    const body: unknown = await c.req.json();
-    if (
-      body &&
-      typeof body === 'object' &&
-      'nonce' in body &&
-      typeof (body as { nonce: unknown }).nonce === 'string'
-    ) {
-      nonce = (body as { nonce: string }).nonce;
-    }
-  } catch {
-    // No body or invalid JSON
-  }
+  const ContainerReadyBody = z.object({ nonce: z.string() });
 
-  if (!nonce) {
+  const parsed = ContainerReadyBody.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
     return c.json(resError('Missing required field: nonce'), 400);
   }
+  const { nonce } = parsed.data;
 
   const town = getTownDOStub(c.env, params.townId);
   const cleared = await town.acknowledgeContainerReady(nonce);

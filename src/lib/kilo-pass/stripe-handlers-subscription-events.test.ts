@@ -397,7 +397,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
     expect(toIso(pauseEvent.resumes_at)).toBe(new Date(resumesAtSeconds * 1000).toISOString());
   });
 
-  test('sets DB status to paused when Stripe status is active but pause_collection is set', async () => {
+  test('preserves Stripe status in DB when pause_collection is set but status is active', async () => {
     const { handleKiloPassSubscriptionEvent } =
       await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
 
@@ -426,11 +426,13 @@ describe('handleKiloPassSubscriptionEvent', () => {
       subscription,
     });
 
+    // DB stores Stripe's reported status (active), not 'paused'.
+    // The state query derives paused from the open pause event.
     const subRow = await db.query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
     });
     expect(subRow).toBeTruthy();
-    expect(subRow!.status).toBe('paused');
+    expect(subRow!.status).toBe('active');
 
     const pauseEvents = await db
       .select()

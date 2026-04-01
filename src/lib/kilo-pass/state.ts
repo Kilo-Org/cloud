@@ -124,20 +124,22 @@ export async function getKiloPassStateForUser(
   const selected = pickSubscriptionForState(subscriptions);
   if (!selected) return null;
 
-  let resumesAt: string | null = null;
-  if (selected.status === 'paused') {
-    const openPause = await getOpenPauseEvent(db, {
-      kiloPassSubscriptionId: selected.subscriptionId,
-    });
-    resumesAt = openPause?.resumes_at ? normalizeTimestampToIso(openPause.resumes_at) : null;
-  }
+  // Check for an open pause event. Stripe keeps status 'active' when pause_collection
+  // is first set (the status changes to 'paused' only at the next billing cycle), so we
+  // derive the paused state from the pause event table rather than the DB status.
+  const openPause = await getOpenPauseEvent(db, {
+    kiloPassSubscriptionId: selected.subscriptionId,
+  });
+  const isPaused = openPause != null;
+  const resumesAt =
+    isPaused && openPause.resumes_at ? normalizeTimestampToIso(openPause.resumes_at) : null;
 
   return {
     subscriptionId: selected.subscriptionId,
     stripeSubscriptionId: selected.stripeSubscriptionId,
     tier: selected.tier,
     cadence: selected.cadence,
-    status: selected.status,
+    status: isPaused ? 'paused' : selected.status,
     cancelAtPeriodEnd: selected.cancelAtPeriodEnd,
     currentStreakMonths: selected.currentStreakMonths,
     nextYearlyIssueAt: normalizeTimestampToIso(selected.nextYearlyIssueAt),

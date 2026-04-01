@@ -97,16 +97,7 @@ export async function handleKiloPassSubscriptionEvent(params: {
       ).pause_collection;
 
       if (pauseCollection && pauseCollection.behavior) {
-        // Stripe keeps the status as 'active' until the current period ends, but we
-        // treat pause_collection being set as the subscription being paused so the UI
-        // reflects the user's intent immediately.
-        if (stripeStatus !== 'paused') {
-          await tx
-            .update(kilo_pass_subscriptions)
-            .set({ status: 'paused' })
-            .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
-        }
-
+        // Subscription has an active pause — open a pause event
         const resumesAtIso = pauseCollection.resumes_at
           ? dayjs.unix(pauseCollection.resumes_at).utc().toISOString()
           : null;

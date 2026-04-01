@@ -34,6 +34,7 @@ import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router'
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
+import { adminCliSessionsV2Router } from '@/routers/admin-cli-sessions-v2-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import * as z from 'zod';
 import { eq, and, ne, or, ilike, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
@@ -1350,4 +1351,5 @@ export const adminRouter = createTRPCRouter({
   botRequests: adminBotRequestsRouter,
   gastown: adminGastownRouter,
   extendClawTrial: extendClawTrialRouter,
+  cliSessionsV2: adminCliSessionsV2Router,
 });

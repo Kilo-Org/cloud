@@ -23,6 +23,7 @@ import {
   Bell,
   Server,
   Network,
+  ScrollText,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -162,6 +163,11 @@ const analyticsObservabilityItems: MenuItem[] = [
     title: () => 'Session Traces',
     url: '/admin/session-traces',
     icon: () => <FileSearch />,
+  },
+  {
+    title: () => 'CLI Sessions V2',
+    url: '/admin/cli-sessions-v2',
+    icon: () => <ScrollText />,
   },
   {
     title: () => 'Feature Interest',

@@ -13,10 +13,7 @@ type ChurnkeyInitOptions = {
   mode: 'live' | 'test';
   provider: 'stripe';
   record: boolean;
-  handleCancel: (
-    customer: string,
-    surveyAnswer: string
-  ) => Promise<ChurnkeyHandleCancelResult>;
+  handleCancel: (customer: string, surveyAnswer: string) => Promise<ChurnkeyHandleCancelResult>;
   onDiscount?: (customer: string, discountInfo: unknown) => void;
   onClose?: () => void;
 };
@@ -95,8 +92,4 @@ export async function showCancelFlow(params: ShowCancelFlowParams): Promise<void
 
     onClose: params.onClose,
   });
-}
-
-export function isChurnkeyAvailable(): boolean {
-  return Boolean(CHURNKEY_APP_ID);
 }

@@ -19,7 +19,7 @@ import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
 import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
-import { isChurnkeyAvailable, showCancelFlow } from '@/lib/churnkey/loader';
+import { showCancelFlow } from '@/lib/churnkey/loader';
 
 import { getTierName } from './utils';
 import { useKiloPassSubscriptionInfo } from './useKiloPassSubscriptionInfo';
@@ -251,14 +251,6 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   const showUpdatePanel = panel === 'update';
 
   const handleOpenCancelFlow = useCallback(async () => {
-    if (!isChurnkeyAvailable()) {
-      // Fallback: direct cancellation when Churnkey is not configured
-      if (window.confirm('Are you sure you want to cancel your Kilo Pass subscription?')) {
-        actions.cancelSubscription();
-      }
-      return;
-    }
-
     try {
       const { hash, customerId } = await trpcClient.kiloPass.getChurnkeyAuthHash.query();
 

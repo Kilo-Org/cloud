@@ -117,12 +117,10 @@ function createMockConfig(overrides: Partial<SessionManagerConfig> = {}): Sessio
       reject: jest.fn().mockResolvedValue({}),
       respondToPermission: jest.fn().mockResolvedValue({}),
     },
-    prepare: jest
-      .fn()
-      .mockResolvedValue({
-        cloudAgentSessionId: cloudAgentId('agent-new'),
-        kiloSessionId: kiloId('ses-new'),
-      }),
+    prepare: jest.fn().mockResolvedValue({
+      cloudAgentSessionId: cloudAgentId('agent-new'),
+      kiloSessionId: kiloId('ses-new'),
+    }),
     initiate: jest.fn().mockResolvedValue({}),
     fetchSession: jest.fn().mockResolvedValue(defaultFetchedSession),
     ...overrides,

@@ -30,6 +30,7 @@ import * as reviewQueue from './review-queue';
 import * as agents from './agents';
 import * as beadOps from './beads';
 import { getRig } from './rigs';
+import { PR_POLL_INTERVAL_MS } from './actions';
 import type { Action } from './actions';
 import type { TownEventRecord } from '../../db/tables/town-events.table';
 
@@ -98,6 +99,7 @@ const MrBeadRow = BeadRecord.pick({
   rig_id: true,
   updated_at: true,
   assignee_agent_bead_id: true,
+  metadata: true,
 }).extend({
   // Joined from review_metadata
   pr_url: ReviewMetadataRecord.shape.pr_url,
@@ -753,6 +755,7 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
       /* sql */ `
         SELECT b.${beads.columns.bead_id}, b.${beads.columns.status},
                b.${beads.columns.rig_id}, b.${beads.columns.updated_at},
+               b.${beads.columns.metadata},
                rm.${review_metadata.columns.pr_url},
                b.${beads.columns.assignee_agent_bead_id}
         FROM ${beads} b
@@ -765,13 +768,21 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
   ]);
 
   for (const mr of mrBeads) {
-    // Rule 1: PR-strategy MR beads in_progress need polling
+    // Rule 1: PR-strategy MR beads in_progress need polling.
+    // Rate-limit: skip if polled less than PR_POLL_INTERVAL_MS ago (#1632).
     if (mr.status === 'in_progress' && mr.pr_url) {
-      actions.push({
-        type: 'poll_pr',
-        bead_id: mr.bead_id,
-        pr_url: mr.pr_url,
-      });
+      const lastPollAt = mr.metadata?.last_poll_at;
+      const msSinceLastPoll = typeof lastPollAt === 'string'
+        ? Date.now() - new Date(lastPollAt).getTime()
+        : Infinity;
+
+      if (msSinceLastPoll >= PR_POLL_INTERVAL_MS) {
+        actions.push({
+          type: 'poll_pr',
+          bead_id: mr.bead_id,
+          pr_url: mr.pr_url,
+        });
+      }
     }
 
     // Rule 2: Stuck MR beads in_progress with no PR, no working agent, stale >30min

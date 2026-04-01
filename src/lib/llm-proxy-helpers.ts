@@ -20,6 +20,7 @@ import type {
 } from '@/lib/providers/openrouter/types';
 import {
   type FraudDetectionHeaders,
+  getFraudDetectionHeaders,
   isRooCodeBasedClient,
   toMicrodollars,
 } from '@/lib/utils';

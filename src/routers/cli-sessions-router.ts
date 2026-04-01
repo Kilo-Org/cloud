@@ -310,8 +310,8 @@ function buildScopeConditions(opts: {
       ? opts.createdOnPlatform
       : [opts.createdOnPlatform];
 
-    if (platforms.length === 1 && platforms[0] === 'extension') {
-      // "Extension" means everything NOT in the known platforms list
+    if (platforms.length === 1 && platforms[0] === 'other') {
+      // "Other" means everything NOT in the known platforms list
       conditions.push(notInArray(cliSessions.created_on_platform, [...KNOWN_PLATFORMS]));
     } else if (platforms.length === 1) {
       conditions.push(eq(cliSessions.created_on_platform, platforms[0]));

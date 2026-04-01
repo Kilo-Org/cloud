@@ -77,19 +77,34 @@ function buildScopeFragments(
       ? opts.createdOnPlatform
       : [opts.createdOnPlatform];
 
-    if (platforms.length === 1 && platforms[0] === 'extension') {
+    const hasOther = platforms.includes('other');
+    const concrete = platforms.filter(p => p !== 'other');
+
+    if (hasOther && concrete.length > 0) {
+      // 'other' is a pseudo-filter (NOT IN known platforms); OR it with
+      // any concrete platform selections so both sets of sessions appear.
+      fragments.push(
+        sql`(${table.created_on_platform} IN (${sql.join(
+          concrete.map(p => sql`${p}`),
+          sql`, `
+        )}) OR ${table.created_on_platform} NOT IN (${sql.join(
+          KNOWN_PLATFORMS.map(p => sql`${p}`),
+          sql`, `
+        )}))`
+      );
+    } else if (hasOther) {
       fragments.push(
         sql`${table.created_on_platform} NOT IN (${sql.join(
           KNOWN_PLATFORMS.map(p => sql`${p}`),
           sql`, `
         )})`
       );
-    } else if (platforms.length === 1) {
-      fragments.push(sql`${table.created_on_platform} = ${platforms[0]}`);
+    } else if (concrete.length === 1) {
+      fragments.push(sql`${table.created_on_platform} = ${concrete[0]}`);
     } else {
       fragments.push(
         sql`${table.created_on_platform} IN (${sql.join(
-          platforms.map(p => sql`${p}`),
+          concrete.map(p => sql`${p}`),
           sql`, `
         )})`
       );

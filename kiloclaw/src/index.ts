@@ -466,8 +466,13 @@ app.all('*', async c => {
         c.env.KILOCLAW_INSTANCE.idFromName(activeInstanceId)
       );
       const instanceStatus = await stub.getStatus();
-      // Only use the cookie if the instance belongs to this user
-      if (instanceStatus.userId === userId && instanceStatus.flyMachineId) {
+      // Only use the cookie if the instance belongs to this user and is in a proxyable state
+      if (
+        instanceStatus.userId === userId &&
+        instanceStatus.flyMachineId &&
+        instanceStatus.status !== 'destroying' &&
+        instanceStatus.status !== 'restoring'
+      ) {
         const appName = instanceStatus.flyAppName ?? c.env.FLY_APP_NAME;
         if (appName && instanceStatus.sandboxId) {
           console.log(
@@ -508,8 +513,16 @@ app.all('*', async c => {
             containerWs.accept();
             const [clientWs, serverWs] = Object.values(new WebSocketPair());
             serverWs.accept();
-            serverWs.addEventListener('message', event => containerWs.send(event.data));
-            containerWs.addEventListener('message', event => serverWs.send(event.data));
+            serverWs.addEventListener('message', event => {
+              if (containerWs.readyState === WebSocket.OPEN) {
+                containerWs.send(event.data as string | ArrayBuffer);
+              }
+            });
+            containerWs.addEventListener('message', event => {
+              if (serverWs.readyState === WebSocket.OPEN) {
+                serverWs.send(event.data as string | ArrayBuffer);
+              }
+            });
             serverWs.addEventListener('close', event =>
               containerWs.close(event.code, event.reason)
             );

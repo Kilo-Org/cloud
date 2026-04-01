@@ -29,7 +29,7 @@ const CHANNEL_OPTIONS: ChannelOption[] = [
     label: 'Telegram',
     icon: TelegramIcon,
     description:
-      'Chat with your bot directly in Telegram. Just open a conversation with it \u2014 no workspace, no admin access, ready in seconds.',
+      'Chat with your bot directly in Telegram. Just open a conversation with it \u2014 no workspace, no admin access, ready in about 5 minutes.',
     effort: 1,
     effortColor: 'emerald',
     recommended: true,

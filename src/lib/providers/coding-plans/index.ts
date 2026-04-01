@@ -1,15 +1,18 @@
 import { type UserByokProviderId } from '@/lib/providers/openrouter/inference-provider-id';
-import type { CodingPlanModel, CodingPlanProvider } from '@/lib/providers/coding-plans/types';
+import {
+  COMPATIBLE_USER_AGENT,
+  type CodingPlanModel,
+  type CodingPlanProvider,
+} from '@/lib/providers/coding-plans/types';
 import CODING_PLANS from './coding-plan-definitions';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/byok';
 import { readDb } from '@/lib/drizzle';
 import { preferredModels } from '@/lib/models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { OpenCodeSettings } from '@kilocode/db';
-import { BINARY_THINKING_VARIANTS } from '@/lib/providers/model-settings';
 
 export function formatCodingPlanModelId(provider: CodingPlanProvider, model: CodingPlanModel) {
-  return provider.id + '/' + model.id;
+  return (provider.id + '/' + model.id).toLowerCase();
 }
 
 function convertModel(
@@ -54,7 +57,7 @@ function convertModel(
     preferredIndex: model.flags.includes('recommended') ? preferredIndex : undefined,
     opencode: {
       ai_sdk_provider: provider.ai_sdk_provider,
-      variants: BINARY_THINKING_VARIANTS,
+      variants: model.variants ?? undefined,
     } satisfies OpenCodeSettings,
   };
 }
@@ -105,6 +108,11 @@ export function createAiSdkProvider(codingPlanProvider: CodingPlanProvider, apiK
       baseURL: codingPlanProvider.base_url,
       apiKey,
       name: 'openaiCompatible',
+      fetch: (url, init) => {
+        const headers = new Headers(init?.headers);
+        headers.set('user-agent', COMPATIBLE_USER_AGENT);
+        return fetch(url, init ? { ...init, headers } : { headers });
+      },
     });
   } else {
     throw new Error('Unrecognized AI SDK provider: ' + codingPlanProvider.ai_sdk_provider);

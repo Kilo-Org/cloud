@@ -39,6 +39,10 @@
     {
       "path": "/api/cron/kiloclaw-billing-lifecycle",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/db-pool-metrics",
+      "schedule": "* * * * *"
     }
   ],
   "build": {

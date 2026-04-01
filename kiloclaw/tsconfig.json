@@ -9,12 +9,15 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "allowJs": true,
+    "resolveJsonModule": true
   },
   "include": [
     "worker-configuration.d.ts",
     "src/**/*.ts",
     "controller/src/**/*.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "drizzle/**/*"
   ]
 }

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
@@ -14,14 +13,6 @@ import { GastownBackdrop } from '@/components/gastown/GastownBackdrop';
 import { Plus, Factory, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 
 type OrgTownListPageClientProps = {
   organizationId: string;
@@ -32,8 +23,7 @@ export function OrgTownListPageClient({ organizationId, role }: OrgTownListPageC
   const isOwner = role === 'owner';
   const router = useRouter();
   const trpc = useGastownTRPC();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [newTownName, setNewTownName] = useState('');
+  const onboardingUrl = `/gastown/onboarding?orgId=${encodeURIComponent(organizationId)}`;
 
   const queryClient = useQueryClient();
   const townsQuery = useQuery(trpc.gastown.listOrgTowns.queryOptions({ organizationId }));
@@ -51,29 +41,6 @@ export function OrgTownListPageClient({ organizationId, role }: OrgTownListPageC
       },
     })
   );
-
-  const createTown = useMutation(
-    trpc.gastown.createOrgTown.mutationOptions({
-      onSuccess: data => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.gastown.listOrgTowns.queryKey({ organizationId }),
-        });
-        toast.success('Town created');
-        setNewTownName('');
-        setIsCreateOpen(false);
-        void router.push(`/organizations/${organizationId}/gastown/${data.id}`);
-      },
-      onError: err => {
-        toast.error(err.message);
-      },
-    })
-  );
-
-  const handleCreateSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTownName.trim()) return;
-    createTown.mutate({ organizationId, name: newTownName.trim() });
-  };
 
   return (
     <PageContainer>
@@ -93,7 +60,7 @@ export function OrgTownListPageClient({ organizationId, role }: OrgTownListPageC
             <Button
               variant="primary"
               size="md"
-              onClick={() => setIsCreateOpen(true)}
+              onClick={() => router.push(onboardingUrl)}
               className="gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
             >
               <Plus className="size-5" />
@@ -152,7 +119,7 @@ export function OrgTownListPageClient({ organizationId, role }: OrgTownListPageC
             <Button
               variant="primary"
               size="md"
-              onClick={() => setIsCreateOpen(true)}
+              onClick={() => router.push(onboardingUrl)}
               className="mt-5 gap-2 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
             >
               <Plus className="size-5" />
@@ -199,45 +166,6 @@ export function OrgTownListPageClient({ organizationId, role }: OrgTownListPageC
           ))}
         </div>
       )}
-
-      <Dialog open={isCreateOpen} onOpenChange={open => !open && setIsCreateOpen(false)}>
-        <DialogContent className="border-white/10 bg-[color:oklch(0.155_0_0)]">
-          <DialogHeader>
-            <DialogTitle>Create Town</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreateSubmit}>
-            <div className="py-4">
-              <label className="mb-2 block text-sm font-medium text-white/70">Town Name</label>
-              <Input
-                value={newTownName}
-                onChange={e => setNewTownName(e.target.value)}
-                placeholder="My Town"
-                autoFocus
-                className="border-white/10 bg-black/25"
-              />
-            </div>
-            <DialogFooter>
-              <Button
-                variant="secondary"
-                size="md"
-                type="button"
-                onClick={() => setIsCreateOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                size="md"
-                type="submit"
-                disabled={!newTownName.trim() || createTown.isPending}
-                className="bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
-              >
-                {createTown.isPending ? 'Creating...' : 'Create'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </PageContainer>
   );
 }

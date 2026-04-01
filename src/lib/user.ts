@@ -24,6 +24,7 @@ import {
   organization_user_limits,
   organization_user_usage,
   organization_invitations,
+  organization_membership_removals,
   organization_audit_logs,
   magic_link_tokens,
   device_auth_requests,
@@ -42,7 +43,6 @@ import {
   cloud_agent_code_reviews,
   kiloclaw_instances,
   kiloclaw_access_codes,
-  kiloclaw_version_pins,
   kiloclaw_earlybird_purchases,
   user_period_cache,
   user_feedback,
@@ -461,6 +461,7 @@ export class SoftDeletePreconditionError extends Error {
  * - referral_codes (user's own code)
  * - magic_link_tokens (email-based)
  * - organization_memberships (removed from all orgs)
+ * - organization_membership_removals (tombstones deleted; removed_by anonymized)
  * - organization_invitations (sent by user + addressed to user's email)
  * - organization_user_limits/usage
  * - organization_audit_logs (actor PII nulled)
@@ -557,6 +558,15 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(organization_memberships)
       .where(eq(organization_memberships.kilo_user_id, userId));
+    // Remove membership removal tombstones for this user
+    await tx
+      .delete(organization_membership_removals)
+      .where(eq(organization_membership_removals.kilo_user_id, userId));
+    // Anonymize removed_by references where this user removed others
+    await tx
+      .update(organization_membership_removals)
+      .set({ removed_by: null })
+      .where(eq(organization_membership_removals.removed_by, userId));
     // Delete invitations sent BY this user and invitations sent TO this user's email
     await tx
       .delete(organization_invitations)
@@ -604,7 +614,6 @@ export async function softDeleteUser(userId: string) {
     await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
     await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
     await tx.delete(kiloclaw_instances).where(eq(kiloclaw_instances.user_id, userId));
-    await tx.delete(kiloclaw_version_pins).where(eq(kiloclaw_version_pins.user_id, userId));
     await tx
       .delete(kiloclaw_earlybird_purchases)
       .where(eq(kiloclaw_earlybird_purchases.user_id, userId));

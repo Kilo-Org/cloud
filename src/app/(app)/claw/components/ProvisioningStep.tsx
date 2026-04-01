@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { useGatewayReady } from '@/hooks/useKiloClaw';
+import { useClawGatewayReady } from '../hooks/useClawHooks';
 import {
   type ExecPreset,
   type ClawMutations,
@@ -112,7 +112,7 @@ export function ProvisioningStep({
 
   // Poll the gateway /ready endpoint to know when channels are fully set up
   // and the system's CPU load has settled after boot.
-  const { data: gatewayReady } = useGatewayReady(instanceRunning);
+  const { data: gatewayReady } = useClawGatewayReady(instanceRunning);
   const isGatewaySettled = gatewayReady?.ready === true && gatewayReady?.settled === true;
 
   // Advance to the next step when config is applied, gateway reports ready,

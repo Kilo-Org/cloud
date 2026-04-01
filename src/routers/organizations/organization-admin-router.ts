@@ -22,6 +22,7 @@ import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/
 import { findUserById } from '@/lib/user';
 import { TRPCError } from '@trpc/server';
 import { successResult } from '@/lib/maybe-result';
+import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
 
 const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -522,6 +523,30 @@ export const organizationAdminRouter = createTRPCRouter({
         code: 'NOT_FOUND',
         message: 'Organization not found',
       });
+    }
+
+    // Block deletion while a non-ended subscription exists (Subscription Lifecycle rule 10)
+    const latestPurchase = await getMostRecentSeatPurchase(organizationId);
+    if (latestPurchase && latestPurchase.subscription_status !== 'ended') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message:
+          'Cannot delete organization with an active subscription. Cancel the subscription first.',
+      });
+    }
+
+    // Secondary guard: check Stripe directly in case a live subscription exists
+    // but the webhook hasn't recorded it locally yet (e.g., checkout just completed).
+    if (existingOrg.stripe_customer_id) {
+      const { getSubscriptionsForStripeCustomerId } = await import('@/lib/stripe');
+      const stripeSubs = await getSubscriptionsForStripeCustomerId(existingOrg.stripe_customer_id);
+      if (stripeSubs.some(sub => sub.ended_at == null)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message:
+            'Cannot delete organization with an active subscription. Cancel the subscription first.',
+        });
+      }
     }
 
     await markOrganizationAsDeleted(organizationId);

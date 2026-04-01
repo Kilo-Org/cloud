@@ -219,6 +219,7 @@ describe('organizations usage details trpc router', () => {
         output_tokens: 200,
         created_at: now,
         model: 'gpt-4',
+        requested_model: 'gpt-4',
       });
 
       await insertUsageWithOverrides({
@@ -229,6 +230,7 @@ describe('organizations usage details trpc router', () => {
         output_tokens: 100,
         created_at: now,
         model: 'gpt-3.5-turbo',
+        requested_model: 'gpt-3.5-turbo',
       });
 
       const caller = await createCallerForUser(memberUser.id);
@@ -248,6 +250,30 @@ describe('organizations usage details trpc router', () => {
 
       expect(gpt35Result).toHaveProperty('model', 'gpt-3.5-turbo');
       expect(gpt35Result?.microdollarCost).toBe('500');
+    });
+
+    it('should fall back to model when requested_model is null (legacy rows)', async () => {
+      const now = await getDateFromDb();
+
+      await insertUsageWithOverrides({
+        kilo_user_id: memberUser.id,
+        organization_id: testOrganization.id,
+        cost: 750,
+        created_at: now,
+        model: 'legacy-model',
+        requested_model: null,
+      });
+
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.get({
+        organizationId: testOrganization.id,
+        groupByModel: true,
+      });
+
+      const legacyRow = result.daily.find(d => d.model === 'legacy-model');
+      expect(legacyRow).toBeDefined();
+      expect(legacyRow?.microdollarCost).toBe('750');
     });
 
     it('should handle empty usage data', async () => {

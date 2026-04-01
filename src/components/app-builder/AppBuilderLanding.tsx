@@ -762,7 +762,7 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
   }, []);
 
   return (
-    <div className="flex h-dvh w-full flex-col items-center overflow-y-auto p-4 md:p-8">
+    <div className="flex h-[calc(100dvh-3.5rem)] w-full flex-col items-center overflow-y-auto p-4 md:p-8">
       <div className="my-auto w-full max-w-3xl">
         {/* Header */}
         <div className="mb-8 text-center">

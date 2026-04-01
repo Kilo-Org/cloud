@@ -25,6 +25,7 @@ import {
   type StoredWebhookAuth,
   type WebhookAuthInput,
 } from '../util/webhook-auth';
+import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
 
 export type { ProcessStatus, RequestUpdates } from '../db/types';
 
@@ -442,7 +443,12 @@ export class TriggerDO extends DurableObject<Env> {
         method: request.method,
         path: request.path,
         query_string: request.queryString,
-        headers: JSON.stringify(request.headers),
+        headers: JSON.stringify(
+          redactSensitiveHeaders(
+            request.headers,
+            storedWebhookAuth ? [storedWebhookAuth.header] : undefined
+          )
+        ),
         body: request.body,
         content_type: request.contentType,
         source_ip: request.sourceIp,

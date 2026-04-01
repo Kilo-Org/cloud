@@ -33,6 +33,7 @@
     "@types/node": "^22.19.15",
     "@typescript/native-preview": "catalog:",
     "@vitest/coverage-v8": "^4.1.0",
+    "drizzle-kit": "catalog:",
     "typescript": "catalog:",
     "vitest": "^4.1.0",
     "wrangler": "catalog:"

@@ -14,6 +14,7 @@ import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
 import { KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto-model';
+import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
 // Default model for Slack integrations - separate from the global platform default
 const SLACK_DEFAULT_MODEL = KILO_AUTO_FREE_MODEL.id;
@@ -478,8 +479,7 @@ export async function updateModel(
   if (owner.type === 'org') {
     const organization = await getOrganizationById(owner.id);
     if (organization) {
-      const modelDenyList = organization.settings?.model_deny_list || [];
-      const providerDenyList = organization.settings?.provider_deny_list || [];
+      const { modelDenyList, providerDenyList } = getEffectiveModelRestrictions(organization);
       if (modelDenyList.length > 0 || providerDenyList.length > 0) {
         const isAllowed = createAllowPredicateFromDenyList(modelDenyList, providerDenyList);
         if (!(await isAllowed(modelSlug))) {

@@ -30,9 +30,11 @@ import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
 import { emailTestingRouter } from '@/routers/admin/email-testing-router';
 import { adminGastownRouter } from '@/routers/admin/gastown-router';
+import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
+import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import * as z from 'zod';
 import { eq, and, ne, or, ilike, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
@@ -667,7 +669,10 @@ export const adminRouter = createTRPCRouter({
         // For resets, attempt to start the instance (best effort, outside transaction)
         if (isReset) {
           const [activeInstance] = await db
-            .select({ id: kiloclaw_instances.id })
+            .select({
+              id: kiloclaw_instances.id,
+              sandbox_id: kiloclaw_instances.sandbox_id,
+            })
             .from(kiloclaw_instances)
             .where(
               and(
@@ -680,7 +685,7 @@ export const adminRouter = createTRPCRouter({
           if (activeInstance) {
             try {
               const client = new KiloClawInternalClient();
-              await client.start(input.userId);
+              await client.start(input.userId, workerInstanceId(activeInstance));
             } catch {
               // Best effort — instance will be startable by the user from the dashboard
             }
@@ -1344,4 +1349,5 @@ export const adminRouter = createTRPCRouter({
   emailTesting: emailTestingRouter,
   botRequests: adminBotRequestsRouter,
   gastown: adminGastownRouter,
+  extendClawTrial: extendClawTrialRouter,
 });

@@ -42,9 +42,6 @@ import {
   DEFAULT_CODE_REVIEW_MODEL,
   DEFAULT_CODE_REVIEW_MODE,
   FEATURE_FLAG_INCREMENTAL_REVIEW,
-  isActiveReviewPromo,
-  REVIEW_PROMO_START,
-  REVIEW_PROMO_END,
 } from '../core/constants';
 import type { Owner } from '../core';
 import { generateReviewPrompt } from '../prompts/generate-prompt';
@@ -439,16 +436,6 @@ export async function prepareReviewPayload(
             upstreamBranch: review.head_ref,
             ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
           };
-
-    if (isActiveReviewPromo('reviewer', sessionInput.model)) {
-      logExceptInTest('[prepareReviewPayload] Promotional model selected for code review', {
-        reviewId,
-        owner,
-        model: sessionInput.model,
-        promoStart: REVIEW_PROMO_START,
-        promoEnd: REVIEW_PROMO_END,
-      });
-    }
 
     // Log the session input for GitLab
     if (platform === PLATFORM.GITLAB) {

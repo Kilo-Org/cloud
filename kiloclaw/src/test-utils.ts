@@ -29,6 +29,7 @@ export function createMockEnv(overrides: Partial<KiloClawEnv> = {}): KiloClawEnv
   return {
     KILOCLAW_INSTANCE: {} as unknown as KiloClawEnv['KILOCLAW_INSTANCE'],
     KILOCLAW_APP: {} as unknown as KiloClawEnv['KILOCLAW_APP'],
+    KILOCLAW_REGISTRY: {} as unknown as KiloClawEnv['KILOCLAW_REGISTRY'],
     KILOCLAW_CONTROLLER_AE: {
       writeDataPoint: vi.fn(),
     } as unknown as KiloClawEnv['KILOCLAW_CONTROLLER_AE'],

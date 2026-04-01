@@ -49,6 +49,8 @@ export type SendMessageInput = {
   images?: Images;
   /** Optional model override - if provided, updates the project's model_id */
   model?: string;
+  /** When true, forces creation of a new cloud agent session (user-initiated new chat) */
+  forceNewSession?: boolean;
 };
 
 /**

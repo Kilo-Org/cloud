@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { createContext, use, useCallback, useEffect, useState } from 'react';
 import type { Channel as StreamChannel, Event } from 'stream-chat';
 import { useQueryClient } from '@tanstack/react-query';
 import { MessageSquare, RotateCw } from 'lucide-react';
@@ -10,13 +10,18 @@ import {
   Window,
   MessageList,
   MessageInput,
+  MessageSimple,
   Thread,
   useCreateChatClient,
   useChatContext,
   useChannelStateContext,
+  useMessageContext,
 } from 'stream-chat-react';
-import { useStreamChatCredentials } from '@/hooks/useKiloClaw';
+import { useClawStreamChatCredentials } from '../hooks/useClawHooks';
 import { useTRPC } from '@/lib/trpc/utils';
+import { useClawContext } from './ClawContext';
+
+const BotUserIdContext = createContext<string>('');
 
 type ChatTabProps = {
   /** Only fetch credentials and connect when true (tab is active + instance running). */
@@ -24,7 +29,7 @@ type ChatTabProps = {
 };
 
 export function ChatTab({ enabled }: ChatTabProps) {
-  const { data: creds, isLoading, error } = useStreamChatCredentials(enabled);
+  const { data: creds, isLoading, error } = useClawStreamChatCredentials(enabled);
 
   if (!enabled) {
     return <ChatPlaceholder message="Chat is available when the machine is running." />;
@@ -75,20 +80,26 @@ function StreamChatUI({
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const { organizationId } = useClawContext();
 
   // Stable token provider that fetches a fresh short-lived token on every call.
   // stream-chat-react calls this when the current token expires (via `exp` claim).
+  // Routes to the correct tRPC endpoint based on personal vs org context.
   const tokenProvider = useCallback(async () => {
-    const creds = await queryClient.fetchQuery(
-      trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
-        staleTime: 0,
-      })
-    );
+    const opts = organizationId
+      ? trpc.organizations.kiloclaw.getStreamChatCredentials.queryOptions(
+          { organizationId },
+          { staleTime: 0 }
+        )
+      : trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
+          staleTime: 0,
+        });
+    const creds = await queryClient.fetchQuery(opts);
     if (!creds?.userToken) {
       throw new Error('Failed to fetch Stream Chat credentials');
     }
     return creds.userToken;
-  }, [queryClient, trpc]);
+  }, [queryClient, trpc, organizationId]);
 
   const client = useCreateChatClient({
     apiKey,
@@ -117,19 +128,38 @@ function StreamChatUI({
   }
 
   return (
-    <div className="claw-chat-wrapper h-[560px]">
-      <Chat client={client} theme="str-chat__theme-dark">
-        <Channel channel={channel}>
-          <Window>
-            <BotStatusBar botUserId={botUserId} />
-            <MessageList />
-            <MessageInput />
-          </Window>
-          <Thread />
-        </Channel>
-      </Chat>
-    </div>
+    <BotUserIdContext value={botUserId}>
+      <div className="claw-chat-wrapper h-[560px]">
+        <Chat client={client} theme="str-chat__theme-dark">
+          <Channel channel={channel} Message={ClawMessage}>
+            <Window>
+              <BotStatusBar botUserId={botUserId} />
+              <MessageList />
+              <MessageInput />
+            </Window>
+            <Thread />
+          </Channel>
+        </Chat>
+      </div>
+    </BotUserIdContext>
   );
+}
+
+function ClawMessage() {
+  const botUserId = use(BotUserIdContext);
+  const { message } = useMessageContext();
+  const isBotThinking =
+    message.user?.id === botUserId && !message.text?.trim() && !message.attachments?.length;
+
+  if (isBotThinking) {
+    return (
+      <div className="claw-thinking-message">
+        <span className="claw-thinking-text">Thinking&hellip;</span>
+      </div>
+    );
+  }
+
+  return <MessageSimple />;
 }
 
 function useBotOnlineStatus(botUserId: string): boolean {

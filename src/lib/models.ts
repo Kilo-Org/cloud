@@ -6,7 +6,6 @@ import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_FREE_MODEL,
-  KILO_AUTO_FREE_MODEL_DEPRECATED,
   KILO_AUTO_FRONTIER_MODEL,
   resolveAutoModel,
 } from '@/lib/kilo-auto-model';
@@ -33,7 +32,10 @@ export const preferredModels = [
   KILO_AUTO_FREE_MODEL.id,
   mimo_v2_pro_free_model.status === 'public' ? mimo_v2_pro_free_model.public_id : null,
   'nvidia/nemotron-3-super-120b-a12b:free',
-  'arcee-ai/trinity-large-preview:free',
+  'qwen/qwen3.6-plus-preview:free',
+  grok_code_fast_1_optimized_free_model.status === 'public'
+    ? grok_code_fast_1_optimized_free_model.public_id
+    : null,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   'openai/gpt-5.4',
@@ -41,7 +43,6 @@ export const preferredModels = [
   MINIMAX_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   'z-ai/glm-5',
-  'x-ai/grok-code-fast-1',
 ].filter(m => m !== null);
 
 export async function getMonitoredModels() {
@@ -60,7 +61,6 @@ export function isFreeModel(model: string): boolean {
   return (
     isKiloFreeModel(model) ||
     model === KILO_AUTO_FREE_MODEL.id ||
-    model === KILO_AUTO_FREE_MODEL_DEPRECATED ||
     (model ?? '').endsWith(':free') ||
     model === 'openrouter/free' ||
     isOpenRouterStealthModel(model ?? '')

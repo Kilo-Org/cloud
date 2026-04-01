@@ -14,6 +14,7 @@ type HeartbeatSession = {
   title: string;
   gitUrl?: string;
   gitBranch?: string;
+  parentSessionId?: string;
 };
 
 type WSAttachment =
@@ -314,6 +315,8 @@ export class UserConnectionDO extends DurableObject<Env> {
         this.sendToWeb(ws2, msg);
       }
     }
+
+    this.sendToCli(ws, { type: 'heartbeat_ack' });
   }
 
   private handleCliEvent(
@@ -684,6 +687,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     for (const [connectionId, sessions] of this.connectionSessions) {
       if (!liveConnectionIds.has(connectionId)) continue;
       for (const session of sessions) {
+        if (session.parentSessionId) continue;
         result.push({ ...session, connectionId });
       }
     }

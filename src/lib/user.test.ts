@@ -24,6 +24,7 @@ import {
   user_admin_notes,
   magic_link_tokens,
   stytch_fingerprints,
+  kiloclaw_instances,
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   security_findings,
@@ -865,8 +866,16 @@ describe('User', () => {
         published_at: new Date().toISOString(),
       });
 
+      const [instance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: user.id,
+          sandbox_id: `test-gdpr-pin-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+
       await db.insert(kiloclaw_version_pins).values({
-        user_id: user.id,
+        instance_id: instance.id,
         image_tag: testTag,
         pinned_by: adminUser.id,
         reason: 'test pin',
@@ -878,7 +887,7 @@ describe('User', () => {
         await db
           .select({ count: count() })
           .from(kiloclaw_version_pins)
-          .where(eq(kiloclaw_version_pins.user_id, user.id))
+          .where(eq(kiloclaw_version_pins.instance_id, instance.id))
           .then(r => r[0].count)
       ).toBe(0);
 

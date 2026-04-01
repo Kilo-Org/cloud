@@ -248,6 +248,9 @@ const prepareSessionHandler = internalApiProtectedProcedure
           model: input.model,
           variant: input.variant,
           kiloSessionId,
+          githubRepo: input.githubRepo,
+          gitUrl: input.gitUrl,
+          platform: input.platform,
         });
 
         if (!registerResult.success) {

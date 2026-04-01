@@ -6,7 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "dev": {
-    "port": 8796,
+    "port": 8805,
     "local_protocol": "http",
     "ip": "0.0.0.0",
   },

@@ -25,6 +25,26 @@ import {
   VersionedSettingsSchema,
 } from '@kilocode/db/schema-types';
 
+// API-facing billing cycle values: 'monthly' | 'annual'
+// The DB stores 'yearly' instead of 'annual'; Stripe uses 'year'/'month'.
+export const BillingCycleSchema = z.enum(['monthly', 'annual']);
+export type BillingCycle = z.infer<typeof BillingCycleSchema>;
+
+export function billingCycleToDb(cycle: BillingCycle): 'monthly' | 'yearly' {
+  return cycle === 'annual' ? 'yearly' : 'monthly';
+}
+
+// Maps DB ('yearly') or Stripe ('year') interval values to the domain BillingCycle.
+export function toBillingCycle(source: 'monthly' | 'yearly' | 'month' | 'year'): BillingCycle {
+  return source === 'yearly' || source === 'year' ? 'annual' : 'monthly';
+}
+
+/** @deprecated Use toBillingCycle */
+export const billingCycleFromDb: (dbCycle: 'monthly' | 'yearly') => BillingCycle = toBillingCycle;
+/** @deprecated Use toBillingCycle */
+export const billingCycleFromStripeInterval: (interval: 'month' | 'year') => BillingCycle =
+  toBillingCycle;
+
 export const OrganizationNameSchema = z
   .string()
   .trim()
@@ -34,7 +54,6 @@ export const OrganizationNameSchema = z
 export const OrganizationCreateRequestSchema = z.object({
   name: OrganizationNameSchema,
   autoAddCreator: z.boolean().optional().default(false),
-  plan: OrganizationPlanSchema.optional().default('teams'),
   company_domain: CompanyDomainSchema.optional(),
 });
 
@@ -50,7 +69,7 @@ export const OrganizationSchema = z.object({
   auto_top_up_enabled: z.boolean(),
   settings: OrganizationSettingsSchema,
   seat_count: z.number().min(0).default(0),
-  require_seats: z.boolean().default(false),
+  require_seats: z.boolean().default(true),
   created_by_kilo_user_id: z.string().nullable(),
   deleted_at: z.string().nullable(),
   sso_domain: z.string().nullable(),

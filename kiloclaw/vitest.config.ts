@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // Treat .sql imports as raw text (needed for drizzle-orm/durable-sqlite migrations)
+  assetsInclude: ['**/*.sql'],
   test: {
     name: 'unit',
     globals: true,

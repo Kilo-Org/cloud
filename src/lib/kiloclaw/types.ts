@@ -156,8 +156,27 @@ export type PlatformStatusResponse = {
   execAsk: string | null;
 };
 
+/** A single registry DO's entries + migration status. */
+export type RegistryResult = {
+  registryKey: string;
+  entries: Array<{
+    instanceId: string;
+    doKey: string;
+    assignedUserId: string;
+    createdAt: string;
+    destroyedAt: string | null;
+  }>;
+  migrated: boolean;
+};
+
+/** Response from GET /api/platform/registry-entries (admin only). */
+export type RegistryEntriesResponse = {
+  registries: RegistryResult[];
+};
+
 /** Response from GET /api/platform/debug-status (internal/admin only). */
 export type PlatformDebugStatusResponse = PlatformStatusResponse & {
+  orgId: string | null;
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;
   pendingPostgresMarkOnFinalize: boolean;
@@ -348,4 +367,6 @@ export type KiloClawDashboardStatus = PlatformStatusResponse & {
   /** Worker base URL for constructing the "Open" link. Falls back to claw.kilo.ai. */
   workerUrl: string;
   name: string | null;
+  /** Postgres row ID. Used to construct /i/{instanceId} proxy paths for instance-keyed instances. */
+  instanceId: string | null;
 };

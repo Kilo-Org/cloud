@@ -42,9 +42,10 @@ import {
   markInstanceDestroyedById,
   renameInstance,
   restoreDestroyedInstance,
+  workerInstanceId,
   type ActiveKiloClawInstance,
 } from '@/lib/kiloclaw/instance-registry';
-import { sandboxIdFromUserId } from '@/lib/kiloclaw/sandbox-id';
+
 import { client as stripe } from '@/lib/stripe-client';
 import { APP_URL } from '@/lib/constants';
 import { getRewardfulReferral } from '@/lib/rewardful';
@@ -81,8 +82,8 @@ const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed
  * exists (e.g. trial expired and personal instance was destroyed).
  *
  * When a new row is created, the subscription row linked to the user's
- * destroyed personal instance (identified by sandboxIdFromUserId) is
- * reassigned to the new instance_id. The update is scoped to that exact
+ * most recently destroyed personal instance is reassigned to the new
+ * instance_id. The update is scoped to that exact
  * destroyed instance row so that subscriptions on other (org or multi-)
  * instances are never touched and UQ_kiloclaw_subscriptions_instance is not
  * violated.
@@ -94,20 +95,20 @@ async function getOrCreateInstanceForBilling(userId: string): Promise<ActiveKilo
   const active = await getActiveInstance(userId);
   if (active) return active;
 
-  // Find the destroyed personal instance row. ensureActiveInstance always
-  // keys personal instances on sandboxIdFromUserId(userId), so this is the
-  // exact row that needs repairing.
-  const sandboxId = sandboxIdFromUserId(userId);
+  // Find the most recently destroyed personal instance. We don't filter by
+  // sandboxId format because both legacy (base64url) and instance-keyed (ki_)
+  // rows may exist.
   const [destroyedInstance] = await db
     .select({ id: kiloclaw_instances.id })
     .from(kiloclaw_instances)
     .where(
       and(
         eq(kiloclaw_instances.user_id, userId),
-        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNull(kiloclaw_instances.organization_id),
         isNotNull(kiloclaw_instances.destroyed_at)
       )
     )
+    .orderBy(desc(kiloclaw_instances.destroyed_at))
     .limit(1);
 
   const newInstance = await ensureActiveInstance(userId);
@@ -330,21 +331,25 @@ async function provisionInstance(
   const [pin] = await db
     .select({ image_tag: kiloclaw_version_pins.image_tag })
     .from(kiloclaw_version_pins)
-    .where(eq(kiloclaw_version_pins.user_id, user.id))
+    .where(eq(kiloclaw_version_pins.instance_id, instanceRow.id))
     .limit(1);
   const pinnedImageTag = pin?.image_tag;
 
   const client = new KiloClawInternalClient();
   try {
-    return await client.provision(user.id, {
-      envVars: input.envVars,
-      encryptedSecrets,
-      channels: buildWorkerChannels(input.channels),
-      kilocodeApiKey,
-      kilocodeApiKeyExpiresAt,
-      kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
-      pinnedImageTag,
-    });
+    return await client.provision(
+      user.id,
+      {
+        envVars: input.envVars,
+        encryptedSecrets,
+        channels: buildWorkerChannels(input.channels),
+        kilocodeApiKey,
+        kilocodeApiKeyExpiresAt,
+        kilocodeDefaultModel: input.kilocodeDefaultModel ?? undefined,
+        pinnedImageTag,
+      },
+      workerInstanceId(instanceRow) ? { instanceId: instanceRow.id } : undefined
+    );
   } catch (error) {
     // Only clean up the exact row this attempt created. Target by primary
     // key so a concurrent request's row is never affected.
@@ -364,6 +369,7 @@ async function patchConfig(
   user: Parameters<typeof generateApiToken>[0],
   input: z.infer<typeof updateKiloCodeConfigSchema>
 ): Promise<KiloCodeConfigPublicResponse> {
+  const instance = await getActiveInstance(user.id);
   const client = new KiloClawInternalClient();
   const expiresInSeconds = TOKEN_EXPIRY.thirtyDays;
   const kilocodeApiKey = generateApiToken(user, undefined, {
@@ -371,11 +377,15 @@ async function patchConfig(
   });
   const kilocodeApiKeyExpiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
 
-  const response = await client.patchKiloCodeConfig(user.id, {
-    ...input,
-    kilocodeApiKey,
-    kilocodeApiKeyExpiresAt,
-  });
+  const response = await client.patchKiloCodeConfig(
+    user.id,
+    {
+      ...input,
+      kilocodeApiKey,
+      kilocodeApiKeyExpiresAt,
+    },
+    workerInstanceId(instance)
+  );
 
   return sanitizeKiloCodeConfigResponse(response);
 }
@@ -580,16 +590,19 @@ export const kiloclawRouter = createTRPCRouter({
   }),
 
   getStatus: baseProcedure.query(async ({ ctx }) => {
-    const client = new KiloClawInternalClient();
-    const status = await client.getStatus(ctx.user.id);
-    const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
-
     const instance = await getActiveInstance(ctx.user.id);
+    const client = new KiloClawInternalClient();
+    const status = await client.getStatus(ctx.user.id, workerInstanceId(instance));
+    const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
 
     return {
       ...status,
       name: instance?.name ?? null,
       workerUrl,
+      // Only expose instanceId for instance-keyed instances (ki_ sandboxId).
+      // Legacy instances use userId-keyed DOs — returning their row UUID would
+      // cause the frontend/gateway to resolve the wrong DO.
+      instanceId: workerInstanceId(instance) ? (instance?.id ?? null) : null,
     } satisfies KiloClawDashboardStatus;
   }),
 
@@ -607,19 +620,93 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   getStreamChatCredentials: clawAccessProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
-    return client.getStreamChatCredentials(ctx.user.id);
+    return client.getStreamChatCredentials(ctx.user.id, workerInstanceId(instance));
   }),
+
+  sendChatMessage: clawAccessProcedure
+    .input(
+      z.object({
+        instanceId: z.string().uuid().optional(),
+        message: z.string().min(1).max(32_000),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.instanceId) {
+        // Explicit instanceId: verify ownership and non-destroyed
+        const [row] = await db
+          .select({ id: kiloclaw_instances.id })
+          .from(kiloclaw_instances)
+          .where(
+            and(
+              eq(kiloclaw_instances.id, input.instanceId),
+              eq(kiloclaw_instances.user_id, ctx.user.id),
+              isNull(kiloclaw_instances.destroyed_at)
+            )
+          )
+          .limit(1);
+        if (!row) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'No active KiloClaw instance found',
+          });
+        }
+      } else {
+        // No instanceId: verify the user has any active instance
+        const instance = await getActiveInstance(ctx.user.id);
+        if (!instance) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'No active KiloClaw instance found',
+          });
+        }
+      }
+
+      const client = new KiloClawInternalClient();
+      try {
+        return await client.sendChatMessage(ctx.user.id, input.message, input.instanceId);
+      } catch (err) {
+        if (err instanceof KiloClawApiError) {
+          const { message } = getKiloClawApiErrorPayload(err);
+          const code =
+            err.statusCode === 404
+              ? 'NOT_FOUND'
+              : err.statusCode === 503
+                ? 'PRECONDITION_FAILED'
+                : 'INTERNAL_SERVER_ERROR';
+          throw new TRPCError({
+            code,
+            message: message ?? 'Failed to send chat message',
+          });
+        }
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to send chat message',
+        });
+      }
+    }),
 
   // Instance lifecycle
   start: clawAccessProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
-    return client.start(ctx.user.id);
+    const result = await client.start(ctx.user.id, workerInstanceId(instance));
+    // /api/platform/start always returns { ok: true } regardless of whether
+    // the machine transitioned state, so this may fire for no-op requests.
+    // The UI only enables Start when isStartable is true, so false fires are rare.
+    PostHogClient().capture({
+      distinctId: ctx.user.google_user_email,
+      event: 'claw_instance_started',
+      properties: { user_id: ctx.user.id },
+    });
+    return result;
   }),
 
   stop: clawAccessProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
-    return client.stop(ctx.user.id);
+    return client.stop(ctx.user.id, workerInstanceId(instance));
   }),
 
   destroy: baseProcedure.mutation(async ({ ctx }) => {
@@ -627,7 +714,7 @@ export const kiloclawRouter = createTRPCRouter({
     const client = new KiloClawInternalClient();
     let result;
     try {
-      result = await client.destroy(ctx.user.id);
+      result = await client.destroy(ctx.user.id, workerInstanceId(destroyedRow));
     } catch (error) {
       if (destroyedRow) {
         await restoreDestroyedInstance(destroyedRow.id);
@@ -716,17 +803,21 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   patchChannels: clawAccessProcedure.input(patchChannelsSchema).mutation(async ({ ctx, input }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
-    return client.patchChannels(ctx.user.id, {
-      channels: buildWorkerChannelsPatch(input),
-    });
+    return client.patchChannels(
+      ctx.user.id,
+      { channels: buildWorkerChannelsPatch(input) },
+      workerInstanceId(instance)
+    );
   }),
 
   patchExecPreset: clawAccessProcedure
     .input(z.object({ security: z.string().optional(), ask: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
-      return client.patchExecPreset(ctx.user.id, input);
+      return client.patchExecPreset(ctx.user.id, input, workerInstanceId(instance));
     }),
 
   /**
@@ -808,12 +899,14 @@ export const kiloclawRouter = createTRPCRouter({
       }
 
       // 4. Forward to worker — translate 4xx responses into TRPCErrors
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       try {
-        return await client.patchSecrets(ctx.user.id, {
-          secrets: encryptedPatch,
-          meta: input.meta,
-        });
+        return await client.patchSecrets(
+          ctx.user.id,
+          { secrets: encryptedPatch, meta: input.meta },
+          workerInstanceId(instance)
+        );
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
           // Extract message from worker response body (JSON or plain text)
@@ -833,17 +926,22 @@ export const kiloclawRouter = createTRPCRouter({
 
   // User-facing (user client -- forwards user's short-lived JWT)
   getConfig: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawUserClient(
       generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
     );
-    return client.getConfig({ userId: ctx.user.id });
+    return client.getConfig({ userId: ctx.user.id, instanceId: workerInstanceId(instance) });
   }),
 
   getChannelCatalog: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawUserClient(
       generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
     );
-    const config = await client.getConfig({ userId: ctx.user.id });
+    const config = await client.getConfig({
+      userId: ctx.user.id,
+      instanceId: workerInstanceId(instance),
+    });
     const channels = getEntriesByCategory('channel');
 
     return channels.map(entry => ({
@@ -865,10 +963,14 @@ export const kiloclawRouter = createTRPCRouter({
   }),
 
   getSecretCatalog: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawUserClient(
       generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
     );
-    const config = await client.getConfig({ userId: ctx.user.id });
+    const config = await client.getConfig({
+      userId: ctx.user.id,
+      instanceId: workerInstanceId(instance),
+    });
     const tools = getEntriesByCategory('tool');
 
     return tools.map(entry => ({
@@ -905,46 +1007,77 @@ export const kiloclawRouter = createTRPCRouter({
         .optional()
     )
     .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawUserClient(
         generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
       );
-      return client.restartMachine(input?.imageTag ? { imageTag: input.imageTag } : undefined, {
-        userId: ctx.user.id,
-      });
+      const result = await client.restartMachine(
+        input?.imageTag ? { imageTag: input.imageTag } : undefined,
+        { userId: ctx.user.id, instanceId: workerInstanceId(instance) }
+      );
+      if (result.success) {
+        PostHogClient().capture({
+          distinctId: ctx.user.google_user_email,
+          event: 'claw_instance_redeployed',
+          properties: {
+            user_id: ctx.user.id,
+            redeploy_mode: input?.imageTag === 'latest' ? 'upgrade' : 'redeploy',
+          },
+        });
+      }
+      return result;
     }),
 
   listPairingRequests: clawAccessProcedure
     .input(z.object({ refresh: z.boolean().optional() }).optional())
     .query(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
-      return client.listPairingRequests(ctx.user.id, input?.refresh);
+      return client.listPairingRequests(ctx.user.id, input?.refresh, workerInstanceId(instance));
     }),
 
   approvePairingRequest: clawAccessProcedure
     .input(z.object({ channel: z.string().min(1), code: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
-      return client.approvePairingRequest(ctx.user.id, input.channel, input.code);
+      return client.approvePairingRequest(
+        ctx.user.id,
+        input.channel,
+        input.code,
+        workerInstanceId(instance)
+      );
     }),
 
   listDevicePairingRequests: clawAccessProcedure
     .input(z.object({ refresh: z.boolean().optional() }).optional())
     .query(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
-      return client.listDevicePairingRequests(ctx.user.id, input?.refresh);
+      return client.listDevicePairingRequests(
+        ctx.user.id,
+        input?.refresh,
+        workerInstanceId(instance)
+      );
     }),
 
   approveDevicePairingRequest: clawAccessProcedure
     .input(z.object({ requestId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
-      return client.approveDevicePairingRequest(ctx.user.id, input.requestId);
+      return client.approveDevicePairingRequest(
+        ctx.user.id,
+        input.requestId,
+        workerInstanceId(instance)
+      );
     }),
 
   gatewayStatus: baseProcedure.query(async ({ ctx }) => {
     try {
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
-      return await client.getGatewayStatus(ctx.user.id);
+      return await client.getGatewayStatus(ctx.user.id, workerInstanceId(instance));
     } catch (err) {
       console.error('Failed to fetch gateway status for user:', ctx.user.id, err);
       if (err instanceof KiloClawApiError && (err.statusCode === 404 || err.statusCode === 409)) {
@@ -962,8 +1095,9 @@ export const kiloclawRouter = createTRPCRouter({
 
   gatewayReady: baseProcedure.query(async ({ ctx }) => {
     try {
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
-      return await client.getGatewayReady(ctx.user.id);
+      return await client.getGatewayReady(ctx.user.id, workerInstanceId(instance));
     } catch (err) {
       console.error('[gatewayReady] error for user:', ctx.user.id, err);
       if (err instanceof KiloClawApiError && (err.statusCode === 404 || err.statusCode === 409)) {
@@ -980,18 +1114,21 @@ export const kiloclawRouter = createTRPCRouter({
   }),
 
   controllerVersion: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
-    return client.getControllerVersion(ctx.user.id);
+    return client.getControllerVersion(ctx.user.id, workerInstanceId(instance));
   }),
 
   restartOpenClaw: clawAccessProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
-    return client.restartGatewayProcess(ctx.user.id);
+    return client.restartGatewayProcess(ctx.user.id, workerInstanceId(instance));
   }),
 
   runDoctor: clawAccessProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
-    return client.runDoctor(ctx.user.id);
+    return client.runDoctor(ctx.user.id, workerInstanceId(instance));
   }),
 
   // ── Kilo CLI Run ──────────────────────────────────────────────────
@@ -999,11 +1136,16 @@ export const kiloclawRouter = createTRPCRouter({
   startKiloCliRun: clawAccessProcedure
     .input(z.object({ prompt: z.string().min(1).max(10_000) }))
     .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
 
       let result;
       try {
-        result = await client.startKiloCliRun(ctx.user.id, input.prompt);
+        result = await client.startKiloCliRun(
+          ctx.user.id,
+          input.prompt,
+          workerInstanceId(instance)
+        );
       } catch (err) {
         if (err instanceof KiloClawApiError) {
           const { code } = getKiloClawApiErrorPayload(err);
@@ -1023,6 +1165,7 @@ export const kiloclawRouter = createTRPCRouter({
         .insert(kiloclaw_cli_runs)
         .values({
           user_id: ctx.user.id,
+          instance_id: instance?.id ?? null,
           prompt: input.prompt,
           status: 'running',
           started_at: result.startedAt,
@@ -1035,14 +1178,21 @@ export const kiloclawRouter = createTRPCRouter({
   getKiloCliRunStatus: clawAccessProcedure
     .input(z.object({ runId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+
       // Load the requested run from the DB to avoid cross-run data leaks.
       // The controller only tracks the *current* run, so polling it for an
       // older run would return the wrong output.
+      const instanceFilter = instance ? eq(kiloclaw_cli_runs.instance_id, instance.id) : undefined;
       const [row] = await db
         .select()
         .from(kiloclaw_cli_runs)
         .where(
-          and(eq(kiloclaw_cli_runs.id, input.runId), eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+          and(
+            eq(kiloclaw_cli_runs.id, input.runId),
+            eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+            instanceFilter
+          )
         )
         .limit(1);
 
@@ -1074,7 +1224,10 @@ export const kiloclawRouter = createTRPCRouter({
 
       // Run is still active — poll the controller for live output.
       const client = new KiloClawInternalClient();
-      const controllerStatus = await client.getKiloCliRunStatus(ctx.user.id);
+      const controllerStatus = await client.getKiloCliRunStatus(
+        ctx.user.id,
+        workerInstanceId(instance)
+      );
 
       // If controller reports the run finished, persist to the DB row.
       if (
@@ -1094,6 +1247,7 @@ export const kiloclawRouter = createTRPCRouter({
             and(
               eq(kiloclaw_cli_runs.id, input.runId),
               eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              instanceFilter,
               eq(kiloclaw_cli_runs.status, 'running')
             )
           );
@@ -1108,11 +1262,15 @@ export const kiloclawRouter = createTRPCRouter({
   cancelKiloCliRun: clawAccessProcedure
     .input(z.object({ runId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
-      const result = await client.cancelKiloCliRun(ctx.user.id);
+      const result = await client.cancelKiloCliRun(ctx.user.id, workerInstanceId(instance));
 
       // Mark the specific run as cancelled in DB
       if (result.ok) {
+        const instanceFilter = instance
+          ? eq(kiloclaw_cli_runs.instance_id, instance.id)
+          : undefined;
         await db
           .update(kiloclaw_cli_runs)
           .set({
@@ -1123,6 +1281,7 @@ export const kiloclawRouter = createTRPCRouter({
             and(
               eq(kiloclaw_cli_runs.id, input.runId),
               eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              instanceFilter,
               eq(kiloclaw_cli_runs.status, 'running')
             )
           );
@@ -1134,11 +1293,13 @@ export const kiloclawRouter = createTRPCRouter({
   listKiloCliRuns: clawAccessProcedure
     .input(z.object({ limit: z.number().min(1).max(50).default(10) }).optional())
     .query(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const limit = input?.limit ?? 10;
+      const instanceFilter = instance ? eq(kiloclaw_cli_runs.instance_id, instance.id) : undefined;
       const runs = await db
         .select()
         .from(kiloclaw_cli_runs)
-        .where(eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+        .where(and(eq(kiloclaw_cli_runs.user_id, ctx.user.id), instanceFilter))
         .orderBy(desc(kiloclaw_cli_runs.started_at))
         .limit(limit);
 
@@ -1146,8 +1307,9 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   restoreConfig: clawAccessProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
-    return client.restoreConfig(ctx.user.id);
+    return client.restoreConfig(ctx.user.id, undefined, workerInstanceId(instance));
   }),
 
   getGoogleSetupCommand: clawAccessProcedure.query(({ ctx }) => {
@@ -1158,28 +1320,32 @@ export const kiloclawRouter = createTRPCRouter({
     });
     const isDev = process.env.NODE_ENV === 'development';
     const imageTag = isDev ? ':dev' : ':latest';
-    const workerFlag = isDev ? ' --worker-url=http://localhost:8795' : '';
+    const workerFlag = isDev
+      ? ` --worker-url=${process.env.KILOCLAW_API_URL ?? 'http://localhost:8795'}`
+      : '';
     const gmailPushFlag = isDev ? ' --gmail-push-worker-url=${GMAIL_PUSH_WORKER_URL}' : '';
     const imageUrl = `ghcr.io/kilo-org/google-setup${imageTag}`;
     return {
-      command: `docker pull ${imageUrl} && docker run -it --network host ${imageUrl} --token="${token}"${workerFlag}${gmailPushFlag}`,
+      command: `docker pull ${imageUrl} ; docker run -it --network host ${imageUrl} --token="${token}"${workerFlag}${gmailPushFlag}`,
     };
   }),
 
   disconnectGoogle: clawAccessProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
-    return client.clearGoogleCredentials(ctx.user.id);
+    return client.clearGoogleCredentials(ctx.user.id, workerInstanceId(instance));
   }),
 
   setGmailNotifications: baseProcedure
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       try {
         if (input.enabled) {
-          return await client.enableGmailNotifications(ctx.user.id);
+          return await client.enableGmailNotifications(ctx.user.id, workerInstanceId(instance));
         }
-        return await client.disableGmailNotifications(ctx.user.id);
+        return await client.disableGmailNotifications(ctx.user.id, workerInstanceId(instance));
       } catch (err) {
         if (err instanceof KiloClawApiError && err.statusCode >= 400 && err.statusCode < 500) {
           let message = `Failed to update Gmail notifications (${err.statusCode})`;
@@ -1330,6 +1496,9 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   getMyPin: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    if (!instance) return null;
+
     const [result] = await db
       .select({
         pin: kiloclaw_version_pins,
@@ -1342,13 +1511,14 @@ export const kiloclawRouter = createTRPCRouter({
         eq(kiloclaw_version_pins.image_tag, kiloclaw_image_catalog.image_tag)
       )
       // Intentionally not joining pinned_by user — avoid leaking admin email to end users
-      .where(eq(kiloclaw_version_pins.user_id, ctx.user.id))
+      .where(eq(kiloclaw_version_pins.instance_id, instance.id))
       .limit(1);
 
     if (!result) return null;
 
     return {
       ...result.pin,
+      pinnedBySelf: result.pin.pinned_by === ctx.user.id,
       openclaw_version: result.openclaw_version,
       variant: result.variant,
     };
@@ -1362,6 +1532,11 @@ export const kiloclawRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+      if (!instance) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'No active KiloClaw instance found' });
+      }
+
       // Verify the version exists and is available
       // Note: There is a small TOCTOU window between this check and the insert below.
       // Worst case: a user pins to a version disabled milliseconds before. The FK constraint
@@ -1390,7 +1565,7 @@ export const kiloclawRouter = createTRPCRouter({
       const [existingPin] = await db
         .select({ pinned_by: kiloclaw_version_pins.pinned_by })
         .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.user_id, ctx.user.id))
+        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
         .limit(1);
 
       if (existingPin && existingPin.pinned_by !== ctx.user.id) {
@@ -1406,13 +1581,13 @@ export const kiloclawRouter = createTRPCRouter({
         [result] = await db
           .insert(kiloclaw_version_pins)
           .values({
-            user_id: ctx.user.id,
+            instance_id: instance.id,
             image_tag: input.imageTag,
             pinned_by: ctx.user.id,
             reason: input.reason ?? null,
           })
           .onConflictDoUpdate({
-            target: kiloclaw_version_pins.user_id,
+            target: kiloclaw_version_pins.instance_id,
             set: {
               image_tag: input.imageTag,
               pinned_by: ctx.user.id,
@@ -1440,13 +1615,18 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   removeMyPin: clawAccessProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    if (!instance) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'No active KiloClaw instance found' });
+    }
+
     // Atomically delete only self-set pins — the WHERE clause enforces the admin-pin guard
     // so there's no TOCTOU race between checking pinned_by and deleting.
     const [deleted] = await db
       .delete(kiloclaw_version_pins)
       .where(
         and(
-          eq(kiloclaw_version_pins.user_id, ctx.user.id),
+          eq(kiloclaw_version_pins.instance_id, instance.id),
           eq(kiloclaw_version_pins.pinned_by, ctx.user.id)
         )
       )
@@ -1457,7 +1637,7 @@ export const kiloclawRouter = createTRPCRouter({
       const [existingPin] = await db
         .select({ pinned_by: kiloclaw_version_pins.pinned_by })
         .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.user_id, ctx.user.id))
+        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
         .limit(1);
 
       if (existingPin) {
@@ -1475,8 +1655,9 @@ export const kiloclawRouter = createTRPCRouter({
 
   fileTree: clawAccessProcedure.query(async ({ ctx }) => {
     try {
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
-      const result = await client.getFileTree(ctx.user.id);
+      const result = await client.getFileTree(ctx.user.id, workerInstanceId(instance));
       return result.tree;
     } catch (err) {
       handleFileOperationError(err, 'fetch file tree');
@@ -1487,8 +1668,9 @@ export const kiloclawRouter = createTRPCRouter({
     .input(z.object({ path: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       try {
+        const instance = await getActiveInstance(ctx.user.id);
         const client = new KiloClawInternalClient();
-        return await client.readFile(ctx.user.id, input.path);
+        return await client.readFile(ctx.user.id, input.path, workerInstanceId(instance));
       } catch (err) {
         handleFileOperationError(err, 'read file');
       }
@@ -1504,6 +1686,7 @@ export const kiloclawRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        const instance = await getActiveInstance(ctx.user.id);
         const client = new KiloClawInternalClient();
         let content = input.content;
 
@@ -1526,7 +1709,13 @@ export const kiloclawRouter = createTRPCRouter({
           content = JSON.stringify(userConfig, null, 2);
         }
 
-        return await client.writeFile(ctx.user.id, input.path, content, input.etag);
+        return await client.writeFile(
+          ctx.user.id,
+          input.path,
+          content,
+          input.etag,
+          workerInstanceId(instance)
+        );
       } catch (err) {
         handleFileOperationError(err, 'write file');
       }
@@ -1536,8 +1725,13 @@ export const kiloclawRouter = createTRPCRouter({
     .input(z.object({ patch: z.record(z.string(), z.unknown()) }))
     .mutation(async ({ ctx, input }) => {
       try {
+        const instance = await getActiveInstance(ctx.user.id);
         const client = new KiloClawInternalClient();
-        return await client.patchOpenclawConfig(ctx.user.id, input.patch);
+        return await client.patchOpenclawConfig(
+          ctx.user.id,
+          input.patch,
+          workerInstanceId(instance)
+        );
       } catch (err) {
         handleFileOperationError(err, 'patch openclaw config');
       }
@@ -1816,12 +2010,25 @@ export const kiloclawRouter = createTRPCRouter({
       // Intro pricing eligibility (spec Credit Enrollment rule 3).
       const hadPaidSubscription = await hadPriorPaidSubscription(ctx.user.id);
 
-      await enrollWithCreditsImpl({
-        userId: ctx.user.id,
-        instanceId: instance.id,
-        plan: input.plan,
-        hadPaidSubscription,
-      });
+      try {
+        await enrollWithCreditsImpl({
+          userId: ctx.user.id,
+          instanceId: instance.id,
+          plan: input.plan,
+          hadPaidSubscription,
+        });
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        const message = error instanceof Error ? error.message : 'Credit enrollment failed';
+        const code = message.includes('not found')
+          ? 'NOT_FOUND'
+          : message.includes('already exists') || message.includes('already processed')
+            ? 'CONFLICT'
+            : message.includes('Insufficient credit balance')
+              ? 'BAD_REQUEST'
+              : 'INTERNAL_SERVER_ERROR';
+        throw new TRPCError({ code, message, cause: error });
+      }
 
       return { success: true };
     }),

@@ -83,16 +83,16 @@ export function SeatChangeModal({
       return { isValid: false, error: 'Seat count must be a whole number', count: null };
     }
 
-    // Check if it's non-negative
-    if (count < 0) {
-      return { isValid: false, error: 'Seat count cannot be negative', count: null };
-    }
+    // Backend requires at least 1 seat (UpdateSeatCountInputSchema min(1))
+    const minimumSeats = Math.max(1, activeSeatCount);
 
-    // Check if it's at least the active seat count (minimum users + invites in org)
-    if (count < activeSeatCount) {
+    if (count < minimumSeats) {
       return {
         isValid: false,
-        error: `Seat count must be at least ${activeSeatCount} (current active members and invites)`,
+        error:
+          activeSeatCount > 0
+            ? `Seat count must be at least ${activeSeatCount} (current active members and invites)`
+            : 'Seat count must be at least 1',
         count: null,
       };
     }
@@ -133,7 +133,7 @@ export function SeatChangeModal({
 
   const handleDecrement = () => {
     const currentValue = parseInt(inputValue, 10);
-    if (!isNaN(currentValue) && currentValue > activeSeatCount) {
+    if (!isNaN(currentValue) && currentValue > Math.max(1, activeSeatCount)) {
       const newValue = currentValue - 1;
       const newValueString = newValue.toString();
       setInputValue(newValueString);
@@ -277,7 +277,7 @@ export function SeatChangeModal({
                     variant="outline"
                     size="sm"
                     onClick={handleDecrement}
-                    disabled={isLoading || parseInt(inputValue, 10) <= activeSeatCount}
+                    disabled={isLoading || parseInt(inputValue, 10) <= Math.max(1, activeSeatCount)}
                     className="h-10 w-10 p-0"
                   >
                     <Minus className="h-4 w-4" />

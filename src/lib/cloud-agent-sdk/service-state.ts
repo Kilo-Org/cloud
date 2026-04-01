@@ -201,6 +201,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processPreparing(event: Extract<ServiceEvent, { type: 'preparing' }>): void {
     if (event.step === 'ready') {
       cloudStatus = { type: 'ready' };
+      if (event.branch) config.onBranchChanged?.(event.branch);
       config.onPreparationReady?.();
     } else if (event.step === 'failed') {
       cloudStatus = { type: 'error', message: event.message };

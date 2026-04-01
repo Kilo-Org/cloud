@@ -8,6 +8,7 @@ import { KNOWN_PLATFORMS } from '@/routers/cli-sessions-router';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 
 const PAGE_SIZE = 10;
+const RECENT_DAYS_LIMIT = 200;
 
 type UnifiedSession = {
   session_id: string;
@@ -38,6 +39,7 @@ const ListSessionsInputSchema = z.object({
   organizationId: z.uuid().nullable().optional(),
   includeSubSessions: z.boolean().optional().default(false),
   gitUrl: z.string().optional(),
+  updatedSince: z.iso.datetime().optional(),
 });
 
 const SearchInputSchema = z.object({
@@ -165,6 +167,7 @@ export const unifiedSessionsRouter = createTRPCRouter({
       organizationId,
       includeSubSessions,
       gitUrl,
+      updatedSince,
     } = input;
 
     if (organizationId) {
@@ -194,6 +197,13 @@ export const unifiedSessionsRouter = createTRPCRouter({
       v2Where.push(cursorCondition(cli_sessions_v2));
     }
 
+    if (updatedSince) {
+      v1Where.push(sql`${cliSessions.updated_at} >= ${updatedSince}`);
+      v2Where.push(sql`${cli_sessions_v2.updated_at} >= ${updatedSince}`);
+    }
+
+    const effectiveLimit = updatedSince ? RECENT_DAYS_LIMIT : limit;
+
     const query = sql`
         SELECT * FROM (
           SELECT ${v1Columns()}
@@ -207,12 +217,12 @@ export const unifiedSessionsRouter = createTRPCRouter({
           WHERE ${joinWithAnd(v2Where)}
         ) unified
         ORDER BY ${orderColumn} DESC
-        LIMIT ${limit + 1}`;
+        LIMIT ${effectiveLimit + 1}`;
 
     const { rows } = await db.execute<UnifiedSession>(query);
 
-    const hasMore = rows.length > limit;
-    const resultSessions = hasMore ? rows.slice(0, limit) : rows;
+    const hasMore = rows.length > effectiveLimit;
+    const resultSessions = hasMore ? rows.slice(0, effectiveLimit) : rows;
 
     let nextCursor: string | null = null;
     if (hasMore && resultSessions.length > 0) {
@@ -231,11 +241,11 @@ export const unifiedSessionsRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.uuid().nullable().optional(),
-        recentDays: z.number().min(1).max(365).optional().default(5),
+        updatedSince: z.iso.datetime(),
       })
     )
     .query(async ({ ctx, input }) => {
-      const { organizationId, recentDays } = input;
+      const { organizationId, updatedSince } = input;
 
       if (organizationId) {
         await ensureOrganizationAccess(ctx, organizationId);
@@ -251,13 +261,11 @@ export const unifiedSessionsRouter = createTRPCRouter({
       const v2Where = buildScopeFragments('cli_sessions_v2', scopeOpts);
 
       v1Where.push(sql`${cliSessions.git_url} IS NOT NULL`);
-      v1Where.push(sql`${cliSessions.updated_at} >= NOW() - make_interval(days => ${recentDays})`);
+      v1Where.push(sql`${cliSessions.updated_at} >= ${updatedSince}`);
       v1Where.push(sql`${cliSessions.created_on_platform} != 'app-builder'`);
 
       v2Where.push(sql`${cli_sessions_v2.git_url} IS NOT NULL`);
-      v2Where.push(
-        sql`${cli_sessions_v2.updated_at} >= NOW() - make_interval(days => ${recentDays})`
-      );
+      v2Where.push(sql`${cli_sessions_v2.updated_at} >= ${updatedSince}`);
       v2Where.push(sql`${cli_sessions_v2.created_on_platform} != 'app-builder'`);
 
       const query = sql`

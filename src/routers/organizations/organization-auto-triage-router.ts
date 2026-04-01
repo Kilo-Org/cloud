@@ -1,5 +1,9 @@
 import { createTRPCRouter } from '@/lib/trpc/init';
-import { organizationMemberProcedure, organizationOwnerProcedure } from './utils';
+import {
+  organizationMemberProcedure,
+  organizationMemberMutationProcedure,
+  organizationBillingMutationProcedure,
+} from './utils';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import {
@@ -87,16 +91,16 @@ export const organizationAutoTriageRouter = createTRPCRouter({
   getGitHubStatus: organizationMemberProcedure.query(sharedHandlers.getGitHubStatus),
   listGitHubRepositories: organizationMemberProcedure.query(sharedHandlers.listGitHubRepositories),
   getAutoTriageConfig: organizationMemberProcedure.query(sharedHandlers.getAutoTriageConfig),
-  saveAutoTriageConfig: organizationOwnerProcedure
+  saveAutoTriageConfig: organizationBillingMutationProcedure
     .input(sharedHandlers.saveAutoTriageConfig.inputSchema)
     .mutation(sharedHandlers.saveAutoTriageConfig.handler),
-  toggleAutoTriageAgent: organizationOwnerProcedure
+  toggleAutoTriageAgent: organizationBillingMutationProcedure
     .input(sharedHandlers.toggleAutoTriageAgent.inputSchema)
     .mutation(sharedHandlers.toggleAutoTriageAgent.handler),
-  retryTicket: organizationMemberProcedure
+  retryTicket: organizationMemberMutationProcedure
     .input(sharedHandlers.retryTicket.inputSchema)
     .mutation(sharedHandlers.retryTicket.handler),
-  interruptTicket: organizationMemberProcedure
+  interruptTicket: organizationMemberMutationProcedure
     .input(sharedHandlers.interruptTicket.inputSchema)
     .mutation(sharedHandlers.interruptTicket.handler),
   listTickets: organizationMemberProcedure

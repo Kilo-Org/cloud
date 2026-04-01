@@ -627,14 +627,14 @@ export const organizationKiloclawRouter = createTRPCRouter({
     }),
 
   getConfig: organizationMemberProcedure.query(async ({ ctx, input }) => {
-    const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const instanceId = workerInstanceId(instance);
     const token = generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
     return fetchViaInstanceProxy<UserConfigResponse>('/api/kiloclaw/config', token, instanceId);
   }),
 
   getChannelCatalog: organizationMemberProcedure.query(async ({ ctx, input }) => {
-    const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const instanceId = workerInstanceId(instance);
     const token = generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
     const config = await fetchViaInstanceProxy<UserConfigResponse>(
@@ -662,7 +662,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
   }),
 
   getSecretCatalog: organizationMemberProcedure.query(async ({ ctx, input }) => {
-    const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const instanceId = workerInstanceId(instance);
     const token = generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
     const config = await fetchViaInstanceProxy<UserConfigResponse>(

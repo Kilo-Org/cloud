@@ -1,5 +1,4 @@
 import type { BYOKResult } from '@/lib/providers/types';
-import { kiloFreeModels } from '@/lib/models';
 import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
 import type { VercelUserByokInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import {
@@ -20,6 +19,8 @@ import { unstable_cache } from 'next/cache';
 import { readDb } from '@/lib/drizzle';
 import { modelsByProvider } from '@kilocode/db/schema';
 import { desc } from 'drizzle-orm';
+import { StoredModelSchema } from '@kilocode/db';
+import * as z from 'zod';
 
 // EMERGENCY SWITCH
 // This routes all models that normally would be routed to OpenRouter to Vercel instead.
@@ -34,6 +35,10 @@ function getRandomNumberLessThan100(randomSeed: string) {
 }
 
 async function getVercelRoutingPercentage() {
+  if (ENABLE_UNIVERSAL_VERCEL_ROUTING) {
+    console.debug(`[shouldRouteToVercel] universal Vercel routing is enabled`);
+    return 100;
+  }
   const errorRate = await getGatewayErrorRate();
   const isOpenRouterErrorRateHigh = errorRate.openrouter > ERROR_RATE_THRESHOLD;
   const isVercelErrorRateHigh = errorRate.vercel > ERROR_RATE_THRESHOLD;
@@ -50,14 +55,6 @@ async function getVercelRoutingPercentage() {
   return 10;
 }
 
-function isLikelyAvailableOnAllGateways(requestedModel: string) {
-  return (
-    !requestedModel.startsWith('openrouter/') &&
-    (kiloFreeModels.find(m => m.public_id === requestedModel && m.status !== 'disabled')?.gateway ??
-      'openrouter') === 'openrouter'
-  );
-}
-
 const getVercelModels_cached = unstable_cache(
   async () => {
     const result = await readDb
@@ -65,11 +62,22 @@ const getVercelModels_cached = unstable_cache(
       .from(modelsByProvider)
       .orderBy(desc(modelsByProvider.id))
       .limit(1);
-    return result.at(0)?.vercel ?? null;
+    return Object.entries(z.record(z.string(), StoredModelSchema).parse(result.at(0)?.vercel))
+      .filter(([_modelId, model]) => model.type === 'language' && model.endpoints.length > 0)
+      .map(([modelId]) => modelId);
   },
   undefined,
   { revalidate: 3600 }
 );
+
+async function getVercelModels() {
+  try {
+    return await getVercelModels_cached();
+  } catch (e) {
+    console.error('[getVercelModels]', e);
+    return [];
+  }
+}
 
 export async function shouldRouteToVercel(
   requestedModel: string,
@@ -90,16 +98,6 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  if (!isLikelyAvailableOnAllGateways(requestedModel)) {
-    console.debug(`[shouldRouteToVercel] model not available on all gateways`);
-    return false;
-  }
-
-  if (ENABLE_UNIVERSAL_VERCEL_ROUTING) {
-    console.debug(`[shouldRouteToVercel] universal Vercel routing is enabled`);
-    return true;
-  }
-
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
   const passedRandomization =
     getRandomNumberLessThan100('vercel_routing_' + randomSeed) <
@@ -109,10 +107,10 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  const vercelModels = await getVercelModels_cached();
+  const vercelModels = await getVercelModels();
   const vercelModelId = mapModelIdToVercel(requestedModel);
-  if (!vercelModels || !(vercelModelId in vercelModels)) {
-    console.debug(`[shouldRouteToVercel] model not found in models_by_provider.vercel`);
+  if (!vercelModels.includes(vercelModelId)) {
+    console.debug(`[shouldRouteToVercel] model ${vercelModelId} not found in Vercel model list`);
     return false;
   }
 

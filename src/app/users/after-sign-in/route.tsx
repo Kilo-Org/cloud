@@ -49,7 +49,10 @@ export async function GET(request: NextRequest) {
       // callbackPath query param, so the value cannot be user-tampered. This
       // runs exactly once per signup because has_validation_stytch is set
       // after account verification completes.
-      const product = resolveSignupProduct(responsePath, !!url.searchParams.get('source'));
+      const product = resolveSignupProduct(
+        callbackPath && isValidCallbackPath(callbackPath) ? responsePath : null,
+        !!url.searchParams.get('source')
+      );
       if (product) {
         PostHogClient().capture({
           distinctId: user.google_user_email,

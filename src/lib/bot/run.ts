@@ -136,6 +136,7 @@ export async function processMessage({
 
   const startedAt = Date.now();
   const collectedSteps: BotRequestStep[] = [];
+  let startedCloudAgentSession = false;
 
   if (botRequestId) {
     updateBotRequest(botRequestId, { modelUsed: modelSlug });
@@ -159,7 +160,8 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
             authToken,
             user.id,
             botRequestId,
-            ({ kiloSessionId }) => {
+            ({ kiloSessionId, cloudAgentSessionId }) => {
+              startedCloudAgentSession = true;
               const sessionUrl = buildSessionUrl(kiloSessionId, owner);
               void postSessionLinkEphemeral(
                 thread,
@@ -171,7 +173,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               );
 
               if (botRequestId) {
-                updateBotRequest(botRequestId, { cloudAgentSessionId: kiloSessionId });
+                updateBotRequest(botRequestId, { cloudAgentSessionId });
               }
             }
           ),
@@ -190,7 +192,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
 
     if (botRequestId) {
       updateBotRequest(botRequestId, {
-        status: 'completed',
+        ...(startedCloudAgentSession ? {} : { status: 'completed' }),
         steps: [...collectedSteps],
         responseTimeMs: Date.now() - startedAt,
       });

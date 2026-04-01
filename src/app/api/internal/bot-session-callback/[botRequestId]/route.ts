@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
-import { bot_requests } from '@kilocode/db/schema';
+import { bot_requests, platform_integrations } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { fetchFinalAssistantTextWithRetries } from '@/lib/cloud-agent-next/session-result';
@@ -26,6 +26,35 @@ async function getBotRequest(botRequestId: string) {
     .limit(1);
 
   return request ?? null;
+}
+
+async function getSlackBotToken(platformIntegrationId: string | null): Promise<string | null> {
+  if (!platformIntegrationId) {
+    return null;
+  }
+
+  const [integration] = await db
+    .select({
+      platformInstallationId: platform_integrations.platform_installation_id,
+    })
+    .from(platform_integrations)
+    .where(eq(platform_integrations.id, platformIntegrationId))
+    .limit(1);
+
+  const teamId = integration?.platformInstallationId;
+  if (!teamId) {
+    return null;
+  }
+
+  await bot.initialize();
+  const slackAdapter = bot.getAdapter('slack');
+  const installation = await slackAdapter.getInstallation(teamId);
+
+  return installation?.botToken ?? null;
+}
+
+function logCallback(message: string, extra?: Record<string, unknown>) {
+  console.log('[BotSessionCallback]', message, extra ?? {});
 }
 
 async function completeBotRequest(params: {
@@ -76,10 +105,39 @@ async function failBotRequest(params: {
   return row ?? null;
 }
 
-async function postSlackThreadMessage(threadId: string, markdown: string): Promise<void> {
-  await bot.initialize();
+async function postSlackThreadMessage(params: {
+  threadId: string;
+  markdown: string;
+  platformIntegrationId: string | null;
+}): Promise<void> {
+  logCallback('Posting Slack thread message', {
+    threadId: params.threadId,
+    markdownPreview: params.markdown.slice(0, 200),
+    markdownLength: params.markdown.length,
+    platformIntegrationId: params.platformIntegrationId,
+  });
+  logCallback('Bot initialized for Slack post', { threadId: params.threadId });
   const slackAdapter = bot.getAdapter('slack');
-  await slackAdapter.postMessage(threadId, { markdown });
+
+  const botToken = await getSlackBotToken(params.platformIntegrationId);
+  if (!botToken) {
+    throw new Error(
+      `No Slack bot token found for platform integration ${params.platformIntegrationId ?? 'null'}`
+    );
+  }
+
+  logCallback('Resolved Slack bot token for callback post', {
+    threadId: params.threadId,
+    platformIntegrationId: params.platformIntegrationId,
+  });
+
+  const posted = await slackAdapter.withBotToken(botToken, async () =>
+    await slackAdapter.postMessage(params.threadId, { markdown: params.markdown })
+  );
+  logCallback('Slack thread message posted', {
+    threadId: params.threadId,
+    messageId: posted.id,
+  });
 }
 
 function formatFailureMessage(payload: ExecutionCallbackPayload): string {
@@ -96,6 +154,14 @@ async function handleCompletedCallback(
   startedAt: number,
   requestRow: NonNullable<Awaited<ReturnType<typeof getBotRequest>>>
 ) {
+  logCallback('Handling completed callback', {
+    botRequestId,
+    callbackSessionId: payload.cloudAgentSessionId,
+    kiloSessionId: payload.kiloSessionId,
+    threadId: requestRow.platform_thread_id,
+    requestStatus: requestRow.status,
+  });
+
   if (!payload.kiloSessionId) {
     const errorMessage = 'Cloud Agent completed but no kilo session id was provided.';
     const updated = await failBotRequest({
@@ -105,8 +171,17 @@ async function handleCompletedCallback(
       responseTimeMs: Date.now() - startedAt,
     });
 
+    logCallback('Completed callback missing kiloSessionId', {
+      botRequestId,
+      updated: Boolean(updated),
+    });
+
     if (updated) {
-      await postSlackThreadMessage(requestRow.platform_thread_id, errorMessage);
+      await postSlackThreadMessage({
+        threadId: requestRow.platform_thread_id,
+        markdown: errorMessage,
+        platformIntegrationId: requestRow.platform_integration_id,
+      });
     }
     return;
   }
@@ -114,6 +189,27 @@ async function handleCompletedCallback(
   const finalMessage = await fetchFinalAssistantTextWithRetries({
     kiloSessionId: payload.kiloSessionId,
     userId: requestRow.created_by,
+    onRetry: attempt => {
+      logCallback('Retrying ingest fetch for final bot message', {
+        botRequestId,
+        kiloSessionId: payload.kiloSessionId,
+        attempt,
+      });
+    },
+    onFetchError: (attempt, error) => {
+      logCallback('Ingest fetch failed for bot callback', {
+        botRequestId,
+        kiloSessionId: payload.kiloSessionId,
+        attempt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    },
+  });
+
+  logCallback('Resolved final message from ingest', {
+    botRequestId,
+    hasFinalMessage: Boolean(finalMessage),
+    finalMessagePreview: finalMessage?.slice(0, 200),
   });
 
   if (!finalMessage) {
@@ -126,8 +222,17 @@ async function handleCompletedCallback(
       responseTimeMs: Date.now() - startedAt,
     });
 
+    logCallback('Completed callback missing final message from ingest', {
+      botRequestId,
+      updated: Boolean(updated),
+    });
+
     if (updated) {
-      await postSlackThreadMessage(requestRow.platform_thread_id, errorMessage);
+      await postSlackThreadMessage({
+        threadId: requestRow.platform_thread_id,
+        markdown: errorMessage,
+        platformIntegrationId: requestRow.platform_integration_id,
+      });
     }
     return;
   }
@@ -138,11 +243,28 @@ async function handleCompletedCallback(
     responseTimeMs: Date.now() - startedAt,
   });
 
+  logCallback('Completed callback attempted terminal DB update', {
+    botRequestId,
+    updated: Boolean(updated),
+    expectedCloudAgentSessionId: payload.cloudAgentSessionId,
+    storedCloudAgentSessionId: requestRow.cloud_agent_session_id,
+  });
+
   if (!updated) {
+    logCallback('Skipping Slack post because completed update returned no row', {
+      botRequestId,
+      requestStatus: requestRow.status,
+      storedCloudAgentSessionId: requestRow.cloud_agent_session_id,
+      callbackCloudAgentSessionId: payload.cloudAgentSessionId,
+    });
     return;
   }
 
-  await postSlackThreadMessage(requestRow.platform_thread_id, finalMessage);
+  await postSlackThreadMessage({
+    threadId: requestRow.platform_thread_id,
+    markdown: finalMessage,
+    platformIntegrationId: requestRow.platform_integration_id,
+  });
 }
 
 async function handleFailedCallback(
@@ -152,6 +274,12 @@ async function handleFailedCallback(
   requestRow: NonNullable<Awaited<ReturnType<typeof getBotRequest>>>
 ) {
   const errorMessage = formatFailureMessage(payload);
+  logCallback('Handling failed callback', {
+    botRequestId,
+    callbackSessionId: payload.cloudAgentSessionId,
+    threadId: requestRow.platform_thread_id,
+    errorMessage,
+  });
   const updated = await failBotRequest({
     botRequestId,
     expectedCloudAgentSessionId: payload.cloudAgentSessionId,
@@ -159,11 +287,28 @@ async function handleFailedCallback(
     responseTimeMs: Date.now() - startedAt,
   });
 
+  logCallback('Failed callback attempted terminal DB update', {
+    botRequestId,
+    updated: Boolean(updated),
+    expectedCloudAgentSessionId: payload.cloudAgentSessionId,
+    storedCloudAgentSessionId: requestRow.cloud_agent_session_id,
+  });
+
   if (!updated) {
+    logCallback('Skipping Slack post because failed update returned no row', {
+      botRequestId,
+      requestStatus: requestRow.status,
+      storedCloudAgentSessionId: requestRow.cloud_agent_session_id,
+      callbackCloudAgentSessionId: payload.cloudAgentSessionId,
+    });
     return;
   }
 
-  await postSlackThreadMessage(requestRow.platform_thread_id, errorMessage);
+  await postSlackThreadMessage({
+    threadId: requestRow.platform_thread_id,
+    markdown: errorMessage,
+    platformIntegrationId: requestRow.platform_integration_id,
+  });
 }
 
 export async function POST(
@@ -180,7 +325,19 @@ export async function POST(
     const payload = (await req.json()) as Partial<ExecutionCallbackPayload>;
     const callbackSessionId = payload.cloudAgentSessionId;
 
+    logCallback('Received callback request', {
+      botRequestId,
+      status: payload.status,
+      callbackSessionId,
+      kiloSessionId: payload.kiloSessionId,
+    });
+
     if (!payload.status || !callbackSessionId) {
+      logCallback('Rejecting callback due to missing fields', {
+        botRequestId,
+        status: payload.status,
+        callbackSessionId,
+      });
       return NextResponse.json(
         { error: 'Missing required fields: status and cloudAgentSessionId' },
         { status: 400 }
@@ -189,23 +346,48 @@ export async function POST(
 
     const requestRow = await getBotRequest(botRequestId);
     if (!requestRow) {
+      logCallback('Bot request not found for callback', { botRequestId });
       return NextResponse.json({ error: 'Bot request not found' }, { status: 404 });
     }
+
+    logCallback('Loaded bot request for callback', {
+      botRequestId,
+      storedStatus: requestRow.status,
+      storedCloudAgentSessionId: requestRow.cloud_agent_session_id,
+      threadId: requestRow.platform_thread_id,
+      platform: requestRow.platform,
+      createdBy: requestRow.created_by,
+      platformIntegrationId: requestRow.platform_integration_id,
+    });
 
     if (
       requestRow.cloud_agent_session_id &&
       requestRow.cloud_agent_session_id !== callbackSessionId
     ) {
+      logCallback('Ignoring stale callback due to session mismatch', {
+        botRequestId,
+        storedCloudAgentSessionId: requestRow.cloud_agent_session_id,
+        callbackCloudAgentSessionId: callbackSessionId,
+      });
       return NextResponse.json({ success: true, message: 'Stale callback ignored' });
     }
 
     if (requestRow.status === 'completed' || requestRow.status === 'error') {
+      logCallback('Ignoring callback because bot request already finalized', {
+        botRequestId,
+        storedStatus: requestRow.status,
+      });
       return NextResponse.json({ success: true, message: 'Bot request already finalized' });
     }
 
     const startedAt = new Date(requestRow.created_at).getTime();
 
     after(async () => {
+      logCallback('Starting deferred callback processing', {
+        botRequestId,
+        status: payload.status,
+        callbackSessionId,
+      });
       try {
         if (payload.status === 'completed') {
           await handleCompletedCallback(
@@ -233,7 +415,15 @@ export async function POST(
           errorMessage: `Unknown callback status: ${String(payload.status)}`,
           responseTimeMs: Date.now() - startedAt,
         });
+        logCallback('Stored failure for unknown callback status', {
+          botRequestId,
+          status: payload.status,
+        });
       } catch (error) {
+        console.error('[BotSessionCallback] Deferred callback processing failed', {
+          botRequestId,
+          error,
+        });
         captureException(error, {
           tags: { source: 'bot-session-callback-api' },
           extra: { botRequestId, payload },
@@ -241,8 +431,14 @@ export async function POST(
       }
     });
 
+    logCallback('Acknowledging callback request', {
+      botRequestId,
+      status: payload.status,
+      callbackSessionId,
+    });
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error('[BotSessionCallback] Request handling failed', error);
     captureException(error, { tags: { source: 'bot-session-callback-api' } });
     return NextResponse.json(
       {

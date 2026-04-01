@@ -3,7 +3,7 @@ import 'server-only';
 import { fetchSessionSnapshot, type SessionSnapshot } from '@/lib/session-ingest-client';
 
 const DEFAULT_RETRY_DELAY_MS = 5000;
-const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_MAX_ATTEMPTS = 10;
 
 export function extractLastAssistantText(snapshot: SessionSnapshot): string | null {
   for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {

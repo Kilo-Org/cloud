@@ -10,10 +10,11 @@ import {
   activeServerCount,
   getUptime,
   stopAll,
+  drainAll,
   getAgentEvents,
   registerEventSink,
 } from './process-manager';
-import { startHeartbeat, stopHeartbeat } from './heartbeat';
+import { startHeartbeat, stopHeartbeat, notifyContainerReady } from './heartbeat';
 import { pushContext as pushDashboardContext } from './dashboard-context';
 import { mergeBranch, setupRigBrowseWorktree } from './git-manager';
 import {
@@ -92,6 +93,15 @@ app.use('*', async (c, next) => {
 
 // GET /health
 app.get('/health', c => {
+  // When the TownDO is draining, it passes the drain nonce and town
+  // ID via headers so idle containers (no running agents) can
+  // acknowledge readiness and clear the drain flag.
+  const drainNonce = c.req.header('X-Drain-Nonce');
+  const townId = c.req.header('X-Town-Id');
+  if (drainNonce && townId) {
+    void notifyContainerReady(townId, drainNonce);
+  }
+
   const response: HealthResponse = {
     status: 'ok',
     agents: activeAgentCount(),
@@ -723,7 +733,7 @@ export function startControlServer(): void {
     startHeartbeat(apiUrl, authToken);
   }
 
-  // Handle graceful shutdown
+  // Handle graceful shutdown (immediate, no drain — used by SIGINT for dev)
   const shutdown = async () => {
     console.log('Shutting down control server...');
     stopHeartbeat();
@@ -731,7 +741,18 @@ export function startControlServer(): void {
     process.exit(0);
   };
 
-  process.on('SIGTERM', () => void shutdown());
+  process.on(
+    'SIGTERM',
+    () =>
+      void (async () => {
+        console.log('[control-server] SIGTERM received — starting graceful drain...');
+        stopHeartbeat();
+        await drainAll();
+        await stopAll();
+        process.exit(0);
+      })()
+  );
+
   process.on('SIGINT', () => void shutdown());
 
   // Track connected WebSocket clients with optional agent filter

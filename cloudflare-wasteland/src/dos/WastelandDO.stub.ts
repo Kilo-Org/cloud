@@ -14,6 +14,25 @@ export type WastelandConfigResult = {
   updated_at: string;
 };
 
+/** Input for initializeWasteland — creates the wasteland config row. */
+export type InitializeWastelandInput = {
+  wasteland_id: string;
+  name: string;
+  owner_type: 'user' | 'org';
+  owner_user_id: string | null;
+  organization_id: string | null;
+  dolthub_upstream: string | null;
+  visibility: 'public' | 'private';
+};
+
+/** Partial update fields for updateConfig. */
+export type UpdateWastelandConfigInput = {
+  name?: string;
+  visibility?: 'public' | 'private';
+  dolthub_upstream?: string | null;
+  status?: 'active' | 'deleted';
+};
+
 /**
  * Stub WastelandDO — placeholder until the full implementation lands.
  * Provides the class export that wrangler.jsonc requires for the
@@ -28,7 +47,15 @@ export class WastelandDO extends DurableObject<Env> {
     });
   }
 
+  async initializeWasteland(_input: InitializeWastelandInput): Promise<WastelandConfigResult> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
   async getConfig(): Promise<WastelandConfigResult | null> {
+    throw new Error('WastelandDO not yet implemented');
+  }
+
+  async updateConfig(_input: UpdateWastelandConfigInput): Promise<WastelandConfigResult> {
     throw new Error('WastelandDO not yet implemented');
   }
 }

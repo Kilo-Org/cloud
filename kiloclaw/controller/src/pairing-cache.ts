@@ -190,12 +190,10 @@ export function detectChannels(config: unknown): string[] {
   const tg = isRecord(ch.telegram) ? ch.telegram : {};
   const dc = isRecord(ch.discord) ? ch.discord : {};
   const sl = isRecord(ch.slack) ? ch.slack : {};
-  const sc = isRecord(ch.streamchat) ? ch.streamchat : {};
   const channels: string[] = [];
   if (tg.enabled && tg.botToken) channels.push('telegram');
   if (dc.enabled && dc.token) channels.push('discord');
   if (sl.enabled && (sl.botToken || sl.appToken)) channels.push('slack');
-  if (sc.enabled && sc.apiKey) channels.push('streamchat');
   return channels;
 }
 

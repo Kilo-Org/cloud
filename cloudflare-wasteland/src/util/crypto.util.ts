@@ -20,11 +20,7 @@ export async function encryptToken(plaintext: string, key: CryptoKey): Promise<s
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const encoded = new TextEncoder().encode(plaintext);
 
-  const ciphertextWithTag = await crypto.subtle.encrypt(
-    { name: ALGORITHM, iv },
-    key,
-    encoded,
-  );
+  const ciphertextWithTag = await crypto.subtle.encrypt({ name: ALGORITHM, iv }, key, encoded);
 
   // Concatenate iv || ciphertext || tag (GCM appends the 16-byte tag automatically)
   const result = new Uint8Array(iv.byteLength + ciphertextWithTag.byteLength);
@@ -45,11 +41,7 @@ export async function decryptToken(encrypted: string, key: CryptoKey): Promise<s
   const iv = data.slice(0, IV_BYTES);
   const ciphertextWithTag = data.slice(IV_BYTES);
 
-  const decrypted = await crypto.subtle.decrypt(
-    { name: ALGORITHM, iv },
-    key,
-    ciphertextWithTag,
-  );
+  const decrypted = await crypto.subtle.decrypt({ name: ALGORITHM, iv }, key, ciphertextWithTag);
 
   return new TextDecoder().decode(decrypted);
 }
@@ -61,7 +53,7 @@ export async function deriveEncryptionKey(secret: string): Promise<CryptoKey> {
     new TextEncoder().encode(secret),
     'PBKDF2',
     false,
-    ['deriveKey'],
+    ['deriveKey']
   );
 
   return crypto.subtle.deriveKey(
@@ -74,7 +66,7 @@ export async function deriveEncryptionKey(secret: string): Promise<CryptoKey> {
     keyMaterial,
     { name: ALGORITHM, length: 256 },
     false,
-    ['encrypt', 'decrypt'],
+    ['encrypt', 'decrypt']
   );
 }
 

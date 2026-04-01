@@ -1,10 +1,13 @@
 import { DurableObject } from 'cloudflare:workers';
+import { z } from 'zod';
 import { query } from '../util/query.util';
 import {
   createTableWastelandRegistry,
   wasteland_registry,
   WastelandRegistryRecord,
 } from '../db/tables/wasteland-registry.table';
+
+const CountResult = z.object({ cnt: z.coerce.number() });
 
 const LOG = '[WastelandRegistry.do]';
 
@@ -137,6 +140,18 @@ export class WastelandRegistryDO extends DurableObject<Env> {
       ),
     ];
     return WastelandRegistryRecord.array().parse(rows);
+  }
+
+  async countAll(): Promise<number> {
+    await this.ensureInitialized();
+    const rows = [
+      ...query(
+        this.sql,
+        /* sql */ `SELECT COUNT(*) AS cnt FROM ${wasteland_registry}`,
+        []
+      ),
+    ];
+    return CountResult.parse(rows[0]).cnt;
   }
 }
 

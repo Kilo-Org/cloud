@@ -22,6 +22,7 @@
     "@cloudflare/containers": "^0.1.0",
     "@kilocode/worker-utils": "workspace:*",
     "@sentry/cloudflare": "^9",
+    "@hono/trpc-server": "^0.4.2",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "itty-time": "^1.0.6",

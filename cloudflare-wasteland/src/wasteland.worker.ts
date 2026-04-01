@@ -1,5 +1,7 @@
 import * as Sentry from '@sentry/cloudflare';
 import { withSentry } from '@sentry/cloudflare';
+import { TRPCError } from '@trpc/server';
+import { trpcServer } from '@hono/trpc-server';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { cors } from 'hono/cors';
@@ -10,12 +12,14 @@ import type { MiddlewareHandler } from 'hono';
 import type { AuthVariables } from './middleware/auth.middleware';
 import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
 import { timingMiddleware } from './middleware/analytics.middleware';
+import { wrappedWastelandRouter } from './trpc/router';
 
 // ── DO Exports ──────────────────────────────────────────────────────────
 // Wrangler requires these exports to match the class_name bindings in wrangler.jsonc.
 
 export { WastelandDO } from './dos/Wasteland.do';
 export { WastelandContainerDO } from './dos/WastelandContainer.do';
+export { WastelandRegistryDO } from './dos/WastelandRegistry.do';
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -67,6 +71,7 @@ const corsMiddleware = cors({
 });
 
 app.use('/api/*', corsMiddleware);
+app.use('/trpc/*', corsMiddleware);
 
 // ── Health ──────────────────────────────────────────────────────────────
 
@@ -81,27 +86,33 @@ app.use('/api/*', async (c: Context<WastelandEnv, string>, next) =>
   c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
 );
 
-// ── Route stubs ─────────────────────────────────────────────────────────
-// Phase 2: Wasteland CRUD
-// POST /api/wastelands — create
-// GET  /api/wastelands — list (user's wastelands)
-// GET  /api/wastelands/:wastelandId — get
-// DELETE /api/wastelands/:wastelandId — delete
+// ── tRPC ────────────────────────────────────────────────────────────────
+// Serve the wasteland tRPC router directly. The frontend tRPC client
+// connects here instead of going through the Next.js proxy layer.
 
-// Phase 2: Wasteland Settings
-// PATCH /api/wastelands/:wastelandId/config
-// POST  /api/wastelands/:wastelandId/credentials — store DoltHub token
-
-// Phase 2: Members
-// GET  /api/wastelands/:wastelandId/members
-// POST /api/wastelands/:wastelandId/members
-// DELETE /api/wastelands/:wastelandId/members/:memberId
-
-// Phase 3: Wanted Board
-// GET  /api/wastelands/:wastelandId/wanted — browse
-// POST /api/wastelands/:wastelandId/wanted — post new item
-// POST /api/wastelands/:wastelandId/wanted/:itemId/claim
-// POST /api/wastelands/:wastelandId/wanted/:itemId/done
+app.use('/trpc/*', async (c: Context<WastelandEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
+);
+app.use(
+  '/trpc/*',
+  trpcServer({
+    router: wrappedWastelandRouter,
+    endpoint: '/trpc',
+    createContext: (_opts: unknown, c: Context<WastelandEnv>) => ({
+      env: c.env,
+      userId: c.get('kiloUserId') ?? '',
+      isAdmin: c.get('kiloIsAdmin') ?? false,
+      apiTokenPepper: c.get('kiloApiTokenPepper') ?? null,
+      orgMemberships: c.get('kiloOrgMemberships') ?? [],
+    }),
+    onError: ({ error, path }: { error: Error; path?: string }) => {
+      console.error(`[wasteland-trpc] error on ${path ?? 'unknown'}:`, error.message);
+      if (!(error instanceof TRPCError)) {
+        Sentry.captureException(error);
+      }
+    },
+  })
+);
 
 // ── Error handling ──────────────────────────────────────────────────────
 

@@ -18,7 +18,7 @@ export type WastelandEventName =
   // a massive union — event names are derived from route patterns.
   | (string & {});
 
-export type WastelandDelivery = 'http' | 'internal';
+export type WastelandDelivery = 'http' | 'trpc' | 'internal';
 
 export type WastelandEventData = {
   event: WastelandEventName;

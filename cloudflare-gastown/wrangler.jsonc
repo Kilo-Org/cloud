@@ -36,7 +36,7 @@
       "class_name": "TownContainerDO",
       "image": "./container/Dockerfile",
       "instance_type": "standard-4",
-      "max_instances": 500,
+      "max_instances": 600,
     },
   ],
 

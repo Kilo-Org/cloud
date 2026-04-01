@@ -3179,10 +3179,13 @@ export class TownDO extends DurableObject<Env> {
     logger.setTags({ townId });
     logger.info('alarm: fired');
 
-    const hasRigs = rigs.listRigs(this.sql).length > 0;
+    // Call once per tick — threaded to ensureContainerReady, maybeDispatchTriageAgent, and getAlarmStatus
+    const rigList = rigs.listRigs(this.sql);
+    const hasRigs = rigList.length > 0;
+
     if (hasRigs) {
       try {
-        await this.ensureContainerReady();
+        await this.ensureContainerReady(rigList);
       } catch (err) {
         logger.warn('alarm: container health check failed', {
           error: err instanceof Error ? err.message : String(err),
@@ -3445,7 +3448,16 @@ export class TownDO extends DurableObject<Env> {
       label: JSON.stringify(metrics.actionsByType),
     });
 
+    // ── Post-reconciliation: cache activity snapshot ────────────────
+    // Computed after Phases 0-2 so re-arm and getAlarmStatus reflect
+    // any work created during reconciliation (hooks, dispatches, triage).
+    const activeWork = this.hasActiveWork();
+
     // ── Phase 3: Housekeeping (independent, all parallelizable) ────
+
+    // Call once per tick — threaded to maybeDispatchTriageAgent and getAlarmStatus
+    const cachedTriageCount = patrol.countPendingTriageRequests(this.sql);
+
     await Promise.allSettled([
       this.deliverPendingMail().catch(err =>
         logger.warn('alarm: deliverPendingMail failed', {
@@ -3462,7 +3474,7 @@ export class TownDO extends DurableObject<Env> {
           error: err instanceof Error ? err.message : String(err),
         })
       ),
-      this.maybeDispatchTriageAgent().catch(err =>
+      this.maybeDispatchTriageAgent(cachedTriageCount, rigList).catch(err =>
         logger.warn('alarm: maybeDispatchTriageAgent failed', {
           error: err instanceof Error ? err.message : String(err),
         })
@@ -3478,19 +3490,25 @@ export class TownDO extends DurableObject<Env> {
         }
       }),
     ]);
+
     // Re-arm: fast when active, slow when idle
-    const active = this.hasActiveWork();
-    const interval = active ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
+    const interval = activeWork ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
     await this.ctx.storage.setAlarm(Date.now() + interval);
 
-    // Broadcast status snapshot to connected WebSocket clients
-    try {
-      const snapshot = await this.getAlarmStatus();
-      this.broadcastAlarmStatus(snapshot);
-    } catch (err) {
-      logger.warn('alarm: status broadcast failed', {
-        error: err instanceof Error ? err.message : String(err),
-      });
+    // Broadcast status snapshot to connected WebSocket clients (skip if nobody is listening)
+    const statusClients = this.ctx.getWebSockets('status');
+    if (statusClients.length > 0) {
+      try {
+        const snapshot = await this.getAlarmStatus({
+          activeWork,
+          triageCount: cachedTriageCount,
+        });
+        this.broadcastAlarmStatus(snapshot);
+      } catch (err) {
+        logger.warn('alarm: status broadcast failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
   }
 
@@ -3619,8 +3637,11 @@ export class TownDO extends DurableObject<Env> {
    *
    * Skips dispatch if a triage agent is already working.
    */
-  private async maybeDispatchTriageAgent(): Promise<void> {
-    const pendingCount = patrol.countPendingTriageRequests(this.sql);
+  private async maybeDispatchTriageAgent(
+    cachedTriageCount?: number,
+    cachedRigList?: rigs.RigRecord[]
+  ): Promise<void> {
+    const pendingCount = cachedTriageCount ?? patrol.countPendingTriageRequests(this.sql);
     if (pendingCount === 0) return;
 
     // Check if a triage batch bead is already in progress (meaning a
@@ -3657,7 +3678,7 @@ export class TownDO extends DurableObject<Env> {
 
     // Validate preconditions before creating any beads to avoid
     // leaked phantom issue beads on early-return paths.
-    const rigList = rigs.listRigs(this.sql);
+    const rigList = cachedRigList ?? rigs.listRigs(this.sql);
     if (rigList.length === 0) {
       console.warn(`${TOWN_LOG} maybeDispatchTriageAgent: no rigs available, skipping`);
       return;
@@ -3942,13 +3963,15 @@ export class TownDO extends DurableObject<Env> {
     }
   }
 
-  private async ensureContainerReady(): Promise<void> {
-    const hasRigs = rigs.listRigs(this.sql).length > 0;
-    if (!hasRigs) return;
+  private async ensureContainerReady(
+    cachedRigList?: rigs.RigRecord[],
+    cachedActiveWork?: boolean
+  ): Promise<void> {
+    const rigList = cachedRigList ?? rigs.listRigs(this.sql);
+    if (rigList.length === 0) return;
 
-    const hasWork = this.hasActiveWork();
+    const hasWork = cachedActiveWork ?? this.hasActiveWork();
     if (!hasWork && !this._draining) {
-      const rigList = rigs.listRigs(this.sql);
       const newestRigAge = rigList.reduce((min, r) => {
         const age = Date.now() - new Date(r.created_at).getTime();
         return Math.min(min, age);
@@ -4057,7 +4080,10 @@ export class TownDO extends DurableObject<Env> {
    * Return a structured snapshot of the alarm loop and patrol state
    * for the dashboard Status tab.
    */
-  async getAlarmStatus(): Promise<{
+  async getAlarmStatus(cached?: {
+    activeWork?: boolean;
+    triageCount?: number;
+  }): Promise<{
     alarm: {
       nextFireAt: string | null;
       intervalMs: number;
@@ -4091,7 +4117,7 @@ export class TownDO extends DurableObject<Env> {
     }>;
   }> {
     const currentAlarm = await this.ctx.storage.getAlarm();
-    const active = this.hasActiveWork();
+    const active = cached?.activeWork ?? this.hasActiveWork();
     const intervalMs = active ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
 
     // Agent counts by status
@@ -4144,38 +4170,26 @@ export class TownDO extends DurableObject<Env> {
     }
 
     // Triage request count (issue beads with gt:triage-request label)
-    beadCounts.triageRequests = patrol.countPendingTriageRequests(this.sql);
+    beadCounts.triageRequests = cached?.triageCount ?? patrol.countPendingTriageRequests(this.sql);
 
-    // Patrol indicators — count active warnings/issues
-    const guppWarnings = Number(
-      [
-        ...query(
-          this.sql,
-          /* sql */ `
-            SELECT COUNT(*) AS cnt FROM ${beads}
-            WHERE ${beads.type} = 'message'
-              AND ${beads.title} = 'GUPP_CHECK'
-              AND ${beads.status} = 'open'
-          `,
-          []
-        ),
-      ][0]?.cnt ?? 0
-    );
-
-    const guppEscalations = Number(
-      [
-        ...query(
-          this.sql,
-          /* sql */ `
-            SELECT COUNT(*) AS cnt FROM ${beads}
-            WHERE ${beads.type} = 'message'
-              AND ${beads.title} = 'GUPP_ESCALATION'
-              AND ${beads.status} = 'open'
-          `,
-          []
-        ),
-      ][0]?.cnt ?? 0
-    );
+    // Patrol indicators — count active GUPP warnings + escalations in one query
+    const guppRows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT
+            SUM(CASE WHEN ${beads.title} = 'GUPP_CHECK' THEN 1 ELSE 0 END) AS warnings,
+            SUM(CASE WHEN ${beads.title} = 'GUPP_ESCALATION' THEN 1 ELSE 0 END) AS escalations
+          FROM ${beads}
+          WHERE ${beads.type} = 'message'
+            AND ${beads.title} IN ('GUPP_CHECK', 'GUPP_ESCALATION')
+            AND ${beads.status} = 'open'
+        `,
+        []
+      ),
+    ];
+    const guppWarnings = Number(guppRows[0]?.warnings ?? 0);
+    const guppEscalations = Number(guppRows[0]?.escalations ?? 0);
 
     const stalledAgents = agentCounts.stalled;
 

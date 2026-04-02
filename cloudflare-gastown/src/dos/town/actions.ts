@@ -517,6 +517,19 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
         `,
         [agentId]
       );
+      // Track dispatch attempts on the bead itself (not just the agent).
+      // The bead counter is never reset by hookBead, preventing the
+      // infinite retry loop (#1653).
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.dispatch_attempts} = ${beads.columns.dispatch_attempts} + 1,
+              ${beads.columns.last_dispatch_attempt_at} = ?
+          WHERE ${beads.bead_id} = ?
+        `,
+        [now(), beadId]
+      );
       beadOps.updateBeadStatus(sql, beadId, 'in_progress', agentId);
 
       const capturedAgentId = agentId;

@@ -23,7 +23,18 @@ const LOG = '[scheduling]';
 // ── Constants ──────────────────────────────────────────────────────────
 
 export const DISPATCH_COOLDOWN_MS = 2 * 60_000; // 2 min
-export const MAX_DISPATCH_ATTEMPTS = 20;
+export const MAX_DISPATCH_ATTEMPTS = 5;
+
+/**
+ * Exponential backoff schedule for dispatch retries, indexed by attempt number.
+ * Caps total retry window at ~1h for 5 attempts.
+ */
+export function getDispatchBackoffMs(attempts: number): number {
+  if (attempts <= 2) return DISPATCH_COOLDOWN_MS; // 2 min (existing behavior)
+  if (attempts === 3) return 5 * 60_000; // 5 min
+  if (attempts === 4) return 10 * 60_000; // 10 min
+  return 30 * 60_000; // 30 min (attempt 5+)
+}
 
 // ── Context passed by the Town DO ──────────────────────────────────────
 
@@ -109,6 +120,18 @@ export async function dispatchAgent(
       `,
       [timestamp, agent.id]
     );
+    // Track dispatch attempts on the bead itself — the bead counter
+    // is never reset by hookBead, preventing infinite retry loops (#1653).
+    query(
+      ctx.sql,
+      /* sql */ `
+        UPDATE ${beads}
+        SET ${beads.columns.dispatch_attempts} = ${beads.columns.dispatch_attempts} + 1,
+            ${beads.columns.last_dispatch_attempt_at} = ?
+        WHERE ${beads.bead_id} = ?
+      `,
+      [timestamp, bead.bead_id]
+    );
 
     const started = await dispatch.startAgentInContainer(ctx.env, ctx.storage, {
       townId: ctx.townId,
@@ -170,6 +193,7 @@ export async function dispatchAgent(
         agentId: agent.id,
         beadId: bead.bead_id,
         role: agent.role,
+        label: 'container returned false',
       });
     }
     return started;
@@ -178,6 +202,7 @@ export async function dispatchAgent(
     Sentry.captureException(err, {
       extra: { agentId: agent.id, beadId: bead.bead_id },
     });
+    const reason = err instanceof Error ? err.message : String(err);
     try {
       query(
         ctx.sql,
@@ -199,6 +224,7 @@ export async function dispatchAgent(
       agentId: agent.id,
       beadId: bead.bead_id,
       role: agent.role,
+      label: reason,
     });
     return false;
   }

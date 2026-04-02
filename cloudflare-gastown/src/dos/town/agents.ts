@@ -282,13 +282,16 @@ export function hookBead(sql: SqlStorage, agentId: string, beadId: string): void
     unhookBead(sql, stale.bead_id);
   }
 
+  // Do NOT reset dispatch_attempts here — per-bead dispatch tracking
+  // lives on the beads table now (beads.dispatch_attempts). Resetting
+  // the agent counter on every hook was the root cause of the infinite
+  // retry loop (#1653).
   query(
     sql,
     /* sql */ `
       UPDATE ${agent_metadata}
       SET ${agent_metadata.columns.current_hook_bead_id} = ?,
           ${agent_metadata.columns.status} = 'idle',
-          ${agent_metadata.columns.dispatch_attempts} = 0,
           ${agent_metadata.columns.last_activity_at} = ?,
           ${agent_metadata.columns.agent_status_message} = NULL,
           ${agent_metadata.columns.agent_status_updated_at} = NULL

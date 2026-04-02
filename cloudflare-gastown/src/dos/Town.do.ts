@@ -1555,6 +1555,25 @@ export class TownDO extends DurableObject<Env> {
       switch (action) {
         case 'RESTART':
         case 'RESTART_WITH_BACKOFF': {
+          // Fix 4 (#1653): if the hooked bead has exhausted its dispatch
+          // attempts, fail it instead of restarting — prevents infinite loops.
+          const restartBeadId = snapshotHookedBeadId ?? targetAgent?.current_hook_bead_id;
+          if (restartBeadId) {
+            const restartBead = beadOps.getBead(this.sql, restartBeadId);
+            if (restartBead && restartBead.dispatch_attempts >= scheduling.MAX_DISPATCH_ATTEMPTS) {
+              beadOps.updateBeadStatus(this.sql, restartBeadId, 'failed', input.agent_id);
+              if (targetAgent?.current_hook_bead_id === restartBeadId) {
+                if (targetAgent.status === 'working' || targetAgent.status === 'stalled') {
+                  dispatch
+                    .stopAgentInContainer(this.env, this.townId, targetAgentId)
+                    .catch(() => {});
+                }
+                agents.unhookBead(this.sql, targetAgentId);
+              }
+              break;
+            }
+          }
+
           // Stop the agent in the container, reset to idle so the
           // scheduler picks it up again on the next alarm cycle.
           if (targetAgent?.status === 'working' || targetAgent?.status === 'stalled') {

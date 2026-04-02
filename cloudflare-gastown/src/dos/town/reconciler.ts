@@ -25,7 +25,7 @@ import {
   AGENT_GC_RETENTION_MS,
   TRIAGE_LABEL_LIKE,
 } from './patrol';
-import { DISPATCH_COOLDOWN_MS, MAX_DISPATCH_ATTEMPTS } from './scheduling';
+import { MAX_DISPATCH_ATTEMPTS, getDispatchBackoffMs } from './scheduling';
 import * as reviewQueue from './review-queue';
 import * as agents from './agents';
 import * as beadOps from './beads';
@@ -34,6 +34,13 @@ import type { Action } from './actions';
 import type { TownEventRecord } from '../../db/tables/town-events.table';
 
 const LOG = '[reconciler]';
+
+// ── Circuit breaker constants ────────────────────────────────────────
+
+/** Number of total dispatch failures in a 30-min window that trips the circuit breaker. */
+const CIRCUIT_BREAKER_FAILURE_THRESHOLD = 20;
+/** Window (ms) over which dispatch failures are counted. */
+const CIRCUIT_BREAKER_WINDOW_MS = 30 * 60_000; // 30 min
 
 // ── Timeouts (from spec §7) ─────────────────────────────────────────
 
@@ -59,6 +66,33 @@ const STALE_IN_PROGRESS_TIMEOUT_MS = 5 * 60_000; // 5 min
 function staleMs(timestamp: string | null, thresholdMs: number): boolean {
   if (!timestamp) return true;
   return Date.now() - new Date(timestamp).getTime() > thresholdMs;
+}
+
+/**
+ * Town-level dispatch circuit breaker (#1653).
+ * Counts total dispatch_attempts across all beads with last_dispatch_attempt_at
+ * in the recent window. If it exceeds the threshold, returns the failure count.
+ * Returns 0 if the circuit breaker is not tripped.
+ */
+function checkDispatchCircuitBreaker(sql: SqlStorage): number {
+  const cutoff = new Date(Date.now() - CIRCUIT_BREAKER_WINDOW_MS).toISOString();
+  const rows = z
+    .object({ total_attempts: z.number() })
+    .array()
+    .parse([
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT COALESCE(SUM(${beads.columns.dispatch_attempts}), 0) as total_attempts
+          FROM ${beads}
+          WHERE ${beads.columns.last_dispatch_attempt_at} > ?
+            AND ${beads.columns.dispatch_attempts} > 0
+        `,
+        [cutoff]
+      ),
+    ]);
+  const totalAttempts = rows[0]?.total_attempts ?? 0;
+  return totalAttempts >= CIRCUIT_BREAKER_FAILURE_THRESHOLD ? totalAttempts : 0;
 }
 
 // ── Row schemas for queries ─────────────────────────────────────────
@@ -89,6 +123,8 @@ const BeadRow = BeadRecord.pick({
   updated_at: true,
   labels: true,
   created_by: true,
+  dispatch_attempts: true,
+  last_dispatch_attempt_at: true,
 });
 type BeadRow = z.infer<typeof BeadRow>;
 
@@ -460,6 +496,22 @@ export function reconcileAgents(sql: SqlStorage): Action[] {
 export function reconcileBeads(sql: SqlStorage): Action[] {
   const actions: Action[] = [];
 
+  // Town-level circuit breaker (#1653): if too many dispatch failures
+  // in the recent window, skip all dispatch_agent actions and escalate.
+  const cbFailures = checkDispatchCircuitBreaker(sql);
+  if (cbFailures > 0) {
+    console.warn(
+      `${LOG} circuit breaker OPEN: ${cbFailures} dispatch attempts in last 30min (threshold=${CIRCUIT_BREAKER_FAILURE_THRESHOLD}). Skipping all dispatches.`
+    );
+    actions.push({
+      type: 'notify_mayor',
+      message: `Dispatch circuit breaker is OPEN: ${cbFailures} dispatch attempts across all beads in the last 30 minutes exceeds threshold of ${CIRCUIT_BREAKER_FAILURE_THRESHOLD}. All dispatches are paused until the window expires.`,
+    });
+    // Still run non-dispatch rules (stale bead cleanup, in-review checks)
+    // but skip Rule 1 and Rule 2 (dispatch paths)
+    return [...actions, ...reconcileBeadsNonDispatch(sql)];
+  }
+
   // Rule 1: Open issue beads with no assignee, no blockers, not staged, not triage
   const unassigned = BeadRow.array().parse([
     ...query(
@@ -470,7 +522,9 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
                b.${beads.columns.assignee_agent_bead_id},
                b.${beads.columns.updated_at},
                b.${beads.columns.labels},
-               b.${beads.columns.created_by}
+               b.${beads.columns.created_by},
+               b.${beads.columns.dispatch_attempts},
+               b.${beads.columns.last_dispatch_attempt_at}
         FROM ${beads} b
         WHERE b.${beads.columns.type} = 'issue'
           AND b.${beads.columns.status} = 'open'
@@ -498,6 +552,24 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
 
   for (const bead of unassigned) {
     if (!bead.rig_id) continue;
+
+    // Per-bead dispatch cap (#1653): fail beads that have exhausted retries
+    if (bead.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
+      actions.push({
+        type: 'transition_bead',
+        bead_id: bead.bead_id,
+        from: 'open',
+        to: 'failed',
+        reason: `max dispatch attempts exceeded (${bead.dispatch_attempts}/${MAX_DISPATCH_ATTEMPTS})`,
+        actor: 'system',
+      });
+      continue;
+    }
+
+    // Exponential backoff: respect cooldown based on attempt count (#1653)
+    const backoffMs = getDispatchBackoffMs(bead.dispatch_attempts);
+    if (!staleMs(bead.last_dispatch_attempt_at, backoffMs)) continue;
+
     // In shadow mode we can't call getOrCreateAgent, so we just note
     // that a hook_agent + dispatch_agent is needed.
     // The action includes rig_id so Phase 3's applyAction can resolve the agent.
@@ -532,36 +604,21 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
   for (const agent of idleHooked) {
     if (!agent.current_hook_bead_id) continue;
 
-    // Check dispatch cooldown
-    if (!staleMs(agent.last_activity_at, DISPATCH_COOLDOWN_MS)) continue;
-
-    // Check max dispatch attempts
-    if (agent.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
-      actions.push({
-        type: 'transition_bead',
-        bead_id: agent.current_hook_bead_id,
-        from: null,
-        to: 'failed',
-        reason: 'max dispatch attempts exceeded',
-        actor: 'system',
-      });
-      actions.push({
-        type: 'unhook_agent',
-        agent_id: agent.bead_id,
-        reason: 'max dispatch attempts',
-      });
-      continue;
-    }
-
-    // Check if the hooked bead is open and unblocked
+    // Check if the hooked bead is open and unblocked, and read bead-level dispatch tracking
     const hookedRows = z
-      .object({ status: z.string(), rig_id: z.string().nullable() })
+      .object({
+        status: z.string(),
+        rig_id: z.string().nullable(),
+        dispatch_attempts: z.number().default(0),
+        last_dispatch_attempt_at: z.string().nullable().default(null),
+      })
       .array()
       .parse([
         ...query(
           sql,
           /* sql */ `
-          SELECT ${beads.status}, ${beads.rig_id}
+          SELECT ${beads.status}, ${beads.rig_id},
+                 ${beads.dispatch_attempts}, ${beads.last_dispatch_attempt_at}
           FROM ${beads}
           WHERE ${beads.bead_id} = ?
         `,
@@ -572,6 +629,28 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
     if (hookedRows.length === 0) continue;
     const hooked = hookedRows[0];
     if (hooked.status !== 'open') continue;
+
+    // Per-bead dispatch cap (#1653): use bead.dispatch_attempts, not agent's
+    if (hooked.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
+      actions.push({
+        type: 'transition_bead',
+        bead_id: agent.current_hook_bead_id,
+        from: null,
+        to: 'failed',
+        reason: `max dispatch attempts exceeded (${hooked.dispatch_attempts}/${MAX_DISPATCH_ATTEMPTS})`,
+        actor: 'system',
+      });
+      actions.push({
+        type: 'unhook_agent',
+        agent_id: agent.bead_id,
+        reason: 'max dispatch attempts',
+      });
+      continue;
+    }
+
+    // Exponential backoff based on bead attempt count (#1653)
+    const backoffMs = getDispatchBackoffMs(hooked.dispatch_attempts);
+    if (!staleMs(hooked.last_dispatch_attempt_at, backoffMs)) continue;
 
     // Check blockers
     const blockerCount = z
@@ -602,6 +681,15 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
     });
   }
 
+  actions.push(...reconcileBeadsNonDispatch(sql));
+
+  return actions;
+}
+
+/** Rules 3 + 4 of reconcileBeads — separated so the circuit breaker can skip dispatch rules. */
+function reconcileBeadsNonDispatch(sql: SqlStorage): Action[] {
+  const actions: Action[] = [];
+
   // Rule 3: In-progress issue beads with no working/stalled agent
   const staleInProgress = BeadRow.array().parse([
     ...query(
@@ -612,7 +700,9 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
                b.${beads.columns.assignee_agent_bead_id},
                b.${beads.columns.updated_at},
                b.${beads.columns.labels},
-               b.${beads.columns.created_by}
+               b.${beads.columns.created_by},
+               b.${beads.columns.dispatch_attempts},
+               b.${beads.columns.last_dispatch_attempt_at}
         FROM ${beads} b
         WHERE b.${beads.columns.type} = 'issue'
           AND b.${beads.columns.status} = 'in_progress'
@@ -649,6 +739,24 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
 
     if (hookedAgent.length > 0) continue;
 
+    // Fix 4 (#1653): beads at max dispatch attempts should transition
+    // to 'failed' instead of 'open' to prevent infinite retry loops.
+    if (bead.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
+      actions.push({
+        type: 'transition_bead',
+        bead_id: bead.bead_id,
+        from: 'in_progress',
+        to: 'failed',
+        reason: `agent lost, max dispatch attempts exhausted (${bead.dispatch_attempts}/${MAX_DISPATCH_ATTEMPTS})`,
+        actor: 'system',
+      });
+      actions.push({
+        type: 'clear_bead_assignee',
+        bead_id: bead.bead_id,
+      });
+      continue;
+    }
+
     actions.push({
       type: 'transition_bead',
       bead_id: bead.bead_id,
@@ -673,7 +781,9 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
                b.${beads.columns.assignee_agent_bead_id},
                b.${beads.columns.updated_at},
                b.${beads.columns.labels},
-               b.${beads.columns.created_by}
+               b.${beads.columns.created_by},
+               b.${beads.columns.dispatch_attempts},
+               b.${beads.columns.last_dispatch_attempt_at}
         FROM ${beads} b
         WHERE b.${beads.columns.type} = 'issue'
           AND b.${beads.columns.status} = 'in_review'
@@ -745,6 +855,9 @@ export function reconcileBeads(sql: SqlStorage): Action[] {
 
 export function reconcileReviewQueue(sql: SqlStorage): Action[] {
   const actions: Action[] = [];
+
+  // Town-level circuit breaker (#1653): skip dispatch-related rules
+  const circuitBreakerOpen = checkDispatchCircuitBreaker(sql) > 0;
 
   // Get all MR beads that need attention
   const mrBeads = MrBeadRow.array().parse([
@@ -846,6 +959,9 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
       }
     }
   }
+
+  // Skip dispatch rules when circuit breaker is open
+  if (circuitBreakerOpen) return actions;
 
   // Rule 5: Pop open MR bead for idle refinery
   // Get all rigs that have open MR beads
@@ -1000,39 +1116,21 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
   for (const ref of idleRefineries) {
     if (!ref.current_hook_bead_id) continue;
 
-    // Cooldown: skip if last activity is too recent (#1342)
-    if (!staleMs(ref.last_activity_at, DISPATCH_COOLDOWN_MS)) continue;
-
-    // Circuit-breaker: fail the MR bead after too many attempts (#1342)
-    if (ref.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
-      actions.push({
-        type: 'transition_bead',
-        bead_id: ref.current_hook_bead_id,
-        from: null,
-        to: 'failed',
-        reason: 'refinery max dispatch attempts exceeded',
-        actor: 'system',
-      });
-      actions.push({
-        type: 'unhook_agent',
-        agent_id: ref.bead_id,
-        reason: 'max dispatch attempts',
-      });
-      continue;
-    }
-
     const mrRows = z
       .object({
         status: z.string(),
         type: z.string(),
         rig_id: z.string().nullable(),
+        dispatch_attempts: z.number().default(0),
+        last_dispatch_attempt_at: z.string().nullable().default(null),
       })
       .array()
       .parse([
         ...query(
           sql,
           /* sql */ `
-          SELECT ${beads.status}, ${beads.type}, ${beads.rig_id}
+          SELECT ${beads.status}, ${beads.type}, ${beads.rig_id},
+                 ${beads.dispatch_attempts}, ${beads.last_dispatch_attempt_at}
           FROM ${beads}
           WHERE ${beads.bead_id} = ?
         `,
@@ -1043,6 +1141,28 @@ export function reconcileReviewQueue(sql: SqlStorage): Action[] {
     if (mrRows.length === 0) continue;
     const mr = mrRows[0];
     if (mr.type !== 'merge_request' || mr.status !== 'in_progress') continue;
+
+    // Per-bead dispatch cap (#1653): use bead.dispatch_attempts, not agent's
+    if (mr.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
+      actions.push({
+        type: 'transition_bead',
+        bead_id: ref.current_hook_bead_id,
+        from: null,
+        to: 'failed',
+        reason: `refinery max dispatch attempts exceeded (${mr.dispatch_attempts}/${MAX_DISPATCH_ATTEMPTS})`,
+        actor: 'system',
+      });
+      actions.push({
+        type: 'unhook_agent',
+        agent_id: ref.bead_id,
+        reason: 'max dispatch attempts',
+      });
+      continue;
+    }
+
+    // Exponential backoff based on bead attempt count (#1653)
+    const backoffMs = getDispatchBackoffMs(mr.dispatch_attempts);
+    if (!staleMs(mr.last_dispatch_attempt_at, backoffMs)) continue;
 
     // Container status is checked at apply time (async). In shadow mode,
     // we just note that a dispatch is needed.

@@ -1,11 +1,5 @@
 import type { BYOKResult } from '@/lib/providers/types';
-import { kiloFreeModels } from '@/lib/models';
-import { isAnthropicModel } from '@/lib/providers/anthropic';
 import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
-import { isGeminiModel } from '@/lib/providers/google';
-import { isMinimaxModel } from '@/lib/providers/minimax';
-import { isMoonshotModel } from '@/lib/providers/moonshotai';
-import { isOpenAiModel, isOpenAiOssModel } from '@/lib/providers/openai';
 import type { VercelUserByokInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import {
   DirectUserByokInferenceProviderIdSchema,
@@ -20,9 +14,13 @@ import type {
   VercelProviderConfig,
 } from '@/lib/providers/openrouter/types';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
-import { mimo_v2_pro_free_model } from '@/lib/providers/xiaomi';
-import { isZaiModel } from '@/lib/providers/zai';
 import * as crypto from 'crypto';
+import { unstable_cache } from 'next/cache';
+import { readDb } from '@/lib/drizzle';
+import { modelsByProvider } from '@kilocode/db/schema';
+import { desc } from 'drizzle-orm';
+import { StoredModelSchema } from '@kilocode/db';
+import * as z from 'zod';
 
 // EMERGENCY SWITCH
 // This routes all models that normally would be routed to OpenRouter to Vercel instead.
@@ -37,6 +35,10 @@ function getRandomNumberLessThan100(randomSeed: string) {
 }
 
 async function getVercelRoutingPercentage() {
+  if (ENABLE_UNIVERSAL_VERCEL_ROUTING) {
+    console.debug(`[shouldRouteToVercel] universal Vercel routing is enabled`);
+    return 100;
+  }
   const errorRate = await getGatewayErrorRate();
   const isOpenRouterErrorRateHigh = errorRate.openrouter > ERROR_RATE_THRESHOLD;
   const isVercelErrorRateHigh = errorRate.vercel > ERROR_RATE_THRESHOLD;
@@ -53,12 +55,31 @@ async function getVercelRoutingPercentage() {
   return 10;
 }
 
-function isLikelyAvailableOnAllGateways(requestedModel: string) {
-  return (
-    !requestedModel.startsWith('openrouter/') &&
-    (kiloFreeModels.find(m => m.public_id === requestedModel && m.status !== 'disabled')?.gateway ??
-      'openrouter') === 'openrouter'
-  );
+const getVercelModels_cached = unstable_cache(
+  async () => {
+    const result = await readDb
+      .select({ vercel: modelsByProvider.vercel })
+      .from(modelsByProvider)
+      .orderBy(desc(modelsByProvider.id))
+      .limit(1);
+    return Object.values(z.record(z.string(), StoredModelSchema).parse(result.at(0)?.vercel))
+      .filter(model => model.type === 'language' && model.endpoints.length > 0)
+      .map(model => model.id);
+  },
+  undefined,
+  { revalidate: 3600 }
+);
+
+async function getVercelModels() {
+  let models = new Array<string>();
+  const startTime = performance.now();
+  try {
+    models = await getVercelModels_cached();
+  } catch (e) {
+    console.error('[getVercelModels]', e);
+  }
+  console.debug(`[getVercelModels] took ${performance.now() - startTime}ms`);
+  return models;
 }
 
 export async function shouldRouteToVercel(
@@ -80,35 +101,23 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  if (!isLikelyAvailableOnAllGateways(requestedModel)) {
-    console.debug(`[shouldRouteToVercel] model not available on all gateways`);
-    return false;
-  }
-
-  if (ENABLE_UNIVERSAL_VERCEL_ROUTING) {
-    console.debug(`[shouldRouteToVercel] universal Vercel routing is enabled`);
-    return true;
-  }
-
-  if (
-    !isAnthropicModel(requestedModel) &&
-    !isGeminiModel(requestedModel) &&
-    !isMinimaxModel(requestedModel) &&
-    !isMoonshotModel(requestedModel) &&
-    !isOpenAiModel(requestedModel) &&
-    !isOpenAiOssModel(requestedModel) &&
-    requestedModel !== mimo_v2_pro_free_model.public_id &&
-    !isZaiModel(requestedModel)
-  ) {
-    console.debug(`[shouldRouteToVercel] model family not allowed for randomized Vercel routing`);
-    return false;
-  }
-
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  return (
+  const passedRandomization =
     getRandomNumberLessThan100('vercel_routing_' + randomSeed) <
-    (await getVercelRoutingPercentage())
-  );
+    (await getVercelRoutingPercentage());
+
+  if (!passedRandomization) {
+    return false;
+  }
+
+  const vercelModels = await getVercelModels();
+  const vercelModelId = mapModelIdToVercel(requestedModel);
+  if (!vercelModels.includes(vercelModelId)) {
+    console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
+    return false;
+  }
+
+  return true;
 }
 
 function convertProviderOptions(

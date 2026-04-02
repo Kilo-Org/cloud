@@ -5,25 +5,47 @@ import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
-import { getActiveInstance, workerInstanceId } from '@/lib/kiloclaw/instance-registry';
+import {
+  getActiveInstance,
+  getActiveOrgInstance,
+  workerInstanceId,
+} from '@/lib/kiloclaw/instance-registry';
 
 export async function GET() {
-  const { user, authFailedResponse } = await getUserFromAuth({
+  const { user, authFailedResponse, organizationId } = await getUserFromAuth({
     adminOnly: false,
   });
   if (authFailedResponse) return authFailedResponse;
 
-  try {
-    await requireKiloClawAccess(user.id);
-  } catch (err) {
-    if (err instanceof TRPCError && err.code === 'FORBIDDEN') {
-      return NextResponse.json({ error: err.message }, { status: 403 });
+  // Personal-only billing gate — org access is gated at org membership level
+  // (validated by getUserFromAuth). Matches tRPC org router's
+  // getStreamChatCredentials which uses organizationMemberProcedure (no billing gate).
+  if (!organizationId) {
+    try {
+      await requireKiloClawAccess(user.id);
+    } catch (err) {
+      if (err instanceof TRPCError && err.code === 'FORBIDDEN') {
+        return NextResponse.json({ error: err.message }, { status: 403 });
+      }
+      throw err;
     }
-    throw err;
   }
 
   try {
-    const instance = await getActiveInstance(user.id);
+    const instance = organizationId
+      ? await getActiveOrgInstance(user.id, organizationId)
+      : await getActiveInstance(user.id);
+
+    // No org instance → 404. Without this guard workerInstanceId(null)
+    // → undefined → the worker queries the personal DO, leaking personal
+    // credentials into the org context.
+    if (organizationId && !instance) {
+      return NextResponse.json(
+        { error: 'No active instance for this organization' },
+        { status: 404 }
+      );
+    }
+
     const token = generateApiToken(user, undefined, {
       expiresIn: TOKEN_EXPIRY.fiveMinutes,
     });

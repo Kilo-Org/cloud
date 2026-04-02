@@ -70,6 +70,8 @@ bot.onNewMention(async function handleIncomingMessage(
   const received = thread.createSentMessageFromMessage(message);
   await received.addReaction(emoji.eyes);
 
+  await bot.registerSingleton();
+
   try {
     await processMessage({ thread, message, platformIntegration, user, botRequestId });
   } catch (error) {
@@ -82,8 +84,6 @@ bot.onNewMention(async function handleIncomingMessage(
       });
     }
     await thread.post({ markdown: 'Sorry, something went wrong while processing your message.' });
-  } finally {
-    await Promise.all([received.removeReaction(emoji.eyes), received.addReaction(emoji.check)]);
   }
 });
 

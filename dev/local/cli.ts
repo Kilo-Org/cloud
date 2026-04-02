@@ -142,7 +142,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   const SIDEBAR_WIDTH = 40;
 
   // --- Start capture services first (tunnel, stripe) and wait for output ---
-  const captureServiceSet = new Set(['kiloclaw-tunnel', 'kiloclaw-stripe']);
+  const captureServiceSet = new Set(['kiloclaw-tunnel', 'kiloclaw-stripe', 'app-builder-tunnel']);
   const captureServices = serviceNames.filter(n => captureServiceSet.has(n));
   const otherServices = serviceNames.filter(n => !captureServiceSet.has(n));
 
@@ -158,6 +158,12 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
       oldValues.set(
         'stripe',
         readEnvValue(path.join(repoRoot, '.env.development.local'), 'STRIPE_WEBHOOK_SECRET')
+      );
+    }
+    if (captureServices.includes('app-builder-tunnel')) {
+      oldValues.set(
+        'app-builder-tunnel',
+        readEnvValue(path.join(repoRoot, 'cloudflare-app-builder/.dev.vars'), 'BUILDER_HOSTNAME')
       );
     }
 
@@ -198,6 +204,25 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
             console.log('  Stripe webhook secret captured');
           } else {
             console.warn('  Stripe secret not captured after 30s - check kiloclaw-stripe window');
+          }
+        })
+      );
+    }
+
+    if (captureServices.includes('app-builder-tunnel')) {
+      waits.push(
+        waitForEnvValueChange(
+          path.join(repoRoot, 'cloudflare-app-builder/.dev.vars'),
+          'BUILDER_HOSTNAME',
+          oldValues.get('app-builder-tunnel'),
+          30_000
+        ).then(ready => {
+          if (ready) {
+            console.log('  App builder tunnel URL captured');
+          } else {
+            console.warn(
+              '  App builder tunnel URL not captured after 30s - check app-builder-tunnel window'
+            );
           }
         })
       );

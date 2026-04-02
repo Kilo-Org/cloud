@@ -28,7 +28,7 @@
     "@cloudflare/sandbox": "0.7.13",
     "@cloudflare/workers-types": "catalog:",
     "@types/jsonwebtoken": "catalog:",
-    "@types/node": "^22.19.15",
+    "@types/node": ">=24 <25",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
     "tsx": "^4.21.0",

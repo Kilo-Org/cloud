@@ -305,7 +305,7 @@ OpenClaw has strict config validation. Common gotchas:
 
 ## Docker Image
 
-The Dockerfile is based on `debian:bookworm-slim` and installs Node.js 22 + OpenClaw.
+The Dockerfile is based on `debian:bookworm-slim` and installs Node.js 24 + OpenClaw.
 The image is pushed to Fly's registry (`registry.fly.io/{FLY_APP_NAME}`) via CI.
 
 The Dockerfile has two cache bust mechanisms:

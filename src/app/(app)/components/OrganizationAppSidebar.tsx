@@ -23,6 +23,7 @@ import {
   ListChecks,
   Wrench,
   Webhook,
+  Settings,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
@@ -121,8 +122,8 @@ export default function OrganizationAppSidebar({
     },
   ];
 
-  // Cloud group
-  const cloudItems: Array<{
+  // KiloClaw group
+  const kiloClawItems: Array<{
     title: string;
     icon: React.ElementType;
     url: string;
@@ -133,6 +134,20 @@ export default function OrganizationAppSidebar({
       icon: KiloCrabIcon,
       url: `/organizations/${organizationId}/claw`,
     },
+    {
+      title: 'Settings',
+      icon: Settings,
+      url: `/organizations/${organizationId}/claw/settings`,
+    },
+  ];
+
+  // Cloud group
+  const cloudItems: Array<{
+    title: string;
+    icon: React.ElementType;
+    url: string;
+    className?: string;
+  }> = [
     {
       title: 'App Builder',
       icon: Plus,
@@ -263,8 +278,8 @@ export default function OrganizationAppSidebar({
   ];
 
   const allUrls = useMemo(
-    () => [...dashboardItems, ...cloudItems, ...accountItems].map(i => i.url),
-    [dashboardItems, cloudItems, accountItems]
+    () => [...dashboardItems, ...kiloClawItems, ...cloudItems, ...accountItems].map(i => i.url),
+    [dashboardItems, kiloClawItems, cloudItems, accountItems]
   );
 
   // Determine if we should show the OrganizationSwitcher
@@ -288,6 +303,7 @@ export default function OrganizationAppSidebar({
 
       <SidebarContent>
         <SidebarMenuList label="Dashboard" items={dashboardItems} allUrls={allUrls} />
+        <SidebarMenuList label="KiloClaw" items={kiloClawItems} allUrls={allUrls} />
         {cloudItems.length > 0 && (
           <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
         )}

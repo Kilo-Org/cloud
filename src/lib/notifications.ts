@@ -110,7 +110,7 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateAutoTopUpNotification,
     generateAutoTopUpOrgsNotification,
     generateByokProvidersNotification,
-    generateMiniMaxNoLongerFreeNotification,
+    generateMimoNoLongerFreeNotification,
     generateFirstDayWelcomeNotification,
     generateKiloPassNotification,
   ];
@@ -229,7 +229,7 @@ async function generateTeamsTrialNotification(
   ];
 }
 
-async function generateMiniMaxNoLongerFreeNotification(
+async function generateMimoNoLongerFreeNotification(
   user: User,
   _ctx: NotificationContext
 ): Promise<KiloNotification[]> {
@@ -237,24 +237,22 @@ async function generateMiniMaxNoLongerFreeNotification(
     const users = await cachedPosthogQuery(
       z.array(z.tuple([z.string()]).transform(([userId]) => userId))
     )(
-      'minimax-no-longer-free-users',
-      'select kilo_user_id from notification_mar_23_minimax_no_longer_free limit 5e5'
+      'mimo-no-longer-free-users',
+      'select kilo_user_id from notification_apr_2_mimo_no_longer_free_users limit 5e5'
     );
 
     if (!users.includes(user.id)) {
-      console.debug(
-        '[generateMiniMaxNoLongerFreeNotification] user has not used MiniMax M2.5 free'
-      );
+      console.debug('[generateMimoNoLongerFreeNotification] not showing notification for user');
       return [];
     }
 
-    console.debug('[generateMiniMaxNoLongerFreeNotification] user has used MiniMax M2.5 free');
+    console.debug('[generateMimoNoLongerFreeNotification] showing notification for user');
     return [
       {
-        id: 'minimax-no-longer-free-mar-23',
-        title: 'MiniMax M2.5 Free ending soon',
+        id: 'mimo-no-longer-free-apr-2',
+        title: 'MiMo V2 and MiniMax M2.5 no longer free',
         message:
-          'The MiniMax M2.5 free promotion ends soon. Please switch to Kilo Auto Free or another free model.',
+          'The MiMo V2 and MiniMax M2.5 free promotions have ended. Please switch to Kilo Auto Free or another free model.',
         suggestModelId: KILO_AUTO_FREE_MODEL.id,
         showIn: ['cli', 'extension'],
       },

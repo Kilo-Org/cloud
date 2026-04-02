@@ -502,8 +502,15 @@
     {
       "idx": 71,
       "version": "7",
-      "when": 1775061370899,
-      "tag": "0071_scheduled_triggers",
+      "when": 1775125519225,
+      "tag": "0071_rich_hobgoblin",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1775232000000,
+      "tag": "0072_scheduled_triggers",
       "breakpoints": true
     }
   ]

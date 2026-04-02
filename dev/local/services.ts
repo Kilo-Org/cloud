@@ -67,9 +67,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
   },
   'cloudflare-session-ingest': { group: 'cloud-agent', dependsOn: ['postgres'] },
   // app-builder
+  'app-builder-tunnel': { group: 'app-builder', dependsOn: [] },
   'cloudflare-app-builder': {
     group: 'app-builder',
-    dependsOn: ['cloudflare-db-proxy', 'cloudflare-git-token-service'],
+    dependsOn: ['cloudflare-db-proxy', 'cloudflare-git-token-service', 'app-builder-tunnel'],
+    useLanIp: true,
   },
   'cloudflare-db-proxy': { group: 'app-builder', dependsOn: ['postgres'] },
   'cloudflare-git-token-service': { group: 'app-builder', dependsOn: ['postgres'] },
@@ -261,6 +263,21 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
+    if (name === 'app-builder-tunnel') {
+      const appBuilderPort =
+        readWranglerPort(path.join(repoRoot, 'cloudflare-app-builder')) + portOffset;
+      defs.push({
+        name,
+        type: 'process',
+        dir: '.',
+        port: 0,
+        dependsOn: meta.dependsOn,
+        command: ['tsx', 'dev/local/scripts/start-app-builder-tunnel.ts', String(appBuilderPort)],
+        group: meta.group,
+      });
+      continue;
+    }
+
     // Worker — read port from wrangler.jsonc
     const basePort = readWranglerPort(path.join(repoRoot, dir));
     const port = basePort + portOffset;
@@ -303,6 +320,7 @@ export const shortcuts: Record<string, string[]> = {
     'cloudflare-session-ingest',
     'cloudflare-db-proxy',
     'cloudflare-git-token-service',
+    'app-builder-tunnel',
     'cloudflare-app-builder',
   ],
   agents: ['cloud-agent-next', 'nextjs', 'cloudflare-session-ingest'],

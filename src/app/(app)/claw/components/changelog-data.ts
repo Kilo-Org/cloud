@@ -11,6 +11,12 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-04-01',
+    description: 'Updated OpenClaw to 2026.3.24.',
+    category: 'feature',
+    deployHint: 'redeploy_suggested',
+  },
+  {
     date: '2026-03-31',
     description:
       'Added Webhook Integration — receive webhook events as messages in your KiloClaw chat. Any service that can send an HTTP POST (CI/CD pipelines, monitoring tools, form builders, custom scripts, etc.) can trigger your bot to take action. Enable it in Settings > Webhook Integration. Supports custom prompt templates and optional webhook authentication.',

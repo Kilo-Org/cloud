@@ -19,13 +19,14 @@ function convert(publicId: string, model: CustomLlmDefinition) {
       instruct_type: null,
     },
     pricing: {
-      prompt: '0.0000000',
-      completion: '0.0000000',
+      prompt: model.pricing?.prompt ?? '0.0000000',
+      completion: model.pricing?.completion ?? '0.0000000',
       request: '0',
       image: '0',
       web_search: '0',
       internal_reasoning: '0',
-      input_cache_read: '0.00000000',
+      input_cache_read: model.pricing?.input_cache_read ?? '0.00000000',
+      input_cache_write: model.pricing?.input_cache_write ?? '0.00000000',
     },
     top_provider: {
       context_length: model.context_length,

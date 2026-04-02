@@ -100,8 +100,8 @@ const KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT = 15 * 60 * 1000;
 /** Default per-execution wall-clock deadline: 30 minutes */
 const DEFAULT_MAX_RUNTIME_MS = 1_800_000;
 
-/** Hung execution timeout: no non-heartbeat events for 2 minutes */
-const HUNG_EXECUTION_TIMEOUT_MS = 2 * 60 * 1000;
+/** Hung execution timeout: no non-heartbeat events for 5 minutes */
+const HUNG_EXECUTION_TIMEOUT_MS = 5 * 60 * 1000;
 
 /** Grace period before failing execution after wrapper disconnect (ms).
  *  Covers the first few reconnection attempts (exponential backoff: 1s, 2s, 4s …). */
@@ -1486,7 +1486,7 @@ export class CloudAgentSession extends DurableObject {
       await this.failExecution({
         executionId: activeExecutionId,
         status: 'failed',
-        error: 'Execution hung — no events received for 2 minutes',
+        error: 'Execution hung — no events received for 5 minutes',
         streamEventType: 'error',
       });
     }

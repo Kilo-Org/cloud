@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": "^22"
+    "node": ">=24 <25"
   },
   "scripts": {
     "dev": "bash scripts/dev.sh",
@@ -163,7 +163,7 @@
     "@tailwindcss/typography": "^0.5.19",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "catalog:",
-    "@types/node": "^22.19.15",
+    "@types/node": ">=24 <25",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@typescript/native-preview": "catalog:",
@@ -209,7 +209,7 @@
     "patchedDependencies": {
       "@storybook/nextjs@9.1.20": "patches/@storybook__nextjs@9.1.20.patch",
       "@gorhom/bottom-sheet@5.1.8": "patches/@gorhom__bottom-sheet@5.1.8.patch",
-      "stream-chat-expo@8.13.7": "patches/stream-chat-expo@8.13.7.patch"
+      "stream-chat-react-native-core": "patches/stream-chat-react-native-core.patch"
     },
     "onlyBuiltDependencies": [
       "@swc/core",

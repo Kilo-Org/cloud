@@ -13,3 +13,7 @@ export const qwen35_plus_free_model: KiloFreeModel = {
   internal_id: 'qwen3.5-plus',
   inference_provider: 'alibaba',
 };
+
+export const QWEN36_PLUS_FREE_MODEL_ID = 'qwen/qwen3.6-plus:free';
+
+export const QWEN36_PLUS_FREE_MODEL_NAME = 'Qwen: Qwen3.6 Plus (free)';

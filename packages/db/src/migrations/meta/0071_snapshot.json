@@ -1,5 +1,5 @@
 {
-  "id": "bac36061-9636-403c-b9db-106d8a919ff4",
+  "id": "692f8c28-6cf9-4d92-bc8c-bbcc5bb71d3f",
   "prevId": "191ad37c-9c1b-4c5e-95c4-d191a8aaabc4",
   "version": "7",
   "dialect": "postgresql",
@@ -3970,26 +3970,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "activation_mode": {
-          "name": "activation_mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'webhook'"
-        },
-        "cron_expression": {
-          "name": "cron_expression",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cron_timezone": {
-          "name": "cron_timezone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'UTC'"
-        },
         "github_repo": {
           "name": "github_repo",
           "type": "text",
@@ -4199,10 +4179,6 @@
         "CHK_cloud_agent_webhook_triggers_kiloclaw_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_kiloclaw_fields",
           "value": "(\n        \"cloud_agent_webhook_triggers\".\"target_type\" != 'kiloclaw_chat' OR\n        \"cloud_agent_webhook_triggers\".\"kiloclaw_instance_id\" IS NOT NULL\n      )"
-        },
-        "CHK_cloud_agent_webhook_triggers_scheduled_fields": {
-          "name": "CHK_cloud_agent_webhook_triggers_scheduled_fields",
-          "value": "(\n        \"cloud_agent_webhook_triggers\".\"activation_mode\" != 'scheduled' OR\n        \"cloud_agent_webhook_triggers\".\"cron_expression\" IS NOT NULL\n      )"
         }
       },
       "isRLSEnabled": false
@@ -4785,109 +4761,6 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.custom_llm": {
-      "name": "custom_llm",
-      "schema": "",
-      "columns": {
-        "public_id": {
-          "name": "public_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "display_name": {
-          "name": "display_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "context_length": {
-          "name": "context_length",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "max_completion_tokens": {
-          "name": "max_completion_tokens",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "internal_id": {
-          "name": "internal_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider": {
-          "name": "provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "base_url": {
-          "name": "base_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "api_key": {
-          "name": "api_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "organization_ids": {
-          "name": "organization_ids",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "supports_image_input": {
-          "name": "supports_image_input",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "force_reasoning": {
-          "name": "force_reasoning",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "opencode_settings": {
-          "name": "opencode_settings",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "extra_body": {
-          "name": "extra_body",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "extra_headers": {
-          "name": "extra_headers",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "interleaved_format": {
-          "name": "interleaved_format",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

@@ -1,6 +1,18 @@
 // Load environment variables before any other imports
 import '../lib/load-env';
 
+// Shim 'server-only' for CLI scripts. Next.js strips this at build time, but
+// tsx/Node.js doesn't — pre-populate the require cache with an empty module so
+// transitive imports of 'server-only' (e.g. via config.server.ts) don't throw.
+import Module from 'node:module';
+const serverOnlyResolved = require.resolve('server-only');
+(Module as unknown as { _cache: Record<string, unknown> })._cache[serverOnlyResolved] = {
+  id: serverOnlyResolved,
+  filename: serverOnlyResolved,
+  loaded: true,
+  exports: {},
+};
+
 // get all folders in the src/scripts directory excluding './lib'
 import { readdirSync } from 'fs';
 import { join } from 'path';

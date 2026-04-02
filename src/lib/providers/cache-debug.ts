@@ -40,7 +40,8 @@ export function logCacheDiagnostics(
             'cache_control' in part &&
             typeof (part as Record<string, unknown>).cache_control === 'object' &&
             (part as Record<string, unknown>).cache_control !== null &&
-            'type' in ((part as Record<string, unknown>).cache_control as Record<string, unknown>) &&
+            'type' in
+              ((part as Record<string, unknown>).cache_control as Record<string, unknown>) &&
             ((part as Record<string, unknown>).cache_control as Record<string, unknown>).type ===
               'ephemeral'
         );

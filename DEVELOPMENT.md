@@ -50,12 +50,10 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"
 ```
 
-Then reload your shell and install the pinned Node version:
+Then reload your shell:
 
 ```bash
 source ~/.zshrc
-nvm install
-nvm use
 ```
 
 ### pnpm
@@ -97,12 +95,13 @@ brew install stripe/stripe-cli/stripe
 ```bash
 git clone git@github.com:Kilo-Org/cloud.git
 cd cloud
+nvm install
+nvm use
 ```
 
 ### 2. Install dependencies and pull LFS assets
 
 ```bash
-nvm use
 pnpm install
 git lfs pull
 ```

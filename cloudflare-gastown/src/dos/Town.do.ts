@@ -1273,14 +1273,24 @@ export class TownDO extends DurableObject<Env> {
     agents.touchAgent(this.sql, agentId, watermark);
     await this.armAlarmIfNeeded();
 
-    // If the container instance ID changed, a new container has started.
-    // Clear the drain flag so the UI banner disappears and dispatch resumes.
+    // Detect container restarts via instance ID change. The instance ID
+    // is persisted so it survives DO restarts (unlike in-memory only).
     if (watermark?.containerInstanceId) {
+      // Hydrate from storage on first access after DO restart
+      if (this._containerInstanceId === null) {
+        this._containerInstanceId =
+          (await this.ctx.storage.get<string>('town:containerInstanceId')) ?? null;
+      }
+
       if (
         this._draining &&
         this._containerInstanceId &&
         watermark.containerInstanceId !== this._containerInstanceId
       ) {
+        // New container started — clear drain flag. This supplements the
+        // nonce handshake (acknowledgeContainerReady) as a faster path:
+        // the heartbeat fires every 30s vs the nonce which requires the
+        // container to explicitly call /container-ready.
         this._draining = false;
         this._drainNonce = null;
         this._drainStartedAt = null;
@@ -1291,7 +1301,11 @@ export class TownDO extends DurableObject<Env> {
           `${TOWN_LOG} heartbeat: new container instance ${watermark.containerInstanceId} (was ${this._containerInstanceId}), clearing drain flag`
         );
       }
-      this._containerInstanceId = watermark.containerInstanceId;
+
+      if (watermark.containerInstanceId !== this._containerInstanceId) {
+        this._containerInstanceId = watermark.containerInstanceId;
+        await this.ctx.storage.put('town:containerInstanceId', watermark.containerInstanceId);
+      }
     }
 
     return { drainNonce: this._drainNonce };
@@ -2177,9 +2191,12 @@ export class TownDO extends DurableObject<Env> {
         // while the mayor processes this prompt. Also reschedule the alarm
         // immediately — the idle alarm may be up to 5 min away, and we need
         // the reconciler/health-check loop to resume promptly.
+        // Always refresh the watermark so a stale mayorWaiting callback
+        // from a previous turn can't flip the mayor back to waiting
+        // while a queued prompt is being processed.
+        this._mayorWorkingSince = Date.now();
         if (mayor.status === 'waiting') {
           agents.updateAgentStatus(this.sql, mayor.id, 'working');
-          this._mayorWorkingSince = Date.now();
           await this.ctx.storage.setAlarm(Date.now() + ACTIVE_ALARM_INTERVAL_MS);
         }
         sessionStatus = 'active';

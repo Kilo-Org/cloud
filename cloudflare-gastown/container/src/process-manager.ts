@@ -713,6 +713,14 @@ export async function startAgent(
         ...(request.systemPrompt ? { system: request.systemPrompt } : {}),
       },
     });
+
+    // If the event stream errored while we were awaiting the prompt,
+    // the stream-error handler already set the agent to 'failed' and
+    // reported completion. Don't continue with a success log.
+    if (agent.status === 'failed') {
+      throw new Error('Event stream failed during initial prompt');
+    }
+
     agent.messageCount = 1;
 
     log.info('agent.start', {

@@ -23,6 +23,9 @@ export function DrainStatusBanner({ townId }: { townId: string }) {
     refetchInterval: 5_000,
   });
 
+  const { data: adminAccess } = useQuery(trpc.gastown.checkAdminAccess.queryOptions({ townId }));
+  const isReadOnly = adminAccess?.isAdminViewing === true;
+
   const destroyContainer = useMutation(
     trpc.gastown.destroyContainer.mutationOptions({
       onSuccess: () => {
@@ -60,19 +63,21 @@ export function DrainStatusBanner({ townId }: { townId: string }) {
           completes.
         </Banner.Description>
       </Banner.Content>
-      <Banner.Action>
-        <Button
-          variant="destructive"
-          size="sm"
-          disabled={destroyContainer.isPending}
-          onClick={() => destroyContainer.mutate({ townId })}
-        >
-          {destroyContainer.isPending ? (
-            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-          ) : null}
-          Force Shutdown
-        </Button>
-      </Banner.Action>
+      {!isReadOnly && (
+        <Banner.Action>
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={destroyContainer.isPending}
+            onClick={() => destroyContainer.mutate({ townId })}
+          >
+            {destroyContainer.isPending ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : null}
+            Force Shutdown
+          </Button>
+        </Banner.Action>
+      )}
     </Banner>
   );
 }

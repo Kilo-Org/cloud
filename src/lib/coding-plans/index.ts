@@ -81,11 +81,13 @@ export async function subscribeToCodingPlan(
   // 4. Atomic transaction
   const now = new Date();
   const periodEnd = addDays(now, billingPeriodDays);
-  const periodKey = format(now, 'yyyy-MM');
   const subscriptionId = existingSub?.id ?? crypto.randomUUID();
-  const deductionCategory = `coding-plan:${providerId}:${subscriptionId}:${periodKey}`;
+  const activationKey =
+    existingSub?.status === 'canceled' ? (existingSub.canceled_at ?? existingSub.id) : 'initial';
+  const deductionCategory = `coding-plan-activate:${providerId}:${userId}:${activationKey}`;
 
   let assignedKeyId: string | null = null;
+  let skippedDuplicateActivation = false;
 
   await db.transaction(async tx => {
     // 4a. Deduct credits (idempotent)
@@ -106,6 +108,7 @@ export async function subscribeToCodingPlan(
 
       if ((deductionResult.rowCount ?? 0) === 0) {
         // Already processed — idempotent duplicate
+        skippedDuplicateActivation = true;
         logInfo('Duplicate subscription attempt', {
           user_id: userId,
           providerId,
@@ -229,6 +232,25 @@ export async function subscribeToCodingPlan(
       });
     }
   });
+
+  if (skippedDuplicateActivation) {
+    const [currentSub] = await db
+      .select({ id: coding_plan_subscriptions.id })
+      .from(coding_plan_subscriptions)
+      .where(
+        and(
+          eq(coding_plan_subscriptions.user_id, userId),
+          eq(coding_plan_subscriptions.provider_id, providerId)
+        )
+      )
+      .limit(1);
+
+    if (!currentSub) {
+      throw new Error('Coding plan activation was already processed, but no subscription was found.');
+    }
+
+    return { subscriptionId: currentSub.id };
+  }
 
   // 5. Post-transaction: evaluate Kilo Pass bonus (best-effort)
   if (costMicrodollars > 0) {

@@ -3397,23 +3397,41 @@ export class TownDO extends DurableObject<Env> {
       Sentry.captureException(err);
     }
 
-    // Auto-clear drain flag if it has been active for too long.
-    // The drain sequence (drainAll) waits up to 10 minutes, so 15
-    // minutes is a generous upper bound. After this timeout the old
-    // container is certainly dead and it is safe to resume dispatch.
-    const DRAIN_TIMEOUT_MS = 15 * 60 * 1000;
-    if (
-      this._draining &&
-      this._drainStartedAt &&
-      Date.now() - this._drainStartedAt > DRAIN_TIMEOUT_MS
-    ) {
-      this._draining = false;
-      this._drainNonce = null;
-      this._drainStartedAt = null;
-      await this.ctx.storage.put('town:draining', false);
-      await this.ctx.storage.delete('town:drainNonce');
-      await this.ctx.storage.delete('town:drainStartedAt');
-      logger.info('reconciler: drain timeout exceeded, auto-clearing draining flag');
+    // Auto-clear drain flag. Two triggers:
+    // 1. No working/stalled non-mayor agents remain — the container is
+    //    gone and all agents have been recovered. Clear immediately so
+    //    the UI banner disappears within one alarm tick (~5s).
+    // 2. Hard timeout (7 min) as a safety net if agent state gets stuck.
+    if (this._draining) {
+      const DRAIN_TIMEOUT_MS = 7 * 60 * 1000;
+      const timedOut = this._drainStartedAt && Date.now() - this._drainStartedAt > DRAIN_TIMEOUT_MS;
+
+      const hasActiveNonMayor =
+        !timedOut &&
+        query(
+          this.sql,
+          /* sql */ `
+            SELECT 1 FROM ${agent_metadata}
+            WHERE ${agent_metadata.status} IN ('working', 'stalled')
+              AND ${agent_metadata.role} != 'mayor'
+            LIMIT 1
+          `,
+          []
+        ).length > 0;
+
+      if (timedOut || !hasActiveNonMayor) {
+        this._draining = false;
+        this._drainNonce = null;
+        this._drainStartedAt = null;
+        await this.ctx.storage.put('town:draining', false);
+        await this.ctx.storage.delete('town:drainNonce');
+        await this.ctx.storage.delete('town:drainStartedAt');
+        logger.info(
+          timedOut
+            ? 'reconciler: drain timeout exceeded, auto-clearing draining flag'
+            : 'reconciler: no active non-mayor agents, clearing draining flag'
+        );
+      }
     }
 
     // Phase 1: Reconcile — compute desired state vs actual state

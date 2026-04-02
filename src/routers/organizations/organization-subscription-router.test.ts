@@ -103,6 +103,16 @@ describe('organizations subscription trpc router', () => {
         })
       ).rejects.toThrow();
     });
+
+    it('rejects non-owner members from reading subscription details', async () => {
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.organizations.subscription.get({
+          organizationId: testOrganization.id,
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+    });
   });
 
   describe('getSubscriptionStripeUrl procedure', () => {
@@ -195,7 +205,7 @@ describe('organizations subscription trpc router', () => {
       ).rejects.toThrow('You do not have the required organizational role to access this feature');
     });
 
-    it('lists organization invoices for the Stripe customer across seat subscriptions', async () => {
+    it('lists invoices only for the latest seats subscription', async () => {
       await db.insert(organization_seats_purchases).values([
         {
           organization_id: testOrganization.id,
@@ -205,6 +215,7 @@ describe('organizations subscription trpc router', () => {
           starts_at: '2026-01-01T00:00:00.000Z',
           expires_at: '2026-02-01T00:00:00.000Z',
           billing_cycle: 'monthly',
+          created_at: '2026-01-01T00:00:00.000Z',
         },
         {
           organization_id: testOrganization.id,
@@ -214,6 +225,7 @@ describe('organizations subscription trpc router', () => {
           starts_at: '2026-02-01T00:00:00.000Z',
           expires_at: '2026-03-01T00:00:00.000Z',
           billing_cycle: 'monthly',
+          created_at: '2026-02-01T00:00:00.000Z',
         },
       ]);
       stripeMock.invoices.list.mockResolvedValue({
@@ -239,6 +251,7 @@ describe('organizations subscription trpc router', () => {
 
       expect(stripeMock.invoices.list).toHaveBeenCalledWith({
         customer: 'cus_test_org',
+        subscription: 'sub_org_new',
         limit: 25,
       });
       expect(result).toEqual({

@@ -87,7 +87,7 @@ const CursorInputSchema = OrganizationIdInputSchema.extend({
 });
 
 export const organizationsSubscriptionRouter = createTRPCRouter({
-  get: organizationMemberProcedure
+  get: organizationBillingProcedure
     .input(OrganizationIdInputSchema)
     .output(OrganizationSubscriptionResponseSchema)
     .query(async ({ input }): Promise<OrganizationSubscriptionResponse> => {
@@ -358,6 +358,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
 
       const invoices = await client.invoices.list({
         customer: customerId,
+        subscription: latestPurchase.subscription_stripe_id,
         limit: 25,
         ...(input.cursor ? { starting_after: input.cursor } : {}),
       });

@@ -6,13 +6,20 @@ import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
+const KILO_INTERNAL_PREFIX = 'kilo-internal/';
+
+const publicIdSchema = z
+  .string()
+  .min(1, 'public_id is required')
+  .startsWith(KILO_INTERNAL_PREFIX, `public_id must start with "${KILO_INTERNAL_PREFIX}"`);
+
 const UpsertCustomLlmSchema = z.object({
-  public_id: z.string().min(1, 'public_id is required'),
+  public_id: publicIdSchema,
   definition: CustomLlmDefinitionSchema,
 });
 
 const DeleteCustomLlmSchema = z.object({
-  public_id: z.string().min(1),
+  public_id: publicIdSchema,
 });
 
 export const adminCustomLlmRouter = createTRPCRouter({

@@ -242,7 +242,7 @@ export default function AdminCustomLlmsPage() {
                     }))
                   }
                   disabled={editor.mode === 'edit'}
-                  placeholder="e.g. my-custom-model"
+                  placeholder="e.g. kilo-internal/my-custom-model"
                   className="font-mono"
                 />
               </div>

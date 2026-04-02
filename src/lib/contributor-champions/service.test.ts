@@ -87,9 +87,13 @@ async function insertEvent(input: {
 describe('contributor champions service', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(contributor_champion_memberships);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(contributor_champion_events);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(contributor_champion_sync_state);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(contributor_champion_contributors);
   });
 
@@ -202,7 +206,10 @@ describe('contributor champions service', () => {
   it('sync is idempotent, excludes team members, and updates rolling/all-time counts', async () => {
     mockedFetchWithBackoff.mockImplementation(async url => {
       const parsedUrl = toUrl(url);
-      if (parsedUrl.pathname.endsWith('/search/issues') && parsedUrl.searchParams.get('page') === '1') {
+      if (
+        parsedUrl.pathname.endsWith('/search/issues') &&
+        parsedUrl.searchParams.get('page') === '1'
+      ) {
         return jsonResponse({
           total_count: 2,
           items: [
@@ -247,7 +254,10 @@ describe('contributor champions service', () => {
         ]);
       }
 
-      if (parsedUrl.pathname.endsWith('/search/issues') && parsedUrl.searchParams.get('page') === '2') {
+      if (
+        parsedUrl.pathname.endsWith('/search/issues') &&
+        parsedUrl.searchParams.get('page') === '2'
+      ) {
         return jsonResponse({
           total_count: 2,
           items: [],
@@ -267,7 +277,10 @@ describe('contributor champions service', () => {
 
     mockedFetchWithBackoff.mockImplementation(async url => {
       const parsedUrl = toUrl(url);
-      if (parsedUrl.pathname.endsWith('/search/issues') && parsedUrl.searchParams.get('page') === '1') {
+      if (
+        parsedUrl.pathname.endsWith('/search/issues') &&
+        parsedUrl.searchParams.get('page') === '1'
+      ) {
         return jsonResponse({
           total_count: 1,
           items: [
@@ -313,7 +326,10 @@ describe('contributor champions service', () => {
 
     mockedFetchWithBackoff.mockImplementation(async url => {
       const parsedUrl = toUrl(url);
-      if (parsedUrl.pathname.endsWith('/search/issues') && parsedUrl.searchParams.get('page') === '1') {
+      if (
+        parsedUrl.pathname.endsWith('/search/issues') &&
+        parsedUrl.searchParams.get('page') === '1'
+      ) {
         return jsonResponse({
           total_count: 1,
           items: [

@@ -38,7 +38,5 @@
     "opencode-ai",
     "rekram1-node"
   ],
-  "other": [
-    "github-actions[bot]"
-  ]
+  "other": ["github-actions[bot]"]
 }

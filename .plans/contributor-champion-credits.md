@@ -6,11 +6,11 @@ Add monthly Kilo Credits to the contributor champions feature, modeled after the
 
 ### Tier Credit Amounts
 
-| Tier | Monthly Credits | Auto-upgrade threshold |
-|------|----------------|----------------------|
-| Contributor | $0/month | 1+ merged PR in 90 days |
-| Ambassador | $50/month | 5+ merged PRs all-time |
-| Champion | $150/month | 15+ merged PRs all-time |
+| Tier        | Monthly Credits | Auto-upgrade threshold  |
+| ----------- | --------------- | ----------------------- |
+| Contributor | $0/month        | 1+ merged PR in 90 days |
+| Ambassador  | $50/month       | 5+ merged PRs all-time  |
+| Champion    | $150/month      | 15+ merged PRs all-time |
 
 ---
 
@@ -108,6 +108,7 @@ refreshContributorChampionCredits(): Promise<CreditRefreshSummary>
 ```
 
 Logic:
+
 1. Query all enrolled memberships where:
    - `enrolled_tier IS NOT NULL`
    - `credit_amount_microdollars > 0`
@@ -128,6 +129,7 @@ processAutoTierUpgrades(): Promise<AutoUpgradeSummary>
 ```
 
 Logic:
+
 1. Query enrolled memberships joined with contributor stats.
 2. For each enrolled contributor:
    - If `all_time_contributions >= 15` and `enrolled_tier !== 'champion'` → upgrade to `champion`.
@@ -184,12 +186,15 @@ In [`contributor-champions-router.ts`](src/routers/admin/contributor-champions-r
 2. Return the credit amount in the response so the UI can show a confirmation message.
 
 Updated signature:
+
 ```ts
 enroll: adminProcedure
-  .input(z.object({
-    contributorId: z.string().uuid(),
-    tier: TierSchema.nullable().optional(),
-  }))
+  .input(
+    z.object({
+      contributorId: z.string().uuid(),
+      tier: TierSchema.nullable().optional(),
+    })
+  )
   .mutation(async ({ input, ctx }) => {
     const result = await enrollContributorChampion({
       contributorId: input.contributorId,
@@ -202,7 +207,7 @@ enroll: adminProcedure
       creditAmountUsd: result.creditAmountUsd,
       creditGranted: result.creditGranted,
     };
-  })
+  });
 ```
 
 ### 5b. Return credit info in leaderboard/enrolled list
@@ -218,29 +223,33 @@ The existing `leaderboard` and `enrolledList` queries already return from [`getC
 Update the enrollment dialog in [`page.tsx`](src/app/admin/contributors/page.tsx:1060) to show credit information:
 
 **Current:**
+
 > Enroll @username as **ambassador**.
 
 **Proposed:**
+
 > Enroll @username as **ambassador**.
 >
 > **Ambassador tier: $50/month in Kilo Credits** will be added to the person's Kilo account and renew every month.
 
 For `contributor` tier (no credits), show:
+
 > Enroll @username as **contributor**.
 >
 > Contributor tier receives no monthly credits.
 
 If the contributor has no linked Kilo account, show a warning:
+
 > ⚠️ No linked Kilo account found. Credits cannot be granted until the contributor has a Kilo account with a matching email.
 
 ### 6b. Enrolled table — add credit columns
 
 Add columns to the Enrolled table:
 
-| Column | Description |
-|--------|------------|
-| Credits/mo | e.g. "$50" or "—" for contributor tier |
-| Last Grant | e.g. "2025-02-15 12:00" or "Never" |
+| Column       | Description                                                     |
+| ------------ | --------------------------------------------------------------- |
+| Credits/mo   | e.g. "$50" or "—" for contributor tier                          |
+| Last Grant   | e.g. "2025-02-15 12:00" or "Never"                              |
 | Kilo Account | Already effectively shown via the email link + AlertCircle icon |
 
 ### 6c. Tier selector credit preview in review queue
@@ -287,16 +296,21 @@ flowchart TD
 ## Key Design Decisions
 
 ### Credits go to personal accounts, not organizations
+
 Unlike OSS sponsorships which grant credits to an **organization**, contributor champion credits go to the contributor's **personal Kilo account**. This means we use [`grantCreditForCategory(user, ...)`](src/lib/promotionalCredits.ts:73) (the user-level wrapper), not `grantEntityCreditForCategory()` with an organization.
 
 ### Rolling 30-day cycle per member
+
 Each contributor has their own independent 30-day cycle tracked by `credits_last_granted_at`. This is simpler than a global monthly reset and matches the "rolling 30-day refresh" requirement.
 
 ### Credit expiration is handled by the existing system
+
 By setting `expiry_hours: 30 * 24` on the credit grant, the standard [`processLocalExpirations()`](src/lib/creditExpiration.ts:152) system handles expiry automatically. Old credits expire, new ones are granted — purchased credits are never touched.
 
 ### Auto-upgrade uses all-time contributions
+
 The task specifies `5+ merged PRs → Ambassador` and `15+ merged PRs → Champion`. These are all-time thresholds, not rolling windows. This is stored in [`all_time_contributions`](packages/db/src/schema.ts:2010) on the contributors table.
 
 ### `linked_kilo_user_id` is resolved at enrollment and refreshed by cron
+
 At enrollment time, we resolve the contributor's commit email → Kilo user. If no match exists, we store `NULL` and skip credit granting. The cron can attempt to re-resolve unlinked contributors on each run by checking for new email matches.

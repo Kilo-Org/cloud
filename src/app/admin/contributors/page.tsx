@@ -156,13 +156,7 @@ function TierDisplay({ tier }: { tier: ContributorTier | null }) {
   return <Badge variant="outline">{tier}</Badge>;
 }
 
-function ContributionCountButton({
-  count,
-  onClick,
-}: {
-  count: number;
-  onClick: () => void;
-}) {
+function ContributionCountButton({ count, onClick }: { count: number; onClick: () => void }) {
   return (
     <Button variant="link" className="h-auto p-0" onClick={onClick}>
       {count}
@@ -181,10 +175,7 @@ function EmailCell({
 }) {
   if (linkedUserId) {
     return (
-      <Link
-        href={`/admin/users/${encodeURIComponent(linkedUserId)}`}
-        className="hover:underline"
-      >
+      <Link href={`/admin/users/${encodeURIComponent(linkedUserId)}`} className="hover:underline">
         {email ?? linkedUserName ?? 'Linked Kilo account'}
       </Link>
     );
@@ -463,7 +454,8 @@ export default function ContributorChampionsAdminPage() {
       row =>
         matchesFilter(row.githubLogin, enrolledFilters.githubLogin) &&
         matchesFilter(row.email, enrolledFilters.email) &&
-        (enrolledFilters.enrolledTier === '' || row.enrolledTier === enrolledFilters.enrolledTier) &&
+        (enrolledFilters.enrolledTier === '' ||
+          row.enrolledTier === enrolledFilters.enrolledTier) &&
         matchesKiloAccount(row.linkedUserId, enrolledFilters.hasKiloAccount)
     );
   }, [enrolledQuery.data, enrolledFilters]);
@@ -529,7 +521,7 @@ export default function ContributorChampionsAdminPage() {
           case 'contributions30d':
             return row.contributions30d;
           case 'tier':
-            return (row.selectedTier ?? row.suggestedTier) ?? '';
+            return row.selectedTier ?? row.suggestedTier ?? '';
           default:
             return '';
         }
@@ -581,11 +573,7 @@ export default function ContributorChampionsAdminPage() {
             <h2 className="text-2xl font-bold">Enrolled</h2>
             <div className="flex items-center gap-3">
               <p className="text-muted-foreground text-sm">Official contributor champions</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setManualEnrollOpen(true)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setManualEnrollOpen(true)}>
                 <UserPlus className="mr-2 h-4 w-4" />
                 Manual enroll
               </Button>
@@ -610,9 +598,7 @@ export default function ContributorChampionsAdminPage() {
                 placeholder="Filter email…"
                 className="h-8 w-[200px]"
                 value={enrolledFilters.email}
-                onChange={e =>
-                  setEnrolledFilters(prev => ({ ...prev, email: e.target.value }))
-                }
+                onChange={e => setEnrolledFilters(prev => ({ ...prev, email: e.target.value }))}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -787,9 +773,7 @@ export default function ContributorChampionsAdminPage() {
                       <TableCell>
                         {row.enrolledAt ? new Date(row.enrolledAt).toLocaleString() : '—'}
                       </TableCell>
-                      <TableCell>
-                        {row.creditAmountUsd ? `$${row.creditAmountUsd}` : '—'}
-                      </TableCell>
+                      <TableCell>{row.creditAmountUsd ? `$${row.creditAmountUsd}` : '—'}</TableCell>
                       <TableCell>
                         {row.creditsLastGrantedAt
                           ? new Date(row.creditsLastGrantedAt).toLocaleString()
@@ -825,9 +809,7 @@ export default function ContributorChampionsAdminPage() {
                 placeholder="Filter GitHub…"
                 className="h-8 w-[160px]"
                 value={reviewFilters.githubLogin}
-                onChange={e =>
-                  setReviewFilters(prev => ({ ...prev, githubLogin: e.target.value }))
-                }
+                onChange={e => setReviewFilters(prev => ({ ...prev, githubLogin: e.target.value }))}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -836,9 +818,7 @@ export default function ContributorChampionsAdminPage() {
                 placeholder="Filter email…"
                 className="h-8 w-[200px]"
                 value={reviewFilters.email}
-                onChange={e =>
-                  setReviewFilters(prev => ({ ...prev, email: e.target.value }))
-                }
+                onChange={e => setReviewFilters(prev => ({ ...prev, email: e.target.value }))}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -1029,7 +1009,8 @@ export default function ContributorChampionsAdminPage() {
                             </Select>
                             {effectiveTier ? (
                               <span className="text-muted-foreground text-xs">
-                                → {effectiveTier === 'contributor'
+                                →{' '}
+                                {effectiveTier === 'contributor'
                                   ? 'no credits'
                                   : `$${effectiveTier === 'ambassador' ? '50' : '150'}/mo`}
                               </span>
@@ -1159,9 +1140,7 @@ export default function ContributorChampionsAdminPage() {
               <p>
                 <b className="capitalize">{enrollmentState.tier}</b> tier:{' '}
                 {TIER_CREDIT_DISPLAY[enrollmentState.tier]}
-                {enrollmentState.tier !== 'contributor'
-                  ? ', renewing every 30 days'
-                  : ''}
+                {enrollmentState.tier !== 'contributor' ? ', renewing every 30 days' : ''}
               </p>
               {(() => {
                 const matchedRow = (reviewQuery.data ?? []).find(
@@ -1181,8 +1160,8 @@ export default function ContributorChampionsAdminPage() {
                 return null;
               })()}
               <p className="text-muted-foreground text-xs">
-                Contributors are auto-upgraded when they reach 5 PRs (→ Ambassador) or 15 PRs
-                (→ Champion).
+                Contributors are auto-upgraded when they reach 5 PRs (→ Ambassador) or 15 PRs (→
+                Champion).
               </p>
             </div>
           ) : null}
@@ -1226,7 +1205,8 @@ export default function ContributorChampionsAdminPage() {
           <DialogHeader>
             <DialogTitle>Manual Enrollment</DialogTitle>
             <DialogDescription>
-              Add a contributor directly to the enrolled list. Type an email to search for an existing Kilo account.
+              Add a contributor directly to the enrolled list. Type an email to search for an
+              existing Kilo account.
             </DialogDescription>
           </DialogHeader>
 

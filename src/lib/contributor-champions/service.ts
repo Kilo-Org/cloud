@@ -11,7 +11,6 @@ import {
   contributor_champion_sync_state,
   kilocode_users,
 } from '@kilocode/db/schema';
-import type { User } from '@kilocode/db/schema';
 import { and, eq, gte, isNotNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';
@@ -296,7 +295,9 @@ async function listMergedPullRequestsSince(options: {
     const response = await githubRequest(url.toString());
     if (!response.ok) {
       const body = await response.text().catch(() => '');
-      throw new Error(`GitHub search PRs failed: ${response.status} ${response.statusText}${body ? ` - ${body}` : ''}`);
+      throw new Error(
+        `GitHub search PRs failed: ${response.status} ${response.statusText}${body ? ` - ${body}` : ''}`
+      );
     }
 
     const searchResult = SEARCH_PULL_REQUEST_LIST_SCHEMA.parse(await response.json());
@@ -402,16 +403,20 @@ export async function syncContributorChampionData(): Promise<SyncSummary> {
     };
   }
 
-  const pullRequestsWithEmail = await mapWithConcurrencyLimit(mergedPullRequests, 4, async pullRequest => {
-    const email = await getPullRequestAuthorEmail({
-      pullRequestNumber: pullRequest.number,
-      authorLogin: pullRequest.authorLogin,
-    });
-    return {
-      ...pullRequest,
-      authorEmail: email,
-    };
-  });
+  const pullRequestsWithEmail = await mapWithConcurrencyLimit(
+    mergedPullRequests,
+    4,
+    async pullRequest => {
+      const email = await getPullRequestAuthorEmail({
+        pullRequestNumber: pullRequest.number,
+        authorLogin: pullRequest.authorLogin,
+      });
+      return {
+        ...pullRequest,
+        authorEmail: email,
+      };
+    }
+  );
 
   let insertedContributionEvents = 0;
   let upsertedContributors = 0;
@@ -682,7 +687,6 @@ export async function getContributorChampionReviewQueue(): Promise<LeaderboardRo
   );
 }
 
-
 export async function enrollContributorChampion(input: {
   contributorId: string;
   tier: ContributorTier | null;
@@ -795,14 +799,16 @@ export async function refreshContributorChampionCredits(): Promise<CreditRefresh
   // Fetch candidate IDs without locking — a lightweight scan to find rows to process.
   // Each row is then claimed and processed inside its own transaction using
   // FOR UPDATE SKIP LOCKED so concurrent cron runs never double-grant credits.
-  const candidateIds = await db.execute<{ id: string }>(sql`
+  const candidateIds = await db
+    .execute<{ id: string }>(sql`
     SELECT id
     FROM contributor_champion_memberships
     WHERE enrolled_tier IS NOT NULL
       AND credit_amount_microdollars > 0
       AND linked_kilo_user_id IS NOT NULL
       AND (credits_last_granted_at IS NULL OR credits_last_granted_at <= ${thirtyDaysAgo})
-  `).then(result => result.rows);
+  `)
+    .then(result => result.rows);
 
   for (const { id } of candidateIds) {
     try {
@@ -901,10 +907,7 @@ export async function processAutoTierUpgrades(): Promise<AutoUpgradeSummary> {
     .from(contributor_champion_memberships)
     .innerJoin(
       contributor_champion_contributors,
-      eq(
-        contributor_champion_memberships.contributor_id,
-        contributor_champion_contributors.id
-      )
+      eq(contributor_champion_memberships.contributor_id, contributor_champion_contributors.id)
     )
     .where(isNotNull(contributor_champion_memberships.enrolled_tier));
 
@@ -920,10 +923,7 @@ export async function processAutoTierUpgrades(): Promise<AutoUpgradeSummary> {
     // This intentionally differs from getContributorTierSuggestion() which uses 90d.
     if (row.allTimeContributions >= 15 && currentTier !== 'champion') {
       newTier = 'champion';
-    } else if (
-      row.allTimeContributions >= 5 &&
-      currentTier === 'contributor'
-    ) {
+    } else if (row.allTimeContributions >= 5 && currentTier === 'contributor') {
       newTier = 'ambassador';
     }
 
@@ -1030,10 +1030,9 @@ export async function manualEnrollContributor(input: {
   const creditAmountMicrodollars = toMicrodollars(creditAmountUsd);
 
   // Create or find contributor record
-  const githubLogin = input.githubLogin ?? `manual-${input.email.replace('@', '-at-').replace(/\./g, '-')}`;
-  const githubProfileUrl = input.githubLogin
-    ? `https://github.com/${input.githubLogin}`
-    : '#';
+  const githubLogin =
+    input.githubLogin ?? `manual-${input.email.replace('@', '-at-').replace(/\./g, '-')}`;
+  const githubProfileUrl = input.githubLogin ? `https://github.com/${input.githubLogin}` : '#';
 
   const contributorRows = await db
     .insert(contributor_champion_contributors)

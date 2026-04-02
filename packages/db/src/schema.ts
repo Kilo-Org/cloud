@@ -2260,7 +2260,10 @@ export const contributor_champion_events = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    unique('UQ_contributor_champion_events_repo_pr').on(table.repo_full_name, table.github_pr_number),
+    unique('UQ_contributor_champion_events_repo_pr').on(
+      table.repo_full_name,
+      table.github_pr_number
+    ),
     index('IDX_contributor_champion_events_contributor_id').on(table.contributor_id),
     index('IDX_contributor_champion_events_merged_at').on(table.merged_at),
     index('IDX_contributor_champion_events_author_email').on(table.github_author_email),
@@ -2306,9 +2309,7 @@ export const contributor_champion_memberships = pgTable(
     ),
     index('IDX_contributor_champion_memberships_credits_due')
       .on(table.credits_last_granted_at)
-      .where(
-        sql`${table.enrolled_tier} IS NOT NULL AND ${table.credit_amount_microdollars} > 0`
-      ),
+      .where(sql`${table.enrolled_tier} IS NOT NULL AND ${table.credit_amount_microdollars} > 0`),
   ]
 );
 

@@ -101,7 +101,8 @@
       "description": "Free with limited capability. No credits required. Uses Qwen3.6 Plus.",
       "architecture": {
         "input_modalities": [
-          "text"
+          "text",
+          "image"
         ],
         "output_modalities": [
           "text"
@@ -131,15 +132,6 @@
         "reasoning",
         "include_reasoning"
       ],
-      "settings": {
-        "included_tools": [
-          "search_and_replace"
-        ],
-        "excluded_tools": [
-          "apply_diff",
-          "edit_file"
-        ]
-      },
       "opencode": {},
       "preferredIndex": 2,
       "isFree": true

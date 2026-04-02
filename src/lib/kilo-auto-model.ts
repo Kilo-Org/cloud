@@ -174,11 +174,8 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   completion_price: '0',
   input_cache_read_price: '0',
   input_cache_write_price: '0',
-  supports_images: false,
-  roocode_settings: {
-    included_tools: ['search_and_replace'],
-    excluded_tools: ['apply_diff', 'edit_file'],
-  },
+  supports_images: true,
+  roocode_settings: undefined,
   opencode_settings: undefined,
 };
 

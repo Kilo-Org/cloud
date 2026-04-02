@@ -26,7 +26,21 @@ type SpawnCloudAgentResult = {
   sessionId?: string;
 };
 
-const sharedFields = {
+// Structured as a single object (not z.union) so the JSON schema has a top-level
+// "type": "object", which Anthropic's tool API requires.
+export const spawnCloudAgentInputSchema = z.object({
+  githubRepo: z
+    .string()
+    .regex(/^[-a-zA-Z0-9_.]+\/[-a-zA-Z0-9_.]+$/)
+    .describe('The GitHub repository in owner/repo format (e.g., "facebook/react")')
+    .optional(),
+  gitlabProject: z
+    .string()
+    .regex(/^[-a-zA-Z0-9_.]+(?:\/[-a-zA-Z0-9_.]+)+$/)
+    .describe(
+      'The GitLab project path in group/project format (e.g., "mygroup/myproject"). May include nested groups (e.g., "group/subgroup/project").'
+    )
+    .optional(),
   prompt: z
     .string()
     .describe(
@@ -38,27 +52,7 @@ const sharedFields = {
     .describe(
       'The agent mode: "code" for making changes (creates a PR/MR), "ask" for questions and explanations about existing code.'
     ),
-};
-
-const githubSchema = z.object({
-  githubRepo: z
-    .string()
-    .regex(/^[-a-zA-Z0-9_.]+\/[-a-zA-Z0-9_.]+$/)
-    .describe('The GitHub repository in owner/repo format (e.g., "facebook/react")'),
-  ...sharedFields,
 });
-
-const gitlabSchema = z.object({
-  gitlabProject: z
-    .string()
-    .regex(/^[-a-zA-Z0-9_.]+(?:\/[-a-zA-Z0-9_.]+)+$/)
-    .describe(
-      'The GitLab project path in group/project format (e.g., "mygroup/myproject"). May include nested groups (e.g., "group/subgroup/project").'
-    ),
-  ...sharedFields,
-});
-
-export const spawnCloudAgentInputSchema = z.union([githubSchema, gitlabSchema]);
 
 type SpawnCloudAgentInput = z.infer<typeof spawnCloudAgentInputSchema>;
 

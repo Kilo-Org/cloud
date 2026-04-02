@@ -179,6 +179,29 @@ export async function handleWriteCheckpoint(
   return c.json(resSuccess({ written: true }));
 }
 
+const EvictionContextBody = z.object({
+  branch: z.string(),
+  agent_name: z.string(),
+  saved_at: z.string(),
+});
+
+export async function handleWriteEvictionContext(
+  c: Context<GastownEnv>,
+  params: { rigId: string; agentId: string }
+) {
+  const parsed = EvictionContextBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+  const townId = c.get('townId');
+  const town = getTownDOStub(c.env, townId);
+  await town.writeBeadEvictionContext(params.agentId, parsed.data);
+  return c.json(resSuccess({ written: true }));
+}
+
 export async function handleCheckMail(
   c: Context<GastownEnv>,
   params: { rigId: string; agentId: string }

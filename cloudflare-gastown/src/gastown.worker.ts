@@ -37,6 +37,7 @@ import {
   handleRequestChanges,
   handleAgentCompleted,
   handleWriteCheckpoint,
+  handleWriteEvictionContext,
   handleCheckMail,
   handleHeartbeat,
   handleGetOrCreateAgent,
@@ -261,6 +262,45 @@ app.post('/debug/towns/:townId/replay-events', async c => {
   return c.json(result);
 });
 
+app.get('/debug/towns/:townId/drain-status', async c => {
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const draining = await town.isDraining();
+  // eslint-disable-next-line @typescript-eslint/await-thenable
+  const drainNonce = await town.getDrainNonce();
+  return c.json({ draining, drainNonce });
+});
+
+app.get('/debug/towns/:townId/nudges', async c => {
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const nudges = await town.debugPendingNudges();
+  return c.json({ nudges });
+});
+
+app.post('/debug/towns/:townId/send-message', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const body: { message: string; model?: string } = await c.req.json();
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable
+  const result = await town.sendMayorMessage(
+    body.message,
+    body.model ?? 'anthropic/claude-sonnet-4.6'
+  );
+  return c.json(result);
+});
+
+app.post('/debug/towns/:townId/graceful-stop', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const containerStub = getTownContainerStub(c.env, townId);
+  await containerStub.stop();
+  return c.json({ stopped: true });
+});
+
 // ── Town ID + Auth ──────────────────────────────────────────────────────
 // All rig routes live under /api/towns/:townId/rigs/:rigId so the townId
 // is always available from the URL path.
@@ -385,6 +425,11 @@ app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/completed', c =>
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/checkpoint', c =>
   instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/checkpoint', () =>
     handleWriteCheckpoint(c, c.req.param())
+  )
+);
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/eviction-context', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/eviction-context', () =>
+    handleWriteEvictionContext(c, c.req.param())
   )
 );
 app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/mail', c =>

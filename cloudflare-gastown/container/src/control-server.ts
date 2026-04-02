@@ -11,6 +11,7 @@ import {
   getUptime,
   stopAll,
   drainAll,
+  isDraining,
   getAgentEvents,
   registerEventSink,
 } from './process-manager';
@@ -154,6 +155,7 @@ app.get('/health', c => {
     agents: activeAgentCount(),
     servers: activeServerCount(),
     uptime: getUptime(),
+    draining: isDraining() || undefined,
   };
   return c.json(response);
 });
@@ -202,6 +204,11 @@ app.post('/sync-config', async c => {
 
 // POST /agents/start
 app.post('/agents/start', async c => {
+  if (isDraining()) {
+    console.warn('[control-server] /agents/start: rejected — container is draining');
+    return c.json({ error: 'Container is draining, cannot start new agents' }, 503);
+  }
+
   const body: unknown = await c.req.json().catch(() => null);
   const parsed = StartAgentRequest.safeParse(body);
   if (!parsed.success) {

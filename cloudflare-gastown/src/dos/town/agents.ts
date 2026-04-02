@@ -324,12 +324,15 @@ export function unhookBead(sql: SqlStorage, agentId: string): void {
 
   const beadId = agent.current_hook_bead_id;
 
+  // Clear checkpoint when unhooking — the agent is done with this bead
+  // and the checkpoint (if any) should not leak into the next dispatch.
   query(
     sql,
     /* sql */ `
       UPDATE ${agent_metadata}
       SET ${agent_metadata.columns.current_hook_bead_id} = NULL,
-          ${agent_metadata.columns.status} = 'idle'
+          ${agent_metadata.columns.status} = 'idle',
+          ${agent_metadata.columns.checkpoint} = NULL
       WHERE ${agent_metadata.bead_id} = ?
     `,
     [agentId]

@@ -1220,6 +1220,27 @@ export class TownDO extends DurableObject<Env> {
     return agents.readCheckpoint(this.sql, agentId);
   }
 
+  /**
+   * Append eviction context to a bead's body so the next agent dispatched
+   * to it knows there is WIP code on a branch. Called by the container's
+   * Phase 4 force-save after pushing the WIP commit.
+   */
+  async writeBeadEvictionContext(
+    agentId: string,
+    context: { branch: string; agent_name: string; saved_at: string }
+  ): Promise<void> {
+    const agent = agents.getAgent(this.sql, agentId);
+    if (!agent?.current_hook_bead_id) return;
+    const bead = beadOps.getBead(this.sql, agent.current_hook_bead_id);
+    if (!bead) return;
+    const evictionNote =
+      `\n\n---\n**Container eviction note:** ${context.agent_name} pushed WIP progress ` +
+      `to branch \`${context.branch}\` before container eviction at ${context.saved_at}. ` +
+      `Pick up from where they left off — pull the branch and continue the work.`;
+    const updatedBody = (bead.body ?? '') + evictionNote;
+    beadOps.updateBeadFields(this.sql, bead.bead_id, { body: updatedBody }, 'system');
+  }
+
   // ── Heartbeat ─────────────────────────────────────────────────────
 
   /**
@@ -4080,10 +4101,7 @@ export class TownDO extends DurableObject<Env> {
    * Return a structured snapshot of the alarm loop and patrol state
    * for the dashboard Status tab.
    */
-  async getAlarmStatus(cached?: {
-    activeWork?: boolean;
-    triageCount?: number;
-  }): Promise<{
+  async getAlarmStatus(cached?: { activeWork?: boolean; triageCount?: number }): Promise<{
     alarm: {
       nextFireAt: string | null;
       intervalMs: number;
@@ -4428,6 +4446,30 @@ export class TownDO extends DurableObject<Env> {
   }
 
   // DEBUG: raw agent_metadata dump — remove after debugging
+  async debugPendingNudges(): Promise<unknown[]> {
+    return [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${agent_nudges.nudge_id},
+                 ${agent_nudges.agent_bead_id},
+                 ${agent_nudges.message},
+                 ${agent_nudges.mode},
+                 ${agent_nudges.priority},
+                 ${agent_nudges.source},
+                 ${agent_nudges.created_at},
+                 ${agent_nudges.delivered_at},
+                 ${agent_nudges.expires_at}
+          FROM ${agent_nudges}
+          WHERE ${agent_nudges.delivered_at} IS NULL
+          ORDER BY ${agent_nudges.created_at} DESC
+          LIMIT 20
+        `,
+        []
+      ),
+    ];
+  }
+
   async debugAgentMetadata(): Promise<unknown[]> {
     return [
       ...query(

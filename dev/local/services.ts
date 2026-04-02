@@ -272,11 +272,7 @@ function buildServiceDefs(): ServiceDef[] {
         dir: '.',
         port: 0,
         dependsOn: meta.dependsOn,
-        command: [
-          'tsx',
-          'dev/local/scripts/start-app-builder-tunnel.ts',
-          String(appBuilderPort),
-        ],
+        command: ['tsx', 'dev/local/scripts/start-app-builder-tunnel.ts', String(appBuilderPort)],
         group: meta.group,
       });
       continue;

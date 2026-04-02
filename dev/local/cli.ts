@@ -163,10 +163,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     if (captureServices.includes('app-builder-tunnel')) {
       oldValues.set(
         'app-builder-tunnel',
-        readEnvValue(
-          path.join(repoRoot, 'cloudflare-app-builder/.dev.vars'),
-          'BUILDER_HOSTNAME'
-        )
+        readEnvValue(path.join(repoRoot, 'cloudflare-app-builder/.dev.vars'), 'BUILDER_HOSTNAME')
       );
     }
 

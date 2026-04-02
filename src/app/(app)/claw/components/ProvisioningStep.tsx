@@ -214,7 +214,7 @@ export function ProvisioningErrorView({ totalSteps = 4 }: { totalSteps?: number 
         <p className="text-muted-foreground max-w-md text-sm leading-relaxed">
           Something went wrong while setting up your instance. Please try again by restarting the
           setup process. If the problem persists, contact{' '}
-          <a href="mailto:support@kilo.ai" className="text-blue-500 underline">
+          <a href="mailto:hi@kilo.ai" className="text-blue-500 underline">
             hi@kilo.ai
           </a>
           .

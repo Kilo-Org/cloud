@@ -875,9 +875,13 @@ export const CustomLlmExtraHeadersSchema = z.record(z.string(), z.string());
 
 export type CustomLlmExtraHeaders = z.infer<typeof CustomLlmExtraHeadersSchema>;
 
+// All price fields are in dollars per token (e.g. "0.000001" = $1 per million tokens),
+// matching the OpenRouter pricing convention.
 export const CustomLlmPricingSchema = z.object({
   prompt: z.string(),
   completion: z.string(),
+  input_cache_read: z.string().optional(),
+  input_cache_write: z.string().optional(),
 });
 
 export type CustomLlmPricing = z.infer<typeof CustomLlmPricingSchema>;

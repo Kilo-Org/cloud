@@ -2,12 +2,14 @@ import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import {
   app_builder_projects,
+  app_builder_project_sessions,
+  cliSessions,
   kilocode_users,
   organizations,
-  cliSessions,
+  cli_sessions_v2,
 } from '@kilocode/db/schema';
 import * as z from 'zod';
-import { eq, and, or, ilike, desc, asc, count, isNotNull, type SQL } from 'drizzle-orm';
+import { eq, and, or, ilike, desc, asc, count, isNotNull, sql, type SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as appBuilderClient from '@/lib/app-builder/app-builder-client';
 
@@ -53,8 +55,18 @@ export type AdminAppBuilderProject = {
   is_deployed: boolean;
 };
 
-export type AdminAppBuilderProjectDetail = AdminAppBuilderProject & {
+export type AdminAppBuilderProjectSession = {
+  id: string;
+  cloud_agent_session_id: string;
   cli_session_id: string | null;
+  created_at: string;
+  ended_at: string | null;
+  reason: string;
+  worker_version: string;
+};
+
+export type AdminAppBuilderProjectDetail = AdminAppBuilderProject & {
+  sessions: AdminAppBuilderProjectSession[];
 };
 
 export const adminAppBuilderRouter = createTRPCRouter({
@@ -87,16 +99,34 @@ export const adminAppBuilderRouter = createTRPCRouter({
       });
     }
 
-    // Look up the CLI session by cloud_agent_session_id
-    let cliSessionId: string | null = null;
-    if (result.project.session_id) {
-      const [cliSession] = await db
-        .select({ session_id: cliSessions.session_id })
-        .from(cliSessions)
-        .where(eq(cliSessions.cloud_agent_session_id, result.project.session_id))
-        .limit(1);
-      cliSessionId = cliSession?.session_id ?? null;
-    }
+    // Fetch all sessions for this project with linked CLI session info.
+    // Join both v2 and v1 CLI session tables so older projects still resolve their trace link.
+    const projectSessions = await db
+      .select({
+        id: app_builder_project_sessions.id,
+        cloud_agent_session_id: app_builder_project_sessions.cloud_agent_session_id,
+        cli_session_id: sql<
+          string | null
+        >`coalesce(${cli_sessions_v2.session_id}, ${cliSessions.session_id}::text)`,
+        created_at: app_builder_project_sessions.created_at,
+        ended_at: app_builder_project_sessions.ended_at,
+        reason: app_builder_project_sessions.reason,
+        worker_version: app_builder_project_sessions.worker_version,
+      })
+      .from(app_builder_project_sessions)
+      .leftJoin(
+        cli_sessions_v2,
+        eq(
+          app_builder_project_sessions.cloud_agent_session_id,
+          cli_sessions_v2.cloud_agent_session_id
+        )
+      )
+      .leftJoin(
+        cliSessions,
+        eq(app_builder_project_sessions.cloud_agent_session_id, cliSessions.cloud_agent_session_id)
+      )
+      .where(eq(app_builder_project_sessions.project_id, projectId))
+      .orderBy(desc(app_builder_project_sessions.created_at));
 
     const projectDetail: AdminAppBuilderProjectDetail = {
       id: result.project.id,
@@ -114,7 +144,15 @@ export const adminAppBuilderRouter = createTRPCRouter({
       owner_email: result.owner_user?.email ?? null,
       owner_org_name: result.owner_org?.name ?? null,
       is_deployed: result.project.deployment_id !== null,
-      cli_session_id: cliSessionId,
+      sessions: projectSessions.map(s => ({
+        id: s.id,
+        cloud_agent_session_id: s.cloud_agent_session_id,
+        cli_session_id: s.cli_session_id,
+        created_at: s.created_at,
+        ended_at: s.ended_at,
+        reason: s.reason,
+        worker_version: s.worker_version,
+      })),
     };
 
     return projectDetail;

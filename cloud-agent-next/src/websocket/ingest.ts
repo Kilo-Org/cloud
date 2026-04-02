@@ -415,7 +415,7 @@ export function createIngestHandler(
         // Events arriving within HEARTBEAT_DEBOUNCE_MS of the last write are
         // skipped — the stored timestamp may lag behind the true latest event
         // by up to the throttle window. This is fine because the only consumer
-        // (checkHungExecution) uses a 2-minute timeout on a 2-minute alarm cycle.
+        // (checkHungExecution) uses a 5-minute timeout on a 2-minute alarm cycle.
         if (eventType !== 'heartbeat') {
           if (now - attachment.lastEventAtUpdate >= HEARTBEAT_DEBOUNCE_MS) {
             attachment.lastEventAtUpdate = now;

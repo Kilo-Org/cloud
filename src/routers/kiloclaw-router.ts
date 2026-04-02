@@ -65,7 +65,9 @@ import {
 } from '@/lib/kiloclaw/constants';
 import {
   enrollWithCredits as enrollWithCreditsImpl,
+  getEffectiveCreditBalancePreview,
   KILOCLAW_PLAN_COST_MICRODOLLARS,
+  KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS,
 } from '@/lib/kiloclaw/credit-billing';
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
 import PostHogClient from '@/lib/posthog';
@@ -619,6 +621,11 @@ export const kiloclawRouter = createTRPCRouter({
       }
     }),
 
+  getActiveInstanceId: clawAccessProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    return instance ? { instanceId: instance.id } : null;
+  }),
+
   getStreamChatCredentials: clawAccessProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
@@ -670,11 +677,15 @@ export const kiloclawRouter = createTRPCRouter({
         if (err instanceof KiloClawApiError) {
           const { message } = getKiloClawApiErrorPayload(err);
           const code =
-            err.statusCode === 404
-              ? 'NOT_FOUND'
-              : err.statusCode === 503
-                ? 'PRECONDITION_FAILED'
-                : 'INTERNAL_SERVER_ERROR';
+            err.statusCode === 400
+              ? 'BAD_REQUEST'
+              : err.statusCode === 403
+                ? 'FORBIDDEN'
+                : err.statusCode === 404
+                  ? 'NOT_FOUND'
+                  : err.statusCode === 503
+                    ? 'PRECONDITION_FAILED'
+                    : 'INTERNAL_SERVER_ERROR';
           throw new TRPCError({
             code,
             message: message ?? 'Failed to send chat message',
@@ -1138,11 +1149,27 @@ export const kiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
-      const result = await client.startKiloCliRun(
-        ctx.user.id,
-        input.prompt,
-        workerInstanceId(instance)
-      );
+
+      let result;
+      try {
+        result = await client.startKiloCliRun(
+          ctx.user.id,
+          input.prompt,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        if (err instanceof KiloClawApiError) {
+          const { code } = getKiloClawApiErrorPayload(err);
+          if (code === 'controller_route_unavailable') {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'Instance needs redeploy to support recovery',
+              cause: new UpstreamApiError('controller_route_unavailable'),
+            });
+          }
+        }
+        throw err;
+      }
 
       // Persist the run in the database and return its ID
       const [row] = await db
@@ -1796,15 +1823,12 @@ export const kiloclawRouter = createTRPCRouter({
       sub.status !== 'trialing' &&
       (sub.stripe_subscription_id || sub.payment_source === 'credits');
 
-    // Compute Stripe-funding indicator and conversion prompt.
+    // Compute Stripe-funding indicator and Kilo Pass state.
     // See Billing Status Reporting rules 6-7.
     const hasStripeFunding = hasPaidSubscription ? !!sub.stripe_subscription_id : false;
-
-    let showConversionPrompt = false;
-    if (hasStripeFunding) {
-      const kiloPassState = await getKiloPassStateForUser(db, ctx.user.id);
-      showConversionPrompt = !!kiloPassState && !isStripeSubscriptionEnded(kiloPassState.status);
-    }
+    const kiloPassState = await getKiloPassStateForUser(db, ctx.user.id);
+    const hasActiveKiloPass = !!kiloPassState && !isStripeSubscriptionEnded(kiloPassState.status);
+    const showConversionPrompt = hasStripeFunding && hasActiveKiloPass;
 
     // Renewal cost for the next billing period.
     // For hybrid subscriptions the actual amount is Stripe-determined; report
@@ -1853,12 +1877,31 @@ export const kiloclawRouter = createTRPCRouter({
       };
     }
 
-    // Credit balance: microdollars available for credit enrollment
-    const creditBalanceMicrodollars =
-      ctx.user.total_microdollars_acquired - ctx.user.microdollars_used;
-
     // First-month credit discount eligibility (spec Credit Enrollment rule 3).
     const creditIntroEligible = !(await hadPriorPaidSubscription(ctx.user.id));
+    const creditBalanceMicrodollars =
+      ctx.user.total_microdollars_acquired - ctx.user.microdollars_used;
+    const standardCreditCostMicrodollars = creditIntroEligible
+      ? KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS
+      : KILOCLAW_PLAN_COST_MICRODOLLARS.standard;
+    const [standardCreditEnrollmentPreview, commitCreditEnrollmentPreview] = await Promise.all([
+      getEffectiveCreditBalancePreview({
+        userId: ctx.user.id,
+        balanceMicrodollars: creditBalanceMicrodollars,
+        microdollarsUsed: ctx.user.microdollars_used,
+        kiloPassThreshold: ctx.user.kilo_pass_threshold,
+        costMicrodollars: standardCreditCostMicrodollars,
+        subscription: kiloPassState,
+      }),
+      getEffectiveCreditBalancePreview({
+        userId: ctx.user.id,
+        balanceMicrodollars: creditBalanceMicrodollars,
+        microdollarsUsed: ctx.user.microdollars_used,
+        kiloPassThreshold: ctx.user.kilo_pass_threshold,
+        costMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
+        subscription: kiloPassState,
+      }),
+    ]);
 
     return {
       hasAccess,
@@ -1866,6 +1909,17 @@ export const kiloclawRouter = createTRPCRouter({
       trialEligible: !activeInstance && !sub && !earlybird,
       creditBalanceMicrodollars,
       creditIntroEligible,
+      hasActiveKiloPass,
+      creditEnrollmentPreview: {
+        standard: {
+          costMicrodollars: standardCreditCostMicrodollars,
+          ...standardCreditEnrollmentPreview,
+        },
+        commit: {
+          costMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
+          ...commitCreditEnrollmentPreview,
+        },
+      },
       trial: trialData,
       subscription: subscriptionData,
       earlybird: earlybirdData,

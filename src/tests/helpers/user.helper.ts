@@ -34,6 +34,7 @@ export function defineTestUser(userData: Partial<User> = {}): User {
     github_url: null,
     discord_server_membership_verified_at: null,
     openrouter_upstream_safety_identifier: null,
+    vercel_downstream_safety_identifier: null,
     customer_source: null,
     ...userData,
   } satisfies User;

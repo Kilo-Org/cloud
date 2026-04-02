@@ -32,9 +32,9 @@ git lfs install --skip-repo
 
 The `--skip-repo` flag avoids conflicts with the project's Husky hooks. Git LFS is used for large binary files (videos).
 
-### Node.js 22 (via nvm)
+### Node.js 24.14.1 (via nvm)
 
-The project requires Node.js 22 (see `.nvmrc` and `package.json` `engines` field).
+The project requires Node.js 24.14.1 locally (see `.nvmrc`) and accepts any Node.js 24.x runtime in `package.json` `engines`.
 
 ```bash
 brew install nvm
@@ -50,12 +50,10 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"
 ```
 
-Then reload your shell and install Node 22:
+Then reload your shell:
 
 ```bash
 source ~/.zshrc
-nvm install 22
-nvm use 22
 ```
 
 ### pnpm
@@ -97,12 +95,13 @@ brew install stripe/stripe-cli/stripe
 ```bash
 git clone git@github.com:Kilo-Org/cloud.git
 cd cloud
+nvm install
+nvm use
 ```
 
 ### 2. Install dependencies and pull LFS assets
 
 ```bash
-nvm use 22
 pnpm install
 git lfs pull
 ```
@@ -343,6 +342,7 @@ Run `pnpm dev:env` again after pulling changes that add new env vars to any `.de
 ### Limitations in local dev
 
 - **Service bindings** between workers don't function in local `wrangler dev`. This affects chains like session-ingest → o11y, webhook-agent → cloud-agent, and app-builder → db-proxy/git-token-service.
+- **Webhook → KiloClaw Chat** triggers require the KiloClaw worker running on port 8795. The webhook worker calls it via `KILOCLAW_API_URL` (HTTP, not a service binding) to deliver messages to Stream Chat. Stream Chat credentials (`STREAM_CHAT_API_KEY`, `STREAM_CHAT_API_SECRET`) must be in `kiloclaw/.dev.vars`.
 - **Cloudflare Containers** (used by cloud-agent, cloud-agent-next, app-builder) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
 - **Cloudflare-specific features** like Analytics Engine, Pipelines, and dispatch namespaces don't work locally.
 
@@ -368,11 +368,11 @@ With `auto`, the primary worktree gets offset 0 (default ports), and secondary w
 
 ### Node version mismatch
 
-If you see errors about unsupported Node.js versions, ensure you're using Node 22:
+If you see errors about unsupported Node.js versions, ensure you're using the pinned Node 24 release:
 
 ```bash
-nvm use 22
-node --version  # Should output v22.x.x
+nvm use
+node --version  # Should output v24.14.1
 ```
 
 ### Database connection errors
@@ -392,7 +392,7 @@ The dev server won't start without environment variables. Run `vercel env pull` 
 
 ### `pnpm install` fails with engine mismatch
 
-This means your active Node.js version doesn't match the `engines` field in `package.json`. Switch to Node 22 with `nvm use 22`.
+This means your active Node.js version doesn't match the supported 24.x range in `package.json`. Switch to the pinned local version with `nvm use`.
 
 ### Git LFS files show as pointer files
 

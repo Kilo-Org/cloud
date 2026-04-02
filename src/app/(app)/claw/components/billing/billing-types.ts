@@ -62,6 +62,16 @@ export type ClawBillingStatus = {
 
   /** True when the user qualifies for the $4 first-month discount on standard credit enrollment. */
   creditIntroEligible: boolean;
+  /** True when the user has a non-ended Kilo Pass subscription. */
+  hasActiveKiloPass: boolean;
+  creditEnrollmentPreview: Record<
+    ClawPlan,
+    {
+      costMicrodollars: number;
+      projectedKiloPassBonusMicrodollars: number;
+      effectiveBalanceMicrodollars: number;
+    }
+  >;
 
   trial: {
     startedAt: string;

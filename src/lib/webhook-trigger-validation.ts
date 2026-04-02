@@ -15,7 +15,8 @@ export const RESERVED_TRIGGER_IDS = [
 ] as const;
 
 /**
- * Validation schema for trigger IDs.
+ * Validation schema for trigger IDs (used by get/update/delete/list endpoints).
+ * Accepts min(1) to remain compatible with any existing short IDs in production.
  *
  * Requirements:
  * - 1-64 characters
@@ -31,6 +32,16 @@ export const triggerIdSchema = z
     id => !RESERVED_TRIGGER_IDS.includes(id as (typeof RESERVED_TRIGGER_IDS)[number]),
     'This trigger ID is reserved'
   );
+
+/**
+ * Stricter schema for new trigger creation.
+ * Derives from triggerIdSchema to stay in sync, then adds a min-length guard
+ * to prevent trivially guessable IDs in the webhook URL.
+ */
+export const triggerIdCreateSchema = triggerIdSchema.refine(
+  id => id.length >= 8,
+  'Trigger ID must be at least 8 characters'
+);
 
 /**
  * Transform user input to a valid trigger ID format.

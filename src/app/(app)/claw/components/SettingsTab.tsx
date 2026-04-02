@@ -58,6 +58,7 @@ import { VersionPinCard } from './VersionPinCard';
 import { WorkspaceFileEditor } from './WorkspaceFileEditor';
 import { PermissionPresetCards } from './PermissionPresetCards';
 import { CustomSecretsSection } from './CustomSecretsSection';
+import { WebhookIntegrationSection } from './WebhookIntegrationSection';
 import { type ExecPreset, configToExecPreset, execPresetToConfig } from './claw.types';
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
@@ -811,6 +812,9 @@ export function SettingsTab({
         mutations={mutations}
         onRedeploy={onRedeploy}
       />
+
+      {/* ── Webhook Integration ── */}
+      <WebhookIntegrationSection />
 
       {/* ── Messaging Channels ── */}
       <div>

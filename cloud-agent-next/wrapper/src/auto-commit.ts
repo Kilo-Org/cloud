@@ -141,7 +141,7 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
         )
       );
       const result = await Promise.race([commitMsgPromise, timeoutPromise]);
-      commitMessage = result.message;
+      commitMessage = result.message.trim() || 'wip';
       logToFile(`auto-commit: generated commit message: ${commitMessage}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

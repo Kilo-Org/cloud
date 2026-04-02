@@ -12,9 +12,11 @@ export type TriggerConfigResponse = {
   orgId: string | null;
   createdAt: string;
   isActive: boolean;
-  githubRepo: string;
-  mode: string;
-  model: string;
+  targetType: 'cloud_agent' | 'kiloclaw_chat';
+  kiloclawInstanceId?: string | null;
+  githubRepo: string | null;
+  mode: string | null;
+  model: string | null;
   promptTemplate: string;
   profileId?: string | null;
   autoCommit?: boolean;
@@ -28,11 +30,13 @@ export type TriggerConfigResponse = {
  * Profile is referenced by ID - resolved at runtime in the worker.
  */
 export type CreateTriggerInput = {
-  githubRepo: string;
-  mode: string;
-  model: string;
+  targetType?: 'cloud_agent' | 'kiloclaw_chat';
+  kiloclawInstanceId?: string;
+  githubRepo?: string;
+  mode?: string;
+  model?: string;
   promptTemplate: string;
-  profileId: string;
+  profileId?: string;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   webhookAuth?: {

@@ -28,7 +28,7 @@
     "@cloudflare/workers-types": "catalog:",
     "@sentry/cli": "^2.58.5",
     "@types/jest": "^29.5.14",
-    "@types/node": "^22.19.15",
+    "@types/node": ">=24 <25",
     "@types/tar-stream": "^3.1.4",
     "@typescript/native-preview": "catalog:",
     "jest": "^29.7.0",

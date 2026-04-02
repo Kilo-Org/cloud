@@ -92,6 +92,7 @@ describe('User', () => {
         linkedin_url: 'https://linkedin.com/in/testuser',
         github_url: 'https://github.com/testuser',
         openrouter_upstream_safety_identifier: 'openrouter_upstream_safety_identifier',
+        vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
         is_admin: true,
       });
@@ -107,7 +108,12 @@ describe('User', () => {
       expect(softDeleted!.linkedin_url).toBeNull();
       expect(softDeleted!.github_url).toBeNull();
       expect(softDeleted!.discord_server_membership_verified_at).toBeNull();
-      expect(softDeleted!.openrouter_upstream_safety_identifier).toBeNull();
+      expect(softDeleted!.openrouter_upstream_safety_identifier).toBe(
+        'openrouter_upstream_safety_identifier'
+      );
+      expect(softDeleted!.vercel_downstream_safety_identifier).toBe(
+        'vercel_downstream_safety_identifier'
+      );
       expect(softDeleted!.customer_source).toBeNull();
       expect(softDeleted!.api_token_pepper).toBeNull();
       expect(softDeleted!.default_model).toBeNull();

@@ -30,7 +30,6 @@ import {
 } from './reasoning-provider-metadata';
 import type { Phase } from './schemas';
 import { PhaseSchema, type ChatCompletionChunk, type ChatCompletionChunkChoice } from './schemas';
-import { type CustomLlm } from '@kilocode/db/schema';
 import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { debugSaveLog, inStreamDebugMode } from '@/lib/debugUtils';
@@ -46,6 +45,24 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type OpenAI from 'openai';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 import PROVIDERS from '@/lib/providers/provider-definitions';
+
+type CustomLlm = {
+  public_id: string;
+  display_name: string;
+  context_length: number;
+  max_completion_tokens: number;
+  internal_id: string;
+  provider: string;
+  base_url: string;
+  api_key: string;
+  organization_ids: string[];
+  supports_image_input?: boolean | null;
+  force_reasoning?: boolean | null;
+  opencode_settings?: Record<string, unknown> | null;
+  extra_body?: Record<string, unknown> | null;
+  extra_headers?: Record<string, string> | null;
+  interleaved_format?: string | null;
+};
 
 function convertMessages(messages: OpenRouterChatCompletionsInput): ModelMessage[] {
   const toolNameByCallId = new Map<string, string>();

@@ -191,6 +191,55 @@ describe('generateBaseConfig', () => {
     expect(config.models).toBeUndefined();
   });
 
+  it('skips gateway-URL stale migration for org-scoped instances', () => {
+    const existing = JSON.stringify({
+      models: {
+        providers: {
+          kilocode: {
+            baseUrl: 'https://api.kilo.ai/api/gateway/',
+            headers: { 'X-Custom': 'user-managed' },
+            models: [{ id: 'kept/model', name: 'Kept' }],
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), KILOCODE_ORGANIZATION_ID: 'org_abc123' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    // Provider not nuked — user-managed settings preserved
+    expect(config.models.providers.kilocode.headers['X-Custom']).toBe('user-managed');
+    expect(config.models.providers.kilocode.headers['X-KiloCode-OrganizationId']).toBe(
+      'org_abc123'
+    );
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+  });
+
+  it('still removes openrouter stale provider for org-scoped instances', () => {
+    const existing = JSON.stringify({
+      models: {
+        providers: {
+          kilocode: {
+            baseUrl: 'https://api.kilo.ai/api/openrouter/',
+            headers: { 'X-Custom': 'stale' },
+            models: [],
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), KILOCODE_ORGANIZATION_ID: 'org_abc123' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    // openrouter provider nuked, then rebuilt by org-header block
+    expect(config.models.providers.kilocode.headers['X-Custom']).toBeUndefined();
+    expect(config.models.providers.kilocode.headers['X-KiloCode-OrganizationId']).toBe(
+      'org_abc123'
+    );
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+  });
+
   it('preserves non-kilocode providers when removing stale kilocode entry', () => {
     const existing = JSON.stringify({
       models: {
@@ -240,6 +289,78 @@ describe('generateBaseConfig', () => {
 
     // baseUrl updated, existing models preserved
     expect(config.models.providers.kilocode.baseUrl).toBe('https://new-tunnel.example.com/');
+    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+  });
+
+  it('sets X-KiloCode-OrganizationId header when KILOCODE_ORGANIZATION_ID is set', () => {
+    const { deps } = fakeDeps();
+    const env = { ...minimalEnv(), KILOCODE_ORGANIZATION_ID: 'org_abc123' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.models.providers.kilocode.headers['X-KiloCode-OrganizationId']).toBe(
+      'org_abc123'
+    );
+    // Explicit provider entries require a baseUrl per OpenClaw's strict schema
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+    expect(config.models.providers.kilocode.models).toEqual([]);
+  });
+
+  it('does not set org header when KILOCODE_ORGANIZATION_ID is not set', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    // No kilocode provider entry created when neither baseUrl nor orgId is set
+    expect(config.models).toBeUndefined();
+  });
+
+  it('preserves existing kilocode config when adding org header', () => {
+    const existing = JSON.stringify({
+      models: {
+        providers: {
+          kilocode: {
+            baseUrl: 'https://tunnel.example.com/',
+            headers: { 'X-Custom': 'value' },
+            models: [{ id: 'kept/model', name: 'Kept' }],
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), KILOCODE_ORGANIZATION_ID: 'org_xyz789' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.models.providers.kilocode.headers['X-KiloCode-OrganizationId']).toBe(
+      'org_xyz789'
+    );
+    expect(config.models.providers.kilocode.headers['X-Custom']).toBe('value');
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://tunnel.example.com/');
+    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+  });
+
+  it('removes stale org header when KILOCODE_ORGANIZATION_ID is no longer set', () => {
+    const existing = JSON.stringify({
+      models: {
+        providers: {
+          kilocode: {
+            baseUrl: 'https://tunnel.example.com/',
+            headers: {
+              'X-KiloCode-OrganizationId': 'org_old_stale',
+              'X-Custom': 'preserved',
+            },
+            models: [{ id: 'kept/model', name: 'Kept' }],
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    // No KILOCODE_ORGANIZATION_ID in env
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    // Stale org header removed
+    expect(config.models.providers.kilocode.headers['X-KiloCode-OrganizationId']).toBeUndefined();
+    // Other headers and config preserved
+    expect(config.models.providers.kilocode.headers['X-Custom']).toBe('preserved');
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://tunnel.example.com/');
     expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
   });
 

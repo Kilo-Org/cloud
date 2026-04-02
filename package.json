@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": "^22"
+    "node": ">=24 <25"
   },
   "scripts": {
     "dev": "bash scripts/dev.sh",
@@ -32,6 +32,7 @@
     "test:e2e:debug": "playwright test --debug",
     "promo": "pnpm -s script src/scripts/encrypt-promo-codes.ts",
     "dev:discord-gateway-cron": "tsx dev/discord-gateway-cron.ts",
+    "worktree:prepare": "bash scripts/worktree-prepare.sh",
     "dev:start": "tsx --tsconfig tsconfig.scripts.json dev/local/cli.ts up",
     "dev:stop": "tsx --tsconfig tsconfig.scripts.json dev/local/cli.ts stop",
     "dev:env": "tsx --tsconfig tsconfig.scripts.json dev/local/cli.ts env"
@@ -93,6 +94,7 @@
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
     "@trpc/tanstack-react-query": "catalog:",
+    "@types/archiver": "^7.0.0",
     "@types/js-cookie": "^3.0.6",
     "@types/js-yaml": "^4.0.9",
     "@types/mdx": "^2.0.13",
@@ -103,6 +105,7 @@
     "@xterm/addon-web-links": "^0.12.0",
     "@xterm/xterm": "^6.0.0",
     "ai": "^6.0.116",
+    "archiver": "^7.0.1",
     "chat": "^4.20.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -159,7 +162,7 @@
     "@tailwindcss/typography": "^0.5.19",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "catalog:",
-    "@types/node": "^22.19.15",
+    "@types/node": ">=24 <25",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@typescript/native-preview": "catalog:",

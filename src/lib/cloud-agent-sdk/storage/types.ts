@@ -15,7 +15,7 @@ type SessionStorage = {
   upsertPart(messageId: string, part: Part): void;
   applyPartDelta(messageId: string, partId: string, field: string, delta: string): void;
   deletePart(messageId: string, partId: string): void;
-  getParts(messageId: string): Part[];
+  getParts(messageId: string): readonly Part[];
 
   // Granular subscriptions
   // Keys: "messageIds", "message:{id}", "parts:{messageId}"

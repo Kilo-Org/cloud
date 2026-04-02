@@ -41,10 +41,10 @@ const PLATFORM_OPTIONS: readonly {
   { value: 'cloud-agent', label: 'Cloud', icon: Cloud },
   { value: 'cli', label: 'CLI', icon: Terminal },
   { value: 'agent-manager', label: 'Agent Manager', icon: Bot },
-  { value: 'extension', label: 'Extension', icon: Puzzle },
+  { value: 'other', label: 'Other', icon: Puzzle },
 ];
 
-type PlatformFilterValue = 'all' | 'cloud-agent' | 'cli' | 'agent-manager' | 'extension';
+type PlatformFilterValue = 'all' | 'cloud-agent' | 'cli' | 'agent-manager' | 'other';
 
 export function SessionsPageContent() {
   const trpc = useTRPC();

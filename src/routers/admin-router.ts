@@ -18,6 +18,7 @@ import {
 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot, type SessionMessage } from '@/lib/session-ingest-client';
+import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
 import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
 import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
 import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
@@ -1131,6 +1132,13 @@ export const adminRouter = createTRPCRouter({
       revalidatePath('/api/models/stats');
       revalidatePath('/api/models/stats/[slug]', 'page');
       return { success: true, message: 'Cache busted successfully' };
+    }),
+  }),
+
+  syncProviders: createTRPCRouter({
+    triggerSync: adminProcedure.mutation(async () => {
+      const result = await syncAndStoreProviders();
+      return result;
     }),
   }),
 

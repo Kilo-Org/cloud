@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const cutoffDate = getDaysAgo(7).toISOString();
+  const cutoffDate = getDaysAgo(30).toISOString();
   const result = await db.delete(api_request_log).where(lt(api_request_log.created_at, cutoffDate));
 
   await fetch(BETTERSTACK_HEARTBEAT_URL);

@@ -13,7 +13,7 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/encryption/src"
   },
   "devDependencies": {
-    "@types/node": "^22.19.15",
+    "@types/node": ">=24 <25",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
     "vitest": "~3.2.4"

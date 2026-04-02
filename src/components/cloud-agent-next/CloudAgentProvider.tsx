@@ -217,6 +217,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           : await trpcClient.cloudAgentNext.prepareSession.mutate(castInput);
         return {
           cloudAgentSessionId: result.cloudAgentSessionId as CloudAgentSessionId,
+          kiloSessionId: result.kiloSessionId as KiloSessionId,
         };
       },
 

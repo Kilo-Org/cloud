@@ -623,6 +623,15 @@ export class TriggerDO extends DurableObject<Env> {
       return; // Deactivated or mode changed — don't reschedule
     }
 
+    // If this is a DST retry alarm (no cron occurrence matched), just try to reschedule
+    // without creating a request. The flag is cleared by scheduleNextAlarm on success.
+    const isRetry = (await this.ctx.storage.get<boolean>('alarmRetry')) ?? false;
+    if (isRetry) {
+      await this.ctx.storage.delete('alarmRetry');
+      await this.scheduleNextAlarm(config);
+      return;
+    }
+
     // Check in-flight limit (same as webhook path)
     const inflightRows = this.db
       .select({ count: sql<number>`count(*)` })
@@ -723,10 +732,12 @@ export class TriggerDO extends DurableObject<Env> {
       nextTime = computeNextCronTime(config.cronExpression, 'UTC');
     }
     if (!nextTime) {
-      // Still null — schedule a retry in 1 hour so the trigger doesn't stop forever
+      // Still null — schedule a retry in 1 hour so the trigger doesn't stop forever.
+      // Set a flag so alarm() knows this is a reschedule retry, not a real cron fire.
       logger.error('Failed to compute next cron time, retrying in 1 hour', {
         triggerId: config.triggerId,
       });
+      await this.ctx.storage.put('alarmRetry', true);
       await this.ctx.storage.setAlarm(Date.now() + 3_600_000);
       return;
     }

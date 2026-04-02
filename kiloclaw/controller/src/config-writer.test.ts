@@ -577,9 +577,9 @@ describe('generateBaseConfig', () => {
     expect(config.channels.streamchat.botUserToken).toBe('sc-bot-token');
     expect(config.channels.streamchat.botUserName).toBe('KiloClaw');
     expect(config.channels.streamchat.enabled).toBe(true);
-    expect(config.plugins.entries.streamchat.enabled).toBe(true);
+    expect(config.plugins.entries['openclaw-channel-streamchat'].enabled).toBe(true);
     expect(config.plugins.load.paths).toContain(
-      '/usr/local/lib/node_modules/streamchat'
+      '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'
     );
   });
 
@@ -603,9 +603,9 @@ describe('generateBaseConfig', () => {
       channels: { streamchat: { apiKey: 'old-key', enabled: true } },
       plugins: {
         load: {
-          paths: ['/usr/local/lib/node_modules/streamchat'],
+          paths: ['/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'],
         },
-        entries: { streamchat: { enabled: true } },
+        entries: { 'openclaw-channel-streamchat': { enabled: true } },
       },
     });
     const { deps } = fakeDeps(existing);
@@ -617,7 +617,7 @@ describe('generateBaseConfig', () => {
     };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
-    const pluginPath = '/usr/local/lib/node_modules/streamchat';
+    const pluginPath = '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
     const paths = config.plugins.load.paths as string[];
     expect(paths.filter(p => p === pluginPath)).toHaveLength(1);
   });

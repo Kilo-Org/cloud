@@ -251,6 +251,8 @@ describe('generateBaseConfig', () => {
     expect(config.models.providers.kilocode.headers['X-KiloCode-OrganizationId']).toBe(
       'org_abc123'
     );
+    // Explicit provider entries require a baseUrl per OpenClaw's strict schema
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
     expect(config.models.providers.kilocode.models).toEqual([]);
   });
 

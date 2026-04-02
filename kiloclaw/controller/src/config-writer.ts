@@ -187,6 +187,11 @@ export function generateBaseConfig(
     config.models = config.models ?? {};
     config.models.providers = config.models.providers ?? {};
     config.models.providers.kilocode = config.models.providers.kilocode ?? {};
+    // Explicit provider entries require a baseUrl per OpenClaw's strict schema.
+    // When KILOCODE_API_BASE_URL already set the URL above, preserve it;
+    // otherwise default to the production gateway URL.
+    config.models.providers.kilocode.baseUrl =
+      config.models.providers.kilocode.baseUrl ?? 'https://api.kilo.ai/api/gateway/';
     config.models.providers.kilocode.headers = config.models.providers.kilocode.headers ?? {};
     config.models.providers.kilocode.headers['X-KiloCode-OrganizationId'] =
       env.KILOCODE_ORGANIZATION_ID;

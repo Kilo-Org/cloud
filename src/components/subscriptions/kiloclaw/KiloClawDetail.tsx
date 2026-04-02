@@ -25,6 +25,7 @@ import {
   formatDateLabel,
   formatKiloclawPrice,
   formatPaymentSummary,
+  isKiloclawTerminal,
 } from '@/components/subscriptions/helpers';
 import { capitalize } from '@/lib/utils';
 
@@ -337,51 +338,53 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-2">
-        {subscription.plan !== 'trial' ? (
-          subscription.scheduledPlan ? (
-            <Button variant="outline" onClick={() => setConfirmationAction('cancelPlanSwitch')}>
-              Cancel Plan Switch
+      {isKiloclawTerminal(subscription.status) ? null : (
+        <div className="flex flex-wrap gap-2">
+          {subscription.plan !== 'trial' ? (
+            subscription.scheduledPlan ? (
+              <Button variant="outline" onClick={() => setConfirmationAction('cancelPlanSwitch')}>
+                Cancel Plan Switch
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setConfirmationAction('switchPlan')}>
+                Switch to {capitalize(otherPlan)} Plan
+              </Button>
+            )
+          ) : null}
+
+          {subscription.cancelAtPeriodEnd ? (
+            <Button variant="outline" onClick={() => setConfirmationAction('reactivate')}>
+              Reactivate
             </Button>
           ) : (
-            <Button variant="outline" onClick={() => setConfirmationAction('switchPlan')}>
-              Switch to {capitalize(otherPlan)} Plan
+            <Button
+              variant="outline"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setConfirmationAction('cancelSubscription')}
+            >
+              Cancel Subscription
             </Button>
-          )
-        ) : null}
+          )}
 
-        {subscription.cancelAtPeriodEnd ? (
-          <Button variant="outline" onClick={() => setConfirmationAction('reactivate')}>
-            Reactivate
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => setConfirmationAction('cancelSubscription')}
-          >
-            Cancel Subscription
-          </Button>
-        )}
+          {subscription.showConversionPrompt ? (
+            <Button variant="outline" onClick={() => setConfirmationAction('switchToCredits')}>
+              Switch to Credits
+            </Button>
+          ) : null}
 
-        {subscription.showConversionPrompt ? (
-          <Button variant="outline" onClick={() => setConfirmationAction('switchToCredits')}>
-            Switch to Credits
-          </Button>
-        ) : null}
-
-        {subscription.hasStripeFunding ? (
-          <StripePortalLink
-            onOpenPortal={async () => {
-              const result = await trpcClient.kiloclaw.getCustomerPortalUrl.mutate({
-                instanceId,
-                returnUrl: window.location.href,
-              });
-              return result.url;
-            }}
-          />
-        ) : null}
-      </div>
+          {subscription.hasStripeFunding ? (
+            <StripePortalLink
+              onOpenPortal={async () => {
+                const result = await trpcClient.kiloclaw.getCustomerPortalUrl.mutate({
+                  instanceId,
+                  returnUrl: window.location.href,
+                });
+                return result.url;
+              }}
+            />
+          ) : null}
+        </div>
+      )}
 
       <Card>
         <CardHeader className="pb-4">

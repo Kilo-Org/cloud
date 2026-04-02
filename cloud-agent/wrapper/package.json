@@ -8,7 +8,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/node": ">=24 <25",
+    "@types/node": "^20.19.37",
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:"
   }

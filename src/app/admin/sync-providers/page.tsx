@@ -46,13 +46,13 @@ export default function SyncProvidersPage() {
     <AdminPage breadcrumbs={breadcrumbs}>
       <div className="flex w-full flex-col gap-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Sync OpenRouter Providers</h2>
+          <h2 className="text-2xl font-bold">Sync Provider and Model data</h2>
         </div>
 
         <p className="text-muted-foreground">
           Fetches provider and model data from OpenRouter and the Vercel AI Gateway, then stores the
           result in the database. This runs automatically via cron but can be triggered manually
-          here.
+          here. Mainly intented for local development use.
         </p>
 
         <Card>
@@ -62,7 +62,7 @@ export default function SyncProvidersPage() {
               Manual Sync
             </CardTitle>
             <CardDescription>
-              Trigger a full sync of OpenRouter providers and models. This may take a minute or two.
+              Trigger a full sync of providers and models. This may take a minute.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">

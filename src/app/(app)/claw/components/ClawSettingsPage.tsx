@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Settings } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
@@ -82,13 +82,23 @@ function ClawSettingsInner({ status }: { status: KiloClawDashboardStatus }) {
  * before rendering the settings content.
  */
 function ClawSettingsWithStatus({ organizationId }: { organizationId?: string }) {
+  const router = useRouter();
   const personalStatus = useKiloClawStatus();
   const orgStatus = useOrgKiloClawStatus(organizationId ?? '');
   const { data: status, isLoading, error } = organizationId ? orgStatus : personalStatus;
 
   const clawUrl = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
 
-  if (isLoading) {
+  // Redirect to main KiloClaw page when there is no instance — it has the
+  // onboarding/provisioning flow that guides the user through setup.
+  const shouldRedirect = !isLoading && !error && (!status || status.status === null);
+  useEffect(() => {
+    if (shouldRedirect) {
+      router.replace(clawUrl);
+    }
+  }, [shouldRedirect, clawUrl, router]);
+
+  if (isLoading || shouldRedirect) {
     return (
       <Card>
         <CardContent className="py-12 text-center">
@@ -110,22 +120,8 @@ function ClawSettingsWithStatus({ organizationId }: { organizationId?: string })
     );
   }
 
-  if (!status || status.status === null) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <p className="text-muted-foreground">
-            No KiloClaw instance found.{' '}
-            <Link href={clawUrl} className="underline">
-              Go to KiloClaw
-            </Link>{' '}
-            to provision one.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
+  // status is guaranteed non-null with a non-null .status after the checks above
+  if (!status || status.status === null) return null;
   const settingsContent = <ClawSettingsInner status={status} />;
 
   // Personal context uses BillingWrapper for access-lock dialogs/banners.

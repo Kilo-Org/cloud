@@ -1000,6 +1000,7 @@ type KiloUserSearchResult = {
 export async function searchKiloUsersByEmail(query: string): Promise<KiloUserSearchResult[]> {
   if (!query || query.length < 2) return [];
 
+  const escapedQuery = query.toLowerCase().replace(/[%_\\]/g, '\\$&');
   const rows = await db.execute<{
     id: string;
     google_user_email: string;
@@ -1007,7 +1008,7 @@ export async function searchKiloUsersByEmail(query: string): Promise<KiloUserSea
   }>(sql`
     SELECT id, google_user_email, google_user_name
     FROM kilocode_users
-    WHERE lower(google_user_email) LIKE ${`%${query.toLowerCase().replace(/[%_]/g, '\\$&')}%`}
+    WHERE lower(google_user_email) LIKE ${`%${escapedQuery}%`}
     ORDER BY google_user_email ASC
     LIMIT 10
   `);

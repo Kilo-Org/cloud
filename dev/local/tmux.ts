@@ -29,7 +29,7 @@ function getWorktreeRoot(): string {
 
 function getSessionName(): string {
   const root = getWorktreeRoot();
-  const slug = path.basename(root);
+  const slug = path.basename(root).replace(/\./g, '_');
   return `kilo-dev-${slug}`;
 }
 

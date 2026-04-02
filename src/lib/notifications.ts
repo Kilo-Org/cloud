@@ -11,6 +11,7 @@ import { subDays } from 'date-fns';
 import { hasReceivedPromotion } from '@/lib/promotionalCredits';
 
 import { fromMicrodollars } from '@/lib/utils';
+import { KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto-model';
 
 /** Pre-fetched data shared across notification generators to avoid duplicate DB queries. */
 type NotificationContext = {
@@ -109,6 +110,7 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateAutoTopUpNotification,
     generateAutoTopUpOrgsNotification,
     generateByokProvidersNotification,
+    generateMimoNoLongerFreeNotification,
     generateFirstDayWelcomeNotification,
     generateKiloPassNotification,
   ];
@@ -225,6 +227,39 @@ async function generateTeamsTrialNotification(
       showIn: ['cli', 'extension'],
     },
   ];
+}
+async function generateMimoNoLongerFreeNotification(
+  user: User,
+  _ctx: NotificationContext
+): Promise<KiloNotification[]> {
+  try {
+    const users = await cachedPosthogQuery(
+      z.array(z.tuple([z.string()]).transform(([userId]) => userId))
+    )(
+      'mimo-no-longer-free-users',
+      'select kilo_user_id from notification_apr_2_mimo_no_longer_free_users limit 5e5'
+    );
+
+    if (!users.includes(user.id)) {
+      console.debug('[generateMimoNoLongerFreeNotification] not showing notification for user');
+      return [];
+    }
+
+    console.debug('[generateMimoNoLongerFreeNotification] showing notification for user');
+    return [
+      {
+        id: 'mimo-no-longer-free-apr-2',
+        title: 'MiMo V2 and MiniMax M2.5 no longer free',
+        message:
+          'The MiMo V2 and MiniMax M2.5 promotions have ended. Please switch to Kilo Auto Free or another free model.',
+        suggestModelId: KILO_AUTO_FREE_MODEL.id,
+        showIn: ['cli', 'extension'],
+      },
+    ];
+  } catch (e) {
+    console.error('[generateMiniMaxNoLongerFreeNotification]', e);
+    return [];
+  }
 }
 
 async function generateByokProvidersNotification(

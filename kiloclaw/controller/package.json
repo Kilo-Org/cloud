@@ -7,6 +7,6 @@
     "zod": "4.3.6"
   },
   "devDependencies": {
-    "@types/node": ">=24 <25"
+    "@types/node": "22.0.0"
   }
 }

@@ -30,7 +30,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": ">=24 <25",
+    "@types/node": "^22.19.15",
     "@typescript/native-preview": "catalog:",
     "@vitest/coverage-v8": "^4.1.0",
     "drizzle-kit": "catalog:",

@@ -31,7 +31,7 @@ export const preferredModels = [
   KILO_AUTO_BALANCED_MODEL.id,
   KILO_AUTO_FREE_MODEL.id,
   mimo_v2_pro_free_model.status === 'public' ? mimo_v2_pro_free_model.public_id : null,
-  'nvidia/nemotron-3-super-120b-a12b:free',
+  seed_20_pro_free_model.status === 'public' ? seed_20_pro_free_model.public_id : null,
   QWEN36_PLUS_FREE_MODEL_ID,
   grok_code_fast_1_optimized_free_model.status === 'public'
     ? grok_code_fast_1_optimized_free_model.public_id

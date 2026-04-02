@@ -1,4 +1,3 @@
-import { AlarmStatusRecord } from '@/routers/admin/gastown-router';
 import { Card, CardContent } from '@/components/ui/card';
 
 type AggregateStatsSidebarProps = {

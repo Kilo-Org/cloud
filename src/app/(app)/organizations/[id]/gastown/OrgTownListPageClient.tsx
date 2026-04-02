@@ -36,7 +36,7 @@ export function OrgTownListPageClient({ organizationId, role }: OrgTownListPageC
     <GastownOverviewClient
       towns={townsQuery.data ?? []}
       onboardingUrl={onboardingUrl}
-      onDeleteTown={(townId) => deleteTown.mutate({ organizationId, townId })}
+      onDeleteTown={isOwner ? (townId) => deleteTown.mutate({ organizationId, townId }) : undefined}
       title="Gas Town"
       description="A chat-first orchestration console for towns, rigs, beads, and agents. Built for radical transparency: every object is clickable; every outcome is attributable."
       organizationId={organizationId}

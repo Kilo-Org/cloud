@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react';
 
+import { trackEvent } from '@/lib/appsflyer';
 import { CONTEXT_KEY } from '@/lib/context/context-context';
 import { queryClient } from '@/lib/query-client';
 
@@ -44,6 +45,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
   const signIn = useCallback(async (tokenValue: string) => {
     await SecureStore.setItemAsync(TOKEN_KEY, tokenValue);
+    trackEvent('login');
     setToken(tokenValue);
   }, []);
 

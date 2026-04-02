@@ -13,6 +13,9 @@ import {
 } from '@/lib/config.server';
 import { generateApiToken } from '@/lib/tokens';
 import type { User } from '@kilocode/db/schema';
+import { microdollar_usage_view } from '@kilocode/db/schema';
+import { db } from '@/lib/drizzle';
+import { sql, and, eq, gte } from 'drizzle-orm';
 
 // ── Zod schemas matching Gastown API response shapes ─────────────────────────
 
@@ -385,6 +388,38 @@ export const adminGastownRouter = createTRPCRouter({
     .output(z.array(UserTownRecord))
     .query(({ input, ctx }) => {
       return gastownGet(ctx.user, `/api/users/${input.userId}/towns`, z.array(UserTownRecord));
+    }),
+
+  /**
+   * Get aggregate usage/cost metadata for the 'gastown' feature over the last 7 days.
+   */
+  getAggregateStats: adminProcedure
+    .input(z.object({}))
+    .output(
+      z.object({
+        totalCost: z.number(),
+        totalTokens: z.number(),
+      })
+    )
+    .query(async () => {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const result = await db
+        .select({
+          totalCost: sql<number>`SUM(${microdollar_usage_view.cost})`,
+          totalTokens: sql<number>`SUM(${microdollar_usage_view.input_tokens} + ${microdollar_usage_view.output_tokens})`,
+        })
+        .from(microdollar_usage_view)
+        .where(
+          and(
+            eq(microdollar_usage_view.feature, 'gastown'),
+            gte(microdollar_usage_view.created_at, sevenDaysAgo.toISOString())
+          )
+        );
+
+      return {
+        totalCost: Number(result[0].totalCost) || 0,
+        totalTokens: Number(result[0].totalTokens) || 0,
+      };
     }),
 
   /**

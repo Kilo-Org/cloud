@@ -14,8 +14,6 @@ import {
   type BotAgentMessageLike,
 } from '@/lib/bot/agent-runner';
 import { findUserById } from '@/lib/user';
-import type { PlatformIntegration } from '@kilocode/db';
-import type { Message } from 'chat';
 
 type ExecutionCallbackPayload = {
   sessionId: string;
@@ -242,8 +240,8 @@ async function continueBotAgentAfterCallback(params: {
 
   return await runBotAgent({
     thread,
-    message: callbackMessage as Message,
-    platformIntegration: platformIntegration as PlatformIntegration,
+    message: callbackMessage,
+    platformIntegration,
     user,
     botRequestId: params.botRequestId,
     prompt: params.continuationPrompt,

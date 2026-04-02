@@ -36,7 +36,7 @@ import { ToolLoopAgent, generateText, stepCountIs, tool } from 'ai';
 import type { StepResult, ToolSet } from 'ai';
 import { Actions, Card, CardText, LinkButton, Section } from 'chat';
 import { ThreadImpl } from 'chat';
-import type { Author, Thread, Message } from 'chat';
+import type { Author, Thread } from 'chat';
 
 export type BotAgentContinuation = {
   finalText: string;
@@ -47,7 +47,7 @@ export type BotAgentContinuation = {
 
 type RunBotAgentParams = {
   thread: Thread;
-  message: Message;
+  message: BotAgentMessageLike;
   platformIntegration: PlatformIntegration;
   user: User;
   botRequestId: string | undefined;
@@ -87,7 +87,7 @@ function serializeStep(step: StepResult<ToolSet>): BotRequestStep {
 async function buildSystemPrompt(
   platformIntegration: PlatformIntegration,
   thread: Thread,
-  triggerMessage: Message
+  triggerMessage: { id: string }
 ) {
   const owner = ownerFromIntegration(platformIntegration);
 
@@ -146,7 +146,7 @@ async function summarizePrompt(
 
 export async function postSessionLinkEphemeral(params: {
   thread: Thread;
-  message: Message;
+  message: BotAgentMessageLike;
   sessionUrl: string;
   prompt: string;
   provider: ReturnType<typeof createOpenAICompatible>;

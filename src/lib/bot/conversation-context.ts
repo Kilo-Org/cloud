@@ -56,7 +56,7 @@ async function collectMessages(
  */
 export async function getConversationContext(
   thread: Thread,
-  triggerMessage: Message,
+  triggerMessage: { id: string },
   limits?: { channelMessages?: number; threadMessages?: number }
 ): Promise<ConversationContext> {
   const channelMessagesLimit = limits?.channelMessages ?? 12;

@@ -718,14 +718,22 @@ export function agentCompleted(
       } else if (hookedBead && hookedBead.status === 'in_progress') {
         if (input.reason === 'container eviction') {
           // Container eviction: WIP was force-pushed and eviction context
-          // was written on the bead body. Reset to open immediately so the
-          // reconciler can re-dispatch on the next tick instead of waiting
-          // for Rule 3's stale timeout.
+          // was written on the bead body. Reset to open and clear the
+          // stale assignee so the reconciler can re-dispatch immediately.
           console.log(
             `[review-queue] agentCompleted: polecat ${agentId} evicted — ` +
               `resetting bead ${agent.current_hook_bead_id} to open`
           );
           updateBeadStatus(sql, agent.current_hook_bead_id, 'open', agentId);
+          query(
+            sql,
+            /* sql */ `
+              UPDATE ${beads}
+              SET ${beads.columns.assignee_agent_bead_id} = NULL
+              WHERE ${beads.bead_id} = ?
+            `,
+            [agent.current_hook_bead_id]
+          );
         } else {
           // Agent exited 'completed' but bead is still in_progress — gt_done was never called.
           // Don't close the bead. Rule 3 will handle rework.

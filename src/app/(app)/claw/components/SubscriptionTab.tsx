@@ -5,6 +5,7 @@ import { CreditCard } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
+import { EarlybirdCard } from './billing/EarlybirdCard';
 import { SubscriptionCard } from './billing/SubscriptionCard';
 import { CancelDialog } from './billing/CancelDialog';
 import { PlanSelectionDialog } from './billing/PlanSelectionDialog';
@@ -17,7 +18,22 @@ export function SubscriptionTab() {
 
   if (!billing) return null;
 
-  if (!billing.subscription) {
+  const subscription = billing.subscription;
+  const showInactiveSubscriptionState = !subscription || subscription.status === 'canceled';
+
+  if (showInactiveSubscriptionState) {
+    if (billing.earlybird && billing.earlybird.daysRemaining > 0) {
+      return (
+        <>
+          <EarlybirdCard
+            earlybird={billing.earlybird}
+            onSubscribeClick={() => setShowPlanDialog(true)}
+          />
+          <PlanSelectionDialog open={showPlanDialog} onOpenChange={setShowPlanDialog} />
+        </>
+      );
+    }
+
     const trialDays = billing.trial && !billing.trial.expired ? billing.trial.daysRemaining : null;
 
     return (

@@ -17,10 +17,7 @@ import type {
 import { requestContainsImages } from '@/lib/providers/openrouter/request-helpers';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 import type OpenAI from 'openai';
-import {
-  QWEN36_PLUS_PREVIEW_FREE_MODEL_ID,
-  QWEN36_PLUS_PREVIEW_FREE_MODEL_NAME,
-} from '@/lib/providers/qwen';
+import { QWEN36_PLUS_FREE_MODEL_ID, QWEN36_PLUS_FREE_MODEL_NAME } from '@/lib/providers/qwen';
 
 function stripDisplayName(displayName: string): string {
   const start = displayName.indexOf(': ');
@@ -170,9 +167,9 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
 export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Kilo Auto Free',
-  description: `Free with limited capability. No credits required. Uses ${stripDisplayName(QWEN36_PLUS_PREVIEW_FREE_MODEL_NAME)}.`,
+  description: `Free with limited capability. No credits required. Uses ${stripDisplayName(QWEN36_PLUS_FREE_MODEL_NAME)}.`,
   context_length: 1_000_000,
-  max_completion_tokens: 32_000,
+  max_completion_tokens: 65_536,
   prompt_price: '0',
   completion_price: '0',
   input_cache_read_price: '0',
@@ -238,7 +235,7 @@ export async function resolveAutoModel(
   hasImages: boolean
 ): Promise<ResolvedAutoModel> {
   if (model === KILO_AUTO_FREE_MODEL.id) {
-    return { model: QWEN36_PLUS_PREVIEW_FREE_MODEL_ID };
+    return { model: QWEN36_PLUS_FREE_MODEL_ID };
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {
     return {

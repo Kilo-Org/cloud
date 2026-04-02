@@ -98,7 +98,7 @@
       "id": "kilo-auto/free",
       "name": "Kilo Auto Free",
       "created": 0,
-      "description": "Free with limited capability. No credits required. Uses Qwen3.6 Plus Preview.",
+      "description": "Free with limited capability. No credits required. Uses Qwen3.6 Plus.",
       "architecture": {
         "input_modalities": [
           "text"
@@ -111,7 +111,7 @@
       "top_provider": {
         "is_moderated": false,
         "context_length": 1000000,
-        "max_completion_tokens": 32000
+        "max_completion_tokens": 65536
       },
       "pricing": {
         "prompt": "0",

@@ -207,6 +207,7 @@ async function continueBotAgentAfterCallback(params: {
   }
 
   await bot.initialize();
+  await bot.registerSingleton();
   const slackAdapter = bot.getAdapter('slack');
   const botToken = await getSlackBotToken(params.requestRow.platform_integration_id);
   if (!botToken) {

@@ -82,15 +82,17 @@ export default async function spawnCloudAgentSession(
   authToken: string,
   ticketUserId: string,
   botRequestId: string | undefined,
-  onSessionReady?: RunSessionInput['onSessionReady']
+  onSessionReady?: RunSessionInput['onSessionReady'],
+  options?: { prSignature?: string; chatPlatform?: string }
 ): Promise<SpawnCloudAgentResult> {
-  console.log('[SlackBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
+  console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
 
   // Build platform-specific prepareInput and initiateInput
   const kilocodeOrganizationId = platformIntegration.owned_by_organization_id || undefined;
   let prepareInput: PrepareSessionInput;
   let initiateInput: { githubToken?: string; kilocodeOrganizationId?: string };
   const mode: AgentMode = args.mode;
+  const chatPlatform = options?.chatPlatform ?? 'slack';
   const callbackTarget =
     botRequestId && INTERNAL_API_SECRET
       ? {
@@ -104,13 +106,18 @@ export default async function spawnCloudAgentSession(
   }
 
   const isGitLab = !!args.gitlabProject;
-  const prompt =
+  let prompt =
     mode === 'code'
       ? args.prompt +
         (isGitLab
           ? '\n\nOpen a merge request with your changes and return the MR URL.'
           : '\n\nOpen a pull request with your changes and return the PR URL.')
       : args.prompt;
+
+  // Append PR/MR signature to the prompt if available
+  if (options?.prSignature) {
+    prompt += options.prSignature;
+  }
 
   if (args.gitlabProject) {
     // GitLab path: get token + instance URL, build clone URL, use gitUrl/gitToken
@@ -135,7 +142,7 @@ export default async function spawnCloudAgentSession(
 
     const isSelfHosted = !/^https?:\/\/(www\.)?gitlab\.com(\/|$)/i.test(instanceUrl);
     console.log(
-      '[SlackBot] GitLab session - project:',
+      '[KiloBot] GitLab session - project:',
       args.gitlabProject,
       'instance:',
       isSelfHosted ? 'self-hosted' : 'gitlab.com'
@@ -149,7 +156,7 @@ export default async function spawnCloudAgentSession(
       gitToken: gitlabToken,
       platform: 'gitlab',
       kilocodeOrganizationId,
-      createdOnPlatform: 'slack',
+      createdOnPlatform: chatPlatform,
       callbackTarget,
     };
     initiateInput = { kilocodeOrganizationId };
@@ -174,7 +181,7 @@ export default async function spawnCloudAgentSession(
       model,
       githubToken,
       kilocodeOrganizationId,
-      createdOnPlatform: 'slack',
+      createdOnPlatform: chatPlatform,
       callbackTarget,
     };
     initiateInput = { githubToken, kilocodeOrganizationId };

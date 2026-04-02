@@ -9,6 +9,7 @@ import {
   getConversationContext,
   formatConversationContextForPrompt,
 } from '@/lib/bot/conversation-context';
+import { buildPrSignature, getRequesterInfo } from '@/lib/bot/pr-signature';
 import { updateBotRequest, linkBotRequestToSession } from '@/lib/bot/request-logging';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
@@ -35,7 +36,7 @@ import { ToolLoopAgent, generateText, stepCountIs, tool } from 'ai';
 import type { StepResult, ToolSet } from 'ai';
 import { Actions, Card, CardText, LinkButton, Section } from 'chat';
 import { ThreadImpl } from 'chat';
-import type { Author, Thread } from 'chat';
+import type { Author, Message, Thread } from 'chat';
 
 export type BotAgentContinuation = {
   finalText: string;
@@ -47,6 +48,8 @@ export type BotAgentContinuation = {
 type RunBotAgentParams = {
   thread: Thread;
   message: BotAgentMessageLike;
+  /** Full chat Message for PR signature (has `raw` for platform-specific fields). */
+  rawMessage?: Message;
   platformIntegration: PlatformIntegration;
   user: User;
   botRequestId: string | undefined;
@@ -204,6 +207,24 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
     (params.platformIntegration.metadata as { model_slug?: string }).model_slug ??
     DEFAULT_BOT_MODEL;
   const owner = ownerFromIntegration(params.platformIntegration);
+  const chatPlatform = params.thread.id.split(':')[0];
+
+  // Build PR signature from requester info (display name + message permalink)
+  let prSignature: string | undefined;
+  if (params.rawMessage) {
+    try {
+      const requesterInfo = await getRequesterInfo(
+        params.thread,
+        params.rawMessage,
+        params.platformIntegration
+      );
+      if (requesterInfo) {
+        prSignature = buildPrSignature(requesterInfo);
+      }
+    } catch (error) {
+      console.warn('[KiloBot] Failed to build PR signature, continuing without it:', error);
+    }
+  }
 
   const startedAt = Date.now();
   const collectedSteps: BotRequestStep[] = [];
@@ -250,7 +271,8 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
                 provider,
                 modelSlug,
               });
-            }
+            },
+            { prSignature, chatPlatform }
           );
 
           // Persist the session link synchronously so callbacks can

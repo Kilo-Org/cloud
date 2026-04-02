@@ -191,6 +191,31 @@ describe('generateBaseConfig', () => {
     expect(config.models).toBeUndefined();
   });
 
+  it('skips stale migration when KILOCODE_ORGANIZATION_ID is set', () => {
+    const existing = JSON.stringify({
+      models: {
+        providers: {
+          kilocode: {
+            baseUrl: 'https://api.kilo.ai/api/gateway/',
+            headers: { 'X-Custom': 'user-managed' },
+            models: [{ id: 'kept/model', name: 'Kept' }],
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), KILOCODE_ORGANIZATION_ID: 'org_abc123' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    // Provider not nuked — user-managed settings preserved
+    expect(config.models.providers.kilocode.headers['X-Custom']).toBe('user-managed');
+    expect(config.models.providers.kilocode.headers['X-KiloCode-OrganizationId']).toBe(
+      'org_abc123'
+    );
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+  });
+
   it('preserves non-kilocode providers when removing stale kilocode entry', () => {
     const existing = JSON.stringify({
       models: {

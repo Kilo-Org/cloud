@@ -390,25 +390,23 @@ export const gastownRouter = router({
     return userStub.listTowns();
   }),
 
-  getAggregateStats: gastownProcedure
-    .output(RpcAggregateStatsOutput)
-    .query(async ({ ctx }) => {
-      if (!ctx.env.HYPERDRIVE) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'HYPERDRIVE binding not configured',
-        });
-      }
-      try {
-        return await fetchAggregateStats(ctx.env.HYPERDRIVE.connectionString);
-      } catch (error) {
-        console.error('[gastown-trpc] getAggregateStats failed', error);
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to load aggregate stats',
-        });
-      }
-    }),
+  getAggregateStats: gastownProcedure.output(RpcAggregateStatsOutput).query(async ({ ctx }) => {
+    if (!ctx.env.HYPERDRIVE) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'HYPERDRIVE binding not configured',
+      });
+    }
+    try {
+      return await fetchAggregateStats(ctx.env.HYPERDRIVE.connectionString);
+    } catch (error) {
+      console.error('[gastown-trpc] getAggregateStats failed', error);
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to load aggregate stats',
+      });
+    }
+  }),
 
   getTown: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))

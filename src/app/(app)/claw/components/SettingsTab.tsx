@@ -24,11 +24,7 @@ import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombob
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
-import {
-  useClawConfig,
-  useClawMyPin,
-  useClawGoogleSetupCommand,
-} from '../hooks/useClawHooks';
+import { useClawConfig, useClawMyPin, useClawGoogleSetupCommand } from '../hooks/useClawHooks';
 import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
 
 import { useDefaultModelSelection } from '../hooks/useDefaultModelSelection';

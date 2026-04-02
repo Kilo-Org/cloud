@@ -129,6 +129,9 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
 
     reconnectAttempt = attempt;
     clearStalenessTimeout();
+    // Anchor the staleness clock to this socket so visibility checks don't
+    // inherit timing from a previous connection.
+    lastMessageTime = Date.now();
 
     // Close existing socket - clear reference first so onclose ignores it
     const oldWs = ws;

@@ -170,6 +170,38 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.destroy();
     });
 
+    it('anchors staleness clock to the new socket after reconnect', () => {
+      jest.spyOn(Math, 'random').mockReturnValue(0);
+
+      const { connection, onDisconnected } = createTestConnection();
+      connection.connect();
+      connectSocket(0);
+
+      // Advance time so old socket's lastMessageTime becomes stale
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS + 1000);
+
+      // Force a reconnect via socket close + minimal backoff.
+      // With Math.random()=0, backoff for attempt 0 = 500ms.
+      closeSocket(0);
+      jest.advanceTimersByTime(500);
+
+      // New socket created — connectInternal resets lastMessageTime to Date.now()
+      expect(sockets).toHaveLength(2);
+
+      // Tab becomes visible immediately after new socket is created.
+      // Without the lastMessageTime reset, the old socket's stale timestamp
+      // would cause a spurious staleness-timeout reconnect here.
+      simulateVisibilityChange('hidden');
+      simulateVisibilityChange('visible');
+
+      // Advance past the staleness window — no extra reconnect should occur
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
+      expect(sockets).toHaveLength(2);
+      expect(onDisconnected).toHaveBeenCalledTimes(1); // only from the first close
+
+      connection.destroy();
+    });
+
     it('skips staleness check when a message was received recently', () => {
       const { connection, onDisconnected } = createTestConnection();
       connection.connect();

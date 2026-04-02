@@ -62,9 +62,9 @@ const getVercelModels_cached = unstable_cache(
       .from(modelsByProvider)
       .orderBy(desc(modelsByProvider.id))
       .limit(1);
-    return Object.entries(z.record(z.string(), StoredModelSchema).parse(result.at(0)?.vercel))
-      .filter(([_modelId, model]) => model.type === 'language' && model.endpoints.length > 0)
-      .map(([modelId]) => modelId);
+    return Object.values(z.record(z.string(), StoredModelSchema).parse(result.at(0)?.vercel))
+      .filter(model => model.type === 'language' && model.endpoints.length > 0)
+      .map(model => model.id);
   },
   undefined,
   { revalidate: 3600 }

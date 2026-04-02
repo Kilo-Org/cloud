@@ -57,6 +57,7 @@
     "nativewind": "5.0.0-preview.3",
     "react": "19.2.0",
     "react-native": "0.83.4",
+    "react-native-appsflyer": "^6.17.9",
     "react-native-css": "3.0.6",
     "react-native-gesture-handler": "~2.30.0",
     "react-native-reanimated": "4.2.1",

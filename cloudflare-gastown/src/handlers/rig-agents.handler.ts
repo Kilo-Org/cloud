@@ -162,6 +162,24 @@ export async function handleAgentCompleted(
   return c.json(resSuccess({ completed: true }));
 }
 
+/**
+ * Called by the container when the mayor's session goes idle (turn done,
+ * waiting for user input). Transitions the mayor from "working" to
+ * "waiting" so the alarm drops to the idle cadence and health-check
+ * pings stop resetting the container's sleepAfter timer.
+ */
+export async function handleAgentWaiting(
+  c: Context<GastownEnv>,
+  params: { rigId: string; agentId: string }
+) {
+  const body = (await parseJsonBody(c)) as Record<string, unknown>;
+  const firedAt = typeof body?.firedAt === 'number' ? body.firedAt : undefined;
+  const townId = c.get('townId');
+  const town = getTownDOStub(c.env, townId);
+  await town.mayorWaiting(params.agentId, firedAt);
+  return c.json(resSuccess({ acknowledged: true }));
+}
+
 export async function handleWriteCheckpoint(
   c: Context<GastownEnv>,
   params: { rigId: string; agentId: string }

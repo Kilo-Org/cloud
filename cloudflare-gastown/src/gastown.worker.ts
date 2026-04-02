@@ -36,6 +36,7 @@ import {
   handleAgentDone,
   handleRequestChanges,
   handleAgentCompleted,
+  handleAgentWaiting,
   handleWriteCheckpoint,
   handleWriteEvictionContext,
   handleCheckMail,
@@ -420,6 +421,11 @@ app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/request-changes', c =>
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/completed', c =>
   instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/completed', () =>
     handleAgentCompleted(c, c.req.param())
+  )
+);
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/waiting', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/waiting', () =>
+    handleAgentWaiting(c, c.req.param())
   )
 );
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/checkpoint', c =>

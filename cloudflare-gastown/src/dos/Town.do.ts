@@ -125,7 +125,7 @@ function formatEventMessage(row: Record<string, unknown>): string {
 
 // Alarm intervals
 const ACTIVE_ALARM_INTERVAL_MS = 5_000; // 5s when agents are active
-const IDLE_ALARM_INTERVAL_MS = 1 * 60_000; // 1m when idle
+const IDLE_ALARM_INTERVAL_MS = 5 * 60_000; // 5m when idle (no working agents)
 
 // Escalation constants
 const STALE_ESCALATION_THRESHOLD_MS = 4 * 60 * 60 * 1000;
@@ -547,6 +547,10 @@ export class TownDO extends DurableObject<Env> {
   private _townId: string | null = null;
   private _lastReconcilerMetrics: reconciler.ReconcilerMetrics | null = null;
   private _dashboardContext: string | null = null;
+  /** Monotonic timestamp of the last working → transition for the mayor.
+   *  Used to reject stale session.idle callbacks that arrive after a new
+   *  prompt has already re-activated the mayor. */
+  private _mayorWorkingSince = 0;
   private _draining = false;
   private _drainNonce: string | null = null;
   private _drainStartedAt: number | null = null;
@@ -676,7 +680,7 @@ export class TownDO extends DurableObject<Env> {
     const townConfig = await this.getTownConfig();
     const userId = townConfig.owner_user_id ?? townId;
     await dispatch.forceRefreshContainerToken(this.env, townId, userId);
-    this.lastContainerTokenRefreshAt = Date.now();
+    await this.ctx.storage.put('container:lastTokenRefreshAt', Date.now());
   }
 
   /**
@@ -1558,6 +1562,43 @@ export class TownDO extends DurableObject<Env> {
     await this.armAlarmIfNeeded();
   }
 
+  /**
+   * Transition the mayor from "working" to "waiting". Called by the
+   * container when the mayor's session goes idle (turn done, waiting for
+   * user input). The "waiting" status means the mayor is alive in the
+   * container but not doing LLM work — hasActiveWork() returns false,
+   * so the alarm drops to the idle cadence and health-check pings stop
+   * resetting the container's sleepAfter timer.
+   *
+   * @param firedAt - Timestamp (ms) when the container fired this
+   *   callback. Used to reject stale session.idle callbacks from a
+   *   previous turn that arrive after the mayor has already been
+   *   re-activated by a new prompt.
+   */
+  async mayorWaiting(agentId?: string, firedAt?: number): Promise<void> {
+    let resolvedAgentId = agentId;
+    if (!resolvedAgentId) {
+      const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0];
+      if (mayor) resolvedAgentId = mayor.id;
+    }
+    if (!resolvedAgentId) return;
+
+    const agent = agents.getAgent(this.sql, resolvedAgentId);
+    if (!agent || agent.role !== 'mayor') return;
+
+    // Only transition from working → waiting. If the agent has already
+    // been set to idle/stalled/dead by another path, don't overwrite.
+    // Guard against stale session.idle callbacks: reportMayorWaiting is
+    // fire-and-forget, so a callback from a previous turn can arrive
+    // after sendMayorMessage has already re-activated the mayor. If the
+    // callback carries a firedAt timestamp that predates the last
+    // working transition, it belongs to an older turn — reject it.
+    if (agent.status === 'working') {
+      if (firedAt && firedAt < this._mayorWorkingSince) return;
+      agents.updateAgentStatus(this.sql, resolvedAgentId, 'waiting');
+    }
+  }
+
   async agentCompleted(
     agentId: string,
     input: { status: 'completed' | 'failed'; reason?: string }
@@ -2106,7 +2147,20 @@ export class TownDO extends DurableObject<Env> {
 
     if (isAlive) {
       const sent = await dispatch.sendMessageToAgent(this.env, townId, mayor.id, combinedMessage);
-      sessionStatus = sent ? 'active' : 'idle';
+      if (sent) {
+        // Transition waiting → working so the alarm runs at the active cadence
+        // while the mayor processes this prompt. Also reschedule the alarm
+        // immediately — the idle alarm may be up to 5 min away, and we need
+        // the reconciler/health-check loop to resume promptly.
+        if (mayor.status === 'waiting') {
+          agents.updateAgentStatus(this.sql, mayor.id, 'working');
+          this._mayorWorkingSince = Date.now();
+          await this.ctx.storage.setAlarm(Date.now() + ACTIVE_ALARM_INTERVAL_MS);
+        }
+        sessionStatus = 'active';
+      } else {
+        sessionStatus = 'idle';
+      }
     } else {
       const townConfig = await this.getTownConfig();
       const rigConfig = await this.getMayorRigConfig();
@@ -2152,6 +2206,7 @@ export class TownDO extends DurableObject<Env> {
 
       if (started) {
         agents.updateAgentStatus(this.sql, mayor.id, 'working');
+        this._mayorWorkingSince = Date.now();
         sessionStatus = 'starting';
       } else {
         sessionStatus = 'idle';
@@ -2200,8 +2255,9 @@ export class TownDO extends DurableObject<Env> {
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
 
     if (isAlive) {
-      const status = mayor.status === 'working' || mayor.status === 'stalled' ? 'active' : 'idle';
-      return { agentId: mayor.id, sessionStatus: status };
+      const isActive =
+        mayor.status === 'working' || mayor.status === 'stalled' || mayor.status === 'waiting';
+      return { agentId: mayor.id, sessionStatus: isActive ? 'active' : 'idle' };
     }
 
     // Start the container with an idle mayor (no initial prompt)
@@ -2253,6 +2309,7 @@ export class TownDO extends DurableObject<Env> {
 
     if (started) {
       agents.updateAgentStatus(this.sql, mayor.id, 'working');
+      this._mayorWorkingSince = Date.now();
       return { agentId: mayor.id, sessionStatus: 'starting' };
     }
 
@@ -2317,7 +2374,7 @@ export class TownDO extends DurableObject<Env> {
     const mapStatus = (agentStatus: string): 'idle' | 'active' | 'starting' => {
       switch (agentStatus) {
         case 'working':
-          return 'active';
+        case 'waiting':
         case 'stalled':
           return 'active';
         default:
@@ -3543,12 +3600,17 @@ export class TownDO extends DurableObject<Env> {
    * from the alarm handler, throttled to once per hour (tokens have
    * 8h expiry). The TownContainerDO stores it as an env var so it's
    * available to all agents in the container.
+   *
+   * The throttle timestamp is persisted in ctx.storage so it survives
+   * DO eviction. Without persistence, eviction resets the throttle to 0
+   * and the refresh fires immediately on the next alarm tick, sending
+   * requests that reset the container's sleepAfter timer (#1409).
    */
-  private lastContainerTokenRefreshAt = 0;
   private async refreshContainerToken(): Promise<void> {
     const TOKEN_REFRESH_INTERVAL_MS = 60 * 60_000; // 1 hour
     const now = Date.now();
-    if (now - this.lastContainerTokenRefreshAt < TOKEN_REFRESH_INTERVAL_MS) return;
+    const lastRefresh = (await this.ctx.storage.get<number>('container:lastTokenRefreshAt')) ?? 0;
+    if (now - lastRefresh < TOKEN_REFRESH_INTERVAL_MS) return;
 
     const townId = this.townId;
     if (!townId) return;
@@ -3557,7 +3619,7 @@ export class TownDO extends DurableObject<Env> {
     await dispatch.refreshContainerToken(this.env, townId, userId);
     // Only mark as refreshed after success — failed refreshes should
     // be retried on the next alarm tick, not throttled for an hour.
-    this.lastContainerTokenRefreshAt = now;
+    await this.ctx.storage.put('container:lastTokenRefreshAt', now);
   }
 
   /**
@@ -4114,6 +4176,7 @@ export class TownDO extends DurableObject<Env> {
     };
     agents: {
       working: number;
+      waiting: number;
       idle: number;
       stalled: number;
       dead: number;
@@ -4157,7 +4220,7 @@ export class TownDO extends DurableObject<Env> {
         []
       ),
     ];
-    const agentCounts = { working: 0, idle: 0, stalled: 0, dead: 0, total: 0 };
+    const agentCounts = { working: 0, waiting: 0, idle: 0, stalled: 0, dead: 0, total: 0 };
     for (const row of agentRows) {
       const s = `${row.status as string}`;
       const c = Number(row.cnt);
@@ -4266,7 +4329,7 @@ export class TownDO extends DurableObject<Env> {
       alarm: {
         nextFireAt: currentAlarm ? new Date(Number(currentAlarm)).toISOString() : null,
         intervalMs,
-        intervalLabel: active ? 'active (5s)' : 'idle (60s)',
+        intervalLabel: active ? 'active (5s)' : 'idle (5m)',
       },
       agents: agentCounts,
       beads: beadCounts,

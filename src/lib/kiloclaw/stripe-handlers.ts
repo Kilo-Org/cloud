@@ -83,6 +83,15 @@ function getReSubscriptionMonthNumber(params: { anchorDate: string; periodStart:
   );
 }
 
+async function runAfterResponse(work: () => Promise<void>) {
+  if (IS_IN_AUTOMATED_TEST) {
+    await work();
+    return;
+  }
+
+  after(work);
+}
+
 function getSubscriptionPeriods(subscription: Stripe.Subscription, kiloUserId?: string) {
   // Stripe moved period timestamps to the item level (not the top-level subscription object).
   const item = subscription.items.data[0];
@@ -608,7 +617,7 @@ export async function handleKiloClawSubscriptionCreated(params: {
   }
 
   if (didProcess && convertedFromTrial) {
-    after(async () => {
+    await runAfterResponse(async () => {
       const tracking = await getImpactTrackingContext(kiloUserId, metadata.impactClickId);
       if (!tracking) {
         logWarning('KiloClaw trial conversion missing user for Impact trial end', {
@@ -1107,7 +1116,7 @@ export async function handleKiloClawInvoicePaid(params: {
     amount_paid: invoice.amount_paid,
   });
 
-  after(async () => {
+  await runAfterResponse(async () => {
     const tracking = await getImpactTrackingContext(metadata.kiloUserId, metadata.impactClickId);
     if (!tracking) {
       logWarning('KiloClaw invoice.paid user not found for Impact tracking', {
@@ -1161,7 +1170,7 @@ export async function handleKiloClawInvoicePaid(params: {
 
   // Fire PostHog revenue tracking event in the background
   if (!IS_IN_AUTOMATED_TEST) {
-    after(async () => {
+    await runAfterResponse(async () => {
       const [user] = await db
         .select({ email: kilocode_users.google_user_email })
         .from(kilocode_users)

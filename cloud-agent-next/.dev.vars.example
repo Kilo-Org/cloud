@@ -72,6 +72,11 @@ R2_ENDPOINT=""
 R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID=""
 R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY=""
 
+# Session ingest URL used by the wrapper to post session data.
+# Use a host-reachable IP (not localhost) so sandbox containers can connect back.
+# @url cloudflare-session-ingest
+KILO_SESSION_INGEST_URL=http://192.168.x.x:8800
+
 # Local dev worker origins allowed to connect to /stream
 # @url nextjs,cloud-agent-next
 WS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8794

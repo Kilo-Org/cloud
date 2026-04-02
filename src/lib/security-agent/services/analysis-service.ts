@@ -31,7 +31,7 @@ import { maybeAutoDismissAnalysis } from './auto-dismiss-service';
 import { sentryLogger } from '@/lib/utils.server';
 import { APP_URL } from '@/lib/constants';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
-import type { SessionSnapshot } from '@/lib/session-ingest-client';
+import { extractLastAssistantText } from '@/lib/cloud-agent-next/session-result';
 
 import {
   DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
@@ -105,23 +105,7 @@ function buildAnalysisPrompt(finding: SecurityFinding): string {
   return ANALYSIS_PROMPT_TEMPLATE.replace(/\{\{(\w+)\}\}/g, (_, key) => replacements[key] ?? '');
 }
 
-/** Extract the last assistant message text from a session snapshot. */
-export function extractLastAssistantMessage(snapshot: SessionSnapshot): string | null {
-  for (let i = snapshot.messages.length - 1; i >= 0; i--) {
-    const msg = snapshot.messages[i];
-    if (msg.info.role !== 'assistant') continue;
-
-    let text = '';
-    for (const p of msg.parts) {
-      if (p.type === 'text' && typeof p.text === 'string') {
-        text += p.text;
-      }
-    }
-
-    if (text.length > 0) return text;
-  }
-  return null;
-}
+export const extractLastAssistantMessage = extractLastAssistantText;
 
 /**
  * Tier 3: Extract structured fields from raw markdown, preserve triage data,

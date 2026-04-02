@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Volume2 } from 'lucide-react';
+import { AlertTriangle, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useClawGatewayReady } from '../hooks/useClawHooks';
@@ -115,6 +115,32 @@ export function ProvisioningStep({
   const { data: gatewayReady } = useClawGatewayReady(instanceRunning);
   const isGatewaySettled = gatewayReady?.ready === true && gatewayReady?.settled === true;
 
+  // Grace period: tolerate transient 502s during startup (the gateway may not
+  // have bound its port yet). Only treat 502 as terminal after 30 consecutive
+  // seconds to avoid false negatives on healthy instances.
+  const GATEWAY_502_GRACE_MS = 30_000;
+  const first502AtRef = useRef<number | null>(null);
+  const [gateway502Expired, setGateway502Expired] = useState(false);
+
+  useEffect(() => {
+    if (gatewayReady?.status !== 502) {
+      first502AtRef.current = null;
+      setGateway502Expired(false);
+      return;
+    }
+    if (first502AtRef.current === null) {
+      first502AtRef.current = Date.now();
+    }
+    const elapsed = Date.now() - first502AtRef.current;
+    const remaining = GATEWAY_502_GRACE_MS - elapsed;
+    if (remaining <= 0) {
+      setGateway502Expired(true);
+      return;
+    }
+    const timer = setTimeout(() => setGateway502Expired(true), remaining);
+    return () => clearTimeout(timer);
+  }, [gatewayReady]);
+
   // Advance to the next step when config is applied, gateway reports ready,
   // and boot CPU pressure has subsided (settled === true).
   useEffect(() => {
@@ -123,6 +149,10 @@ export function ProvisioningStep({
       onCompleteRef.current();
     }
   }, [configReady, isGatewaySettled]);
+
+  if (gateway502Expired) {
+    return <ProvisioningErrorView totalSteps={totalSteps} />;
+  }
 
   return <ProvisioningStepView totalSteps={totalSteps} />;
 }
@@ -163,6 +193,41 @@ const PROVISIONING_PHRASES = [
   'Ah, the fruit tree company! 🍎',
   'Greetings, Professor Falken.',
 ];
+
+/** Error view shown when the gateway returns a 502 during provisioning. */
+export function ProvisioningErrorView({ totalSteps = 4 }: { totalSteps?: number }) {
+  return (
+    <OnboardingStepView
+      currentStep={4}
+      totalSteps={totalSteps}
+      stepLabel="Provisioning failed"
+      contentClassName="items-center gap-8"
+    >
+      {/* Error icon */}
+      <div className="flex h-24 w-24 items-center justify-center rounded-full bg-red-500/10">
+        <AlertTriangle className="h-12 w-12 text-red-500" />
+      </div>
+
+      {/* Heading + explanation */}
+      <div className="flex flex-col items-center gap-2 text-center">
+        <h2 className="text-foreground text-2xl font-bold">Provisioning failed</h2>
+        <p className="text-muted-foreground max-w-md text-sm leading-relaxed">
+          Something went wrong while setting up your instance. Please try again by restarting the
+          setup process. If the problem persists, contact{' '}
+          <a href="mailto:hi@kilo.ai" className="text-blue-500 underline">
+            hi@kilo.ai
+          </a>
+          .
+        </p>
+      </div>
+
+      {/* Retry action */}
+      <Button variant="default" onClick={() => window.location.reload()}>
+        Try again
+      </Button>
+    </OnboardingStepView>
+  );
+}
 
 /** Pure visual shell — extracted so Storybook can render it without wiring up mutations. */
 export function ProvisioningStepView({ totalSteps = 4 }: { totalSteps?: number }) {

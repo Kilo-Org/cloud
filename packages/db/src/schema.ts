@@ -63,12 +63,7 @@ import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
   StripeSubscriptionStatus,
-  OpenCodeSettings,
   StoredModel,
-  CustomLlmExtraBody,
-  CustomLlmExtraHeaders,
-  CustomLlmProvider,
-  InterleavedFormat,
   GatewayApiKind,
 } from './schema-types';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
@@ -918,31 +913,10 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
 
-export const custom_llm = pgTable('custom_llm', {
-  public_id: text().notNull().primaryKey(),
-  display_name: text().notNull(),
-  context_length: integer().notNull(),
-  max_completion_tokens: integer().notNull(),
-  internal_id: text().notNull(),
-  provider: text().notNull().$type<CustomLlmProvider>(),
-  base_url: text().notNull(),
-  api_key: text().notNull(),
-  organization_ids: jsonb().notNull().$type<string[]>(),
-
-  supports_image_input: boolean(),
-  force_reasoning: boolean(),
-  opencode_settings: jsonb().$type<OpenCodeSettings>(),
-  extra_body: jsonb().$type<CustomLlmExtraBody>(),
-  extra_headers: jsonb().$type<CustomLlmExtraHeaders>(),
-  interleaved_format: text().$type<InterleavedFormat>(),
-});
-
 export const custom_llm2 = pgTable('custom_llm2', {
   public_id: text().notNull().primaryKey(),
   definition: jsonb().notNull().$type<CustomLlmDefinition>(),
 });
-
-export type CustomLlm = typeof custom_llm.$inferSelect;
 
 export const user_admin_notes = pgTable(
   'user_admin_notes',

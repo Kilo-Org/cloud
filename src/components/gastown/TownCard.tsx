@@ -9,7 +9,7 @@ type TownCardProps = {
     created_at: string;
   };
   onClick: () => void;
-  onDelete: (e: React.MouseEvent) => void;
+  onDelete?: (e: React.MouseEvent) => void;
 };
 
 export function TownCard({ town, onClick, onDelete }: TownCardProps) {
@@ -25,12 +25,14 @@ export function TownCard({ town, onClick, onDelete }: TownCardProps) {
             Created {formatDistanceToNow(new Date(town.created_at), { addSuffix: true })}
           </p>
         </div>
-        <button
-          onClick={onDelete}
-          className="rounded p-1.5 text-white/35 transition-colors hover:bg-red-500/10 hover:text-red-300"
-        >
-          <Trash2 className="size-4" />
-        </button>
+        {onDelete && (
+          <button
+            onClick={onDelete}
+            className="rounded p-1.5 text-white/35 transition-colors hover:bg-red-500/10 hover:text-red-300"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        )}
       </CardContent>
     </Card>
   );

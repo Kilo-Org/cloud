@@ -22,7 +22,7 @@ type Town = {
 type GastownOverviewClientProps = {
   towns: Town[];
   onboardingUrl: string;
-  onDeleteTown: (townId: string) => void;
+  onDeleteTown?: (townId: string) => void;
   title: string;
   description: string;
   organizationId?: string;
@@ -113,10 +113,14 @@ export function GastownOverviewClient({ towns, onboardingUrl, onDeleteTown, titl
                 key={town.id}
                 town={town}
                 onClick={() => organizationId ? router.push(`/organizations/${organizationId}/gastown/${town.id}`) : router.push(`/gastown/${town.id}`)}
-                onDelete={e => {
-                  e.stopPropagation();
-                  if (confirm(`Delete town "${town.name}"?`)) onDeleteTown(town.id);
-                }}
+                onDelete={
+                  onDeleteTown
+                    ? e => {
+                        e.stopPropagation();
+                        if (confirm(`Delete town "${town.name}"?`)) onDeleteTown(town.id);
+                      }
+                    : undefined
+                }
               />
             ))}
           </div>

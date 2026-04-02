@@ -505,6 +505,13 @@
       "when": 1775125519225,
       "tag": "0071_rich_hobgoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1775132336582,
+      "tag": "0072_odd_shatterstar",
+      "breakpoints": true
     }
   ]
 }

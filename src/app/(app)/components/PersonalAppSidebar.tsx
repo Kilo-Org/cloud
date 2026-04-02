@@ -24,6 +24,7 @@ import {
   Wrench,
   Webhook,
   Factory,
+  MessagesSquare,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import HeaderLogo from '@/components/HeaderLogo';
@@ -67,6 +68,25 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     },
   ];
 
+  // KiloClaw group
+  const kiloClawItems: Array<{
+    title: string;
+    icon: React.ElementType;
+    url: string;
+    className?: string;
+  }> = [
+    {
+      title: 'KiloClaw Chat',
+      icon: MessagesSquare,
+      url: '/claw#chat',
+    },
+    {
+      title: 'KiloClaw Settings',
+      icon: KiloCrabIcon,
+      url: '/claw',
+    },
+  ];
+
   // Cloud group
   const cloudItems: Array<{
     title: string;
@@ -74,11 +94,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     url: string;
     className?: string;
   }> = [
-    {
-      title: 'KiloClaw',
-      icon: KiloCrabIcon,
-      url: '/claw',
-    },
     {
       title: 'App Builder',
       icon: Plus,
@@ -204,8 +219,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   ];
 
   const allUrls = useMemo(
-    () => [...dashboardItems, ...cloudItems, ...accountItems, ...startItems].map(i => i.url),
-    [dashboardItems, cloudItems, accountItems, startItems]
+    () =>
+      [...dashboardItems, ...kiloClawItems, ...cloudItems, ...accountItems, ...startItems].map(
+        i => i.url
+      ),
+    [dashboardItems, kiloClawItems, cloudItems, accountItems, startItems]
   );
 
   return (
@@ -223,6 +241,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
 
       <SidebarContent>
         <SidebarMenuList label="Dashboard" items={dashboardItems} allUrls={allUrls} />
+        <SidebarMenuList label="KiloClaw" items={kiloClawItems} allUrls={allUrls} />
         {cloudItems.length > 0 && (
           <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
         )}

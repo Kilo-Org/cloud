@@ -549,7 +549,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     };
   }
 
-
   async updateBotIdentity(patch: {
     botName?: string | null;
     botNature?: string | null;

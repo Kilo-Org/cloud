@@ -569,16 +569,17 @@ describe('formatBotSoulMarkdown', () => {
 describe('writeBotSoulFile', () => {
   it('writes workspace/SOUL.md and removes legacy files when present', () => {
     const harness = fakeDeps();
-    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) =>
-      p === '/root/.openclaw/workspace/BOOTSTRAP.md' || p === '/root/.openclaw/workspace/IDENTITY.md'
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) =>
+        p === '/root/.openclaw/workspace/BOOTSTRAP.md' ||
+        p === '/root/.openclaw/workspace/IDENTITY.md'
     );
 
-    writeBotSoulFile(
-      { KILOCLAW_BOT_NAME: 'Milo', KILOCLAW_BOT_NATURE: 'Operator' },
-      harness.deps
-    );
+    writeBotSoulFile({ KILOCLAW_BOT_NAME: 'Milo', KILOCLAW_BOT_NATURE: 'Operator' }, harness.deps);
 
-    expect(harness.renameCalls.some(call => call.to === '/root/.openclaw/workspace/SOUL.md')).toBe(true);
+    expect(harness.renameCalls.some(call => call.to === '/root/.openclaw/workspace/SOUL.md')).toBe(
+      true
+    );
     expect((harness.deps.unlinkSync as ReturnType<typeof vi.fn>).mock.calls).toEqual([
       ['/root/.openclaw/workspace/BOOTSTRAP.md'],
       ['/root/.openclaw/workspace/IDENTITY.md'],

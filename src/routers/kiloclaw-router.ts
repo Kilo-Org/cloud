@@ -838,11 +838,13 @@ export const kiloclawRouter = createTRPCRouter({
       return client.patchExecPreset(ctx.user.id, input, workerInstanceId(instance));
     }),
 
-  patchBotIdentity: clawAccessProcedure.input(patchBotIdentitySchema).mutation(async ({ ctx, input }) => {
-    const instance = await getActiveInstance(ctx.user.id);
-    const client = new KiloClawInternalClient();
-    return client.patchBotIdentity(ctx.user.id, input, workerInstanceId(instance));
-  }),
+  patchBotIdentity: clawAccessProcedure
+    .input(patchBotIdentitySchema)
+    .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+      const client = new KiloClawInternalClient();
+      return client.patchBotIdentity(ctx.user.id, input, workerInstanceId(instance));
+    }),
 
   /**
    * Generic secret patch — supports both catalog secrets and custom user secrets.

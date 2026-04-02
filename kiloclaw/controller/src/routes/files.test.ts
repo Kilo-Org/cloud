@@ -77,8 +77,8 @@ describe('file routes', () => {
 
   describe('POST /_kilo/bot-identity', () => {
     it('writes workspace/SOUL.md', async () => {
-      vi.mocked(fs.existsSync).mockImplementation((path: any) =>
-        typeof path === 'string' && path.endsWith('BOOTSTRAP.md')
+      vi.mocked(fs.existsSync).mockImplementation(
+        (path: any) => typeof path === 'string' && path.endsWith('BOOTSTRAP.md')
       );
 
       const res = await app.request('/_kilo/bot-identity', {

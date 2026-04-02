@@ -154,12 +154,15 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
     fs.mkdirSync(path.dirname(targetPath), { recursive: true });
 
     try {
-      atomicWrite(targetPath, formatBotSoulMarkdown({
-        KILOCLAW_BOT_NAME: parsed.data.botName ?? undefined,
-        KILOCLAW_BOT_NATURE: parsed.data.botNature ?? undefined,
-        KILOCLAW_BOT_VIBE: parsed.data.botVibe ?? undefined,
-        KILOCLAW_BOT_EMOJI: parsed.data.botEmoji ?? undefined,
-      }));
+      atomicWrite(
+        targetPath,
+        formatBotSoulMarkdown({
+          KILOCLAW_BOT_NAME: parsed.data.botName ?? undefined,
+          KILOCLAW_BOT_NATURE: parsed.data.botNature ?? undefined,
+          KILOCLAW_BOT_VIBE: parsed.data.botVibe ?? undefined,
+          KILOCLAW_BOT_EMOJI: parsed.data.botEmoji ?? undefined,
+        })
+      );
 
       for (const legacyPath of LEGACY_BOT_IDENTITY_RELATIVE_PATHS) {
         try {

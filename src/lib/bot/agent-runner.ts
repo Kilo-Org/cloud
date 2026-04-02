@@ -13,7 +13,6 @@ import { updateBotRequest, linkBotRequestToSession } from '@/lib/bot/request-log
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
 } from '@/lib/bot/tools/spawn-cloud-agent-session';
-import { bot } from '@/lib/bot';
 import { buildSessionUrl } from '@/lib/cloud-agent-next/session-url';
 import { APP_URL } from '@/lib/constants';
 import { FEATURE_HEADER } from '@/lib/feature-detection';
@@ -183,8 +182,6 @@ export async function postSessionLinkEphemeral(params: {
 }
 
 export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentContinuation> {
-  await bot.registerSingleton();
-
   const headers: Record<string, string> = {
     'X-KiloCode-Version': BOT_VERSION,
     'User-Agent': BOT_USER_AGENT,

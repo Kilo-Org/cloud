@@ -48,7 +48,6 @@ export const spawnCloudAgentInputSchema = z.object({
     ),
   mode: z
     .enum(['code', 'ask'])
-    .default('code')
     .describe(
       'The agent mode: "code" for making changes (creates a PR/MR), "ask" for questions and explanations about existing code.'
     ),
@@ -75,7 +74,7 @@ export default async function spawnCloudAgentSession(
   const kilocodeOrganizationId = platformIntegration.owned_by_organization_id || undefined;
   let prepareInput: PrepareSessionInput;
   let initiateInput: { githubToken?: string; kilocodeOrganizationId?: string };
-  const mode: AgentMode = args.mode ?? 'code';
+  const mode: AgentMode = args.mode;
 
   if (!args.githubRepo && !args.gitlabProject) {
     return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };

@@ -135,7 +135,6 @@ jobs:
             registry.fly.io/kiloclaw-machines:latest
           build-args: |
             CONTROLLER_COMMIT=${{ github.sha }}
-            STREAM_CHAT_CACHE_BUSTER=2
 
       # ── Resolve image digest ────────────────────────────────────
       # Gets the Docker digest from whichever source is available:

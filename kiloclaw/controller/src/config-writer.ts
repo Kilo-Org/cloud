@@ -327,7 +327,7 @@ export function generateBaseConfig(
     config.plugins.entries = config.plugins.entries ?? {};
     // Entry key must match the plugin's manifest id (openclaw.plugin.json).
     // The fork's manifest declares id "openclaw-channel-streamchat" to align
-    // with the idHint that OpenClaw 3.24 derives from the package name.
+    // with the idHint that OpenClaw derives from the package name.
     const scEntry = 'openclaw-channel-streamchat';
     config.plugins.entries[scEntry] = config.plugins.entries[scEntry] ?? {};
     config.plugins.entries[scEntry].enabled = true;

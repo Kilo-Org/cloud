@@ -169,14 +169,13 @@ export default function AdminCustomLlmsPage() {
                 <TableHead>Display Name</TableHead>
                 <TableHead>Internal ID</TableHead>
                 <TableHead>Base URL</TableHead>
-                <TableHead>Organizations</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data?.items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground text-center">
+                   <TableCell colSpan={5} className="text-muted-foreground text-center">
                     No custom LLMs defined yet.
                   </TableCell>
                 </TableRow>
@@ -188,11 +187,6 @@ export default function AdminCustomLlmsPage() {
                   <TableCell className="font-mono text-sm">{item.definition.internal_id}</TableCell>
                   <TableCell className="max-w-48 truncate text-sm">
                     {item.definition.base_url}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {item.definition.organization_ids.length > 0
-                      ? item.definition.organization_ids.join(', ')
-                      : '-'}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">

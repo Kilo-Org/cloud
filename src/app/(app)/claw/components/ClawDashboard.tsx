@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
-import { Check, MessageSquare, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
+import { ArrowUpCircle, Check, MessageSquare, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import { calverAtLeast, cleanVersion, getRunningVersionBadge } from '@/lib/kiloclaw/version';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
-import { useClawServiceDegraded } from '../hooks/useClawHooks';
+import { useClawControllerVersion, useClawLatestVersion, useClawServiceDegraded } from '../hooks/useClawHooks';
 import { ClawContextProvider, useClawContext } from './ClawContext';
+import { Banner } from '@/components/shared/Banner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -119,6 +121,36 @@ function ClawDashboardInner({
   } = organizationId ? orgGateway : personalGateway;
 
   const { data: isServiceDegraded } = useClawServiceDegraded();
+
+  // ── Version / upgrade detection (mirrors SettingsTab logic) ──
+  const { data: controllerVersion } = useClawControllerVersion(!!isRunning);
+  const { data: latestVersion } = useClawLatestVersion();
+  const trackedVersion = cleanVersion(instanceStatus?.openclawVersion);
+  const runningVersion = cleanVersion(controllerVersion?.openclawVersion);
+  const latestAvailableVersion = cleanVersion(latestVersion?.openclawVersion);
+  const isModified = getRunningVersionBadge(runningVersion, trackedVersion) === 'modified';
+  const catalogNewerThanImage =
+    !!trackedVersion &&
+    !!latestAvailableVersion &&
+    latestAvailableVersion !== trackedVersion &&
+    calverAtLeast(latestAvailableVersion, trackedVersion);
+  const hasVersionInfo = !!isRunning && !!trackedVersion && trackedVersion !== ':latest';
+  const variantsMatch =
+    !instanceStatus?.imageVariant ||
+    instanceStatus.imageVariant === 'default' ||
+    instanceStatus.imageVariant === latestVersion?.variant;
+  const imageTagDiffers =
+    hasVersionInfo &&
+    variantsMatch &&
+    !!instanceStatus?.trackedImageTag &&
+    !!latestVersion?.imageTag &&
+    instanceStatus.trackedImageTag !== latestVersion.imageTag;
+  const updateAvailable = catalogNewerThanImage
+    ? !isModified ||
+      (!!runningVersion &&
+        calverAtLeast(latestAvailableVersion, runningVersion) &&
+        latestAvailableVersion !== runningVersion)
+    : imageTagDiffers;
 
   const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
   const instanceYoung =
@@ -274,6 +306,33 @@ function ClawDashboardInner({
             Book your session
           </a>
         </div>
+      )}
+
+      {updateAvailable && (
+        <Banner color="amber">
+          <Banner.Icon>
+            <ArrowUpCircle />
+          </Banner.Icon>
+          <Banner.Content>
+            <Banner.Title>
+              {catalogNewerThanImage
+                ? `A newer OpenClaw version (${latestAvailableVersion}) is available`
+                : `A newer image (${latestVersion?.imageTag ?? 'unknown'}) is available`}
+            </Banner.Title>
+            <Banner.Description>
+              Upgrade your instance to get the latest features and fixes.
+            </Banner.Description>
+          </Banner.Content>
+          <Banner.Action>
+            <Button
+              size="sm"
+              className="bg-amber-500 text-primary-foreground hover:bg-amber-500/90 w-full sm:w-auto"
+              onClick={onRequestUpgrade}
+            >
+              Upgrade now
+            </Button>
+          </Banner.Action>
+        </Banner>
       )}
 
       <MaybeBillingWrapper skip={!!organizationId} hideBanners={isNewSetup}>

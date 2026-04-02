@@ -14,6 +14,7 @@
     "start": "wrangler dev --env dev --ip 0.0.0.0",
     "types": "wrangler types --include-runtime=false",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.workers.config.ts",
     "test:watch": "vitest",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json cloudflare-wasteland/src"

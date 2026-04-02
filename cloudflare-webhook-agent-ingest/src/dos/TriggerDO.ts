@@ -716,9 +716,18 @@ export class TriggerDO extends DurableObject<Env> {
   private async scheduleNextAlarm(config: TriggerConfig): Promise<void> {
     if (!config.cronExpression || config.activationMode !== 'scheduled') return;
 
-    const nextTime = computeNextCronTime(config.cronExpression, config.cronTimezone ?? 'UTC');
+    let nextTime = computeNextCronTime(config.cronExpression, config.cronTimezone ?? 'UTC');
     if (!nextTime) {
-      logger.error('Failed to compute next cron time', { triggerId: config.triggerId });
+      // DST spring-forward can skip an occurrence. Retry with UTC as fallback
+      // to avoid permanently losing the alarm.
+      nextTime = computeNextCronTime(config.cronExpression, 'UTC');
+    }
+    if (!nextTime) {
+      // Still null — schedule a retry in 1 hour so the trigger doesn't stop forever
+      logger.error('Failed to compute next cron time, retrying in 1 hour', {
+        triggerId: config.triggerId,
+      });
+      await this.ctx.storage.setAlarm(Date.now() + 3_600_000);
       return;
     }
 

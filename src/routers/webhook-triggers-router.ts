@@ -587,6 +587,8 @@ export const webhookTriggersRouter = createTRPCRouter({
 
     // Build update payload
     // Use null to explicitly clear fields, undefined to leave unchanged
+    // Cron fields only apply to scheduled triggers — ignore for webhook triggers
+    const isScheduledTrigger = dbTrigger.activation_mode === 'scheduled';
     const updatePayload: Parameters<typeof updateWorkerTrigger>[3] = {
       mode: input.mode,
       model: input.model,
@@ -596,8 +598,8 @@ export const webhookTriggersRouter = createTRPCRouter({
       autoCommit: input.autoCommit,
       condenseOnComplete: input.condenseOnComplete,
       webhookAuth: input.webhookAuth,
-      cronExpression: input.cronExpression,
-      cronTimezone: input.cronTimezone,
+      cronExpression: isScheduledTrigger ? input.cronExpression : undefined,
+      cronTimezone: isScheduledTrigger ? input.cronTimezone : undefined,
     };
 
     // Update in worker
@@ -629,8 +631,12 @@ export const webhookTriggersRouter = createTRPCRouter({
       .set({
         ...(input.isActive !== undefined ? { is_active: input.isActive } : {}),
         ...(input.profileId !== undefined ? { profile_id: input.profileId } : {}),
-        ...(input.cronExpression !== undefined ? { cron_expression: input.cronExpression } : {}),
-        ...(input.cronTimezone !== undefined ? { cron_timezone: input.cronTimezone } : {}),
+        ...(isScheduledTrigger && input.cronExpression !== undefined
+          ? { cron_expression: input.cronExpression }
+          : {}),
+        ...(isScheduledTrigger && input.cronTimezone !== undefined
+          ? { cron_timezone: input.cronTimezone }
+          : {}),
         updated_at: new Date().toISOString(),
       })
       .where(eq(cloud_agent_webhook_triggers.id, dbTrigger.id));

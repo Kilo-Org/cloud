@@ -48,7 +48,7 @@ export function DrainStatusBanner({ townId }: { townId: string }) {
       : null;
 
   return (
-    <Banner color="amber" className="mb-4" role="alert">
+    <Banner color="amber" className="mx-6 mt-4 mb-4" role="alert">
       <Banner.Icon>
         <AlertTriangle />
       </Banner.Icon>

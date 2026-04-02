@@ -3,12 +3,13 @@ import { db } from '@/lib/drizzle';
 import {
   app_builder_projects,
   app_builder_project_sessions,
+  cliSessions,
   kilocode_users,
   organizations,
   cli_sessions_v2,
 } from '@kilocode/db/schema';
 import * as z from 'zod';
-import { eq, and, or, ilike, desc, asc, count, isNotNull, type SQL } from 'drizzle-orm';
+import { eq, and, or, ilike, desc, asc, count, isNotNull, sql, type SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as appBuilderClient from '@/lib/app-builder/app-builder-client';
 
@@ -98,12 +99,15 @@ export const adminAppBuilderRouter = createTRPCRouter({
       });
     }
 
-    // Fetch all sessions for this project with linked CLI session info
+    // Fetch all sessions for this project with linked CLI session info.
+    // Join both v2 and v1 CLI session tables so older projects still resolve their trace link.
     const projectSessions = await db
       .select({
         id: app_builder_project_sessions.id,
         cloud_agent_session_id: app_builder_project_sessions.cloud_agent_session_id,
-        cli_session_id: cli_sessions_v2.session_id,
+        cli_session_id: sql<
+          string | null
+        >`coalesce(${cli_sessions_v2.session_id}, ${cliSessions.session_id}::text)`,
         created_at: app_builder_project_sessions.created_at,
         ended_at: app_builder_project_sessions.ended_at,
         reason: app_builder_project_sessions.reason,
@@ -112,7 +116,14 @@ export const adminAppBuilderRouter = createTRPCRouter({
       .from(app_builder_project_sessions)
       .leftJoin(
         cli_sessions_v2,
-        eq(app_builder_project_sessions.cloud_agent_session_id, cli_sessions_v2.cloud_agent_session_id)
+        eq(
+          app_builder_project_sessions.cloud_agent_session_id,
+          cli_sessions_v2.cloud_agent_session_id
+        )
+      )
+      .leftJoin(
+        cliSessions,
+        eq(app_builder_project_sessions.cloud_agent_session_id, cliSessions.cloud_agent_session_id)
       )
       .where(eq(app_builder_project_sessions.project_id, projectId))
       .orderBy(desc(app_builder_project_sessions.created_at));

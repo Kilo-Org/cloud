@@ -216,7 +216,7 @@ export function AppBuilderProjectDetail({ projectId }: { projectId: string }) {
               <p className="text-muted-foreground text-sm">No sessions found</p>
             ) : (
               <div className="divide-border divide-y">
-                {project.sessions.map((session) => {
+                {project.sessions.map(session => {
                   const isActive = session.ended_at === null;
                   return (
                     <div key={session.id} className="flex flex-col gap-2 py-4 first:pt-0 last:pb-0">
@@ -257,9 +257,7 @@ export function AppBuilderProjectDetail({ projectId }: { projectId: string }) {
 
                       {session.cli_session_id ? (
                         <div className="flex items-center gap-2">
-                          <Link
-                            href={`/admin/session-traces?sessionId=${session.cli_session_id}`}
-                          >
+                          <Link href={`/admin/session-traces?sessionId=${session.cli_session_id}`}>
                             <Button variant="outline" size="sm">
                               <ExternalLink className="mr-2 h-4 w-4" />
                               View Session Traces
@@ -267,9 +265,7 @@ export function AppBuilderProjectDetail({ projectId }: { projectId: string }) {
                           </Link>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground text-sm">
-                          No linked CLI session
-                        </span>
+                        <span className="text-muted-foreground text-sm">No linked CLI session</span>
                       )}
                     </div>
                   );

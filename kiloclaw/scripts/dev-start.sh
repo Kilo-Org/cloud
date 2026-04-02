@@ -152,11 +152,12 @@ fi
 # (NVM_PREFIX) that spawned shell commands prepend to activate the correct version.
 REQUIRED_NODE="$(tr -d '[:space:]' < "$MONOREPO_ROOT/.nvmrc" 2>/dev/null)"
 REQUIRED_NODE="${REQUIRED_NODE:-22}"
+REQUIRED_NODE_MAJOR="$(echo "$REQUIRED_NODE" | cut -d. -f1)"
 CURRENT_NODE_MAJOR="$(node -v 2>/dev/null | sed 's/^v//' | cut -d. -f1)"
 
 NVM_PREFIX=""
 if [ -n "${NVM_DIR:-}" ] && [ -s "$NVM_DIR/nvm.sh" ]; then
-  if [ "${CURRENT_NODE_MAJOR:-0}" != "$REQUIRED_NODE" ]; then
+  if [ "${CURRENT_NODE_MAJOR:-0}" != "$REQUIRED_NODE_MAJOR" ]; then
     echo "==> Node.js $(node -v 2>/dev/null || echo 'not found') active; switching to v${REQUIRED_NODE} via nvm..."
   fi
   # shellcheck source=/dev/null
@@ -170,8 +171,8 @@ if [ -n "${NVM_DIR:-}" ] && [ -s "$NVM_DIR/nvm.sh" ]; then
   export PATH="${NVM_BIN}:${PATH}"
   hash -r
   NVM_PREFIX=". '${NVM_DIR}/nvm.sh' && nvm use ${REQUIRED_NODE} && export PATH=\$(dirname \"\$(nvm which ${REQUIRED_NODE})\"):\$PATH && "
-elif [ "${CURRENT_NODE_MAJOR:-0}" != "$REQUIRED_NODE" ]; then
-  echo "ERROR: Node.js ^${REQUIRED_NODE} required but $(node -v 2>/dev/null || echo 'none') is active."
+elif [ "${CURRENT_NODE_MAJOR:-0}" != "$REQUIRED_NODE_MAJOR" ]; then
+  echo "ERROR: Node.js ${REQUIRED_NODE_MAJOR}.x required but $(node -v 2>/dev/null || echo 'none') is active."
   echo "Install nvm and Node.js ${REQUIRED_NODE}: nvm install ${REQUIRED_NODE} && nvm use ${REQUIRED_NODE}"
   exit 1
 fi

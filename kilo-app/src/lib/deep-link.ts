@@ -9,8 +9,13 @@ let pending: PendingDeepLink | null = null;
 let listener: ((link: PendingDeepLink) => void) | null = null;
 
 function setPendingDeepLink(link: PendingDeepLink) {
-  pending = link;
-  listener?.(link);
+  if (listener) {
+    // Warm start: deliver directly, don't store (avoids replay on remount)
+    listener(link);
+  } else {
+    // Cold start: stash for consumePendingDeepLink() on first mount
+    pending = link;
+  }
 }
 
 export function consumePendingDeepLink(): PendingDeepLink | null {

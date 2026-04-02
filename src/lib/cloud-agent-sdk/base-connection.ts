@@ -12,6 +12,9 @@ export type BaseConnectionConfig = {
   isAuthFailure?: (event: CloseEvent) => boolean;
   refreshAuth?: () => Promise<void>;
   onOpen?: (ws: WebSocket) => void;
+  /** How long to wait for a server message (e.g. heartbeat) on tab resume before
+   *  treating the connection as stale. Should exceed the server's heartbeat interval. */
+  stalenessTimeoutMs?: number;
 };
 
 export type Connection = {
@@ -23,7 +26,7 @@ export type Connection = {
 const MAX_RECONNECT_ATTEMPTS = 8;
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30000;
-export const PING_TIMEOUT_MS = 5000;
+export const DEFAULT_STALENESS_TIMEOUT_MS = 30_000;
 
 // min(cap, base * 2^attempt) * (0.5 + random jitter)
 function calculateBackoffDelay(attempt: number): number {
@@ -42,7 +45,9 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
   let reconnectAttempt = 0;
   let generation = 0;
   let hasConnectedOnce = false;
-  let pingTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  let stalenessTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  let lastMessageTime = 0;
+  const stalenessTimeoutMs = config.stalenessTimeoutMs ?? DEFAULT_STALENESS_TIMEOUT_MS;
 
   // Bound handler references for event listener cleanup
   let boundVisibilityHandler: (() => void) | null = null;
@@ -56,10 +61,10 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
     }
   }
 
-  function clearPingTimeout(): void {
-    if (pingTimeoutId !== null) {
-      clearTimeout(pingTimeoutId);
-      pingTimeoutId = null;
+  function clearStalenessTimeout(): void {
+    if (stalenessTimeoutId !== null) {
+      clearTimeout(stalenessTimeoutId);
+      stalenessTimeoutId = null;
     }
   }
 
@@ -123,7 +128,7 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
     if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
 
     reconnectAttempt = attempt;
-    clearPingTimeout();
+    clearStalenessTimeout();
 
     // Close existing socket - clear reference first so onclose ignores it
     const oldWs = ws;
@@ -144,8 +149,9 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
     };
 
     newWs.onmessage = (messageEvent: MessageEvent) => {
-      // Any incoming message cancels an active ping staleness check
-      clearPingTimeout();
+      // Any incoming message cancels an active staleness check
+      clearStalenessTimeout();
+      lastMessageTime = Date.now();
 
       const parsed = config.parseMessage(messageEvent.data);
       if (parsed === null) {
@@ -245,7 +251,7 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
     if (typeof document === 'undefined') return;
 
     if (document.visibilityState === 'hidden') {
-      clearPingTimeout();
+      clearStalenessTimeout();
       return;
     }
 
@@ -258,14 +264,18 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
       return;
     }
 
-    // Socket appears open - send a ping to verify it's not stale
-    ws.send('ping');
+    // If a message arrived recently, the connection is verified alive
+    if (Date.now() - lastMessageTime < stalenessTimeoutMs) {
+      return;
+    }
+
+    // Socket appears open but no recent message — wait for the next server
+    // heartbeat to confirm liveness; if nothing arrives, treat as stale.
     const currentGeneration = generation;
-    pingTimeoutId = setTimeout(() => {
-      pingTimeoutId = null;
+    stalenessTimeoutId = setTimeout(() => {
+      stalenessTimeoutId = null;
       if (destroyed || intentionalDisconnect || currentGeneration !== generation) return;
-      // No message received in time - connection is stale
-      console.log('[Connection] Ping timeout - connection stale, reconnecting');
+      console.log('[Connection] Staleness timeout - no server message, reconnecting');
       const staleWs = ws;
       if (staleWs !== null) {
         ws = null;
@@ -276,7 +286,7 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
         config.onDisconnected();
       }
       void refreshAndConnect(currentGeneration);
-    }, PING_TIMEOUT_MS);
+    }, stalenessTimeoutMs);
   }
 
   function handlePageshow(event: PageTransitionEvent): void {
@@ -288,7 +298,7 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
     console.log('[Connection] BFCache restore detected, forcing reconnect');
     reconnectAttempt = 0;
     clearReconnectTimer();
-    clearPingTimeout();
+    clearStalenessTimeout();
 
     const staleWs = ws;
     if (staleWs !== null) {
@@ -356,9 +366,10 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
     connected = false;
     reconnectAttempt = 0;
     hasConnectedOnce = false;
+    lastMessageTime = 0;
     generation += 1;
     clearReconnectTimer();
-    clearPingTimeout();
+    clearStalenessTimeout();
     addEventListeners();
     connectInternal(0, generation);
   }
@@ -368,7 +379,8 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
     generation += 1;
 
     clearReconnectTimer();
-    clearPingTimeout();
+    clearStalenessTimeout();
+    removeEventListeners();
 
     if (ws !== null) {
       ws.close();
@@ -386,7 +398,7 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
     generation += 1;
 
     clearReconnectTimer();
-    clearPingTimeout();
+    clearStalenessTimeout();
     removeEventListeners();
 
     if (ws !== null) {

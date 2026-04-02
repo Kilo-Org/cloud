@@ -1,6 +1,6 @@
 import {
   createBaseConnection,
-  PING_TIMEOUT_MS,
+  DEFAULT_STALENESS_TIMEOUT_MS,
   type BaseConnectionConfig,
 } from './base-connection';
 
@@ -145,20 +145,22 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.destroy();
     });
 
-    it('sends ping and reconnects if no message within timeout when tab becomes visible with open WS', () => {
+    it('reconnects if no server message within timeout when tab becomes visible with open WS', () => {
       const { connection, onDisconnected } = createTestConnection();
       connection.connect();
       connectSocket(0);
 
+      // Advance past the recency window so the staleness check fires
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
+
       simulateVisibilityChange('hidden');
       simulateVisibilityChange('visible');
 
-      // Socket is OPEN, so it should send a ping rather than immediately reconnecting
-      expect(sockets[0].send).toHaveBeenCalledWith('ping');
+      // Socket is OPEN but last message is stale — timeout is armed
       expect(sockets).toHaveLength(1);
 
-      // Advance past the ping timeout
-      jest.advanceTimersByTime(PING_TIMEOUT_MS);
+      // Advance past the staleness timeout
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
       // Should have closed the stale socket and created a new one
       expect(sockets[0].close).toHaveBeenCalled();
@@ -168,21 +170,17 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.destroy();
     });
 
-    it('cancels ping timeout if a message arrives before deadline', () => {
+    it('skips staleness check when a message was received recently', () => {
       const { connection, onDisconnected } = createTestConnection();
       connection.connect();
       connectSocket(0);
 
+      // Do NOT advance time — last message is within the recency window
       simulateVisibilityChange('hidden');
       simulateVisibilityChange('visible');
 
-      expect(sockets[0].send).toHaveBeenCalledWith('ping');
-
-      // Receive a message before the timeout fires
-      sockets[0].onmessage?.({ data: 'server-reply' } as MessageEvent);
-
-      // Advance past the ping timeout - should NOT trigger reconnect
-      jest.advanceTimersByTime(PING_TIMEOUT_MS);
+      // Advance past the timeout — nothing should happen
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
       expect(sockets).toHaveLength(1);
       expect(onDisconnected).not.toHaveBeenCalled();
@@ -190,20 +188,43 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.destroy();
     });
 
-    it('clears ping timeout when tab is hidden', () => {
+    it('cancels staleness timeout if a server message arrives before deadline', () => {
       const { connection, onDisconnected } = createTestConnection();
       connection.connect();
       connectSocket(0);
 
-      // Tab visible → sends ping
-      simulateVisibilityChange('visible');
-      expect(sockets[0].send).toHaveBeenCalledWith('ping');
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
-      // Tab hidden → should clear the ping timeout
+      simulateVisibilityChange('hidden');
+      simulateVisibilityChange('visible');
+
+      // Receive a message before the timeout fires
+      sockets[0].onmessage?.({ data: 'server-reply' } as MessageEvent);
+
+      // Advance past the timeout - should NOT trigger reconnect
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
+
+      expect(sockets).toHaveLength(1);
+      expect(onDisconnected).not.toHaveBeenCalled();
+
+      connection.destroy();
+    });
+
+    it('clears staleness timeout when tab is hidden', () => {
+      const { connection, onDisconnected } = createTestConnection();
+      connection.connect();
+      connectSocket(0);
+
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
+
+      // Tab visible → arms staleness timeout
+      simulateVisibilityChange('visible');
+
+      // Tab hidden → should clear the timeout
       simulateVisibilityChange('hidden');
 
-      // Advance past the ping timeout - nothing should happen
-      jest.advanceTimersByTime(PING_TIMEOUT_MS);
+      // Advance past the timeout - nothing should happen
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
       expect(sockets).toHaveLength(1);
       expect(onDisconnected).not.toHaveBeenCalled();
@@ -371,19 +392,19 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
   });
 
   describe('proactive auth refresh on reconnect', () => {
-    it('calls refreshAuth before reconnecting after ping timeout', async () => {
+    it('calls refreshAuth before reconnecting after staleness timeout', async () => {
       const refreshAuth = jest.fn(() => Promise.resolve());
       const { connection } = createTestConnection({ refreshAuth });
       connection.connect();
       connectSocket(0);
 
-      // Simulate tab hidden then visible — triggers ping
+      // Make lastMessageTime stale, then trigger visibility check
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
       simulateVisibilityChange('hidden');
       simulateVisibilityChange('visible');
-      expect(sockets[0].send).toHaveBeenCalledWith('ping');
 
-      // Advance past ping timeout
-      jest.advanceTimersByTime(PING_TIMEOUT_MS);
+      // Advance past staleness timeout
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
       // refreshAuth should be called to get a fresh ticket before reconnecting
       expect(refreshAuth).toHaveBeenCalledTimes(1);
@@ -447,10 +468,11 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.connect();
       connectSocket(0);
 
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
       simulateVisibilityChange('hidden');
       simulateVisibilityChange('visible');
 
-      jest.advanceTimersByTime(PING_TIMEOUT_MS);
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
       expect(refreshAuth).toHaveBeenCalledTimes(1);
 
@@ -468,10 +490,11 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.connect();
       connectSocket(0);
 
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
       simulateVisibilityChange('hidden');
       simulateVisibilityChange('visible');
 
-      jest.advanceTimersByTime(PING_TIMEOUT_MS);
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
       // Should still create a new socket (direct connect, no refresh)
       expect(sockets).toHaveLength(2);
@@ -489,6 +512,23 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.connect();
 
       connection.destroy();
+
+      const docRemovedEvents = docRemoveSpy.mock.calls.map(call => call[0]);
+      const winRemovedEvents = winRemoveSpy.mock.calls.map(call => call[0]);
+
+      expect(docRemovedEvents).toContain('visibilitychange');
+      expect(winRemovedEvents).toContain('pageshow');
+      expect(winRemovedEvents).toContain('online');
+    });
+
+    it('disconnect() removes visibilitychange, pageshow, and online listeners', () => {
+      const docRemoveSpy = jest.spyOn(mockDocument, 'removeEventListener');
+      const winRemoveSpy = jest.spyOn(mockWindow, 'removeEventListener');
+
+      const { connection } = createTestConnection();
+      connection.connect();
+
+      connection.disconnect();
 
       const docRemovedEvents = docRemoveSpy.mock.calls.map(call => call[0]);
       const winRemovedEvents = winRemoveSpy.mock.calls.map(call => call[0]);

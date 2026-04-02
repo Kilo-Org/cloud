@@ -60,6 +60,7 @@ export function createConnection(config: ConnectionConfig): Connection {
   const refreshTicket = config.onRefreshTicket;
 
   return createBaseConnection({
+    stalenessTimeoutMs: config.heartbeatTimeoutMs,
     buildUrl: () => {
       const url = new URL(config.websocketUrl);
       url.searchParams.set('ticket', currentTicket);

@@ -70,6 +70,8 @@ bot.onNewMention(async function handleIncomingMessage(
   const received = thread.createSentMessageFromMessage(message);
   await received.addReaction(emoji.eyes);
 
+  await bot.registerSingleton();
+
   try {
     await processMessage({ thread, message, platformIntegration, user, botRequestId });
   } catch (error) {

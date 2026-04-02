@@ -2,7 +2,7 @@ import { type Href } from 'expo-router';
 
 export type PendingDeepLink = {
   targetRoute: Href;
-  organizationId: string;
+  organizationId?: string;
 };
 
 let pending: PendingDeepLink | null = null;
@@ -24,7 +24,7 @@ export function consumePendingDeepLink(): PendingDeepLink | null {
   return link;
 }
 
-/** Subscribe to org-scoped deep links arriving while the app is open. */
+/** Subscribe to deep links arriving while the app is open. */
 export function onPendingDeepLink(handler: (link: PendingDeepLink) => void): () => void {
   listener = handler;
   return () => {
@@ -65,10 +65,15 @@ const PROFILE: Href = '/(app)/profile' as Href;
 /**
  * Map an incoming web URL / path to an internal app route.
  *
- * - Simple routes are returned directly as a rewritten path string.
- * - Org-scoped routes store a pending deep link (for context switching)
- *   and return `/(app)` so the app layout can pick it up.
- * - Unrecognised paths are returned as-is (Expo Router's default handling).
+ * Every recognised URL is stored as a pending deep link so the app can
+ * navigate there after auth completes (if the user isn't logged in).
+ * The rewritten path is also returned for direct navigation when the
+ * user is already authenticated.
+ *
+ * - Non-org routes: stored + direct rewrite returned.
+ * - Org-scoped routes: stored (with orgId for context switch),
+ *   returns `/(app)` so the app layout picks it up.
+ * - Unrecognised paths: returned as-is (Expo Router default handling).
  */
 export function resolveDeepLink(raw: string): string {
   const pathname = toPathname(raw);
@@ -78,11 +83,13 @@ export function resolveDeepLink(raw: string): string {
 
   // /claw → instance list (personal context)
   if (pathname === '/claw' || pathname === '/claw/') {
+    setPendingDeepLink({ targetRoute: INSTANCE_LIST });
     return INSTANCE_LIST as string;
   }
 
   // /profile → profile screen
   if (pathname === '/profile' || pathname === '/profile/') {
+    setPendingDeepLink({ targetRoute: PROFILE });
     return PROFILE as string;
   }
 

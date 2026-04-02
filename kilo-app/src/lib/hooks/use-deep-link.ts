@@ -7,12 +7,12 @@ import { consumePendingDeepLink, onPendingDeepLink, type PendingDeepLink } from 
 import { trpcClient } from '@/lib/trpc';
 
 /**
- * Consumes pending org-scoped deep links (set by +native-intent),
- * validates org membership, switches context, and navigates to the
- * destination screen.
+ * Consumes pending deep links (set by +native-intent), validates access
+ * for org-scoped links, switches context if needed, and navigates.
  *
- * Handles both cold-start (pending link already set before mount) and
- * warm-start (new link arriving while the app is open).
+ * Handles both cold-start (pending link set before mount — covers the
+ * case where the user wasn't logged in and went through auth first) and
+ * warm-start (new link arriving while the app is already open).
  *
  * Must be called inside the (app) layout (inside providers, after auth).
  */
@@ -24,13 +24,15 @@ export function useDeepLink() {
     (link: PendingDeepLink) => {
       const navigate = async () => {
         try {
-          const orgs = await trpcClient.organizations.list.query();
-          const hasAccess = orgs.some(org => org.organizationId === link.organizationId);
-          if (!hasAccess) {
-            toast.error('You don\u2019t have access to this organization');
-            return;
+          if (link.organizationId) {
+            const orgs = await trpcClient.organizations.list.query();
+            const hasAccess = orgs.some(org => org.organizationId === link.organizationId);
+            if (!hasAccess) {
+              toast.error('You don\u2019t have access to this organization');
+              return;
+            }
+            await setContext({ type: 'organization', organizationId: link.organizationId });
           }
-          await setContext({ type: 'organization', organizationId: link.organizationId });
           router.replace(link.targetRoute);
         } catch {
           toast.error('Failed to open link');
@@ -43,6 +45,7 @@ export function useDeepLink() {
 
   useEffect(() => {
     // Cold start: consume any link set before this component mounted
+    // (includes links that waited through the auth flow)
     const link = consumePendingDeepLink();
     if (link) {
       handleLink(link);

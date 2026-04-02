@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ArrowUpCircle,
   Check,
@@ -82,6 +82,25 @@ export function InstanceControls({
 
   const { updateAvailable, catalogNewerThanImage, latestAvailableVersion, latestVersion } =
     useClawUpdateAvailable(status);
+
+  const upgradeVersion = latestAvailableVersion ?? latestVersion?.imageTag ?? '';
+  const dismissKey = `claw-upgrade-banner-dismissed:${upgradeVersion}`;
+
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const raw = localStorage.getItem(dismissKey);
+    if (!raw) return false;
+    const dismissedAt = Number(raw);
+    const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+    return Date.now() - dismissedAt < TWENTY_FOUR_HOURS_MS;
+  });
+
+  const dismissBanner = useCallback(() => {
+    localStorage.setItem(dismissKey, String(Date.now()));
+    setBannerDismissed(true);
+  }, [dismissKey]);
+
+  const showUpgradeBanner = updateAvailable && !bannerDismissed;
 
   const handleSaveName = () => {
     const trimmed = nameValue.trim();
@@ -178,7 +197,7 @@ export function InstanceControls({
           </Badge>
         </div>
       </div>
-      {updateAvailable && (
+      {showUpgradeBanner && (
         <Banner color="amber" className="mb-4">
           <Banner.Icon>
             <ArrowUpCircle />
@@ -194,6 +213,7 @@ export function InstanceControls({
             </Banner.Description>
           </Banner.Content>
           <Banner.Button
+            className="text-white"
             onClick={() => {
               setRedeployMode('upgrade');
               setConfirmRedeploy(true);
@@ -201,6 +221,14 @@ export function InstanceControls({
           >
             Upgrade now
           </Banner.Button>
+          <button
+            type="button"
+            onClick={dismissBanner}
+            className="text-amber-400/60 hover:text-amber-400 transition-colors"
+            aria-label="Dismiss upgrade banner"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </Banner>
       )}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">

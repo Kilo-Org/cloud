@@ -5,11 +5,11 @@ import { Check, Loader2, Monitor, RefreshCw, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import {
-  useKiloClawPairing,
-  useKiloClawDevicePairing,
-  useRefreshPairing,
-  useRefreshDevicePairing,
-} from '@/hooks/useKiloClaw';
+  useClawPairing,
+  useClawDevicePairing,
+  useClawRefreshPairing,
+  useClawRefreshDevicePairing,
+} from '../hooks/useClawHooks';
 import { Button } from '@/components/ui/button';
 
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
@@ -30,14 +30,14 @@ export function PairingSection({ mutations }: { mutations: ClawMutations }) {
     data: channelPairing,
     isLoading: channelLoading,
     isFetching: channelFetching,
-  } = useKiloClawPairing(true);
+  } = useClawPairing(true);
   const {
     data: devicePairing,
     isLoading: deviceLoading,
     isFetching: deviceFetching,
-  } = useKiloClawDevicePairing(true);
-  const refreshChannelPairing = useRefreshPairing();
-  const refreshDevicePairingFn = useRefreshDevicePairing();
+  } = useClawDevicePairing(true);
+  const refreshChannelPairing = useClawRefreshPairing();
+  const refreshDevicePairingFn = useClawRefreshDevicePairing();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const isLoading = channelLoading || deviceLoading;

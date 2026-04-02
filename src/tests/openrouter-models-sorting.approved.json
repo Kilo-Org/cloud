@@ -586,7 +586,9 @@
         "reasoning",
         "include_reasoning"
       ],
-      "opencode": {},
+      "opencode": {
+        "ai_sdk_provider": "openai"
+      },
       "isFree": false
     }
   ]

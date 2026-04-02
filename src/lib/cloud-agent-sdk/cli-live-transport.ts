@@ -157,9 +157,9 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             return null;
           }
         },
-        onEvent: (payload: unknown) => {
+        onEvent: payload => {
           console.log('[cli-debug] WebSocket event received: %o', payload);
-          handleInboundMessage(payload as WebInboundMessage);
+          handleInboundMessage(payload);
         },
         onOpen: (ws: WebSocket) => {
           console.log(

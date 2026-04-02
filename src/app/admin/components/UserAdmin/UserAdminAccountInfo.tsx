@@ -108,6 +108,21 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
                 <p className="text-muted-foreground">N/A</p>
               )}
             </div>
+            <div>
+              <h4 className="text-muted-foreground text-sm font-medium">
+                Vercel Downstream Safety Identifier
+              </h4>
+              {user.vercel_downstream_safety_identifier ? (
+                <div className="flex items-center gap-2">
+                  <p className="font-mono text-sm break-all">
+                    {user.vercel_downstream_safety_identifier}
+                  </p>
+                  <CopyTextButton text={user.vercel_downstream_safety_identifier} />
+                </div>
+              ) : (
+                <p className="text-muted-foreground">N/A</p>
+              )}
+            </div>
           </div>
         </div>
       </CardContent>

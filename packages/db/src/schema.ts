@@ -63,12 +63,7 @@ import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
   StripeSubscriptionStatus,
-  OpenCodeSettings,
   StoredModel,
-  CustomLlmExtraBody,
-  CustomLlmExtraHeaders,
-  CustomLlmProvider,
-  InterleavedFormat,
   GatewayApiKind,
 } from './schema-types';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
@@ -209,6 +204,7 @@ export const kilocode_users = pgTable(
     github_url: text(),
     discord_server_membership_verified_at: timestamp({ withTimezone: true, mode: 'string' }),
     openrouter_upstream_safety_identifier: text(),
+    vercel_downstream_safety_identifier: text(),
     customer_source: text(),
   },
   table => [
@@ -218,6 +214,9 @@ export const kilocode_users = pgTable(
     uniqueIndex('UQ_kilocode_users_openrouter_upstream_safety_identifier')
       .on(table.openrouter_upstream_safety_identifier)
       .where(sql`${table.openrouter_upstream_safety_identifier} IS NOT NULL`),
+    uniqueIndex('UQ_kilocode_users_vercel_downstream_safety_identifier')
+      .on(table.vercel_downstream_safety_identifier)
+      .where(sql`${table.vercel_downstream_safety_identifier} IS NOT NULL`),
   ]
 );
 
@@ -914,31 +913,10 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
 
-export const custom_llm = pgTable('custom_llm', {
-  public_id: text().notNull().primaryKey(),
-  display_name: text().notNull(),
-  context_length: integer().notNull(),
-  max_completion_tokens: integer().notNull(),
-  internal_id: text().notNull(),
-  provider: text().notNull().$type<CustomLlmProvider>(),
-  base_url: text().notNull(),
-  api_key: text().notNull(),
-  organization_ids: jsonb().notNull().$type<string[]>(),
-
-  supports_image_input: boolean(),
-  force_reasoning: boolean(),
-  opencode_settings: jsonb().$type<OpenCodeSettings>(),
-  extra_body: jsonb().$type<CustomLlmExtraBody>(),
-  extra_headers: jsonb().$type<CustomLlmExtraHeaders>(),
-  interleaved_format: text().$type<InterleavedFormat>(),
-});
-
 export const custom_llm2 = pgTable('custom_llm2', {
   public_id: text().notNull().primaryKey(),
   definition: jsonb().notNull().$type<CustomLlmDefinition>(),
 });
-
-export type CustomLlm = typeof custom_llm.$inferSelect;
 
 export const user_admin_notes = pgTable(
   'user_admin_notes',
@@ -1874,15 +1852,19 @@ export const cloud_agent_webhook_triggers = pgTable(
     organization_id: uuid('organization_id').references(() => organizations.id, {
       onDelete: 'cascade',
     }),
-    github_repo: text('github_repo').notNull(),
+    // Target type: 'cloud_agent' (default) or 'kiloclaw_chat'
+    target_type: text('target_type').notNull().default('cloud_agent'),
+    // KiloClaw Chat target: which instance to send messages to
+    kiloclaw_instance_id: uuid('kiloclaw_instance_id').references(() => kiloclaw_instances.id),
+    // Cloud Agent target fields (nullable — only required when target_type = 'cloud_agent')
+    github_repo: text('github_repo'),
     is_active: boolean('is_active').notNull().default(true),
     // Profile reference - resolved at runtime in the worker via Hyperdrive
     // ON DELETE RESTRICT prevents deletion of profiles referenced by triggers
-    profile_id: uuid('profile_id')
-      .notNull()
-      .references(() => agent_environment_profiles.id, {
-        onDelete: 'restrict',
-      }),
+    // Nullable — only required when target_type = 'cloud_agent'
+    profile_id: uuid('profile_id').references(() => agent_environment_profiles.id, {
+      onDelete: 'restrict',
+    }),
     created_at: timestamp('created_at', { withTimezone: true, mode: 'string' })
       .defaultNow()
       .notNull(),
@@ -1910,6 +1892,22 @@ export const cloud_agent_webhook_triggers = pgTable(
       sql`(
         (${table.user_id} IS NOT NULL AND ${table.organization_id} IS NULL) OR
         (${table.user_id} IS NULL AND ${table.organization_id} IS NOT NULL)
+      )`
+    ),
+    // Cloud Agent triggers require github_repo and profile_id
+    check(
+      'CHK_cloud_agent_webhook_triggers_cloud_agent_fields',
+      sql`(
+        ${table.target_type} != 'cloud_agent' OR
+        (${table.github_repo} IS NOT NULL AND ${table.profile_id} IS NOT NULL)
+      )`
+    ),
+    // KiloClaw Chat triggers require kiloclaw_instance_id
+    check(
+      'CHK_cloud_agent_webhook_triggers_kiloclaw_fields',
+      sql`(
+        ${table.target_type} != 'kiloclaw_chat' OR
+        ${table.kiloclaw_instance_id} IS NOT NULL
       )`
     ),
   ]
@@ -2055,7 +2053,7 @@ export const modelStats = pgTable(
 export type ModelStats = typeof modelStats.$inferSelect;
 export type NewModelStats = typeof modelStats.$inferInsert;
 
-export const MODELS_BY_PROVIDER_SCRIPT_NAME = 'pnpm script:run openrouter sync-providers';
+export const MODELS_BY_PROVIDER_ADMIN_URL = '/admin/sync-providers';
 
 export const modelsByProvider = pgTable('models_by_provider', {
   id: serial().notNull().primaryKey(),
@@ -3466,16 +3464,16 @@ export const discord_gateway_listener = pgTable('discord_gateway_listener', {
 
 export type DiscordGatewayListener = typeof discord_gateway_listener.$inferSelect;
 
-// KiloClaw Version Pins — one row per user, tracks who pinned them and why.
+// KiloClaw Version Pins — one row per instance, tracks who pinned them and why.
 // Both admins and end users can pin (distinguished by pinned_by).
 export const kiloclaw_version_pins = pgTable('kiloclaw_version_pins', {
   id: uuid()
     .default(sql`gen_random_uuid()`)
     .primaryKey()
     .notNull(),
-  user_id: text()
+  instance_id: uuid()
     .notNull()
-    .references(() => kilocode_users.id, { onDelete: 'cascade' })
+    .references(() => kiloclaw_instances.id, { onDelete: 'cascade' })
     .unique(),
   image_tag: text()
     .notNull()
@@ -3674,6 +3672,7 @@ export const kiloclaw_cli_runs = pgTable(
     user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    instance_id: uuid().references(() => kiloclaw_instances.id),
     prompt: text().notNull(),
     status: text().$type<KiloClawCliRunStatus>().notNull().default('running'),
     exit_code: integer(),
@@ -3684,6 +3683,7 @@ export const kiloclaw_cli_runs = pgTable(
   table => [
     index('IDX_kiloclaw_cli_runs_user_id').on(table.user_id),
     index('IDX_kiloclaw_cli_runs_started_at').on(table.started_at),
+    index('IDX_kiloclaw_cli_runs_instance_id').on(table.instance_id),
   ]
 );
 

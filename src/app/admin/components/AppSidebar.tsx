@@ -23,6 +23,8 @@ import {
   Bell,
   Server,
   Network,
+  RefreshCw,
+  KeyRound,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
@@ -79,6 +81,11 @@ const userManagementItems: MenuItem[] = [
     url: '/admin/blacklisted-domains',
     icon: () => <Shield />,
   },
+  {
+    title: () => 'Safety Identifiers',
+    url: '/admin/safety-identifiers',
+    icon: () => <KeyRound />,
+  },
 ];
 
 const financialItems: MenuItem[] = [
@@ -88,7 +95,7 @@ const financialItems: MenuItem[] = [
     icon: () => <DollarSign />,
   },
   {
-    title: () => 'Bulk Credits',
+    title: () => 'Bulk Credits & Trials',
     url: '/admin/bulk-credits',
     icon: () => <Upload />,
   },
@@ -150,6 +157,11 @@ const productEngineeringItems: MenuItem[] = [
     url: '/admin/gastown',
     icon: () => <Network />,
   },
+  {
+    title: () => 'Sync Providers',
+    url: '/admin/sync-providers',
+    icon: () => <RefreshCw />,
+  },
 ];
 
 const analyticsObservabilityItems: MenuItem[] = [
@@ -182,6 +194,11 @@ const analyticsObservabilityItems: MenuItem[] = [
     title: () => 'Alerting (TTFB)',
     url: '/admin/alerting-ttfb',
     icon: () => <Bell />,
+  },
+  {
+    title: () => 'API Request Log',
+    url: '/admin/api-request-log',
+    icon: () => <Database />,
   },
 ];
 

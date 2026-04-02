@@ -1,17 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '@/components/Button';
 import {
-  Plus,
+  SquarePen,
   Search,
   SlidersHorizontal,
   MoreHorizontal,
   Trash2,
-  Check,
   X,
   Pencil,
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import { usePathname, useRouter } from 'next/navigation';
 import { isToday, isYesterday, startOfDay, differenceInCalendarDays, format } from 'date-fns';
@@ -20,6 +19,7 @@ import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -107,11 +107,11 @@ type ChatSidebarProps = {
   activeSessions?: ActiveSession[];
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
-  platformFilter?: string;
-  onPlatformChange?: (platform: string | undefined) => void;
+  platformFilter?: string[];
+  onPlatformChange?: (platforms: string[]) => void;
   onMobileSheetOpenChange?: (open: boolean) => void;
-  projectFilter?: string;
-  onProjectChange?: (gitUrl: string | undefined) => void;
+  projectFilter?: string[];
+  onProjectChange?: (gitUrls: string[]) => void;
   recentProjects?: Array<{ gitUrl: string; displayName: string }>;
 };
 
@@ -248,18 +248,22 @@ function SessionRow({
   );
 }
 
-const PLATFORM_FILTERS = ['all', 'cloud-agent', 'cli', 'extension'] as const;
+const PLATFORM_FILTERS = ['cloud-agent', 'extension', 'cli', 'slack', 'other'] as const;
 
-function platformFilterLabel(p: (typeof PLATFORM_FILTERS)[number]): string {
+function platformFilterLabel(p: string): string {
   switch (p) {
-    case 'all':
-      return 'All';
     case 'cloud-agent':
       return 'Cloud';
+    case 'extension':
+      return 'Extension';
     case 'cli':
       return 'CLI';
-    case 'extension':
-      return 'Ext';
+    case 'slack':
+      return 'Slack';
+    case 'other':
+      return 'Other';
+    default:
+      return p;
   }
 }
 
@@ -350,7 +354,7 @@ export function ChatSidebar({
     activeS => !sessions.some(s => s.sessionId === activeS.id)
   );
 
-  const hasActiveFilter = !!platformFilter || !!projectFilter;
+  const hasActiveFilter = (platformFilter?.length ?? 0) > 0 || (projectFilter?.length ?? 0) > 0;
 
   const dateGroups = useMemo(() => groupSessionsByDate(sessions), [sessions]);
 
@@ -358,83 +362,94 @@ export function ChatSidebar({
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className={cn('flex items-center gap-2 border-b px-3 py-2.5', isInSheet && 'pt-14')}>
-        <Button onClick={handleNewSession} className="flex-1" variant="primary" size="sm">
-          <Plus className="mr-2 h-4 w-4" />
-          New Session
-        </Button>
-        <button
-          onClick={toggleSearch}
-          className={cn(
-            'hover:bg-accent rounded-md p-1.5 transition-colors',
-            showSearch && 'bg-accent'
-          )}
-        >
-          <Search className="text-muted-foreground h-4 w-4" />
-        </button>
-        {(onPlatformChange || onProjectChange) && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className={cn(
-                  'hover:bg-accent rounded-md p-1.5 transition-colors',
-                  hasActiveFilter && 'bg-accent'
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={handleNewSession}
+              className="hover:bg-accent rounded-md p-1.5 transition-colors"
+              aria-label="New session"
+            >
+              <SquarePen className="text-muted-foreground h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">New session</TooltipContent>
+        </Tooltip>
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            onClick={toggleSearch}
+            className={cn(
+              'hover:bg-accent rounded-md p-1.5 transition-colors',
+              showSearch && 'bg-accent'
+            )}
+          >
+            <Search className="text-muted-foreground h-4 w-4" />
+          </button>
+          {(onPlatformChange || onProjectChange) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={cn(
+                    'hover:bg-accent rounded-md p-1.5 transition-colors',
+                    hasActiveFilter && 'bg-accent'
+                  )}
+                >
+                  <SlidersHorizontal className="text-muted-foreground h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {onProjectChange && recentProjects.length > 0 && (
+                  <>
+                    <DropdownMenuLabel>Project</DropdownMenuLabel>
+                    {recentProjects.map(project => {
+                      const isChecked = projectFilter?.includes(project.gitUrl) ?? false;
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={project.gitUrl}
+                          checked={isChecked}
+                          onSelect={e => e.preventDefault()}
+                          onCheckedChange={() => {
+                            const current = projectFilter ?? [];
+                            onProjectChange(
+                              isChecked
+                                ? current.filter(u => u !== project.gitUrl)
+                                : [...current, project.gitUrl]
+                            );
+                          }}
+                        >
+                          {project.displayName}
+                        </DropdownMenuCheckboxItem>
+                      );
+                    })}
+                  </>
                 )}
-              >
-                <SlidersHorizontal className="text-muted-foreground h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {onProjectChange && recentProjects.length > 0 && (
-                <>
-                  <DropdownMenuLabel>Project</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => onProjectChange(undefined)}>
-                    <Check
-                      className={cn('mr-2 h-4 w-4', !projectFilter ? 'opacity-100' : 'opacity-0')}
-                    />
-                    All projects
-                  </DropdownMenuItem>
-                  {recentProjects.map(project => {
-                    const isActive = projectFilter === project.gitUrl;
-                    return (
-                      <DropdownMenuItem
-                        key={project.gitUrl}
-                        onClick={() => onProjectChange(project.gitUrl)}
-                      >
-                        <Check
-                          className={cn('mr-2 h-4 w-4', isActive ? 'opacity-100' : 'opacity-0')}
-                        />
-                        {project.displayName}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </>
-              )}
-              {onPlatformChange && (
-                <>
-                  {onProjectChange && recentProjects.length > 0 && <DropdownMenuSeparator />}
-                  <DropdownMenuLabel>Platform</DropdownMenuLabel>
-                  {PLATFORM_FILTERS.map(p => {
-                    const isFilterActive = p === 'all' ? !platformFilter : platformFilter === p;
-                    return (
-                      <DropdownMenuItem
-                        key={p}
-                        onClick={() => onPlatformChange(p === 'all' ? undefined : p)}
-                      >
-                        <Check
-                          className={cn(
-                            'mr-2 h-4 w-4',
-                            isFilterActive ? 'opacity-100' : 'opacity-0'
-                          )}
-                        />
-                        {platformFilterLabel(p)}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+                {onPlatformChange && (
+                  <>
+                    {onProjectChange && recentProjects.length > 0 && <DropdownMenuSeparator />}
+                    <DropdownMenuLabel>Platform</DropdownMenuLabel>
+                    {PLATFORM_FILTERS.map(p => {
+                      const isChecked = platformFilter?.includes(p) ?? false;
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={p}
+                          checked={isChecked}
+                          onSelect={e => e.preventDefault()}
+                          onCheckedChange={() => {
+                            const current = platformFilter ?? [];
+                            onPlatformChange(
+                              isChecked ? current.filter(f => f !== p) : [...current, p]
+                            );
+                          }}
+                        >
+                          {platformFilterLabel(p)}
+                        </DropdownMenuCheckboxItem>
+                      );
+                    })}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       {/* Collapsible search */}
@@ -457,30 +472,26 @@ export function ChatSidebar({
       {/* Active filter chips */}
       {hasActiveFilter && (
         <div className="flex flex-wrap gap-1.5 border-b px-3 py-2">
-          {projectFilter && (
+          {projectFilter?.map(gitUrl => (
             <button
-              onClick={() => onProjectChange?.(undefined)}
+              key={gitUrl}
+              onClick={() => onProjectChange?.(projectFilter.filter(u => u !== gitUrl))}
               className="bg-muted text-foreground hover:bg-muted/70 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs transition-colors"
             >
-              {recentProjects.find(p => p.gitUrl === projectFilter)?.displayName ?? 'Project'}
+              {recentProjects.find(p => p.gitUrl === gitUrl)?.displayName ?? 'Project'}
               <X className="h-3 w-3 opacity-60" />
             </button>
-          )}
-          {platformFilter && (
+          ))}
+          {platformFilter?.map(p => (
             <button
-              onClick={() => onPlatformChange?.(undefined)}
+              key={p}
+              onClick={() => onPlatformChange?.(platformFilter.filter(f => f !== p))}
               className="bg-muted text-foreground hover:bg-muted/70 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs transition-colors"
             >
-              {platformFilter === 'cloud-agent'
-                ? 'Cloud'
-                : platformFilter === 'cli'
-                  ? 'CLI'
-                  : platformFilter === 'extension'
-                    ? 'Ext'
-                    : platformFilter}
+              {platformFilterLabel(p)}
               <X className="h-3 w-3 opacity-60" />
             </button>
-          )}
+          ))}
         </div>
       )}
 

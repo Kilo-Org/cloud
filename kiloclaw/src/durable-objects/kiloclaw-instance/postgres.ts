@@ -6,9 +6,9 @@ import {
   getInstanceBySandboxId,
   markInstanceDestroyed,
 } from '../../db';
-import { appNameFromUserId } from '../../fly/apps';
+import { appNameFromUserId, appNameFromInstanceId } from '../../fly/apps';
 import type { InstanceMutableState } from './types';
-import { getFlyConfig } from './types';
+import { getAppKey, getFlyConfig } from './types';
 import { storageUpdate } from './state';
 import { attemptMetadataRecovery } from './reconcile';
 import { doError, doWarn, toLoggable, createReconcileContext } from './log';
@@ -58,15 +58,22 @@ export async function restoreFromPostgres(
     const channels = null;
 
     // Recover flyAppName from the App DO or derive deterministically.
-    const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(userId));
+    // Instance-keyed DOs (ki_ sandboxId) have per-instance apps (inst-{hash}),
+    // legacy DOs have per-user apps (acct-{hash}).
+    const appKey = getAppKey({ userId, sandboxId: instance.sandboxId });
+    const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(appKey));
     const prefix = env.WORKER_ENV === 'development' ? 'dev' : undefined;
-    const recoveredAppName =
-      (await appStub.getAppName()) ?? (await appNameFromUserId(userId, prefix));
+    const isInstanceKeyed = appKey !== userId;
+    const fallbackAppName = isInstanceKeyed
+      ? await appNameFromInstanceId(appKey, prefix)
+      : await appNameFromUserId(userId, prefix);
+    const recoveredAppName = (await appStub.getAppName()) ?? fallbackAppName;
 
     await ctx.storage.put(
       storageUpdate({
         userId,
         sandboxId: instance.sandboxId,
+        orgId: instance.orgId ?? null,
         status: 'provisioned',
         envVars,
         encryptedSecrets,
@@ -92,6 +99,7 @@ export async function restoreFromPostgres(
 
     state.userId = userId;
     state.sandboxId = instance.sandboxId;
+    state.orgId = instance.orgId ?? null;
     state.status = 'provisioned';
     state.envVars = envVars;
     state.encryptedSecrets = encryptedSecrets;

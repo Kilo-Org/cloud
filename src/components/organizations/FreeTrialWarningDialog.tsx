@@ -63,9 +63,9 @@ export function FreeTrialWarningDialog({
 
         <div className="my-4 rounded-lg border border-red-900 bg-red-950/50 p-4">
           <p className="text-center text-sm text-gray-300">
-            <strong>{organization.name}</strong> has been permanently locked. You can no longer view
-            or access any data from this organization. Upgrade now to restore full access to all
-            features and data.
+            <strong>{organization.name}</strong> has been locked due to an expired trial. Editing
+            and new actions are disabled. Upgrade now to restore full access to all features and
+            data.
           </p>
         </div>
 

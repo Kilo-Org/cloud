@@ -104,3 +104,4 @@ supabase/.temp
 
 # @kilocode/trpc build output (rebuilt by: pnpm --filter @kilocode/trpc run build)
 packages/trpc/dist/
+.plan/

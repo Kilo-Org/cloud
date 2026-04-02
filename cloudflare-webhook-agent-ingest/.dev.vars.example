@@ -1,2 +1,10 @@
+# Shared secrets (required for local dev — secrets store not available in wrangler dev)
+NEXTAUTH_SECRET=
+INTERNAL_API_SECRET=
+
+# Worker environment
+ENVIRONMENT=development
+
 # Set your host/IP for local development callback URL
-WEBHOOK_AGENT_URL=http://192.168.200.174:8793
+# @url cloudflare-webhook-agent-ingest
+WEBHOOK_AGENT_URL=http://localhost:8793

@@ -3,11 +3,7 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { db, readDb } from '@/lib/drizzle';
-import {
-  byok_api_keys,
-  MODELS_BY_PROVIDER_SCRIPT_NAME,
-  modelsByProvider,
-} from '@kilocode/db/schema';
+import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL, modelsByProvider } from '@kilocode/db/schema';
 import { desc, eq } from 'drizzle-orm';
 import { encryptApiKey } from '@/lib/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -50,7 +46,8 @@ const fetchSupportedModels = unstable_cache(
 
     if (!modelMetadataRaw) {
       throw new Error(
-        'No Vercel model metadata in the database, run ' + MODELS_BY_PROVIDER_SCRIPT_NAME
+        'No Vercel model metadata in the database, use the admin panel at ' +
+          MODELS_BY_PROVIDER_ADMIN_URL
       );
     }
 

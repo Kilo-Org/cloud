@@ -6,7 +6,7 @@
   "compatibility_date": "2026-01-27",
   "compatibility_flags": ["nodejs_compat"],
   "dev": {
-    "port": 8787,
+    "port": 8800,
     "local_protocol": "http",
     "ip": "0.0.0.0",
   },

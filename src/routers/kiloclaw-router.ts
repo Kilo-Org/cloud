@@ -65,7 +65,9 @@ import {
 } from '@/lib/kiloclaw/constants';
 import {
   enrollWithCredits as enrollWithCreditsImpl,
+  getEffectiveCreditBalancePreview,
   KILOCLAW_PLAN_COST_MICRODOLLARS,
+  KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS,
 } from '@/lib/kiloclaw/credit-billing';
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
 import PostHogClient from '@/lib/posthog';
@@ -331,7 +333,7 @@ async function provisionInstance(
   const [pin] = await db
     .select({ image_tag: kiloclaw_version_pins.image_tag })
     .from(kiloclaw_version_pins)
-    .where(eq(kiloclaw_version_pins.user_id, user.id))
+    .where(eq(kiloclaw_version_pins.instance_id, instanceRow.id))
     .limit(1);
   const pinnedImageTag = pin?.image_tag;
 
@@ -599,6 +601,10 @@ export const kiloclawRouter = createTRPCRouter({
       ...status,
       name: instance?.name ?? null,
       workerUrl,
+      // Only expose instanceId for instance-keyed instances (ki_ sandboxId).
+      // Legacy instances use userId-keyed DOs — returning their row UUID would
+      // cause the frontend/gateway to resolve the wrong DO.
+      instanceId: workerInstanceId(instance) ? (instance?.id ?? null) : null,
     } satisfies KiloClawDashboardStatus;
   }),
 
@@ -614,6 +620,11 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
     }),
+
+  getActiveInstanceId: clawAccessProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    return instance ? { instanceId: instance.id } : null;
+  }),
 
   getStreamChatCredentials: clawAccessProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
@@ -666,11 +677,15 @@ export const kiloclawRouter = createTRPCRouter({
         if (err instanceof KiloClawApiError) {
           const { message } = getKiloClawApiErrorPayload(err);
           const code =
-            err.statusCode === 404
-              ? 'NOT_FOUND'
-              : err.statusCode === 503
-                ? 'PRECONDITION_FAILED'
-                : 'INTERNAL_SERVER_ERROR';
+            err.statusCode === 400
+              ? 'BAD_REQUEST'
+              : err.statusCode === 403
+                ? 'FORBIDDEN'
+                : err.statusCode === 404
+                  ? 'NOT_FOUND'
+                  : err.statusCode === 503
+                    ? 'PRECONDITION_FAILED'
+                    : 'INTERNAL_SERVER_ERROR';
           throw new TRPCError({
             code,
             message: message ?? 'Failed to send chat message',
@@ -922,17 +937,22 @@ export const kiloclawRouter = createTRPCRouter({
 
   // User-facing (user client -- forwards user's short-lived JWT)
   getConfig: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawUserClient(
       generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
     );
-    return client.getConfig({ userId: ctx.user.id });
+    return client.getConfig({ userId: ctx.user.id, instanceId: workerInstanceId(instance) });
   }),
 
   getChannelCatalog: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawUserClient(
       generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
     );
-    const config = await client.getConfig({ userId: ctx.user.id });
+    const config = await client.getConfig({
+      userId: ctx.user.id,
+      instanceId: workerInstanceId(instance),
+    });
     const channels = getEntriesByCategory('channel');
 
     return channels.map(entry => ({
@@ -954,10 +974,14 @@ export const kiloclawRouter = createTRPCRouter({
   }),
 
   getSecretCatalog: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawUserClient(
       generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
     );
-    const config = await client.getConfig({ userId: ctx.user.id });
+    const config = await client.getConfig({
+      userId: ctx.user.id,
+      instanceId: workerInstanceId(instance),
+    });
     const tools = getEntriesByCategory('tool');
 
     return tools.map(entry => ({
@@ -994,12 +1018,13 @@ export const kiloclawRouter = createTRPCRouter({
         .optional()
     )
     .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawUserClient(
         generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
       );
       const result = await client.restartMachine(
         input?.imageTag ? { imageTag: input.imageTag } : undefined,
-        { userId: ctx.user.id }
+        { userId: ctx.user.id, instanceId: workerInstanceId(instance) }
       );
       if (result.success) {
         PostHogClient().capture({
@@ -1124,17 +1149,34 @@ export const kiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
-      const result = await client.startKiloCliRun(
-        ctx.user.id,
-        input.prompt,
-        workerInstanceId(instance)
-      );
+
+      let result;
+      try {
+        result = await client.startKiloCliRun(
+          ctx.user.id,
+          input.prompt,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        if (err instanceof KiloClawApiError) {
+          const { code } = getKiloClawApiErrorPayload(err);
+          if (code === 'controller_route_unavailable') {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'Instance needs redeploy to support recovery',
+              cause: new UpstreamApiError('controller_route_unavailable'),
+            });
+          }
+        }
+        throw err;
+      }
 
       // Persist the run in the database and return its ID
       const [row] = await db
         .insert(kiloclaw_cli_runs)
         .values({
           user_id: ctx.user.id,
+          instance_id: instance?.id ?? null,
           prompt: input.prompt,
           status: 'running',
           started_at: result.startedAt,
@@ -1147,14 +1189,21 @@ export const kiloclawRouter = createTRPCRouter({
   getKiloCliRunStatus: clawAccessProcedure
     .input(z.object({ runId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+
       // Load the requested run from the DB to avoid cross-run data leaks.
       // The controller only tracks the *current* run, so polling it for an
       // older run would return the wrong output.
+      const instanceFilter = instance ? eq(kiloclaw_cli_runs.instance_id, instance.id) : undefined;
       const [row] = await db
         .select()
         .from(kiloclaw_cli_runs)
         .where(
-          and(eq(kiloclaw_cli_runs.id, input.runId), eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+          and(
+            eq(kiloclaw_cli_runs.id, input.runId),
+            eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+            instanceFilter
+          )
         )
         .limit(1);
 
@@ -1185,7 +1234,6 @@ export const kiloclawRouter = createTRPCRouter({
       }
 
       // Run is still active — poll the controller for live output.
-      const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       const controllerStatus = await client.getKiloCliRunStatus(
         ctx.user.id,
@@ -1210,6 +1258,7 @@ export const kiloclawRouter = createTRPCRouter({
             and(
               eq(kiloclaw_cli_runs.id, input.runId),
               eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              instanceFilter,
               eq(kiloclaw_cli_runs.status, 'running')
             )
           );
@@ -1230,6 +1279,9 @@ export const kiloclawRouter = createTRPCRouter({
 
       // Mark the specific run as cancelled in DB
       if (result.ok) {
+        const instanceFilter = instance
+          ? eq(kiloclaw_cli_runs.instance_id, instance.id)
+          : undefined;
         await db
           .update(kiloclaw_cli_runs)
           .set({
@@ -1240,6 +1292,7 @@ export const kiloclawRouter = createTRPCRouter({
             and(
               eq(kiloclaw_cli_runs.id, input.runId),
               eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+              instanceFilter,
               eq(kiloclaw_cli_runs.status, 'running')
             )
           );
@@ -1251,11 +1304,13 @@ export const kiloclawRouter = createTRPCRouter({
   listKiloCliRuns: clawAccessProcedure
     .input(z.object({ limit: z.number().min(1).max(50).default(10) }).optional())
     .query(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const limit = input?.limit ?? 10;
+      const instanceFilter = instance ? eq(kiloclaw_cli_runs.instance_id, instance.id) : undefined;
       const runs = await db
         .select()
         .from(kiloclaw_cli_runs)
-        .where(eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+        .where(and(eq(kiloclaw_cli_runs.user_id, ctx.user.id), instanceFilter))
         .orderBy(desc(kiloclaw_cli_runs.started_at))
         .limit(limit);
 
@@ -1276,11 +1331,13 @@ export const kiloclawRouter = createTRPCRouter({
     });
     const isDev = process.env.NODE_ENV === 'development';
     const imageTag = isDev ? ':dev' : ':latest';
-    const workerFlag = isDev ? ' --worker-url=http://localhost:8795' : '';
+    const workerFlag = isDev
+      ? ` --worker-url=${process.env.KILOCLAW_API_URL ?? 'http://localhost:8795'}`
+      : '';
     const gmailPushFlag = isDev ? ' --gmail-push-worker-url=${GMAIL_PUSH_WORKER_URL}' : '';
     const imageUrl = `ghcr.io/kilo-org/google-setup${imageTag}`;
     return {
-      command: `docker pull ${imageUrl} && docker run -it --network host ${imageUrl} --token="${token}"${workerFlag}${gmailPushFlag}`,
+      command: `docker pull ${imageUrl} ; docker run -it --network host ${imageUrl} --token="${token}"${workerFlag}${gmailPushFlag}`,
     };
   }),
 
@@ -1450,6 +1507,9 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   getMyPin: baseProcedure.query(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    if (!instance) return null;
+
     const [result] = await db
       .select({
         pin: kiloclaw_version_pins,
@@ -1462,13 +1522,14 @@ export const kiloclawRouter = createTRPCRouter({
         eq(kiloclaw_version_pins.image_tag, kiloclaw_image_catalog.image_tag)
       )
       // Intentionally not joining pinned_by user — avoid leaking admin email to end users
-      .where(eq(kiloclaw_version_pins.user_id, ctx.user.id))
+      .where(eq(kiloclaw_version_pins.instance_id, instance.id))
       .limit(1);
 
     if (!result) return null;
 
     return {
       ...result.pin,
+      pinnedBySelf: result.pin.pinned_by === ctx.user.id,
       openclaw_version: result.openclaw_version,
       variant: result.variant,
     };
@@ -1482,6 +1543,11 @@ export const kiloclawRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+      if (!instance) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'No active KiloClaw instance found' });
+      }
+
       // Verify the version exists and is available
       // Note: There is a small TOCTOU window between this check and the insert below.
       // Worst case: a user pins to a version disabled milliseconds before. The FK constraint
@@ -1510,7 +1576,7 @@ export const kiloclawRouter = createTRPCRouter({
       const [existingPin] = await db
         .select({ pinned_by: kiloclaw_version_pins.pinned_by })
         .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.user_id, ctx.user.id))
+        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
         .limit(1);
 
       if (existingPin && existingPin.pinned_by !== ctx.user.id) {
@@ -1526,13 +1592,13 @@ export const kiloclawRouter = createTRPCRouter({
         [result] = await db
           .insert(kiloclaw_version_pins)
           .values({
-            user_id: ctx.user.id,
+            instance_id: instance.id,
             image_tag: input.imageTag,
             pinned_by: ctx.user.id,
             reason: input.reason ?? null,
           })
           .onConflictDoUpdate({
-            target: kiloclaw_version_pins.user_id,
+            target: kiloclaw_version_pins.instance_id,
             set: {
               image_tag: input.imageTag,
               pinned_by: ctx.user.id,
@@ -1560,13 +1626,18 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   removeMyPin: clawAccessProcedure.mutation(async ({ ctx }) => {
+    const instance = await getActiveInstance(ctx.user.id);
+    if (!instance) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'No active KiloClaw instance found' });
+    }
+
     // Atomically delete only self-set pins — the WHERE clause enforces the admin-pin guard
     // so there's no TOCTOU race between checking pinned_by and deleting.
     const [deleted] = await db
       .delete(kiloclaw_version_pins)
       .where(
         and(
-          eq(kiloclaw_version_pins.user_id, ctx.user.id),
+          eq(kiloclaw_version_pins.instance_id, instance.id),
           eq(kiloclaw_version_pins.pinned_by, ctx.user.id)
         )
       )
@@ -1577,7 +1648,7 @@ export const kiloclawRouter = createTRPCRouter({
       const [existingPin] = await db
         .select({ pinned_by: kiloclaw_version_pins.pinned_by })
         .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.user_id, ctx.user.id))
+        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
         .limit(1);
 
       if (existingPin) {
@@ -1752,15 +1823,12 @@ export const kiloclawRouter = createTRPCRouter({
       sub.status !== 'trialing' &&
       (sub.stripe_subscription_id || sub.payment_source === 'credits');
 
-    // Compute Stripe-funding indicator and conversion prompt.
+    // Compute Stripe-funding indicator and Kilo Pass state.
     // See Billing Status Reporting rules 6-7.
     const hasStripeFunding = hasPaidSubscription ? !!sub.stripe_subscription_id : false;
-
-    let showConversionPrompt = false;
-    if (hasStripeFunding) {
-      const kiloPassState = await getKiloPassStateForUser(db, ctx.user.id);
-      showConversionPrompt = !!kiloPassState && !isStripeSubscriptionEnded(kiloPassState.status);
-    }
+    const kiloPassState = await getKiloPassStateForUser(db, ctx.user.id);
+    const hasActiveKiloPass = !!kiloPassState && !isStripeSubscriptionEnded(kiloPassState.status);
+    const showConversionPrompt = hasStripeFunding && hasActiveKiloPass;
 
     // Renewal cost for the next billing period.
     // For hybrid subscriptions the actual amount is Stripe-determined; report
@@ -1809,12 +1877,31 @@ export const kiloclawRouter = createTRPCRouter({
       };
     }
 
-    // Credit balance: microdollars available for credit enrollment
-    const creditBalanceMicrodollars =
-      ctx.user.total_microdollars_acquired - ctx.user.microdollars_used;
-
     // First-month credit discount eligibility (spec Credit Enrollment rule 3).
     const creditIntroEligible = !(await hadPriorPaidSubscription(ctx.user.id));
+    const creditBalanceMicrodollars =
+      ctx.user.total_microdollars_acquired - ctx.user.microdollars_used;
+    const standardCreditCostMicrodollars = creditIntroEligible
+      ? KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS
+      : KILOCLAW_PLAN_COST_MICRODOLLARS.standard;
+    const [standardCreditEnrollmentPreview, commitCreditEnrollmentPreview] = await Promise.all([
+      getEffectiveCreditBalancePreview({
+        userId: ctx.user.id,
+        balanceMicrodollars: creditBalanceMicrodollars,
+        microdollarsUsed: ctx.user.microdollars_used,
+        kiloPassThreshold: ctx.user.kilo_pass_threshold,
+        costMicrodollars: standardCreditCostMicrodollars,
+        subscription: kiloPassState,
+      }),
+      getEffectiveCreditBalancePreview({
+        userId: ctx.user.id,
+        balanceMicrodollars: creditBalanceMicrodollars,
+        microdollarsUsed: ctx.user.microdollars_used,
+        kiloPassThreshold: ctx.user.kilo_pass_threshold,
+        costMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
+        subscription: kiloPassState,
+      }),
+    ]);
 
     return {
       hasAccess,
@@ -1822,6 +1909,17 @@ export const kiloclawRouter = createTRPCRouter({
       trialEligible: !activeInstance && !sub && !earlybird,
       creditBalanceMicrodollars,
       creditIntroEligible,
+      hasActiveKiloPass,
+      creditEnrollmentPreview: {
+        standard: {
+          costMicrodollars: standardCreditCostMicrodollars,
+          ...standardCreditEnrollmentPreview,
+        },
+        commit: {
+          costMicrodollars: KILOCLAW_PLAN_COST_MICRODOLLARS.commit,
+          ...commitCreditEnrollmentPreview,
+        },
+      },
       trial: trialData,
       subscription: subscriptionData,
       earlybird: earlybirdData,

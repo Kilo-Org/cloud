@@ -28,7 +28,6 @@ export function ClawHeader({
         title="KiloClaw"
         icon={<KiloCrabIcon className="text-muted-foreground h-4 w-4" />}
       >
-        <Badge variant="beta">Beta</Badge>
         {statusInfo && (
           <Badge variant="outline" className={statusInfo.className}>
             {statusInfo.label}

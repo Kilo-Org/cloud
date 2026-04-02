@@ -14,6 +14,7 @@ import { useActiveSessions } from './hooks/useActiveSessions';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { deleteSessionFromStoreAtom } from './store/db-session-atoms';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 // Context for children to toggle the mobile sidebar sheet
 type SidebarLayoutContextValue = {
@@ -39,17 +40,36 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
   const currentSessionId = searchParams.get('sessionId') ?? undefined;
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [platformFilter, setPlatformFilter] = useState<string | undefined>('cloud-agent');
-  const [projectFilter, setProjectFilter] = useState<string | undefined>(undefined);
+  const projectFilterKey = `cloud-sessions:project-filter:${organizationId ?? 'personal'}`;
+  const [platformFilter, setPlatformFilter] = useLocalStorage<string[]>(
+    'cloud-sessions:platform-filter',
+    ['cloud-agent']
+  );
+  const [projectFilter, setProjectFilter] = useLocalStorage<string[]>(projectFilterKey, []);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 30)).toISOString(), []);
+
+  const createdOnPlatform = useMemo(() => {
+    if (platformFilter.length === 0) return undefined;
+    return platformFilter.flatMap(p => {
+      switch (p) {
+        // 'cloud-agent-web' is a variant of the cloud agent
+        case 'cloud-agent':
+          return ['cloud-agent', 'cloud-agent-web'];
+        // Extension sessions are created from VS Code or agent-manager
+        case 'extension':
+          return ['vscode', 'agent-manager'];
+        default:
+          return [p];
+      }
+    });
+  }, [platformFilter]);
 
   const { sessions, refetchSessions, renameSessionLocally } = useSidebarSessions({
     organizationId: organizationId ?? null,
     searchQuery,
-    createdOnPlatform:
-      platformFilter === 'cloud-agent' ? ['cloud-agent', 'cloud-agent-web'] : platformFilter,
-    gitUrl: projectFilter,
+    createdOnPlatform,
+    gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
   });
   const { activeSessions } = useActiveSessions();
 

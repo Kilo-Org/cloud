@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Loader2, Send, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useKiloClawPairing, useRefreshPairing } from '@/hooks/useKiloClaw';
+import { useClawPairing, useClawRefreshPairing } from '../hooks/useClawHooks';
 import { Button } from '@/components/ui/button';
 import type { ClawMutations } from './claw.types';
 import { OnboardingStepView } from './OnboardingStepView';
@@ -34,9 +34,9 @@ export function ChannelPairingStep({
   onComplete: () => void;
   onSkip: () => void;
 }) {
-  const { data: pairingData } = useKiloClawPairing(true);
+  const { data: pairingData } = useClawPairing(true);
 
-  const refreshPairing = useRefreshPairing();
+  const refreshPairing = useClawRefreshPairing();
   const refreshRef = useRef(refreshPairing);
   refreshRef.current = refreshPairing;
 

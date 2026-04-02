@@ -3,7 +3,7 @@ FROM docker.io/cloudflare/sandbox:0.7.13
 # Build arguments for metadata (all optional with defaults)
 ARG BUILD_DATE=""
 ARG VCS_REF=""
-ARG KILOCODE_CLI_VERSION="7.1.11"
+ARG KILOCODE_CLI_VERSION="7.1.17"
 
 # Build the kilo binary:
 #   cd ~/projects/kilocode-backend/cloud-agent

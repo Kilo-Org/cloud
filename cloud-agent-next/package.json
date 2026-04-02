@@ -44,7 +44,7 @@
     "@cloudflare/containers": "0.1.1",
     "@cloudflare/vitest-pool-workers": "^0.12.21",
     "@types/jsonwebtoken": "catalog:",
-    "@types/node": "^22.19.15",
+    "@types/node": ">=24 <25",
     "@typescript/native-preview": "catalog:",
     "@vitest/ui": "^3.2.4",
     "drizzle-kit": "catalog:",

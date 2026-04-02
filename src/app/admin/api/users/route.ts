@@ -79,6 +79,7 @@ export async function GET(
           eq(kilocode_users.id, searchTerm),
           eq(kilocode_users.stripe_customer_id, searchTerm),
           eq(kilocode_users.openrouter_upstream_safety_identifier, searchTerm),
+          eq(kilocode_users.vercel_downstream_safety_identifier, searchTerm),
           ...(referralCodeOwnerId ? [eq(kilocode_users.id, referralCodeOwnerId)] : [])
         )
       );

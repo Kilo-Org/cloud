@@ -66,6 +66,7 @@ export async function getActiveInstance(db: WorkerDb, userId: string) {
     .select({
       id: kiloclaw_instances.id,
       sandbox_id: kiloclaw_instances.sandbox_id,
+      organization_id: kiloclaw_instances.organization_id,
     })
     .from(kiloclaw_instances)
     .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
@@ -73,7 +74,7 @@ export async function getActiveInstance(db: WorkerDb, userId: string) {
     .then(rows => rows[0] ?? null);
 
   if (!row) return null;
-  return { id: row.id, sandboxId: row.sandbox_id };
+  return { id: row.id, sandboxId: row.sandbox_id, orgId: row.organization_id };
 }
 
 /**
@@ -86,6 +87,7 @@ export async function getInstanceBySandboxId(db: WorkerDb, sandboxId: string) {
       id: kiloclaw_instances.id,
       sandbox_id: kiloclaw_instances.sandbox_id,
       user_id: kiloclaw_instances.user_id,
+      organization_id: kiloclaw_instances.organization_id,
     })
     .from(kiloclaw_instances)
     .where(
@@ -99,6 +101,7 @@ export async function getInstanceBySandboxId(db: WorkerDb, sandboxId: string) {
     id: row.id,
     sandboxId: row.sandbox_id,
     userId: row.user_id,
+    orgId: row.organization_id,
   };
 }
 

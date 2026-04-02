@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowUpCircle,
   Check,
@@ -86,21 +86,28 @@ export function InstanceControls({
   const upgradeVersion = latestAvailableVersion ?? latestVersion?.imageTag ?? '';
   const dismissKey = `claw-upgrade-banner-dismissed:${upgradeVersion}`;
 
-  const [bannerDismissed, setBannerDismissed] = useState(() => {
+  const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+  const isDismissedInStorage = useMemo(() => {
     if (typeof window === 'undefined') return false;
     const raw = localStorage.getItem(dismissKey);
     if (!raw) return false;
-    const dismissedAt = Number(raw);
-    const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-    return Date.now() - dismissedAt < TWENTY_FOUR_HOURS_MS;
-  });
+    return Date.now() - Number(raw) < TWENTY_FOUR_HOURS_MS;
+  }, [dismissKey]);
+
+  const [manuallyDismissed, setManuallyDismissed] = useState(false);
+
+  // Reset the in-session dismiss flag when the target version changes.
+  useEffect(() => {
+    setManuallyDismissed(false);
+  }, [dismissKey]);
 
   const dismissBanner = useCallback(() => {
     localStorage.setItem(dismissKey, String(Date.now()));
-    setBannerDismissed(true);
+    setManuallyDismissed(true);
   }, [dismissKey]);
 
-  const showUpgradeBanner = updateAvailable && !bannerDismissed;
+  const showUpgradeBanner = updateAvailable && !isDismissedInStorage && !manuallyDismissed;
 
   const handleSaveName = () => {
     const trimmed = nameValue.trim();

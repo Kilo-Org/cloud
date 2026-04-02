@@ -319,7 +319,7 @@ export function generateBaseConfig(
     config.plugins.load.paths = Array.isArray(config.plugins.load.paths)
       ? config.plugins.load.paths
       : [];
-    const pluginPath = '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
+    const pluginPath = '/usr/local/lib/node_modules/streamchat';
     if (!(config.plugins.load.paths as string[]).includes(pluginPath)) {
       (config.plugins.load.paths as string[]).push(pluginPath);
     }

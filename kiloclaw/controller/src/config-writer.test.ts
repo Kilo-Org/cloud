@@ -579,7 +579,7 @@ describe('generateBaseConfig', () => {
     expect(config.channels.streamchat.enabled).toBe(true);
     expect(config.plugins.entries.streamchat.enabled).toBe(true);
     expect(config.plugins.load.paths).toContain(
-      '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'
+      '/usr/local/lib/node_modules/streamchat'
     );
   });
 
@@ -603,7 +603,7 @@ describe('generateBaseConfig', () => {
       channels: { streamchat: { apiKey: 'old-key', enabled: true } },
       plugins: {
         load: {
-          paths: ['/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'],
+          paths: ['/usr/local/lib/node_modules/streamchat'],
         },
         entries: { streamchat: { enabled: true } },
       },
@@ -617,7 +617,7 @@ describe('generateBaseConfig', () => {
     };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
-    const pluginPath = '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
+    const pluginPath = '/usr/local/lib/node_modules/streamchat';
     const paths = config.plugins.load.paths as string[];
     expect(paths.filter(p => p === pluginPath)).toHaveLength(1);
   });

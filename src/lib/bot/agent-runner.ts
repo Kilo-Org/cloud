@@ -9,7 +9,7 @@ import {
   getConversationContext,
   formatConversationContextForPrompt,
 } from '@/lib/bot/conversation-context';
-import { updateBotRequest } from '@/lib/bot/request-logging';
+import { updateBotRequest, linkBotRequestToSession } from '@/lib/bot/request-logging';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
 } from '@/lib/bot/tools/spawn-cloud-agent-session';
@@ -230,8 +230,10 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
 
 This tool returns an acknowledgement immediately. The final Cloud Agent result will be posted later in the same thread after the async session completes.`,
         inputSchema: spawnCloudAgentInputSchema,
-        execute: async args =>
-          await spawnCloudAgentSession(
+        execute: async args => {
+          let resolvedSessionId: string | undefined;
+
+          const result = await spawnCloudAgentSession(
             args,
             modelSlug,
             params.platformIntegration,
@@ -240,6 +242,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
             params.botRequestId,
             ({ kiloSessionId, cloudAgentSessionId }) => {
               startedCloudAgentSession = true;
+              resolvedSessionId = cloudAgentSessionId;
               params.onSessionReady?.({ kiloSessionId, cloudAgentSessionId, prompt: args.prompt });
               const sessionUrl = buildSessionUrl(kiloSessionId, owner);
               void postSessionLinkEphemeral({
@@ -250,12 +253,17 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
                 provider,
                 modelSlug,
               });
-
-              if (params.botRequestId) {
-                updateBotRequest(params.botRequestId, { cloudAgentSessionId });
-              }
             }
-          ),
+          );
+
+          // Persist the session link synchronously so callbacks can
+          // correlate immediately — must complete before we return.
+          if (params.botRequestId && resolvedSessionId) {
+            await linkBotRequestToSession(params.botRequestId, resolvedSessionId);
+          }
+
+          return result;
+        },
       }),
     },
     onStepFinish: step => {

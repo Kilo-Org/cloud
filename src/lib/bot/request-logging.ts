@@ -85,3 +85,26 @@ async function performUpdate(id: string, params: UpdateBotRequestParams): Promis
 export function updateBotRequest(id: string, params: UpdateBotRequestParams): void {
   after(() => performUpdate(id, params));
 }
+
+/**
+ * Persist `cloud_agent_session_id` synchronously so callback routes can
+ * correlate on it immediately. Unlike `updateBotRequest`, this awaits
+ * the DB write — use it only for fields that external systems depend on
+ * before the current request finishes.
+ */
+export async function linkBotRequestToSession(
+  botRequestId: string,
+  cloudAgentSessionId: string
+): Promise<void> {
+  try {
+    await db
+      .update(bot_requests)
+      .set({ cloud_agent_session_id: cloudAgentSessionId })
+      .where(eq(bot_requests.id, botRequestId));
+  } catch (error) {
+    captureException(error, {
+      tags: { component: 'bot-request-log', op: 'link-session' },
+      extra: { botRequestId, cloudAgentSessionId },
+    });
+  }
+}

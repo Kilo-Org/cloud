@@ -673,8 +673,8 @@ importers:
   cloud-agent-next/wrapper:
     dependencies:
       '@kilocode/sdk':
-        specifier: 7.1.11
-        version: 7.1.11
+        specifier: 7.1.17
+        version: 7.1.17
     devDependencies:
       '@types/bun':
         specifier: latest
@@ -3936,8 +3936,8 @@ packages:
   '@kilocode/sdk@7.0.37':
     resolution: {integrity: sha512-t7HEjYpAuW3IdbEp+2VYQPFLhidYFSmWK3nl6vWri0QBNh+spQcotdMYENNmv/HQOAXr84pXgOFtc8YCEOz5wQ==}
 
-  '@kilocode/sdk@7.1.11':
-    resolution: {integrity: sha512-ZebBy/M77eY3GI7/SmkNaDX9gjkCHG9w/lE0qH3wkmlEb6t2XuR2BBNvusLLmb876rPoNj6KZ6Gu4PLLMzNCKw==}
+  '@kilocode/sdk@7.1.17':
+    resolution: {integrity: sha512-OMe11pt8m72rUIOrgUn9OEwSl+KlQzOlGD3zDyFutHqxylqXOr0/9IfYtAP5F5fUWYCtYE7SJbXcEbWvIyVhTg==}
 
   '@lottiefiles/dotlottie-react@0.17.15':
     resolution: {integrity: sha512-4wYAjsJhM28eUvJ/gT3KRM6fcyT7EM9n7PDrP71LaBTacc6bSN43qFTSJc1Li3QxUiraz23p0Q8EJBzXo8DsRw==}
@@ -17563,7 +17563,7 @@ snapshots:
 
   '@kilocode/sdk@7.0.37': {}
 
-  '@kilocode/sdk@7.1.11': {}
+  '@kilocode/sdk@7.1.17': {}
 
   '@lottiefiles/dotlottie-react@0.17.15(react@19.2.4)':
     dependencies:

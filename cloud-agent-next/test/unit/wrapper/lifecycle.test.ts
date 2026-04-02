@@ -508,5 +508,18 @@ describe('createLifecycleManager', () => {
       await vi.advanceTimersByTimeAsync(15_000);
       expect(connectionFns.reconnectEventSubscription).not.toHaveBeenCalled();
     });
+
+    it('initial arming triggers reconnect when stream never yields', async () => {
+      const mgr = createManager();
+      state.startJob(createJobContext());
+
+      // Simulate the initial arming added in startEventSubscription()
+      // before the for-await loop — no stream events follow.
+      mgr.onSseEvent();
+
+      // After 15s with no further onSseEvent calls, the timer should fire.
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(connectionFns.reconnectEventSubscription).toHaveBeenCalledTimes(1);
+    });
   });
 });

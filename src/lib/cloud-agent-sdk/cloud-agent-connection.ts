@@ -70,7 +70,7 @@ export function createConnection(config: ConnectionConfig): Connection {
       if (parsed.type === 'error') return { type: 'error', message: parsed.error.message };
       return { type: 'event', payload: parsed.event };
     },
-    onEvent: payload => config.onEvent(payload as CloudAgentEvent),
+    onEvent: payload => config.onEvent(payload),
     onConnected: config.onConnected,
     onDisconnected: config.onDisconnected,
     onUnexpectedDisconnect: config.onUnexpectedDisconnect,

@@ -1,9 +1,9 @@
-export type BaseConnectionConfig = {
+export type BaseConnectionConfig<T = unknown> = {
   buildUrl: () => string;
   parseMessage: (
     data: unknown
-  ) => { type: 'event'; payload: unknown } | { type: 'error'; message: string } | null;
-  onEvent: (payload: unknown) => void;
+  ) => { type: 'event'; payload: T } | { type: 'error'; message: string } | null;
+  onEvent: (payload: T) => void;
   onConnected: () => void;
   onDisconnected: () => void;
   onUnexpectedDisconnect?: () => void;
@@ -30,7 +30,7 @@ function calculateBackoffDelay(attempt: number): number {
   return Math.floor(exponentialDelay * jitter);
 }
 
-export function createBaseConnection(config: BaseConnectionConfig): Connection {
+export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connection {
   let ws: WebSocket | null = null;
   let intentionalDisconnect = false;
   let destroyed = false;

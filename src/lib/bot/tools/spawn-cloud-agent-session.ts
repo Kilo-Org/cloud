@@ -26,7 +26,21 @@ type SpawnCloudAgentResult = {
   sessionId?: string;
 };
 
-const sharedFields = {
+// Structured as a single object (not z.union) so the JSON schema has a top-level
+// "type": "object", which Anthropic's tool API requires.
+export const spawnCloudAgentInputSchema = z.object({
+  githubRepo: z
+    .string()
+    .regex(/^[-a-zA-Z0-9_.]+\/[-a-zA-Z0-9_.]+$/)
+    .describe('The GitHub repository in owner/repo format (e.g., "facebook/react")')
+    .optional(),
+  gitlabProject: z
+    .string()
+    .regex(/^[-a-zA-Z0-9_.]+(?:\/[-a-zA-Z0-9_.]+)+$/)
+    .describe(
+      'The GitLab project path in group/project format (e.g., "mygroup/myproject"). May include nested groups (e.g., "group/subgroup/project").'
+    )
+    .optional(),
   prompt: z
     .string()
     .describe(
@@ -34,31 +48,10 @@ const sharedFields = {
     ),
   mode: z
     .enum(['code', 'ask'])
-    .default('code')
     .describe(
       'The agent mode: "code" for making changes (creates a PR/MR), "ask" for questions and explanations about existing code.'
     ),
-};
-
-const githubSchema = z.object({
-  githubRepo: z
-    .string()
-    .regex(/^[-a-zA-Z0-9_.]+\/[-a-zA-Z0-9_.]+$/)
-    .describe('The GitHub repository in owner/repo format (e.g., "facebook/react")'),
-  ...sharedFields,
 });
-
-const gitlabSchema = z.object({
-  gitlabProject: z
-    .string()
-    .regex(/^[-a-zA-Z0-9_.]+(?:\/[-a-zA-Z0-9_.]+)+$/)
-    .describe(
-      'The GitLab project path in group/project format (e.g., "mygroup/myproject"). May include nested groups (e.g., "group/subgroup/project").'
-    ),
-  ...sharedFields,
-});
-
-export const spawnCloudAgentInputSchema = z.union([githubSchema, gitlabSchema]);
 
 type SpawnCloudAgentInput = z.infer<typeof spawnCloudAgentInputSchema>;
 
@@ -81,9 +74,13 @@ export default async function spawnCloudAgentSession(
   const kilocodeOrganizationId = platformIntegration.owned_by_organization_id || undefined;
   let prepareInput: PrepareSessionInput;
   let initiateInput: { githubToken?: string; kilocodeOrganizationId?: string };
-  const mode: AgentMode = args.mode ?? 'code';
+  const mode: AgentMode = args.mode;
 
-  const isGitLab = 'gitlabProject' in args;
+  if (!args.githubRepo && !args.gitlabProject) {
+    return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
+  }
+
+  const isGitLab = !!args.gitlabProject;
   const prompt =
     mode === 'code'
       ? args.prompt +
@@ -92,7 +89,7 @@ export default async function spawnCloudAgentSession(
           : '\n\nOpen a pull request with your changes and return the PR URL.')
       : args.prompt;
 
-  if ('gitlabProject' in args) {
+  if (args.gitlabProject) {
     // GitLab path: get token + instance URL, build clone URL, use gitUrl/gitToken
     const gitlabToken =
       typeof platformIntegration.owned_by_organization_id === 'string'

@@ -37,8 +37,13 @@ const gmailPushWorkerUrl = gmailPushWorkerUrlArg
   ? gmailPushWorkerUrlArg.substring(gmailPushWorkerUrlArg.indexOf('=') + 1)
   : 'https://kiloclaw-gmail.kiloapps.io';
 
+const instanceIdArg = args.find(a => a.startsWith('--instance-id='));
+const instanceId = instanceIdArg?.substring(instanceIdArg.indexOf('=') + 1);
+
 if (!token) {
-  console.error('Usage: docker run -it ghcr.io/kilo-org/google-setup --token=<session-jwt>');
+  console.error(
+    'Usage: docker run -it ghcr.io/kilo-org/google-setup --token=<session-jwt> [--instance-id=<uuid>]'
+  );
   process.exit(1);
 }
 
@@ -64,6 +69,12 @@ const authHeaders = {
   authorization: `Bearer ${token}`,
   'content-type': 'application/json',
 };
+
+/** Build a worker API URL, appending ?instanceId= when targeting an org instance. */
+function workerApiUrl(path) {
+  const base = `${workerUrl}${path}`;
+  return instanceId ? `${base}?instanceId=${encodeURIComponent(instanceId)}` : base;
+}
 
 // APIs to enable in the GCP project
 const GCP_APIS = [
@@ -117,6 +128,9 @@ function runCommandOutput(cmd, args) {
 // Step 1: Validate session token
 // ---------------------------------------------------------------------------
 
+if (instanceId) {
+  console.log(`Targeting instance: ${instanceId}`);
+}
 console.log('Validating session token...');
 
 const validateRes = await fetch(`${workerUrl}/health`);
@@ -125,7 +139,7 @@ if (!validateRes.ok) {
   process.exit(1);
 }
 
-const authCheckRes = await fetch(`${workerUrl}/api/admin/google-credentials`, {
+const authCheckRes = await fetch(workerApiUrl('/api/admin/google-credentials'), {
   headers: authHeaders,
 });
 
@@ -146,7 +160,7 @@ console.log('Session token verified.\n');
 
 console.log('Fetching encryption public key...');
 
-const pubKeyRes = await fetch(`${workerUrl}/api/admin/public-key`, { headers: authHeaders });
+const pubKeyRes = await fetch(workerApiUrl('/api/admin/public-key'), { headers: authHeaders });
 if (!pubKeyRes.ok) {
   console.error('Failed to fetch public key from worker.');
   process.exit(1);
@@ -688,7 +702,7 @@ const encryptedBundle = {
 
 console.log('Sending credentials to your kiloclaw instance...');
 
-const postRes = await fetch(`${workerUrl}/api/admin/google-credentials`, {
+const postRes = await fetch(workerApiUrl('/api/admin/google-credentials'), {
   method: 'POST',
   headers: authHeaders,
   body: JSON.stringify({ googleCredentials: encryptedBundle }),

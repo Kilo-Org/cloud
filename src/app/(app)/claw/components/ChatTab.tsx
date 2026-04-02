@@ -17,8 +17,9 @@ import {
   useChannelStateContext,
   useMessageContext,
 } from 'stream-chat-react';
-import { useStreamChatCredentials } from '@/hooks/useKiloClaw';
+import { useClawStreamChatCredentials } from '../hooks/useClawHooks';
 import { useTRPC } from '@/lib/trpc/utils';
+import { useClawContext } from './ClawContext';
 
 const BotUserIdContext = createContext<string>('');
 
@@ -28,7 +29,7 @@ type ChatTabProps = {
 };
 
 export function ChatTab({ enabled }: ChatTabProps) {
-  const { data: creds, isLoading, error } = useStreamChatCredentials(enabled);
+  const { data: creds, isLoading, error } = useClawStreamChatCredentials(enabled);
 
   if (!enabled) {
     return <ChatPlaceholder message="Chat is available when the machine is running." />;
@@ -79,20 +80,26 @@ function StreamChatUI({
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const { organizationId } = useClawContext();
 
   // Stable token provider that fetches a fresh short-lived token on every call.
   // stream-chat-react calls this when the current token expires (via `exp` claim).
+  // Routes to the correct tRPC endpoint based on personal vs org context.
   const tokenProvider = useCallback(async () => {
-    const creds = await queryClient.fetchQuery(
-      trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
-        staleTime: 0,
-      })
-    );
+    const opts = organizationId
+      ? trpc.organizations.kiloclaw.getStreamChatCredentials.queryOptions(
+          { organizationId },
+          { staleTime: 0 }
+        )
+      : trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
+          staleTime: 0,
+        });
+    const creds = await queryClient.fetchQuery(opts);
     if (!creds?.userToken) {
       throw new Error('Failed to fetch Stream Chat credentials');
     }
     return creds.userToken;
-  }, [queryClient, trpc]);
+  }, [queryClient, trpc, organizationId]);
 
   const client = useCreateChatClient({
     apiKey,

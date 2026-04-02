@@ -199,7 +199,7 @@ function createJotaiStorage(store: JotaiStore): JotaiSessionStorage {
       if (cached) return cached;
 
       const arr = store.get(partsAtom).get(messageId);
-      if (!arr || arr.length === 0) return EMPTY_PARTS as Part[];
+      if (!arr || arr.length === 0) return EMPTY_PARTS;
 
       const snapshot = arr.map(part => createReadonlyPartView(clonePart(part)));
       partsSnapshot.set(messageId, snapshot);

@@ -1,7 +1,7 @@
 FROM debian:bookworm-slim
 
-# Install Node.js 22 (required by OpenClaw)
-ENV NODE_VERSION=22.22.1
+# Install Node.js 24 (required by OpenClaw)
+ENV NODE_VERSION=24.14.1
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        ca-certificates curl gnupg git xz-utils unzip jq ripgrep rsync zstd \
@@ -42,7 +42,7 @@ RUN npm install -g pnpm
 
 # Install OpenClaw
 # Pin to specific version for reproducible builds
-RUN npm install -g openclaw@2026.3.13 \
+RUN npm install -g openclaw@2026.3.24 \
     && openclaw --version
 
 # Install ClawHub CLI
@@ -58,7 +58,7 @@ RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#catrielmuller/att
 RUN npm install -g @steipete/summarize@0.12.0
 
 # Install Kilo CLI (agentic coding assistant for the terminal)
-RUN npm install -g @kilocode/cli@7.0.46
+RUN npm install -g @kilocode/cli@7.1.13
 
 # Install Go (available at runtime for users to `go install` additional tools)
 ENV GO_VERSION=1.26.0

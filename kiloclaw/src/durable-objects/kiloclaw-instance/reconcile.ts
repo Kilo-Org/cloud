@@ -18,8 +18,9 @@ import {
   selectRecoveryCandidate,
   volumeIdFromMachine,
 } from '../machine-recovery';
-import { METADATA_KEY_USER_ID } from '../machine-config';
+import { METADATA_KEY_USER_ID, METADATA_KEY_SANDBOX_ID } from '../machine-config';
 import type { InstanceMutableState, DestroyResult } from './types';
+import { getAppKey } from './types';
 import { storageUpdate, resetMutableState } from './state';
 import { doError, doWarn, toLoggable, createReconcileContext } from './log';
 import type { ReconcileContext } from './log';
@@ -175,8 +176,9 @@ async function reconcileApiKeyExpiry(
     const machine = await fly.getMachine(flyConfig, machineId);
     const updatedEnv = { ...machine.config.env };
 
-    const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(userId));
-    const { key: envKey, secretsVersion } = await appStub.ensureEnvKey(userId);
+    const appKey = getAppKey({ userId, sandboxId: state.sandboxId });
+    const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(appKey));
+    const { key: envKey, secretsVersion } = await appStub.ensureEnvKey(appKey);
     updatedEnv[`${ENCRYPTED_ENV_PREFIX}KILOCODE_API_KEY`] = encryptEnvValue(envKey, freshKey.token);
 
     await fly.updateMachine(
@@ -661,6 +663,7 @@ export async function attemptMetadataRecovery(
   try {
     const machines = await fly.listMachines(flyConfig, {
       [METADATA_KEY_USER_ID]: state.userId,
+      ...(state.sandboxId ? { [METADATA_KEY_SANDBOX_ID]: state.sandboxId } : {}),
     });
 
     if (machines.length > 1) {

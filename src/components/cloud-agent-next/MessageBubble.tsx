@@ -130,7 +130,13 @@ export function MessageBubble({
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
   const timestamp = message.info.time.created;
 
-  const getTextForCopy = useCallback(() => getAssistantTextContent(message.parts), [message.parts]);
+  const getTextForCopy = useCallback(
+    () =>
+      isUserMessage(message.info)
+        ? getUserTextContent(message.parts)
+        : getAssistantTextContent(message.parts),
+    [message.info, message.parts]
+  );
 
   // User message
   if (isUserMessage(message.info)) {
@@ -149,10 +155,10 @@ export function MessageBubble({
 
     return (
       <div className="group/msg flex flex-col items-end py-2">
-        <TimeAgo
-          timestamp={timestamp}
-          className="text-muted-foreground/50 mb-1 text-xs opacity-0 transition-opacity group-hover/msg:opacity-100"
-        />
+        <div className="mb-1 flex items-center gap-2 opacity-0 transition-opacity group-hover/msg:opacity-100">
+          {userContent && <CopyMessageButton getText={getTextForCopy} />}
+          <TimeAgo timestamp={timestamp} className="text-muted-foreground/50 text-xs" />
+        </div>
         <div className="bg-primary text-primary-foreground max-w-[95%] rounded-lg p-3 sm:max-w-[85%] md:max-w-[80%] md:p-4">
           {userContent && (
             <p className="overflow-wrap-anywhere text-sm wrap-break-word whitespace-pre-wrap">

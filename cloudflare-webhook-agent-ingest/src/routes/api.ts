@@ -163,26 +163,65 @@ api.delete('/triggers/org/:orgId/:triggerId', async c => {
 
 type RouteContext = Context<HonoContext>;
 
-const TriggerConfigInput = z.object({
-  githubRepo: z.string().trim().min(1, 'githubRepo is required'),
-  mode: z.string().trim().min(1, 'mode is required'),
-  model: z.string().trim().min(1, 'model is required'),
-  promptTemplate: z.string().trim().min(1, 'promptTemplate is required'),
-  // Profile reference - resolved at runtime via Hyperdrive
-  profileId: z.string().uuid(),
-  // Behavior flags (not profile-related)
-  autoCommit: z.boolean().optional(),
-  condenseOnComplete: z.boolean().optional(),
-  webhookAuth: z
-    .object({
-      header: z.string().trim().min(1, 'webhookAuth.header is required'),
-      secret: z.string().trim().min(1, 'webhookAuth.secret is required'),
-    })
-    .optional(),
-});
+const TriggerConfigInput = z
+  .object({
+    targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
+    kiloclawInstanceId: z.string().uuid().optional(),
+    githubRepo: z.string().trim().min(1, 'githubRepo is required').optional(),
+    mode: z.string().trim().min(1, 'mode is required').optional(),
+    model: z.string().trim().min(1, 'model is required').optional(),
+    promptTemplate: z.string().trim().min(1, 'promptTemplate is required'),
+    profileId: z.string().uuid().optional(),
+    autoCommit: z.boolean().optional(),
+    condenseOnComplete: z.boolean().optional(),
+    webhookAuth: z
+      .object({
+        header: z.string().trim().min(1, 'webhookAuth.header is required'),
+        secret: z.string().trim().min(1, 'webhookAuth.secret is required'),
+      })
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.targetType === 'cloud_agent') {
+      if (!data.githubRepo)
+        ctx.addIssue({
+          code: 'custom',
+          message: 'githubRepo is required for cloud_agent triggers',
+          path: ['githubRepo'],
+        });
+      if (!data.mode)
+        ctx.addIssue({
+          code: 'custom',
+          message: 'mode is required for cloud_agent triggers',
+          path: ['mode'],
+        });
+      if (!data.model)
+        ctx.addIssue({
+          code: 'custom',
+          message: 'model is required for cloud_agent triggers',
+          path: ['model'],
+        });
+      if (!data.profileId)
+        ctx.addIssue({
+          code: 'custom',
+          message: 'profileId is required for cloud_agent triggers',
+          path: ['profileId'],
+        });
+    }
+    if (data.targetType === 'kiloclaw_chat') {
+      if (!data.kiloclawInstanceId)
+        ctx.addIssue({
+          code: 'custom',
+          message: 'kiloclawInstanceId is required for kiloclaw_chat triggers',
+          path: ['kiloclawInstanceId'],
+        });
+    }
+  });
 
 // Schema for partial updates (PUT endpoint)
 // null = explicitly clear the field, undefined = leave unchanged
+// Note: targetType and kiloclawInstanceId are intentionally excluded — they are
+// immutable after creation. To change target type or instance, delete and recreate.
 const TriggerConfigUpdateInput = z.object({
   mode: z.string().trim().min(1).optional(),
   model: z.string().trim().min(1).optional(),

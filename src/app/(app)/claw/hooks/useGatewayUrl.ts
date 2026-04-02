@@ -5,6 +5,12 @@ export function useGatewayUrl(status: KiloClawDashboardStatus | undefined) {
   return useMemo(() => {
     const baseUrl = status?.workerUrl || 'https://claw.kilo.ai';
     if (!status?.userId) return baseUrl;
-    return `${baseUrl}/kilo-access-gateway?userId=${encodeURIComponent(status.userId)}`;
-  }, [status?.workerUrl, status?.userId]);
+    const params = new URLSearchParams({ userId: status.userId });
+    // Instance-keyed instances need the instanceId so the access gateway
+    // can resolve the correct sandboxId and redirect to /i/{instanceId}/.
+    if (status.instanceId) {
+      params.set('instanceId', status.instanceId);
+    }
+    return `${baseUrl}/kilo-access-gateway?${params.toString()}`;
+  }, [status?.workerUrl, status?.userId, status?.instanceId]);
 }

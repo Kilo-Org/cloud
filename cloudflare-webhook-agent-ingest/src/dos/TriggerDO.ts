@@ -36,11 +36,13 @@ export const TriggerConfig = z.object({
   orgId: z.string().nullable(),
   createdAt: z.string(),
   isActive: z.boolean(),
-  githubRepo: z.string(),
-  mode: z.string(),
-  model: z.string(),
+  targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
+  kiloclawInstanceId: z.string().nullable().optional(),
+  githubRepo: z.string().nullable().optional(),
+  mode: z.string().nullable().optional(),
+  model: z.string().nullable().optional(),
   promptTemplate: z.string(),
-  profileId: z.string(),
+  profileId: z.string().nullable().optional(),
   autoCommit: z.boolean().optional(),
   condenseOnComplete: z.boolean().optional(),
   webhookAuthHeader: z.string().optional(),
@@ -71,11 +73,13 @@ export type CapturedRequest = {
 };
 
 type ConfigureInput = {
-  githubRepo: string;
-  mode: string;
-  model: string;
+  targetType?: 'cloud_agent' | 'kiloclaw_chat';
+  kiloclawInstanceId?: string;
+  githubRepo?: string;
+  mode?: string;
+  model?: string;
   promptTemplate: string;
-  profileId: string;
+  profileId?: string;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   webhookAuth?: WebhookAuthInput;
@@ -128,11 +132,13 @@ export class TriggerDO extends DurableObject<Env> {
       orgId,
       createdAt: new Date().toISOString(),
       isActive: true,
-      githubRepo: configOverrides.githubRepo,
-      mode: configOverrides.mode,
-      model: configOverrides.model,
+      targetType: configOverrides.targetType ?? 'cloud_agent',
+      kiloclawInstanceId: configOverrides.kiloclawInstanceId ?? null,
+      githubRepo: configOverrides.githubRepo ?? null,
+      mode: configOverrides.mode ?? null,
+      model: configOverrides.model ?? null,
       promptTemplate: configOverrides.promptTemplate,
-      profileId: configOverrides.profileId,
+      profileId: configOverrides.profileId ?? null,
       autoCommit: configOverrides.autoCommit,
       condenseOnComplete: configOverrides.condenseOnComplete,
       webhookAuthHeader: webhookAuth?.header,
@@ -148,11 +154,13 @@ export class TriggerDO extends DurableObject<Env> {
       org_id: config.orgId,
       created_at: config.createdAt,
       is_active: config.isActive ? 1 : 0,
-      github_repo: config.githubRepo,
-      mode: config.mode,
-      model: config.model,
+      target_type: config.targetType,
+      kiloclaw_instance_id: config.kiloclawInstanceId ?? null,
+      github_repo: config.githubRepo ?? null,
+      mode: config.mode ?? null,
+      model: config.model ?? null,
       prompt_template: config.promptTemplate,
-      profile_id: config.profileId,
+      profile_id: config.profileId ?? null,
       auto_commit: config.autoCommit !== undefined ? (config.autoCommit ? 1 : 0) : null,
       condense_on_complete:
         config.condenseOnComplete !== undefined ? (config.condenseOnComplete ? 1 : 0) : null,
@@ -203,11 +211,13 @@ export class TriggerDO extends DurableObject<Env> {
       orgId: record.org_id,
       createdAt: record.created_at,
       isActive: record.is_active === 1,
-      githubRepo: record.github_repo,
-      mode: record.mode,
-      model: record.model,
+      targetType: record.target_type === 'kiloclaw_chat' ? 'kiloclaw_chat' : 'cloud_agent',
+      kiloclawInstanceId: record.kiloclaw_instance_id ?? null,
+      githubRepo: record.github_repo ?? null,
+      mode: record.mode ?? null,
+      model: record.model ?? null,
       promptTemplate: record.prompt_template,
-      profileId: record.profile_id,
+      profileId: record.profile_id ?? null,
       autoCommit: record.auto_commit !== null ? record.auto_commit === 1 : undefined,
       condenseOnComplete:
         record.condense_on_complete !== null ? record.condense_on_complete === 1 : undefined,

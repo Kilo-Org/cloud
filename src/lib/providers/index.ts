@@ -125,12 +125,18 @@ export async function getProvider(
           id: 'custom',
           apiUrl: customLlm.base_url,
           apiKey: customLlm.api_key,
-          supportedChatApis: ['chat_completions', 'messages', 'responses'],
+          supportedChatApis: inferSupportedChatApis(
+            customLlm.opencode_settings?.ai_sdk_provider ?? 'openrouter'
+          ),
           transformRequest(context) {
-            Object.assign(context.request.body, customLlm.extra_body ?? {});
-            for (const [key, value] of Object.entries(customLlm.extra_headers ?? {})) {
-              context.extraHeaders[key] = value;
+            if (customLlm.remove_from_body) {
+              const body = context.request.body as Record<string, unknown>;
+              for (const key of customLlm.remove_from_body ?? []) {
+                delete body[key];
+              }
             }
+            Object.assign(context.request.body, customLlm.extra_body ?? {});
+            Object.assign(context.extraHeaders, customLlm.extra_headers ?? {});
             context.request.body.model = customLlm.internal_id;
           },
         },
@@ -140,15 +146,19 @@ export async function getProvider(
     }
   }
 
-  if (await shouldRouteToVercel(requestedModel, request, taskId || user.id)) {
+  const kiloFreeModel = kiloFreeModels.find(m => m.public_id === requestedModel);
+  const defaultProvider =
+    Object.values(PROVIDERS).find(p => p.id === kiloFreeModel?.gateway) ?? PROVIDERS.OPENROUTER;
+
+  if (
+    defaultProvider.id === 'openrouter' &&
+    (await shouldRouteToVercel(requestedModel, request, taskId || user.id))
+  ) {
     return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, bypassAccessCheck: false };
   }
 
-  const kiloFreeModel = kiloFreeModels.find(m => m.public_id === requestedModel);
-  const freeModelProvider = Object.values(PROVIDERS).find(p => p.id === kiloFreeModel?.gateway);
-
   return {
-    provider: freeModelProvider ?? PROVIDERS.OPENROUTER,
+    provider: defaultProvider,
     userByok: null,
     bypassAccessCheck: false,
   };

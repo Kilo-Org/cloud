@@ -7,6 +7,6 @@
     "start": "node setup.mjs"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24 <25"
   }
 }

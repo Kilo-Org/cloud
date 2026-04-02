@@ -44,7 +44,7 @@ export type ChatCompletionChunk = OpenAI.Chat.Completions.ChatCompletionChunk &
 
 export interface Message {
   role: string;
-  content?: string | { type?: string; text?: string }[];
+  content?: string | ({ type?: string; text?: string } | null)[];
   parts?: { text?: string }[];
 }
 

@@ -16,11 +16,13 @@ import {
   User,
   Building2,
   Calendar,
+  Clock,
   Cpu,
   ExternalLink,
   Loader2,
   FileCode,
   Rocket,
+  Terminal,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -200,48 +202,76 @@ export function AppBuilderProjectDetail({ projectId }: { projectId: string }) {
           </CardContent>
         </Card>
 
-        {/* Session Information Card */}
+        {/* Sessions Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Session Information</CardTitle>
-            <CardDescription>Cloud Agent and CLI session details</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <Terminal className="h-5 w-5" />
+              Sessions
+            </CardTitle>
+            <CardDescription>All cloud agent sessions for this project</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Cloud Agent Session ID */}
-            <div>
-              <div className="text-muted-foreground text-sm font-medium">
-                Cloud Agent Session ID
-              </div>
-              {project.session_id ? (
-                <code className="bg-muted rounded px-2 py-1 text-sm">{project.session_id}</code>
-              ) : (
-                <span className="text-muted-foreground text-sm">No session</span>
-              )}
-            </div>
+          <CardContent>
+            {project.sessions.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No sessions found</p>
+            ) : (
+              <div className="divide-border divide-y">
+                {project.sessions.map(session => {
+                  const isActive = session.ended_at === null;
+                  return (
+                    <div key={session.id} className="flex flex-col gap-2 py-4 first:pt-0 last:pb-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <code className="bg-muted rounded px-2 py-1 text-sm">
+                          {session.cloud_agent_session_id}
+                        </code>
+                        <Badge variant="outline">{session.reason}</Badge>
+                        <Badge
+                          variant={session.worker_version === 'v2' ? 'default' : 'secondary'}
+                          className={session.worker_version === 'v2' ? 'bg-green-600' : undefined}
+                        >
+                          {session.worker_version}
+                        </Badge>
+                        {isActive ? (
+                          <Badge variant="default" className="bg-green-600">
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">Ended</Badge>
+                        )}
+                      </div>
 
-            {/* CLI Session Link */}
-            <div>
-              <div className="text-muted-foreground mb-2 text-sm font-medium">CLI Session</div>
-              {project.cli_session_id ? (
-                <div className="flex items-center gap-3">
-                  <code className="bg-muted rounded px-2 py-1 text-sm">
-                    {project.cli_session_id}
-                  </code>
-                  <Link href={`/admin/session-traces?sessionId=${project.cli_session_id}`}>
-                    <Button variant="outline" size="sm">
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      View Session Traces
-                    </Button>
-                  </Link>
-                </div>
-              ) : project.session_id ? (
-                <span className="text-muted-foreground text-sm">
-                  No linked CLI session found for this cloud agent session
-                </span>
-              ) : (
-                <span className="text-muted-foreground text-sm">No session available</span>
-              )}
-            </div>
+                      <div className="text-muted-foreground flex flex-wrap items-center gap-4 text-sm">
+                        <span
+                          className="flex items-center gap-1"
+                          title={formatAbsoluteTime(session.created_at)}
+                        >
+                          <Clock className="h-3.5 w-3.5" />
+                          Created {formatRelativeTime(session.created_at)}
+                        </span>
+                        {session.ended_at && (
+                          <span title={formatAbsoluteTime(session.ended_at)}>
+                            Ended {formatRelativeTime(session.ended_at)}
+                          </span>
+                        )}
+                      </div>
+
+                      {session.cli_session_id ? (
+                        <div className="flex items-center gap-2">
+                          <Link href={`/admin/session-traces?sessionId=${session.cli_session_id}`}>
+                            <Button variant="outline" size="sm">
+                              <ExternalLink className="mr-2 h-4 w-4" />
+                              View Session Traces
+                            </Button>
+                          </Link>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">No linked CLI session</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 

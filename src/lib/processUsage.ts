@@ -95,7 +95,7 @@ const extractMessageTextContent = (m: Message) =>
     ? m.content
     : Array.isArray(m.content)
       ? m.content
-          .filter(c => c.type === 'text')
+          .filter((c): c is { type?: string; text?: string } => c != null && c.type === 'text')
           .map(c => c.text)
           .join('\n')
       : '';

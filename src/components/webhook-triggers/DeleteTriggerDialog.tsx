@@ -41,9 +41,9 @@ export const DeleteTriggerDialog = memo(function DeleteTriggerDialog({
         <DialogHeader>
           <DialogTitle>Delete Trigger</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete the trigger &quot;{trigger?.triggerId}&quot; for
-            repository &quot;{trigger?.githubRepo}&quot;? This action cannot be undone. Any pending
-            webhook requests will fail.
+            Are you sure you want to delete the trigger &quot;{trigger?.triggerId}&quot;
+            {trigger?.githubRepo && <> for repository &quot;{trigger.githubRepo}&quot;</>}? This
+            action cannot be undone. Any pending webhook requests will fail.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

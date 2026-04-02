@@ -7,14 +7,15 @@ const getGatewayErrorRate_cached = unstable_cache(
     console.debug(`[getGatewayErrorRate_cached] refreshing at ${new Date().toISOString()}`);
     const { rows } = await db.execute(sql`
         select
-            provider as "gateway",
-            1.0 * count(*) filter(where has_error = true) / count(*) as "errorRate"
-        from microdollar_usage_view
+            mu.provider as "gateway",
+            1.0 * count(*) filter(where mu.has_error = true) / count(*) as "errorRate"
+        from microdollar_usage mu
+        join microdollar_usage_metadata meta on mu.id = meta.id
         where true
-            and created_at >= now() - interval '10 minutes'
-            and is_user_byok = false
-            and provider in ('openrouter', 'vercel')
-        group by provider
+            and mu.created_at >= now() - interval '10 minutes'
+            and meta.is_user_byok = false
+            and mu.provider in ('openrouter', 'vercel')
+        group by mu.provider
     `);
     return z
       .array(

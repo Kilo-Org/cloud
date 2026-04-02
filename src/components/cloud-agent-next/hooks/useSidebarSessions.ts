@@ -55,7 +55,7 @@ type UseSidebarSessionsOptions = {
   organizationId?: string | null;
   searchQuery?: string;
   createdOnPlatform?: string | string[];
-  gitUrl?: string;
+  gitUrl?: string | string[];
 };
 
 type UseSidebarSessionsReturn = {

@@ -43,7 +43,7 @@
     "@cloudflare/workers-types": "catalog:",
     "@sentry/cli": "^2.58.2",
     "@types/jsonwebtoken": "catalog:",
-    "@types/node": "^22",
+    "@types/node": ">=24 <25",
     "@typescript/native-preview": "7.0.0-dev.20251019.1",
     "typescript": "catalog:",
     "vitest": "^3.2.4",

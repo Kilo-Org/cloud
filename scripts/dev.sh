@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-TARGET_PORT=${PORT:-3000}
+OFFSET=${KILO_PORT_OFFSET:-0}
+TARGET_PORT=${PORT:-$((3000 + OFFSET))}
 
 # Find an available port starting from TARGET_PORT (same behavior as Next.js auto-increment).
 # Tries TARGET_PORT through TARGET_PORT+9, then falls back to port 0 (OS-assigned).

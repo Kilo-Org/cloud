@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 22+
+- Node.js 24.x
 - pnpm
 - [Workers Paid plan](https://www.cloudflare.com/plans/developer-platform/) ($5/month) -- required for Cloudflare Sandbox containers
 - [Containers enabled](https://dash.cloudflare.com/?to=/:account/workers/containers) on your account

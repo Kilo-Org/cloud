@@ -1121,6 +1121,16 @@ export async function drainAll(): Promise<void> {
     );
     if (active.length === 0) break;
 
+    // If every active agent already has an idle timer running, they've
+    // finished their work and are just waiting for the timer to fire.
+    // No need to keep polling — break and let Phase 3 handle them.
+    if (active.every(a => idleTimers.has(a.agentId))) {
+      console.log(
+        `${DRAIN_LOG} All ${active.length} non-mayor agents are idle (timer pending), proceeding to Phase 3`
+      );
+      break;
+    }
+
     console.log(
       `${DRAIN_LOG} Waiting for ${active.length} non-mayor agents: ` +
         active.map(a => `${a.role}:${a.agentId.slice(0, 8)}=${a.status}`).join(', ')

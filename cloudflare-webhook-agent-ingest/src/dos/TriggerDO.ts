@@ -333,8 +333,9 @@ export class TriggerDO extends DurableObject<Env> {
     // Alarm lifecycle for scheduled triggers
     if (updatedConfig.activationMode === 'scheduled') {
       if (!updatedConfig.isActive) {
-        // Deactivated — clear alarm and stale next-run display
+        // Deactivated — clear alarm, retry flag, and stale next-run display
         await this.ctx.storage.deleteAlarm();
+        await this.ctx.storage.delete('alarmRetry');
         updatedConfig.nextScheduledAt = null;
         this.db
           .update(triggerConfigTable)
@@ -349,6 +350,7 @@ export class TriggerDO extends DurableObject<Env> {
       ) {
         // Reactivated or cron expression changed — reschedule
         await this.ctx.storage.deleteAlarm();
+        await this.ctx.storage.delete('alarmRetry');
         await this.scheduleNextAlarm(updatedConfig);
       }
     }
@@ -725,15 +727,11 @@ export class TriggerDO extends DurableObject<Env> {
   private async scheduleNextAlarm(config: TriggerConfig): Promise<void> {
     if (!config.cronExpression || config.activationMode !== 'scheduled') return;
 
-    let nextTime = computeNextCronTime(config.cronExpression, config.cronTimezone ?? 'UTC');
+    const nextTime = computeNextCronTime(config.cronExpression, config.cronTimezone ?? 'UTC');
     if (!nextTime) {
-      // DST spring-forward can skip an occurrence. Retry with UTC as fallback
-      // to avoid permanently losing the alarm.
-      nextTime = computeNextCronTime(config.cronExpression, 'UTC');
-    }
-    if (!nextTime) {
-      // Still null — schedule a retry in 1 hour so the trigger doesn't stop forever.
-      // Set a flag so alarm() knows this is a reschedule retry, not a real cron fire.
+      // DST spring-forward can skip an occurrence. Schedule a retry in 1 hour
+      // so the trigger doesn't stop forever. Set a flag so alarm() knows this
+      // is a reschedule retry, not a real cron fire.
       logger.error('Failed to compute next cron time, retrying in 1 hour', {
         triggerId: config.triggerId,
       });
@@ -741,6 +739,10 @@ export class TriggerDO extends DurableObject<Env> {
       await this.ctx.storage.setAlarm(Date.now() + 3_600_000);
       return;
     }
+
+    // Successfully computed next time — clear any stale retry flag so it doesn't
+    // cause alarm() to skip the next real cron fire.
+    await this.ctx.storage.delete('alarmRetry');
 
     // Add jitter to prevent thundering herd on popular cron times (±30s)
     const jitterMs = Math.floor(Math.random() * 60_000) - 30_000;

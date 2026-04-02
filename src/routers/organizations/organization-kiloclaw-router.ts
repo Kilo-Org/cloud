@@ -156,6 +156,14 @@ const patchChannelsSchema = z.object({
   slackAppToken: z.string().nullable().optional(),
 });
 
+const patchBotIdentitySchema = z.object({
+  organizationId: z.uuid(),
+  botName: z.string().trim().min(1).max(80).nullable().optional(),
+  botNature: z.string().trim().min(1).max(120).nullable().optional(),
+  botVibe: z.string().trim().min(1).max(120).nullable().optional(),
+  botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
+});
+
 // ── Helpers ────────────────────────────────────────────────────────
 
 function buildWorkerChannels(channels: z.infer<typeof updateConfigSchema>['channels']) {
@@ -268,6 +276,10 @@ export const organizationKiloclawRouter = createTRPCRouter({
         gmailNotificationsEnabled: false,
         execSecurity: null,
         execAsk: null,
+        botName: null,
+        botNature: null,
+        botVibe: null,
+        botEmoji: null,
         workerUrl,
         name: null,
         instanceId: null,
@@ -511,6 +523,14 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
       return client.patchExecPreset(ctx.user.id, input, workerInstanceId(instance));
+    }),
+
+  patchBotIdentity: organizationMemberMutationProcedure
+    .input(patchBotIdentitySchema)
+    .mutation(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.patchBotIdentity(ctx.user.id, input, workerInstanceId(instance));
     }),
 
   patchSecrets: organizationMemberMutationProcedure

@@ -12,6 +12,12 @@ describe('resolveSafePath', () => {
     expect(resolveSafePath('workspace/SOUL.md', ROOT)).toBe('/root/.openclaw/workspace/SOUL.md');
   });
 
+  it('resolves the legacy bootstrap path in workspace', () => {
+    expect(resolveSafePath('workspace/BOOTSTRAP.md', ROOT)).toBe(
+      '/root/.openclaw/workspace/BOOTSTRAP.md'
+    );
+  });
+
   it('rejects path traversal with ..', () => {
     expect(() => resolveSafePath('../etc/passwd', ROOT)).toThrow();
   });

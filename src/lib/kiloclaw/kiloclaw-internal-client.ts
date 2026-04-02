@@ -11,6 +11,8 @@ import type {
   KiloCodeConfigResponse,
   ChannelsPatchInput,
   ChannelsPatchResponse,
+  BotIdentityPatchInput,
+  BotIdentityPatchResponse,
   SecretsPatchInput,
   SecretsPatchResponse,
   PairingListResponse,
@@ -271,6 +273,22 @@ export class KiloClawInternalClient {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/exec-preset${params}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ userId, ...patch }),
+      },
+      { userId }
+    );
+  }
+
+  async patchBotIdentity(
+    userId: string,
+    patch: BotIdentityPatchInput,
+    instanceId?: string
+  ): Promise<BotIdentityPatchResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/bot-identity${params}`,
       {
         method: 'PATCH',
         body: JSON.stringify({ userId, ...patch }),

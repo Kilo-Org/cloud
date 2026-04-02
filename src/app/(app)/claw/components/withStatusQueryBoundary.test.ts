@@ -28,6 +28,10 @@ const baseStatus: KiloClawDashboardStatus = {
   gmailNotificationsEnabled: false,
   execSecurity: null,
   execAsk: null,
+  botName: null,
+  botNature: null,
+  botVibe: null,
+  botEmoji: null,
   workerUrl: 'https://claw.kilo.ai',
   instanceId: null,
 };

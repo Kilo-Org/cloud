@@ -7,7 +7,9 @@ import { isRunningInExpoGo } from 'expo';
 import { Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Toaster } from 'sonner-native';
@@ -144,7 +146,13 @@ function RootLayout() {
   }, [ref]);
 
   useEffect(() => {
-    initAppsFlyer();
+    async function startAppsFlyer() {
+      if (Platform.OS === 'ios') {
+        await requestTrackingPermissionsAsync();
+      }
+      initAppsFlyer();
+    }
+    void startAppsFlyer();
   }, []);
 
   return (

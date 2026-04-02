@@ -90,6 +90,13 @@ const config = {
     'expo-sharing',
     'expo-video',
     'expo-asset',
+    [
+      'expo-tracking-transparency',
+      {
+        userTrackingPermission:
+          'Allow $(PRODUCT_NAME) to use your data to measure ad performance and show personalized ads.',
+      },
+    ],
     ['react-native-appsflyer', {}],
   ],
   experiments: {

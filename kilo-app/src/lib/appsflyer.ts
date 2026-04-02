@@ -40,6 +40,7 @@ export function initAppsFlyer(): void {
       isDebug: false,
       appId: appId ?? '',
       onInstallConversionDataListener: true,
+      timeToWaitForATTUserAuthorization: 10,
     },
     () => {
       initialized = true;

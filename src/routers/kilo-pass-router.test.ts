@@ -733,10 +733,6 @@ describe('kiloPassRouter', () => {
   });
 
   describe('isEligibleForFirstMonthPromo in getState', () => {
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
     it('returns isEligibleForFirstMonthPromo=true when user has no subscriptions', async () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-promo-eligible-no-sub@example.com',
@@ -750,18 +746,36 @@ describe('kiloPassRouter', () => {
     });
 
     it('returns isEligibleForFirstMonthPromo=false when user has no subscriptions after the promo cutoff', async () => {
-      jest.useFakeTimers();
-      jest.setSystemTime(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.add(1, 'second').toDate());
-
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-promo-ineligible-no-sub-after-cutoff@example.com',
       });
-
       const caller = await createCallerForUser(user.id);
-      const result = await caller.kiloPass.getState();
 
-      expect(result.isEligibleForFirstMonthPromo).toBe(false);
-      expect(result.subscription).toBeNull();
+      const afterCutoff = KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.add(1, 'second').toDate();
+      const OrigDate = globalThis.Date;
+      const MockDate = class extends OrigDate {
+        constructor(...args: Parameters<typeof OrigDate>) {
+          if (args.length === 0) {
+            super(afterCutoff);
+          } else {
+            super(...args);
+          }
+        }
+
+        static override now() {
+          return afterCutoff.getTime();
+        }
+      } as DateConstructor;
+      globalThis.Date = MockDate;
+
+      try {
+        const result = await caller.kiloPass.getState();
+
+        expect(result.isEligibleForFirstMonthPromo).toBe(false);
+        expect(result.subscription).toBeNull();
+      } finally {
+        globalThis.Date = OrigDate;
+      }
     });
 
     it('returns isEligibleForFirstMonthPromo=false when user has a canceled subscription', async () => {

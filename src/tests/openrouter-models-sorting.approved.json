@@ -98,11 +98,10 @@
       "id": "kilo-auto/free",
       "name": "Kilo Auto Free",
       "created": 0,
-      "description": "Free with limited capability. No credits required. Uses Qwen3.6 Plus.",
+      "description": "Free with limited capability. No credits required. Uses MiniMax M2.5.",
       "architecture": {
         "input_modalities": [
-          "text",
-          "image"
+          "text"
         ],
         "output_modalities": [
           "text"
@@ -111,8 +110,8 @@
       },
       "top_provider": {
         "is_moderated": false,
-        "context_length": 1000000,
-        "max_completion_tokens": 65536
+        "context_length": 204800,
+        "max_completion_tokens": 131072
       },
       "pricing": {
         "prompt": "0",
@@ -124,7 +123,7 @@
         "web_search": "0",
         "internal_reasoning": "0"
       },
-      "context_length": 1000000,
+      "context_length": 204800,
       "supported_parameters": [
         "max_tokens",
         "temperature",
@@ -132,6 +131,14 @@
         "reasoning",
         "include_reasoning"
       ],
+      "settings": {
+        "included_tools": [
+          "search_and_replace"
+        ],
+        "excluded_tools": [
+          "apply_diff"
+        ]
+      },
       "opencode": {},
       "preferredIndex": 2,
       "isFree": true
@@ -178,7 +185,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 5,
+      "preferredIndex": 4,
       "isFree": true,
       "opencode": {
         "ai_sdk_provider": "openai"

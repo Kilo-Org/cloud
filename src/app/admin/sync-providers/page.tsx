@@ -52,7 +52,7 @@ export default function SyncProvidersPage() {
         <p className="text-muted-foreground">
           Fetches provider and model data from OpenRouter and the Vercel AI Gateway, then stores the
           result in the database. This runs automatically via cron but can be triggered manually
-          here. Mainly intented for local development use.
+          here. Mainly intended for local development use.
         </p>
 
         <Card>

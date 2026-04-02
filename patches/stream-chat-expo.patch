@@ -1,0 +1,68 @@
+diff --git a/src/optionalDependencies/getPhotos.ts b/src/optionalDependencies/getPhotos.ts
+index c0bbe84696a35ae1004aae3ca9b371815f2998c6..74c428c067d80522f74797d46c5b555df78a5740 100644
+--- a/src/optionalDependencies/getPhotos.ts
++++ b/src/optionalDependencies/getPhotos.ts
+@@ -18,6 +18,29 @@ if (!MediaLibrary) {
+   );
+ }
+ 
++let createVideoPlayer;
++
++try {
++  createVideoPlayer = require('expo-video').createVideoPlayer;
++} catch {
++  // optional – video thumbnails will not be generated
++}
++
++const getVideoThumbnail = async (uri: string, durationSec: number) => {
++  if (!createVideoPlayer) return undefined;
++  const player = createVideoPlayer(uri);
++  try {
++    // Use 1s into the video to avoid blank first frames; fall back to 0 for very short clips
++    const time = durationSec > 1 ? 1 : 0;
++    const [thumbnail] = await player.generateThumbnailsAsync([time]);
++    return thumbnail;
++  } catch {
++    return undefined;
++  } finally {
++    player.release();
++  }
++};
++
+ import { getLocalAssetUri } from './getLocalAssetUri';
+ 
+ type ReturnType = {
+@@ -55,6 +78,7 @@ export const getPhotos = MediaLibrary
+         const assets = await Promise.all(
+           results.assets.map(async (asset) => {
+             const localUri = await getLocalAssetUri(asset.id);
++            const videoUri = localUri || asset.uri;
+             const mimeType =
+               mime.getType(asset.filename || asset.uri) ||
+               (asset.mediaType === MediaLibrary.MediaType.video ? 'video/*' : 'image/*');
+@@ -63,14 +87,23 @@ export const getPhotos = MediaLibrary
+               height: asset.height,
+               name: asset.filename,
+               size: 0,
+-              thumb_url: asset.mediaType === 'photo' ? undefined : asset.uri,
++              thumb_url: undefined,
+               type: mimeType,
+-              uri: localUri || asset.uri,
++              uri: videoUri,
+               width: asset.width,
+             };
+           }),
+         );
+ 
++        // Generate video thumbnails sequentially — concurrent calls overwhelm
++        // AVAssetImageGenerator on iOS, causing random failures.
++        for (const asset of assets) {
++          if (asset.type?.startsWith('video')) {
++            const thumb = await getVideoThumbnail(asset.uri, asset.duration);
++            asset.thumb_url = thumb || asset.uri;
++          }
++        }
++
+         const hasNextPage = results.hasNextPage;
+         const endCursor = results.endCursor;
+         return { assets, endCursor, hasNextPage, iOSLimited: accessPrivileges === 'limited' };

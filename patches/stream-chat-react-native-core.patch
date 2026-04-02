@@ -1,0 +1,43 @@
+diff --git a/src/components/AttachmentPicker/components/AttachmentPickerItem.tsx b/src/components/AttachmentPicker/components/AttachmentPickerItem.tsx
+index 61e82d37fdfa6e7d5199330549f35e1b220d867f..d9c34284c817b779f86a376eb514976ea2e572a4 100644
+--- a/src/components/AttachmentPicker/components/AttachmentPickerItem.tsx
++++ b/src/components/AttachmentPicker/components/AttachmentPickerItem.tsx
+@@ -1,6 +1,7 @@
+ import React from 'react';
+ 
+ import { Alert, ImageBackground, StyleSheet, Text, View } from 'react-native';
++import { Image as ExpoImage } from 'expo-image';
+ 
+ import { FileReference, isLocalImageAttachment, isLocalVideoAttachment } from 'stream-chat';
+ 
+@@ -67,8 +68,7 @@ const AttachmentVideo = (props: AttachmentPickerItemType) => {
+ 
+   return (
+     <BottomSheetTouchableOpacity onPress={onPressVideo}>
+-      <ImageBackground
+-        source={{ uri: thumb_url }}
++      <View
+         style={[
+           {
+             height: size,
+@@ -78,6 +78,11 @@ const AttachmentVideo = (props: AttachmentPickerItemType) => {
+           image,
+         ]}
+       >
++        <ExpoImage
++          source={typeof thumb_url === 'string' ? { uri: thumb_url } : thumb_url}
++          style={StyleSheet.absoluteFill}
++          contentFit="cover"
++        />
+         {selected && (
+           <View style={[styles.overlay, { backgroundColor: overlay }, imageOverlay]}>
+             <ImageOverlaySelectedComponent />
+@@ -91,7 +96,7 @@ const AttachmentVideo = (props: AttachmentPickerItemType) => {
+             </Text>
+           ) : null}
+         </View>
+-      </ImageBackground>
++      </View>
+     </BottomSheetTouchableOpacity>
+   );
+ };

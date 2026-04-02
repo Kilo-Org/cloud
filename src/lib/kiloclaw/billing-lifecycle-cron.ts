@@ -35,6 +35,8 @@ import { client as stripe } from '@/lib/stripe-client';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import { NEXTAUTH_URL, KILOCLAW_BILLING_ENFORCEMENT } from '@/lib/config.server';
 import { sentryLogger } from '@/lib/utils.server';
+import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
+import { trackTrialEnd } from '@/lib/impact';
 
 const logInfo = sentryLogger('kiloclaw-billing-cron', 'info');
 const logWarning = sentryLogger('kiloclaw-billing-cron', 'warning');
@@ -731,6 +733,16 @@ export async function runKiloClawBillingLifecycleCron(
         })
         .where(eq(kiloclaw_subscriptions.id, row.id));
       summary.sweep1_trial_expiry++;
+
+      const attribution = await getAffiliateAttribution(row.user_id, 'impact');
+      if (attribution) {
+        await trackTrialEnd({
+          clickId: attribution.tracking_id,
+          customerId: row.user_id,
+          customerEmail: row.email,
+          eventDate: new Date(now),
+        });
+      }
 
       await trySendEmail(
         database,

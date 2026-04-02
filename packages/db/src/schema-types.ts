@@ -156,6 +156,12 @@ export const KiloClawPaymentSource = {
 export type KiloClawPaymentSource =
   (typeof KiloClawPaymentSource)[keyof typeof KiloClawPaymentSource];
 
+export const AffiliateProvider = {
+  Impact: 'impact',
+} as const;
+
+export type AffiliateProvider = (typeof AffiliateProvider)[keyof typeof AffiliateProvider];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.reassociate',

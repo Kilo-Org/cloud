@@ -3,6 +3,7 @@ import { db } from '@/lib/drizzle';
 import {
   payment_methods,
   kilocode_users,
+  user_affiliate_attributions,
   user_auth_provider,
   credit_transactions,
   kilo_pass_subscriptions,
@@ -54,6 +55,7 @@ describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
     await db.delete(user_auth_provider);
+    await db.delete(user_affiliate_attributions);
     await db.delete(payment_methods);
     await db.delete(kilo_pass_issuance_items);
     await db.delete(kilo_pass_issuances);
@@ -142,6 +144,33 @@ describe('User', () => {
         .from(user_auth_provider)
         .where(eq(user_auth_provider.kilo_user_id, user.id));
       expect(providers).toHaveLength(0);
+    });
+
+    it('should delete affiliate attributions for the user', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      await db.insert(user_affiliate_attributions).values([
+        { user_id: user1.id, provider: 'impact', tracking_id: 'im_ref_user_1' },
+        { user_id: user2.id, provider: 'impact', tracking_id: 'im_ref_user_2' },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(user_affiliate_attributions)
+          .where(eq(user_affiliate_attributions.user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(user_affiliate_attributions)
+          .where(eq(user_affiliate_attributions.user_id, user2.id))
+          .then(r => r[0].count)
+      ).toBe(1);
     });
 
     it('should delete enrichment_data for the user', async () => {

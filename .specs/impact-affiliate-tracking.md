@@ -11,6 +11,7 @@ retry strategies, and other implementation choices belong in plan documents and 
 ## Status
 
 Draft -- created 2026-03-31.
+Updated 2026-04-01 -- aligned with revised Impact integration document and implementation review.
 
 ## Conventions
 
@@ -26,9 +27,9 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 - **Click ID**: An opaque tracking identifier (`im_ref` query parameter) appended to landing page URLs by Impact.com
   when a visitor arrives via an affiliate tracking link.
 - **Conversion**: An event reported to Impact.com's Conversions API representing a meaningful step in the customer
-  lifecycle (signup, trial, or subscription payment).
-- **Lead event**: A conversion representing a user signup. In Impact.com's parent-child model, this is the parent
-  action.
+  lifecycle (visit, signup, trial, or subscription payment).
+- **Lead event**: A conversion representing a visit or user signup. In Impact.com's parent-child model, the SIGNUP
+  event is the parent action.
 - **Sale event**: A conversion representing a trial or subscription payment. In Impact.com's parent-child model, these
   are child actions linked to the lead via the customer identifier.
 - **Affiliate attribution**: A record associating a user with the affiliate tracking identifier that brought them to
@@ -79,62 +80,98 @@ This integration applies only to KiloClaw subscriptions.
 
 8. The system MUST report the following conversion events to Impact.com, in order of the customer lifecycle:
 
-   | Event       | Impact.com Type | Trigger                                       |
-   | ----------- | --------------- | --------------------------------------------- |
-   | SIGNUP      | Lead            | New user creation (with attribution)          |
-   | TRIAL_START | Sale            | KiloClaw trial subscription becomes active    |
-   | TRIAL_END   | Sale            | KiloClaw trial subscription ends (any reason) |
-   | SALE        | Sale            | KiloClaw subscription invoice is paid         |
+   | Event           | ActionTrackerId | Impact.com Type | Trigger                                       |
+   | --------------- | --------------- | --------------- | --------------------------------------------- |
+   | VISIT           | 71668           | Lead            | Visitor lands on `kilo.ai` with `im_ref`      |
+   | SIGNUP          | 71655           | Lead            | New user creation (with attribution)          |
+   | TRIAL_START     | 71656           | Sale            | KiloClaw trial subscription becomes active    |
+   | TRIAL_END       | 71658           | Sale            | KiloClaw trial subscription ends (any reason) |
+   | SALE            | 71659           | Sale            | First paid KiloClaw invoice settles           |
+   | RE_SUBSCRIPTION | 71660           | Sale            | Subsequent paid KiloClaw invoice settles      |
 
 9. Each conversion event sent to Impact.com MUST include:
-   - The user's affiliate tracking identifier (if available)
-   - A stable customer identifier (the user's internal ID)
-   - The customer's email address, SHA-1 hashed
    - An event timestamp
-   - A unique order identifier (for sale events)
+   - An order identifier
+   - The user's affiliate tracking identifier, when available for that event
+   - A stable customer identifier, when available for that event
+   - The customer's email address, SHA-1 hashed, when available for that event
 
-10. SALE events MUST include the invoice amount and currency.
+10. VISIT events MUST only include `EventDate`, `ClickId`, and `OrderId`. VISIT events MUST NOT include `CustomerId`,
+    `CustomerEmail`, `IpAddress`, or `CustomerStatus`.
 
-11. SALE events MUST be reported for every paid KiloClaw invoice (initial purchase and renewals), not only the first.
-    Impact.com determines commission eligibility based on its own contract rules.
+11. VISIT events MUST fire on the marketing site (`kilo.ai`) before a user account exists. VISIT events MUST NOT create
+    a `user_affiliate_attributions` row.
 
-12. SALE events MUST include the subscription plan identifier (e.g. `kiloclaw-standard`, `kiloclaw-commit`) as the item
-    category.
+12. When a meaningful internal order identifier is not available, the system MUST send `IR_AN_64_TS` as `OrderId`.
+    Impact.com generates a unique alphanumeric order identifier from this macro. This applies to VISIT, SIGNUP,
+    TRIAL_START, and TRIAL_END events. These generated identifiers MUST NOT be relied on for internal reconciliation.
 
-13. Conversion events SHOULD include a promo code when one was applied to the transaction.
+13. SIGNUP and TRIAL_START events MUST include `ClickId` alongside `CustomerId` as an attribution fallback. This covers
+    the case where a child event is processed before the parent SIGNUP event finishes processing. For later sale events,
+    including `ClickId` is RECOMMENDED but not REQUIRED.
 
-14. The SIGNUP event MUST only be sent for new user creation, not for returning users who sign in.
+14. VISIT events MUST NOT include `CustomerId` because the user does not yet exist.
+
+15. SALE and RE_SUBSCRIPTION events MUST include the invoice amount and currency.
+
+16. SALE and RE_SUBSCRIPTION events MUST include the subscription plan identifier (e.g. `kiloclaw-standard`,
+    `kiloclaw-commit`) as the item category.
+
+17. RE_SUBSCRIPTION events MUST include the subscription month number in `Numeric1`. The month number MUST be
+    1-indexed from the subscription lifecycle anchor chosen by the implementation, and MUST be used to support
+    Impact.com's 12-month commission cutoff rules.
+
+18. SALE events MUST be reported only for the first paid KiloClaw invoice on a subscription.
+
+19. RE_SUBSCRIPTION events MUST be reported for every subsequent paid KiloClaw invoice on the same subscription.
+
+20. Conversion events SHOULD include a promo code when one was applied to the transaction.
+
+21. The SIGNUP event MUST only be sent for new user creation, not for returning users who sign in.
 
 ### Client-Side Tracking (UTT)
 
-15. The system MUST load the Impact.com UTT script on all pages when the UTT identifier is configured.
+22. The system MUST load the Impact.com UTT script on all pages when the UTT identifier is configured.
 
-16. The system MUST NOT load the UTT script when the UTT identifier is not configured.
+23. The system MUST NOT load the UTT script when the UTT identifier is not configured.
 
-17. After a user authenticates, the system MUST call the UTT `identify` function with the user's internal ID and SHA-1
+24. After a user authenticates, the system MUST call the UTT `identify` function with the user's internal ID and SHA-1
     hashed email to enable cross-device attribution.
 
 ### Reliability and Isolation
 
-18. Conversion reporting MUST NOT block or delay the primary operation it is attached to (user creation, subscription
+25. Conversion reporting MUST NOT block or delay the primary operation it is attached to (user creation, subscription
     settlement, etc.). Failures in conversion reporting MUST be handled asynchronously.
 
-19. If Impact.com credentials are not configured, all tracking operations MUST be no-ops. The application MUST function
+26. If Impact.com credentials are not configured, all tracking operations MUST be no-ops. The application MUST function
     normally without Impact.com configuration.
 
-20. The system SHOULD retry conversion API calls that receive a server error (5xx) response.
+27. The system SHOULD retry conversion API calls that receive a server error (5xx) response.
 
-21. The system MUST log conversion reporting failures for observability.
+28. The system MUST log conversion reporting failures for observability.
 
 ### Rewardful Removal
 
-22. The existing Rewardful integration MUST be fully removed. This includes the client-side script, server-side cookie
+29. The existing Rewardful integration MUST be fully removed. This includes the client-side script, server-side cookie
     reading, and any checkout session metadata populated by Rewardful.
 
 ### Checkout Metadata
 
-23. The KiloClaw checkout session MUST include the user's affiliate tracking identifier (if any) in Stripe subscription
+30. The KiloClaw checkout session MUST include the user's affiliate tracking identifier (if any) in Stripe subscription
     metadata, so it is available to webhook handlers independently of a database lookup.
+
+### API Contract
+
+31. Conversion API requests MUST use JSON request bodies, not form-encoded bodies.
+
+32. Conversion API requests MUST use `ActionTrackerId` to identify the configured event, not `EventTypeId`.
+
+### Reference Values
+
+33. The implementation MUST treat the following program identifiers as configuration constants for this integration:
+    - CampaignId: `50754`
+    - UTT UUID: `A7138521-9724-4b8f-95f4-1db2fbae81141`
+    - ActionTrackerIds: `71655`, `71656`, `71658`, `71659`, `71660`, `71668`
 
 ## Error Handling
 
@@ -157,3 +194,10 @@ This integration applies only to KiloClaw subscriptions.
 
 Renamed the SUBSCRIPTION_START event to SALE to reflect that it covers all KiloClaw payments (initial purchase and
 renewals), not just subscription creation. Clarified that SALE events fire for every paid invoice.
+
+### 2026-04-01 -- Align spec with revised Impact integration guide
+
+Added the VISIT and RE_SUBSCRIPTION events, switched API terminology to `ActionTrackerId`, documented JSON request
+bodies, clarified `IR_AN_64_TS` order ID usage, required `ClickId` fallback on early events, added `Numeric1` month
+tracking for renewals, and recorded the concrete Campaign/UTT/ActionTracker identifiers from the latest implementation
+guide.

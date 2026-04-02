@@ -52,10 +52,11 @@ const startTime = Date.now();
 // lets the drain loop nudge agents that transition to running mid-drain.
 let _draining = false;
 
-// Tracks how many times each agent has gone idle since drain started.
-// First idle = use normal timeout (nudge may be queued, needs time to arrive).
-// Second+ idle = 10s (agent processed the nudge and is done).
-const drainIdleCounts = new Map<string, number>();
+// Agents that were successfully nudged about eviction in Phase 2/3.
+// Used by handleIdleEvent to decide the drain idle timeout:
+//   nudged agents → 10s (they've been told to wrap up)
+//   un-nudged agents → 120s (nudge may still be in SDK queue)
+const drainNudgedAgents = new Set<string>();
 
 export function isDraining(): boolean {
   return _draining;
@@ -435,19 +436,16 @@ async function handleIdleEvent(agent: ManagedAgent, onExit: () => void): Promise
   }
 
   // No nudges (or fetch error) — (re)start the idle timeout.
-  // During drain: first idle uses normal timeout (the mayor's nudge via
-  // gt_nudge queues a message that hasn't been processed yet — the agent
-  // needs to go idle, then the SDK delivers the queued nudge, then the
-  // agent processes it). Second+ idle uses 10s (agent saw the nudge and
-  // is done).
+  // During drain:
+  //   - Nudged agents get 10s: they've been told to wrap up, this idle
+  //     means they finished processing the nudge.
+  //   - Un-nudged agents get 120s: the nudge may still be queued in the
+  //     SDK (session.prompt enqueues behind the active turn). The agent
+  //     needs time to finish its turn, then process the nudge.
   clearIdleTimer(agentId);
   let timeoutMs: number;
   if (_draining) {
-    const idleCount = (drainIdleCounts.get(agentId) ?? 0) + 1;
-    drainIdleCounts.set(agentId, idleCount);
-    // First idle: give the agent time to receive and process the nudge.
-    // Second+: agent has had its chance, use aggressive timeout.
-    timeoutMs = idleCount <= 1 ? 120_000 : 10_000;
+    timeoutMs = drainNudgedAgents.has(agentId) ? 10_000 : 120_000;
   } else {
     timeoutMs =
       agent.role === 'refinery'
@@ -1107,6 +1105,7 @@ export async function drainAll(): Promise<void> {
   const nudgeAgent = async (agent: ManagedAgent): Promise<boolean> => {
     if (nudgedAgents.has(agent.agentId)) return false;
     nudgedAgents.add(agent.agentId);
+    drainNudgedAgents.add(agent.agentId);
 
     if (agent.role === 'mayor' || agent.role === 'triage') return false;
 

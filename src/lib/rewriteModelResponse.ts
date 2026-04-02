@@ -22,7 +22,17 @@ export async function rewriteFreeModelResponse_ChatCompletions(response: Respons
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const json = (await response.json()) as OpenAI.ChatCompletion;
+    let json: OpenAI.ChatCompletion;
+    try {
+      json = (await response.clone().json()) as OpenAI.ChatCompletion;
+    } catch {
+      // Upstream returned invalid/empty JSON body — pass through as-is
+      return new NextResponse(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }
     if (json.model) {
       json.model = model;
     }
@@ -132,9 +142,19 @@ export async function rewriteFreeModelResponse_Messages(response: Response, mode
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const json = (await response.json()) as Anthropic.Messages.Message & {
-      usage?: MessagesApiUsage;
-    };
+    let json: Anthropic.Messages.Message & { usage?: MessagesApiUsage };
+    try {
+      json = (await response.clone().json()) as Anthropic.Messages.Message & {
+        usage?: MessagesApiUsage;
+      };
+    } catch {
+      // Upstream returned invalid/empty JSON body — pass through as-is
+      return new NextResponse(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }
     if (json.model) {
       json.model = model;
     }
@@ -220,9 +240,19 @@ export async function rewriteFreeModelResponse_Responses(response: Response, mod
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
-    const json = (await response.json()) as OpenAI.Responses.Response & {
-      usage?: OpenRouterUsage | null;
-    };
+    let json: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
+    try {
+      json = (await response.clone().json()) as OpenAI.Responses.Response & {
+        usage?: OpenRouterUsage | null;
+      };
+    } catch {
+      // Upstream returned invalid/empty JSON body — pass through as-is
+      return new NextResponse(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }
     if (json.model) {
       json.model = model;
     }

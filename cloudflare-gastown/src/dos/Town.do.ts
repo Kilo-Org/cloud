@@ -4204,6 +4204,48 @@ export class TownDO extends DurableObject<Env> {
     return { townId, alarmSet, activeAgents, pendingBeads };
   }
 
+  async getTownOverview(): Promise<Omit<import('../trpc/schemas').TownOverviewCardOutput, 'id' | 'name'>> {
+    const alarmStatus = await this.getAlarmStatus();
+
+    // 30 min buckets, 48 buckets (24h)
+    const now = Date.now();
+    const buckets = new Array(48).fill(0);
+    const windowMs = 48 * 30 * 60 * 1000;
+
+    const rows = [
+      ...query(this.sql, /* sql */ `
+        SELECT ${town_events.columns.created_at} 
+        FROM ${town_events} 
+        WHERE ${town_events.columns.created_at} > datetime('now', '-24 hours')
+      `, [])
+    ];
+
+    for (const row of rows) {
+      const createdAt = new Date(row.created_at as string).getTime();
+      const diff = now - createdAt;
+      if (diff >= 0 && diff < windowMs) {
+        const bucketIndex = Math.floor(diff / (30 * 60 * 1000));
+        if (bucketIndex < 48) {
+          buckets[47 - bucketIndex]++;
+        }
+      }
+    }
+
+    const lastActivity = rows.length > 0 ? rows[rows.length - 1].created_at as string : null;
+
+    return {
+      beadCounts: {
+        open: alarmStatus.beads.open,
+        inProgress: alarmStatus.beads.inProgress,
+        inReview: alarmStatus.beads.inReview,
+        failed: alarmStatus.beads.failed,
+      },
+      activeAgents: alarmStatus.agents.working,
+      activitySparkline: buckets,
+      lastActivityAt: lastActivity,
+    };
+  }
+
   /**
    * Return a structured snapshot of the alarm loop and patrol state
    * for the dashboard Status tab.

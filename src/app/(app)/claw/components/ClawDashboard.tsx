@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
 import { Check, MessageSquare, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
@@ -19,7 +18,6 @@ import { CreateInstanceCard } from './CreateInstanceCard';
 import { InstanceControls } from './InstanceControls';
 import { InstanceTab } from './InstanceTab';
 import { OpenClawButton } from './OpenClawButton';
-import { SettingsTab } from './SettingsTab';
 import { ChangelogTab } from './ChangelogTab';
 import { SubscriptionTab } from './SubscriptionTab';
 import { ChannelPairingStep } from './ChannelPairingStep';
@@ -127,7 +125,7 @@ function ClawDashboardInner({
     Date.now() - instanceStatus.provisionedAt < SEVEN_DAYS_MS;
   const configServiceNudgeVisible = !instanceStatus || instanceYoung;
 
-  const VALID_TABS = ['instance', 'chat', 'settings', 'subscription', 'changelog'] as const;
+  const VALID_TABS = ['instance', 'chat', 'subscription', 'changelog'] as const;
   type TabValue = (typeof VALID_TABS)[number];
 
   function tabFromHash(): TabValue {
@@ -173,45 +171,11 @@ function ClawDashboardInner({
     prevIsNewSetup.current = isNewSetup;
   }, [isNewSetup]);
 
-  const [dirtySecrets, setDirtySecrets] = useState<Set<string>>(new Set());
-
-  const onSecretsChanged = useCallback((entryId: string) => {
-    setDirtySecrets(prev => new Set([...prev, entryId]));
-  }, []);
   const [upgradeRequested, setUpgradeRequested] = useState(false);
-  const onRequestUpgrade = useCallback(() => setUpgradeRequested(true), []);
   const onUpgradeHandled = useCallback(() => setUpgradeRequested(false), []);
 
-  const onRedeploySuccess = useCallback(() => {
-    setDirtySecrets(new Set());
-  }, []);
-
-  const onRedeploy = useCallback(() => {
-    mutations.restartMachine.mutate(undefined, {
-      onSuccess: () => {
-        toast.success('Redeploying');
-        onRedeploySuccess();
-      },
-      onError: err => {
-        toast.error(err.message, { duration: 10000 });
-      },
-    });
-  }, [mutations.restartMachine, onRedeploySuccess]);
-
-  const onUpgrade = useCallback(() => {
-    mutations.restartMachine.mutate(
-      { imageTag: 'latest' },
-      {
-        onSuccess: () => {
-          toast.success('Upgrading to latest image');
-          onRedeploySuccess();
-        },
-        onError: err => {
-          toast.error(err.message, { duration: 10000 });
-        },
-      }
-    );
-  }, [mutations.restartMachine, onRedeploySuccess]);
+  // Called by InstanceControls after a successful redeploy/upgrade action.
+  const onRedeploySuccess = useCallback(() => {}, []);
 
   // Billing gating (welcome page for new users, loading spinner) is handled
   // by page.tsx before this component mounts. ClawDashboard always renders
@@ -400,9 +364,6 @@ function ClawDashboardInner({
                     <MessageSquare className="mr-1.5 inline h-3.5 w-3.5" />
                     Chat
                   </TabsTrigger>
-                  <TabsTrigger value="settings" className={tabTriggerClass}>
-                    Settings
-                  </TabsTrigger>
                   {!organizationId && (
                     <TabsTrigger value="subscription" className={tabTriggerClass}>
                       Subscription
@@ -425,17 +386,7 @@ function ClawDashboardInner({
                 <TabsContent value="chat" className="mt-0">
                   <ChatTab enabled={activeTab === 'chat' && isRunning} />
                 </TabsContent>
-                <TabsContent value="settings" className="mt-0">
-                  <SettingsTab
-                    status={instanceStatus}
-                    mutations={mutations}
-                    onSecretsChanged={onSecretsChanged}
-                    dirtySecrets={dirtySecrets}
-                    onRedeploy={onRedeploy}
-                    onUpgrade={onUpgrade}
-                    onRequestUpgrade={onRequestUpgrade}
-                  />
-                </TabsContent>
+
                 <TabsContent value="subscription" className="mt-0">
                   <SubscriptionTab />
                 </TabsContent>

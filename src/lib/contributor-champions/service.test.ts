@@ -27,7 +27,7 @@ jest.mock('@/lib/fetchWithBackoff', () => ({
   fetchWithBackoff: jest.fn(),
 }));
 
-const mockedFetchWithBackoff = fetchWithBackoff as jest.MockedFunction<typeof fetchWithBackoff>;
+const mockedFetchWithBackoff = jest.mocked(fetchWithBackoff);
 
 function toUrl(input: string | URL | Request): URL {
   if (typeof input === 'string' || input instanceof URL) {

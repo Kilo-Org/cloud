@@ -1428,10 +1428,10 @@ platform.post('/send-chat-message', async c => {
   }
 
   try {
-    // Always use userId for the DO lookup (KiloClaw instances are personal, DO keyed by userId).
-    // instanceId is accepted for future multi-instance support but not used as the DO key today.
+    // Use instanceId as the DO key when available (matches how other endpoints resolve DOs).
+    // Falls back to userId for backward compatibility with triggers that predate instanceId.
     const creds = await withDORetry(
-      instanceStubFactory(c.env, userId),
+      instanceStubFactory(c.env, userId, instanceId),
       stub => stub.getStreamChatCredentials(),
       'getStreamChatCredentials'
     );

@@ -31,8 +31,10 @@ import {
   kiloclaw_instances,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
+  cloud_agent_webhook_triggers,
 } from '@kilocode/db/schema';
 import { and, eq, ne, desc, isNotNull, isNull, inArray, sql } from 'drizzle-orm';
+import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import {
@@ -779,6 +781,39 @@ export const kiloclawRouter = createTRPCRouter({
             sql`${kiloclaw_email_log.email_type} LIKE 'claw_instance_ready:%'`
           )
         );
+
+      // Clean up webhook/scheduled triggers for the destroyed instance.
+      // Delete from worker DOs first (best-effort), then from PostgreSQL.
+      if (destroyedRow) {
+        const orphanedTriggers = await db
+          .select({
+            triggerId: cloud_agent_webhook_triggers.trigger_id,
+            userId: cloud_agent_webhook_triggers.user_id,
+            organizationId: cloud_agent_webhook_triggers.organization_id,
+          })
+          .from(cloud_agent_webhook_triggers)
+          .where(eq(cloud_agent_webhook_triggers.kiloclaw_instance_id, destroyedRow.id));
+
+        for (const t of orphanedTriggers) {
+          await deleteWorkerTrigger(
+            t.userId ?? undefined,
+            t.organizationId ?? undefined,
+            t.triggerId
+          ).catch(err => {
+            console.warn(
+              '[kiloclaw] Failed to delete worker trigger on destroy:',
+              t.triggerId,
+              err
+            );
+          });
+        }
+
+        if (orphanedTriggers.length > 0) {
+          await db
+            .delete(cloud_agent_webhook_triggers)
+            .where(eq(cloud_agent_webhook_triggers.kiloclaw_instance_id, destroyedRow.id));
+        }
+      }
     } catch (cleanupError) {
       console.error('[kiloclaw] Post-destroy cleanup failed:', cleanupError);
     }

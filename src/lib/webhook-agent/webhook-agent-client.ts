@@ -23,6 +23,11 @@ export type TriggerConfigResponse = {
   condenseOnComplete?: boolean;
   webhookAuthHeader?: string;
   webhookAuthConfigured: boolean;
+  activationMode: 'webhook' | 'scheduled';
+  cronExpression?: string | null;
+  cronTimezone?: string | null;
+  lastScheduledAt?: string | null;
+  nextScheduledAt?: string | null;
 };
 
 /**
@@ -43,6 +48,9 @@ export type CreateTriggerInput = {
     header: string;
     secret: string;
   };
+  activationMode?: 'webhook' | 'scheduled';
+  cronExpression?: string;
+  cronTimezone?: string;
 };
 
 /**
@@ -62,6 +70,8 @@ export type UpdateTriggerInput = {
     header?: string | null;
     secret?: string | null;
   };
+  cronExpression?: string;
+  cronTimezone?: string;
 };
 
 /**
@@ -82,6 +92,7 @@ export type CapturedRequest = {
   processStatus: 'captured' | 'inprogress' | 'success' | 'failed';
   cloudAgentSessionId: string | null;
   errorMessage: string | null;
+  triggerSource: 'webhook' | 'scheduled';
 };
 
 /**

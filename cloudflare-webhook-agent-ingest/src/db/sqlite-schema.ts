@@ -25,6 +25,7 @@ export const requests = sqliteTable(
       .default('captured'),
     cloud_agent_session_id: text('cloud_agent_session_id'),
     error_message: text('error_message'),
+    trigger_source: text('trigger_source').notNull().default('webhook'),
   },
   table => [
     index('idx_requests_timestamp').on(sql`${table.timestamp} desc`),
@@ -55,4 +56,9 @@ export const triggerConfig = sqliteTable('trigger_config', {
   condense_on_complete: integer('condense_on_complete'),
   webhook_auth_header: text('webhook_auth_header'),
   webhook_auth_secret_hash: text('webhook_auth_secret_hash'),
+  activation_mode: text('activation_mode').notNull().default('webhook'),
+  cron_expression: text('cron_expression'),
+  cron_timezone: text('cron_timezone').default('UTC'),
+  last_scheduled_at: text('last_scheduled_at'),
+  next_scheduled_at: text('next_scheduled_at'),
 });

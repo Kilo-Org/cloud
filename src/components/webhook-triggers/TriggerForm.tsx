@@ -27,13 +27,18 @@ import {
   triggerIdCreateSchema,
   RESERVED_TRIGGER_IDS,
 } from '@/lib/webhook-trigger-validation';
+import { TimezoneSelector } from './TimezoneSelector';
+import { ScheduleBuilder } from './ScheduleBuilder';
 import { cn } from '@/lib/utils';
-import { AlertCircle, Check, Copy, Loader2, Webhook } from 'lucide-react';
+import { AlertCircle, Check, Clock, Copy, Loader2, Webhook } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AgentMode } from '@/components/cloud-agent/types';
 
 export type TriggerFormData = {
   triggerId: string;
+  activationMode: 'webhook' | 'scheduled';
+  cronExpression?: string;
+  cronTimezone?: string;
   githubRepo: string;
   mode: AgentMode;
   model: string;
@@ -54,6 +59,9 @@ export type TriggerFormProps = {
   organizationId?: string;
   initialData?: {
     triggerId: string;
+    activationMode?: 'webhook' | 'scheduled';
+    cronExpression?: string | null;
+    cronTimezone?: string | null;
     githubRepo: string;
     mode: AgentMode;
     model: string;
@@ -108,13 +116,24 @@ export function TriggerForm({
   const isEditMode = formMode === 'edit';
 
   // Form state
+  const [activationMode, setActivationMode] = useState<'webhook' | 'scheduled'>(
+    initialData?.activationMode ?? 'webhook'
+  );
+  const [cronExpression, setCronExpression] = useState(initialData?.cronExpression ?? '');
+  const [cronTimezone, setCronTimezone] = useState(
+    initialData?.cronTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone
+  );
+  const isScheduled = activationMode === 'scheduled';
   const [triggerId, setTriggerId] = useState(initialData?.triggerId ?? '');
   const [triggerIdError, setTriggerIdError] = useState<string | null>(null);
   const [githubRepo, setGithubRepo] = useState(initialData?.githubRepo ?? '');
   const [agentMode, setAgentMode] = useState<AgentMode>((initialData?.mode as AgentMode) ?? 'ask');
   const [model, setModel] = useState(initialData?.model ?? '');
+  const WEBHOOK_DEFAULT_PROMPT = 'Describe this webhook request payload:\n\n{{body}}';
+  const SCHEDULED_DEFAULT_PROMPT = 'Run the scheduled task. Triggered at {{scheduledTime}}.';
   const [promptTemplate, setPromptTemplate] = useState(
-    initialData?.promptTemplate ?? 'Describe this webhook request payload:\n\n{{body}}'
+    initialData?.promptTemplate ??
+      (activationMode === 'scheduled' ? SCHEDULED_DEFAULT_PROMPT : WEBHOOK_DEFAULT_PROMPT)
   );
   const [profileId, setProfileId] = useState<string | null>(initialData?.profileId ?? null);
   const [autoCommit, setAutoCommit] = useState(initialData?.autoCommit ?? false);
@@ -132,6 +151,9 @@ export function TriggerForm({
   // Reset form when initialData changes (for edit mode)
   useEffect(() => {
     if (initialData) {
+      setActivationMode(initialData.activationMode ?? 'webhook');
+      setCronExpression(initialData.cronExpression ?? '');
+      setCronTimezone(initialData.cronTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
       setTriggerId(initialData.triggerId);
       setGithubRepo(initialData.githubRepo);
       setAgentMode(initialData.mode ?? 'ask');
@@ -150,6 +172,18 @@ export function TriggerForm({
     }
     setWebhookAuthSecret('');
   }, [initialData]);
+
+  // Update default prompt when activation mode toggles (create mode only)
+  useEffect(() => {
+    if (isEditMode) return;
+    setPromptTemplate(prev =>
+      prev === WEBHOOK_DEFAULT_PROMPT || prev === SCHEDULED_DEFAULT_PROMPT
+        ? isScheduled
+          ? SCHEDULED_DEFAULT_PROMPT
+          : WEBHOOK_DEFAULT_PROMPT
+        : prev
+    );
+  }, [isScheduled, isEditMode]);
 
   // Auto-select first model if none selected
   useEffect(() => {
@@ -220,6 +254,12 @@ export function TriggerForm({
       }
     }
 
+    if (isScheduled) {
+      if (!cronExpression.trim()) {
+        errors.push('Cron expression is required for scheduled triggers');
+      }
+    }
+
     if (!githubRepo) {
       errors.push('Repository is required');
     }
@@ -233,14 +273,14 @@ export function TriggerForm({
     }
 
     if (!profileId) {
-      errors.push('Profile is required for webhook triggers');
+      errors.push('Profile is required');
     }
 
-    if (webhookAuthHeaderError) {
+    if (!isScheduled && webhookAuthHeaderError) {
       errors.push(webhookAuthHeaderError);
     }
 
-    if (webhookAuthSecretError) {
+    if (!isScheduled && webhookAuthSecretError) {
       errors.push(webhookAuthSecretError);
     }
 
@@ -248,6 +288,8 @@ export function TriggerForm({
   }, [
     activeTriggerIdSchema,
     triggerId,
+    isScheduled,
+    cronExpression,
     githubRepo,
     model,
     promptTemplate,
@@ -268,16 +310,20 @@ export function TriggerForm({
         return;
       }
 
-      const webhookAuthData: TriggerFormData['webhookAuth'] = webhookAuthEnabled
-        ? {
-            enabled: true,
-            header: trimmedWebhookAuthHeader,
-            secret: trimmedWebhookAuthSecret ? trimmedWebhookAuthSecret : undefined,
-          }
-        : { enabled: false };
+      const webhookAuthData: TriggerFormData['webhookAuth'] =
+        !isScheduled && webhookAuthEnabled
+          ? {
+              enabled: true,
+              header: trimmedWebhookAuthHeader,
+              secret: trimmedWebhookAuthSecret ? trimmedWebhookAuthSecret : undefined,
+            }
+          : { enabled: false };
 
       await onSubmit({
         triggerId,
+        activationMode,
+        cronExpression: isScheduled ? cronExpression.trim() : undefined,
+        cronTimezone: isScheduled ? cronTimezone : undefined,
         githubRepo,
         mode: agentMode,
         model,
@@ -294,6 +340,10 @@ export function TriggerForm({
       profileId,
       onSubmit,
       triggerId,
+      activationMode,
+      cronExpression,
+      cronTimezone,
+      isScheduled,
       githubRepo,
       agentMode,
       model,
@@ -328,13 +378,13 @@ export function TriggerForm({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Webhook className="h-5 w-5" />
+            {isScheduled ? <Clock className="h-5 w-5" /> : <Webhook className="h-5 w-5" />}
             {isEditMode ? 'Edit Trigger' : 'Create New Trigger'}
           </CardTitle>
           <CardDescription>
             {isEditMode
-              ? 'Update the configuration for this webhook trigger'
-              : 'Configure a new webhook trigger to automatically start cloud agent sessions'}
+              ? 'Update the configuration for this trigger'
+              : 'Configure a new trigger to automatically start cloud agent sessions'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -347,8 +397,71 @@ export function TriggerForm({
               disabled={isEditMode || isLoading}
             />
 
-            {/* Webhook URL (edit mode only) */}
-            {isEditMode && inboundUrl && (
+            {/* Activation Mode (immutable in edit mode) */}
+            <div className="space-y-2">
+              <Label>Activation Mode</Label>
+              {isEditMode ? (
+                <div className="bg-muted flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+                  {isScheduled ? (
+                    <>
+                      <Clock className="h-4 w-4" /> Scheduled
+                    </>
+                  ) : (
+                    <>
+                      <Webhook className="h-4 w-4" /> Webhook
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={!isScheduled ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setActivationMode('webhook')}
+                    disabled={isLoading}
+                  >
+                    <Webhook className="mr-1 h-4 w-4" /> Webhook
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={isScheduled ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setActivationMode('scheduled')}
+                    disabled={isLoading}
+                  >
+                    <Clock className="mr-1 h-4 w-4" /> Scheduled
+                  </Button>
+                </div>
+              )}
+              <p className="text-muted-foreground text-xs">
+                {isScheduled
+                  ? 'Trigger runs on a recurring cron schedule'
+                  : 'Trigger fires when an HTTP request is received'}
+              </p>
+            </div>
+
+            {/* Schedule (scheduled mode only) */}
+            {isScheduled && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+                  <ScheduleBuilder
+                    cronExpression={cronExpression}
+                    onCronExpressionChange={setCronExpression}
+                    timezone={cronTimezone}
+                    disabled={isLoading}
+                  />
+                  <TimezoneSelector
+                    value={cronTimezone}
+                    onValueChange={setCronTimezone}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Webhook URL (edit mode, webhook activation only) */}
+            {isEditMode && !isScheduled && inboundUrl && (
               <WebhookUrlDisplay url={inboundUrl} onCopy={handleCopyUrl} />
             )}
 
@@ -374,7 +487,7 @@ export function TriggerForm({
                   isLoading={isLoadingRepositories}
                   error={repositoriesError}
                   placeholder="Select a repository"
-                  emptyStateText="No repositories available"
+                  emptyStateText="Requires a GitHub integration — configure in Integrations"
                   hideLabel
                 />
               )}
@@ -404,6 +517,7 @@ export function TriggerForm({
               value={promptTemplate}
               onChange={setPromptTemplate}
               disabled={isLoading}
+              isScheduled={isScheduled}
             />
 
             {/* Profile Selection (Required) */}
@@ -428,102 +542,104 @@ export function TriggerForm({
               </p>
             </div>
 
-            {/* Webhook Authentication */}
-            <div className="space-y-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1">
-                  <Label>Webhook Authentication</Label>
-                  <p className="text-muted-foreground text-xs">
-                    Require inbound requests to include a shared secret header before they are
-                    accepted.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Switch
-                    id="webhookAuthEnabled"
-                    checked={webhookAuthEnabled}
-                    onCheckedChange={value => {
-                      const enabled = value === true;
-                      setWebhookAuthEnabled(enabled);
-                      if (!enabled) {
-                        setWebhookAuthSecret('');
-                      }
-                    }}
-                    disabled={isLoading}
-                  />
-                  <Label htmlFor="webhookAuthEnabled" className="cursor-pointer font-normal">
-                    {webhookAuthEnabled ? 'Authentication enabled' : 'Authentication disabled'}
-                  </Label>
-                </div>
-              </div>
-
-              {webhookAuthEnabled && (
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="webhookAuthHeader">
-                      Secret Header <span className="text-red-400">*</span>
-                    </Label>
-                    <Input
-                      id="webhookAuthHeader"
-                      value={webhookAuthHeader}
-                      onChange={event => setWebhookAuthHeader(event.target.value)}
-                      placeholder="x-webhook-secret"
-                      autoComplete="off"
+            {/* Webhook Authentication (webhook mode only) */}
+            {!isScheduled && (
+              <div className="space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <Label>Webhook Authentication</Label>
+                    <p className="text-muted-foreground text-xs">
+                      Require inbound requests to include a shared secret header before they are
+                      accepted.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      id="webhookAuthEnabled"
+                      checked={webhookAuthEnabled}
+                      onCheckedChange={value => {
+                        const enabled = value === true;
+                        setWebhookAuthEnabled(enabled);
+                        if (!enabled) {
+                          setWebhookAuthSecret('');
+                        }
+                      }}
                       disabled={isLoading}
                     />
-                    {webhookAuthHeaderError ? (
-                      <p className="text-destructive text-xs">{webhookAuthHeaderError}</p>
-                    ) : (
-                      <p className="text-muted-foreground text-xs">
-                        Header names are stored in lowercase and matched case-insensitively.
-                      </p>
-                    )}
+                    <Label htmlFor="webhookAuthEnabled" className="cursor-pointer font-normal">
+                      {webhookAuthEnabled ? 'Authentication enabled' : 'Authentication disabled'}
+                    </Label>
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="webhookAuthSecret">
-                      Shared Secret
-                      {initialWebhookAuthConfigured ? (
-                        <span className="text-muted-foreground"> (optional)</span>
+                {webhookAuthEnabled && (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="webhookAuthHeader">
+                        Secret Header <span className="text-red-400">*</span>
+                      </Label>
+                      <Input
+                        id="webhookAuthHeader"
+                        value={webhookAuthHeader}
+                        onChange={event => setWebhookAuthHeader(event.target.value)}
+                        placeholder="x-webhook-secret"
+                        autoComplete="off"
+                        disabled={isLoading}
+                      />
+                      {webhookAuthHeaderError ? (
+                        <p className="text-destructive text-xs">{webhookAuthHeaderError}</p>
                       ) : (
-                        <span className="text-red-400">*</span>
+                        <p className="text-muted-foreground text-xs">
+                          Header names are stored in lowercase and matched case-insensitively.
+                        </p>
                       )}
-                    </Label>
-                    <Input
-                      id="webhookAuthSecret"
-                      type="password"
-                      value={webhookAuthSecret}
-                      onChange={event => setWebhookAuthSecret(event.target.value)}
-                      placeholder={
-                        initialWebhookAuthConfigured
-                          ? 'Leave blank to keep existing secret'
-                          : 'Enter shared secret'
-                      }
-                      autoComplete="new-password"
-                      disabled={isLoading}
-                    />
-                    {webhookAuthSecretError ? (
-                      <p className="text-destructive text-xs">{webhookAuthSecretError}</p>
-                    ) : initialWebhookAuthConfigured ? (
-                      <p className="text-muted-foreground text-xs">
-                        Leave blank to keep the current secret. Provide a new value to rotate it.
-                      </p>
-                    ) : (
-                      <p className="text-muted-foreground text-xs">
-                        Use a strong random string. This value must be supplied with each webhook
-                        call.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
+                    </div>
 
-              {!webhookAuthEnabled && initialWebhookAuthConfigured && (
-                <p className="text-muted-foreground text-xs">
-                  Authentication will be disabled after you save changes.
-                </p>
-              )}
-            </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="webhookAuthSecret">
+                        Shared Secret
+                        {initialWebhookAuthConfigured ? (
+                          <span className="text-muted-foreground"> (optional)</span>
+                        ) : (
+                          <span className="text-red-400">*</span>
+                        )}
+                      </Label>
+                      <Input
+                        id="webhookAuthSecret"
+                        type="password"
+                        value={webhookAuthSecret}
+                        onChange={event => setWebhookAuthSecret(event.target.value)}
+                        placeholder={
+                          initialWebhookAuthConfigured
+                            ? 'Leave blank to keep existing secret'
+                            : 'Enter shared secret'
+                        }
+                        autoComplete="new-password"
+                        disabled={isLoading}
+                      />
+                      {webhookAuthSecretError ? (
+                        <p className="text-destructive text-xs">{webhookAuthSecretError}</p>
+                      ) : initialWebhookAuthConfigured ? (
+                        <p className="text-muted-foreground text-xs">
+                          Leave blank to keep the current secret. Provide a new value to rotate it.
+                        </p>
+                      ) : (
+                        <p className="text-muted-foreground text-xs">
+                          Use a strong random string. This value must be supplied with each webhook
+                          call.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {!webhookAuthEnabled && initialWebhookAuthConfigured && (
+                  <p className="text-muted-foreground text-xs">
+                    Authentication will be disabled after you save changes.
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Options */}
             <div className="space-y-4">
@@ -569,7 +685,7 @@ export function TriggerForm({
                   </Label>
                   {!isActive && (
                     <span className="text-muted-foreground text-xs">
-                      (webhooks will return 404)
+                      {isScheduled ? '(schedule paused)' : '(webhooks will return 404)'}
                     </span>
                   )}
                 </div>
@@ -684,7 +800,7 @@ const TriggerIdField = memo(function TriggerIdField({
         <p className="text-destructive text-xs">{error}</p>
       ) : (
         <p className="text-muted-foreground text-xs">
-          1-64 characters, lowercase alphanumeric with hyphens. Reserved words:{' '}
+          8-64 characters, lowercase alphanumeric with hyphens. Reserved words:{' '}
           {RESERVED_TRIGGER_IDS.join(', ')}
         </p>
       )}
@@ -734,12 +850,14 @@ type PromptTemplateFieldProps = {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  isScheduled?: boolean;
 };
 
 const PromptTemplateField = memo(function PromptTemplateField({
   value,
   onChange,
   disabled,
+  isScheduled,
 }: PromptTemplateFieldProps) {
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -757,45 +875,61 @@ const PromptTemplateField = memo(function PromptTemplateField({
         id="promptTemplate"
         value={value}
         onChange={handleChange}
-        placeholder={`Process the incoming webhook request:
-
-{{body}}
-
-Extract the relevant information and take appropriate action.`}
+        placeholder={
+          isScheduled
+            ? 'Run the scheduled task. Triggered at {{scheduledTime}}.'
+            : `Process the incoming webhook request:\n\n{{body}}\n\nExtract the relevant information and take appropriate action.`
+        }
         rows={6}
         className="resize-y font-mono text-sm"
         disabled={disabled}
+        maxLength={10000}
       />
       <div className="text-muted-foreground space-y-1 text-xs">
         <p>Available variables:</p>
         <ul className="ml-4 list-disc space-y-0.5">
-          <li>
-            <code className="bg-muted rounded px-1">{'{{body}}'}</code> - Raw request body
-          </li>
-          <li>
-            <code className="bg-muted rounded px-1">{'{{bodyJson}}'}</code> - Parsed JSON body
-            (pretty-printed)
-          </li>
-          <li>
-            <code className="bg-muted rounded px-1">{'{{headers}}'}</code> - Request headers
-          </li>
-          <li>
-            <code className="bg-muted rounded px-1">{'{{method}}'}</code> - HTTP method (GET, POST,
-            etc.)
-          </li>
-          <li>
-            <code className="bg-muted rounded px-1">{'{{path}}'}</code> - Request path after trigger
-            ID
-          </li>
-          <li>
-            <code className="bg-muted rounded px-1">{'{{query}}'}</code> - Query string parameters
-          </li>
-          <li>
-            <code className="bg-muted rounded px-1">{'{{sourceIp}}'}</code> - Client IP address
-          </li>
-          <li>
-            <code className="bg-muted rounded px-1">{'{{timestamp}}'}</code> - Request timestamp
-          </li>
+          {isScheduled ? (
+            <>
+              <li>
+                <code className="bg-muted rounded px-1">{'{{scheduledTime}}'}</code> - Scheduled
+                trigger timestamp
+              </li>
+              <li>
+                <code className="bg-muted rounded px-1">{'{{timestamp}}'}</code> - Request timestamp
+              </li>
+            </>
+          ) : (
+            <>
+              <li>
+                <code className="bg-muted rounded px-1">{'{{body}}'}</code> - Raw request body
+              </li>
+              <li>
+                <code className="bg-muted rounded px-1">{'{{bodyJson}}'}</code> - Parsed JSON body
+                (pretty-printed)
+              </li>
+              <li>
+                <code className="bg-muted rounded px-1">{'{{headers}}'}</code> - Request headers
+              </li>
+              <li>
+                <code className="bg-muted rounded px-1">{'{{method}}'}</code> - HTTP method (GET,
+                POST, etc.)
+              </li>
+              <li>
+                <code className="bg-muted rounded px-1">{'{{path}}'}</code> - Request path after
+                trigger ID
+              </li>
+              <li>
+                <code className="bg-muted rounded px-1">{'{{query}}'}</code> - Query string
+                parameters
+              </li>
+              <li>
+                <code className="bg-muted rounded px-1">{'{{sourceIp}}'}</code> - Client IP address
+              </li>
+              <li>
+                <code className="bg-muted rounded px-1">{'{{timestamp}}'}</code> - Request timestamp
+              </li>
+            </>
+          )}
         </ul>
       </div>
     </div>

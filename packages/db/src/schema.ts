@@ -1882,6 +1882,11 @@ export const cloud_agent_webhook_triggers = pgTable(
     target_type: text('target_type').notNull().default('cloud_agent'),
     // KiloClaw Chat target: which instance to send messages to
     kiloclaw_instance_id: uuid('kiloclaw_instance_id').references(() => kiloclaw_instances.id),
+    // Activation mode: 'webhook' (default) or 'scheduled' (cron-based)
+    activation_mode: text('activation_mode').notNull().default('webhook'),
+    // Scheduled trigger fields (only applicable when activation_mode = 'scheduled')
+    cron_expression: text('cron_expression'),
+    cron_timezone: text('cron_timezone').default('UTC'),
     // Cloud Agent target fields (nullable — only required when target_type = 'cloud_agent')
     github_repo: text('github_repo'),
     is_active: boolean('is_active').notNull().default(true),
@@ -1934,6 +1939,14 @@ export const cloud_agent_webhook_triggers = pgTable(
       sql`(
         ${table.target_type} != 'kiloclaw_chat' OR
         ${table.kiloclaw_instance_id} IS NOT NULL
+      )`
+    ),
+    // Scheduled triggers require cron_expression
+    check(
+      'CHK_cloud_agent_webhook_triggers_scheduled_fields',
+      sql`(
+        ${table.activation_mode} != 'scheduled' OR
+        ${table.cron_expression} IS NOT NULL
       )`
     ),
   ]

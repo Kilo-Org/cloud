@@ -22,6 +22,7 @@ export function renderPromptTemplate(template: string, request: WebhookRequest):
     '{{query}}': request.queryString ?? '',
     '{{sourceIp}}': request.sourceIp ?? 'unknown',
     '{{timestamp}}': request.timestamp,
+    '{{scheduledTime}}': request.method === 'SCHEDULED' ? request.timestamp : '',
   };
 
   let result = template;

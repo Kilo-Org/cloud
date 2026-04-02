@@ -48,8 +48,8 @@ export function SafetyIdentifiersBackfill() {
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
-        Backfill safety identifiers for users missing either field. Each click processes up to 1 000
-        users. Click repeatedly until the counter reaches zero.
+        Backfill safety identifiers for users missing either field. Each click processes up to 10
+        000 users (10 batches of 1 000). Click repeatedly until the counter reaches zero.
       </p>
 
       <div className="bg-background rounded-lg border p-6 space-y-4">
@@ -77,7 +77,7 @@ export function SafetyIdentifiersBackfill() {
           disabled={isLoading || isDone || mutation.isPending}
           variant={isDone ? 'outline' : 'default'}
         >
-          {mutation.isPending ? 'Backfilling…' : isDone ? 'Nothing to do' : 'Backfill next 1 000'}
+          {mutation.isPending ? 'Backfilling…' : isDone ? 'Nothing to do' : 'Backfill next 10 000'}
         </Button>
       </div>
 

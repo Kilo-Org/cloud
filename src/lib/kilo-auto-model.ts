@@ -6,11 +6,7 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_NAME,
 } from '@/lib/providers/anthropic';
-import {
-  MINIMAX_CURRENT_MODEL_ID,
-  MINIMAX_CURRENT_MODEL_NAME,
-  minimax_m25_free_model,
-} from '@/lib/providers/minimax';
+import { MINIMAX_CURRENT_MODEL_ID, MINIMAX_CURRENT_MODEL_NAME } from '@/lib/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID, KIMI_CURRENT_MODEL_NAME } from '@/lib/providers/moonshotai';
 import { gpt_oss_20b_free_model, GPT_5_NANO_ID, GPT_5_NANO_NAME } from '@/lib/providers/openai';
 import type {
@@ -21,6 +17,7 @@ import type {
 import { requestContainsImages } from '@/lib/providers/openrouter/request-helpers';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 import type OpenAI from 'openai';
+import { seed_20_pro_free_model } from '@/lib/providers/bytedance';
 
 function stripDisplayName(displayName: string): string {
   const start = displayName.indexOf(': ');
@@ -170,18 +167,15 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
 export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Kilo Auto Free',
-  description: `Free with limited capability. No credits required. Uses ${stripDisplayName(minimax_m25_free_model.display_name)}.`,
-  context_length: minimax_m25_free_model.context_length,
-  max_completion_tokens: minimax_m25_free_model.max_completion_tokens,
+  description: `Free with limited capability. No credits required. Uses ${stripDisplayName(seed_20_pro_free_model.display_name)}.`,
+  context_length: seed_20_pro_free_model.context_length,
+  max_completion_tokens: seed_20_pro_free_model.max_completion_tokens,
   prompt_price: '0',
   completion_price: '0',
   input_cache_read_price: '0',
   input_cache_write_price: '0',
   supports_images: false,
-  roocode_settings: {
-    included_tools: ['search_and_replace'],
-    excluded_tools: ['apply_diff', 'edit_file'],
-  },
+  roocode_settings: undefined,
   opencode_settings: undefined,
 };
 
@@ -238,7 +232,7 @@ export async function resolveAutoModel(
   hasImages: boolean
 ): Promise<ResolvedAutoModel> {
   if (model === KILO_AUTO_FREE_MODEL.id) {
-    return { model: minimax_m25_free_model.public_id };
+    return { model: seed_20_pro_free_model.public_id };
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {
     return {

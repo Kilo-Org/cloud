@@ -98,7 +98,7 @@
       "id": "kilo-auto/free",
       "name": "Kilo Auto Free",
       "created": 0,
-      "description": "Free with limited capability. No credits required. Uses MiniMax M2.5.",
+      "description": "Free with limited capability. No credits required. Uses Dola Seed 2.0 Pro.",
       "architecture": {
         "input_modalities": [
           "text"
@@ -110,8 +110,8 @@
       },
       "top_provider": {
         "is_moderated": false,
-        "context_length": 204800,
-        "max_completion_tokens": 131072
+        "context_length": 256000,
+        "max_completion_tokens": 128000
       },
       "pricing": {
         "prompt": "0",
@@ -123,7 +123,7 @@
         "web_search": "0",
         "internal_reasoning": "0"
       },
-      "context_length": 204800,
+      "context_length": 256000,
       "supported_parameters": [
         "max_tokens",
         "temperature",
@@ -131,15 +131,6 @@
         "reasoning",
         "include_reasoning"
       ],
-      "settings": {
-        "included_tools": [
-          "search_and_replace"
-        ],
-        "excluded_tools": [
-          "apply_diff",
-          "edit_file"
-        ]
-      },
       "opencode": {},
       "preferredIndex": 2,
       "isFree": true

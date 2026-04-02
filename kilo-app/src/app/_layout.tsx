@@ -13,6 +13,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { Toaster } from 'sonner-native';
 
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
+import { initAppsFlyer } from '@/lib/appsflyer';
 import { ContextProvider, useAppContext } from '@/lib/context/context-context';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { queryClient } from '@/lib/query-client';
@@ -141,6 +142,10 @@ function RootLayout() {
       navigationIntegration.registerNavigationContainer(ref);
     }
   }, [ref]);
+
+  useEffect(() => {
+    initAppsFlyer();
+  }, []);
 
   return (
     <GestureHandlerRootView className="flex-1">

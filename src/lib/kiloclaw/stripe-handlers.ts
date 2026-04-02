@@ -2,7 +2,7 @@ import 'server-only';
 
 import type Stripe from 'stripe';
 import { eq, and, isNotNull, isNull, sql } from 'drizzle-orm';
-import { addMonths, differenceInMonths } from 'date-fns';
+import { addMonths } from 'date-fns';
 
 import { db } from '@/lib/drizzle';
 import { kiloclaw_subscriptions, kiloclaw_instances, kilocode_users } from '@kilocode/db/schema';
@@ -21,8 +21,7 @@ import { after } from 'next/server';
 import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
 import { client as stripe } from '@/lib/stripe-client';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
-import { shouldTrackImpactReSubscription } from '@/lib/impact-affiliate-utils';
-import { trackReSubscription, trackSale, trackTrialEnd } from '@/lib/impact';
+import { trackSale, trackTrialEnd } from '@/lib/impact';
 
 const logInfo = sentryLogger('kiloclaw-stripe', 'info');
 const logWarning = sentryLogger('kiloclaw-stripe', 'warning');
@@ -74,13 +73,6 @@ function getImpactItemCategory(plan: 'commit' | 'standard') {
 
 function getImpactItemName(plan: 'commit' | 'standard') {
   return plan === 'commit' ? 'KiloClaw Commit Plan' : 'KiloClaw Standard Plan';
-}
-
-function getReSubscriptionMonthNumber(params: { anchorDate: string; periodStart: string }) {
-  return Math.max(
-    2,
-    differenceInMonths(new Date(params.periodStart), new Date(params.anchorDate)) + 1
-  );
 }
 
 async function runAfterResponse(work: () => Promise<void>) {
@@ -1078,22 +1070,6 @@ export async function handleKiloClawInvoicePaid(params: {
     return;
   }
 
-  const [subscriptionRow] = await db
-    .select({
-      created_at: kiloclaw_subscriptions.created_at,
-      payment_source: kiloclaw_subscriptions.payment_source,
-      stripe_subscription_id: kiloclaw_subscriptions.stripe_subscription_id,
-      trial_started_at: kiloclaw_subscriptions.trial_started_at,
-    })
-    .from(kiloclaw_subscriptions)
-    .where(
-      and(
-        eq(kiloclaw_subscriptions.user_id, metadata.kiloUserId),
-        eq(kiloclaw_subscriptions.stripe_subscription_id, stripeSubscriptionId)
-      )
-    )
-    .limit(1);
-
   const periodStart = new Date(periodStartUnix * 1000).toISOString();
   const periodEnd = new Date(periodEndUnix * 1000).toISOString();
   const amountMicrodollars = invoice.amount_paid * 10_000;
@@ -1141,29 +1117,6 @@ export async function handleKiloClawInvoicePaid(params: {
       itemCategory: getImpactItemCategory(plan),
       itemName: getImpactItemName(plan),
     };
-
-    if (
-      shouldTrackImpactReSubscription({
-        billingReason: invoice.billing_reason,
-        subscriptionRow: subscriptionRow
-          ? {
-              paymentSource: subscriptionRow.payment_source ?? null,
-              stripeSubscriptionId: subscriptionRow.stripe_subscription_id ?? null,
-            }
-          : null,
-      })
-    ) {
-      const anchorDate =
-        subscriptionRow?.trial_started_at ?? subscriptionRow?.created_at ?? periodStart;
-      await trackReSubscription({
-        ...basePayload,
-        monthNumber: getReSubscriptionMonthNumber({
-          anchorDate,
-          periodStart,
-        }),
-      });
-      return;
-    }
 
     await trackSale(basePayload);
   });

@@ -80,14 +80,13 @@ This integration applies only to KiloClaw subscriptions.
 
 8. The system MUST report the following conversion events to Impact.com, in order of the customer lifecycle:
 
-   | Event           | ActionTrackerId | Impact.com Type | Trigger                                       |
-   | --------------- | --------------- | --------------- | --------------------------------------------- |
-   | VISIT           | 71668           | Lead            | Visitor lands on `kilo.ai` with `im_ref`      |
-   | SIGNUP          | 71655           | Lead            | New user creation (with attribution)          |
-   | TRIAL_START     | 71656           | Sale            | KiloClaw trial subscription becomes active    |
-   | TRIAL_END       | 71658           | Sale            | KiloClaw trial subscription ends (any reason) |
-   | SALE            | 71659           | Sale            | First paid KiloClaw invoice settles           |
-   | RE_SUBSCRIPTION | 71660           | Sale            | Subsequent paid KiloClaw invoice settles      |
+   | Event       | ActionTrackerId | Impact.com Type | Trigger                                       |
+   | ----------- | --------------- | --------------- | --------------------------------------------- |
+   | VISIT       | 71668           | Lead            | Visitor lands on `kilo.ai` with `im_ref`      |
+   | SIGNUP      | 71655           | Lead            | New user creation (with attribution)          |
+   | TRIAL_START | 71656           | Sale            | KiloClaw trial subscription becomes active    |
+   | TRIAL_END   | 71658           | Sale            | KiloClaw trial subscription ends (any reason) |
+   | SALE        | 71659           | Sale            | Paid KiloClaw invoice settles                 |
 
 9. Each conversion event sent to Impact.com MUST include:
    - An event timestamp
@@ -112,22 +111,16 @@ This integration applies only to KiloClaw subscriptions.
 
 14. VISIT events MUST NOT include `CustomerId` because the user does not yet exist.
 
-15. SALE and RE_SUBSCRIPTION events MUST include the invoice amount and currency.
+15. SALE events MUST include the invoice amount and currency.
 
-16. SALE and RE_SUBSCRIPTION events MUST include the subscription plan identifier (e.g. `kiloclaw-standard`,
+16. SALE events MUST include the subscription plan identifier (e.g. `kiloclaw-standard`,
     `kiloclaw-commit`) as the item category.
 
-17. RE_SUBSCRIPTION events MUST include the subscription month number in `Numeric1`. The month number MUST be
-    1-indexed from the subscription lifecycle anchor chosen by the implementation, and MUST be used to support
-    Impact.com's 12-month commission cutoff rules.
+17. SALE events MUST be reported for every paid KiloClaw invoice on a subscription (both initial and renewal).
 
-18. SALE events MUST be reported only for the first paid KiloClaw invoice on a subscription.
+18. Conversion events SHOULD include a promo code when one was applied to the transaction.
 
-19. RE_SUBSCRIPTION events MUST be reported for every subsequent paid KiloClaw invoice on the same subscription.
-
-20. Conversion events SHOULD include a promo code when one was applied to the transaction.
-
-21. The SIGNUP event MUST only be sent for new user creation, not for returning users who sign in.
+19. The SIGNUP event MUST only be sent for new user creation, not for returning users who sign in.
 
 ### Client-Side Tracking (UTT)
 
@@ -171,7 +164,7 @@ This integration applies only to KiloClaw subscriptions.
 33. The implementation MUST treat the following program identifiers as configuration constants for this integration:
     - CampaignId: `50754`
     - UTT UUID: `A7138521-9724-4b8f-95f4-1db2fbae81141`
-    - ActionTrackerIds: `71655`, `71656`, `71658`, `71659`, `71660`, `71668`
+    - ActionTrackerIds: `71655`, `71656`, `71658`, `71659`, `71668`
 
 ## Error Handling
 
@@ -201,3 +194,9 @@ Added the VISIT and RE_SUBSCRIPTION events, switched API terminology to `ActionT
 bodies, clarified `IR_AN_64_TS` order ID usage, required `ClickId` fallback on early events, added `Numeric1` month
 tracking for renewals, and recorded the concrete Campaign/UTT/ActionTracker identifiers from the latest implementation
 guide.
+
+### 2026-04-02 -- Remove RE_SUBSCRIPTION event, use SALE for all paid invoices
+
+The RE_SUBSCRIPTION action tracker (71660) no longer exists in Impact.com. Removed the RE_SUBSCRIPTION event and
+consolidated all paid KiloClaw invoice tracking under the SALE event (71659). The `Numeric1` month number field is no
+longer sent. Both initial and renewal invoices now fire the same SALE conversion.

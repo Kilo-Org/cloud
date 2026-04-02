@@ -21,7 +21,6 @@ export const IMPACT_ACTION_TRACKER_IDS = {
   trialStart: 71656,
   trialEnd: 71658,
   sale: 71659,
-  reSubscription: 71660,
   visit: 71668,
 } as const;
 
@@ -197,21 +196,6 @@ export function buildSalePayload(
   };
 }
 
-export function buildReSubscriptionPayload(
-  params: ImpactSaleFields & {
-    eventDate: Date;
-    monthNumber: number;
-  }
-): ImpactConversionPayload {
-  return {
-    CampaignId: IMPACT_CAMPAIGN_ID,
-    ActionTrackerId: IMPACT_ACTION_TRACKER_IDS.reSubscription,
-    EventDate: toEventDate(params.eventDate),
-    Numeric1: params.monthNumber,
-    ...buildSaleFields(params),
-  };
-}
-
 async function sleep(ms: number): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -312,13 +296,4 @@ export async function trackTrialEnd(params: {
 
 export async function trackSale(params: ImpactSaleFields & { eventDate: Date }): Promise<void> {
   await sendImpactConversion(buildSalePayload(params), 'sale');
-}
-
-export async function trackReSubscription(
-  params: ImpactSaleFields & {
-    eventDate: Date;
-    monthNumber: number;
-  }
-): Promise<void> {
-  await sendImpactConversion(buildReSubscriptionPayload(params), 're_subscription');
 }

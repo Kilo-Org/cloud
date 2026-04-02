@@ -40,38 +40,6 @@ describe('impact', () => {
     });
   });
 
-  it('builds a re-subscription payload with Numeric1 and sale details', async () => {
-    const { buildReSubscriptionPayload, hashEmailForImpact } = await import('@/lib/impact');
-    const payload = buildReSubscriptionPayload({
-      clickId: 'impact-click-123',
-      customerId: 'user_123',
-      customerEmail: 'user@example.com',
-      orderId: 'in_123',
-      amount: 9,
-      currencyCode: 'usd',
-      eventDate: new Date('2026-04-02T12:00:00.000Z'),
-      itemCategory: 'kiloclaw-standard',
-      itemName: 'KiloClaw Standard Plan',
-      monthNumber: 2,
-    });
-
-    expect(payload).toEqual({
-      CampaignId: '50754',
-      ActionTrackerId: 71660,
-      EventDate: '2026-04-02T12:00:00.000Z',
-      ClickId: 'impact-click-123',
-      CustomerId: 'user_123',
-      CustomerEmail: hashEmailForImpact('user@example.com'),
-      OrderId: 'in_123',
-      ItemSubTotal1: '9.00',
-      CurrencyCode: 'USD',
-      ItemCategory1: 'kiloclaw-standard',
-      ItemName1: 'KiloClaw Standard Plan',
-      ItemQuantity1: 1,
-      Numeric1: 2,
-    });
-  });
-
   it('sends JSON conversions with basic auth and retries once on 5xx', async () => {
     jest.useFakeTimers();
     const fetchMock = jest

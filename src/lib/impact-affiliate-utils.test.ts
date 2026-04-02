@@ -2,7 +2,6 @@ import { describe, expect, it } from '@jest/globals';
 
 import {
   IMPACT_SIGNUP_FALLBACK_MAX_ACCOUNT_AGE_MS,
-  shouldTrackImpactReSubscription,
   shouldTrackImpactSignupFallback,
 } from '@/lib/impact-affiliate-utils';
 
@@ -46,32 +45,6 @@ describe('impact affiliate utils', () => {
           hasValidationStytch: false,
           userCreatedAt: '2026-04-02T12:00:00.000Z',
           now: new Date('2026-04-02T12:10:00.000Z'),
-        })
-      ).toBe(false);
-    });
-  });
-
-  describe('shouldTrackImpactReSubscription', () => {
-    it('treats settled hybrid subscription cycles as re-subscriptions', () => {
-      expect(
-        shouldTrackImpactReSubscription({
-          billingReason: 'subscription_cycle',
-          subscriptionRow: {
-            paymentSource: 'credits',
-            stripeSubscriptionId: 'sub_123',
-          },
-        })
-      ).toBe(true);
-    });
-
-    it('treats first delayed-billing invoices as sales before hybrid conversion', () => {
-      expect(
-        shouldTrackImpactReSubscription({
-          billingReason: 'subscription_cycle',
-          subscriptionRow: {
-            paymentSource: 'stripe',
-            stripeSubscriptionId: 'sub_123',
-          },
         })
       ).toBe(false);
     });

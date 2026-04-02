@@ -281,7 +281,7 @@ async function fetchPendingNudges(
     };
     const resp = await fetch(
       `${agent.gastownApiUrl}/api/towns/${agent.townId}/rigs/${agent.rigId}/agents/${agent.agentId}/pending-nudges`,
-      { headers }
+      { headers, signal: AbortSignal.timeout(10_000) }
     );
     if (!resp.ok) {
       console.warn(
@@ -400,7 +400,10 @@ async function handleIdleEvent(agent: ManagedAgent, onExit: () => void): Promise
   const agentId = agent.agentId;
   console.log(`${MANAGER_LOG} handleIdleEvent: checking nudges for agent ${agentId}`);
 
-  const nudges = await fetchPendingNudges(agent);
+  // During drain, skip the nudge fetch — it can hang if the container
+  // runtime's outbound networking is degraded after SIGTERM. The agent
+  // finished its work; just start the idle timer so it exits promptly.
+  const nudges = _draining ? null : await fetchPendingNudges(agent);
 
   if (nudges === null) {
     // Error fetching — treat as no nudges, start idle timer

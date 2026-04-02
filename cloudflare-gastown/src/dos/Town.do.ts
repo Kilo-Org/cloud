@@ -1017,6 +1017,16 @@ export class TownDO extends DurableObject<Env> {
     return beadOps.listBeadEvents(this.sql, options);
   }
 
+  /** Overview stats for town list cards: bead counts, active agents, sparkline. */
+  async getOverviewStats(): Promise<beadOps.OverviewStats> {
+    return beadOps.getOverviewStats(this.sql);
+  }
+
+  /** Count beads closed in the last 7 days. */
+  async countClosedLast7d(): Promise<number> {
+    return beadOps.countClosedLast7d(this.sql);
+  }
+
   /**
    * Partially update a bead's editable fields.
    * Only fields explicitly provided are updated (partial update semantics).

@@ -939,3 +939,130 @@ export function getConvoyFeatureBranch(sql: SqlStorage, convoyId: string): strin
   if (rows.length === 0) return null;
   return z.object({ feature_branch: z.string().nullable() }).parse(rows[0]).feature_branch;
 }
+
+// ── Overview Stats (for town list overview cards) ───────────────────
+
+export type OverviewStats = {
+  beadCounts: {
+    open: number;
+    in_progress: number;
+    in_review: number;
+    closed: number;
+    failed: number;
+  };
+  activeAgents: number;
+  lastActivityAt: string | null;
+  activitySparkline: number[];
+};
+
+const CountRow = z.object({ status: z.string(), cnt: z.coerce.number() });
+const AgentCountRow = z.object({ cnt: z.coerce.number() });
+const LastActivityRow = z.object({ last_at: z.string().nullable() });
+const BucketRow = z.object({ bucket_idx: z.coerce.number(), cnt: z.coerce.number() });
+
+/**
+ * Compute overview stats for a single town in one batch:
+ * - Bead counts by status (excluding agent/message types)
+ * - Active agent count (working or stalled)
+ * - Last activity timestamp
+ * - 24h activity sparkline (48 buckets, 30 min each)
+ */
+export function getOverviewStats(sql: SqlStorage): OverviewStats {
+  // 1. Bead counts by status
+  const beadRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${beads.status} AS status, COUNT(*) AS cnt
+        FROM ${beads}
+        WHERE ${beads.type} NOT IN ('agent', 'message')
+        GROUP BY ${beads.status}
+      `,
+      []
+    ),
+  ];
+  const beadCounts = { open: 0, in_progress: 0, in_review: 0, closed: 0, failed: 0 };
+  for (const row of CountRow.array().parse(beadRows)) {
+    const s = row.status;
+    if (s === 'open') beadCounts.open = row.cnt;
+    else if (s === 'in_progress') beadCounts.in_progress = row.cnt;
+    else if (s === 'in_review') beadCounts.in_review = row.cnt;
+    else if (s === 'closed') beadCounts.closed = row.cnt;
+    else if (s === 'failed') beadCounts.failed = row.cnt;
+  }
+
+  // 2. Active agents (working or stalled)
+  const agentRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT COUNT(*) AS cnt
+        FROM ${agent_metadata}
+        WHERE ${agent_metadata.status} IN ('working', 'stalled')
+      `,
+      []
+    ),
+  ];
+  const activeAgents = AgentCountRow.parse(agentRows[0] ?? { cnt: 0 }).cnt;
+
+  // 3. Last activity (most recent bead event)
+  const lastRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT MAX(${bead_events.created_at}) AS last_at
+        FROM ${bead_events}
+      `,
+      []
+    ),
+  ];
+  const lastActivityAt = LastActivityRow.parse(lastRows[0] ?? { last_at: null }).last_at;
+
+  // 4. 24h sparkline — count events per 30-min bucket
+  //    Bucket 0 = 24h ago, bucket 47 = now
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const bucketRows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT
+          CAST((julianday(${bead_events.created_at}) - julianday(?)) * 48.0 AS INTEGER) AS bucket_idx,
+          COUNT(*) AS cnt
+        FROM ${bead_events}
+        WHERE ${bead_events.created_at} > ?
+        GROUP BY bucket_idx
+        HAVING bucket_idx >= 0 AND bucket_idx < 48
+      `,
+      [cutoff, cutoff]
+    ),
+  ];
+  const sparkline = new Array<number>(48).fill(0);
+  for (const row of BucketRow.array().parse(bucketRows)) {
+    if (row.bucket_idx >= 0 && row.bucket_idx < 48) {
+      sparkline[row.bucket_idx] = row.cnt;
+    }
+  }
+
+  return { beadCounts, activeAgents, lastActivityAt, activitySparkline: sparkline };
+}
+
+/**
+ * Count beads closed in the last 7 days (excluding agent/message types).
+ */
+export function countClosedLast7d(sql: SqlStorage): number {
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT COUNT(*) AS cnt
+        FROM ${beads}
+        WHERE ${beads.type} NOT IN ('agent', 'message')
+          AND ${beads.status} = 'closed'
+          AND ${beads.columns.closed_at} > ?
+      `,
+      [cutoff]
+    ),
+  ];
+  return AgentCountRow.parse(rows[0] ?? { cnt: 0 }).cnt;
+}

@@ -31,6 +31,38 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       }[];
       meta: object;
     }>;
+    /**
+     * Overview data for the town list page — cards with bead counts,
+     * sparklines, active agents, plus aggregate stats across all towns.
+     */
+    getTownOverview: import('@trpc/server').TRPCQueryProcedure<{
+      input: void;
+      output: {
+        cards: {
+          townId: string;
+          name: string;
+          lastActivityAt: string | null;
+          beadCounts: {
+            open: number;
+            in_progress: number;
+            in_review: number;
+            closed: number;
+            failed: number;
+          };
+          activeAgents: number;
+          activitySparkline: number[];
+        }[];
+        aggregate: {
+          totalTowns: number;
+          openBeads: number;
+          closedLast7d: number;
+          activeAgents: number;
+          costLast7dMicrodollars: number;
+          tokensLast7d: number;
+        };
+      };
+      meta: object;
+    }>;
     getTown: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         townId: string;
@@ -41,6 +73,16 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         owner_user_id: string;
         created_at: string;
         updated_at: string;
+      };
+      meta: object;
+    }>;
+    getDrainStatus: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        townId: string;
+      };
+      output: {
+        draining: boolean;
+        drainStartedAt: string | null;
       };
       meta: object;
     }>;
@@ -56,16 +98,6 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         isAdminViewing: boolean;
         ownerUserId: string | null;
         ownerOrgId: string | null;
-      };
-      meta: object;
-    }>;
-    getDrainStatus: import('@trpc/server').TRPCQueryProcedure<{
-      input: {
-        townId: string;
-      };
-      output: {
-        draining: boolean;
-        drainStartedAt: string | null;
       };
       meta: object;
     }>;
@@ -981,6 +1013,36 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       }[];
       meta: object;
     }>;
+    getOrgTownOverview: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        organizationId: string;
+      };
+      output: {
+        cards: {
+          townId: string;
+          name: string;
+          lastActivityAt: string | null;
+          beadCounts: {
+            open: number;
+            in_progress: number;
+            in_review: number;
+            closed: number;
+            failed: number;
+          };
+          activeAgents: number;
+          activitySparkline: number[];
+        }[];
+        aggregate: {
+          totalTowns: number;
+          openBeads: number;
+          closedLast7d: number;
+          activeAgents: number;
+          costLast7dMicrodollars: number;
+          tokensLast7d: number;
+        };
+      };
+      meta: object;
+    }>;
     createOrgTown: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         organizationId: string;
@@ -1327,6 +1389,38 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
           }[];
           meta: object;
         }>;
+        /**
+         * Overview data for the town list page — cards with bead counts,
+         * sparklines, active agents, plus aggregate stats across all towns.
+         */
+        getTownOverview: import('@trpc/server').TRPCQueryProcedure<{
+          input: void;
+          output: {
+            cards: {
+              townId: string;
+              name: string;
+              lastActivityAt: string | null;
+              beadCounts: {
+                open: number;
+                in_progress: number;
+                in_review: number;
+                closed: number;
+                failed: number;
+              };
+              activeAgents: number;
+              activitySparkline: number[];
+            }[];
+            aggregate: {
+              totalTowns: number;
+              openBeads: number;
+              closedLast7d: number;
+              activeAgents: number;
+              costLast7dMicrodollars: number;
+              tokensLast7d: number;
+            };
+          };
+          meta: object;
+        }>;
         getTown: import('@trpc/server').TRPCQueryProcedure<{
           input: {
             townId: string;
@@ -1337,6 +1431,16 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             owner_user_id: string;
             created_at: string;
             updated_at: string;
+          };
+          meta: object;
+        }>;
+        getDrainStatus: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            townId: string;
+          };
+          output: {
+            draining: boolean;
+            drainStartedAt: string | null;
           };
           meta: object;
         }>;
@@ -1352,16 +1456,6 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             isAdminViewing: boolean;
             ownerUserId: string | null;
             ownerOrgId: string | null;
-          };
-          meta: object;
-        }>;
-        getDrainStatus: import('@trpc/server').TRPCQueryProcedure<{
-          input: {
-            townId: string;
-          };
-          output: {
-            draining: boolean;
-            drainStartedAt: string | null;
           };
           meta: object;
         }>;
@@ -2275,6 +2369,36 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             created_at: string;
             updated_at: string;
           }[];
+          meta: object;
+        }>;
+        getOrgTownOverview: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            organizationId: string;
+          };
+          output: {
+            cards: {
+              townId: string;
+              name: string;
+              lastActivityAt: string | null;
+              beadCounts: {
+                open: number;
+                in_progress: number;
+                in_review: number;
+                closed: number;
+                failed: number;
+              };
+              activeAgents: number;
+              activitySparkline: number[];
+            }[];
+            aggregate: {
+              totalTowns: number;
+              openBeads: number;
+              closedLast7d: number;
+              activeAgents: number;
+              costLast7dMicrodollars: number;
+              tokensLast7d: number;
+            };
+          };
           meta: object;
         }>;
         createOrgTown: import('@trpc/server').TRPCMutationProcedure<{

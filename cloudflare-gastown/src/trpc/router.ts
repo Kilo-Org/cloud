@@ -8,6 +8,9 @@
 /* eslint-disable @typescript-eslint/await-thenable -- DO RPC stubs return Rpc.Promisified which is thenable at runtime */
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
+import { sql as dsql, and, eq, isNull, gte } from 'drizzle-orm';
+import { getWorkerDb } from '@kilocode/db/client';
+import { microdollar_usage } from '@kilocode/db/schema';
 import { router, gastownProcedure, adminProcedure } from './init';
 import { getTownDOStub } from '../dos/Town.do';
 import { getTownContainerStub } from '../dos/TownContainer.do';
@@ -35,6 +38,7 @@ import {
   RpcAlarmStatusOutput,
   RpcOrgTownOutput,
   RpcMergeQueueDataOutput,
+  RpcTownOverviewOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
 
@@ -94,6 +98,38 @@ function getOrgMembership(
 /** List org IDs where the user has a non-billing_manager role (from JWT). */
 function listAccessibleOrgIds(memberships: JwtOrgMembership[]): string[] {
   return memberships.filter(m => m.role !== 'billing_manager').map(m => m.orgId);
+}
+
+/**
+ * Query 7-day cost and token totals from microdollar_usage via Hyperdrive.
+ * Filters by kilo_user_id (personal) or organization_id (org).
+ */
+async function queryUsageLast7d(
+  env: Env,
+  scope: { type: 'user'; userId: string } | { type: 'org'; organizationId: string }
+): Promise<{ costMicrodollars: number; tokens: number }> {
+  if (!env.HYPERDRIVE) return { costMicrodollars: 0, tokens: 0 };
+  const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 5_000 });
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const ownerFilter =
+    scope.type === 'user'
+      ? and(
+          eq(microdollar_usage.kilo_user_id, scope.userId),
+          isNull(microdollar_usage.organization_id)
+        )
+      : eq(microdollar_usage.organization_id, scope.organizationId);
+  const rows = await db
+    .select({
+      totalCost: dsql<number>`COALESCE(SUM(${microdollar_usage.cost})::float, 0)`,
+      totalTokens: dsql<number>`COALESCE(SUM(${microdollar_usage.input_tokens} + ${microdollar_usage.output_tokens})::float, 0)`,
+    })
+    .from(microdollar_usage)
+    .where(and(ownerFilter, gte(microdollar_usage.created_at, cutoff)));
+  const row = rows[0];
+  return {
+    costMicrodollars: row?.totalCost ?? 0,
+    tokens: row?.totalTokens ?? 0,
+  };
 }
 
 /**
@@ -354,6 +390,76 @@ export const gastownRouter = router({
   listTowns: gastownProcedure.output(z.array(RpcTownOutput)).query(async ({ ctx }) => {
     const userStub = getGastownUserStub(ctx.env, ctx.userId);
     return userStub.listTowns();
+  }),
+
+  /**
+   * Overview data for the town list page — cards with bead counts,
+   * sparklines, active agents, plus aggregate stats across all towns.
+   */
+  getTownOverview: gastownProcedure.output(RpcTownOverviewOutput).query(async ({ ctx }) => {
+    const userStub = getGastownUserStub(ctx.env, ctx.userId);
+
+    // Fan out DO stats + Postgres usage query in parallel
+    const [towns, usage] = await Promise.all([
+      userStub.listTowns(),
+      queryUsageLast7d(ctx.env, { type: 'user', userId: ctx.userId }),
+    ]);
+
+    const statsResults = await Promise.allSettled(
+      towns.map(async town => {
+        const townStub = getTownDOStub(ctx.env, town.id);
+        const [overview, closedLast7d] = await Promise.all([
+          townStub.getOverviewStats() as Promise<{
+            beadCounts: {
+              open: number;
+              in_progress: number;
+              in_review: number;
+              closed: number;
+              failed: number;
+            };
+            activeAgents: number;
+            lastActivityAt: string | null;
+            activitySparkline: number[];
+          }>,
+          townStub.countClosedLast7d() as Promise<number>,
+        ]);
+        return { town, overview, closedLast7d };
+      })
+    );
+
+    const cards = [];
+    let totalOpen = 0;
+    let totalClosedLast7d = 0;
+    let totalActiveAgents = 0;
+
+    for (const result of statsResults) {
+      if (result.status === 'rejected') continue;
+      const { town, overview, closedLast7d } = result.value;
+      cards.push({
+        townId: town.id,
+        name: town.name,
+        lastActivityAt: overview.lastActivityAt,
+        beadCounts: overview.beadCounts,
+        activeAgents: overview.activeAgents,
+        activitySparkline: overview.activitySparkline,
+      });
+      totalOpen +=
+        overview.beadCounts.open + overview.beadCounts.in_progress + overview.beadCounts.in_review;
+      totalClosedLast7d += closedLast7d;
+      totalActiveAgents += overview.activeAgents;
+    }
+
+    return {
+      cards,
+      aggregate: {
+        totalTowns: cards.length,
+        openBeads: totalOpen,
+        closedLast7d: totalClosedLast7d,
+        activeAgents: totalActiveAgents,
+        costLast7dMicrodollars: usage.costMicrodollars,
+        tokensLast7d: usage.tokens,
+      },
+    };
   }),
 
   getTown: gastownProcedure
@@ -1267,6 +1373,79 @@ export const gastownRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN' });
       const stub = getGastownOrgStub(ctx.env, input.organizationId);
       return stub.listTowns();
+    }),
+
+  getOrgTownOverview: gastownProcedure
+    .input(z.object({ organizationId: z.string().uuid() }))
+    .output(RpcTownOverviewOutput)
+    .query(async ({ input, ctx }) => {
+      const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
+      if (!membership || membership.role === 'billing_manager')
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      const orgStub = getGastownOrgStub(ctx.env, input.organizationId);
+
+      const [towns, usage] = await Promise.all([
+        orgStub.listTowns(),
+        queryUsageLast7d(ctx.env, { type: 'org', organizationId: input.organizationId }),
+      ]);
+
+      const statsResults = await Promise.allSettled(
+        towns.map(async town => {
+          const townStub = getTownDOStub(ctx.env, town.id);
+          const [overview, closedLast7d] = await Promise.all([
+            townStub.getOverviewStats() as Promise<{
+              beadCounts: {
+                open: number;
+                in_progress: number;
+                in_review: number;
+                closed: number;
+                failed: number;
+              };
+              activeAgents: number;
+              lastActivityAt: string | null;
+              activitySparkline: number[];
+            }>,
+            townStub.countClosedLast7d() as Promise<number>,
+          ]);
+          return { town, overview, closedLast7d };
+        })
+      );
+
+      const cards = [];
+      let totalOpen = 0;
+      let totalClosedLast7d = 0;
+      let totalActiveAgents = 0;
+
+      for (const result of statsResults) {
+        if (result.status === 'rejected') continue;
+        const { town, overview, closedLast7d } = result.value;
+        cards.push({
+          townId: town.id,
+          name: town.name,
+          lastActivityAt: overview.lastActivityAt,
+          beadCounts: overview.beadCounts,
+          activeAgents: overview.activeAgents,
+          activitySparkline: overview.activitySparkline,
+        });
+        totalOpen +=
+          overview.beadCounts.open +
+          overview.beadCounts.in_progress +
+          overview.beadCounts.in_review;
+        totalClosedLast7d += closedLast7d;
+        totalActiveAgents += overview.activeAgents;
+      }
+
+      return {
+        cards,
+        aggregate: {
+          totalTowns: cards.length,
+          openBeads: totalOpen,
+          closedLast7d: totalClosedLast7d,
+          activeAgents: totalActiveAgents,
+          costLast7dMicrodollars: usage.costMicrodollars,
+          tokensLast7d: usage.tokens,
+        },
+      };
     }),
 
   createOrgTown: gastownProcedure

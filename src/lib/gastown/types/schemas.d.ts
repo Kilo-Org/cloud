@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import type { z } from 'zod';
 export declare const TownOutput: z.ZodObject<
   {
     id: z.ZodString;
@@ -1467,6 +1467,153 @@ export declare const RpcMergeQueueDataOutput: z.ZodPipe<
           },
           z.core.$strip
         >
+      >;
+    },
+    z.core.$strip
+  >
+>;
+export declare const TownOverviewCardOutput: z.ZodObject<
+  {
+    townId: z.ZodString;
+    name: z.ZodString;
+    lastActivityAt: z.ZodNullable<z.ZodString>;
+    beadCounts: z.ZodObject<
+      {
+        open: z.ZodNumber;
+        in_progress: z.ZodNumber;
+        in_review: z.ZodNumber;
+        closed: z.ZodNumber;
+        failed: z.ZodNumber;
+      },
+      z.core.$strip
+    >;
+    activeAgents: z.ZodNumber;
+    activitySparkline: z.ZodArray<z.ZodNumber>;
+  },
+  z.core.$strip
+>;
+export declare const RpcTownOverviewCardOutput: z.ZodPipe<
+  z.ZodAny,
+  z.ZodObject<
+    {
+      townId: z.ZodString;
+      name: z.ZodString;
+      lastActivityAt: z.ZodNullable<z.ZodString>;
+      beadCounts: z.ZodObject<
+        {
+          open: z.ZodNumber;
+          in_progress: z.ZodNumber;
+          in_review: z.ZodNumber;
+          closed: z.ZodNumber;
+          failed: z.ZodNumber;
+        },
+        z.core.$strip
+      >;
+      activeAgents: z.ZodNumber;
+      activitySparkline: z.ZodArray<z.ZodNumber>;
+    },
+    z.core.$strip
+  >
+>;
+export declare const AggregateStatsOutput: z.ZodObject<
+  {
+    totalTowns: z.ZodNumber;
+    openBeads: z.ZodNumber;
+    closedLast7d: z.ZodNumber;
+    activeAgents: z.ZodNumber;
+    costLast7dMicrodollars: z.ZodNumber;
+    tokensLast7d: z.ZodNumber;
+  },
+  z.core.$strip
+>;
+export declare const RpcAggregateStatsOutput: z.ZodPipe<
+  z.ZodAny,
+  z.ZodObject<
+    {
+      totalTowns: z.ZodNumber;
+      openBeads: z.ZodNumber;
+      closedLast7d: z.ZodNumber;
+      activeAgents: z.ZodNumber;
+      costLast7dMicrodollars: z.ZodNumber;
+      tokensLast7d: z.ZodNumber;
+    },
+    z.core.$strip
+  >
+>;
+export declare const TownOverviewOutput: z.ZodObject<
+  {
+    cards: z.ZodArray<
+      z.ZodObject<
+        {
+          townId: z.ZodString;
+          name: z.ZodString;
+          lastActivityAt: z.ZodNullable<z.ZodString>;
+          beadCounts: z.ZodObject<
+            {
+              open: z.ZodNumber;
+              in_progress: z.ZodNumber;
+              in_review: z.ZodNumber;
+              closed: z.ZodNumber;
+              failed: z.ZodNumber;
+            },
+            z.core.$strip
+          >;
+          activeAgents: z.ZodNumber;
+          activitySparkline: z.ZodArray<z.ZodNumber>;
+        },
+        z.core.$strip
+      >
+    >;
+    aggregate: z.ZodObject<
+      {
+        totalTowns: z.ZodNumber;
+        openBeads: z.ZodNumber;
+        closedLast7d: z.ZodNumber;
+        activeAgents: z.ZodNumber;
+        costLast7dMicrodollars: z.ZodNumber;
+        tokensLast7d: z.ZodNumber;
+      },
+      z.core.$strip
+    >;
+  },
+  z.core.$strip
+>;
+export declare const RpcTownOverviewOutput: z.ZodPipe<
+  z.ZodAny,
+  z.ZodObject<
+    {
+      cards: z.ZodArray<
+        z.ZodObject<
+          {
+            townId: z.ZodString;
+            name: z.ZodString;
+            lastActivityAt: z.ZodNullable<z.ZodString>;
+            beadCounts: z.ZodObject<
+              {
+                open: z.ZodNumber;
+                in_progress: z.ZodNumber;
+                in_review: z.ZodNumber;
+                closed: z.ZodNumber;
+                failed: z.ZodNumber;
+              },
+              z.core.$strip
+            >;
+            activeAgents: z.ZodNumber;
+            activitySparkline: z.ZodArray<z.ZodNumber>;
+          },
+          z.core.$strip
+        >
+      >;
+      aggregate: z.ZodObject<
+        {
+          totalTowns: z.ZodNumber;
+          openBeads: z.ZodNumber;
+          closedLast7d: z.ZodNumber;
+          activeAgents: z.ZodNumber;
+          costLast7dMicrodollars: z.ZodNumber;
+          tokensLast7d: z.ZodNumber;
+        },
+        z.core.$strip
       >;
     },
     z.core.$strip

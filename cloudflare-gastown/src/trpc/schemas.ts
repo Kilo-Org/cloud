@@ -334,6 +334,40 @@ export const MergeQueueDataOutput = z.object({
 
 export const RpcMergeQueueDataOutput = rpcSafe(MergeQueueDataOutput);
 
+// ── Town Overview ────────────────────────────────────────────────────
+
+export const TownOverviewCardOutput = z.object({
+  townId: z.string(),
+  name: z.string(),
+  lastActivityAt: z.string().nullable(),
+  beadCounts: z.object({
+    open: z.number(),
+    in_progress: z.number(),
+    in_review: z.number(),
+    closed: z.number(),
+    failed: z.number(),
+  }),
+  activeAgents: z.number(),
+  activitySparkline: z.array(z.number()),
+});
+export const RpcTownOverviewCardOutput = rpcSafe(TownOverviewCardOutput);
+
+export const AggregateStatsOutput = z.object({
+  totalTowns: z.number(),
+  openBeads: z.number(),
+  closedLast7d: z.number(),
+  activeAgents: z.number(),
+  costLast7dMicrodollars: z.number(),
+  tokensLast7d: z.number(),
+});
+export const RpcAggregateStatsOutput = rpcSafe(AggregateStatsOutput);
+
+export const TownOverviewOutput = z.object({
+  cards: z.array(TownOverviewCardOutput),
+  aggregate: AggregateStatsOutput,
+});
+export const RpcTownOverviewOutput = rpcSafe(TownOverviewOutput);
+
 // OrgTown (from GastownOrgDO)
 export const OrgTownOutput = z.object({
   id: z.string(),

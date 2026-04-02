@@ -10,16 +10,16 @@ import {
 } from '@/components/ui/breadcrumb';
 
 export function AppTopbar() {
-  const { title, icon, extras } = usePageTitle();
+  const { title, icon, extras, actions } = usePageTitle();
 
   return (
-    <header className="bg-background sticky top-0 z-10 h-14 shrink-0 border-b flex items-center">
+    <header className="bg-background sticky top-0 z-10 flex h-14 shrink-0 items-center border-b">
       <div className="flex aspect-square h-14 items-center justify-center">
         <SidebarTrigger className="-ml-1" />
       </div>
 
       {title && (
-        <div className="flex h-full items-center gap-2">
+        <div className="flex h-full flex-1 items-center gap-2 pr-4">
           {icon}
           <Breadcrumb>
             <BreadcrumbList>
@@ -29,6 +29,7 @@ export function AppTopbar() {
             </BreadcrumbList>
           </Breadcrumb>
           {extras}
+          {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
         </div>
       )}
     </header>

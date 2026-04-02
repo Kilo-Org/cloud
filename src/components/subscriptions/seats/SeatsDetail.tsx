@@ -21,7 +21,11 @@ import { SEAT_PRICING } from '@/lib/organizations/constants';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { DetailPageHeader } from '@/components/subscriptions/DetailPageHeader';
 import { BillingHistoryTable } from '@/components/subscriptions/BillingHistoryTable';
-import { formatDateLabel, getPaidSeatSubscriptionItem } from '@/components/subscriptions/helpers';
+import {
+  formatDateLabel,
+  getPaidSeatSubscriptionItem,
+  isSeatsTerminal,
+} from '@/components/subscriptions/helpers';
 
 export function SeatsDetail({ organizationId }: { organizationId: string }) {
   const trpc = useTRPC();
@@ -264,53 +268,55 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" onClick={() => setSeatDialogOpen(true)}>
-          Change Seat Count
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => setBillingCycleDialogOpen(true)}
-          disabled={hasPendingCycleChange}
-        >
-          Change Billing Cycle
-        </Button>
-        {subscription.cancel_at_period_end ? (
+      {isSeatsTerminal(subscription.status) ? null : (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setSeatDialogOpen(true)}>
+            Change Seat Count
+          </Button>
           <Button
             variant="outline"
-            onClick={() =>
-              void (async () => {
-                await trpcClient.organizations.subscription.stopCancellation.mutate({
-                  organizationId,
-                });
-                toast.success('Subscription resumed');
-                await refreshData();
-              })()
-            }
+            onClick={() => setBillingCycleDialogOpen(true)}
+            disabled={hasPendingCycleChange}
           >
-            Resume Subscription
+            Change Billing Cycle
           </Button>
-        ) : (
-          <Button
-            variant="outline"
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => {
-              if (!window.confirm('Cancel this seats subscription at period end?')) return;
-              void (async () => {
-                await trpcClient.organizations.subscription.cancel.mutate({ organizationId });
-                toast.success('Subscription will cancel at period end');
-                await refreshData();
-              })();
-            }}
-          >
-            Cancel Subscription
+          {subscription.cancel_at_period_end ? (
+            <Button
+              variant="outline"
+              onClick={() =>
+                void (async () => {
+                  await trpcClient.organizations.subscription.stopCancellation.mutate({
+                    organizationId,
+                  });
+                  toast.success('Subscription resumed');
+                  await refreshData();
+                })()
+              }
+            >
+              Resume Subscription
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => {
+                if (!window.confirm('Cancel this seats subscription at period end?')) return;
+                void (async () => {
+                  await trpcClient.organizations.subscription.cancel.mutate({ organizationId });
+                  toast.success('Subscription will cancel at period end');
+                  await refreshData();
+                })();
+              }}
+            >
+              Cancel Subscription
+            </Button>
+          )}
+          <Button variant="outline" onClick={openCustomerPortal} disabled={isOpeningPortal}>
+            <ExternalLink className="h-4 w-4" />
+            {isOpeningPortal ? 'Opening...' : 'Manage Payment Method'}
           </Button>
-        )}
-        <Button variant="outline" onClick={openCustomerPortal} disabled={isOpeningPortal}>
-          <ExternalLink className="h-4 w-4" />
-          {isOpeningPortal ? 'Opening...' : 'Manage Payment Method'}
-        </Button>
-      </div>
+        </div>
+      )}
 
       <Card>
         <CardHeader className="pb-4">

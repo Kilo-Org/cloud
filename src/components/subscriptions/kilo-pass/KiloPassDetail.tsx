@@ -41,6 +41,7 @@ import {
   formatKiloPassPrice,
   formatKiloPassTierLabel,
   formatMonthCountLabel,
+  isKiloPassTerminal,
 } from '@/components/subscriptions/helpers';
 
 export function KiloPassDetail() {
@@ -267,11 +268,13 @@ export function KiloPassDetail() {
           </Card>
         </div>
 
-        <KiloPassInlineActions
-          onOpenSettings={() => setSettingsOpen(true)}
-          onResume={handleResume}
-          hasScheduledChange={Boolean(scheduledChange)}
-        />
+        {isKiloPassTerminal(subscription.status) ? null : (
+          <KiloPassInlineActions
+            onOpenSettings={() => setSettingsOpen(true)}
+            onResume={handleResume}
+            hasScheduledChange={Boolean(scheduledChange)}
+          />
+        )}
 
         <Card>
           <CardHeader className="pb-4">

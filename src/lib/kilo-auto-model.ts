@@ -180,7 +180,7 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   supports_images: false,
   roocode_settings: {
     included_tools: ['search_and_replace'],
-    excluded_tools: ['apply_diff'],
+    excluded_tools: ['apply_diff', 'edit_file'],
   },
   opencode_settings: undefined,
 };

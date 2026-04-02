@@ -18,7 +18,8 @@ import { Copy, Pencil, Trash2, Check } from 'lucide-react';
 export type TriggerItem = {
   id: string;
   triggerId: string;
-  githubRepo: string;
+  targetType?: string;
+  githubRepo: string | null;
   isActive: boolean;
   createdAt: string;
   webhookAuthConfigured?: boolean | null;
@@ -131,7 +132,13 @@ const TriggerRow = memo(function TriggerRow({
         </Link>
       </TableCell>
       <TableCell className="text-muted-foreground font-mono text-sm">
-        {trigger.githubRepo}
+        {trigger.targetType === 'kiloclaw_chat' ? (
+          <Badge variant="outline" className="border-blue-500/30 bg-blue-500/15 text-blue-400">
+            KiloClaw Chat
+          </Badge>
+        ) : (
+          (trigger.githubRepo ?? '—')
+        )}
       </TableCell>
       <TableCell>
         <Badge variant={trigger.isActive ? 'default' : 'secondary'}>
@@ -186,7 +193,7 @@ const TriggerRow = memo(function TriggerRow({
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => onDelete(trigger.triggerId, trigger.githubRepo)}
+                onClick={() => onDelete(trigger.triggerId, trigger.githubRepo ?? '')}
                 title="Delete Trigger"
               >
                 <Trash2 className="text-destructive h-4 w-4" />

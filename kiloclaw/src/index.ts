@@ -13,6 +13,7 @@
 
 import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
+import { getCookie, deleteCookie } from 'hono/cookie';
 
 import type { AppEnv, KiloClawEnv } from './types';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
@@ -22,9 +23,11 @@ import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { sandboxIdFromUserId } from './auth/sandbox-id';
 import { InstanceIdParam } from './schemas/instance-config';
+import { isValidInstanceId } from '@kilocode/worker-utils/instance-id';
 import { registerVersionIfNeeded } from './lib/image-version';
 import { startingUpPage } from './pages/starting-up';
 import { buildForwardHeaders } from './utils/proxy-headers';
+import { KILOCLAW_ACTIVE_INSTANCE_COOKIE } from './config';
 import { timingMiddleware } from './middleware/analytics';
 import { writeEvent } from './utils/analytics';
 import type { RegistryEntry } from './durable-objects/kiloclaw-registry';
@@ -212,6 +215,9 @@ app.all('/i/:instanceId/*', async c => {
 
   if (status.status === 'destroying') {
     return c.json({ error: 'Instance is being destroyed' }, 409);
+  }
+  if (status.status === 'restoring') {
+    return c.json({ error: 'Instance is restoring from a snapshot' }, 409);
   }
   if (!status.flyMachineId) {
     return c.json({ error: 'Instance not provisioned' }, 404);
@@ -449,6 +455,133 @@ app.all('*', async c => {
       { error: 'Authentication required', hint: 'No active session. Please log in.' },
       401
     );
+  }
+
+  // Cookie-based instance routing: when the user opened an instance-keyed
+  // instance via the access gateway, the active-instance cookie is set.
+  // The OpenClaw Control UI connects WebSockets to `/` (not `/i/{instanceId}/`),
+  // so this cookie tells the catch-all which instance to route to.
+  const activeInstanceId = getCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE);
+  if (activeInstanceId && isValidInstanceId(activeInstanceId)) {
+    const userId = c.get('userId');
+    if (userId) {
+      const stub = c.env.KILOCLAW_INSTANCE.get(
+        c.env.KILOCLAW_INSTANCE.idFromName(activeInstanceId)
+      );
+      const instanceStatus = await stub.getStatus();
+
+      // Ownership mismatch — cookie is stale (e.g. from another user session).
+      // Fall through to default personal resolution.
+      if (instanceStatus.userId !== userId) {
+        // Clear the stale cookie so subsequent requests don't repeat this check
+        deleteCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE);
+      } else {
+        // Cookie points to an instance owned by this user. Return explicit errors
+        // for non-proxyable states instead of silently falling through to the
+        // personal instance.
+        if (instanceStatus.status === 'destroying') {
+          return c.json(
+            { error: 'Instance is being destroyed', hint: 'This instance is being torn down.' },
+            409
+          );
+        }
+        if (instanceStatus.status === 'restoring') {
+          return c.json(
+            {
+              error: 'Instance is restoring',
+              hint: 'This instance is being restored from a snapshot. Please wait.',
+            },
+            409
+          );
+        }
+        if (!instanceStatus.flyMachineId) {
+          return c.json(
+            { error: 'Instance not provisioned', hint: 'The instance has no running machine.' },
+            404
+          );
+        }
+
+        const appName = instanceStatus.flyAppName ?? c.env.FLY_APP_NAME;
+        if (appName && instanceStatus.sandboxId) {
+          console.log(
+            '[PROXY] Cookie-routed to instance:',
+            activeInstanceId,
+            'machine:',
+            instanceStatus.flyMachineId
+          );
+          const request = c.req.raw;
+          const url = new URL(request.url);
+          const targetUrl = flyProxyUrl(appName, url);
+
+          if (!c.env.GATEWAY_TOKEN_SECRET) {
+            return c.json({ error: 'Configuration error' }, 503);
+          }
+
+          const forwardHeaders = await buildForwardHeaders({
+            requestHeaders: request.headers,
+            machineId: instanceStatus.flyMachineId,
+            sandboxId: instanceStatus.sandboxId,
+            gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+          });
+
+          const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
+
+          if (isWebSocketRequest) {
+            let containerResponse: Response;
+            try {
+              containerResponse = await fetch(targetUrl, { headers: forwardHeaders });
+            } catch (err) {
+              console.error('[PROXY] Cookie-routed WS fetch failed:', err);
+              return c.json({ error: 'Instance not reachable' }, 503);
+            }
+            const containerWs = containerResponse.webSocket;
+            if (!containerWs) {
+              return c.json({ error: 'WebSocket upgrade failed' }, 502);
+            }
+            containerWs.accept();
+            const [clientWs, serverWs] = Object.values(new WebSocketPair());
+            serverWs.accept();
+            serverWs.addEventListener('message', event => {
+              if (containerWs.readyState === WebSocket.OPEN) {
+                containerWs.send(event.data as string | ArrayBuffer);
+              }
+            });
+            containerWs.addEventListener('message', event => {
+              if (serverWs.readyState === WebSocket.OPEN) {
+                serverWs.send(event.data as string | ArrayBuffer);
+              }
+            });
+            serverWs.addEventListener('close', event =>
+              containerWs.close(event.code, event.reason)
+            );
+            containerWs.addEventListener('close', event =>
+              serverWs.close(event.code, event.reason)
+            );
+            serverWs.addEventListener('error', () => containerWs.close(1011, 'Client error'));
+            containerWs.addEventListener('error', () => serverWs.close(1011, 'Container error'));
+            return new Response(null, { status: 101, webSocket: clientWs });
+          }
+
+          // HTTP proxy
+          const requestBody = request.body ? await request.arrayBuffer() : null;
+          try {
+            const httpResponse = await fetch(targetUrl, {
+              method: request.method,
+              headers: forwardHeaders,
+              body: requestBody,
+            });
+            if (httpResponse.status === 502) {
+              return startingUpPage();
+            }
+            return httpResponse;
+          } catch (err) {
+            console.error('[PROXY] Cookie-routed HTTP fetch failed:', err);
+            return c.json({ error: 'Instance not reachable' }, 503);
+          }
+        }
+      }
+    }
+    // Cookie invalid/stale — fall through to default personal resolution
   }
 
   const { machineId, flyAppName, sandboxId, status } = await resolveInstance(c);

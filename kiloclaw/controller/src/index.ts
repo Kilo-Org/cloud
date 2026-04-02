@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { execFile } from 'node:child_process';
 import { Duplex, Readable } from 'node:stream';
 import { Hono } from 'hono';
 import {
@@ -416,6 +417,27 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     console.log(
       `[controller] Ready version=${CONTROLLER_VERSION} commit=${CONTROLLER_COMMIT} requireProxyToken=${config.requireProxyToken} wsIdleTimeoutMs=${config.wsIdleTimeoutMs} wsHandshakeTimeoutMs=${config.wsHandshakeTimeoutMs} maxWsConnections=${config.maxWsConnections}`
     );
+
+    // ── Background: upgrade Kilo CLI ────────────────────────────────────
+    // The Docker image bakes in a pinned version; this upgrades to the
+    // latest release in the background so the instance always has the
+    // newest CLI without requiring an image rebuild.
+    if (env.KILOCLAW_KILO_CLI === 'true') {
+      // Strip NPM_CONFIG_PREFIX so the install overwrites the system-wide
+      // binary in /usr/local/bin instead of writing to the per-user prefix.
+      const upgradeEnv = { ...process.env };
+      delete upgradeEnv.NPM_CONFIG_PREFIX;
+      execFile('npm', ['install', '-g', '@kilocode/cli@latest'], { env: upgradeEnv }, err => {
+        if (err) {
+          console.warn(
+            '[kilo-cli] Background upgrade failed (using baked-in version):',
+            err.message
+          );
+        } else {
+          console.log('[kilo-cli] Upgraded to latest version');
+        }
+      });
+    }
   } catch (err) {
     const fullError = err instanceof Error ? err.message : String(err);
     controllerState.current = { state: 'degraded', error: toPublicDegradedError('gateway-start') };

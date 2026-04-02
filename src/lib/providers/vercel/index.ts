@@ -5,7 +5,7 @@ import { getGatewayErrorRate } from '@/lib/providers/gateway-error-rate';
 import { isGeminiModel } from '@/lib/providers/google';
 import { isMinimaxModel } from '@/lib/providers/minimax';
 import { isMoonshotModel } from '@/lib/providers/moonshotai';
-import { isOpenAiOssModel } from '@/lib/providers/openai';
+import { isOpenAiModel, isOpenAiOssModel } from '@/lib/providers/openai';
 import type { VercelUserByokInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import {
   DirectUserByokInferenceProviderIdSchema,
@@ -91,11 +91,11 @@ export async function shouldRouteToVercel(
   }
 
   if (
-    !requestedModel.startsWith('arcee-ai/') &&
     !isAnthropicModel(requestedModel) &&
     !isGeminiModel(requestedModel) &&
     !isMinimaxModel(requestedModel) &&
     !isMoonshotModel(requestedModel) &&
+    !isOpenAiModel(requestedModel) &&
     !isOpenAiOssModel(requestedModel) &&
     requestedModel !== mimo_v2_pro_free_model.public_id &&
     !isZaiModel(requestedModel)

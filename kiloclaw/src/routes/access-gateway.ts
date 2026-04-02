@@ -1,7 +1,11 @@
 import { type Context, Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import type { AppEnv } from '../types';
-import { KILOCLAW_AUTH_COOKIE, KILOCLAW_AUTH_COOKIE_MAX_AGE } from '../config';
+import {
+  KILOCLAW_AUTH_COOKIE,
+  KILOCLAW_AUTH_COOKIE_MAX_AGE,
+  KILOCLAW_ACTIVE_INSTANCE_COOKIE,
+} from '../config';
 import { getWorkerDb, validateAndRedeemAccessCode, findPepperByUserId } from '../db';
 import { signKiloToken, validateKiloToken } from '../auth/jwt';
 import { deriveGatewayToken } from '../auth/gateway-token';
@@ -37,31 +41,68 @@ const BASE_STYLES = /* css */ `
 `;
 
 /**
- * Derive the redirect URL with the gateway token hash fragment.
- * The token is computed server-side from the userId — never touches the client.
+ * Verify that the given instanceId belongs to the given userId.
+ * Throws if the instance doesn't exist or belongs to a different user.
  */
+async function assertInstanceOwnership(
+  env: KiloClawEnv,
+  userId: string,
+  instanceId: string
+): Promise<void> {
+  const stub = env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(instanceId));
+  const status = await stub.getStatus();
+  if (!status.userId || status.userId !== userId) {
+    throw new Error('Instance access denied');
+  }
+}
+
 /**
  * Resolve the DO's authoritative sandboxId for gateway token derivation.
- * For instance-keyed DOs this is the ki_ value; for legacy DOs it's the
- * userId-derived base64url value. Falls back to sandboxIdFromUserId if
- * the DO can't be reached (e.g. not provisioned yet).
+ *
+ * When instanceId is provided (instance-keyed), go directly to the Instance DO.
+ * Otherwise fall back to the user registry (legacy personal instances).
+ *
+ * IMPORTANT: Callers must verify instance ownership via assertInstanceOwnership()
+ * before calling this function with a user-supplied instanceId.
  */
-async function resolveSandboxId(userId: string, env: KiloClawEnv): Promise<string> {
+async function resolveSandboxId(
+  userId: string,
+  env: KiloClawEnv,
+  instanceId?: string
+): Promise<string> {
+  // Instance-keyed: go directly to the Instance DO — no registry lookup needed.
+  if (instanceId && isValidInstanceId(instanceId)) {
+    try {
+      const stub = env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(instanceId));
+      const status = await stub.getStatus();
+      // Belt-and-suspenders: reject even if the caller forgot to check ownership
+      if (status.userId && status.userId !== userId) {
+        console.error('[access-gateway] resolveSandboxId: ownership mismatch', {
+          userId,
+          instanceId,
+          instanceOwner: status.userId,
+        });
+        return sandboxIdFromUserId(userId);
+      }
+      if (status.sandboxId) return status.sandboxId;
+    } catch {
+      // DO unreachable — derive from instanceId directly
+    }
+    return sandboxIdFromInstanceId(instanceId);
+  }
+
+  // Legacy: resolve via user registry
   try {
     const registryKey = `user:${userId}`;
     const registryStub = env.KILOCLAW_REGISTRY.get(env.KILOCLAW_REGISTRY.idFromName(registryKey));
     const entries = await registryStub.listInstances(registryKey);
     if (entries.length > 0) {
       const entry = entries[0];
-      // Try the DO's authoritative sandboxId first.
       try {
         const stub = env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(entry.doKey));
         const status = await stub.getStatus();
         if (status.sandboxId) return status.sandboxId;
       } catch {
-        // DO unreachable — derive from the registry entry's doKey.
-        // If doKey is a UUID (instance-keyed), derive ki_ sandboxId from it.
-        // If doKey is a userId (legacy), fall through to sandboxIdFromUserId.
         if (isValidInstanceId(entry.doKey)) {
           return sandboxIdFromInstanceId(entry.doKey);
         }
@@ -73,15 +114,28 @@ async function resolveSandboxId(userId: string, env: KiloClawEnv): Promise<strin
   return sandboxIdFromUserId(userId);
 }
 
-async function buildRedirectUrl(userId: string, env: KiloClawEnv): Promise<string> {
+/**
+ * Build the redirect URL after successful auth.
+ *
+ * For instance-keyed instances: /i/{instanceId}/#token={token}
+ *   → subsequent requests go through the /i/:instanceId/* proxy route
+ * For legacy: /#token={token}
+ *   → subsequent requests go through the catch-all proxy route
+ */
+async function buildRedirectUrl(
+  userId: string,
+  env: KiloClawEnv,
+  instanceId?: string
+): Promise<string> {
   if (!env.GATEWAY_TOKEN_SECRET) return '/';
-  const sandboxId = await resolveSandboxId(userId, env);
+  const sandboxId = await resolveSandboxId(userId, env, instanceId);
   const token = await deriveGatewayToken(sandboxId, env.GATEWAY_TOKEN_SECRET);
-  return `/#token=${token}`;
+  const basePath = instanceId && isValidInstanceId(instanceId) ? `/i/${instanceId}/` : '/';
+  return `${basePath}#token=${token}`;
 }
 
-function renderPage(params: { userId: string; error?: string }) {
-  const { userId, error } = params;
+function renderPage(params: { userId: string; instanceId?: string; error?: string }) {
+  const { userId, instanceId, error } = params;
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -119,6 +173,7 @@ function renderPage(params: { userId: string; error?: string }) {
     ${error ? `<div class="error">${escapeHtml(error)}</div>` : ''}
     <form method="POST" action="/kilo-access-gateway">
       <input type="hidden" name="userId" value="${escapeHtml(userId)}" />
+      ${instanceId ? `<input type="hidden" name="instanceId" value="${escapeHtml(instanceId)}" />` : ''}
       <label for="code">Access Code</label>
       <input type="text" id="code" name="code" placeholder="XXXXX-XXXXX"
              maxlength="11" autocomplete="off" autofocus required />
@@ -198,7 +253,8 @@ async function hasValidCookie(
 async function redeemCodeAndSetCookie(
   c: Context<AppEnv>,
   code: string,
-  userId: string
+  userId: string,
+  instanceId?: string
 ): Promise<{ redirectUrl: string } | { error: string; status: 401 | 500 }> {
   const connectionString = c.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
@@ -234,6 +290,15 @@ async function redeemCodeAndSetCookie(
     env: c.env.WORKER_ENV,
   });
 
+  // Verify instanceId ownership before minting a gateway token
+  if (instanceId && isValidInstanceId(instanceId)) {
+    try {
+      await assertInstanceOwnership(c.env, redeemedUserId, instanceId);
+    } catch {
+      return { error: 'Access denied', status: 401 as const };
+    }
+  }
+
   setCookie(c, KILOCLAW_AUTH_COOKIE, token, {
     path: '/',
     httpOnly: true,
@@ -242,7 +307,29 @@ async function redeemCodeAndSetCookie(
     maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
   });
 
-  const redirectUrl = await buildRedirectUrl(redeemedUserId, c.env);
+  // Track which instance the user is accessing so the catch-all proxy
+  // routes WebSocket/HTTP traffic to the correct instance. The OpenClaw
+  // Control UI connects to `/` without the `/i/{instanceId}/` prefix.
+  if (instanceId && isValidInstanceId(instanceId)) {
+    setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, instanceId, {
+      path: '/',
+      httpOnly: true,
+      secure: c.env.WORKER_ENV !== 'development',
+      sameSite: 'Lax',
+      maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
+    });
+  } else {
+    // Clear the cookie when opening a personal (non-instance-keyed) instance
+    setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, '', {
+      path: '/',
+      httpOnly: true,
+      secure: c.env.WORKER_ENV !== 'development',
+      sameSite: 'Lax',
+      maxAge: 0,
+    });
+  }
+
+  const redirectUrl = await buildRedirectUrl(redeemedUserId, c.env, instanceId);
   return { redirectUrl };
 }
 
@@ -251,13 +338,37 @@ accessGatewayRoutes.get('/kilo-access-gateway', async c => {
   if (!userId) {
     return c.text('Missing userId parameter', 400);
   }
+  const instanceId = c.req.query('instanceId') || undefined;
 
   // If the user already has a valid cookie, derive the gateway token and redirect
   const secret = c.env.NEXTAUTH_SECRET;
   if (secret) {
     const cookie = getCookie(c, KILOCLAW_AUTH_COOKIE);
     if (await hasValidCookie(cookie, userId, secret, c.env.WORKER_ENV)) {
-      const redirectUrl = await buildRedirectUrl(userId, c.env);
+      // Verify instanceId ownership before minting a gateway token
+      if (instanceId && isValidInstanceId(instanceId)) {
+        try {
+          await assertInstanceOwnership(c.env, userId, instanceId);
+        } catch {
+          return c.text('Access denied', 403);
+        }
+        setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, instanceId, {
+          path: '/',
+          httpOnly: true,
+          secure: c.env.WORKER_ENV !== 'development',
+          sameSite: 'Lax',
+          maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
+        });
+      } else {
+        setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, '', {
+          path: '/',
+          httpOnly: true,
+          secure: c.env.WORKER_ENV !== 'development',
+          sameSite: 'Lax',
+          maxAge: 0,
+        });
+      }
+      const redirectUrl = await buildRedirectUrl(userId, c.env, instanceId);
       return c.redirect(redirectUrl);
     }
   }
@@ -266,31 +377,38 @@ accessGatewayRoutes.get('/kilo-access-gateway', async c => {
   // This lets the dashboard embed the code in the Open link so users skip manual entry.
   const authCode = c.req.query('auth_code')?.trim().toUpperCase();
   if (authCode) {
-    const result = await redeemCodeAndSetCookie(c, authCode, userId);
+    const result = await redeemCodeAndSetCookie(c, authCode, userId, instanceId);
     if ('redirectUrl' in result) {
       return c.html(renderLoadingPage(result.redirectUrl));
     }
     // Code was invalid/expired — fall through to the manual form with the error
-    return c.html(renderPage({ userId, error: result.error }), result.status);
+    return c.html(renderPage({ userId, instanceId, error: result.error }), result.status);
   }
 
-  return c.html(renderPage({ userId }));
+  return c.html(renderPage({ userId, instanceId }));
 });
 
 accessGatewayRoutes.post('/kilo-access-gateway', async c => {
   const body = await c.req.parseBody();
   const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : '';
   const userId = typeof body.userId === 'string' ? body.userId.trim() : '';
+  const instanceId =
+    typeof body.instanceId === 'string' && body.instanceId.trim()
+      ? body.instanceId.trim()
+      : undefined;
 
   if (!code || !userId) {
-    return c.html(renderPage({ userId, error: 'Access code and user ID are required.' }), 400);
+    return c.html(
+      renderPage({ userId, instanceId, error: 'Access code and user ID are required.' }),
+      400
+    );
   }
 
-  const result = await redeemCodeAndSetCookie(c, code, userId);
+  const result = await redeemCodeAndSetCookie(c, code, userId, instanceId);
   if ('redirectUrl' in result) {
     return c.html(renderLoadingPage(result.redirectUrl));
   }
-  return c.html(renderPage({ userId, error: result.error }), result.status);
+  return c.html(renderPage({ userId, instanceId, error: result.error }), result.status);
 });
 
 export { accessGatewayRoutes };

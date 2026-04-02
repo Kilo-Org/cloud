@@ -24,6 +24,7 @@ import {
 import {
   normalizeTriggerId,
   triggerIdSchema,
+  triggerIdCreateSchema,
   RESERVED_TRIGGER_IDS,
 } from '@/lib/webhook-trigger-validation';
 import { cn } from '@/lib/utils';
@@ -166,16 +167,20 @@ export function TriggerForm({
       ? 'Webhook auth secret is required when enabling authentication'
       : null;
 
-  // Trigger ID validation
-  const validateTriggerId = useCallback((value: string) => {
-    const result = triggerIdSchema.safeParse(value);
-    if (!result.success) {
-      setTriggerIdError(result.error.issues[0].message);
-      return false;
-    }
-    setTriggerIdError(null);
-    return true;
-  }, []);
+  // Trigger ID validation — use stricter schema for new triggers
+  const activeTriggerIdSchema = isEditMode ? triggerIdSchema : triggerIdCreateSchema;
+  const validateTriggerId = useCallback(
+    (value: string) => {
+      const result = activeTriggerIdSchema.safeParse(value);
+      if (!result.success) {
+        setTriggerIdError(result.error.issues[0].message);
+        return false;
+      }
+      setTriggerIdError(null);
+      return true;
+    },
+    [activeTriggerIdSchema]
+  );
 
   // Handle trigger ID change with auto-transform
   const handleTriggerIdChange = useCallback(
@@ -209,7 +214,7 @@ export function TriggerForm({
     if (!triggerId) {
       errors.push('Trigger Name is required');
     } else {
-      const result = triggerIdSchema.safeParse(triggerId);
+      const result = activeTriggerIdSchema.safeParse(triggerId);
       if (!result.success) {
         errors.push(result.error.issues[0].message);
       }
@@ -241,6 +246,7 @@ export function TriggerForm({
 
     return errors;
   }, [
+    activeTriggerIdSchema,
     triggerId,
     githubRepo,
     model,

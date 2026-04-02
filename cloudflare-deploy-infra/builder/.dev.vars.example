@@ -3,11 +3,13 @@ CLOUDFLARE_API_TOKEN="321"
 
 # Auth token that Backend uses to make API calls to the builder
 # Same as USER_DEPLOYMENTS_API_AUTH_KEY env var in the backend 
-BACKEND_AUTH_TOKEN="555"
+# @from USER_DEPLOYMENTS_API_AUTH_KEY
+BACKEND_AUTH_TOKEN=
 
 # Backend webhook delivery configuration
 # URL endpoint where build events will be sent (REQUIRED)
-BACKEND_EVENTS_URL="http://192.168.100.100:3000/api/user-deployments/webhook"
+# @url nextjs/api/user-deployments/webhook
+BACKEND_EVENTS_URL=http://localhost:3000/api/user-deployments/webhook
 
 # Maximum number of events to batch before sending
 BACKEND_WEBHOOK_BATCH_MAX_EVENTS="100"

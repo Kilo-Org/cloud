@@ -143,6 +143,17 @@ export function EventPanel({
   const mailSubject = typeof meta.subject === 'string' ? meta.subject : null;
   const mailTo = typeof meta.to === 'string' ? meta.to : null;
 
+  // Extract structured failure reason from status_changed → failed events
+  const failureReason =
+    typeof meta.failure_reason === 'object' && meta.failure_reason !== null
+      ? (meta.failure_reason as {
+          code?: string;
+          message?: string;
+          details?: string;
+          source?: string;
+        })
+      : null;
+
   // Metadata entries excluding the ones we render in context sections
   const contextKeys = new Set([
     'title',
@@ -153,6 +164,7 @@ export function EventPanel({
     'completedBy',
     'subject',
     'to',
+    'failure_reason',
   ]);
   const extraMetadata = Object.entries(meta).filter(
     ([k, v]) => !contextKeys.has(k) && v !== null && v !== undefined && v !== ''
@@ -222,6 +234,19 @@ export function EventPanel({
               {event.new_value ?? '—'}
             </span>
           </div>
+          {event.new_value === 'failed' && failureReason && (
+            <div className="mt-2 rounded-md border border-red-500/20 bg-red-500/5 px-3 py-2">
+              <p className="text-[11px] font-medium text-red-400">{failureReason.message}</p>
+              {failureReason.details && (
+                <p className="mt-1 font-mono text-[10px] text-red-400/60">
+                  {failureReason.details}
+                </p>
+              )}
+              <p className="mt-1 text-[10px] text-red-400/40">
+                {failureReason.source} / {failureReason.code}
+              </p>
+            </div>
+          )}
         </ContextSection>
       )}
 

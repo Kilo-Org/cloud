@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback } from 'react';
-import { useFileTree, useReadFile, type useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { useClawFileTree, useClawReadFile } from '../hooks/useClawHooks';
+import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { FileEditorShell } from './FileEditorShell';
 import { FileEditorPane, type FileSaveError } from './FileEditorPane';
 import { validateOpenclawJsonForSave } from './validateOpenclawJson';
@@ -19,7 +20,7 @@ function UserFileEditorPane({
   mutations: ClawMutations;
   onDirtyChange: (dirty: boolean) => void;
 }) {
-  const { data, isLoading, error, refetch } = useReadFile(filePath, enabled);
+  const { data, isLoading, error, refetch } = useClawReadFile(filePath, enabled);
 
   const handleSave = useCallback(
     (
@@ -59,7 +60,7 @@ export function WorkspaceFileEditor({
   mutations: ClawMutations;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { data: tree, isLoading, error, refetch } = useFileTree(enabled);
+  const { data: tree, isLoading, error, refetch } = useClawFileTree(enabled);
 
   return (
     <FileEditorShell

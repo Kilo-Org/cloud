@@ -26,6 +26,8 @@ import {
   Variable,
   Layers,
   RefreshCw,
+  RotateCcw,
+  Power,
   Container,
   User,
   Key,
@@ -235,6 +237,21 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
     trpc.gastown.refreshContainerToken.mutationOptions({
       onSuccess: () => toast.success('Container token refreshed'),
       onError: err => toast.error(`Token refresh failed: ${err.message}`),
+    })
+  );
+
+  const restartContainer = useMutation(
+    trpc.gastown.forceRestartContainer.mutationOptions({
+      onSuccess: () =>
+        toast.success('Container stopping gracefully — agents will save work before exiting'),
+      onError: err => toast.error(`Container restart failed: ${err.message}`),
+    })
+  );
+
+  const destroyContainer = useMutation(
+    trpc.gastown.destroyContainer.mutationOptions({
+      onSuccess: () => toast.success('Container destroyed — it will restart on next dispatch'),
+      onError: err => toast.error(`Container destroy failed: ${err.message}`),
     })
   );
 
@@ -815,7 +832,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                     </div>
                     <Button
                       onClick={() => refreshToken.mutate({ townId })}
-                      disabled={refreshToken.isPending}
+                      disabled={refreshToken.isPending || effectiveReadOnly}
                       variant="secondary"
                       size="sm"
                       className="ml-4 shrink-0 gap-1.5"
@@ -824,6 +841,48 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                         className={`size-3 ${refreshToken.isPending ? 'animate-spin' : ''}`}
                       />
                       {refreshToken.isPending ? 'Refreshing...' : 'Refresh Token'}
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                    <div>
+                      <p className="text-sm text-white/70">Graceful Stop</p>
+                      <p className="text-[11px] text-white/30">
+                        Sends SIGTERM — agents save their work before the container exits. It will
+                        restart on the next dispatch cycle.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => restartContainer.mutate({ townId })}
+                      disabled={restartContainer.isPending || effectiveReadOnly}
+                      variant="secondary"
+                      size="sm"
+                      className="ml-4 shrink-0 gap-1.5"
+                    >
+                      <RotateCcw
+                        className={`size-3 ${restartContainer.isPending ? 'animate-spin' : ''}`}
+                      />
+                      {restartContainer.isPending ? 'Stopping...' : 'Graceful Stop'}
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3">
+                    <div>
+                      <p className="text-sm text-red-400">Destroy Container</p>
+                      <p className="text-[11px] text-red-400/70">
+                        Sends SIGKILL — the container dies immediately with no graceful drain. Use
+                        when the container is stuck or unresponsive.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => destroyContainer.mutate({ townId })}
+                      disabled={destroyContainer.isPending || effectiveReadOnly}
+                      variant="secondary"
+                      size="sm"
+                      className="ml-4 shrink-0 gap-1.5"
+                    >
+                      <Power
+                        className={`size-3 ${destroyContainer.isPending ? 'animate-spin' : ''}`}
+                      />
+                      {destroyContainer.isPending ? 'Destroying...' : 'Destroy Container'}
                     </Button>
                   </div>
                 </div>
@@ -852,7 +911,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                           disabled={
                             deleteTown.isPending || deleteOrgTown.isPending || effectiveReadOnly
                           }
-                          variant="destructive"
+                          variant="secondary"
                           size="sm"
                           className="ml-4 shrink-0 gap-1.5"
                         >

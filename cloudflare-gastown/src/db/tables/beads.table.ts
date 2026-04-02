@@ -50,6 +50,8 @@ export const BeadRecord = z.object({
       }
     })
     .pipe(z.record(z.string(), z.any())), // z.any() needed for Rpc.Serializable compatibility
+  dispatch_attempts: z.number().default(0),
+  last_dispatch_attempt_at: z.string().nullable().default(null),
   created_by: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -126,11 +128,20 @@ export function createTableBeads(): string {
     priority: `text default 'medium'`,
     labels: `text default '[]'`,
     metadata: `text default '{}'`,
+    dispatch_attempts: `integer not null default 0`,
+    last_dispatch_attempt_at: `text`,
     created_by: `text`,
     created_at: `text not null`,
     updated_at: `text not null`,
     closed_at: `text`,
   });
+}
+
+export function migrateBeads(): string[] {
+  return [
+    `ALTER TABLE beads ADD COLUMN dispatch_attempts integer not null default 0`,
+    `ALTER TABLE beads ADD COLUMN last_dispatch_attempt_at text`,
+  ];
 }
 
 export function getIndexesBeads(): string[] {

@@ -169,7 +169,7 @@ export function AccessLockedDialog({
   }
 
   function handleDismiss() {
-    router.push('/');
+    router.push('/profile');
   }
 
   const isCreditFunded =

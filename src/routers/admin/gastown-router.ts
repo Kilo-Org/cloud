@@ -7,6 +7,9 @@ import {
   GASTOWN_SERVICE_URL,
   GASTOWN_CF_ACCESS_CLIENT_ID,
   GASTOWN_CF_ACCESS_CLIENT_SECRET,
+  CLOUDFLARE_ACCOUNT_ID,
+  CLOUDFLARE_TOWN_DO_NAMESPACE_ID,
+  CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID,
 } from '@/lib/config.server';
 import { generateApiToken } from '@/lib/tokens';
 import type { User } from '@kilocode/db/schema';
@@ -243,9 +246,20 @@ const GastownApiResponseSchema = z.union([
   z.object({ success: z.literal(false), error: z.string() }),
 ]);
 
+function requireGastownUrl(): string {
+  if (!GASTOWN_SERVICE_URL) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'GASTOWN_SERVICE_URL is not configured',
+    });
+  }
+  return GASTOWN_SERVICE_URL;
+}
+
 /** GET request to the Gastown worker, parsing the response with the given schema. */
 async function gastownGet<T>(adminUser: User, path: string, schema: z.ZodType<T>): Promise<T> {
-  const response = await fetch(`${GASTOWN_SERVICE_URL}${path}`, {
+  const baseUrl = requireGastownUrl();
+  const response = await fetch(`${baseUrl}${path}`, {
     method: 'GET',
     headers: buildAdminHeaders(adminUser),
   });
@@ -272,7 +286,8 @@ async function gastownPatch<T>(
   body: unknown,
   schema: z.ZodType<T>
 ): Promise<T> {
-  const response = await fetch(`${GASTOWN_SERVICE_URL}${path}`, {
+  const baseUrl = requireGastownUrl();
+  const response = await fetch(`${baseUrl}${path}`, {
     method: 'PATCH',
     headers: buildAdminHeaders(adminUser),
     body: JSON.stringify(body),
@@ -305,8 +320,9 @@ async function gastownTrpcGet<T>(
   input: unknown,
   schema: z.ZodType<T>
 ): Promise<T | null> {
+  const baseUrl = requireGastownUrl();
   const headers = buildAdminHeaders(adminUser);
-  const url = `${GASTOWN_SERVICE_URL}/trpc/${procedure}?input=${encodeURIComponent(JSON.stringify(input))}`;
+  const url = `${baseUrl}/trpc/${procedure}?input=${encodeURIComponent(JSON.stringify(input))}`;
   const response = await fetch(url, { headers });
   if (!response.ok) {
     if (response.status === 404) return null;
@@ -330,8 +346,9 @@ async function gastownTrpcMutate<T>(
   input: unknown,
   schema: z.ZodType<T>
 ): Promise<T | null> {
+  const baseUrl = requireGastownUrl();
   const headers = buildAdminHeaders(adminUser);
-  const url = `${GASTOWN_SERVICE_URL}/trpc/${procedure}`;
+  const url = `${baseUrl}/trpc/${procedure}`;
   const response = await fetch(url, {
     method: 'POST',
     headers,
@@ -413,6 +430,59 @@ export const adminGastownRouter = createTRPCRouter({
         { townId: input.townId },
         AlarmStatusRecord
       );
+    }),
+
+  /**
+   * Get Cloudflare dashboard links for a town.
+   * Fetches DO IDs from the gastown worker and constructs CF dashboard URLs.
+   * Gracefully degrades when env vars are not configured.
+   */
+  getCloudflareLinks: adminProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .output(
+      z.object({
+        workerLogsUrl: z.string(),
+        containerInstanceUrl: z.string().nullable(),
+        townDoLogsUrl: z.string().nullable(),
+        containerDoLogsUrl: z.string().nullable(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const accountId = CLOUDFLARE_ACCOUNT_ID;
+      if (!accountId) {
+        return {
+          workerLogsUrl:
+            'https://dash.cloudflare.com/workers/services/view/gastown/production/logs/live',
+          containerInstanceUrl: null,
+          townDoLogsUrl: null,
+          containerDoLogsUrl: null,
+        };
+      }
+
+      const debugInfo = await gastownGet(
+        ctx.user,
+        `/api/towns/${input.townId}/cloudflare-debug`,
+        z.object({ containerDoId: z.string().nullable(), townDoId: z.string() })
+      ).catch(() => null);
+
+      const townDoNamespaceId = CLOUDFLARE_TOWN_DO_NAMESPACE_ID;
+      const containerDoNamespaceId = CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID;
+
+      return {
+        workerLogsUrl: `https://dash.cloudflare.com/${accountId}/workers/services/view/gastown/production/logs/live`,
+        // containerDoId is only non-null when the container is actually running
+        containerInstanceUrl: debugInfo?.containerDoId
+          ? `https://dash.cloudflare.com/${accountId}/workers/containers/app-gastown/instances/${debugInfo.containerDoId}`
+          : null,
+        townDoLogsUrl:
+          townDoNamespaceId && debugInfo
+            ? `https://dash.cloudflare.com/${accountId}/workers/durable-objects/view/${townDoNamespaceId}/${debugInfo.townDoId}/logs`
+            : null,
+        containerDoLogsUrl:
+          containerDoNamespaceId && debugInfo?.containerDoId
+            ? `https://dash.cloudflare.com/${accountId}/workers/durable-objects/view/${containerDoNamespaceId}/${debugInfo.containerDoId}/logs`
+            : null,
+      };
     }),
 
   /**

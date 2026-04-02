@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Start the local KiloClaw development environment.
 #
 # Opens terminal windows: Next.js, KiloClaw worker, cloudflared tunnel, and Stripe webhook.
@@ -18,9 +18,14 @@
 #                              temporary quick tunnel. Named tunnels have a
 #                              stable hostname that doesn't change between restarts.
 #   --display <mode>           How to display the dev processes:
-#                                tabs   — separate terminal tabs (default)
-#                                split  — single tab with split panes (requires iTerm2)
-#                                tmux   — tmux session "kiloclaw" (2x2 pane grid)
+#                                tabs   — separate terminal tabs/windows (default)
+#                                         macOS: iTerm2 or Terminal.app
+#                                         Linux: gnome-terminal, konsole, xfce4-terminal,
+#                                                mate-terminal, lxterminal, kitty, alacritty
+#                                         Falls back to tmux if no supported terminal found.
+#                                split  — single tab with split panes (requires iTerm2, macOS only)
+#                                         On Linux, automatically falls back to tmux.
+#                                tmux   — tmux session "kiloclaw" (2x2 pane grid, cross-platform)
 #   --with-replica             Keep POSTGRES_REPLICA_EU_URL in .env.local.
 #                              By default it is commented out (unreachable locally).
 #
@@ -34,6 +39,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 KILOCLAW_DIR="$(dirname "$SCRIPT_DIR")"
 MONOREPO_ROOT="$(cd "$KILOCLAW_DIR/.." && pwd)"
+
+# ---------- OS detection ----------
+
+OS_TYPE="$(uname -s)"
 
 # ---------- Defaults (overridden by .dev-start.conf, then by CLI flags) ----------
 
@@ -75,7 +84,7 @@ while [[ $# -gt 0 ]]; do
     *)
       echo "Unknown option: $1"
       echo "Usage: $0 [--has-controller-changes] [--tunnel-name <name>] [--display <mode>] [--with-replica]"
-      echo "Display modes: tabs (default), split, tmux"
+      echo "Display modes: tabs (default), split (macOS/iTerm2), tmux"
       exit 1
       ;;
   esac
@@ -90,6 +99,27 @@ case "$DISPLAY_MODE" in
     exit 1
     ;;
 esac
+
+# On Linux, 'split' requires iTerm2 (macOS-only) — fall back to tmux.
+# 'tabs' falls back to tmux if no supported Linux terminal emulator is found.
+if [ "$OS_TYPE" = "Linux" ]; then
+  if [ "$DISPLAY_MODE" = "split" ]; then
+    echo "==> 'split' display mode requires iTerm2 (macOS). Falling back to 'tmux'."
+    DISPLAY_MODE="tmux"
+  elif [ "$DISPLAY_MODE" = "tabs" ]; then
+    LINUX_TERM=""
+    for t in gnome-terminal konsole xfce4-terminal mate-terminal lxterminal kitty alacritty; do
+      if command -v "$t" &>/dev/null; then
+        LINUX_TERM="$t"
+        break
+      fi
+    done
+    if [ -z "$LINUX_TERM" ]; then
+      echo "==> No supported terminal emulator found for 'tabs' mode on Linux. Falling back to 'tmux'."
+      DISPLAY_MODE="tmux"
+    fi
+  fi
+fi
 
 # ---------- Pre-flight checks ----------
 
@@ -107,8 +137,13 @@ if [ "$missing_cli" = true ]; then
   echo "  vercel:      npm i -g vercel"
   echo "  pnpm:        corepack enable && corepack prepare pnpm@latest --activate"
   echo "  docker:      https://docs.docker.com/get-docker/"
-  echo "  cloudflared: brew install cloudflare/cloudflare/cloudflared"
-  echo "  stripe:      brew install stripe/stripe-cli/stripe"
+  if [ "$OS_TYPE" = "Darwin" ]; then
+    echo "  cloudflared: brew install cloudflare/cloudflare/cloudflared"
+    echo "  stripe:      brew install stripe/stripe-cli/stripe"
+  else
+    echo "  cloudflared: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
+    echo "  stripe:      https://docs.stripe.com/stripe-cli#install"
+  fi
   exit 1
 fi
 
@@ -444,6 +479,42 @@ open_terminal_tab() {
   local title="$1"
   local cmd="$2"
 
+  if [ "$OS_TYPE" = "Linux" ]; then
+    # On Linux, open a new terminal window with the given command.
+    # LINUX_TERM is resolved during display-mode validation above.
+    case "${LINUX_TERM:-}" in
+      gnome-terminal)
+        gnome-terminal --title="$title" -- bash -c "echo '--- $title ---'; $cmd; exec bash" &
+        ;;
+      konsole)
+        konsole --new-tab -p tabtitle="$title" -e bash -c "echo '--- $title ---'; $cmd; exec bash" &
+        ;;
+      xfce4-terminal)
+        xfce4-terminal --title="$title" -e "bash -c \"echo '--- $title ---'; $cmd; exec bash\"" &
+        ;;
+      mate-terminal)
+        mate-terminal --title="$title" -e "bash -c \"echo '--- $title ---'; $cmd; exec bash\"" &
+        ;;
+      lxterminal)
+        lxterminal --title="$title" -e "bash -c \"echo '--- $title ---'; $cmd; exec bash\"" &
+        ;;
+      kitty)
+        kitty --title "$title" bash -c "echo '--- $title ---'; $cmd; exec bash" &
+        ;;
+      alacritty)
+        alacritty --title "$title" -e bash -c "echo '--- $title ---'; $cmd; exec bash" &
+        ;;
+      *)
+        echo "ERROR: No supported terminal emulator for 'tabs' mode on Linux."
+        echo "Supported: gnome-terminal, konsole, xfce4-terminal, mate-terminal, lxterminal, kitty, alacritty"
+        echo "Use --display tmux instead."
+        exit 1
+        ;;
+    esac
+    return
+  fi
+
+  # macOS: use osascript for iTerm2 or Terminal.app
   # Escape backslashes and double quotes so $cmd is safe inside AppleScript strings
   local safe_cmd="${cmd//\\/\\\\}"
   safe_cmd="${safe_cmd//\"/\\\"}"
@@ -471,13 +542,18 @@ EOF
   fi
 }
 
-# Open 3 commands in a single iTerm2 tab with vertical/horizontal splits:
+# Open 3 commands in a single iTerm2 tab with vertical/horizontal splits (macOS only):
 #   ┌──────────────┬──────────────┐
 #   │   tunnel     │   Next.js    │
 #   │              ├──────────────┤
 #   │              │   worker     │
 #   └──────────────┴──────────────┘
 open_split_screen() {
+  if [ "$OS_TYPE" = "Linux" ]; then
+    echo "ERROR: split mode requires iTerm2 (macOS only). Use --display tmux on Linux."
+    exit 1
+  fi
+
   local title1="$1" cmd1="$2"
   local title2="$3" cmd2="$4"
   local title3="$5" cmd3="$6"
@@ -639,7 +715,11 @@ STRIPE_LOG="$(mktemp)"
 if [ "$DISPLAY_MODE" = "tmux" ]; then
   # For tmux, create the session now with stripe as the first window
   if ! command -v tmux &>/dev/null; then
-    echo "ERROR: 'tmux' not found. Install it: brew install tmux"
+    if [ "$OS_TYPE" = "Darwin" ]; then
+      echo "ERROR: 'tmux' not found. Install it: brew install tmux"
+    else
+      echo "ERROR: 'tmux' not found. Install it via your package manager (e.g. apt install tmux)"
+    fi
     exit 1
   fi
   tmux kill-session -t kiloclaw 2>/dev/null || true
@@ -759,7 +839,11 @@ EOF
     open_terminal_tab "KiloClaw worker" "$WORKER_CMD"
 
     echo ""
-    echo "Dev environment starting in 4 terminal tabs:"
+    if [ "$OS_TYPE" = "Linux" ]; then
+      echo "Dev environment starting in 4 terminal windows:"
+    else
+      echo "Dev environment starting in 4 terminal tabs:"
+    fi
     echo "  1. Stripe webhook listener"
     echo "  2. cloudflared tunnel"
     echo "  3. Next.js (port 3000)"

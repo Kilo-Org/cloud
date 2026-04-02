@@ -37,6 +37,29 @@ function now(): string {
   return new Date().toISOString();
 }
 
+/**
+ * Extract the human-readable failure message from a bead event's metadata.
+ *
+ * Two sources:
+ *  - status_changed events store it at `metadata.failure_reason.message`
+ *  - review_completed / pr_creation_failed events store it at `metadata.message`
+ */
+function extractFailureMessage(
+  status: string,
+  metadata: Record<string, unknown> | null | undefined
+): string | null {
+  if (status !== 'failed' || !metadata) return null;
+  // Structured failure_reason (from status_changed events via updateBeadStatus)
+  const fr = metadata.failure_reason;
+  if (typeof fr === 'object' && fr !== null && 'message' in fr) {
+    const msg = (fr as Record<string, unknown>).message;
+    if (typeof msg === 'string') return msg;
+  }
+  // Top-level message (from review_completed / pr_creation_failed events)
+  if (typeof metadata.message === 'string') return metadata.message;
+  return null;
+}
+
 export function initReviewQueueTables(_sql: SqlStorage): void {
   // Review queue and molecule tables are now part of beads + satellite tables.
   // Initialization happens in beads.initBeadTables().
@@ -235,29 +258,11 @@ export function completeReview(
   entryId: string,
   status: 'merged' | 'failed'
 ): void {
-  // Guard: don't overwrite terminal states (closed MR bead that was
-  // already merged should never be set to 'failed' by a stale call)
-  const current = getBead(sql, entryId);
-  if (current && (current.status === 'closed' || current.status === 'failed')) {
-    console.warn(
-      `[review-queue] completeReview: bead ${entryId} already ${current.status}, skipping`
-    );
-    return;
-  }
-
   const beadStatus = status === 'merged' ? 'closed' : 'failed';
-  const timestamp = now();
-  query(
-    sql,
-    /* sql */ `
-      UPDATE ${beads}
-      SET ${beads.columns.status} = ?,
-          ${beads.columns.updated_at} = ?,
-          ${beads.columns.closed_at} = ?
-      WHERE ${beads.bead_id} = ?
-    `,
-    [beadStatus, timestamp, beadStatus === 'closed' ? timestamp : null, entryId]
-  );
+  // Delegate to updateBeadStatus so a status_changed event is recorded
+  // on the event timeline. It also handles terminal-state guards,
+  // closed_at timestamps, and convoy progress updates.
+  updateBeadStatus(sql, entryId, beadStatus, 'system');
 }
 
 /**
@@ -705,14 +710,38 @@ export function agentCompleted(
       //    Rule 3 will reset it to open after the staleness timeout.
       const hookedBead = getBead(sql, agent.current_hook_bead_id);
       if (input.status === 'failed') {
-        updateBeadStatus(sql, agent.current_hook_bead_id, 'failed', agentId);
+        updateBeadStatus(sql, agent.current_hook_bead_id, 'failed', agentId, {
+          code: 'agent_failed',
+          message: 'Agent exited with failed status',
+          source: 'container',
+        });
       } else if (hookedBead && hookedBead.status === 'in_progress') {
-        // Agent exited 'completed' but bead is still in_progress — gt_done was never called.
-        // Don't close the bead. Rule 3 will handle rework.
-        console.log(
-          `[review-queue] agentCompleted: polecat ${agentId} exited without gt_done — ` +
-            `bead ${agent.current_hook_bead_id} stays in_progress (Rule 3 will recover)`
-        );
+        if (input.reason === 'container eviction') {
+          // Container eviction: WIP was force-pushed and eviction context
+          // was written on the bead body. Reset to open and clear the
+          // stale assignee so the reconciler can re-dispatch immediately.
+          console.log(
+            `[review-queue] agentCompleted: polecat ${agentId} evicted — ` +
+              `resetting bead ${agent.current_hook_bead_id} to open`
+          );
+          updateBeadStatus(sql, agent.current_hook_bead_id, 'open', agentId);
+          query(
+            sql,
+            /* sql */ `
+              UPDATE ${beads}
+              SET ${beads.columns.assignee_agent_bead_id} = NULL
+              WHERE ${beads.bead_id} = ?
+            `,
+            [agent.current_hook_bead_id]
+          );
+        } else {
+          // Agent exited 'completed' but bead is still in_progress — gt_done was never called.
+          // Don't close the bead. Rule 3 will handle rework.
+          console.log(
+            `[review-queue] agentCompleted: polecat ${agentId} exited without gt_done — ` +
+              `bead ${agent.current_hook_bead_id} stays in_progress (Rule 3 will recover)`
+          );
+        }
       } else if (hookedBead && hookedBead.status === 'open') {
         // Bead is open (wasn't dispatched yet or was already reset). No-op.
       } else {
@@ -1197,12 +1226,7 @@ function mrBeadRowToItem(row: z.output<typeof MrBeadRow>): MergeQueueItem {
       : null,
     rigName: row.rig_name,
     staleSince: null,
-    failureReason:
-      row.status === 'failed' && row.failure_event_metadata
-        ? typeof row.failure_event_metadata.message === 'string'
-          ? row.failure_event_metadata.message
-          : null
-        : null,
+    failureReason: extractFailureMessage(row.status, row.failure_event_metadata),
   };
 }
 

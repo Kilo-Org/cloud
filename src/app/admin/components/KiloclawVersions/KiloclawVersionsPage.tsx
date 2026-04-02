@@ -244,7 +244,7 @@ export function PinsTab() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
-  const [removingUserId, setRemovingUserId] = useState<string | null>(null);
+  const [removingInstanceId, setRemovingInstanceId] = useState<string | null>(null);
   const limit = 25;
 
   // Add pin form state
@@ -302,7 +302,7 @@ export function PinsTab() {
       onSuccess: () => {
         toast.success('Pin removed');
         invalidatePinQueries();
-        setRemovingUserId(null);
+        setRemovingInstanceId(null);
       },
       onError: err => {
         toast.error(`Failed to remove pin: ${err.message}`);
@@ -415,7 +415,7 @@ export function PinsTab() {
               </p>
               <label className="text-muted-foreground mb-1 block text-xs">Reason</label>
               <Input
-                placeholder="Why pin this user?"
+                placeholder="Why pin this instance?"
                 value={pinReason}
                 onChange={e => setPinReason(e.target.value)}
               />
@@ -432,7 +432,7 @@ export function PinsTab() {
               }
               disabled={!selectedUserId || !pinImageTag || isPinning}
             >
-              {isPinning ? 'Pinning...' : 'Pin User'}
+              {isPinning ? 'Pinning...' : 'Pin Instance'}
             </Button>
           </div>
         </CardContent>
@@ -442,6 +442,7 @@ export function PinsTab() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Instance</TableHead>
               <TableHead>User</TableHead>
               <TableHead>Image Tag</TableHead>
               <TableHead>OpenClaw Version</TableHead>
@@ -455,20 +456,21 @@ export function PinsTab() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center">
+                <TableCell colSpan={9} className="text-center">
                   <Loader2 className="mx-auto h-4 w-4 animate-spin" />
                 </TableCell>
               </TableRow>
             ) : data?.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-muted-foreground text-center">
+                <TableCell colSpan={9} className="text-muted-foreground text-center">
                   No active pins
                 </TableCell>
               </TableRow>
             ) : (
               data?.items.map(pin => (
                 <TableRow key={pin.id}>
-                  <TableCell className="font-medium">{pin.user_email ?? pin.user_id}</TableCell>
+                  <TableCell className="font-mono text-xs">{pin.instance_id}</TableCell>
+                  <TableCell className="font-medium">{pin.user_email ?? 'Unknown user'}</TableCell>
                   <TableCell>
                     <code className="text-xs">{pin.image_tag}</code>
                   </TableCell>
@@ -487,7 +489,7 @@ export function PinsTab() {
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => setRemovingUserId(pin.user_id)}
+                      onClick={() => setRemovingInstanceId(pin.instance_id)}
                     >
                       Remove
                     </Button>
@@ -527,8 +529,8 @@ export function PinsTab() {
 
       {/* Remove Pin Confirmation Dialog */}
       <Dialog
-        open={removingUserId !== null}
-        onOpenChange={open => !open && setRemovingUserId(null)}
+        open={removingInstanceId !== null}
+        onOpenChange={open => !open && setRemovingInstanceId(null)}
       >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -549,7 +551,9 @@ export function PinsTab() {
             </DialogClose>
             <Button
               variant="destructive"
-              onClick={() => removingUserId && void removePin({ userId: removingUserId })}
+              onClick={() =>
+                removingInstanceId && void removePin({ instanceId: removingInstanceId })
+              }
               disabled={isRemoving}
             >
               {isRemoving ? 'Removing...' : 'Remove Pin'}

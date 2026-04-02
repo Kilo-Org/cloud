@@ -197,6 +197,29 @@ export async function handleWriteCheckpoint(
   return c.json(resSuccess({ written: true }));
 }
 
+const EvictionContextBody = z.object({
+  branch: z.string(),
+  agent_name: z.string(),
+  saved_at: z.string(),
+});
+
+export async function handleWriteEvictionContext(
+  c: Context<GastownEnv>,
+  params: { rigId: string; agentId: string }
+) {
+  const parsed = EvictionContextBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+  const townId = c.get('townId');
+  const town = getTownDOStub(c.env, townId);
+  await town.writeBeadEvictionContext(params.agentId, parsed.data);
+  return c.json(resSuccess({ written: true }));
+}
+
 export async function handleCheckMail(
   c: Context<GastownEnv>,
   params: { rigId: string; agentId: string }
@@ -239,7 +262,11 @@ export async function handleHeartbeat(
     // No body or invalid JSON — old container format, just touch
   }
 
-  await town.touchAgentHeartbeat(
+  // touchAgentHeartbeat returns the drain nonce atomically — no
+  // second RPC needed, which prevents a TOCTOU race where an
+  // in-flight heartbeat from the old container could observe a nonce
+  // generated between two separate DO calls.
+  const { drainNonce } = await town.touchAgentHeartbeat(
     params.agentId,
     watermark
       ? {
@@ -250,7 +277,7 @@ export async function handleHeartbeat(
       : undefined
   );
 
-  return c.json(resSuccess({ heartbeat: true }));
+  return c.json(resSuccess({ heartbeat: true, ...(drainNonce ? { drainNonce } : {}) }));
 }
 
 const GetOrCreateAgentBody = z.object({

@@ -219,6 +219,137 @@ export async function getActiveInstance(userId: string): Promise<ActiveKiloClawI
 }
 
 /**
+ * Fetch an active instance by its primary key (UUID).
+ * Used by admin endpoints that already know the instance ID.
+ * Returns null if the instance doesn't exist or is destroyed.
+ */
+export async function getInstanceById(instanceId: string): Promise<ActiveKiloClawInstance | null> {
+  const [row] = await db
+    .select({
+      id: kiloclaw_instances.id,
+      userId: kiloclaw_instances.user_id,
+      sandboxId: kiloclaw_instances.sandbox_id,
+      organizationId: kiloclaw_instances.organization_id,
+      name: kiloclaw_instances.name,
+    })
+    .from(kiloclaw_instances)
+    .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)))
+    .limit(1);
+
+  return row ?? null;
+}
+
+/**
+ * Fetch the user's active org-scoped KiloClaw instance for a specific organization.
+ * Returns null if no active org instance exists for this user+org pair.
+ */
+export async function getActiveOrgInstance(
+  userId: string,
+  orgId: string
+): Promise<ActiveKiloClawInstance | null> {
+  const [row] = await db
+    .select({
+      id: kiloclaw_instances.id,
+      userId: kiloclaw_instances.user_id,
+      sandboxId: kiloclaw_instances.sandbox_id,
+      organizationId: kiloclaw_instances.organization_id,
+      name: kiloclaw_instances.name,
+    })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.organization_id, orgId),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .orderBy(kiloclaw_instances.created_at)
+    .limit(1);
+
+  return row ?? null;
+}
+
+/**
+ * List all active instances for an organization (all users).
+ */
+export async function listActiveOrgInstances(orgId: string): Promise<ActiveKiloClawInstance[]> {
+  return db
+    .select({
+      id: kiloclaw_instances.id,
+      userId: kiloclaw_instances.user_id,
+      sandboxId: kiloclaw_instances.sandbox_id,
+      organizationId: kiloclaw_instances.organization_id,
+      name: kiloclaw_instances.name,
+    })
+    .from(kiloclaw_instances)
+    .where(
+      and(eq(kiloclaw_instances.organization_id, orgId), isNull(kiloclaw_instances.destroyed_at))
+    )
+    .orderBy(kiloclaw_instances.created_at);
+}
+
+/**
+ * Soft-delete all active instances for a user within an organization.
+ * Returns metadata for each destroyed instance so callers can trigger
+ * worker-side teardown.
+ *
+ * Used by org member removal to revoke access synchronously.
+ */
+export async function destroyOrgInstancesForUser(
+  userId: string,
+  orgId: string
+): Promise<Array<{ instanceId: string; sandboxId: string }>> {
+  const rows = await db
+    .update(kiloclaw_instances)
+    .set({ destroyed_at: new Date().toISOString() })
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.organization_id, orgId),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .returning({
+      instanceId: kiloclaw_instances.id,
+      sandboxId: kiloclaw_instances.sandbox_id,
+    });
+
+  return rows;
+}
+
+/**
+ * Rename an org instance by its primary key.
+ */
+export async function renameOrgInstance(
+  instanceId: string,
+  userId: string,
+  orgId: string,
+  name: string | null
+): Promise<void> {
+  const trimmed = name?.trim() || null;
+
+  if (trimmed !== null && trimmed.length > 50) {
+    throw new Error('Instance name must be 50 characters or fewer');
+  }
+
+  const result = await db
+    .update(kiloclaw_instances)
+    .set({ name: trimmed })
+    .where(
+      and(
+        eq(kiloclaw_instances.id, instanceId),
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.organization_id, orgId),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    );
+
+  if (result.rowCount === 0) {
+    throw new Error('No active instance found');
+  }
+}
+
+/**
  * Update the display name of the user's active KiloClaw instance.
  * Pass null to clear the name.
  */

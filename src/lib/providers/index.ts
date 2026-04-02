@@ -125,12 +125,18 @@ export async function getProvider(
           id: 'custom',
           apiUrl: customLlm.base_url,
           apiKey: customLlm.api_key,
-          supportedChatApis: ['chat_completions', 'messages', 'responses'],
+          supportedChatApis: inferSupportedChatApis(
+            customLlm.opencode_settings?.ai_sdk_provider ?? 'openrouter'
+          ),
           transformRequest(context) {
-            Object.assign(context.request.body, customLlm.extra_body ?? {});
-            for (const [key, value] of Object.entries(customLlm.extra_headers ?? {})) {
-              context.extraHeaders[key] = value;
+            if (customLlm.remove_from_body) {
+              const body = context.request.body as Record<string, unknown>;
+              for (const key of customLlm.remove_from_body ?? []) {
+                delete body[key];
+              }
             }
+            Object.assign(context.request.body, customLlm.extra_body ?? {});
+            Object.assign(context.extraHeaders, customLlm.extra_headers ?? {});
             context.request.body.model = customLlm.internal_id;
           },
         },

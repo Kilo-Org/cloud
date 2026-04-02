@@ -199,10 +199,24 @@ function sanitizeError(err: unknown, operation: string): { message: string; stat
 
   // Allow known-safe messages through
   if (SAFE_ERROR_PREFIXES.some(prefix => normalized.startsWith(prefix))) {
-    return { message: normalized, status };
+    return { message: normalized, status: correctLostStatus(normalized, status) };
   }
 
   return { message: `${operation} failed`, status };
+}
+
+/**
+ * DO lifecycle methods throw `Object.assign(new Error('Instance not provisioned'), { status: 404 })`
+ * but `.status` is lost crossing the DO RPC boundary, so `statusCodeFromError`
+ * defaults to 500. Correct it here for this specific message only.
+ *
+ * Note: `requireGatewayControllerContext()` in gateway.ts throws the same message
+ * with status 409 (conflict). We only correct when status === 500 (i.e. lost),
+ * so a preserved 409 passes through unchanged.
+ */
+function correctLostStatus(message: string, status: number): number {
+  if (status === 500 && message === 'Instance not provisioned') return 404;
+  return status;
 }
 
 const OPENCLAW_CONFIG_ERROR_CODES = new Set([
@@ -236,7 +250,11 @@ function sanitizeOpenclawConfigError(
   }
 
   if (SAFE_ERROR_PREFIXES.some(prefix => normalized.startsWith(prefix))) {
-    return { message: normalized, status, ...(code ? { code } : {}) };
+    return {
+      message: normalized,
+      status: correctLostStatus(normalized, status),
+      ...(code ? { code } : {}),
+    };
   }
 
   return { message: `${operation} failed`, status, ...(code ? { code } : {}) };
@@ -1097,10 +1115,17 @@ platform.post('/kilo-cli-run/start', async c => {
       stub => stub.startKiloCliRun(result.data.prompt),
       'startKiloCliRun'
     );
+    if (!response) {
+      return jsonError(
+        'Kilo CLI agent not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
     return c.json(response, 200);
   } catch (err) {
-    const { message, status } = sanitizeError(err, 'kilo-cli-run start');
-    return jsonError(message, status);
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'kilo-cli-run start');
+    return jsonError(message, status, code);
   }
 });
 
@@ -1403,9 +1428,10 @@ platform.post('/send-chat-message', async c => {
   }
 
   try {
-    // Get the sandboxId and channel info from the DO
+    // Always use userId for the DO lookup (KiloClaw instances are personal, DO keyed by userId).
+    // instanceId is accepted for future multi-instance support but not used as the DO key today.
     const creds = await withDORetry(
-      instanceStubFactory(c.env, userId, instanceId),
+      instanceStubFactory(c.env, userId),
       stub => stub.getStreamChatCredentials(),
       'getStreamChatCredentials'
     );
@@ -1416,9 +1442,28 @@ platform.post('/send-chat-message', async c => {
 
     await sendMessage(apiKey, apiSecret, creds.channelId, creds.userId, message);
 
+    writeEvent(c.env, {
+      event: 'instance.webhook_chat_message_sent',
+      delivery: 'http',
+      route: '/api/platform/send-chat-message',
+      userId,
+      instanceId: instanceId ?? undefined,
+      channelId: creds.channelId,
+    });
+
     return c.json({ success: true, channelId: creds.channelId });
   } catch (err) {
     const { message: errMsg, status } = sanitizeError(err, 'send-chat-message');
+
+    writeEvent(c.env, {
+      event: 'instance.webhook_chat_message_failed',
+      delivery: 'http',
+      route: '/api/platform/send-chat-message',
+      userId,
+      instanceId: instanceId ?? undefined,
+      error: errMsg,
+    });
+
     return jsonError(errMsg, status);
   }
 });

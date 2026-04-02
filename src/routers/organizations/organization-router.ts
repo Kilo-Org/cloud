@@ -60,6 +60,7 @@ import { organizationSecurityAuditLogRouter } from '@/routers/organizations/orga
 import { organizationAutoTriageRouter } from '@/routers/organizations/organization-auto-triage-router';
 import { organizationAutoFixRouter } from '@/routers/organizations/organization-auto-fix-router';
 import { organizationAutoTopUpRouter } from '@/routers/organizations/organization-auto-top-up-router';
+import { organizationKiloclawRouter } from '@/routers/organizations/organization-kiloclaw-router';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
   name: OrganizationNameSchema,
@@ -114,6 +115,7 @@ export const organizationsRouter = createTRPCRouter({
   autoTriage: organizationAutoTriageRouter,
   autoFix: organizationAutoFixRouter,
   autoTopUp: organizationAutoTopUpRouter,
+  kiloclaw: organizationKiloclawRouter,
 
   list: baseProcedure.query(async opts => {
     const { user } = opts.ctx;

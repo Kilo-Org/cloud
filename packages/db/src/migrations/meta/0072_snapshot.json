@@ -1,5 +1,5 @@
 {
-  "id": "scheduled-triggers-0072",
+  "id": "bc886bc1-f59f-43d0-b2af-66d1726556bc",
   "prevId": "692f8c28-6cf9-4d92-bc8c-bbcc5bb71d3f",
   "version": "7",
   "dialect": "postgresql",
@@ -3970,6 +3970,26 @@
           "primaryKey": false,
           "notNull": false
         },
+        "activation_mode": {
+          "name": "activation_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'webhook'"
+        },
+        "cron_expression": {
+          "name": "cron_expression",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cron_timezone": {
+          "name": "cron_timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'UTC'"
+        },
         "github_repo": {
           "name": "github_repo",
           "type": "text",
@@ -4002,26 +4022,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "activation_mode": {
-          "name": "activation_mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'webhook'"
-        },
-        "cron_expression": {
-          "name": "cron_expression",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cron_timezone": {
-          "name": "cron_timezone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'UTC'"
         }
       },
       "indexes": {

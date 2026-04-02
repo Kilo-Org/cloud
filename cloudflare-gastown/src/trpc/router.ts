@@ -35,6 +35,7 @@ import {
   RpcAlarmStatusOutput,
   RpcOrgTownOutput,
   RpcMergeQueueDataOutput,
+  RpcAggregateStatsOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
 
@@ -326,6 +327,39 @@ async function mintKilocodeToken(env: Env, user: { id: string; api_token_pepper:
   return generateKiloApiToken(user, secret);
 }
 
+async function fetchAggregateStats(connectionString: string): Promise<{
+  totalCost: number;
+  totalTokens: number;
+}> {
+  const [{ getWorkerDb }, { microdollar_usage_view }, { and, eq, gte, sql }] = await Promise.all([
+    import('@kilocode/db/client'),
+    import('@kilocode/db/schema'),
+    import('drizzle-orm'),
+  ]);
+
+  const db = getWorkerDb(connectionString, { statement_timeout: 5_000 });
+  const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const result = await db
+    .select({
+      totalCost: sql<number>`COALESCE(SUM(${microdollar_usage_view.cost}), 0)`,
+      totalTokens: sql<number>`COALESCE(SUM(${microdollar_usage_view.input_tokens} + ${microdollar_usage_view.output_tokens}), 0)`,
+    })
+    .from(microdollar_usage_view)
+    .where(
+      and(
+        eq(microdollar_usage_view.feature, 'gastown'),
+        gte(microdollar_usage_view.created_at, sevenDaysAgoIso)
+      )
+    );
+
+  const totals = result[0];
+  return {
+    totalCost: Number(totals?.totalCost ?? 0),
+    totalTokens: Number(totals?.totalTokens ?? 0),
+  };
+}
+
 // ── Router ─────────────────────────────────────────────────────────────
 
 export const gastownRouter = router({
@@ -355,6 +389,26 @@ export const gastownRouter = router({
     const userStub = getGastownUserStub(ctx.env, ctx.userId);
     return userStub.listTowns();
   }),
+
+  getAggregateStats: gastownProcedure
+    .output(RpcAggregateStatsOutput)
+    .query(async ({ ctx }) => {
+      if (!ctx.env.HYPERDRIVE) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'HYPERDRIVE binding not configured',
+        });
+      }
+      try {
+        return await fetchAggregateStats(ctx.env.HYPERDRIVE.connectionString);
+      } catch (error) {
+        console.error('[gastown-trpc] getAggregateStats failed', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to load aggregate stats',
+        });
+      }
+    }),
 
   getTown: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))

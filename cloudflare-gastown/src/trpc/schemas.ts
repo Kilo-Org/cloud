@@ -188,6 +188,13 @@ export const RpcConvoyOutput = rpcSafe(ConvoyOutput);
 export const RpcConvoyDetailOutput = rpcSafe(ConvoyDetailOutput);
 export const RpcSlingResultOutput = rpcSafe(SlingResultOutput);
 
+// Aggregate stats (overview page)
+const AggregateStatsOutput = z.object({
+  totalCost: z.number(),
+  totalTokens: z.number().int().nonnegative(),
+});
+export const RpcAggregateStatsOutput = rpcSafe(AggregateStatsOutput);
+
 // Alarm status
 const AlarmStatusOutput = z.object({
   alarm: z.object({

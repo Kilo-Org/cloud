@@ -17,6 +17,8 @@ export async function processMessage({
   user: User;
   botRequestId: string | undefined;
 }) {
+  const startedAt = Date.now();
+
   try {
     const result = await runBotAgent({
       thread,
@@ -47,6 +49,7 @@ export async function processMessage({
       updateBotRequest(botRequestId, {
         status: 'error',
         errorMessage: errMsg.slice(0, 2000),
+        responseTimeMs: Date.now() - startedAt,
       });
     }
 

@@ -1,7 +1,7 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { after } from 'next/server';
 import { bot_requests, type BotRequestStatus, type BotRequestStep } from '@kilocode/db/schema';
 
@@ -48,28 +48,22 @@ export async function createBotRequest(
 }
 
 type UpdateBotRequestParams = {
-  status?: BotRequestStatus | 'running';
+  status?: BotRequestStatus;
   errorMessage?: string;
   modelUsed?: string;
   steps?: BotRequestStep[];
-  cloudAgentSessionId?: string;
   responseTimeMs?: number;
 };
 
 async function performUpdate(id: string, params: UpdateBotRequestParams): Promise<void> {
   try {
-    const statusUpdate = params.status === 'running' ? sql`'pending'` : params.status;
-
     await db
       .update(bot_requests)
       .set({
-        ...(params.status !== undefined && { status: statusUpdate }),
+        ...(params.status !== undefined && { status: params.status }),
         ...(params.errorMessage !== undefined && { error_message: params.errorMessage }),
         ...(params.modelUsed !== undefined && { model_used: params.modelUsed }),
         ...(params.steps !== undefined && { steps: params.steps }),
-        ...(params.cloudAgentSessionId !== undefined && {
-          cloud_agent_session_id: params.cloudAgentSessionId,
-        }),
         ...(params.responseTimeMs !== undefined && { response_time_ms: params.responseTimeMs }),
       })
       .where(eq(bot_requests.id, id));

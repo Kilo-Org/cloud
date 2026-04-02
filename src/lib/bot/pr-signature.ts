@@ -28,8 +28,7 @@ export function buildPrSignature(requesterInfo: RequesterInfo): string {
     ? `[${requesterInfo.displayName}](${requesterInfo.messageLink})`
     : requesterInfo.displayName;
 
-  const { label, url } =
-    PLATFORM_LINKS[requesterInfo.platform] ?? DEFAULT_PLATFORM_LINK;
+  const { label, url } = PLATFORM_LINKS[requesterInfo.platform] ?? DEFAULT_PLATFORM_LINK;
 
   return `
 
@@ -90,10 +89,7 @@ async function getSlackRequesterInfo(
   return { displayName, messageLink: permalink, platform: 'slack' };
 }
 
-function getDiscordRequesterInfo(
-  message: Message,
-  displayName: string
-): RequesterInfo {
+function getDiscordRequesterInfo(message: Message, displayName: string): RequesterInfo {
   const raw = message.raw as { guild_id?: string; channel_id?: string } | null;
   const guildId = raw?.guild_id;
   const channelId = raw?.channel_id;

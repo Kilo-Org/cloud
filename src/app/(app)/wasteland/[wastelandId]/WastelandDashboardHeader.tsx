@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useWastelandTRPC } from '@/lib/wasteland/trpc';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Skull, Globe, Lock, ScrollText, Users, Settings } from 'lucide-react';
+import { Skull, Globe, Lock, ScrollText, FileCheck, Users, Settings } from 'lucide-react';
 
 const statusStyles: Record<string, string> = {
   active: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
@@ -15,6 +15,7 @@ const statusStyles: Record<string, string> = {
 
 const TABS = [
   { href: 'wanted', label: 'Wanted Board', icon: ScrollText },
+  { href: 'claims', label: 'Claims', icon: FileCheck },
   { href: 'members', label: 'Members', icon: Users },
   { href: 'settings', label: 'Settings', icon: Settings },
 ] as const;

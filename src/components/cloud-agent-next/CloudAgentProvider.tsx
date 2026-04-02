@@ -40,10 +40,37 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
         try {
           const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
           if (session.cloud_agent_session_id) {
+            let isLive = true;
+            try {
+              const withState = await trpcClient.cliSessionsV2.getWithRuntimeState.query({
+                session_id: kiloSessionId,
+              });
+              const rs = withState.runtimeState;
+              const executionStatus = rs?.execution?.status;
+              if (
+                executionStatus === 'completed' ||
+                executionStatus === 'failed' ||
+                executionStatus === 'interrupted'
+              ) {
+                // Terminal execution status — session is done.
+                isLive = false;
+              } else if (executionStatus === 'pending' || executionStatus === 'running') {
+                // Active execution — session is live.
+                isLive = true;
+              } else {
+                // execution is null: either pre-execution (not yet initiated) or
+                // post-execution (DO cleaned up the execution record).
+                // If initiatedAt is set, the session ran and finished → not live.
+                // If initiatedAt is not set, the session is still being prepared → live.
+                isLive = !rs?.initiatedAt;
+              }
+            } catch {
+              // If we can't determine runtime state, assume live (safer — will just open a WebSocket)
+            }
             return {
               kiloSessionId,
               cloudAgentSessionId: session.cloud_agent_session_id as CloudAgentSessionId,
-              isLive: true,
+              isLive,
             };
           }
           // CLI session — check if live

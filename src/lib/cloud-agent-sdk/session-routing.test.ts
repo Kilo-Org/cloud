@@ -201,6 +201,66 @@ describe('session transport routing', () => {
     });
   });
 
+  describe('resolveSession returning completed Cloud Agent session', () => {
+    it('routes to historical transport when cloudAgentSessionId exists but isLive is false', async () => {
+      const snapshot = makeSnapshot({ id: SES_ID }, [
+        {
+          info: stubUserMessage({ id: 'msg-1', sessionID: SES_ID }),
+          parts: [
+            stubTextPart({ id: 'part-1', messageID: 'msg-1', sessionID: SES_ID, text: 'hi' }),
+          ],
+        },
+      ]);
+
+      const resolveSession = jest.fn(
+        (): Promise<ResolvedSession> =>
+          Promise.resolve({
+            kiloSessionId: kiloId('ses-1'),
+            cloudAgentSessionId: cloudAgentId('do-456'),
+            isLive: false,
+          })
+      );
+
+      const fetchSnapshot = jest.fn(() => Promise.resolve(snapshot));
+
+      const session = createCloudAgentSession({
+        kiloSessionId: kiloId('ses-1'),
+        resolveSession,
+        transport: {
+          fetchSnapshot,
+          getTicket: () => 'ticket',
+          api: {
+            send: () => Promise.resolve(),
+            interrupt: () => Promise.resolve(),
+            answer: () => Promise.resolve(),
+            reject: () => Promise.resolve(),
+            respondToPermission: () => Promise.resolve(),
+          },
+        },
+      });
+
+      session.connect();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Should NOT open a WebSocket — historical transport is snapshot-only
+      expect(webSocketConstructor).not.toHaveBeenCalled();
+
+      // Session info set from snapshot
+      expect(session.state.getSessionInfo()).toEqual({ id: 'ses-1', parentID: undefined });
+
+      // Messages in storage
+      const messageIds = session.storage.getMessageIds();
+      expect(messageIds).toContain('msg-1');
+
+      // Historical session should not be interactive
+      expect(session.canSend).toBe(false);
+      expect(session.canInterrupt).toBe(false);
+
+      session.destroy();
+    });
+  });
+
   describe('resolveSession failure', () => {
     it('sets error state and fires onError', async () => {
       const onError = jest.fn();
@@ -410,7 +470,7 @@ describe('session transport routing', () => {
       await Promise.resolve();
 
       expect(onError).toHaveBeenCalledWith(
-        'CloudAgentSession transport.fetchSnapshot is required for historical CLI sessions'
+        'CloudAgentSession transport.fetchSnapshot is required for historical sessions'
       );
       expect(session.state.getActivity()).toEqual({ type: 'idle' });
       expect(session.state.getStatus().type).toBe('error');

@@ -6,6 +6,7 @@ export type BaseConnectionConfig = {
   onEvent: (payload: unknown) => void;
   onConnected: () => void;
   onDisconnected: () => void;
+  onReconnected?: () => void;
   onUnexpectedDisconnect?: () => void;
   onError?: (message: string) => void;
   isAuthFailure?: (event: CloseEvent) => boolean;
@@ -22,6 +23,7 @@ export type Connection = {
 const MAX_RECONNECT_ATTEMPTS = 8;
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30000;
+export const PING_TIMEOUT_MS = 5000;
 
 // min(cap, base * 2^attempt) * (0.5 + random jitter)
 function calculateBackoffDelay(attempt: number): number {
@@ -39,11 +41,25 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
   let connected = false;
   let reconnectAttempt = 0;
   let generation = 0;
+  let hasConnectedOnce = false;
+  let pingTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  // Bound handler references for event listener cleanup
+  let boundVisibilityHandler: (() => void) | null = null;
+  let boundPageshowHandler: ((e: PageTransitionEvent) => void) | null = null;
+  let boundOnlineHandler: (() => void) | null = null;
 
   function clearReconnectTimer(): void {
     if (reconnectTimeoutId !== null) {
       clearTimeout(reconnectTimeoutId);
       reconnectTimeoutId = null;
+    }
+  }
+
+  function clearPingTimeout(): void {
+    if (pingTimeoutId !== null) {
+      clearTimeout(pingTimeoutId);
+      pingTimeoutId = null;
     }
   }
 
@@ -65,6 +81,18 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
       config.onUnexpectedDisconnect?.();
       scheduleReconnect(0, expectedGeneration);
     }
+  }
+
+  async function refreshAndConnect(expectedGeneration: number): Promise<void> {
+    if (config.refreshAuth) {
+      try {
+        await config.refreshAuth();
+      } catch {
+        // Continue with existing auth — the old ticket might still work
+      }
+      if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
+    }
+    connectInternal(0, expectedGeneration);
   }
 
   function scheduleReconnect(attempt: number, expectedGeneration: number) {
@@ -95,6 +123,7 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
     if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
 
     reconnectAttempt = attempt;
+    clearPingTimeout();
 
     // Close existing socket - clear reference first so onclose ignores it
     const oldWs = ws;
@@ -115,6 +144,9 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
     };
 
     newWs.onmessage = (messageEvent: MessageEvent) => {
+      // Any incoming message cancels an active ping staleness check
+      clearPingTimeout();
+
       const parsed = config.parseMessage(messageEvent.data);
       if (parsed === null) {
         return;
@@ -131,7 +163,12 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
 
       if (!connected) {
         connected = true;
-        config.onConnected();
+        if (hasConnectedOnce) {
+          config.onReconnected?.();
+        } else {
+          hasConnectedOnce = true;
+          config.onConnected();
+        }
       }
 
       config.onEvent(parsed.payload);
@@ -202,6 +239,115 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
     };
   }
 
+  function handleVisibilityChange(): void {
+    if (destroyed || intentionalDisconnect) return;
+
+    if (typeof document === 'undefined') return;
+
+    if (document.visibilityState === 'hidden') {
+      clearPingTimeout();
+      return;
+    }
+
+    // Tab became visible
+    reconnectAttempt = 0;
+
+    if (ws === null || ws.readyState !== WebSocket.OPEN) {
+      clearReconnectTimer();
+      void refreshAndConnect(generation);
+      return;
+    }
+
+    // Socket appears open - send a ping to verify it's not stale
+    ws.send('ping');
+    const currentGeneration = generation;
+    pingTimeoutId = setTimeout(() => {
+      pingTimeoutId = null;
+      if (destroyed || intentionalDisconnect || currentGeneration !== generation) return;
+      // No message received in time - connection is stale
+      console.log('[Connection] Ping timeout - connection stale, reconnecting');
+      const staleWs = ws;
+      if (staleWs !== null) {
+        ws = null;
+        staleWs.close();
+      }
+      if (connected) {
+        connected = false;
+        config.onDisconnected();
+      }
+      void refreshAndConnect(currentGeneration);
+    }, PING_TIMEOUT_MS);
+  }
+
+  function handlePageshow(event: PageTransitionEvent): void {
+    if (destroyed || intentionalDisconnect) return;
+
+    if (!event.persisted) return;
+
+    // BFCache restore - WebSocket is guaranteed dead
+    console.log('[Connection] BFCache restore detected, forcing reconnect');
+    reconnectAttempt = 0;
+    clearReconnectTimer();
+    clearPingTimeout();
+
+    const staleWs = ws;
+    if (staleWs !== null) {
+      ws = null;
+      staleWs.close();
+    }
+    if (connected) {
+      connected = false;
+      config.onDisconnected();
+    }
+    void refreshAndConnect(generation);
+  }
+
+  function handleOnline(): void {
+    if (destroyed || intentionalDisconnect) return;
+
+    // If already connected with an open socket, nothing to do
+    if (connected && ws !== null && ws.readyState === WebSocket.OPEN) return;
+
+    console.log('[Connection] Online event - reconnecting');
+    reconnectAttempt = 0;
+    clearReconnectTimer();
+    void refreshAndConnect(generation);
+  }
+
+  function addEventListeners(): void {
+    if (typeof document !== 'undefined' && boundVisibilityHandler === null) {
+      boundVisibilityHandler = handleVisibilityChange;
+      document.addEventListener('visibilitychange', boundVisibilityHandler);
+    }
+    if (typeof window !== 'undefined') {
+      if (boundPageshowHandler === null) {
+        boundPageshowHandler = handlePageshow;
+        window.addEventListener('pageshow', boundPageshowHandler);
+      }
+      if (boundOnlineHandler === null) {
+        boundOnlineHandler = handleOnline;
+        window.addEventListener('online', boundOnlineHandler);
+      }
+    }
+  }
+
+  function removeEventListeners(): void {
+    if (typeof document !== 'undefined' && boundVisibilityHandler !== null) {
+      document.removeEventListener('visibilitychange', boundVisibilityHandler);
+      boundVisibilityHandler = null;
+    }
+    if (typeof window !== 'undefined') {
+      if (boundPageshowHandler !== null) {
+        window.removeEventListener('pageshow', boundPageshowHandler);
+        boundPageshowHandler = null;
+      }
+      if (boundOnlineHandler !== null) {
+        window.removeEventListener('online', boundOnlineHandler);
+        boundOnlineHandler = null;
+      }
+    }
+  }
+
   function connect() {
     console.log('[Connection] connect() called - resetting state');
     intentionalDisconnect = false;
@@ -209,8 +355,11 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
     authRefreshAttempted = false;
     connected = false;
     reconnectAttempt = 0;
+    hasConnectedOnce = false;
     generation += 1;
     clearReconnectTimer();
+    clearPingTimeout();
+    addEventListeners();
     connectInternal(0, generation);
   }
 
@@ -219,6 +368,7 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
     generation += 1;
 
     clearReconnectTimer();
+    clearPingTimeout();
 
     if (ws !== null) {
       ws.close();
@@ -236,6 +386,8 @@ export function createBaseConnection(config: BaseConnectionConfig): Connection {
     generation += 1;
 
     clearReconnectTimer();
+    clearPingTimeout();
+    removeEventListeners();
 
     if (ws !== null) {
       ws.close();

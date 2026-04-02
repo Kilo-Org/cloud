@@ -142,7 +142,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
   function pickTransportFactory(resolved: ResolvedSession): TransportFactory {
     console.log('[cli-debug] pickTransportFactory: resolved=%o', resolved);
-    if (resolved.cloudAgentSessionId) {
+    if (resolved.cloudAgentSessionId && resolved.isLive) {
       if (!config.transport.getTicket) {
         throw new Error(
           'CloudAgentSession transport.getTicket is required for Cloud Agent sessions'
@@ -193,11 +193,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
     if (!config.transport.fetchSnapshot) {
       throw new Error(
-        'CloudAgentSession transport.fetchSnapshot is required for historical CLI sessions'
+        'CloudAgentSession transport.fetchSnapshot is required for historical sessions'
       );
     }
     console.log(
-      '[cli-debug] pickTransportFactory: → CLI Historical transport (kiloSessionId=%s)',
+      '[cli-debug] pickTransportFactory: → Historical transport (kiloSessionId=%s)',
       resolved.kiloSessionId
     );
     return createCliHistoricalTransport({

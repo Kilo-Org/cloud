@@ -1152,7 +1152,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
   const { data, isLoading, error } = useQuery({
     ...trpc.admin.kiloclawInstances.get.queryOptions({ id: instanceId }),
-    refetchInterval: awaitingRestartCompletion || awaitingRestoreCompletion ? 3000 : false,
+    refetchInterval: awaitingRestoreCompletion ? 3000 : false,
   });
 
   const userId = data?.user_id;
@@ -1262,39 +1262,37 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     '2026.2.26'
   );
 
-  // After a restart/upgrade, poll the machine status until it returns to "running",
-  // then invalidate controllerVersion so supportsConfigRestore reflects the new build.
-  const prevMachineStatus = useRef(data?.workerStatus?.status);
-  useEffect(() => {
-    const status = data?.workerStatus?.status;
-    const wasRestarting = prevMachineStatus.current !== 'running';
-    prevMachineStatus.current = status;
+  // After a restart/upgrade, poll the machine's get query until it returns to "running",
+  // then re-invalidate controllerVersion so supportsConfigRestore reflects the new build.
+  useQuery({
+    queryKey: ['machine-restart-poll', instanceId, awaitingRestartCompletion],
+    queryFn: async () => {
+      void queryClient.invalidateQueries({
+        queryKey: trpc.admin.kiloclawInstances.get.queryKey(),
+      });
+      return { ts: Date.now() };
+    },
+    enabled: awaitingRestartCompletion,
+    refetchInterval: awaitingRestartCompletion ? 3000 : false,
+  });
 
-    if (awaitingRestartCompletion && status === 'running' && wasRestarting) {
-      setAwaitingRestartCompletion(false);
-      if (data?.user_id && data?.id) {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.admin.kiloclawInstances.controllerVersion.queryKey({
-            userId: data.user_id,
-            instanceId: data.id,
-          }),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: trpc.admin.kiloclawInstances.gatewayStatus.queryKey({
-            userId: data.user_id,
-            instanceId: data.id,
-          }),
-        });
-      }
+  if (awaitingRestartCompletion && data?.workerStatus?.status === 'running') {
+    setAwaitingRestartCompletion(false);
+    if (data.user_id && data.id) {
+      void queryClient.invalidateQueries({
+        queryKey: trpc.admin.kiloclawInstances.controllerVersion.queryKey({
+          userId: data.user_id,
+          instanceId: data.id,
+        }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.admin.kiloclawInstances.gatewayStatus.queryKey({
+          userId: data.user_id,
+          instanceId: data.id,
+        }),
+      });
     }
-  }, [
-    data?.workerStatus?.status,
-    data?.user_id,
-    data?.id,
-    awaitingRestartCompletion,
-    queryClient,
-    trpc,
-  ]);
+  }
 
   // Stop polling when restore completes (status transitions from 'restoring' to something else).
   // Track whether we've seen 'restoring' to avoid false positives when the mutation succeeds

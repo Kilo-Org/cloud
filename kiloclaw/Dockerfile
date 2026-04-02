@@ -52,7 +52,6 @@ RUN npm install -g clawhub
 RUN npm install -g mcporter@0.7.3
 
 # Install Stream Chat channel plugin for OpenClaw (installed from GitHub, not npm)
-ARG CACHE_BUSTER=1
 RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#fix/plugin-name-resolution
 
 # Install summarize (web page summarization CLI)

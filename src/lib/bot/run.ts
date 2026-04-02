@@ -9,6 +9,7 @@ import {
   getConversationContext,
   formatConversationContextForPrompt,
 } from '@/lib/bot/conversation-context';
+import { buildPrSignature, getRequesterInfo } from '@/lib/bot/pr-signature';
 import { updateBotRequest } from '@/lib/bot/request-logging';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
@@ -133,6 +134,18 @@ export async function processMessage({
   const modelSlug =
     (platformIntegration.metadata as { model_slug?: string }).model_slug ?? DEFAULT_BOT_MODEL;
   const owner = ownerFromIntegration(platformIntegration);
+  const chatPlatform = thread.id.split(':')[0];
+
+  // Build PR signature from requester info (display name + message permalink)
+  let prSignature: string | undefined;
+  try {
+    const requesterInfo = await getRequesterInfo(thread, message, platformIntegration);
+    if (requesterInfo) {
+      prSignature = buildPrSignature(requesterInfo);
+    }
+  } catch (error) {
+    console.warn('[KiloBot] Failed to build PR signature, continuing without it:', error);
+  }
 
   const startedAt = Date.now();
   const collectedSteps: BotRequestStep[] = [];
@@ -172,7 +185,8 @@ After the tool returns, if mode was "code", check the result for a PR/MR URL and
               if (botRequestId) {
                 updateBotRequest(botRequestId, { cloudAgentSessionId: kiloSessionId });
               }
-            }
+            },
+            { prSignature, chatPlatform }
           ),
       }),
     },

@@ -22,12 +22,15 @@ export async function rewriteFreeModelResponse_ChatCompletions(response: Respons
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
+    // Read the body text once to avoid "Response body object should not be
+    // disturbed or locked" errors that occur when `.clone().json()` fails.
+    const text = await response.text();
     let json: OpenAI.ChatCompletion;
     try {
-      json = (await response.clone().json()) as OpenAI.ChatCompletion;
+      json = JSON.parse(text) as OpenAI.ChatCompletion;
     } catch {
       // Upstream returned invalid/empty JSON body — pass through as-is
-      return new NextResponse(response.body, {
+      return new NextResponse(text, {
         status: response.status,
         statusText: response.statusText,
         headers,
@@ -142,14 +145,15 @@ export async function rewriteFreeModelResponse_Messages(response: Response, mode
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
+    const text = await response.text();
     let json: Anthropic.Messages.Message & { usage?: MessagesApiUsage };
     try {
-      json = (await response.clone().json()) as Anthropic.Messages.Message & {
+      json = JSON.parse(text) as Anthropic.Messages.Message & {
         usage?: MessagesApiUsage;
       };
     } catch {
       // Upstream returned invalid/empty JSON body — pass through as-is
-      return new NextResponse(response.body, {
+      return new NextResponse(text, {
         status: response.status,
         statusText: response.statusText,
         headers,
@@ -240,14 +244,15 @@ export async function rewriteFreeModelResponse_Responses(response: Response, mod
   const headers = getOutputHeaders(response);
 
   if (headers.get('content-type')?.includes('application/json')) {
+    const text = await response.text();
     let json: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
     try {
-      json = (await response.clone().json()) as OpenAI.Responses.Response & {
+      json = JSON.parse(text) as OpenAI.Responses.Response & {
         usage?: OpenRouterUsage | null;
       };
     } catch {
       // Upstream returned invalid/empty JSON body — pass through as-is
-      return new NextResponse(response.body, {
+      return new NextResponse(text, {
         status: response.status,
         statusText: response.statusText,
         headers,

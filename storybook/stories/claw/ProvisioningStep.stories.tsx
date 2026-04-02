@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs';
-import { ProvisioningStepView } from '@/app/(app)/claw/components/ProvisioningStep';
+import {
+  ProvisioningStepView,
+  ProvisioningErrorView,
+} from '@/app/(app)/claw/components/ProvisioningStep';
 
 const meta: Meta<typeof ProvisioningStepView> = {
   title: 'Claw/ProvisioningStep',
@@ -20,3 +23,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const Error: StoryObj<Meta<typeof ProvisioningErrorView>> = {
+  render: args => <ProvisioningErrorView {...args} />,
+};

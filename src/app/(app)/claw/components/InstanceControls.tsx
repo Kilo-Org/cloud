@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import {
+  ArrowUpCircle,
   Check,
   Cpu,
   HardDrive,
@@ -16,6 +17,7 @@ import {
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import { Banner } from '@/components/shared/Banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +32,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { RunDoctorDialog } from './RunDoctorDialog';
 import { StartKiloCliRunDialog } from './StartKiloCliRunDialog';
@@ -76,6 +79,9 @@ export function InstanceControls({
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [confirmRedeploy, setConfirmRedeploy] = useState(false);
   const [redeployMode, setRedeployMode] = useState<'redeploy' | 'upgrade'>('redeploy');
+
+  const { updateAvailable, catalogNewerThanImage, latestAvailableVersion, latestVersion } =
+    useClawUpdateAvailable(status);
 
   const handleSaveName = () => {
     const trimmed = nameValue.trim();
@@ -172,6 +178,31 @@ export function InstanceControls({
           </Badge>
         </div>
       </div>
+      {updateAvailable && (
+        <Banner color="amber" className="mb-4">
+          <Banner.Icon>
+            <ArrowUpCircle />
+          </Banner.Icon>
+          <Banner.Content>
+            <Banner.Title>
+              {catalogNewerThanImage
+                ? `A newer OpenClaw version (${latestAvailableVersion}) is available`
+                : `A newer image (${latestVersion?.imageTag ?? 'unknown'}) is available`}
+            </Banner.Title>
+            <Banner.Description>
+              Upgrade your instance to get the latest features and fixes.
+            </Banner.Description>
+          </Banner.Content>
+          <Banner.Button
+            onClick={() => {
+              setRedeployMode('upgrade');
+              setConfirmRedeploy(true);
+            }}
+          >
+            Upgrade now
+          </Banner.Button>
+        </Banner>
+      )}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <Button
           size="sm"

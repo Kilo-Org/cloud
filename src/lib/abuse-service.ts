@@ -9,6 +9,7 @@ import {
   ABUSE_SERVICE_URL,
 } from '@/lib/config.server';
 import { getFraudDetectionHeaders } from '@/lib/utils';
+import type Anthropic from '@anthropic-ai/sdk';
 import type {
   GatewayMessagesRequest,
   GatewayRequest,
@@ -114,7 +115,7 @@ function extractFullPromptFromMessages(body: GatewayMessagesRequest) {
     } else if (Array.isArray(content)) {
       userPrompt =
         content
-          .filter((c): c is { type: string; text?: string } => c != null && c.type === 'text')
+          .filter((c): c is Anthropic.TextBlockParam => c != null && c.type === 'text')
           .map(c => c.text)
           .join('\n') || null;
     }

@@ -11,7 +11,7 @@ type CopyMessageButtonProps = {
 };
 
 /**
- * Copy-to-clipboard button for assistant chat messages.
+ * Copy-to-clipboard button for chat messages.
  * Shows a clipboard icon that transitions to a checkmark on success.
  */
 export function CopyMessageButton({ getText, className }: CopyMessageButtonProps) {

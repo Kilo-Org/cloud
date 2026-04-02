@@ -461,7 +461,7 @@ importers:
         specifier: 'catalog:'
         version: 9.0.10
       '@types/node':
-        specifier: ^24
+        specifier: '>=24 <25'
         version: 24.12.0
       '@types/react':
         specifier: ^19.2.14
@@ -576,7 +576,7 @@ importers:
         specifier: 'catalog:'
         version: 9.0.10
       '@types/node':
-        specifier: ^24
+        specifier: '>=24 <25'
         version: 24.12.0
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -649,7 +649,7 @@ importers:
         specifier: 'catalog:'
         version: 9.0.10
       '@types/node':
-        specifier: ^24
+        specifier: '>=24 <25'
         version: 24.12.0
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -778,7 +778,7 @@ importers:
         specifier: 'catalog:'
         version: 9.0.10
       '@types/node':
-        specifier: ^24
+        specifier: '>=24 <25'
         version: 24.12.0
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -893,7 +893,7 @@ importers:
         specifier: ^30.0.0
         version: 30.0.0
       '@types/node':
-        specifier: ^24
+        specifier: '>=24 <25'
         version: 24.12.0
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -942,7 +942,7 @@ importers:
         specifier: ^29.5.14
         version: 29.5.14
       '@types/node':
-        specifier: ^24
+        specifier: '>=24 <25'
         version: 24.12.0
       '@types/tar-stream':
         specifier: ^3.1.4
@@ -1061,7 +1061,7 @@ importers:
         specifier: 'catalog:'
         version: 9.0.10
       '@types/node':
-        specifier: ^24
+        specifier: '>=24 <25'
         version: 24.12.0
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20251019.1
@@ -1182,7 +1182,7 @@ importers:
         specifier: 'catalog:'
         version: 9.0.10
       '@types/node':
-        specifier: ^24
+        specifier: '>=24 <25'
         version: 24.12.0
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1250,7 +1250,7 @@ importers:
         version: 4.3.6
     devDependencies:
       '@types/node':
-        specifier: ^24
+        specifier: '>=24 <25'
         version: 24.12.0
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1278,7 +1278,7 @@ importers:
         version: 4.3.6
     devDependencies:
       '@types/node':
-        specifier: ^24
+        specifier: '>=24 <25'
         version: 24.12.0
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1318,7 +1318,7 @@ importers:
         specifier: 'catalog:'
         version: 4.20260313.1
       '@types/node':
-        specifier: ^24
+        specifier: '>=24 <25'
         version: 24.12.0
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1367,7 +1367,7 @@ importers:
         specifier: ^0.12.21
         version: 0.12.21(@cloudflare/workers-types@4.20260313.1)(@vitest/runner@4.1.0)(@vitest/snapshot@4.1.0)(vitest@3.2.4)
       '@types/node':
-        specifier: ^24
+        specifier: '>=24 <25'
         version: 24.12.0
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1588,7 +1588,7 @@ importers:
         version: 4.3.6
     devDependencies:
       '@types/node':
-        specifier: ^24
+        specifier: '>=24 <25'
         version: 24.12.0
       '@typescript/native-preview':
         specifier: 'catalog:'
@@ -1653,7 +1653,7 @@ importers:
   packages/encryption:
     devDependencies:
       '@types/node':
-        specifier: ^24
+        specifier: '>=24 <25'
         version: 24.12.0
       '@typescript/native-preview':
         specifier: 'catalog:'

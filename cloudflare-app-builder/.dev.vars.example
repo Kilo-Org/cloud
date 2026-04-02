@@ -9,13 +9,11 @@ AUTH_TOKEN=
 # @url nextjs
 ALLOWED_ORIGINS=http://localhost:3000
 
-# Base hostname for preview deployments (e.g., builder.yourdomain.com or your-subdomain.ngrok-free.dev)
+# Base hostname for preview deployments (e.g., builder.yourdomain.com)
 # Preview URLs will be: https://{appId}.{BUILDER_HOSTNAME}
-# Can use [your-lan-ip].nip.io to support subdomains on local ip
-# For example 192-168-0-1.nip.io will resolve to 192.168.0.1
-# This needs to be a lan address because Cloud Agent will need to push changes to git repo
-# @url cloudflare-app-builder
-BUILDER_HOSTNAME=localhost:8790
+# Managed by app-builder-tunnel during `pnpm dev:start app-builder`.
+# Uses cloudflared quick tunnel — the URL changes each restart (fine with DEV_MODE=true).
+BUILDER_HOSTNAME=
 
 # Backend push notification (optional - enables auto-build on push)
 # @url nextjs/api/app-builder/push-notification

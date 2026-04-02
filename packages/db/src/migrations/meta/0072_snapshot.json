@@ -4202,7 +4202,7 @@
         },
         "CHK_cloud_agent_webhook_triggers_scheduled_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_scheduled_fields",
-          "value": "((\"cloud_agent_webhook_triggers\".\"activation_mode\" != 'scheduled' OR \"cloud_agent_webhook_triggers\".\"cron_expression\" IS NOT NULL))"
+          "value": "(\n        \"cloud_agent_webhook_triggers\".\"activation_mode\" != 'scheduled' OR\n        \"cloud_agent_webhook_triggers\".\"cron_expression\" IS NOT NULL\n      )"
         }
       },
       "isRLSEnabled": false

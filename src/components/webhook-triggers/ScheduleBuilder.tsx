@@ -42,7 +42,7 @@ const DEFAULT_SCHEDULE: SimpleSchedule = {
   frequency: 'daily',
   minute: 0,
   hour: 9,
-  intervalMinutes: 5,
+  intervalMinutes: 10,
   days: [false, true, true, true, true, true, false], // weekdays
   monthDay: 1,
 };
@@ -289,12 +289,12 @@ export const ScheduleBuilder = memo(function ScheduleBuilder({
           <div className="flex items-center gap-2">
             <Input
               type="number"
-              min={1}
+              min={10}
               max={59}
               value={schedule.intervalMinutes}
               onChange={e =>
                 updateSchedule({
-                  intervalMinutes: Math.max(1, Math.min(59, parseInt(e.target.value, 10) || 5)),
+                  intervalMinutes: Math.max(10, Math.min(59, parseInt(e.target.value, 10) || 10)),
                 })
               }
               className="w-20"

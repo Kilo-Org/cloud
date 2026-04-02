@@ -303,8 +303,7 @@ export function EditWebhookTriggerContent({
           </Button>
           {isKiloclawChat && (
             <Button variant="outline" size="sm" asChild>
-              {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- intentional: <Link> doesn't trigger hash-based tab switch on /claw */}
-              <a href="/claw#settings">Manage in KiloClaw Settings</a>
+              <Link href="/claw/settings">Manage in KiloClaw Settings</Link>
             </Button>
           )}
         </div>

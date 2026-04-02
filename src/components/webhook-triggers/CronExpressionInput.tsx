@@ -20,7 +20,7 @@ const PRESETS = [
   { label: 'Every hour', value: '0 * * * *' },
   { label: 'Daily 9 AM', value: '0 9 * * *' },
   { label: 'Weekdays 9 AM', value: '0 9 * * 1-5' },
-  { label: 'Every 5 min', value: '*/5 * * * *' },
+  { label: 'Every 10 min', value: '*/10 * * * *' },
 ];
 
 /**
@@ -32,12 +32,12 @@ function validateCron(expression: string): string | null {
   if (!expression.trim()) return null; // empty is handled by required check
   try {
     const job = new Cron(expression);
-    // Check minimum interval (1 minute)
+    // Check minimum interval (10 minutes)
     const first = job.nextRun();
     if (first) {
       const second = job.nextRun(first);
-      if (second && second.getTime() - first.getTime() < 60_000) {
-        return 'Schedule must run at most once per minute';
+      if (second && second.getTime() - first.getTime() < 600_000) {
+        return 'Schedule must run at most once every 10 minutes';
       }
     }
     return null; // valid

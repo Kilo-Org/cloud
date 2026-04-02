@@ -1,0 +1,65 @@
+diff --git a/src/components/AttachmentPicker/components/AttachmentPickerItem.tsx b/src/components/AttachmentPicker/components/AttachmentPickerItem.tsx
+index 61e82d37fdfa6e7d5199330549f35e1b220d867f..69abf2e32aa96b995f11f1484c5e33ac03cee6a9 100644
+--- a/src/components/AttachmentPicker/components/AttachmentPickerItem.tsx
++++ b/src/components/AttachmentPicker/components/AttachmentPickerItem.tsx
+@@ -1,6 +1,7 @@
+ import React from 'react';
+ 
+-import { Alert, ImageBackground, StyleSheet, Text, View } from 'react-native';
++import { Alert, StyleSheet, Text, View } from 'react-native';
++import { Image as ExpoImage } from 'expo-image';
+ 
+ import { FileReference, isLocalImageAttachment, isLocalVideoAttachment } from 'stream-chat';
+ 
+@@ -67,8 +68,7 @@ const AttachmentVideo = (props: AttachmentPickerItemType) => {
+ 
+   return (
+     <BottomSheetTouchableOpacity onPress={onPressVideo}>
+-      <ImageBackground
+-        source={{ uri: thumb_url }}
++      <View
+         style={[
+           {
+             height: size,
+@@ -78,6 +78,7 @@ const AttachmentVideo = (props: AttachmentPickerItemType) => {
+           image,
+         ]}
+       >
++        <ExpoImage source={{ uri: thumb_url }} style={StyleSheet.absoluteFill} />
+         {selected && (
+           <View style={[styles.overlay, { backgroundColor: overlay }, imageOverlay]}>
+             <ImageOverlaySelectedComponent />
+@@ -91,7 +92,7 @@ const AttachmentVideo = (props: AttachmentPickerItemType) => {
+             </Text>
+           ) : null}
+         </View>
+-      </ImageBackground>
++      </View>
+     </BottomSheetTouchableOpacity>
+   );
+ };
+@@ -138,8 +139,7 @@ const AttachmentImage = (props: AttachmentPickerItemType) => {
+ 
+   return (
+     <BottomSheetTouchableOpacity onPress={onPressImage}>
+-      <ImageBackground
+-        source={{ uri }}
++      <View
+         style={[
+           {
+             height: size,
+@@ -149,12 +149,13 @@ const AttachmentImage = (props: AttachmentPickerItemType) => {
+           image,
+         ]}
+       >
++        <ExpoImage source={{ uri }} style={StyleSheet.absoluteFill} />
+         {selected && (
+           <View style={[styles.overlay, { backgroundColor: overlay }, imageOverlay]}>
+             <ImageOverlaySelectedComponent />
+           </View>
+         )}
+-      </ImageBackground>
++      </View>
+     </BottomSheetTouchableOpacity>
+   );
+ };

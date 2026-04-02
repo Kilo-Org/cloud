@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import * as Application from 'expo-application';
+import { useRouter } from 'expo-router';
 import { ArrowLeftRight, Building2, KeyRound, LogOut, User } from 'lucide-react-native';
 import { Alert, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -84,6 +86,7 @@ function CreditsCard() {
 export function ProfileScreen() {
   const { signOut } = useAuth();
   const { context, clearContext } = useAppContext();
+  const router = useRouter();
   const trpc = useTRPC();
   const {
     data,
@@ -191,6 +194,7 @@ export function ProfileScreen() {
             variant="outline"
             className="flex-row gap-2"
             onPress={() => {
+              router.dismiss();
               void clearContext();
             }}
             accessibilityLabel="Switch workspace"
@@ -208,6 +212,10 @@ export function ProfileScreen() {
             <LogOut size={16} color={colors.mutedForeground} />
             <Text className="text-muted-foreground">Sign Out</Text>
           </Button>
+
+          <Text className="text-center text-xs text-muted-foreground">
+            v{Application.nativeApplicationVersion} ({Application.nativeBuildVersion})
+          </Text>
         </View>
       </View>
     </View>

@@ -246,7 +246,9 @@ export async function subscribeToCodingPlan(
       .limit(1);
 
     if (!currentSub) {
-      throw new Error('Coding plan activation was already processed, but no subscription was found.');
+      throw new Error(
+        'Coding plan activation was already processed, but no subscription was found.'
+      );
     }
 
     return { subscriptionId: currentSub.id };

@@ -111,8 +111,8 @@ async function buildSystemPrompt(
 ## Context you may receive
 Additional context may be appended to this prompt:
 - Conversation context (recent messages, thread context)
-${githubContext.repositories && '- Available GitHub repositories for this integration'}
-${gitlabContext.repositories && '- Available GitLab projects for this integration'}
+${githubContext.repositories ? '- Available GitHub repositories for this integration' : ''}
+${gitlabContext.repositories ? '- Available GitLab projects for this integration' : ''}
 
 ${formatGitHubRepositoriesForPrompt(githubContext)}
 ${formatGitLabRepositoriesForPrompt(gitlabContext)}

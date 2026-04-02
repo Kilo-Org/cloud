@@ -36,44 +36,60 @@ export async function GET(): Promise<
   return NextResponse.json({ missing: result?.count ?? 0 });
 }
 
+const BATCH_SIZE = 1000;
+const BATCHES_PER_REQUEST = 10;
+
 export async function POST(): Promise<NextResponse<BackfillBatchResponse | { error: string }>> {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
 
-  const processed = await db.transaction(async tran => {
-    const rows = await tran
-      .select({ id: kilocode_users.id })
-      .from(kilocode_users)
-      .where(missingEither)
-      .orderBy(desc(kilocode_users.created_at))
-      .limit(1000);
+  let totalProcessed = 0;
 
-    for (const user of rows) {
-      const openrouter_upstream_safety_identifier = generateOpenRouterUpstreamSafetyIdentifier(
-        user.id
-      );
-      if (openrouter_upstream_safety_identifier === null) {
-        return null;
+  for (let i = 0; i < BATCHES_PER_REQUEST; i++) {
+    const processed = await db.transaction(async tran => {
+      const rows = await tran
+        .select({ id: kilocode_users.id })
+        .from(kilocode_users)
+        .where(missingEither)
+        .orderBy(desc(kilocode_users.created_at))
+        .limit(BATCH_SIZE);
+
+      for (const user of rows) {
+        const openrouter_upstream_safety_identifier = generateOpenRouterUpstreamSafetyIdentifier(
+          user.id
+        );
+        if (openrouter_upstream_safety_identifier === null) {
+          return null;
+        }
+        await tran
+          .update(kilocode_users)
+          .set({
+            openrouter_upstream_safety_identifier,
+            vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(user.id),
+          })
+          .where(eq(kilocode_users.id, user.id))
+          .execute();
       }
-      await tran
-        .update(kilocode_users)
-        .set({
-          openrouter_upstream_safety_identifier,
-          vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(user.id),
-        })
-        .where(eq(kilocode_users.id, user.id))
-        .execute();
+
+      return rows.length;
+    });
+
+    if (processed === null) {
+      return NextResponse.json(
+        { error: 'OPENROUTER_ORG_ID is not configured on this server' },
+        { status: 500 }
+      );
     }
 
-    return rows.length;
-  });
+    totalProcessed += processed;
 
-  if (processed === null) {
-    return NextResponse.json(
-      { error: 'OPENROUTER_ORG_ID is not configured on this server' },
-      { status: 500 }
-    );
+    if (processed < BATCH_SIZE) {
+      break;
+    }
   }
 
-  return NextResponse.json({ processed, remaining: processed === 1000 });
+  return NextResponse.json({
+    processed: totalProcessed,
+    remaining: totalProcessed === BATCH_SIZE * BATCHES_PER_REQUEST,
+  });
 }

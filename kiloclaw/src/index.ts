@@ -72,8 +72,14 @@ function flyProxyUrl(appName: string, url: URL): string {
 // Named middleware functions
 // =============================================================================
 
+/** Paths that fire too frequently to log on every request (health checks, telemetry). */
+const QUIET_PATHS = new Set(['/global/health', '/global/telemetry']);
+
 async function logRequest(c: Context<AppEnv>, next: Next) {
   const url = new URL(c.req.url);
+  if (QUIET_PATHS.has(url.pathname)) {
+    return next();
+  }
   const redactedSearch = redactSensitiveParams(url);
   console.log(`[REQ] ${c.req.method} ${url.pathname}${redactedSearch}`);
   await next();

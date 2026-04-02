@@ -356,6 +356,20 @@ export const gastownRouter = router({
     return userStub.listTowns();
   }),
 
+  listTownOverview: gastownProcedure
+    .output(z.array(RpcTownOverviewCardOutput))
+    .query(async ({ ctx }) => {
+      const userStub = getGastownUserStub(ctx.env, ctx.userId);
+      return userStub.listTownOverviewData();
+    }),
+
+  getAggregateStats: gastownProcedure
+    .output(RpcAggregateStatsOutput)
+    .query(async ({ ctx }) => {
+      // Stub for now, to be filled by Bead 1 (Postgres cost data)
+      return { totalCost: 0, totalTokens: 0 };
+    }),
+
   getTown: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .output(RpcTownOutput)

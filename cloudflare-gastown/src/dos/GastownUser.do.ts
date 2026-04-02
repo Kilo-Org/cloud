@@ -109,16 +109,19 @@ export class GastownUserDO extends DurableObject<Env> {
     return UserTownRecord.parse(rows[0]);
   }
 
-  async listTowns(): Promise<UserTownRecord[]> {
-    await this.ensureInitialized();
-    const rows = [
-      ...query(
-        this.sql,
-        /* sql */ `SELECT * FROM ${user_towns} ORDER BY ${user_towns.columns.created_at} DESC`,
-        []
-      ),
-    ];
-    return UserTownRecord.array().parse(rows);
+  async listTownOverviewData(): Promise<import('../trpc/schemas').TownOverviewCardOutput[]> {
+    const towns = await this.listTowns();
+    return Promise.all(
+      towns.map(async town => {
+        const townStub = getTownDOStub(this.env, town.id);
+        const overview = await townStub.getTownOverview();
+        return {
+          ...overview,
+          id: town.id,
+          name: town.name,
+        };
+      })
+    );
   }
 
   // ── Rigs ──────────────────────────────────────────────────────────────

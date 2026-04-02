@@ -1,5 +1,3 @@
-
 describe('TownCard', () => {
-  it('renders town info correctly', () => {
-  });
+  it('renders town info correctly', () => {});
 });

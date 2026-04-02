@@ -1,5 +1,3 @@
-
 describe('AggregateStatsSidebar', () => {
-  it('renders stats correctly', () => {
-  });
+  it('renders stats correctly', () => {});
 });

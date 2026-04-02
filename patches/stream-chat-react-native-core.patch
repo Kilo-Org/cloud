@@ -1,11 +1,12 @@
 diff --git a/src/components/AttachmentPicker/components/AttachmentPickerItem.tsx b/src/components/AttachmentPicker/components/AttachmentPickerItem.tsx
-index 61e82d37fdfa6e7d5199330549f35e1b220d867f..d9c34284c817b779f86a376eb514976ea2e572a4 100644
+index 61e82d37fdfa6e7d5199330549f35e1b220d867f..b907221d39594aa9cc6fec3776a7abe0463438e2 100644
 --- a/src/components/AttachmentPicker/components/AttachmentPickerItem.tsx
 +++ b/src/components/AttachmentPicker/components/AttachmentPickerItem.tsx
 @@ -1,6 +1,7 @@
  import React from 'react';
  
- import { Alert, ImageBackground, StyleSheet, Text, View } from 'react-native';
+-import { Alert, ImageBackground, StyleSheet, Text, View } from 'react-native';
++import { Alert, StyleSheet, Text, View } from 'react-native';
 +import { Image as ExpoImage } from 'expo-image';
  
  import { FileReference, isLocalImageAttachment, isLocalVideoAttachment } from 'stream-chat';
@@ -36,6 +37,35 @@ index 61e82d37fdfa6e7d5199330549f35e1b220d867f..d9c34284c817b779f86a376eb514976e
              </Text>
            ) : null}
          </View>
+-      </ImageBackground>
++      </View>
+     </BottomSheetTouchableOpacity>
+   );
+ };
+@@ -138,8 +143,7 @@ const AttachmentImage = (props: AttachmentPickerItemType) => {
+ 
+   return (
+     <BottomSheetTouchableOpacity onPress={onPressImage}>
+-      <ImageBackground
+-        source={{ uri }}
++      <View
+         style={[
+           {
+             height: size,
+@@ -149,12 +153,17 @@ const AttachmentImage = (props: AttachmentPickerItemType) => {
+           image,
+         ]}
+       >
++        <ExpoImage
++          source={{ uri }}
++          style={StyleSheet.absoluteFill}
++          contentFit="cover"
++        />
+         {selected && (
+           <View style={[styles.overlay, { backgroundColor: overlay }, imageOverlay]}>
+             <ImageOverlaySelectedComponent />
+           </View>
+         )}
 -      </ImageBackground>
 +      </View>
      </BottomSheetTouchableOpacity>

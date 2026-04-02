@@ -1,8 +1,8 @@
 diff --git a/src/optionalDependencies/getPhotos.ts b/src/optionalDependencies/getPhotos.ts
-index c0bbe84696a35ae1004aae3ca9b371815f2998c6..74c428c067d80522f74797d46c5b555df78a5740 100644
+index c0bbe84696a35ae1004aae3ca9b371815f2998c6..a306f4f0a4b53a76f84e7d1836e8717f9a7bb328 100644
 --- a/src/optionalDependencies/getPhotos.ts
 +++ b/src/optionalDependencies/getPhotos.ts
-@@ -18,6 +18,29 @@ if (!MediaLibrary) {
+@@ -18,6 +18,27 @@ if (!MediaLibrary) {
    );
  }
  
@@ -14,13 +14,11 @@ index c0bbe84696a35ae1004aae3ca9b371815f2998c6..74c428c067d80522f74797d46c5b555d
 +  // optional – video thumbnails will not be generated
 +}
 +
-+const getVideoThumbnail = async (uri: string, durationSec: number) => {
++const getVideoThumbnail = async (uri: string) => {
 +  if (!createVideoPlayer) return undefined;
 +  const player = createVideoPlayer(uri);
 +  try {
-+    // Use 1s into the video to avoid blank first frames; fall back to 0 for very short clips
-+    const time = durationSec > 1 ? 1 : 0;
-+    const [thumbnail] = await player.generateThumbnailsAsync([time]);
++    const [thumbnail] = await player.generateThumbnailsAsync([0]);
 +    return thumbnail;
 +  } catch {
 +    return undefined;
@@ -32,7 +30,7 @@ index c0bbe84696a35ae1004aae3ca9b371815f2998c6..74c428c067d80522f74797d46c5b555d
  import { getLocalAssetUri } from './getLocalAssetUri';
  
  type ReturnType = {
-@@ -55,6 +78,7 @@ export const getPhotos = MediaLibrary
+@@ -55,6 +76,7 @@ export const getPhotos = MediaLibrary
          const assets = await Promise.all(
            results.assets.map(async (asset) => {
              const localUri = await getLocalAssetUri(asset.id);
@@ -40,7 +38,7 @@ index c0bbe84696a35ae1004aae3ca9b371815f2998c6..74c428c067d80522f74797d46c5b555d
              const mimeType =
                mime.getType(asset.filename || asset.uri) ||
                (asset.mediaType === MediaLibrary.MediaType.video ? 'video/*' : 'image/*');
-@@ -63,14 +87,23 @@ export const getPhotos = MediaLibrary
+@@ -63,14 +85,23 @@ export const getPhotos = MediaLibrary
                height: asset.height,
                name: asset.filename,
                size: 0,
@@ -58,7 +56,7 @@ index c0bbe84696a35ae1004aae3ca9b371815f2998c6..74c428c067d80522f74797d46c5b555d
 +        // AVAssetImageGenerator on iOS, causing random failures.
 +        for (const asset of assets) {
 +          if (asset.type?.startsWith('video')) {
-+            const thumb = await getVideoThumbnail(asset.uri, asset.duration);
++            const thumb = await getVideoThumbnail(asset.uri);
 +            asset.thumb_url = thumb || asset.uri;
 +          }
 +        }

@@ -190,7 +190,33 @@
       "preferredIndex": 3,
       "isFree": true,
       "opencode": {
-        "ai_sdk_provider": "openai-compatible"
+        "ai_sdk_provider": "openai-compatible",
+        "variants": {
+          "none": {
+            "reasoning": {
+              "enabled": false,
+              "effort": "minimal"
+            }
+          },
+          "low": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "low"
+            }
+          },
+          "medium": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "medium"
+            }
+          },
+          "high": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "high"
+            }
+          }
+        }
       }
     },
     {

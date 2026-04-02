@@ -715,9 +715,11 @@ export async function startAgent(
     });
 
     // If the event stream errored while we were awaiting the prompt,
-    // the stream-error handler already set the agent to 'failed' and
-    // reported completion. Don't continue with a success log.
+    // the stream-error handler already set the agent to 'failed',
+    // reported completion, and decremented sessionCount. Mark
+    // sessionCounted false so the catch block doesn't double-decrement.
     if (agent.status === 'failed') {
+      sessionCounted = false;
       throw new Error('Event stream failed during initial prompt');
     }
 
@@ -1130,13 +1132,17 @@ export async function drainAll(): Promise<void> {
     if (active.length === 0) break;
 
     // If every active agent already has an idle timer running, they've
-    // finished their work and are just waiting for the timer to fire.
-    // No need to keep polling — break and let Phase 3 handle them.
+    // finished their work and are just waiting for the 10s timer to
+    // fire via the normal completion path (exitAgent → reportAgentCompleted).
+    // Poll more frequently so we notice the exit promptly, but don't
+    // break to Phase 3 — that would force-save WIP commits on agents
+    // that already called gt_done and are about to exit cleanly.
     if (active.every(a => idleTimers.has(a.agentId))) {
       console.log(
-        `${DRAIN_LOG} All ${active.length} non-mayor agents are idle (timer pending), proceeding to Phase 3`
+        `${DRAIN_LOG} All ${active.length} non-mayor agents are idle (timers pending), waiting for clean exit`
       );
-      break;
+      await new Promise(r => setTimeout(r, 1000));
+      continue;
     }
 
     console.log(

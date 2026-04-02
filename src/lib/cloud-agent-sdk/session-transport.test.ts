@@ -65,9 +65,9 @@ function createCloudAgentResolvedSession(api: CloudAgentApi): CloudAgentSession 
   return createCloudAgentSession({
     kiloSessionId,
     resolveSession: async () => ({
+      type: 'cloud-agent' as const,
       kiloSessionId,
       cloudAgentSessionId,
-      isLive: true,
     }),
     transport: {
       getTicket: () => 'ticket',
@@ -198,14 +198,13 @@ describe('commands throw before transport is connected', () => {
   });
 });
 
-describe('session transport missing command methods (historical session)', () => {
+describe('session transport missing command methods (read-only session)', () => {
   function createHistoricalSession(): CloudAgentSession {
     return createCloudAgentSession({
       kiloSessionId: kiloId('ses_historical'),
       resolveSession: async () => ({
+        type: 'read-only' as const,
         kiloSessionId: kiloId('ses_historical'),
-        cloudAgentSessionId: null,
-        isLive: false,
       }),
       transport: {
         fetchSnapshot: () => Promise.resolve(makeSnapshot({ id: 'ses_historical' })),
@@ -219,7 +218,7 @@ describe('session transport missing command methods (historical session)', () =>
     await new Promise(r => setTimeout(r, 0));
   }
 
-  it('session.send() throws for historical session', async () => {
+  it('session.send() throws for read-only session', async () => {
     const session = createHistoricalSession();
     await connectHistorical(session);
 
@@ -230,7 +229,7 @@ describe('session transport missing command methods (historical session)', () =>
     session.destroy();
   });
 
-  it('session.interrupt() throws for historical session', async () => {
+  it('session.interrupt() throws for read-only session', async () => {
     const session = createHistoricalSession();
     await connectHistorical(session);
 
@@ -241,7 +240,7 @@ describe('session transport missing command methods (historical session)', () =>
     session.destroy();
   });
 
-  it('session.answer() throws for historical session', async () => {
+  it('session.answer() throws for read-only session', async () => {
     const session = createHistoricalSession();
     await connectHistorical(session);
 
@@ -252,7 +251,7 @@ describe('session transport missing command methods (historical session)', () =>
     session.destroy();
   });
 
-  it('session.reject() throws for historical session', async () => {
+  it('session.reject() throws for read-only session', async () => {
     const session = createHistoricalSession();
     await connectHistorical(session);
 
@@ -264,16 +263,15 @@ describe('session transport missing command methods (historical session)', () =>
   });
 });
 
-describe('CLI live session send via typed transport methods', () => {
+describe('remote session send via typed transport methods', () => {
   const cliKiloSessionId = kiloId('ses_cli-live-session');
 
-  it('session.send() uses kiloSessionId for CLI live sessions', async () => {
+  it('session.send() uses kiloSessionId for remote sessions', async () => {
     const session = createCloudAgentSession({
       kiloSessionId: cliKiloSessionId,
       resolveSession: async () => ({
+        type: 'remote' as const,
         kiloSessionId: cliKiloSessionId,
-        cloudAgentSessionId: null,
-        isLive: true,
       }),
       transport: {
         cliWebsocketUrl: 'wss://localhost:9999/api/user/web',
@@ -350,13 +348,12 @@ describe('session capabilities', () => {
     session.destroy();
   });
 
-  it('canSend is true after connecting a CLI live session', async () => {
+  it('canSend is true after connecting a remote session', async () => {
     const session = createCloudAgentSession({
       kiloSessionId: kiloId('ses_cli-live'),
       resolveSession: async () => ({
+        type: 'remote' as const,
         kiloSessionId: kiloId('ses_cli-live'),
-        cloudAgentSessionId: null,
-        isLive: true,
       }),
       transport: {
         cliWebsocketUrl: 'wss://localhost:9999/api/user/web',
@@ -373,13 +370,12 @@ describe('session capabilities', () => {
     session.destroy();
   });
 
-  it('canSend is false after connecting a historical session', async () => {
+  it('canSend is false after connecting a read-only session', async () => {
     const session = createCloudAgentSession({
       kiloSessionId: kiloId('ses_historical'),
       resolveSession: async () => ({
+        type: 'read-only' as const,
         kiloSessionId: kiloId('ses_historical'),
-        cloudAgentSessionId: null,
-        isLive: false,
       }),
       transport: {
         fetchSnapshot: () => Promise.resolve(makeSnapshot({ id: 'ses_historical' })),
@@ -409,13 +405,12 @@ describe('session capabilities', () => {
     session.destroy();
   });
 
-  it('canInterrupt is false for historical sessions', async () => {
+  it('canInterrupt is false for read-only sessions', async () => {
     const session = createCloudAgentSession({
       kiloSessionId: kiloId('ses_historical'),
       resolveSession: async () => ({
+        type: 'read-only' as const,
         kiloSessionId: kiloId('ses_historical'),
-        cloudAgentSessionId: null,
-        isLive: false,
       }),
       transport: {
         fetchSnapshot: () => Promise.resolve(makeSnapshot({ id: 'ses_historical' })),
@@ -434,16 +429,13 @@ describe('session capabilities', () => {
 describe('disconnect during resolution', () => {
   it('disconnect() before resolveSession settles prevents transport from attaching', async () => {
     const api = createMockApi();
-    let resolveSession!: (value: {
+    type CloudAgentResolved = {
+      type: 'cloud-agent';
       kiloSessionId: typeof kiloSessionId;
       cloudAgentSessionId: typeof cloudAgentSessionId;
-      isLive: boolean;
-    }) => void;
-    const resolvePromise = new Promise<{
-      kiloSessionId: typeof kiloSessionId;
-      cloudAgentSessionId: typeof cloudAgentSessionId;
-      isLive: boolean;
-    }>(r => {
+    };
+    let resolveSession!: (value: CloudAgentResolved) => void;
+    const resolvePromise = new Promise<CloudAgentResolved>(r => {
       resolveSession = r;
     });
 
@@ -463,7 +455,7 @@ describe('disconnect during resolution', () => {
     session.disconnect();
 
     // Now let the resolution complete
-    resolveSession({ kiloSessionId, cloudAgentSessionId, isLive: true });
+    resolveSession({ type: 'cloud-agent', kiloSessionId, cloudAgentSessionId });
     await resolvePromise;
     // Flush microtasks so resolveAndConnect can run its post-resolve code
     await new Promise(r => setTimeout(r, 0));

@@ -59,6 +59,16 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       meta: object;
     }>;
+    getDrainStatus: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        townId: string;
+      };
+      output: {
+        draining: boolean;
+        drainStartedAt: string | null;
+      };
+      meta: object;
+    }>;
     deleteTown: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         townId: string;
@@ -591,6 +601,20 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       meta: object;
     }>;
     refreshContainerToken: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        townId: string;
+      };
+      output: void;
+      meta: object;
+    }>;
+    forceRestartContainer: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        townId: string;
+      };
+      output: void;
+      meta: object;
+    }>;
+    destroyContainer: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         townId: string;
       };
@@ -1331,6 +1355,16 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
           };
           meta: object;
         }>;
+        getDrainStatus: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            townId: string;
+          };
+          output: {
+            draining: boolean;
+            drainStartedAt: string | null;
+          };
+          meta: object;
+        }>;
         deleteTown: import('@trpc/server').TRPCMutationProcedure<{
           input: {
             townId: string;
@@ -1863,6 +1897,20 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
           meta: object;
         }>;
         refreshContainerToken: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            townId: string;
+          };
+          output: void;
+          meta: object;
+        }>;
+        forceRestartContainer: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            townId: string;
+          };
+          output: void;
+          meta: object;
+        }>;
+        destroyContainer: import('@trpc/server').TRPCMutationProcedure<{
           input: {
             townId: string;
           };

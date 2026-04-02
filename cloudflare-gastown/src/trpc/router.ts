@@ -363,6 +363,22 @@ export const gastownRouter = router({
       return verifyTownOwnership(ctx.env, ctx, input.townId);
     }),
 
+  getDrainStatus: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .output(z.object({ draining: z.boolean(), drainStartedAt: z.string().nullable() }))
+    .query(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
+      const town = getTownDOStub(ctx.env, input.townId);
+      const [draining, startedAt] = await Promise.all([
+        town.isDraining() as Promise<boolean>,
+        town.getDrainStartedAt() as Promise<number | null>,
+      ]);
+      return {
+        draining,
+        drainStartedAt: startedAt ? new Date(startedAt).toISOString() : null,
+      };
+    }),
+
   /**
    * Check whether the current user is an admin viewing a town they don't own.
    * Used by the frontend to show an admin banner.
@@ -1018,6 +1034,105 @@ export const gastownRouter = router({
       }
       const townStub = getTownDOStub(ctx.env, input.townId);
       await townStub.forceRefreshContainerToken();
+
+      // Also remint and push KILOCODE_TOKEN — this is what actually
+      // authenticates GT tool calls and is the main reason users hit 401s.
+      // For personal towns the caller IS the owner; for org towns we must
+      // use the town owner's identity (not the caller's) so that
+      // git-credentials and other owner-scoped APIs continue to work.
+      let tokenUser: { id: string; api_token_pepper: string | null };
+      if (ownership.type === 'user') {
+        tokenUser = userFromCtx(ctx);
+      } else {
+        // Org town: resolve the owner from the town config
+        const config = await townStub.getTownConfig();
+        const ownerId = config.owner_user_id ?? config.created_by_user_id;
+        if (ownerId && ownerId === ctx.userId) {
+          // Caller happens to be the owner — use their live context
+          tokenUser = userFromCtx(ctx);
+        } else if (ownerId) {
+          // Different org member — look up the owner's pepper from the DB
+          if (!ctx.env.HYPERDRIVE) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'HYPERDRIVE binding not configured — cannot resolve town owner',
+            });
+          }
+          const { findUserById } = await import('../util/user-db.util');
+          const ownerUser = await findUserById(ctx.env.HYPERDRIVE.connectionString, ownerId);
+          if (!ownerUser) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Town owner not found — cannot refresh KILOCODE_TOKEN',
+            });
+          }
+          tokenUser = { id: ownerUser.id, api_token_pepper: ownerUser.api_token_pepper };
+        } else {
+          // No owner recorded — fall back to caller
+          tokenUser = userFromCtx(ctx);
+        }
+      }
+      const newKilocodeToken = await mintKilocodeToken(ctx.env, tokenUser);
+      await townStub.updateTownConfig({ kilocode_token: newKilocodeToken });
+      await townStub.syncConfigToContainer();
+    }),
+
+  forceRestartContainer: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot restart containers for towns they do not own',
+        });
+      }
+      if (ownership.type === 'org') {
+        const townStub = getTownDOStub(ctx.env, input.townId);
+        const config = await townStub.getTownConfig();
+        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
+        const isOrgOwner = membership?.role === 'owner';
+        const isTownCreator = ctx.userId === config.created_by_user_id;
+        if (!isOrgOwner && !isTownCreator) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only town creators and org owners can restart containers',
+          });
+        }
+      }
+      // stop() sends SIGTERM so the container's drain handler can run
+      // drainAll() — nudging agents to commit/push WIP before exiting.
+      const containerStub = getTownContainerStub(ctx.env, input.townId);
+      await containerStub.stop();
+    }),
+
+  destroyContainer: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot destroy containers for towns they do not own',
+        });
+      }
+      if (ownership.type === 'org') {
+        const townStub = getTownDOStub(ctx.env, input.townId);
+        const config = await townStub.getTownConfig();
+        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
+        const isOrgOwner = membership?.role === 'owner';
+        const isTownCreator = ctx.userId === config.created_by_user_id;
+        if (!isOrgOwner && !isTownCreator) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only town creators and org owners can destroy containers',
+          });
+        }
+      }
+      // destroy() sends SIGKILL — the container dies immediately with
+      // no graceful drain. Use when the container is stuck or unresponsive.
+      const containerStub = getTownContainerStub(ctx.env, input.townId);
+      await containerStub.destroy();
     }),
 
   // ── Events ──────────────────────────────────────────────────────────
@@ -1367,7 +1482,11 @@ export const gastownRouter = router({
     .output(RpcBeadOutput)
     .mutation(async ({ ctx, input }) => {
       const townStub = getTownDOStub(ctx.env, input.townId);
-      return townStub.updateBeadStatus(input.beadId, 'failed', 'admin');
+      return townStub.updateBeadStatus(input.beadId, 'failed', 'admin', {
+        code: 'admin_force_fail',
+        message: 'Manually failed by admin',
+        source: 'admin',
+      });
     }),
 
   adminGetAlarmStatus: adminProcedure

@@ -162,6 +162,24 @@ export async function handleAgentCompleted(
   return c.json(resSuccess({ completed: true }));
 }
 
+/**
+ * Called by the container when the mayor's session goes idle (turn done,
+ * waiting for user input). Transitions the mayor from "working" to
+ * "waiting" so the alarm drops to the idle cadence and health-check
+ * pings stop resetting the container's sleepAfter timer.
+ */
+export async function handleAgentWaiting(
+  c: Context<GastownEnv>,
+  params: { rigId: string; agentId: string }
+) {
+  const body = (await parseJsonBody(c)) as Record<string, unknown>;
+  const firedAt = typeof body?.firedAt === 'number' ? body.firedAt : undefined;
+  const townId = c.get('townId');
+  const town = getTownDOStub(c.env, townId);
+  await town.mayorWaiting(params.agentId, firedAt);
+  return c.json(resSuccess({ acknowledged: true }));
+}
+
 export async function handleWriteCheckpoint(
   c: Context<GastownEnv>,
   params: { rigId: string; agentId: string }
@@ -176,6 +194,29 @@ export async function handleWriteCheckpoint(
   const townId = c.get('townId');
   const town = getTownDOStub(c.env, townId);
   await town.writeCheckpoint(params.agentId, parsed.data.data);
+  return c.json(resSuccess({ written: true }));
+}
+
+const EvictionContextBody = z.object({
+  branch: z.string(),
+  agent_name: z.string(),
+  saved_at: z.string(),
+});
+
+export async function handleWriteEvictionContext(
+  c: Context<GastownEnv>,
+  params: { rigId: string; agentId: string }
+) {
+  const parsed = EvictionContextBody.safeParse(await parseJsonBody(c));
+  if (!parsed.success) {
+    return c.json(
+      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
+      400
+    );
+  }
+  const townId = c.get('townId');
+  const town = getTownDOStub(c.env, townId);
+  await town.writeBeadEvictionContext(params.agentId, parsed.data);
   return c.json(resSuccess({ written: true }));
 }
 
@@ -194,6 +235,7 @@ const HeartbeatWatermark = z
     lastEventType: z.string().nullable().optional(),
     lastEventAt: z.string().nullable().optional(),
     activeTools: z.array(z.string()).optional(),
+    containerInstanceId: z.string().optional(),
   })
   .passthrough();
 
@@ -221,18 +263,23 @@ export async function handleHeartbeat(
     // No body or invalid JSON — old container format, just touch
   }
 
-  await town.touchAgentHeartbeat(
+  // touchAgentHeartbeat returns the drain nonce atomically — no
+  // second RPC needed, which prevents a TOCTOU race where an
+  // in-flight heartbeat from the old container could observe a nonce
+  // generated between two separate DO calls.
+  const { drainNonce } = await town.touchAgentHeartbeat(
     params.agentId,
     watermark
       ? {
           lastEventType: watermark.lastEventType ?? null,
           lastEventAt: watermark.lastEventAt ?? null,
           activeTools: watermark.activeTools,
+          containerInstanceId: watermark.containerInstanceId,
         }
       : undefined
   );
 
-  return c.json(resSuccess({ heartbeat: true }));
+  return c.json(resSuccess({ heartbeat: true, ...(drainNonce ? { drainNonce } : {}) }));
 }
 
 const GetOrCreateAgentBody = z.object({

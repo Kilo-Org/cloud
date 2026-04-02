@@ -10,10 +10,12 @@ import {
   activeServerCount,
   getUptime,
   stopAll,
+  drainAll,
+  isDraining,
   getAgentEvents,
   registerEventSink,
 } from './process-manager';
-import { startHeartbeat, stopHeartbeat } from './heartbeat';
+import { startHeartbeat, stopHeartbeat, notifyContainerReady } from './heartbeat';
 import { pushContext as pushDashboardContext } from './dashboard-context';
 import { mergeBranch, setupRigBrowseWorktree } from './git-manager';
 import {
@@ -44,6 +46,53 @@ let lastKnownTownConfig: Record<string, unknown> | null = null;
 /** Get the latest town config delivered via X-Town-Config header. */
 export function getCurrentTownConfig(): Record<string, unknown> | null {
   return lastKnownTownConfig;
+}
+
+/**
+ * Sync config-derived env vars from the last-known town config into
+ * process.env. Safe to call at any time — no-ops when no config is cached.
+ */
+function syncTownConfigToProcessEnv(): void {
+  const cfg = getCurrentTownConfig();
+  if (!cfg) return;
+
+  const CONFIG_ENV_MAP: Array<[string, string]> = [
+    ['github_cli_pat', 'GITHUB_CLI_PAT'],
+    ['git_author_name', 'GASTOWN_GIT_AUTHOR_NAME'],
+    ['git_author_email', 'GASTOWN_GIT_AUTHOR_EMAIL'],
+    ['kilocode_token', 'KILOCODE_TOKEN'],
+  ];
+  for (const [cfgKey, envKey] of CONFIG_ENV_MAP) {
+    const val = cfg[cfgKey];
+    if (typeof val === 'string' && val) {
+      process.env[envKey] = val;
+    } else {
+      delete process.env[envKey];
+    }
+  }
+
+  const gitAuth = cfg.git_auth;
+  if (typeof gitAuth === 'object' && gitAuth !== null) {
+    const auth = gitAuth as Record<string, unknown>;
+    for (const [authKey, envKey] of [
+      ['github_token', 'GIT_TOKEN'],
+      ['gitlab_token', 'GITLAB_TOKEN'],
+      ['gitlab_instance_url', 'GITLAB_INSTANCE_URL'],
+    ] as const) {
+      const val = auth[authKey];
+      if (typeof val === 'string' && val) {
+        process.env[envKey] = val;
+      } else {
+        delete process.env[envKey];
+      }
+    }
+  }
+
+  if (cfg.disable_ai_coauthor) {
+    process.env.GASTOWN_DISABLE_AI_COAUTHOR = '1';
+  } else {
+    delete process.env.GASTOWN_DISABLE_AI_COAUTHOR;
+  }
 }
 
 export const app = new Hono();
@@ -92,11 +141,21 @@ app.use('*', async (c, next) => {
 
 // GET /health
 app.get('/health', c => {
+  // When the TownDO is draining, it passes the drain nonce and town
+  // ID via headers so idle containers (no running agents) can
+  // acknowledge readiness and clear the drain flag.
+  const drainNonce = c.req.header('X-Drain-Nonce');
+  const townId = c.req.header('X-Town-Id');
+  if (drainNonce && townId) {
+    void notifyContainerReady(townId, drainNonce);
+  }
+
   const response: HealthResponse = {
     status: 'ok',
     agents: activeAgentCount(),
     servers: activeServerCount(),
     uptime: getUptime(),
+    draining: isDraining() || undefined,
   };
   return c.json(response);
 });
@@ -133,8 +192,23 @@ app.post('/refresh-token', async c => {
   return c.json({ refreshed: true });
 });
 
+// POST /sync-config
+// Push config-derived env vars from X-Town-Config into process.env on
+// the running container. Called by TownDO.syncConfigToContainer() after
+// persisting env vars to DO storage, so the live process picks up
+// changes (e.g. refreshed KILOCODE_TOKEN) without a container restart.
+app.post('/sync-config', async c => {
+  syncTownConfigToProcessEnv();
+  return c.json({ synced: true });
+});
+
 // POST /agents/start
 app.post('/agents/start', async c => {
+  if (isDraining()) {
+    console.warn('[control-server] /agents/start: rejected — container is draining');
+    return c.json({ error: 'Container is draining, cannot start new agents' }, 503);
+  }
+
   const body: unknown = await c.req.json().catch(() => null);
   const parsed = StartAgentRequest.safeParse(body);
   if (!parsed.success) {
@@ -214,45 +288,7 @@ app.patch('/agents/:agentId/model', async c => {
   // Sync config-derived env vars from X-Town-Config into process.env so
   // the SDK server restart picks up fresh tokens and git identity.
   // The middleware already parsed the header into lastKnownTownConfig.
-  const cfg = getCurrentTownConfig();
-  if (cfg) {
-    const CONFIG_ENV_MAP: Array<[string, string]> = [
-      ['github_cli_pat', 'GITHUB_CLI_PAT'],
-      ['git_author_name', 'GASTOWN_GIT_AUTHOR_NAME'],
-      ['git_author_email', 'GASTOWN_GIT_AUTHOR_EMAIL'],
-    ];
-    for (const [cfgKey, envKey] of CONFIG_ENV_MAP) {
-      const val = cfg[cfgKey];
-      if (typeof val === 'string' && val) {
-        process.env[envKey] = val;
-      } else {
-        delete process.env[envKey];
-      }
-    }
-    // git_auth tokens
-    const gitAuth = cfg.git_auth;
-    if (typeof gitAuth === 'object' && gitAuth !== null) {
-      const auth = gitAuth as Record<string, unknown>;
-      for (const [authKey, envKey] of [
-        ['github_token', 'GIT_TOKEN'],
-        ['gitlab_token', 'GITLAB_TOKEN'],
-        ['gitlab_instance_url', 'GITLAB_INSTANCE_URL'],
-      ] as const) {
-        const val = auth[authKey];
-        if (typeof val === 'string' && val) {
-          process.env[envKey] = val;
-        } else {
-          delete process.env[envKey];
-        }
-      }
-    }
-    // disable_ai_coauthor
-    if (cfg.disable_ai_coauthor) {
-      process.env.GASTOWN_DISABLE_AI_COAUTHOR = '1';
-    } else {
-      delete process.env.GASTOWN_DISABLE_AI_COAUTHOR;
-    }
-  }
+  syncTownConfigToProcessEnv();
 
   await updateAgentModel(
     agentId,
@@ -723,7 +759,7 @@ export function startControlServer(): void {
     startHeartbeat(apiUrl, authToken);
   }
 
-  // Handle graceful shutdown
+  // Handle graceful shutdown (immediate, no drain — used by SIGINT for dev)
   const shutdown = async () => {
     console.log('Shutting down control server...');
     stopHeartbeat();
@@ -731,7 +767,18 @@ export function startControlServer(): void {
     process.exit(0);
   };
 
-  process.on('SIGTERM', () => void shutdown());
+  process.on(
+    'SIGTERM',
+    () =>
+      void (async () => {
+        console.log('[control-server] SIGTERM received — starting graceful drain...');
+        stopHeartbeat();
+        await drainAll();
+        await stopAll();
+        process.exit(0);
+      })()
+  );
+
   process.on('SIGINT', () => void shutdown());
 
   // Track connected WebSocket clients with optional agent filter

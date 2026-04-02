@@ -19,6 +19,7 @@ import { z } from 'zod';
 
 // Sub-modules (plain functions, not classes — per coding style)
 import * as beadOps from './town/beads';
+import type { FailureReason } from './town/types';
 import * as agents from './town/agents';
 import * as mail from './town/mail';
 import * as reviewQueue from './town/review-queue';
@@ -56,6 +57,10 @@ import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerStub } from './TownContainer.do';
 
+import { kiloTokenPayload } from '@kilocode/worker-utils';
+import { jwtVerify } from 'jose';
+import { generateKiloApiToken } from '../util/kilo-token.util';
+import { resolveSecret } from '../util/secret.util';
 import { writeEvent, type GastownEventData } from '../util/analytics.util';
 import { logger, withLogTags } from '../util/log.util';
 import { BeadPriority } from '../types';
@@ -120,7 +125,7 @@ function formatEventMessage(row: Record<string, unknown>): string {
 
 // Alarm intervals
 const ACTIVE_ALARM_INTERVAL_MS = 5_000; // 5s when agents are active
-const IDLE_ALARM_INTERVAL_MS = 1 * 60_000; // 1m when idle
+const IDLE_ALARM_INTERVAL_MS = 5 * 60_000; // 5m when idle (no working agents)
 
 // Escalation constants
 const STALE_ESCALATION_THRESHOLD_MS = 4 * 60 * 60 * 1000;
@@ -504,6 +509,11 @@ export class TownDO extends DurableObject<Env> {
     const townConfig = await config.getTownConfig(this.ctx.storage);
     this._ownerUserId = townConfig.owner_user_id;
 
+    // Load persisted draining flag, nonce, and start time
+    this._draining = (await this.ctx.storage.get<boolean>('town:draining')) ?? false;
+    this._drainNonce = (await this.ctx.storage.get<string>('town:drainNonce')) ?? null;
+    this._drainStartedAt = (await this.ctx.storage.get<number>('town:drainStartedAt')) ?? null;
+
     // All tables are now initialized via beads.initBeadTables():
     // beads, bead_events, bead_dependencies, agent_metadata, review_metadata,
     // escalation_metadata, convoy_metadata
@@ -537,6 +547,15 @@ export class TownDO extends DurableObject<Env> {
   private _townId: string | null = null;
   private _lastReconcilerMetrics: reconciler.ReconcilerMetrics | null = null;
   private _dashboardContext: string | null = null;
+  /** Monotonic timestamp of the last working → transition for the mayor.
+   *  Used to reject stale session.idle callbacks that arrive after a new
+   *  prompt has already re-activated the mayor. */
+  private _mayorWorkingSince = 0;
+  private _draining = false;
+  private _drainNonce: string | null = null;
+  private _drainStartedAt: number | null = null;
+  /** Instance UUID of the current container, set by the first heartbeat. */
+  private _containerInstanceId: string | null = null;
 
   private get townId(): string {
     return this._townId ?? this.ctx.id.name ?? this.ctx.id.toString();
@@ -561,6 +580,77 @@ export class TownDO extends DurableObject<Env> {
 
   async getDashboardContext(): Promise<string | null> {
     return this._dashboardContext;
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // Container Eviction (graceful drain)
+  // ══════════════════════════════════════════════════════════════════
+
+  /**
+   * Record a container eviction event and set the draining flag.
+   * Called by the container when it receives SIGTERM. While draining,
+   * the reconciler skips dispatch to prevent new work from starting.
+   *
+   * Returns a drain nonce that must be presented via
+   * `acknowledgeContainerReady()` to clear the drain flag. This
+   * prevents stale heartbeats from the dying container from
+   * prematurely re-enabling dispatch.
+   */
+  async recordContainerEviction(): Promise<string> {
+    events.insertEvent(this.sql, 'container_eviction', {});
+    const nonce = crypto.randomUUID();
+    const startedAt = Date.now();
+    this._draining = true;
+    this._drainNonce = nonce;
+    this._drainStartedAt = startedAt;
+    await this.ctx.storage.put('town:draining', true);
+    await this.ctx.storage.put('town:drainNonce', nonce);
+    await this.ctx.storage.put('town:drainStartedAt', startedAt);
+    console.log(`${TOWN_LOG} recordContainerEviction: draining flag set, nonce=${nonce}`);
+    return nonce;
+  }
+
+  /**
+   * Acknowledge that the replacement container is ready. Clears the
+   * draining flag only if the provided nonce matches the one generated
+   * during `recordContainerEviction()`. This ensures that only the
+   * new container (which received the nonce via startup config) can
+   * re-enable dispatch — not a stale heartbeat from the old container.
+   */
+  async acknowledgeContainerReady(nonce: string): Promise<boolean> {
+    if (!this._draining) {
+      console.log(`${TOWN_LOG} acknowledgeContainerReady: not draining, noop`);
+      return true;
+    }
+    if (nonce !== this._drainNonce) {
+      console.warn(
+        `${TOWN_LOG} acknowledgeContainerReady: nonce mismatch (got=${nonce}, expected=${this._drainNonce})`
+      );
+      return false;
+    }
+    this._draining = false;
+    this._drainNonce = null;
+    this._drainStartedAt = null;
+    await this.ctx.storage.put('town:draining', false);
+    await this.ctx.storage.delete('town:drainNonce');
+    await this.ctx.storage.delete('town:drainStartedAt');
+    console.log(`${TOWN_LOG} acknowledgeContainerReady: draining flag cleared`);
+    return true;
+  }
+
+  /** Whether the town is in draining mode (container eviction in progress). */
+  async isDraining(): Promise<boolean> {
+    return this._draining;
+  }
+
+  /** The current drain nonce (null when not draining). */
+  async getDrainNonce(): Promise<string | null> {
+    return this._drainNonce;
+  }
+
+  /** When the drain started (epoch ms), or null when not draining. */
+  async getDrainStartedAt(): Promise<number | null> {
+    return this._drainStartedAt;
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -592,13 +682,17 @@ export class TownDO extends DurableObject<Env> {
     const townConfig = await this.getTownConfig();
     const userId = townConfig.owner_user_id ?? townId;
     await dispatch.forceRefreshContainerToken(this.env, townId, userId);
-    this.lastContainerTokenRefreshAt = Date.now();
+    await this.ctx.storage.put('container:lastTokenRefreshAt', Date.now());
   }
 
   /**
    * Push config-derived env vars to the running container. Called after
    * updateTownConfig so that settings changes take effect without a
    * container restart. New agent processes inherit the updated values.
+   *
+   * Two-phase push:
+   *  1. setEnvVar — persists to DO storage for next boot
+   *  2. POST /sync-config — hot-swaps process.env on the running container
    */
   async syncConfigToContainer(): Promise<void> {
     const townId = this.townId;
@@ -606,8 +700,7 @@ export class TownDO extends DurableObject<Env> {
     const townConfig = await this.getTownConfig();
     const container = getTownContainerStub(this.env, townId);
 
-    // Map config fields to their container env var equivalents.
-    // When a value is set, push it; when cleared, remove it.
+    // Phase 1: Persist to DO storage for next boot.
     const envMapping: Array<[string, string | undefined]> = [
       ['GIT_TOKEN', townConfig.git_auth?.github_token],
       ['GITLAB_TOKEN', townConfig.git_auth?.gitlab_token],
@@ -616,6 +709,7 @@ export class TownDO extends DurableObject<Env> {
       ['GASTOWN_GIT_AUTHOR_NAME', townConfig.git_author_name],
       ['GASTOWN_GIT_AUTHOR_EMAIL', townConfig.git_author_email],
       ['GASTOWN_DISABLE_AI_COAUTHOR', townConfig.disable_ai_coauthor ? '1' : undefined],
+      ['KILOCODE_TOKEN', townConfig.kilocode_token],
     ];
 
     for (const [key, value] of envMapping) {
@@ -628,6 +722,26 @@ export class TownDO extends DurableObject<Env> {
       } catch (err) {
         console.warn(`[Town.do] syncConfigToContainer: ${key} sync failed:`, err);
       }
+    }
+
+    // Phase 2: Push to the running container's process.env via the
+    // /sync-config endpoint. The X-Town-Config header delivers the
+    // full config; the endpoint applies CONFIG_ENV_MAP to process.env.
+    try {
+      const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+      await container.fetch('http://container/sync-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Town-Config': JSON.stringify(containerConfig),
+        },
+      });
+    } catch (err) {
+      // Best-effort — container may not be running yet.
+      console.warn(
+        `[Town.do] syncConfigToContainer: /sync-config push failed:`,
+        err instanceof Error ? err.message : err
+      );
     }
   }
 
@@ -812,7 +926,12 @@ export class TownDO extends DurableObject<Env> {
     return beadOps.listBeads(this.sql, filter);
   }
 
-  async updateBeadStatus(beadId: string, status: string, agentId: string): Promise<Bead> {
+  async updateBeadStatus(
+    beadId: string,
+    status: string,
+    agentId: string,
+    failureReason?: FailureReason
+  ): Promise<Bead> {
     // Record terminal transitions as bead_cancelled events for the reconciler.
     // Non-terminal transitions are normal lifecycle changes, not cancellations.
     if (status === 'closed' || status === 'failed') {
@@ -824,7 +943,7 @@ export class TownDO extends DurableObject<Env> {
 
     // Convoy progress is updated automatically inside beadOps.updateBeadStatus
     // when the bead reaches a terminal status (closed/failed).
-    const bead = beadOps.updateBeadStatus(this.sql, beadId, status, agentId);
+    const bead = beadOps.updateBeadStatus(this.sql, beadId, status, agentId, failureReason);
 
     if (status === 'closed') {
       const durationMs = Date.now() - new Date(bead.created_at).getTime();
@@ -915,6 +1034,15 @@ export class TownDO extends DurableObject<Env> {
     }>,
     actorId: string
   ): Promise<Bead> {
+    // Record terminal transitions as bead_cancelled events for the reconciler,
+    // matching the behaviour of updateBeadStatus (the dedicated status method).
+    if (fields.status === 'closed' || fields.status === 'failed') {
+      events.insertEvent(this.sql, 'bead_cancelled', {
+        bead_id: beadId,
+        payload: { cancel_status: fields.status },
+      });
+    }
+
     const bead = beadOps.updateBeadFields(this.sql, beadId, fields, actorId);
 
     // When a bead closes via field update, check for newly unblocked beads
@@ -1103,18 +1231,84 @@ export class TownDO extends DurableObject<Env> {
     return agents.readCheckpoint(this.sql, agentId);
   }
 
+  /**
+   * Append eviction context to a bead's body so the next agent dispatched
+   * to it knows there is WIP code on a branch. Called by the container's
+   * Phase 4 force-save after pushing the WIP commit.
+   */
+  async writeBeadEvictionContext(
+    agentId: string,
+    context: { branch: string; agent_name: string; saved_at: string }
+  ): Promise<void> {
+    const agent = agents.getAgent(this.sql, agentId);
+    if (!agent?.current_hook_bead_id) return;
+    const bead = beadOps.getBead(this.sql, agent.current_hook_bead_id);
+    if (!bead) return;
+    const evictionNote =
+      `\n\n---\n**Container eviction note:** ${context.agent_name} pushed WIP progress ` +
+      `to branch \`${context.branch}\` before container eviction at ${context.saved_at}. ` +
+      `Pick up from where they left off — pull the branch and continue the work.`;
+    const updatedBody = (bead.body ?? '') + evictionNote;
+    beadOps.updateBeadFields(this.sql, bead.bead_id, { body: updatedBody }, 'system');
+  }
+
   // ── Heartbeat ─────────────────────────────────────────────────────
 
+  /**
+   * Update an agent's heartbeat timestamp. Returns the current drain
+   * nonce (if draining) so the caller can include it in the HTTP
+   * response without a second RPC — preventing a TOCTOU race where
+   * an in-flight heartbeat from the old container could observe a
+   * nonce generated between two separate DO calls.
+   */
   async touchAgentHeartbeat(
     agentId: string,
     watermark?: {
       lastEventType?: string | null;
       lastEventAt?: string | null;
       activeTools?: string[];
+      containerInstanceId?: string;
     }
-  ): Promise<void> {
+  ): Promise<{ drainNonce: string | null }> {
     agents.touchAgent(this.sql, agentId, watermark);
     await this.armAlarmIfNeeded();
+
+    // Detect container restarts via instance ID change. The instance ID
+    // is persisted so it survives DO restarts (unlike in-memory only).
+    if (watermark?.containerInstanceId) {
+      // Hydrate from storage on first access after DO restart
+      if (this._containerInstanceId === null) {
+        this._containerInstanceId =
+          (await this.ctx.storage.get<string>('town:containerInstanceId')) ?? null;
+      }
+
+      if (
+        this._draining &&
+        this._containerInstanceId &&
+        watermark.containerInstanceId !== this._containerInstanceId
+      ) {
+        // New container started — clear drain flag. This supplements the
+        // nonce handshake (acknowledgeContainerReady) as a faster path:
+        // the heartbeat fires every 30s vs the nonce which requires the
+        // container to explicitly call /container-ready.
+        this._draining = false;
+        this._drainNonce = null;
+        this._drainStartedAt = null;
+        await this.ctx.storage.put('town:draining', false);
+        await this.ctx.storage.delete('town:drainNonce');
+        await this.ctx.storage.delete('town:drainStartedAt');
+        console.log(
+          `${TOWN_LOG} heartbeat: new container instance ${watermark.containerInstanceId} (was ${this._containerInstanceId}), clearing drain flag`
+        );
+      }
+
+      if (watermark.containerInstanceId !== this._containerInstanceId) {
+        this._containerInstanceId = watermark.containerInstanceId;
+        await this.ctx.storage.put('town:containerInstanceId', watermark.containerInstanceId);
+      }
+    }
+
+    return { drainNonce: this._drainNonce };
   }
 
   async updateAgentStatusMessage(agentId: string, message: string): Promise<void> {
@@ -1407,6 +1601,43 @@ export class TownDO extends DurableObject<Env> {
     await this.armAlarmIfNeeded();
   }
 
+  /**
+   * Transition the mayor from "working" to "waiting". Called by the
+   * container when the mayor's session goes idle (turn done, waiting for
+   * user input). The "waiting" status means the mayor is alive in the
+   * container but not doing LLM work — hasActiveWork() returns false,
+   * so the alarm drops to the idle cadence and health-check pings stop
+   * resetting the container's sleepAfter timer.
+   *
+   * @param firedAt - Timestamp (ms) when the container fired this
+   *   callback. Used to reject stale session.idle callbacks from a
+   *   previous turn that arrive after the mayor has already been
+   *   re-activated by a new prompt.
+   */
+  async mayorWaiting(agentId?: string, firedAt?: number): Promise<void> {
+    let resolvedAgentId = agentId;
+    if (!resolvedAgentId) {
+      const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0];
+      if (mayor) resolvedAgentId = mayor.id;
+    }
+    if (!resolvedAgentId) return;
+
+    const agent = agents.getAgent(this.sql, resolvedAgentId);
+    if (!agent || agent.role !== 'mayor') return;
+
+    // Only transition from working → waiting. If the agent has already
+    // been set to idle/stalled/dead by another path, don't overwrite.
+    // Guard against stale session.idle callbacks: reportMayorWaiting is
+    // fire-and-forget, so a callback from a previous turn can arrive
+    // after sendMayorMessage has already re-activated the mayor. If the
+    // callback carries a firedAt timestamp that predates the last
+    // working transition, it belongs to an older turn — reject it.
+    if (agent.status === 'working') {
+      if (firedAt && firedAt < this._mayorWorkingSince) return;
+      agents.updateAgentStatus(this.sql, resolvedAgentId, 'waiting');
+    }
+  }
+
   async agentCompleted(
     agentId: string,
     input: { status: 'completed' | 'failed'; reason?: string }
@@ -1555,27 +1786,71 @@ export class TownDO extends DurableObject<Env> {
       switch (action) {
         case 'RESTART':
         case 'RESTART_WITH_BACKOFF': {
-          // Stop the agent in the container, reset to idle so the
-          // scheduler picks it up again on the next alarm cycle.
-          if (targetAgent?.status === 'working' || targetAgent?.status === 'stalled') {
-            dispatch.stopAgentInContainer(this.env, this.townId, targetAgentId).catch(() => {});
-          }
           if (targetAgent) {
-            // RESTART clears last_activity_at so the scheduler picks it
-            // up immediately. RESTART_WITH_BACKOFF sets it to now() so
-            // the dispatch cooldown (DISPATCH_COOLDOWN_MS) delays the
-            // next attempt, preventing immediate restart of crash loops.
-            const activityAt = action === 'RESTART_WITH_BACKOFF' ? now() : null;
-            query(
-              this.sql,
-              /* sql */ `
-                UPDATE ${agent_metadata}
-                SET ${agent_metadata.columns.status} = 'idle',
-                    ${agent_metadata.columns.last_activity_at} = ?
-                WHERE ${agent_metadata.bead_id} = ?
-              `,
-              [activityAt, targetAgentId]
-            );
+            // Use the bead captured in the triage snapshot (not the agent's
+            // current hook, which may have changed since the triage request
+            // was created). Fall back to current hook for backward compat.
+            const restartBeadId = snapshotHookedBeadId ?? targetAgent.current_hook_bead_id;
+
+            // Only stop the agent if it's still working on the snapshot bead.
+            // If it has moved on, stopping it would abort unrelated work.
+            const agentStillOnBead =
+              restartBeadId && targetAgent.current_hook_bead_id === restartBeadId;
+            if (
+              agentStillOnBead &&
+              (targetAgent.status === 'working' || targetAgent.status === 'stalled')
+            ) {
+              dispatch.stopAgentInContainer(this.env, this.townId, targetAgentId).catch(() => {});
+            }
+
+            // Check if the hooked bead has exhausted its dispatch cap.
+            // If so, fail it immediately instead of letting the reconciler
+            // re-dispatch indefinitely (#1653).
+            if (restartBeadId) {
+              const hookedBead = beadOps.getBead(this.sql, restartBeadId);
+              if (hookedBead && hookedBead.dispatch_attempts >= scheduling.MAX_DISPATCH_ATTEMPTS) {
+                beadOps.updateBeadStatus(this.sql, restartBeadId, 'failed', 'system', {
+                  code: 'max_dispatch_attempts',
+                  message: `Dispatch attempts exhausted (${hookedBead.dispatch_attempts})`,
+                  source: 'triage',
+                });
+                agents.unhookBead(this.sql, targetAgentId);
+                break;
+              }
+            }
+            // Only reset agent state if it's still on the snapshot bead.
+            // If it moved on, let it continue its current work.
+            if (agentStillOnBead) {
+              // RESTART clears last_activity_at so the scheduler picks it
+              // up immediately. RESTART_WITH_BACKOFF sets it to now() so
+              // the dispatch cooldown (DISPATCH_COOLDOWN_MS) delays the
+              // next attempt, preventing immediate restart of crash loops.
+              const activityAt = action === 'RESTART_WITH_BACKOFF' ? now() : null;
+              query(
+                this.sql,
+                /* sql */ `
+                  UPDATE ${agent_metadata}
+                  SET ${agent_metadata.columns.status} = 'idle',
+                      ${agent_metadata.columns.last_activity_at} = ?
+                  WHERE ${agent_metadata.bead_id} = ?
+                `,
+                [activityAt, targetAgentId]
+              );
+            }
+            // Stamp the bead's last_dispatch_attempt_at regardless — even
+            // if the agent moved on, the backoff gate should still fire
+            // on the snapshot bead to prevent immediate redispatch.
+            if (action === 'RESTART_WITH_BACKOFF' && restartBeadId) {
+              query(
+                this.sql,
+                /* sql */ `
+                  UPDATE ${beads}
+                  SET ${beads.columns.last_dispatch_attempt_at} = ?
+                  WHERE ${beads.bead_id} = ?
+                `,
+                [now(), restartBeadId]
+              );
+            }
           }
           break;
         }
@@ -1584,7 +1859,11 @@ export class TownDO extends DurableObject<Env> {
           // created (not the agent's current hook, which may differ).
           const beadToClose = snapshotHookedBeadId ?? targetAgent?.current_hook_bead_id;
           if (beadToClose) {
-            beadOps.updateBeadStatus(this.sql, beadToClose, 'failed', input.agent_id);
+            beadOps.updateBeadStatus(this.sql, beadToClose, 'failed', input.agent_id, {
+              code: 'triage_close',
+              message: input.resolution_notes || 'Closed via triage',
+              source: 'triage',
+            });
             // Only stop and unhook if the agent is still working on this
             // specific bead. If the agent has moved on, stopping it would
             // abort unrelated work.
@@ -1643,20 +1922,35 @@ export class TownDO extends DurableObject<Env> {
               }
               agents.unhookBead(this.sql, targetAgentId);
             }
-            // Reset the bead to open so the scheduler can re-assign it
-            query(
-              this.sql,
-              /* sql */ `
-                UPDATE ${beads}
-                SET ${beads.columns.assignee_agent_bead_id} = NULL,
-                    ${beads.columns.status} = 'open',
-                    ${beads.columns.updated_at} = ?
-                WHERE ${beads.bead_id} = ?
-                  AND ${beads.status} != 'closed'
-                  AND ${beads.status} != 'failed'
-              `,
-              [now(), beadToReassign]
-            );
+            // Check the bead's dispatch_attempts before resetting to open.
+            // If the bead exhausted its dispatch cap, fail it instead of
+            // re-entering the infinite retry loop (#1653).
+            const reassignBead = beadOps.getBead(this.sql, beadToReassign);
+            if (
+              reassignBead &&
+              reassignBead.dispatch_attempts >= scheduling.MAX_DISPATCH_ATTEMPTS
+            ) {
+              beadOps.updateBeadStatus(this.sql, beadToReassign, 'failed', input.agent_id, {
+                code: 'max_dispatch_attempts',
+                message: `Dispatch attempts exhausted during reassign (${reassignBead.dispatch_attempts})`,
+                source: 'triage',
+              });
+            } else {
+              // Reset the bead to open so the scheduler can re-assign it
+              query(
+                this.sql,
+                /* sql */ `
+                  UPDATE ${beads}
+                  SET ${beads.columns.assignee_agent_bead_id} = NULL,
+                      ${beads.columns.status} = 'open',
+                      ${beads.columns.updated_at} = ?
+                  WHERE ${beads.bead_id} = ?
+                    AND ${beads.status} != 'closed'
+                    AND ${beads.status} != 'failed'
+                `,
+                [now(), beadToReassign]
+              );
+            }
           }
           break;
         }
@@ -1892,7 +2186,23 @@ export class TownDO extends DurableObject<Env> {
 
     if (isAlive) {
       const sent = await dispatch.sendMessageToAgent(this.env, townId, mayor.id, combinedMessage);
-      sessionStatus = sent ? 'active' : 'idle';
+      if (sent) {
+        // Transition waiting → working so the alarm runs at the active cadence
+        // while the mayor processes this prompt. Also reschedule the alarm
+        // immediately — the idle alarm may be up to 5 min away, and we need
+        // the reconciler/health-check loop to resume promptly.
+        // Always refresh the watermark so a stale mayorWaiting callback
+        // from a previous turn can't flip the mayor back to waiting
+        // while a queued prompt is being processed.
+        this._mayorWorkingSince = Date.now();
+        if (mayor.status === 'waiting') {
+          agents.updateAgentStatus(this.sql, mayor.id, 'working');
+          await this.ctx.storage.setAlarm(Date.now() + ACTIVE_ALARM_INTERVAL_MS);
+        }
+        sessionStatus = 'active';
+      } else {
+        sessionStatus = 'idle';
+      }
     } else {
       const townConfig = await this.getTownConfig();
       const rigConfig = await this.getMayorRigConfig();
@@ -1938,6 +2248,7 @@ export class TownDO extends DurableObject<Env> {
 
       if (started) {
         agents.updateAgentStatus(this.sql, mayor.id, 'working');
+        this._mayorWorkingSince = Date.now();
         sessionStatus = 'starting';
       } else {
         sessionStatus = 'idle';
@@ -1986,8 +2297,9 @@ export class TownDO extends DurableObject<Env> {
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
 
     if (isAlive) {
-      const status = mayor.status === 'working' || mayor.status === 'stalled' ? 'active' : 'idle';
-      return { agentId: mayor.id, sessionStatus: status };
+      const isActive =
+        mayor.status === 'working' || mayor.status === 'stalled' || mayor.status === 'waiting';
+      return { agentId: mayor.id, sessionStatus: isActive ? 'active' : 'idle' };
     }
 
     // Start the container with an idle mayor (no initial prompt)
@@ -2039,6 +2351,7 @@ export class TownDO extends DurableObject<Env> {
 
     if (started) {
       agents.updateAgentStatus(this.sql, mayor.id, 'working');
+      this._mayorWorkingSince = Date.now();
       return { agentId: mayor.id, sessionStatus: 'starting' };
     }
 
@@ -2103,7 +2416,7 @@ export class TownDO extends DurableObject<Env> {
     const mapStatus = (agentStatus: string): 'idle' | 'active' | 'starting' => {
       switch (agentStatus) {
         case 'working':
-          return 'active';
+        case 'waiting':
         case 'stalled':
           return 'active';
         default:
@@ -2991,10 +3304,13 @@ export class TownDO extends DurableObject<Env> {
     logger.setTags({ townId });
     logger.info('alarm: fired');
 
-    const hasRigs = rigs.listRigs(this.sql).length > 0;
+    // Call once per tick — threaded to ensureContainerReady, maybeDispatchTriageAgent, and getAlarmStatus
+    const rigList = rigs.listRigs(this.sql);
+    const hasRigs = rigList.length > 0;
+
     if (hasRigs) {
       try {
-        await this.ensureContainerReady();
+        await this.ensureContainerReady(rigList);
       } catch (err) {
         logger.warn('alarm: container health check failed', {
           error: err instanceof Error ? err.message : String(err),
@@ -3011,6 +3327,16 @@ export class TownDO extends DurableObject<Env> {
         await this.refreshContainerToken();
       } catch (err) {
         logger.warn('alarm: refreshContainerToken failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      // Proactively remint KILOCODE_TOKEN before it expires (30-day
+      // expiry, checked daily, refreshed within 7 days of expiry).
+      try {
+        await this.refreshKilocodeTokenIfExpiring();
+      } catch (err) {
+        logger.warn('alarm: refreshKilocodeTokenIfExpiring failed', {
           error: err instanceof Error ? err.message : String(err),
         });
       }
@@ -3113,10 +3439,27 @@ export class TownDO extends DurableObject<Env> {
       Sentry.captureException(err);
     }
 
+    // Safety-net: auto-clear drain flag if it has been active too long.
+    // The primary clear mechanism is the heartbeat instance ID check
+    // (see recordHeartbeat), but this catches edge cases where no
+    // heartbeat arrives (e.g. container failed to start).
+    if (this._draining && this._drainStartedAt) {
+      const DRAIN_TIMEOUT_MS = 7 * 60 * 1000;
+      if (Date.now() - this._drainStartedAt > DRAIN_TIMEOUT_MS) {
+        this._draining = false;
+        this._drainNonce = null;
+        this._drainStartedAt = null;
+        await this.ctx.storage.put('town:draining', false);
+        await this.ctx.storage.delete('town:drainNonce');
+        await this.ctx.storage.delete('town:drainStartedAt');
+        logger.info('reconciler: drain timeout exceeded, auto-clearing draining flag');
+      }
+    }
+
     // Phase 1: Reconcile — compute desired state vs actual state
     const sideEffects: Array<() => Promise<void>> = [];
     try {
-      const actions = reconciler.reconcile(this.sql);
+      const actions = reconciler.reconcile(this.sql, { draining: this._draining });
       metrics.actionsEmitted = actions.length;
       for (const a of actions) {
         metrics.actionsByType[a.type] = (metrics.actionsByType[a.type] ?? 0) + 1;
@@ -3228,7 +3571,16 @@ export class TownDO extends DurableObject<Env> {
       label: JSON.stringify(metrics.actionsByType),
     });
 
+    // ── Post-reconciliation: cache activity snapshot ────────────────
+    // Computed after Phases 0-2 so re-arm and getAlarmStatus reflect
+    // any work created during reconciliation (hooks, dispatches, triage).
+    const activeWork = this.hasActiveWork();
+
     // ── Phase 3: Housekeeping (independent, all parallelizable) ────
+
+    // Call once per tick — threaded to maybeDispatchTriageAgent and getAlarmStatus
+    const cachedTriageCount = patrol.countPendingTriageRequests(this.sql);
+
     await Promise.allSettled([
       this.deliverPendingMail().catch(err =>
         logger.warn('alarm: deliverPendingMail failed', {
@@ -3245,7 +3597,7 @@ export class TownDO extends DurableObject<Env> {
           error: err instanceof Error ? err.message : String(err),
         })
       ),
-      this.maybeDispatchTriageAgent().catch(err =>
+      this.maybeDispatchTriageAgent(cachedTriageCount, rigList).catch(err =>
         logger.warn('alarm: maybeDispatchTriageAgent failed', {
           error: err instanceof Error ? err.message : String(err),
         })
@@ -3261,19 +3613,25 @@ export class TownDO extends DurableObject<Env> {
         }
       }),
     ]);
+
     // Re-arm: fast when active, slow when idle
-    const active = this.hasActiveWork();
-    const interval = active ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
+    const interval = activeWork ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
     await this.ctx.storage.setAlarm(Date.now() + interval);
 
-    // Broadcast status snapshot to connected WebSocket clients
-    try {
-      const snapshot = await this.getAlarmStatus();
-      this.broadcastAlarmStatus(snapshot);
-    } catch (err) {
-      logger.warn('alarm: status broadcast failed', {
-        error: err instanceof Error ? err.message : String(err),
-      });
+    // Broadcast status snapshot to connected WebSocket clients (skip if nobody is listening)
+    const statusClients = this.ctx.getWebSockets('status');
+    if (statusClients.length > 0) {
+      try {
+        const snapshot = await this.getAlarmStatus({
+          activeWork,
+          triageCount: cachedTriageCount,
+        });
+        this.broadcastAlarmStatus(snapshot);
+      } catch (err) {
+        logger.warn('alarm: status broadcast failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
   }
 
@@ -3282,12 +3640,17 @@ export class TownDO extends DurableObject<Env> {
    * from the alarm handler, throttled to once per hour (tokens have
    * 8h expiry). The TownContainerDO stores it as an env var so it's
    * available to all agents in the container.
+   *
+   * The throttle timestamp is persisted in ctx.storage so it survives
+   * DO eviction. Without persistence, eviction resets the throttle to 0
+   * and the refresh fires immediately on the next alarm tick, sending
+   * requests that reset the container's sleepAfter timer (#1409).
    */
-  private lastContainerTokenRefreshAt = 0;
   private async refreshContainerToken(): Promise<void> {
     const TOKEN_REFRESH_INTERVAL_MS = 60 * 60_000; // 1 hour
     const now = Date.now();
-    if (now - this.lastContainerTokenRefreshAt < TOKEN_REFRESH_INTERVAL_MS) return;
+    const lastRefresh = (await this.ctx.storage.get<number>('container:lastTokenRefreshAt')) ?? 0;
+    if (now - lastRefresh < TOKEN_REFRESH_INTERVAL_MS) return;
 
     const townId = this.townId;
     if (!townId) return;
@@ -3296,7 +3659,85 @@ export class TownDO extends DurableObject<Env> {
     await dispatch.refreshContainerToken(this.env, townId, userId);
     // Only mark as refreshed after success — failed refreshes should
     // be retried on the next alarm tick, not throttled for an hour.
-    this.lastContainerTokenRefreshAt = now;
+    await this.ctx.storage.put('container:lastTokenRefreshAt', now);
+  }
+
+  /**
+   * Proactively remint KILOCODE_TOKEN when it's approaching expiry.
+   * Throttled to once per day — the 30-day token is refreshed when
+   * within 7 days of expiry, providing ample safety margin.
+   *
+   * Verifies the existing token's signature before trusting its claims,
+   * preventing a forged near-expiry token from being re-signed with
+   * real credentials.
+   */
+  private lastKilocodeTokenCheckAt = 0;
+  private async refreshKilocodeTokenIfExpiring(): Promise<void> {
+    const CHECK_INTERVAL_MS = 24 * 60 * 60_000; // once per day
+    const REFRESH_WINDOW_SECONDS = 7 * 24 * 60 * 60; // 7 days
+    const now = Date.now();
+    if (now - this.lastKilocodeTokenCheckAt < CHECK_INTERVAL_MS) return;
+    this.lastKilocodeTokenCheckAt = now;
+
+    const townConfig = await this.getTownConfig();
+    const token = townConfig.kilocode_token;
+    if (!token) return;
+
+    if (!this.env.NEXTAUTH_SECRET) {
+      logger.warn('refreshKilocodeTokenIfExpiring: NEXTAUTH_SECRET not configured');
+      return;
+    }
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) {
+      logger.warn('refreshKilocodeTokenIfExpiring: failed to resolve NEXTAUTH_SECRET');
+      return;
+    }
+
+    // Verify the existing token's signature before trusting its claims.
+    // This prevents a forged token from being re-signed with real credentials.
+    // Use a very large clockTolerance so that already-expired (but validly
+    // signed) tokens are still accepted — this alarm is the recovery path
+    // for expired tokens, so rejecting them on exp would leave the town
+    // permanently stuck if it missed the 7-day refresh window.
+    let payload: { kiloUserId: string; apiTokenPepper?: string | null; exp?: number };
+    try {
+      const TEN_YEARS_SECONDS = 10 * 365 * 24 * 60 * 60;
+      const { payload: raw } = await jwtVerify(token, new TextEncoder().encode(secret), {
+        algorithms: ['HS256'],
+        clockTolerance: TEN_YEARS_SECONDS,
+      });
+      const parsed = kiloTokenPayload.safeParse(raw);
+      if (!parsed.success) {
+        logger.warn('refreshKilocodeTokenIfExpiring: token payload failed schema validation');
+        return;
+      }
+      payload = parsed.data;
+    } catch {
+      // Signature invalid or token malformed — don't remint from untrusted claims.
+      logger.warn('refreshKilocodeTokenIfExpiring: existing token failed signature verification');
+      return;
+    }
+
+    const exp = payload.exp;
+    if (!exp) return;
+
+    const nowSeconds = Math.floor(now / 1000);
+    if (exp - nowSeconds > REFRESH_WINDOW_SECONDS) return;
+
+    // Token expires within 7 days — remint it
+    const userId = payload.kiloUserId;
+    if (!userId) return;
+
+    const newToken = await generateKiloApiToken(
+      { id: userId, api_token_pepper: payload.apiTokenPepper ?? null },
+      secret
+    );
+    await this.updateTownConfig({ kilocode_token: newToken });
+    await this.syncConfigToContainer();
+    logger.info('refreshKilocodeTokenIfExpiring: reminted KILOCODE_TOKEN proactively', {
+      userId,
+      oldExp: new Date(exp * 1000).toISOString(),
+    });
   }
 
   private hasActiveWork(): boolean {
@@ -3324,8 +3765,11 @@ export class TownDO extends DurableObject<Env> {
    *
    * Skips dispatch if a triage agent is already working.
    */
-  private async maybeDispatchTriageAgent(): Promise<void> {
-    const pendingCount = patrol.countPendingTriageRequests(this.sql);
+  private async maybeDispatchTriageAgent(
+    cachedTriageCount?: number,
+    cachedRigList?: rigs.RigRecord[]
+  ): Promise<void> {
+    const pendingCount = cachedTriageCount ?? patrol.countPendingTriageRequests(this.sql);
     if (pendingCount === 0) return;
 
     // Check if a triage batch bead is already in progress (meaning a
@@ -3362,7 +3806,7 @@ export class TownDO extends DurableObject<Env> {
 
     // Validate preconditions before creating any beads to avoid
     // leaked phantom issue beads on early-return paths.
-    const rigList = rigs.listRigs(this.sql);
+    const rigList = cachedRigList ?? rigs.listRigs(this.sql);
     if (rigList.length === 0) {
       console.warn(`${TOWN_LOG} maybeDispatchTriageAgent: no rigs available, skipping`);
       return;
@@ -3430,7 +3874,11 @@ export class TownDO extends DurableObject<Env> {
       // Failing the batch bead triggers cooldown: the guard at the top of
       // this method skips dispatch while a failed batch bead's updated_at
       // is within DISPATCH_COOLDOWN_MS.
-      beadOps.updateBeadStatus(this.sql, triageBead.bead_id, 'failed', triageAgent.id);
+      beadOps.updateBeadStatus(this.sql, triageBead.bead_id, 'failed', triageAgent.id, {
+        code: 'container_start_failed',
+        message: 'Triage agent failed to start in container',
+        source: 'container',
+      });
       console.error(`${TOWN_LOG} maybeDispatchTriageAgent: triage agent failed to start`);
     }
   }
@@ -3643,13 +4091,15 @@ export class TownDO extends DurableObject<Env> {
     }
   }
 
-  private async ensureContainerReady(): Promise<void> {
-    const hasRigs = rigs.listRigs(this.sql).length > 0;
-    if (!hasRigs) return;
+  private async ensureContainerReady(
+    cachedRigList?: rigs.RigRecord[],
+    cachedActiveWork?: boolean
+  ): Promise<void> {
+    const rigList = cachedRigList ?? rigs.listRigs(this.sql);
+    if (rigList.length === 0) return;
 
-    const hasWork = this.hasActiveWork();
-    if (!hasWork) {
-      const rigList = rigs.listRigs(this.sql);
+    const hasWork = cachedActiveWork ?? this.hasActiveWork();
+    if (!hasWork && !this._draining) {
       const newestRigAge = rigList.reduce((min, r) => {
         const age = Date.now() - new Date(r.created_at).getTime();
         return Math.min(min, age);
@@ -3663,8 +4113,27 @@ export class TownDO extends DurableObject<Env> {
 
     try {
       const container = getTownContainerStub(this.env, townId);
+      const headers: Record<string, string> = {};
+      // When draining AND enough time has passed for the old container
+      // to have exited (drainAll waits up to 10 min + exit), pass the
+      // nonce so the replacement container can acknowledge readiness.
+      // We only send the nonce after 11 minutes to avoid the old
+      // (still-draining) container receiving it and clearing drain
+      // prematurely — the health check goes to whichever container is
+      // currently serving this town.
+      const DRAIN_HANDOFF_DELAY_MS = 11 * 60 * 1000;
+      if (
+        this._draining &&
+        this._drainNonce &&
+        this._drainStartedAt &&
+        Date.now() - this._drainStartedAt > DRAIN_HANDOFF_DELAY_MS
+      ) {
+        headers['X-Drain-Nonce'] = this._drainNonce;
+        headers['X-Town-Id'] = townId;
+      }
       await container.fetch('http://container/health', {
         signal: AbortSignal.timeout(5_000),
+        headers,
       });
     } catch {
       // Container is starting up or unavailable — alarm will retry
@@ -3739,7 +4208,7 @@ export class TownDO extends DurableObject<Env> {
    * Return a structured snapshot of the alarm loop and patrol state
    * for the dashboard Status tab.
    */
-  async getAlarmStatus(): Promise<{
+  async getAlarmStatus(cached?: { activeWork?: boolean; triageCount?: number }): Promise<{
     alarm: {
       nextFireAt: string | null;
       intervalMs: number;
@@ -3747,6 +4216,7 @@ export class TownDO extends DurableObject<Env> {
     };
     agents: {
       working: number;
+      waiting: number;
       idle: number;
       stalled: number;
       dead: number;
@@ -3771,9 +4241,11 @@ export class TownDO extends DurableObject<Env> {
       type: string;
       message: string;
     }>;
+    draining?: boolean;
+    drainStartedAt?: string;
   }> {
     const currentAlarm = await this.ctx.storage.getAlarm();
-    const active = this.hasActiveWork();
+    const active = cached?.activeWork ?? this.hasActiveWork();
     const intervalMs = active ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
 
     // Agent counts by status
@@ -3788,7 +4260,7 @@ export class TownDO extends DurableObject<Env> {
         []
       ),
     ];
-    const agentCounts = { working: 0, idle: 0, stalled: 0, dead: 0, total: 0 };
+    const agentCounts = { working: 0, waiting: 0, idle: 0, stalled: 0, dead: 0, total: 0 };
     for (const row of agentRows) {
       const s = `${row.status as string}`;
       const c = Number(row.cnt);
@@ -3826,38 +4298,26 @@ export class TownDO extends DurableObject<Env> {
     }
 
     // Triage request count (issue beads with gt:triage-request label)
-    beadCounts.triageRequests = patrol.countPendingTriageRequests(this.sql);
+    beadCounts.triageRequests = cached?.triageCount ?? patrol.countPendingTriageRequests(this.sql);
 
-    // Patrol indicators — count active warnings/issues
-    const guppWarnings = Number(
-      [
-        ...query(
-          this.sql,
-          /* sql */ `
-            SELECT COUNT(*) AS cnt FROM ${beads}
-            WHERE ${beads.type} = 'message'
-              AND ${beads.title} = 'GUPP_CHECK'
-              AND ${beads.status} = 'open'
-          `,
-          []
-        ),
-      ][0]?.cnt ?? 0
-    );
-
-    const guppEscalations = Number(
-      [
-        ...query(
-          this.sql,
-          /* sql */ `
-            SELECT COUNT(*) AS cnt FROM ${beads}
-            WHERE ${beads.type} = 'message'
-              AND ${beads.title} = 'GUPP_ESCALATION'
-              AND ${beads.status} = 'open'
-          `,
-          []
-        ),
-      ][0]?.cnt ?? 0
-    );
+    // Patrol indicators — count active GUPP warnings + escalations in one query
+    const guppRows = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT
+            SUM(CASE WHEN ${beads.title} = 'GUPP_CHECK' THEN 1 ELSE 0 END) AS warnings,
+            SUM(CASE WHEN ${beads.title} = 'GUPP_ESCALATION' THEN 1 ELSE 0 END) AS escalations
+          FROM ${beads}
+          WHERE ${beads.type} = 'message'
+            AND ${beads.title} IN ('GUPP_CHECK', 'GUPP_ESCALATION')
+            AND ${beads.status} = 'open'
+        `,
+        []
+      ),
+    ];
+    const guppWarnings = Number(guppRows[0]?.warnings ?? 0);
+    const guppEscalations = Number(guppRows[0]?.escalations ?? 0);
 
     const stalledAgents = agentCounts.stalled;
 
@@ -3909,7 +4369,7 @@ export class TownDO extends DurableObject<Env> {
       alarm: {
         nextFireAt: currentAlarm ? new Date(Number(currentAlarm)).toISOString() : null,
         intervalMs,
-        intervalLabel: active ? 'active (5s)' : 'idle (60s)',
+        intervalLabel: active ? 'active (5s)' : 'idle (5m)',
       },
       agents: agentCounts,
       beads: beadCounts,
@@ -3921,6 +4381,10 @@ export class TownDO extends DurableObject<Env> {
       },
       reconciler: this._lastReconcilerMetrics,
       recentEvents,
+      draining: this._draining || undefined,
+      drainStartedAt: this._drainStartedAt
+        ? new Date(this._drainStartedAt).toISOString()
+        : undefined,
     };
   }
 
@@ -4096,6 +4560,30 @@ export class TownDO extends DurableObject<Env> {
   }
 
   // DEBUG: raw agent_metadata dump — remove after debugging
+  async debugPendingNudges(): Promise<unknown[]> {
+    return [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${agent_nudges.nudge_id},
+                 ${agent_nudges.agent_bead_id},
+                 ${agent_nudges.message},
+                 ${agent_nudges.mode},
+                 ${agent_nudges.priority},
+                 ${agent_nudges.source},
+                 ${agent_nudges.created_at},
+                 ${agent_nudges.delivered_at},
+                 ${agent_nudges.expires_at}
+          FROM ${agent_nudges}
+          WHERE ${agent_nudges.delivered_at} IS NULL
+          ORDER BY ${agent_nudges.created_at} DESC
+          LIMIT 20
+        `,
+        []
+      ),
+    ];
+  }
+
   async debugAgentMetadata(): Promise<unknown[]> {
     return [
       ...query(

@@ -40,7 +40,7 @@ type SessionConfig = {
   model: string;
   variant?: string | null;
 };
-type ActiveSessionType = 'cloud-agent' | 'cli';
+type ActiveSessionType = 'cloud-agent' | 'remote';
 type StandaloneQuestion = { requestId: string; questions: QuestionInfo[] };
 type StandalonePermission = {
   requestId: string;
@@ -510,8 +510,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (ap?.requestId === requestId) store.set(activePermissionAtom, null);
       },
       onResolved: resolved => {
-        if (resolved.cloudAgentSessionId) activeSessionType = 'cloud-agent';
-        else if (resolved.isLive) activeSessionType = 'cli';
+        if (resolved.type === 'cloud-agent') activeSessionType = 'cloud-agent';
+        else if (resolved.type === 'remote') activeSessionType = 'remote';
       },
       onBranchChanged: branch => {
         const currentFetched = store.get(fetchedSessionDataAtom);
@@ -551,7 +551,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // Fallback: clear loading when events flow even if no root
         // session.created was replayed (e.g. CLI snapshot failure).
         store.set(isLoadingAtom, false);
-        if (activeSessionType === 'cli') {
+        if (activeSessionType === 'remote') {
           config.onRemoteSessionOpened?.({ kiloSessionId });
         }
       },
@@ -592,7 +592,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         model: payload.model,
         variant: payload.variant,
       });
-      if (sessionType === 'cli' && kiloSessionId) {
+      if (sessionType === 'remote' && kiloSessionId) {
         config.onRemoteSessionMessageSent?.({ kiloSessionId });
       }
     } catch (err) {

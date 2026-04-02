@@ -42,6 +42,7 @@ import {
   KiloClawScheduledBy,
   KiloClawSubscriptionStatus,
   KiloClawPaymentSource,
+  AffiliateProvider,
 } from './schema-types';
 import type { CustomLlmDefinition, KiloClawAdminAuditAction } from './schema-types';
 import type {
@@ -108,6 +109,7 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
   KiloClawSubscriptionStatus,
+  AffiliateProvider,
 } as const;
 
 export const credit_transactions = pgTable(
@@ -221,6 +223,29 @@ export const kilocode_users = pgTable(
 );
 
 export type User = typeof kilocode_users.$inferSelect;
+
+export const user_affiliate_attributions = pgTable(
+  'user_affiliate_attributions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    provider: text().notNull().$type<AffiliateProvider>(),
+    tracking_id: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_user_affiliate_attributions_user_provider').on(table.user_id, table.provider),
+    index('IDX_user_affiliate_attributions_user_id').on(table.user_id),
+    enumCheck('user_affiliate_attributions_provider_check', table.provider, AffiliateProvider),
+  ]
+);
+
+export type UserAffiliateAttribution = typeof user_affiliate_attributions.$inferSelect;
 
 export const kilo_pass_subscriptions = pgTable(
   'kilo_pass_subscriptions',

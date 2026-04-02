@@ -103,9 +103,9 @@ function createMockConfig(overrides: Partial<SessionManagerConfig> = {}): Sessio
   return {
     store: createStore(),
     resolveSession: jest.fn().mockResolvedValue({
+      type: 'cloud-agent',
       kiloSessionId: kiloId('ses-1'),
       cloudAgentSessionId: cloudAgentId('agent-1'),
-      isLive: true,
     }),
     getTicket: jest.fn().mockResolvedValue('ticket-123'),
     fetchSnapshot: jest.fn().mockResolvedValue({ info: {}, messages: [] }),

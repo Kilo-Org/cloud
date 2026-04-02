@@ -1268,3 +1268,178 @@ describe('CliLiveTransport onError callback', () => {
     expect(onError).toHaveBeenCalledWith('snapshot fetch failed');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Snapshot refetch on reconnect
+// ---------------------------------------------------------------------------
+
+describe('CliLiveTransport snapshot refetch on reconnect', () => {
+  const validInboundMessage = {
+    type: 'event',
+    sessionId: KILO_SESSION_ID,
+    event: 'session.status',
+    data: { sessionID: KILO_SESSION_ID, status: { type: 'busy' } },
+  };
+
+  function triggerReconnect(ws: MockWebSocket): void {
+    ws.onclose?.({ code: 1006 } as CloseEvent);
+    jest.advanceTimersByTime(60_000);
+  }
+
+  function getLatestMockWs(): MockWebSocket {
+    return webSocketConstructor.mock.results.at(-1)?.value as MockWebSocket;
+  }
+
+  function sendInboundOn(ws: MockWebSocket, msg: Record<string, unknown>): void {
+    ws.onmessage?.({ data: JSON.stringify(msg) } as MessageEvent);
+  }
+
+  it('refetches snapshot on reconnect and replays into sinks', async () => {
+    jest.useFakeTimers();
+    try {
+      const snapshot: SessionSnapshot = makeSnapshot({ id: KILO_SESSION_ID }, [
+        {
+          info: stubUserMessage({ id: 'msg-1', sessionID: KILO_SESSION_ID }),
+          parts: [stubTextPart({ id: 'part-1', sessionID: KILO_SESSION_ID, messageID: 'msg-1' })],
+        },
+      ]);
+
+      const fetchSnapshot = jest.fn(() => Promise.resolve(snapshot));
+      const { transport, chatEvents, serviceEvents } = createTransportWithSinks({ fetchSnapshot });
+
+      transport.connect();
+
+      // Wait for initial snapshot fetch to resolve
+      await jest.advanceTimersByTimeAsync(0);
+
+      // Open WS and mark connection as established with a valid message
+      openConnection();
+      sendInbound(validInboundMessage);
+
+      // Record event counts after initial snapshot + establishment message
+      const chatCountAfterInit = chatEvents.length;
+      const serviceCountAfterInit = serviceEvents.length;
+
+      // Trigger reconnect: close with non-auth code, advance past backoff
+      triggerReconnect(mockWs);
+
+      // Open new WS and send valid message to trigger onReconnected
+      const newMockWs = getLatestMockWs();
+      newMockWs.onopen?.({} as Event);
+      sendInboundOn(newMockWs, validInboundMessage);
+
+      // Flush promises for the async snapshot refetch
+      await jest.advanceTimersByTimeAsync(0);
+
+      expect(fetchSnapshot).toHaveBeenCalledTimes(2);
+      expect(fetchSnapshot).toHaveBeenCalledWith(KILO_SESSION_ID);
+
+      // Snapshot replay adds: 1 session.created + 1 message.updated + 1 message.part.updated
+      // The valid inbound message also adds 1 session.status service event
+      expect(serviceEvents.length).toBeGreaterThan(serviceCountAfterInit);
+      expect(chatEvents.length).toBeGreaterThan(chatCountAfterInit);
+
+      // Verify the replayed snapshot events are present
+      const sessionCreatedEvents = serviceEvents.filter(e => e.type === 'session.created');
+      expect(sessionCreatedEvents).toHaveLength(2); // initial + reconnect
+
+      const messageUpdatedEvents = chatEvents.filter(e => e.type === 'message.updated');
+      expect(messageUpdatedEvents).toHaveLength(2); // initial + reconnect
+
+      const partUpdatedEvents = chatEvents.filter(e => e.type === 'message.part.updated');
+      expect(partUpdatedEvents).toHaveLength(2); // initial + reconnect
+
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('reconnect works without fetchSnapshot configured (no replay)', async () => {
+    jest.useFakeTimers();
+    try {
+      const { transport, serviceEvents } = createTransportWithSinks();
+
+      transport.connect();
+      openConnection();
+      sendInbound(validInboundMessage);
+
+      const serviceCountAfterInit = serviceEvents.length;
+
+      triggerReconnect(mockWs);
+
+      const newMockWs = getLatestMockWs();
+      newMockWs.onopen?.({} as Event);
+      sendInboundOn(newMockWs, validInboundMessage);
+
+      await jest.advanceTimersByTimeAsync(0);
+
+      // No snapshot replay, but the valid inbound message on the new WS still routes
+      const sessionStatusEvents = serviceEvents.filter(e => e.type === 'session.status');
+      expect(sessionStatusEvents.length).toBeGreaterThan(0);
+
+      // No session.created events (no snapshot)
+      const sessionCreatedEvents = serviceEvents.filter(e => e.type === 'session.created');
+      expect(sessionCreatedEvents).toHaveLength(0);
+
+      // Verify no errors — service events grew from the reconnected inbound message
+      expect(serviceEvents.length).toBeGreaterThan(serviceCountAfterInit);
+
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('snapshot fetch failure on reconnect is non-fatal', async () => {
+    jest.useFakeTimers();
+    try {
+      let callCount = 0;
+      const snapshot: SessionSnapshot = makeSnapshot({ id: KILO_SESSION_ID });
+      const fetchSnapshot = jest.fn(() => {
+        callCount++;
+        if (callCount === 1) return Promise.resolve(snapshot);
+        return Promise.reject(new Error('network error'));
+      });
+      const onError = jest.fn();
+
+      const { transport, serviceEvents } = createTransportWithSinks({ fetchSnapshot, onError });
+
+      transport.connect();
+      await jest.advanceTimersByTimeAsync(0);
+
+      openConnection();
+      sendInbound(validInboundMessage);
+
+      // Trigger reconnect
+      triggerReconnect(mockWs);
+
+      const newMockWs = getLatestMockWs();
+      newMockWs.onopen?.({} as Event);
+      sendInboundOn(newMockWs, validInboundMessage);
+
+      // Flush promises — snapshot refetch rejects
+      await jest.advanceTimersByTimeAsync(0);
+
+      expect(fetchSnapshot).toHaveBeenCalledTimes(2);
+
+      // No error propagated to onError (reconnect snapshot failure is silently swallowed)
+      expect(onError).not.toHaveBeenCalled();
+
+      // Transport still works — send another event on the new WS
+      sendInboundOn(newMockWs, {
+        type: 'event',
+        sessionId: KILO_SESSION_ID,
+        event: 'session.status',
+        data: { sessionID: KILO_SESSION_ID, status: { type: 'idle' } },
+      });
+
+      const statusEvents = serviceEvents.filter(e => e.type === 'session.status');
+      expect(statusEvents.length).toBeGreaterThanOrEqual(2);
+
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});

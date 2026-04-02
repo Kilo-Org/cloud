@@ -142,69 +142,75 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
   function pickTransportFactory(resolved: ResolvedSession): TransportFactory {
     console.log('[cli-debug] pickTransportFactory: resolved=%o', resolved);
-    if (resolved.cloudAgentSessionId) {
-      if (!config.transport.getTicket) {
-        throw new Error(
-          'CloudAgentSession transport.getTicket is required for Cloud Agent sessions'
+    switch (resolved.type) {
+      case 'remote': {
+        if (!config.transport.cliWebsocketUrl || !config.transport.getAuthToken) {
+          throw new Error(
+            'CloudAgentSession transport.cliWebsocketUrl and getAuthToken are required for remote CLI sessions'
+          );
+        }
+        console.log(
+          '[cli-debug] pickTransportFactory: → CLI Live transport (kiloSessionId=%s, wsUrl=%s)',
+          resolved.kiloSessionId,
+          config.transport.cliWebsocketUrl
         );
+        return createCliLiveTransport({
+          kiloSessionId: resolved.kiloSessionId,
+          websocketUrl: config.transport.cliWebsocketUrl,
+          getAuthToken: config.transport.getAuthToken,
+          fetchSnapshot: config.transport.fetchSnapshot,
+          onError: config.onError,
+        });
       }
-      if (!config.transport.fetchSnapshot) {
-        throw new Error(
-          'CloudAgentSession transport.fetchSnapshot is required for Cloud Agent sessions'
+      case 'cloud-agent': {
+        if (!config.transport.getTicket) {
+          throw new Error(
+            'CloudAgentSession transport.getTicket is required for Cloud Agent sessions'
+          );
+        }
+        if (!config.transport.fetchSnapshot) {
+          throw new Error(
+            'CloudAgentSession transport.fetchSnapshot is required for Cloud Agent sessions'
+          );
+        }
+        if (!config.transport.api) {
+          throw new Error('CloudAgentSession transport.api is required for Cloud Agent sessions');
+        }
+        console.log(
+          '[cli-debug] pickTransportFactory: → Cloud Agent transport (cloudAgentSessionId=%s)',
+          resolved.cloudAgentSessionId
         );
+        return createCloudAgentTransport({
+          sessionId: resolved.cloudAgentSessionId,
+          kiloSessionId: config.kiloSessionId,
+          api: config.transport.api,
+          getTicket: config.transport.getTicket,
+          fetchSnapshot: config.transport.fetchSnapshot,
+          websocketBaseUrl: config.websocketBaseUrl,
+          onError: config.onError,
+        });
       }
-      if (!config.transport.api) {
-        throw new Error('CloudAgentSession transport.api is required for Cloud Agent sessions');
-      }
-      console.log(
-        '[cli-debug] pickTransportFactory: → Cloud Agent transport (cloudAgentSessionId=%s)',
-        resolved.cloudAgentSessionId
-      );
-      return createCloudAgentTransport({
-        sessionId: resolved.cloudAgentSessionId,
-        kiloSessionId: config.kiloSessionId,
-        api: config.transport.api,
-        getTicket: config.transport.getTicket,
-        fetchSnapshot: config.transport.fetchSnapshot,
-        websocketBaseUrl: config.websocketBaseUrl,
-        onError: config.onError,
-      });
-    }
-
-    if (resolved.isLive) {
-      if (!config.transport.cliWebsocketUrl || !config.transport.getAuthToken) {
-        throw new Error(
-          'CloudAgentSession transport.cliWebsocketUrl and getAuthToken are required for live CLI sessions'
+      case 'read-only': {
+        if (!config.transport.fetchSnapshot) {
+          throw new Error(
+            'CloudAgentSession transport.fetchSnapshot is required for read-only sessions'
+          );
+        }
+        console.log(
+          '[cli-debug] pickTransportFactory: → Historical transport (kiloSessionId=%s)',
+          resolved.kiloSessionId
         );
+        return createCliHistoricalTransport({
+          kiloSessionId: resolved.kiloSessionId,
+          fetchSnapshot: config.transport.fetchSnapshot,
+          onError: config.onError,
+        });
       }
-      console.log(
-        '[cli-debug] pickTransportFactory: → CLI Live transport (kiloSessionId=%s, wsUrl=%s)',
-        resolved.kiloSessionId,
-        config.transport.cliWebsocketUrl
-      );
-      return createCliLiveTransport({
-        kiloSessionId: resolved.kiloSessionId,
-        websocketUrl: config.transport.cliWebsocketUrl,
-        getAuthToken: config.transport.getAuthToken,
-        fetchSnapshot: config.transport.fetchSnapshot,
-        onError: config.onError,
-      });
+      default: {
+        const _exhaustive: never = resolved;
+        throw new Error(`Unknown resolved session type: ${(_exhaustive as { type: string }).type}`);
+      }
     }
-
-    if (!config.transport.fetchSnapshot) {
-      throw new Error(
-        'CloudAgentSession transport.fetchSnapshot is required for historical CLI sessions'
-      );
-    }
-    console.log(
-      '[cli-debug] pickTransportFactory: → CLI Historical transport (kiloSessionId=%s)',
-      resolved.kiloSessionId
-    );
-    return createCliHistoricalTransport({
-      kiloSessionId: resolved.kiloSessionId,
-      fetchSnapshot: config.transport.fetchSnapshot,
-      onError: config.onError,
-    });
   }
 
   async function resolveAndConnect(expectedGeneration: number): Promise<void> {

@@ -5,7 +5,7 @@ import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/
 // queries parsing through AgentMetadataRecord don't throw on old rows.
 // Application code should only create the known roles below.
 const AgentRole = z.enum(['polecat', 'refinery', 'mayor']).or(z.string());
-const AgentProcessStatus = z.enum(['idle', 'working', 'stalled', 'dead']).or(z.string());
+const AgentProcessStatus = z.enum(['idle', 'working', 'waiting', 'stalled', 'dead']).or(z.string());
 
 export const AgentMetadataRecord = z.object({
   bead_id: z.string(),

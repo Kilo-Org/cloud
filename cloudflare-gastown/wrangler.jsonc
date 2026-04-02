@@ -36,7 +36,7 @@
       "class_name": "TownContainerDO",
       "image": "./container/Dockerfile",
       "instance_type": "standard-4",
-      "max_instances": 500,
+      "max_instances": 700,
     },
   ],
 
@@ -117,7 +117,7 @@
         // Desktop VM host gateway IP directly so containers can reach
         // the host's dev servers.
         "KILO_API_URL": "http://192.168.65.254:3000",
-        "GASTOWN_API_URL": "http://192.168.65.254:8787",
+        "GASTOWN_API_URL": "http://192.168.65.254:8803",
       },
       "containers": [
         {

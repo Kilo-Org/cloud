@@ -5,12 +5,14 @@ import { RoleTestingProvider } from '@/contexts/RoleTestingContext';
 import { PageTitleProvider } from '@/contexts/PageTitleContext';
 import { AdminOmnibox } from '@/components/admin-omnibox';
 import { PrefetchedOrganizations } from './components/PrefetchedOrganizations';
+import { ImpactIdentify } from '@/components/ImpactIdentify';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <RoleTestingProvider>
       <PageTitleProvider>
         <SidebarProvider>
+          <ImpactIdentify />
           <PrefetchedOrganizations>
             <div className="flex min-h-screen w-full">
               <AppSidebar />

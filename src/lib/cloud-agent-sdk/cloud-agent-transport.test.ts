@@ -386,3 +386,163 @@ describe('CloudAgentTransport command delegation', () => {
     transport.destroy();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Snapshot refetch on reconnect
+// ---------------------------------------------------------------------------
+
+describe('CloudAgentTransport snapshot refetch on reconnect', () => {
+  // Microtask-based flush that works under jest.useFakeTimers()
+  // (unlike flushPromises which uses setTimeout and hangs with fake timers)
+  async function flushMicrotasks(): Promise<void> {
+    for (let i = 0; i < 10; i++) {
+      await Promise.resolve();
+    }
+  }
+
+  function createTransportWithControllableSnapshot(
+    snapshotOverride?: ReturnType<typeof makeSnapshot>
+  ) {
+    const chatEvents: ChatEvent[] = [];
+    const serviceEvents: ServiceEvent[] = [];
+    const snapshot = snapshotOverride ?? emptySnapshot;
+    const fetchSnapshot = jest.fn(() => Promise.resolve(snapshot));
+
+    const factory = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket: () => 'test-ticket',
+      fetchSnapshot,
+      websocketBaseUrl: 'ws://localhost:9999',
+    });
+
+    const transport = factory({
+      onChatEvent: event => chatEvents.push(event),
+      onServiceEvent: event => serviceEvents.push(event),
+    });
+
+    return { transport, chatEvents, serviceEvents, fetchSnapshot };
+  }
+
+  function sendRawOn(ws: MockWebSocket, event: CloudAgentEvent): void {
+    ws.onmessage?.({ data: JSON.stringify(event) } as MessageEvent);
+  }
+
+  /** Establish connection, simulate close + reconnect, return the new WS mock. */
+  async function simulateReconnect(): Promise<MockWebSocket> {
+    mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
+
+    jest.advanceTimersByTime(2000);
+    await flushMicrotasks();
+
+    const newMockWs = webSocketConstructor.mock.results.at(-1)?.value as MockWebSocket;
+
+    newMockWs.onopen?.(new Event('open'));
+    sendRawOn(
+      newMockWs,
+      kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } })
+    );
+
+    return newMockWs;
+  }
+
+  it('refetches snapshot on reconnect and replays events into sinks', async () => {
+    jest.useFakeTimers();
+    try {
+      const { transport, serviceEvents, fetchSnapshot } = createTransportWithControllableSnapshot();
+
+      transport.connect();
+      await flushMicrotasks();
+
+      expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+
+      // Establish connection in base-connection by sending a valid event
+      sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
+
+      const serviceCountBefore = serviceEvents.length;
+
+      const newMockWs = await simulateReconnect();
+      await flushMicrotasks();
+
+      expect(fetchSnapshot).toHaveBeenCalledTimes(2);
+
+      const replayedCreated = serviceEvents
+        .slice(serviceCountBefore)
+        .filter(e => e.type === 'session.created');
+      expect(replayedCreated).toHaveLength(1);
+
+      transport.destroy();
+      newMockWs.onclose?.({ code: 1000, reason: '', wasClean: true } as CloseEvent);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('replayed snapshot with messages upserts into sinks correctly', async () => {
+    jest.useFakeTimers();
+    try {
+      const snapshotWithMessages = makeSnapshot({ id: 'ses-1' }, [
+        {
+          info: {
+            id: 'msg-1',
+            sessionID: 'ses-1',
+            role: 'user',
+            time: { created: 1 },
+            agent: 'build',
+            model: { providerID: 'a', modelID: 'b' },
+          },
+          parts: [
+            {
+              id: 'part-1',
+              sessionID: 'ses-1',
+              messageID: 'msg-1',
+              type: 'text',
+              text: 'hello',
+            },
+          ],
+        },
+      ]);
+
+      const { transport, chatEvents, serviceEvents, fetchSnapshot } =
+        createTransportWithControllableSnapshot(snapshotWithMessages);
+
+      transport.connect();
+      await flushMicrotasks();
+
+      expect(serviceEvents.filter(e => e.type === 'session.created')).toHaveLength(1);
+      expect(chatEvents.filter(e => e.type === 'message.updated')).toHaveLength(1);
+      expect(chatEvents.filter(e => e.type === 'message.part.updated')).toHaveLength(1);
+
+      // Establish connection
+      sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
+
+      const newMockWs = await simulateReconnect();
+      await flushMicrotasks();
+
+      expect(fetchSnapshot).toHaveBeenCalledTimes(2);
+      expect(serviceEvents.filter(e => e.type === 'session.created')).toHaveLength(2);
+      expect(chatEvents.filter(e => e.type === 'message.updated')).toHaveLength(2);
+      expect(chatEvents.filter(e => e.type === 'message.part.updated')).toHaveLength(2);
+
+      transport.destroy();
+      newMockWs.onclose?.({ code: 1000, reason: '', wasClean: true } as CloseEvent);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('initial connect fetches snapshot once and opens WebSocket', async () => {
+    const { transport, serviceEvents, fetchSnapshot } = createTransportWithControllableSnapshot();
+
+    transport.connect();
+    await flushPromises();
+
+    expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+    expect(fetchSnapshot).toHaveBeenCalledWith('ses-1');
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+    expect(serviceEvents.filter(e => e.type === 'session.created')).toHaveLength(1);
+
+    transport.destroy();
+  });
+});

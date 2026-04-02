@@ -15,7 +15,44 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { ExternalLink } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+
+function CFLink({
+  href,
+  label,
+  disabledTooltip,
+}: {
+  href: string | null | undefined;
+  label: string;
+  disabledTooltip?: string;
+}) {
+  if (!href) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-block">
+            <Button variant="outline" size="sm" disabled className="gap-1.5">
+              <ExternalLink className="size-3.5" />
+              {label}
+            </Button>
+          </span>
+        </TooltipTrigger>
+        {disabledTooltip && <TooltipContent>{disabledTooltip}</TooltipContent>}
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Button variant="outline" size="sm" className="gap-1.5" asChild>
+      <a href={href} target="_blank" rel="noopener noreferrer">
+        <ExternalLink className="size-3.5" />
+        {label}
+      </a>
+    </Button>
+  );
+}
 
 export function ContainerTab({ townId }: { townId: string }) {
   const trpc = useTRPC();
@@ -25,6 +62,7 @@ export function ContainerTab({ townId }: { townId: string }) {
   const healthQuery = useQuery(trpc.admin.gastown.getTownHealth.queryOptions({ townId }));
   const eventsQuery = useQuery(trpc.admin.gastown.listContainerEvents.queryOptions({ townId }));
   const configQuery = useQuery(trpc.admin.gastown.getTownConfig.queryOptions({ townId }));
+  const cfLinksQuery = useQuery(trpc.admin.gastown.getCloudflareLinks.queryOptions({ townId }));
 
   const forceRestartMutation = useMutation(
     trpc.admin.gastown.forceRestartContainer.mutationOptions({
@@ -63,8 +101,47 @@ export function ContainerTab({ townId }: { townId: string }) {
         ? 'bg-red-500/10 text-red-400 border-red-500/20'
         : 'bg-gray-500/10 text-gray-400 border-gray-500/20';
 
+  const cfLinks = cfLinksQuery.data;
+
   return (
     <div className="flex flex-col gap-4">
+      {/* Cloudflare Dashboard */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cloudflare Dashboard</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {cfLinksQuery.isLoading && (
+            <p className="text-muted-foreground text-sm">Loading links…</p>
+          )}
+          {cfLinksQuery.isError && (
+            <p className="text-sm text-red-400">
+              Failed to load Cloudflare links: {cfLinksQuery.error.message}
+            </p>
+          )}
+          {!cfLinksQuery.isLoading && !cfLinksQuery.isError && (
+            <div className="flex flex-wrap gap-3">
+              <CFLink href={cfLinks?.workerLogsUrl} label="Worker Logs" />
+              <CFLink
+                href={cfLinks?.containerInstanceUrl}
+                label="Container Instance"
+                disabledTooltip="Container not running or instance ID unavailable"
+              />
+              <CFLink
+                href={cfLinks?.townDoLogsUrl}
+                label="TownDO Logs"
+                disabledTooltip="Namespace ID not configured"
+              />
+              <CFLink
+                href={cfLinks?.containerDoLogsUrl}
+                label="TownContainerDO Logs"
+                disabledTooltip="Namespace ID not configured or container not running"
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Health & Actions */}
       <Card>
         <CardHeader>

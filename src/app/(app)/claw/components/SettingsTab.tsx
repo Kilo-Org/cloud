@@ -2,6 +2,7 @@
 
 import {
   AlertTriangle,
+  ArrowUpCircle,
   Check,
   ChevronDown,
   Copy,
@@ -35,6 +36,7 @@ import {
 import { useDefaultModelSelection } from '../hooks/useDefaultModelSelection';
 import { getSettingsModelOptions } from './modelSupport';
 
+import { Banner } from '@/components/shared/Banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -676,6 +678,30 @@ export function SettingsTab({
 
       {/* ── Pairing Requests ── */}
       {isRunning && <PairingSection mutations={mutations} />}
+
+      {/* ── Upgrade banner ── */}
+      {updateAvailable && (
+        <Banner color="amber">
+          <Banner.Icon>
+            <ArrowUpCircle />
+          </Banner.Icon>
+          <Banner.Content>
+            <Banner.Title>
+              {catalogNewerThanImage
+                ? `A newer OpenClaw version (${latestAvailableVersion}) is available`
+                : `A newer image (${latestVersion?.imageTag ?? 'unknown'}) is available`}
+            </Banner.Title>
+            <Banner.Description>
+              Upgrade your instance to get the latest features and fixes.
+            </Banner.Description>
+          </Banner.Content>
+          <Banner.Action>
+            <Button size="sm" className="bg-amber-500 text-primary-foreground hover:bg-amber-500/90 w-full sm:w-auto" onClick={onRequestUpgrade}>
+              Upgrade now
+            </Button>
+          </Banner.Action>
+        </Banner>
+      )}
 
       {/* ── OpenClaw Instance card ── */}
       <div className="rounded-lg border px-4 py-3">

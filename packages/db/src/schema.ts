@@ -63,12 +63,7 @@ import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
   StripeSubscriptionStatus,
-  OpenCodeSettings,
   StoredModel,
-  CustomLlmExtraBody,
-  CustomLlmExtraHeaders,
-  CustomLlmProvider,
-  InterleavedFormat,
   GatewayApiKind,
 } from './schema-types';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';

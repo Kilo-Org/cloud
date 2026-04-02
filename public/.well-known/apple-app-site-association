@@ -1,0 +1,46 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["X96D76J65Z.com.kilocode.kiloapp"],
+        "components": [
+          {
+            "/": "/claw",
+            "comment": "KiloClaw instance list"
+          },
+          {
+            "/": "/claw/",
+            "comment": "KiloClaw instance list (trailing slash)"
+          },
+          {
+            "/": "/profile",
+            "comment": "User profile"
+          },
+          {
+            "/": "/profile/",
+            "comment": "User profile (trailing slash)"
+          },
+          {
+            "/": "/organizations/*/claw",
+            "comment": "Org-scoped KiloClaw instance list"
+          },
+          {
+            "/": "/organizations/*/claw/",
+            "comment": "Org-scoped KiloClaw instance list (trailing slash)"
+          },
+          {
+            "/": "/organizations/*",
+            "comment": "Organization profile"
+          },
+          {
+            "/": "/organizations/*/",
+            "comment": "Organization profile (trailing slash)"
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["X96D76J65Z.com.kilocode.kiloapp"]
+  }
+}

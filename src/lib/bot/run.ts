@@ -23,6 +23,7 @@ export async function processMessage({
     const result = await runBotAgent({
       thread,
       message,
+      rawMessage: message,
       platformIntegration,
       user,
       botRequestId,

@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type Href, useRouter } from 'expo-router';
+import { Image as ExpoImage } from 'expo-image'; // eslint-disable-line no-restricted-imports -- raw expo-image needed for Stream Chat SDK ImageComponent prop
 import { Settings } from 'lucide-react-native';
 import { type Channel as StreamChannel, StreamChat } from 'stream-chat';
 import { Channel, Chat, MessageInput, MessageList, OverlayProvider } from 'stream-chat-expo';
@@ -245,7 +246,8 @@ function StreamChatUI({
       </View>
       <View className="flex-1" style={{ paddingBottom: bottom }}>
         <OverlayProvider value={{ style: chatTheme }}>
-          <Chat client={client} style={chatTheme}>
+          {/* eslint-disable-next-line typescript-eslint/no-unsafe-assignment -- expo-image is API-compatible with RN Image */}
+          <Chat client={client} style={chatTheme} ImageComponent={ExpoImage as never}>
             <Channel channel={channel} keyboardVerticalOffset={headerHeight}>
               <MessageList />
               <MessageInput />

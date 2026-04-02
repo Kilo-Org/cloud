@@ -90,7 +90,6 @@ export default async function spawnCloudAgentSession(
   const kilocodeOrganizationId = platformIntegration.owned_by_organization_id || undefined;
   let prepareInput: PrepareSessionInput;
   let initiateInput: { githubToken?: string; kilocodeOrganizationId?: string };
-<<<<<<< RSO/fluff-pan
   const mode: AgentMode = args.mode ?? 'code';
   const callbackTarget =
     botRequestId && INTERNAL_API_SECRET
@@ -99,13 +98,10 @@ export default async function spawnCloudAgentSession(
           headers: { 'X-Bot-Callback-Token': deriveBotCallbackToken(botRequestId) },
         }
       : undefined;
-=======
-  const mode: AgentMode = args.mode;
 
   if (!args.githubRepo && !args.gitlabProject) {
     return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
   }
->>>>>>> main
 
   const isGitLab = !!args.gitlabProject;
   const prompt =

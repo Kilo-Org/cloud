@@ -381,11 +381,11 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
 export function reconcile(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
   const draining = opts?.draining ?? false;
   const actions: Action[] = [];
-  actions.push(...reconcileAgents(sql));
+  actions.push(...reconcileAgents(sql, { draining }));
   actions.push(...reconcileBeads(sql, { draining }));
   actions.push(...reconcileReviewQueue(sql, { draining }));
   actions.push(...reconcileConvoys(sql));
-  actions.push(...reconcileGUPP(sql));
+  actions.push(...reconcileGUPP(sql, { draining }));
   actions.push(...reconcileGC(sql));
   return actions;
 }
@@ -395,7 +395,7 @@ export function reconcile(sql: SqlStorage, opts?: { draining?: boolean }): Actio
 // idle agents with stale hooks to terminal beads
 // ════════════════════════════════════════════════════════════════════
 
-export function reconcileAgents(sql: SqlStorage): Action[] {
+export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
   const actions: Action[] = [];
 
   // Working agents with stale or missing heartbeat — container probably dead.
@@ -425,6 +425,11 @@ export function reconcileAgents(sql: SqlStorage): Action[] {
   for (const agent of workingAgents) {
     // Mayors are always working with no hook — skip them
     if (agent.role === 'mayor') continue;
+
+    // During container drain the heartbeat reporter is stopped, so
+    // last_activity_at freezes. Skip stale-heartbeat checks to avoid
+    // false-positive idle transitions while agents are still working.
+    if (opts?.draining) continue;
 
     if (!agent.last_activity_at) {
       // No heartbeat ever received — container may have failed to start
@@ -1472,7 +1477,12 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
 // reconcileGUPP — detect agents exceeding activity thresholds
 // ════════════════════════════════════════════════════════════════════
 
-export function reconcileGUPP(sql: SqlStorage): Action[] {
+export function reconcileGUPP(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
+  // During container drain the heartbeat reporter is stopped, so
+  // last_event_at freezes. Skip GUPP checks entirely to avoid
+  // false-positive "idle for 15 minutes" nudges while agents are
+  // still actively working in the draining container.
+  if (opts?.draining) return [];
   const actions: Action[] = [];
 
   const workingAgents = AgentRow.array().parse([

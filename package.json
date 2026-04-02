@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": "^24"
+    "node": ">=24 <25"
   },
   "scripts": {
     "dev": "bash scripts/dev.sh",

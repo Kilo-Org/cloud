@@ -1071,6 +1071,19 @@ export const gastownRouter = router({
           message: 'Admins cannot restart containers for towns they do not own',
         });
       }
+      if (ownership.type === 'org') {
+        const townStub = getTownDOStub(ctx.env, input.townId);
+        const config = await townStub.getTownConfig();
+        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
+        const isOrgOwner = membership?.role === 'owner';
+        const isTownCreator = ctx.userId === config.created_by_user_id;
+        if (!isOrgOwner && !isTownCreator) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only town creators and org owners can restart containers',
+          });
+        }
+      }
       // stop() sends SIGTERM so the container's drain handler can run
       // drainAll() — nudging agents to commit/push WIP before exiting.
       const containerStub = getTownContainerStub(ctx.env, input.townId);
@@ -1086,6 +1099,19 @@ export const gastownRouter = router({
           code: 'FORBIDDEN',
           message: 'Admins cannot destroy containers for towns they do not own',
         });
+      }
+      if (ownership.type === 'org') {
+        const townStub = getTownDOStub(ctx.env, input.townId);
+        const config = await townStub.getTownConfig();
+        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
+        const isOrgOwner = membership?.role === 'owner';
+        const isTownCreator = ctx.userId === config.created_by_user_id;
+        if (!isOrgOwner && !isTownCreator) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only town creators and org owners can destroy containers',
+          });
+        }
       }
       // destroy() sends SIGKILL — the container dies immediately with
       // no graceful drain. Use when the container is stuck or unresponsive.

@@ -648,6 +648,13 @@ export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): 
     // are handled by other subsystems and don't need dispatch.
     if (bead.assignee_agent_bead_id === 'system') continue;
 
+    // Skip triage-request beads — patrol.createTriageRequest() sets
+    // assignee_agent_bead_id to route the request to a specific agent,
+    // but hookBead() intentionally refuses to hook triage-request beads.
+    // Without this skip, the reconciler would clear the assignee on
+    // every tick because the hook will never exist.
+    if (bead.labels.includes('gt:triage-request')) continue;
+
     actions.push({
       type: 'clear_bead_assignee',
       bead_id: bead.bead_id,

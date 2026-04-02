@@ -148,16 +148,15 @@ export function generateBaseConfig(
   // OpenClaw 2026.2.24+ has a built-in kilocode provider that activates when
   // KILOCODE_API_KEY is in the environment. Stale config entries with the old
   // /api/openrouter/ URL or the production /api/gateway/ URL conflict with it.
-  // Skip when KILOCODE_ORGANIZATION_ID is set: org-scoped instances need an
-  // explicit provider entry (with the production baseUrl) to carry the org header,
-  // and nuking it here would drop user-managed provider settings before the
-  // org-header block below can rebuild them.
-  if (config.models?.providers?.kilocode && !env.KILOCODE_ORGANIZATION_ID) {
+  // For the production /api/gateway/ URL, skip removal when KILOCODE_ORGANIZATION_ID
+  // is set: org-scoped instances need an explicit provider entry (with the production
+  // baseUrl) to carry the org header. The /api/openrouter/ cleanup always runs since
+  // that URL is unconditionally broken.
+  if (config.models?.providers?.kilocode) {
     const staleBaseUrl: string = config.models.providers.kilocode.baseUrl || '';
-    if (
-      staleBaseUrl.includes('/api/openrouter/') ||
-      staleBaseUrl === 'https://api.kilo.ai/api/gateway/'
-    ) {
+    const isOpenrouterUrl = staleBaseUrl.includes('/api/openrouter/');
+    const isGatewayUrl = staleBaseUrl === 'https://api.kilo.ai/api/gateway/';
+    if (isOpenrouterUrl || (isGatewayUrl && !env.KILOCODE_ORGANIZATION_ID)) {
       delete config.models.providers.kilocode;
       console.log(`Removed stale kilocode provider config (baseUrl: ${staleBaseUrl})`);
       if (Object.keys(config.models.providers).length === 0) {

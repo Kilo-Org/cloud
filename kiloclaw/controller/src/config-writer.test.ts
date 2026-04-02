@@ -191,7 +191,7 @@ describe('generateBaseConfig', () => {
     expect(config.models).toBeUndefined();
   });
 
-  it('skips stale migration when KILOCODE_ORGANIZATION_ID is set', () => {
+  it('skips gateway-URL stale migration for org-scoped instances', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
@@ -214,6 +214,30 @@ describe('generateBaseConfig', () => {
     );
     expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
     expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+  });
+
+  it('still removes openrouter stale provider for org-scoped instances', () => {
+    const existing = JSON.stringify({
+      models: {
+        providers: {
+          kilocode: {
+            baseUrl: 'https://api.kilo.ai/api/openrouter/',
+            headers: { 'X-Custom': 'stale' },
+            models: [],
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), KILOCODE_ORGANIZATION_ID: 'org_abc123' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    // openrouter provider nuked, then rebuilt by org-header block
+    expect(config.models.providers.kilocode.headers['X-Custom']).toBeUndefined();
+    expect(config.models.providers.kilocode.headers['X-KiloCode-OrganizationId']).toBe(
+      'org_abc123'
+    );
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
   });
 
   it('preserves non-kilocode providers when removing stale kilocode entry', () => {

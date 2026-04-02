@@ -624,9 +624,7 @@ export async function startAgent(
     // If the agent is still starting, abort the in-flight startup to prevent
     // an orphaned session from being created after stopAgent returns.
     if (existing.status === 'starting' && existing.startupAbortController) {
-      console.log(
-        `${MANAGER_LOG} startAgent: aborting in-flight startup for ${request.agentId}`
-      );
+      console.log(`${MANAGER_LOG} startAgent: aborting in-flight startup for ${request.agentId}`);
       existing.startupAbortController.abort();
     }
 
@@ -690,12 +688,9 @@ export async function startAgent(
     // 2. Create a session
     const sessionResult = await client.session.create({ body: {} });
 
-    // Check if startup was cancelled while creating the session — this is
-    // the critical window where an orphaned session would leak.
-    if (signal.aborted) {
-      throw new StartupAbortedError(request.agentId);
-    }
-
+    // Parse and store the session ID immediately so the catch block can
+    // abort an orphaned session if startupAbortController fires during
+    // the await above.
     const rawSession: unknown = sessionResult.data ?? sessionResult;
     const parsed = SessionResponse.safeParse(rawSession);
     if (!parsed.success) {
@@ -708,6 +703,12 @@ export async function startAgent(
     }
     const sessionId = parsed.data.id;
     agent.sessionId = sessionId;
+
+    // Now check if startup was cancelled while creating the session.
+    // agent.sessionId is already set, so the catch block will abort it.
+    if (signal.aborted) {
+      throw new StartupAbortedError(request.agentId);
+    }
 
     // 3. Subscribe to events (async, runs in background)
     void subscribeToEvents(client, agent, request);
@@ -769,9 +770,7 @@ export async function startAgent(
     // On abort, clean up silently — the new startAgent invocation will
     // proceed with a fresh entry.
     if (err instanceof StartupAbortedError) {
-      console.log(
-        `${MANAGER_LOG} startAgent: startup aborted for ${request.agentId}, cleaning up`
-      );
+      console.log(`${MANAGER_LOG} startAgent: startup aborted for ${request.agentId}, cleaning up`);
       if (sessionCounted) {
         const instance = sdkInstances.get(workdir);
         if (instance) {

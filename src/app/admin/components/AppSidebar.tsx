@@ -21,13 +21,13 @@ import {
   UserX,
   Upload,
   Bell,
-  Server,
   Network,
   RefreshCw,
   KeyRound,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
+import KiloCrabIcon from '@/components/KiloCrabIcon';
 
 import {
   Sidebar,
@@ -108,6 +108,11 @@ const financialItems: MenuItem[] = [
 
 const productEngineeringItems: MenuItem[] = [
   {
+    title: () => 'KiloClaw',
+    url: '/admin/kiloclaw',
+    icon: () => <KiloCrabIcon className="size-4" />,
+  },
+  {
     title: () => 'Community PRs',
     url: '/admin/community-prs',
     icon: () => <GitPullRequest />,
@@ -136,11 +141,6 @@ const productEngineeringItems: MenuItem[] = [
     title: () => 'App Builder',
     url: '/admin/app-builder',
     icon: () => <Blocks />,
-  },
-  {
-    title: () => 'KiloClaw',
-    url: '/admin/kiloclaw',
-    icon: () => <Server />,
   },
   {
     title: () => 'Email Testing',

@@ -209,7 +209,9 @@ export function TownOverviewPageClient({
   return (
     <div>
       <AdminViewingBanner townId={townId} />
-      <DrainStatusBanner townId={townId} />
+      <div className="px-6">
+        <DrainStatusBanner townId={townId} />
+      </div>
       {/* Top bar — sticky */}
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3">
         <div className="flex items-center gap-3">

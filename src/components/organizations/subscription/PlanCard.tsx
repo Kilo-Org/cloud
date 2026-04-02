@@ -7,6 +7,7 @@ import {
   type OrganizationPlan,
   type BillingCycle,
 } from '@/lib/organizations/organization-types';
+import { cn } from '@/lib/utils';
 
 type PlanCardProps = {
   plan: OrganizationPlan;
@@ -37,59 +38,80 @@ export function PlanCard({
   const isUpgrade = currentIndex < cardIndex;
   const isDowngrade = currentIndex > cardIndex;
 
+  const badgeLabel = isCurrent
+    ? 'Current plan'
+    : isUpgrade
+      ? 'Upgrade'
+      : isDowngrade
+        ? 'Downgrade'
+        : null;
+
+  const badgeClassName = isCurrent
+    ? 'border border-amber-300/70 bg-amber-300 text-amber-950 shadow-sm'
+    : isUpgrade
+      ? 'bg-emerald-500 text-black'
+      : 'bg-muted text-foreground';
+
   return (
-    <div
+    <button
+      type="button"
       onClick={onSelect}
-      className={`relative w-84 rounded-lg border-2 p-6 transition-all ${
+      className={cn(
+        'group relative flex h-full w-full flex-col rounded-2xl border p-6 text-left transition-all',
+        'hover:border-blue-400/70 hover:shadow-[0_0_0_1px_rgba(59,130,246,0.2)]',
         isSelected
-          ? 'border-blue-500 bg-blue-950/20'
-          : 'border-gray-700 bg-gray-900 hover:border-gray-600'
-      } ${!isSelected ? 'cursor-pointer opacity-50' : ''} ${className}`}
+          ? 'border-blue-500/70 bg-blue-500/10 shadow-[0_0_0_1px_rgba(59,130,246,0.25)]'
+          : 'border-border/70 bg-background',
+        className
+      )}
     >
-      {/* Plan Badge */}
-      {isCurrent && (
-        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-orange-600">
-          CURRENT PLAN
+      {badgeLabel ? (
+        <Badge
+          className={cn(
+            'absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3',
+            badgeClassName
+          )}
+        >
+          {badgeLabel.toUpperCase()}
         </Badge>
-      )}
-      {isUpgrade && (
-        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-600">UPGRADE</Badge>
-      )}
-      {isDowngrade && (
-        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gray-600">DOWNGRADE</Badge>
-      )}
+      ) : null}
 
-      {/* Plan Name */}
-      <h3 className="mb-2 text-center text-xl font-semibold text-white">{planName}</h3>
+      <div className="flex h-full flex-col gap-6">
+        <div className="space-y-4 text-center">
+          <h3 className="text-xl font-semibold">{planName}</h3>
 
-      {/* Price */}
-      <div className="mb-6 text-center">
-        <div className="text-4xl font-bold text-white">
-          ${pricePerMonth}
-          <span className="text-lg font-normal text-gray-400">/user/month</span>
+          <div>
+            <div className="flex items-end justify-center gap-1">
+              <span className="text-4xl font-bold">${pricePerMonth}</span>
+              <span className="text-muted-foreground pb-1 text-base font-normal">/user/month</span>
+            </div>
+            <div className="text-muted-foreground mt-2 text-sm">
+              {billingCycle === 'monthly' ? 'Billed monthly' : 'Billed annually'}
+            </div>
+          </div>
         </div>
-        <div className="mt-1 text-sm text-gray-400">
-          {billingCycle === 'monthly' ? 'Billed monthly' : 'Billed annually'}
+
+        <ul className="space-y-3">
+          {features.map(feature => (
+            <li key={feature} className="text-muted-foreground flex items-start gap-2 text-sm">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+
+        <div
+          className={cn(
+            'mt-auto flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors',
+            isSelected
+              ? 'border-blue-500/40 bg-blue-500/10 text-blue-400'
+              : 'border-border/70 text-muted-foreground group-hover:border-blue-400/40 group-hover:text-foreground'
+          )}
+        >
+          {isSelected ? <Check className="h-4 w-4" /> : null}
+          {isSelected ? 'Selected' : 'Select plan'}
         </div>
       </div>
-
-      {/* Features List */}
-      <ul className="mb-6 space-y-3">
-        {features.map((feature, index) => (
-          <li key={index} className="flex items-start gap-2 text-sm text-gray-300">
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
-
-      {/* Selection Indicator */}
-      {isSelected && (
-        <div className="flex items-center justify-center gap-2 text-sm font-medium text-blue-400">
-          <Check className="h-4 w-4" />
-          Selected
-        </div>
-      )}
-    </div>
+    </button>
   );
 }

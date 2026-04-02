@@ -54,6 +54,7 @@ export function KiloPassBonusRampDialog(props: {
   const [sliderMonth, setSliderMonth] = useState(resolvedMonth);
   const effectiveMonth = showSlider ? sliderMonth : resolvedMonth;
   const config = KILO_PASS_TIER_CONFIG[tier];
+  const showPromoCallout = showSlider && showFirstMonthPromo;
 
   const sliderPercent = computeMonthlyCadenceBonusPercent({
     tier,
@@ -169,7 +170,7 @@ export function KiloPassBonusRampDialog(props: {
               </div>
             </div>
 
-            {showSlider && showFirstMonthPromo && (
+            {showPromoCallout && (
               <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-emerald-100">
                 As a new subscriber, your{' '}
                 <strong>first {showSecondMonthPromo ? '2 paid months' : 'paid month'}</strong> get a

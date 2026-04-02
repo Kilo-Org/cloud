@@ -224,6 +224,15 @@ export default function OrganizationAppSidebar({
     url: string;
     className?: string;
   }> = [
+    ...(hasOwnerLevelAccess
+      ? [
+          {
+            title: 'Subscriptions',
+            icon: Users,
+            url: `/organizations/${organizationId}/subscriptions`,
+          },
+        ]
+      : []),
     ...(ENABLE_DEPLOY_FEATURE
       ? [
           {
@@ -258,11 +267,6 @@ export default function OrganizationAppSidebar({
       : []),
     ...(hasOwnerLevelAccess
       ? [
-          {
-            title: 'Subscriptions',
-            icon: Users,
-            url: `/organizations/${organizationId}/subscriptions`,
-          },
           {
             title: 'Invoices',
             icon: CreditCard,

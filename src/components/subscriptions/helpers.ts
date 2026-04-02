@@ -30,6 +30,20 @@ export function formatKiloPassPrice(tier: KiloPassTier, cadence: KiloPassCadence
     : `${formatDollars(monthlyPrice)}/month`;
 }
 
+export function formatKiloPassTierLabel(tier: KiloPassTier): string {
+  if (tier === 'tier_19') return 'Starter';
+  if (tier === 'tier_49') return 'Pro';
+  return 'Expert';
+}
+
+export function formatKiloPassCadenceLabel(cadence: KiloPassCadence): string {
+  return cadence === KiloPassCadence.Yearly ? 'Yearly' : 'Monthly';
+}
+
+export function formatMonthCountLabel(months: number): string {
+  return `${months} month${months === 1 ? '' : 's'}`;
+}
+
 export function getPaidSeatSubscriptionItem(
   subscription: Pick<Stripe.Subscription, 'items'>
 ): Stripe.SubscriptionItem | null {

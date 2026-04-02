@@ -7,8 +7,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatCents, formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
+import { cn, formatCents, formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 
 function formatCreditAmount(amountMicrodollars: number): string {
   return `$${(amountMicrodollars / 1_000_000).toFixed(2)}`;
@@ -27,20 +28,27 @@ export function BillingHistoryTable({
   onLoadMore: () => void;
   isLoading?: boolean;
 }) {
+  const headerCellClassName = 'h-14 bg-muted/20 px-4 text-sm font-semibold';
+  const bodyCellClassName = 'px-4 py-4';
+
   return (
     <div className="space-y-3">
       <div className="overflow-hidden rounded-xl border">
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
+          <TableHeader className="bg-muted/20">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className={headerCellClassName}>Date</TableHead>
               {variant === 'stripe' ? (
-                <TableHead>Amount</TableHead>
+                <TableHead className={headerCellClassName}>Amount</TableHead>
               ) : (
-                <TableHead>Description</TableHead>
+                <TableHead className={headerCellClassName}>Description</TableHead>
               )}
-              <TableHead>{variant === 'stripe' ? 'Status' : 'Amount'}</TableHead>
-              {variant === 'stripe' ? <TableHead>Invoice</TableHead> : null}
+              <TableHead className={headerCellClassName}>
+                {variant === 'stripe' ? 'Status' : 'Amount'}
+              </TableHead>
+              {variant === 'stripe' ? (
+                <TableHead className={headerCellClassName}>Invoice</TableHead>
+              ) : null}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -48,7 +56,7 @@ export function BillingHistoryTable({
               <TableRow>
                 <TableCell
                   colSpan={variant === 'stripe' ? 4 : 3}
-                  className="text-muted-foreground py-8 text-center"
+                  className="text-muted-foreground px-4 py-10 text-center"
                 >
                   No billing history yet.
                 </TableCell>
@@ -56,14 +64,18 @@ export function BillingHistoryTable({
             ) : (
               entries.map(entry => (
                 <TableRow key={entry.id}>
-                  <TableCell>{formatIsoDateString_UsaDateOnlyFormat(entry.date)}</TableCell>
+                  <TableCell className={bodyCellClassName}>
+                    {formatIsoDateString_UsaDateOnlyFormat(entry.date)}
+                  </TableCell>
                   {entry.kind === 'stripe' ? (
                     <>
-                      <TableCell>{formatCents(entry.amountCents, entry.currency)}</TableCell>
-                      <TableCell className="capitalize">
-                        {entry.status.replace(/_/g, ' ')}
+                      <TableCell className={bodyCellClassName}>
+                        {formatCents(entry.amountCents, entry.currency)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className={bodyCellClassName}>
+                        <InvoiceStatusBadge status={entry.status} />
+                      </TableCell>
+                      <TableCell className={bodyCellClassName}>
                         {entry.invoiceUrl ? (
                           <a
                             href={entry.invoiceUrl}
@@ -80,8 +92,10 @@ export function BillingHistoryTable({
                     </>
                   ) : (
                     <>
-                      <TableCell>{entry.description}</TableCell>
-                      <TableCell>{formatCreditAmount(entry.amountMicrodollars)}</TableCell>
+                      <TableCell className={bodyCellClassName}>{entry.description}</TableCell>
+                      <TableCell className={bodyCellClassName}>
+                        {formatCreditAmount(entry.amountMicrodollars)}
+                      </TableCell>
                     </>
                   )}
                 </TableRow>
@@ -97,5 +111,25 @@ export function BillingHistoryTable({
         </Button>
       ) : null}
     </div>
+  );
+}
+
+function InvoiceStatusBadge({ status }: { status: string }) {
+  const label = status.replace(/_/g, ' ');
+  const colorClass =
+    status === 'paid'
+      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+      : status === 'open'
+        ? 'border-amber-500/30 bg-amber-500/10 text-amber-400'
+        : status === 'draft'
+          ? 'border-muted-foreground/30 bg-muted/20 text-muted-foreground'
+          : status === 'void' || status === 'uncollectible'
+            ? 'border-destructive/30 bg-destructive/10 text-destructive'
+            : 'border-muted-foreground/30 bg-muted/20 text-muted-foreground';
+
+  return (
+    <Badge variant="outline" className={cn('capitalize', colorClass)}>
+      {label}
+    </Badge>
   );
 }

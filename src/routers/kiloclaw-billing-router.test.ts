@@ -530,7 +530,7 @@ describe('subscription center procedures', () => {
         amount_microdollars: -9_000_000,
         is_free: false,
         description: 'Standard renewal',
-        credit_category: `kiloclaw-subscription:${instance.id}`,
+        credit_category: `kiloclaw-subscription:${instance.id}:2026-04`,
         created_at: '2026-04-01T12:00:00.000Z',
       },
       {
@@ -539,7 +539,7 @@ describe('subscription center procedures', () => {
         amount_microdollars: -48_000_000,
         is_free: false,
         description: 'Commit renewal',
-        credit_category: `kiloclaw-subscription-commit:${oldInstance.id}`,
+        credit_category: `kiloclaw-subscription-commit:${oldInstance.id}:2026-05`,
         created_at: '2026-05-01T12:00:00.000Z',
       },
       {
@@ -548,7 +548,7 @@ describe('subscription center procedures', () => {
         amount_microdollars: -9_000_000,
         is_free: false,
         description: 'Other instance renewal',
-        credit_category: `kiloclaw-subscription:${otherInstance.id}`,
+        credit_category: `kiloclaw-subscription:${otherInstance.id}:2026-06`,
         created_at: '2026-06-01T12:00:00.000Z',
       },
     ]);

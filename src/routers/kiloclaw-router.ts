@@ -33,7 +33,7 @@ import {
   kiloclaw_email_log,
   kiloclaw_cli_runs,
 } from '@kilocode/db/schema';
-import { and, eq, ne, desc, isNotNull, isNull, inArray, sql } from 'drizzle-orm';
+import { and, eq, ne, desc, isNotNull, isNull, inArray, like, or, sql } from 'drizzle-orm';
 import { sentryLogger } from '@/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import {
@@ -2637,9 +2637,9 @@ export const kiloclawRouter = createTRPCRouter({
           )
         );
       const relatedInstanceIds = relatedInstances.map(instance => instance.id);
-      const deductionCategories = [
-        ...relatedInstanceIds.map(instanceId => `kiloclaw-subscription:${instanceId}`),
-        ...relatedInstanceIds.map(instanceId => `kiloclaw-subscription-commit:${instanceId}`),
+      const deductionCategoryPrefixes = [
+        ...relatedInstanceIds.map(instanceId => `kiloclaw-subscription:${instanceId}:%`),
+        ...relatedInstanceIds.map(instanceId => `kiloclaw-subscription-commit:${instanceId}:%`),
       ];
 
       const transactions = await db
@@ -2654,7 +2654,11 @@ export const kiloclawRouter = createTRPCRouter({
           and(
             eq(credit_transactions.kilo_user_id, ctx.user.id),
             isNull(credit_transactions.organization_id),
-            inArray(credit_transactions.credit_category, deductionCategories)
+            or(
+              ...deductionCategoryPrefixes.map(prefix =>
+                like(credit_transactions.credit_category, prefix)
+              )
+            )
           )
         )
         .orderBy(desc(credit_transactions.created_at), desc(credit_transactions.id))

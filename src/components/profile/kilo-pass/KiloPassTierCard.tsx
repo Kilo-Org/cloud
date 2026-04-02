@@ -1,5 +1,6 @@
 'use client';
 
+import { Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
@@ -21,7 +22,7 @@ export function KiloPassTierCard(props: {
   tier: KiloPassTier;
   cadence: KiloPassCadence;
   pending: boolean;
-  showFirstMonthPromo: boolean;
+  showFirstMonthPromo?: boolean;
   showSecondMonthPromo?: boolean;
   isRecommended: boolean;
   onSelect: (tier: KiloPassTier) => void;
@@ -30,7 +31,7 @@ export function KiloPassTierCard(props: {
     tier,
     cadence,
     pending,
-    showFirstMonthPromo,
+    showFirstMonthPromo = false,
     showSecondMonthPromo = false,
     isRecommended,
     onSelect,
@@ -58,7 +59,7 @@ export function KiloPassTierCard(props: {
       )}
     >
       {isRecommended && (
-        <Badge className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-3">
+        <Badge className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-3 text-white">
           Recommended
         </Badge>
       )}
@@ -77,22 +78,28 @@ export function KiloPassTierCard(props: {
         <div className="text-muted-foreground text-xs">{cadenceLabel}</div>
       </div>
 
-      <div className="mt-4 space-y-1">
+      <div className="mt-4 space-y-2">
         {cadence === KiloPassCadence.Monthly ? (
           <>
-            <div className="text-muted-foreground text-xs leading-5">
-              Includes <span className="text-amber-300">{getBaseCreditsLabel({ tier })}</span> paid
-              credits
+            <div className="text-muted-foreground flex items-start gap-2 text-xs leading-5">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+              <span>
+                Includes <span className="text-amber-300">{getBaseCreditsLabel({ tier })}</span>{' '}
+                paid credits
+              </span>
             </div>
 
-            <div className="text-muted-foreground flex items-center justify-between gap-2 text-xs leading-5">
-              <span className="leading-5">
-                Up to{' '}
-                <span className="text-emerald-300">
-                  {formatPercent(config.monthlyCapBonusPercent)}
-                </span>{' '}
-                free bonus credits
-              </span>
+            <div className="text-muted-foreground flex items-start justify-between gap-2 text-xs leading-5">
+              <div className="flex items-start gap-2">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                <span className="leading-5">
+                  Up to{' '}
+                  <span className="text-emerald-300">
+                    {formatPercent(config.monthlyCapBonusPercent)}
+                  </span>{' '}
+                  free bonus credits
+                </span>
+              </div>
               <KiloPassBonusRampDialog
                 tier={tier}
                 showFirstMonthPromo={showFirstMonthPromo}
@@ -101,21 +108,31 @@ export function KiloPassTierCard(props: {
             </div>
 
             {showFirstMonthPromo && (
-              <div className="text-xs leading-5 text-emerald-300">
-                {showSecondMonthPromo ? 'First 2 months:' : 'First month:'} +
-                {formatPercent(KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT)} free bonus credits
+              <div className="flex items-start gap-2 text-xs leading-5 text-emerald-300">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                <span>
+                  {showSecondMonthPromo ? 'First 2 months:' : 'First month:'} +
+                  {formatPercent(KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT)} free bonus credits
+                </span>
               </div>
             )}
           </>
         ) : (
           <>
-            <div className="text-muted-foreground text-xs leading-5">
-              Includes <span className="text-amber-300">{getBaseCreditsLabel({ tier })}</span> pass
-              credits
+            <div className="text-muted-foreground flex items-start gap-2 text-xs leading-5">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+              <span>
+                Includes <span className="text-amber-300">{getBaseCreditsLabel({ tier })}</span>{' '}
+                pass credits
+              </span>
             </div>
-            <div className="text-muted-foreground text-xs leading-5">
-              Includes <span className="text-emerald-300">{getYearlyMonthlyBonusLabel(tier)}</span>{' '}
-              bonus credits
+            <div className="text-muted-foreground flex items-start gap-2 text-xs leading-5">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+              <span>
+                Includes{' '}
+                <span className="text-emerald-300">{getYearlyMonthlyBonusLabel(tier)}</span> bonus
+                credits
+              </span>
             </div>
           </>
         )}

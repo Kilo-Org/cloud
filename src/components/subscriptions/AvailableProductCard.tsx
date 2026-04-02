@@ -21,10 +21,12 @@ export function AvailableProductCard({
   badge?: string;
   action?: ReactNode;
 }) {
+  const badgeVariant = badge === 'Recommended' ? 'default' : 'secondary-outline';
+
   const button = cta ? (
     <Button
       type="button"
-      variant={badge === 'Recommended' ? 'primary' : 'outline'}
+      variant="outline"
       className="w-full"
       onClick={cta.onClick}
       disabled={cta.disabled}
@@ -40,7 +42,7 @@ export function AvailableProductCard({
           <div className="bg-muted flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
             {icon}
           </div>
-          {badge ? <Badge variant="secondary-outline">{badge}</Badge> : null}
+          {badge ? <Badge variant={badgeVariant}>{badge}</Badge> : null}
         </div>
         <div className="space-y-2">
           <h3 className="font-semibold">{title}</h3>

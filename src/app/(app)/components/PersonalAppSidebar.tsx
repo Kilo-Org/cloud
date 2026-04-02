@@ -169,6 +169,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     url: string;
     className?: string;
   }> = [
+    {
+      title: 'Subscriptions',
+      icon: CreditCard,
+      url: '/subscriptions',
+    },
     ...(ENABLE_DEPLOY_FEATURE
       ? [
           {
@@ -178,11 +183,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
           },
         ]
       : []),
-    {
-      title: 'Subscriptions',
-      icon: CreditCard,
-      url: '/subscriptions',
-    },
     {
       title: 'Invoices',
       icon: Receipt,

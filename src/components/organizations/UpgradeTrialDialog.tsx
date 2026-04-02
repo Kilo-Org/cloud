@@ -6,32 +6,13 @@ import { PlanCard } from './subscription/PlanCard';
 import { Button } from '@/components/Button';
 import type { BillingCycle, OrganizationPlan } from '@/lib/organizations/organization-types';
 import { seatPrice } from '@/lib/organizations/constants';
+import { ENTERPRISE_FEATURES, TEAMS_FEATURES } from './subscription/plan-features';
 import {
   useOrganizationSubscriptionLink,
   useOrganizationSeatUsage,
   useResubscribeDefaults,
 } from '@/app/api/organizations/hooks';
 import { usePostHog } from 'posthog-js/react';
-
-export const TEAMS_FEATURES = [
-  'All the features from open source',
-  'Centralized billing',
-  'Team management dashboard',
-  'Project-level usage analytics and reporting',
-  'AI Adoption Score',
-  'Shared Modes',
-  'Role-based access permissions',
-  'Control data collection policy',
-];
-
-export const ENTERPRISE_FEATURES = [
-  'All the features from teams',
-  'Limit models and/or providers',
-  'Audit logs',
-  'SSO, OIDC, & SCIM support',
-  'SLA commitments',
-  'Dedicated support channels',
-];
 
 type UpgradeTrialDialogProps = {
   open: boolean;
@@ -166,8 +147,10 @@ export function UpgradeTrialDialog({
               </button>
             </div>
             <span
-              className={`rounded-full border border-green-400/30 bg-green-400/10 px-2.5 py-0.5 text-xs font-semibold text-green-400 transition-opacity ${
-                billingCycle === 'annual' ? 'opacity-100' : 'opacity-30'
+              className={`rounded-full border border-green-400/30 bg-green-400/10 px-2.5 py-0.5 text-xs font-semibold text-green-400 transition-[opacity,text-decoration-color] ${
+                billingCycle === 'annual'
+                  ? 'opacity-100'
+                  : 'opacity-30 line-through decoration-current'
               }`}
             >
               Save 17%
@@ -175,7 +158,7 @@ export function UpgradeTrialDialog({
           </div>
 
           {/* Plan Cards */}
-          <div className="flex justify-center gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
             <PlanCard
               plan="teams"
               pricePerMonth={teamPrice}

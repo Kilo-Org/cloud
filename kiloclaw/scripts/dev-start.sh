@@ -182,6 +182,48 @@ if [ ! -f "$KILOCLAW_DIR/.dev.vars" ]; then
   cp "$KILOCLAW_DIR/.dev.vars.example" "$KILOCLAW_DIR/.dev.vars"
 fi
 
+DEV_VARS_FILE="$KILOCLAW_DIR/.dev.vars"
+DEV_VARS_TEMPLATE="$KILOCLAW_DIR/.dev.vars.example"
+
+set_dev_var() {
+  local key="$1"
+  local value="$2"
+
+  if grep -q "^${key}=" "$DEV_VARS_FILE"; then
+    sed "s|^${key}=.*|${key}=${value}|" "$DEV_VARS_FILE" > "$DEV_VARS_FILE.tmp"
+    mv "$DEV_VARS_FILE.tmp" "$DEV_VARS_FILE"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$DEV_VARS_FILE"
+  fi
+}
+
+backfill_dev_vars_from_example() {
+  local added=0
+  local key
+  local line
+
+  [ -f "$DEV_VARS_TEMPLATE" ] || return
+
+  while IFS= read -r line; do
+    case "$line" in
+      ''|'#'*) continue ;;
+      *=*)
+        key="${line%%=*}"
+        if ! grep -q "^${key}=" "$DEV_VARS_FILE"; then
+          if [ "$added" -eq 0 ]; then
+            echo "==> Backfilling missing .dev.vars defaults from .dev.vars.example..."
+          fi
+          printf '%s\n' "$line" >> "$DEV_VARS_FILE"
+          echo "    Added $key"
+          added=$((added + 1))
+        fi
+        ;;
+    esac
+  done < "$DEV_VARS_TEMPLATE"
+}
+
+backfill_dev_vars_from_example
+
 # ---------- Link & pull dev environment from Vercel ----------
 
 if [ ! -d "$MONOREPO_ROOT/.vercel" ] || [ ! -f "$MONOREPO_ROOT/.vercel/project.json" ]; then
@@ -432,6 +474,14 @@ compute_image_hash() {
 CURRENT_IMAGE_HASH="$(compute_image_hash)"
 STORED_IMAGE_HASH="$(grep '^FLY_IMAGE_CONTENT_HASH=' "$KILOCLAW_DIR/.dev.vars" \
   | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//' || true)"
+
+if [ -z "$STORED_IMAGE_HASH" ]; then
+  echo "==> No FLY_IMAGE_CONTENT_HASH found in .dev.vars."
+  echo "    Seeding current hash to avoid an accidental image push."
+  echo "    Pass --has-controller-changes or run ./scripts/push-dev.sh to force a rebuild."
+  set_dev_var FLY_IMAGE_CONTENT_HASH "$CURRENT_IMAGE_HASH"
+  STORED_IMAGE_HASH="$CURRENT_IMAGE_HASH"
+fi
 
 if [ "$CURRENT_IMAGE_HASH" != "$STORED_IMAGE_HASH" ]; then
   if [ "$HAS_CONTROLLER_CHANGES" = false ]; then

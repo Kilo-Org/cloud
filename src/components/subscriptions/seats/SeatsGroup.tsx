@@ -3,10 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Users } from 'lucide-react';
 import type Stripe from 'stripe';
-import { Card, CardContent } from '@/components/ui/card';
 import { useTRPC } from '@/lib/trpc/utils';
-import { CreateSubscriptionButton } from '@/components/organizations/subscription/CreateSubscriptionButton';
-import { AvailableProductCard } from '@/components/subscriptions/AvailableProductCard';
 import { SubscriptionCard } from '@/components/subscriptions/SubscriptionCard';
 import { SubscriptionGroup } from '@/components/subscriptions/SubscriptionGroup';
 import {
@@ -15,6 +12,8 @@ import {
   isSeatsTerminal,
   isWarningStatus,
 } from '@/components/subscriptions/helpers';
+import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import { SeatsSubscribeCard } from './SeatsSubscribeCard';
 
 function getSeatPrice(subscription: Stripe.Subscription) {
   const paidSeatItem = getPaidSeatSubscriptionItem(subscription);
@@ -29,9 +28,11 @@ function getSeatPrice(subscription: Stripe.Subscription) {
 
 export function SeatsGroup({
   organizationId,
+  organizationPlan,
   showTerminal,
 }: {
   organizationId: string;
+  organizationPlan: OrganizationPlan;
   showTerminal: boolean;
 }) {
   const trpc = useTRPC();
@@ -51,6 +52,7 @@ export function SeatsGroup({
     <SubscriptionGroup
       title="Teams / Enterprise Seats"
       description="Manage seats and renewal details for this organization."
+      headerIcon={<Users className="h-5 w-5" />}
       isLoading={query.isLoading}
       isError={query.isError}
       error={query.error}
@@ -78,20 +80,11 @@ export function SeatsGroup({
               : undefined
           }
         />
-      ) : subscription ? (
-        <Card>
-          <CardContent className="text-muted-foreground p-5 text-sm">
-            This organization has an ended seats subscription. Turn on &quot;Show ended&quot; to
-            review it.
-          </CardContent>
-        </Card>
       ) : (
-        <AvailableProductCard
-          icon={<Users className="h-5 w-5" />}
-          title="Teams / Enterprise Seats"
-          description="Create a seats subscription for this organization."
-          price="Flexible monthly or annual billing"
-          action={<CreateSubscriptionButton organizationId={organizationId} className="w-full" />}
+        <SeatsSubscribeCard
+          key={organizationId}
+          organizationId={organizationId}
+          currentPlan={organizationPlan}
         />
       )}
     </SubscriptionGroup>

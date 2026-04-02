@@ -34,6 +34,7 @@ import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
+  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
   KILO_PASS_TIER_CONFIG,
 } from '@/lib/kilo-pass/constants';
 import { fromMicrodollars } from '@/lib/utils';
@@ -133,6 +134,10 @@ function roundToCents(usd: number): number {
 
 function secondsToIso(seconds: number): string {
   return dayjs.unix(seconds).utc().toISOString();
+}
+
+function isTwoMonthPromoOfferActive(): boolean {
+  return dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
 }
 
 function getStripePeriodEndSeconds(subscription: Stripe.Subscription): number | null {
@@ -376,7 +381,7 @@ export const kiloPassRouter = createTRPCRouter({
   getState: baseProcedure.output(GetStateOutputSchema).query(async ({ ctx }) => {
     const subscriptionBase = await getKiloPassStateForUser(db, ctx.user.id);
     if (!subscriptionBase) {
-      return { subscription: null, isEligibleForFirstMonthPromo: true };
+      return { subscription: null, isEligibleForFirstMonthPromo: isTwoMonthPromoOfferActive() };
     }
 
     const stripeCustomerId = ctx.user.stripe_customer_id;
@@ -468,9 +473,10 @@ export const kiloPassRouter = createTRPCRouter({
     if (subscriptionBase.cadence === KiloPassCadence.Yearly) {
       const usd = computeYearlyCadenceMonthlyBonusUsd(subscriptionBase.tier);
       currentPeriodBonusCreditsUsd = roundToCents(usd);
-    } else {
-      const streakMonths = Math.max(1, subscriptionBase.currentStreakMonths);
-      const shouldShowFirstMonthPromo = streakMonths === 1 && isFirstTimeSubscriberEver;
+      } else {
+        const streakMonths = Math.max(1, subscriptionBase.currentStreakMonths);
+        const shouldShowFirstMonthPromo =
+          streakMonths === 1 && isFirstTimeSubscriberEver && isTwoMonthPromoOfferActive();
 
       if (shouldShowFirstMonthPromo) {
         const cents = Math.round(baseAmountUsd * KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT * 100);

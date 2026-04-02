@@ -52,14 +52,14 @@ export function SubscriptionCard({
                 />
               </div>
               <p className="text-muted-foreground text-sm">{subtitle}</p>
-              <div className="text-muted-foreground grid gap-1 text-sm sm:grid-cols-2 sm:gap-x-8">
+              <div className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-sm">
                 <div>
                   <span className="text-foreground font-medium">Price:</span> {price}
                 </div>
                 <div>
-                  <span className="text-foreground font-medium">Billing:</span> {billingDate}
+                  <span className="text-foreground font-medium">Renews at:</span> {billingDate}
                 </div>
-                <div className="sm:col-span-2">
+                <div>
                   <span className="text-foreground font-medium">Payment:</span> {paymentMethod}
                 </div>
               </div>

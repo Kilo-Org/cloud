@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Users } from 'lucide-react';
+import { ArrowRight, ExternalLink, Minus, Plus, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,9 +16,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
+import { capitalize } from '@/lib/utils';
+import { SEAT_PRICING } from '@/lib/organizations/constants';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { DetailPageHeader } from '@/components/subscriptions/DetailPageHeader';
-import { StripePortalLink } from '@/components/subscriptions/StripePortalLink';
 import { BillingHistoryTable } from '@/components/subscriptions/BillingHistoryTable';
 import { formatDateLabel, getPaidSeatSubscriptionItem } from '@/components/subscriptions/helpers';
 
@@ -39,6 +40,8 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
   const [seatDialogOpen, setSeatDialogOpen] = useState(false);
   const [billingCycleDialogOpen, setBillingCycleDialogOpen] = useState(false);
   const [seatCount, setSeatCount] = useState('1');
+  const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  const [isCancelingCycleChange, setIsCancelingCycleChange] = useState(false);
 
   const organizationQuery = useOrganizationWithMembers(organizationId, {
     enabled: !!organizationId,
@@ -110,6 +113,23 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
     }
   }
 
+  function openCustomerPortal() {
+    if (isOpeningPortal) return;
+    setIsOpeningPortal(true);
+    void (async () => {
+      try {
+        const result = await trpcClient.organizations.subscription.getCustomerPortalUrl.mutate({
+          organizationId,
+          returnUrl: window.location.href,
+        });
+        window.location.href = result.url;
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to open Stripe portal');
+        setIsOpeningPortal(false);
+      }
+    })();
+  }
+
   const subscription = subscriptionQuery.data?.subscription ?? null;
   const seatUsagePercent = useMemo(() => {
     const used = subscriptionQuery.data?.seatsUsed ?? 0;
@@ -143,6 +163,7 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
     (sum, item) => sum + (item.price?.unit_amount ?? 0) * (item.quantity ?? 0),
     0
   );
+  const hasPendingCycleChange = subscription.schedule != null;
 
   return (
     <div className="space-y-6">
@@ -151,120 +172,153 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
         backLabel="Back to subscriptions"
         title="Teams / Enterprise Seats"
         status={subscription.status}
-        actions={
-          <StripePortalLink
-            onOpenPortal={async () => {
-              const result =
-                await trpcClient.organizations.subscription.getCustomerPortalUrl.mutate({
-                  organizationId,
-                  returnUrl: window.location.href,
-                });
-              return result.url;
-            }}
-          />
-        }
       />
 
-      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Subscription details
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <DetailRow
-                label="Organization"
-                value={organizationQuery.data?.name ?? 'Organization'}
-              />
-              <DetailRow label="Plan" value={organizationQuery.data?.plan ?? 'teams'} />
-              <DetailRow label="Billing cycle" value={currentInterval} />
-              <DetailRow
-                label="Price"
-                value={`$${(totalAmount / 100).toFixed(2)}/${currentInterval === 'annual' ? 'year' : 'month'}`}
-              />
-              <DetailRow
-                label="Next billing"
-                value={formatDateLabel(
-                  paidSeatItem?.current_period_end
-                    ? new Date(paidSeatItem.current_period_end * 1000).toISOString()
-                    : null,
-                  '—'
-                )}
-              />
-              <DetailRow label="Seats" value={String(subscriptionQuery.data?.totalSeats ?? 0)} />
-            </div>
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Subscription details
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DetailRow
+              label="Organization"
+              value={organizationQuery.data?.name ?? 'Organization'}
+            />
+            <DetailRow
+              label="Plan"
+              value={capitalize(organizationQuery.data?.plan ?? 'teams')}
+            />
+            <DetailRow label="Billing cycle" value={capitalize(currentInterval)} />
+            <DetailRow
+              label="Price"
+              value={`$${(totalAmount / 100).toFixed(2)}/${currentInterval === 'annual' ? 'year' : 'month'}`}
+            />
+            <DetailRow
+              label="Next billing"
+              value={formatDateLabel(
+                paidSeatItem?.current_period_end
+                  ? new Date(paidSeatItem.current_period_end * 1000).toISOString()
+                  : null,
+                '—'
+              )}
+            />
+            <DetailRow label="Seats" value={String(subscriptionQuery.data?.totalSeats ?? 0)} />
+          </div>
 
-            <div className="space-y-3 rounded-xl border p-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Seat utilization</span>
-                <span>
-                  {subscriptionQuery.data?.seatsUsed ?? 0} /{' '}
-                  {subscriptionQuery.data?.totalSeats ?? 0}
-                </span>
-              </div>
-              <Progress value={seatUsagePercent} />
+          <div className="space-y-3 rounded-xl border p-4">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Seat utilization</span>
+              <span>
+                {subscriptionQuery.data?.seatsUsed ?? 0} /{' '}
+                {subscriptionQuery.data?.totalSeats ?? 0}
+              </span>
             </div>
+            <Progress
+              value={seatUsagePercent}
+              className="bg-amber-500/20"
+              indicatorClassName="bg-linear-to-r from-amber-500 to-amber-300"
+            />
+          </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => setSeatDialogOpen(true)}>
-                Change Seat Count
-              </Button>
-              <Button variant="outline" onClick={() => setBillingCycleDialogOpen(true)}>
-                Change Billing Cycle
-              </Button>
-              {subscription.cancel_at_period_end ? (
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    void (async () => {
-                      await trpcClient.organizations.subscription.stopCancellation.mutate({
-                        organizationId,
-                      });
-                      toast.success('Subscription resumed');
-                      await refreshData();
-                    })()
-                  }
-                >
-                  Resume Subscription
-                </Button>
-              ) : (
+          {hasPendingCycleChange ? (
+            <Card className="border-blue-500/30 bg-blue-500/5">
+              <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-medium">Scheduled billing cycle change</p>
+                  <p className="text-muted-foreground text-sm">
+                    Switching to {currentInterval === 'annual' ? 'monthly' : 'annual'} billing at
+                    the next renewal
+                  </p>
+                </div>
                 <Button
                   variant="outline"
                   onClick={() => {
-                    if (!window.confirm('Cancel this seats subscription at period end?')) return;
+                    if (isCancelingCycleChange) return;
+                    setIsCancelingCycleChange(true);
                     void (async () => {
-                      await trpcClient.organizations.subscription.cancel.mutate({ organizationId });
-                      toast.success('Subscription will cancel at period end');
-                      await refreshData();
+                      try {
+                        await trpcClient.organizations.subscription.cancelBillingCycleChange.mutate({
+                          organizationId,
+                        });
+                        toast.success('Billing cycle change canceled');
+                        await refreshData();
+                      } catch (error) {
+                        toast.error(
+                          error instanceof Error
+                            ? error.message
+                            : 'Failed to cancel billing cycle change'
+                        );
+                      } finally {
+                        setIsCancelingCycleChange(false);
+                      }
                     })();
                   }}
+                  disabled={isCancelingCycleChange}
                 >
-                  Cancel Subscription
+                  {isCancelingCycleChange ? 'Canceling...' : 'Cancel Scheduled Change'}
                 </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          ) : null}
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Reviewer notes</CardTitle>
-          </CardHeader>
-          <CardContent className="text-muted-foreground text-sm">
-            Billing admins and owners can update seats, switch cadence, or manage cancellation from
-            this page.
-          </CardContent>
-        </Card>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={() => setSeatDialogOpen(true)}>
+          Change Seat Count
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => setBillingCycleDialogOpen(true)}
+          disabled={hasPendingCycleChange}
+        >
+          Change Billing Cycle
+        </Button>
+        {subscription.cancel_at_period_end ? (
+          <Button
+            variant="outline"
+            onClick={() =>
+              void (async () => {
+                await trpcClient.organizations.subscription.stopCancellation.mutate({
+                  organizationId,
+                });
+                toast.success('Subscription resumed');
+                await refreshData();
+              })()
+            }
+          >
+            Resume Subscription
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => {
+              if (!window.confirm('Cancel this seats subscription at period end?')) return;
+              void (async () => {
+                await trpcClient.organizations.subscription.cancel.mutate({ organizationId });
+                toast.success('Subscription will cancel at period end');
+                await refreshData();
+              })();
+            }}
+          >
+            Cancel Subscription
+          </Button>
+        )}
+        <Button variant="outline" onClick={openCustomerPortal} disabled={isOpeningPortal}>
+          <ExternalLink className="h-4 w-4" />
+          {isOpeningPortal ? 'Opening...' : 'Manage Payment Method'}
+        </Button>
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-4">
           <CardTitle>Billing history</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-1">
           <BillingHistoryTable
             variant="stripe"
             entries={billingEntries}
@@ -276,14 +330,36 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
       </Card>
 
       <Dialog open={seatDialogOpen} onOpenChange={setSeatDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Change seat count</DialogTitle>
           </DialogHeader>
-          <Input
-            value={seatCount}
-            onChange={event => setSeatCount(event.target.value)}
-            inputMode="numeric"
+          <div className="flex items-center justify-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setSeatCount(String(Math.max(1, Number(seatCount) - 1)))}
+              disabled={Number(seatCount) <= 1}
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <Input
+              className="w-20 text-center"
+              value={seatCount}
+              onChange={event => setSeatCount(event.target.value)}
+              inputMode="numeric"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setSeatCount(String(Number(seatCount) + 1))}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+          <SeatCountChangeMessage
+            currentSeats={subscriptionQuery.data?.totalSeats ?? 0}
+            newSeats={Number(seatCount)}
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setSeatDialogOpen(false)}>
@@ -309,10 +385,16 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
       </Dialog>
 
       <Dialog open={billingCycleDialogOpen} onOpenChange={setBillingCycleDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Change billing cycle</DialogTitle>
           </DialogHeader>
+          <BillingCycleChangeContent
+            currentInterval={currentInterval}
+            perSeatCents={paidSeatItem?.price?.unit_amount ?? 0}
+            seatCount={subscriptionQuery.data?.totalSeats ?? 0}
+            plan={(organizationQuery.data?.plan as 'teams' | 'enterprise') ?? 'teams'}
+          />
           <DialogFooter>
             <Button variant="outline" onClick={() => setBillingCycleDialogOpen(false)}>
               Cancel
@@ -335,6 +417,75 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function SeatCountChangeMessage({
+  currentSeats,
+  newSeats,
+}: {
+  currentSeats: number;
+  newSeats: number;
+}) {
+  if (isNaN(newSeats) || newSeats === currentSeats) return null;
+
+  if (newSeats > currentSeats) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        Adding {newSeats - currentSeats} seat{newSeats - currentSeats === 1 ? '' : 's'}. You will be
+        billed a prorated amount immediately.
+      </p>
+    );
+  }
+
+  return (
+    <p className="text-muted-foreground text-sm">
+      Removing {currentSeats - newSeats} seat{currentSeats - newSeats === 1 ? '' : 's'}. This will
+      take effect at the start of your next billing cycle.
+    </p>
+  );
+}
+
+function BillingCycleChangeContent({
+  currentInterval,
+  perSeatCents,
+  seatCount,
+  plan,
+}: {
+  currentInterval: 'monthly' | 'annual';
+  perSeatCents: number;
+  seatCount: number;
+  plan: 'teams' | 'enterprise';
+}) {
+  const targetInterval = currentInterval === 'annual' ? 'monthly' : 'annual';
+  const currentPerSeat = perSeatCents / 100;
+  const targetPerSeat = SEAT_PRICING[plan][targetInterval === 'annual' ? 'annual' : 'monthly'];
+
+  return (
+    <div className="space-y-3 text-sm">
+      <div className="flex items-center justify-center gap-3">
+        <div className="bg-muted/20 border-border/60 flex-1 rounded-lg border px-3 py-2 text-center">
+          <div className="text-muted-foreground text-xs">Current cycle</div>
+          <div className="font-medium">{capitalize(currentInterval)}</div>
+          <div className="text-muted-foreground text-xs">
+            ${currentPerSeat.toFixed(2)}/seat/mo
+          </div>
+        </div>
+        <ArrowRight className="text-muted-foreground h-4 w-4 shrink-0" />
+        <div className="bg-muted/20 border-border/60 flex-1 rounded-lg border px-3 py-2 text-center">
+          <div className="text-muted-foreground text-xs">New cycle</div>
+          <div className="font-medium">{capitalize(targetInterval)}</div>
+          <div className="text-muted-foreground text-xs">
+            ${targetPerSeat.toFixed(2)}/seat/mo
+          </div>
+        </div>
+      </div>
+      <p className="text-muted-foreground">
+        {targetInterval === 'annual'
+          ? `Switching to annual billing takes effect at your next renewal. You will be billed $${(targetPerSeat * seatCount * 12).toFixed(2)}/year upfront for ${seatCount} seat${seatCount === 1 ? '' : 's'}.`
+          : `Switching to monthly billing takes effect at your next renewal. You will be billed $${(targetPerSeat * seatCount).toFixed(2)}/month for ${seatCount} seat${seatCount === 1 ? '' : 's'}.`}
+      </p>
     </div>
   );
 }

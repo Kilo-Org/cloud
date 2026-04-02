@@ -51,10 +51,18 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
 
   const createdOnPlatform = useMemo(() => {
     if (platformFilter.length === 0) return undefined;
-    // When 'cloud-agent' is selected, also include 'cloud-agent-web'
-    return platformFilter.flatMap(p =>
-      p === 'cloud-agent' ? ['cloud-agent', 'cloud-agent-web'] : [p]
-    );
+    return platformFilter.flatMap(p => {
+      switch (p) {
+        // 'cloud-agent-web' is a variant of the cloud agent
+        case 'cloud-agent':
+          return ['cloud-agent', 'cloud-agent-web'];
+        // Extension sessions are created from VS Code or agent-manager
+        case 'extension':
+          return ['vscode', 'agent-manager'];
+        default:
+          return [p];
+      }
+    });
   }, [platformFilter]);
 
   const { sessions, refetchSessions, renameSessionLocally } = useSidebarSessions({

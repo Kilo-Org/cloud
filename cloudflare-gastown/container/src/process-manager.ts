@@ -688,6 +688,15 @@ export async function startAgent(
     // 3. Subscribe to events (async, runs in background)
     void subscribeToEvents(client, agent, request);
 
+    // Mark as running BEFORE the initial prompt. The event subscription
+    // is already active and events may be flowing (the agent is
+    // functionally running). session.prompt() can block if the SDK
+    // server is busy, which would leave the agent stuck in 'starting'
+    // despite being active — causing the drain to wait indefinitely.
+    if (agent.status === 'starting') {
+      agent.status = 'running';
+    }
+
     // 4. Send the initial prompt
     // The model string is an OpenRouter-style ID like "anthropic/claude-sonnet-4.6".
     // The kilo provider (which wraps OpenRouter) takes the FULL model string as modelID.
@@ -705,10 +714,6 @@ export async function startAgent(
         ...(request.systemPrompt ? { system: request.systemPrompt } : {}),
       },
     });
-
-    if (agent.status === 'starting') {
-      agent.status = 'running';
-    }
     agent.messageCount = 1;
 
     log.info('agent.start', {
@@ -1130,16 +1135,19 @@ export async function drainAll(): Promise<void> {
       `Statuses: ${allAgents.map(a => `${a.role}:${a.agentId.slice(0, 8)}=${a.status}`).join(', ')}`
   );
 
-  for (const agent of runningAgents) {
-    try {
-      await nudgeAgent(agent);
-    } catch (err) {
-      console.warn(
-        `${DRAIN_LOG} Phase 2: failed to nudge ${agent.agentId} (${agent.role}):`,
-        err instanceof Error ? err.message : err
-      );
-    }
-  }
+  // Fire all nudges in parallel — sendMessage can block if the SDK server
+  // is busy with the agent's current turn. Sequential nudging would delay
+  // later agents until earlier ones unblock.
+  await Promise.allSettled(
+    runningAgents.map(agent =>
+      nudgeAgent(agent).catch(err => {
+        console.warn(
+          `${DRAIN_LOG} Phase 2: failed to nudge ${agent.agentId} (${agent.role}):`,
+          err instanceof Error ? err.message : err
+        );
+      })
+    )
+  );
 
   // ── Phase 3: Wait up to 10 minutes ──────────────────────────────────
   // Exclude mayors from the running count — they are persistent and will

@@ -1,53 +1,51 @@
+import { AlarmStatusRecord } from '@/routers/admin/gastown-router';
 import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
-import { BookOpen } from 'lucide-react';
 
 type AggregateStatsSidebarProps = {
   stats: {
-    total_towns: number;
-    active_agents: number;
-    total_beads: number;
+    towns: number;
+    agents: {
+      working: number;
+      idle: number;
+      stalled: number;
+      dead: number;
+      total: number;
+    };
+    beads: {
+      open: number;
+      inProgress: number;
+      failed: number;
+      triageRequests: number;
+    };
   };
 };
 
 export function AggregateStatsSidebar({ stats }: AggregateStatsSidebarProps) {
   return (
-    <aside className="sticky top-4 hidden w-64 flex-col gap-4 lg:flex">
-      <Card className="border border-white/10 bg-white/[0.03]">
+    <div className="space-y-4">
+      <Card className="border-white/10 bg-white/[0.03]">
         <CardContent className="p-4">
-          <h2 className="text-sm font-semibold text-white/90">Overview Stats</h2>
-          <div className="mt-4 flex flex-col gap-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-white/60">Total Towns</span>
-              <span className="font-mono text-white/90">{stats.total_towns}</span>
+          <h3 className="text-sm font-medium text-white/90">Aggregated Stats</h3>
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-[11px] tracking-wider text-white/40 uppercase">Towns</div>
+              <div className="text-xl font-semibold text-white/85">{stats.towns}</div>
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-white/60">Active Agents</span>
-              <span className="font-mono text-white/90">{stats.active_agents}</span>
+            <div>
+              <div className="text-[11px] tracking-wider text-white/40 uppercase">Total Agents</div>
+              <div className="text-xl font-semibold text-white/85">{stats.agents.total}</div>
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-white/60">Total Beads</span>
-              <span className="font-mono text-white/90">{stats.total_beads}</span>
+            <div>
+              <div className="text-[11px] tracking-wider text-white/40 uppercase">Open Beads</div>
+              <div className="text-xl font-semibold text-white/85">{stats.beads.open}</div>
+            </div>
+            <div>
+              <div className="text-[11px] tracking-wider text-white/40 uppercase">Failed Beads</div>
+              <div className="text-xl font-semibold text-white/85">{stats.beads.failed}</div>
             </div>
           </div>
         </CardContent>
       </Card>
-
-      <Card className="border border-white/10 bg-white/[0.03]">
-        <CardContent className="p-4">
-          <h2 className="text-sm font-semibold text-white/90">Documentation</h2>
-          <div className="mt-2 flex flex-col gap-2">
-            <a href="#" className="flex items-center gap-2 text-xs text-white/60 hover:text-white">
-              <BookOpen className="size-3" />
-              Gastown Overview
-            </a>
-            <a href="#" className="flex items-center gap-2 text-xs text-white/60 hover:text-white">
-              <BookOpen className="size-3" />
-              Working with Beads
-            </a>
-          </div>
-        </CardContent>
-      </Card>
-    </aside>
+    </div>
   );
 }

@@ -55,7 +55,12 @@ const config = {
           {
             scheme: 'https',
             host: 'app.kilo.ai',
-            pathPrefix: '/organizations',
+            pathPattern: '/organizations/.*/claw',
+          },
+          {
+            scheme: 'https',
+            host: 'app.kilo.ai',
+            pathPattern: '/organizations/.*/claw/',
           },
         ],
         category: ['BROWSABLE', 'DEFAULT'],

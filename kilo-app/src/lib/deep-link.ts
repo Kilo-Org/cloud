@@ -1,20 +1,32 @@
 import { type Href } from 'expo-router';
 
-type PendingDeepLink = {
+export type PendingDeepLink = {
   targetRoute: Href;
   organizationId: string;
 };
 
 let pending: PendingDeepLink | null = null;
+let listener: ((link: PendingDeepLink) => void) | null = null;
 
 function setPendingDeepLink(link: PendingDeepLink) {
   pending = link;
+  listener?.(link);
 }
 
 export function consumePendingDeepLink(): PendingDeepLink | null {
   const link = pending;
   pending = null;
   return link;
+}
+
+/** Subscribe to org-scoped deep links arriving while the app is open. */
+export function onPendingDeepLink(handler: (link: PendingDeepLink) => void): () => void {
+  listener = handler;
+  return () => {
+    if (listener === handler) {
+      listener = null;
+    }
+  };
 }
 
 /**

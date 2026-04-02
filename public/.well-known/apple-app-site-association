@@ -29,6 +29,11 @@
             "comment": "Org-scoped KiloClaw instance list (trailing slash)"
           },
           {
+            "/": "/organizations/*/*",
+            "exclude": true,
+            "comment": "Exclude all other org sub-pages from universal links"
+          },
+          {
             "/": "/organizations/*",
             "comment": "Organization profile"
           },

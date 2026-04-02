@@ -682,21 +682,6 @@ export async function getContributorChampionReviewQueue(): Promise<LeaderboardRo
   );
 }
 
-async function grantContributorChampionCredits(
-  user: User,
-  amountUsd: number
-): Promise<boolean> {
-  if (amountUsd <= 0) return false;
-
-  const result = await grantCreditForCategory(user, {
-    credit_category: 'contributor-champion-credits',
-    amount_usd: amountUsd,
-    expiry_hours: CREDIT_EXPIRY_HOURS,
-    counts_as_selfservice: false,
-  });
-
-  return result.success;
-}
 
 export async function enrollContributorChampion(input: {
   contributorId: string;
@@ -719,50 +704,66 @@ export async function enrollContributorChampion(input: {
 
   const now = new Date().toISOString();
 
-  // Upsert membership first, then grant credits to avoid double-grant on concurrent requests
-  await db
-    .insert(contributor_champion_memberships)
-    .values({
-      contributor_id: input.contributorId,
-      selected_tier: row.selectedTier ?? resolvedTier,
-      enrolled_tier: resolvedTier,
-      enrolled_at: now,
-      credit_amount_microdollars: creditAmountMicrodollars,
-      linked_kilo_user_id: linkedKiloUserId,
-    })
-    .onConflictDoUpdate({
-      target: contributor_champion_memberships.contributor_id,
-      set: {
+  // Use a transaction with FOR UPDATE on the contributor row to prevent concurrent
+  // enrollments from double-granting credits.
+  const creditGranted = await db.transaction(async tx => {
+    // Lock the contributor row for the duration of this transaction so concurrent
+    // enroll requests are serialized rather than racing.
+    await tx.execute(
+      sql`SELECT id FROM contributor_champion_contributors WHERE id = ${input.contributorId} FOR UPDATE`
+    );
+
+    await tx
+      .insert(contributor_champion_memberships)
+      .values({
+        contributor_id: input.contributorId,
         selected_tier: row.selectedTier ?? resolvedTier,
         enrolled_tier: resolvedTier,
         enrolled_at: now,
         credit_amount_microdollars: creditAmountMicrodollars,
         linked_kilo_user_id: linkedKiloUserId,
-        updated_at: sql`now()`,
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: contributor_champion_memberships.contributor_id,
+        set: {
+          selected_tier: row.selectedTier ?? resolvedTier,
+          enrolled_tier: resolvedTier,
+          enrolled_at: now,
+          credit_amount_microdollars: creditAmountMicrodollars,
+          linked_kilo_user_id: linkedKiloUserId,
+          updated_at: sql`now()`,
+        },
+      });
 
-  // Grant credits after membership is persisted
-  let creditGranted = false;
-  if (creditAmountUsd > 0 && linkedKiloUserId) {
-    const [linkedUser] = await db
-      .select()
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, linkedKiloUserId))
-      .limit(1);
+    let granted = false;
+    if (creditAmountUsd > 0 && linkedKiloUserId) {
+      const [linkedUser] = await tx
+        .select()
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, linkedKiloUserId))
+        .limit(1);
 
-    if (linkedUser) {
-      creditGranted = await grantContributorChampionCredits(linkedUser, creditAmountUsd);
+      if (linkedUser) {
+        const result = await grantCreditForCategory(linkedUser, {
+          credit_category: 'contributor-champion-credits',
+          amount_usd: creditAmountUsd,
+          expiry_hours: CREDIT_EXPIRY_HOURS,
+          counts_as_selfservice: false,
+          dbOrTx: tx,
+        });
+        granted = result.success;
+      }
     }
-  }
 
-  // Update credits_last_granted_at only after successful grant
-  if (creditGranted) {
-    await db
-      .update(contributor_champion_memberships)
-      .set({ credits_last_granted_at: now })
-      .where(eq(contributor_champion_memberships.contributor_id, input.contributorId));
-  }
+    if (granted) {
+      await tx
+        .update(contributor_champion_memberships)
+        .set({ credits_last_granted_at: now })
+        .where(eq(contributor_champion_memberships.contributor_id, input.contributorId));
+    }
+
+    return granted;
+  });
 
   return {
     enrolledTier: resolvedTier,
@@ -786,63 +787,88 @@ export async function refreshContributorChampionCredits(): Promise<CreditRefresh
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  // Query all enrolled memberships eligible for credit refresh
-  // Use FOR UPDATE SKIP LOCKED to prevent double-grants from concurrent cron runs
-  const eligibleRows = await db.execute<{
-    id: string;
-    contributor_id: string;
-    credit_amount_microdollars: bigint;
-    linked_kilo_user_id: string | null;
-  }>(sql`
-    SELECT id, contributor_id, credit_amount_microdollars, linked_kilo_user_id
+  // Fetch candidate IDs without locking — a lightweight scan to find rows to process.
+  // Each row is then claimed and processed inside its own transaction using
+  // FOR UPDATE SKIP LOCKED so concurrent cron runs never double-grant credits.
+  const candidateIds = await db.execute<{ id: string }>(sql`
+    SELECT id
     FROM contributor_champion_memberships
     WHERE enrolled_tier IS NOT NULL
       AND credit_amount_microdollars > 0
       AND linked_kilo_user_id IS NOT NULL
       AND (credits_last_granted_at IS NULL OR credits_last_granted_at <= ${thirtyDaysAgo})
-    FOR UPDATE SKIP LOCKED
   `).then(result => result.rows);
 
-  for (const row of eligibleRows) {
-    summary.processed += 1;
-
-    if (!row.linked_kilo_user_id) {
-      summary.skippedNoUser += 1;
-      continue;
-    }
-
+  for (const { id } of candidateIds) {
     try {
-      const [linkedUser] = await db
-        .select()
-        .from(kilocode_users)
-        .where(eq(kilocode_users.id, row.linked_kilo_user_id))
-        .limit(1);
+      await db.transaction(async tx => {
+        // Re-fetch the row with FOR UPDATE SKIP LOCKED inside the transaction so the
+        // lock is held until the transaction commits. If another cron run already
+        // claimed this row, it will be skipped.
+        const rows = await tx.execute<{
+          id: string;
+          contributor_id: string;
+          credit_amount_microdollars: bigint;
+          linked_kilo_user_id: string | null;
+        }>(sql`
+          SELECT id, contributor_id, credit_amount_microdollars, linked_kilo_user_id
+          FROM contributor_champion_memberships
+          WHERE id = ${id}
+            AND enrolled_tier IS NOT NULL
+            AND credit_amount_microdollars > 0
+            AND linked_kilo_user_id IS NOT NULL
+            AND (credits_last_granted_at IS NULL OR credits_last_granted_at <= ${thirtyDaysAgo})
+          FOR UPDATE SKIP LOCKED
+        `);
 
-      if (!linkedUser) {
-        summary.skippedNoUser += 1;
-        continue;
-      }
+        const row = rows.rows[0];
+        if (!row) return; // already processed by another concurrent cron run
 
-      const amountUsd = fromMicrodollars(Number(row.credit_amount_microdollars));
-      const granted = await grantContributorChampionCredits(linkedUser, amountUsd);
+        summary.processed += 1;
 
-      if (granted) {
-        await db
-          .update(contributor_champion_memberships)
-          .set({
-            credits_last_granted_at: new Date().toISOString(),
-            updated_at: sql`now()`,
-          })
-          .where(eq(contributor_champion_memberships.id, row.id));
+        if (!row.linked_kilo_user_id) {
+          summary.skippedNoUser += 1;
+          return;
+        }
 
-        summary.granted += 1;
-      } else {
-        summary.errored += 1;
-      }
+        const [linkedUser] = await tx
+          .select()
+          .from(kilocode_users)
+          .where(eq(kilocode_users.id, row.linked_kilo_user_id))
+          .limit(1);
+
+        if (!linkedUser) {
+          summary.skippedNoUser += 1;
+          return;
+        }
+
+        const amountUsd = fromMicrodollars(Number(row.credit_amount_microdollars));
+        const result = await grantCreditForCategory(linkedUser, {
+          credit_category: 'contributor-champion-credits',
+          amount_usd: amountUsd,
+          expiry_hours: CREDIT_EXPIRY_HOURS,
+          counts_as_selfservice: false,
+          dbOrTx: tx,
+        });
+
+        if (result.success) {
+          await tx
+            .update(contributor_champion_memberships)
+            .set({
+              credits_last_granted_at: new Date().toISOString(),
+              updated_at: sql`now()`,
+            })
+            .where(eq(contributor_champion_memberships.id, row.id));
+
+          summary.granted += 1;
+        } else {
+          summary.errored += 1;
+        }
+      });
     } catch (error) {
       captureException(error, {
         tags: { source: 'contributor_champion_credit_refresh' },
-        extra: { membershipId: row.id, contributorId: row.contributor_id },
+        extra: { membershipId: id },
       });
       summary.errored += 1;
     }
@@ -1027,50 +1053,64 @@ export async function manualEnrollContributor(input: {
 
   const now = new Date().toISOString();
 
-  // Create membership (without credits_last_granted_at — set after grant)
-  await db
-    .insert(contributor_champion_memberships)
-    .values({
-      contributor_id: contributorId,
-      selected_tier: resolvedTier,
-      enrolled_tier: resolvedTier,
-      enrolled_at: now,
-      credit_amount_microdollars: creditAmountMicrodollars,
-      linked_kilo_user_id: input.kiloUserId,
-    })
-    .onConflictDoUpdate({
-      target: contributor_champion_memberships.contributor_id,
-      set: {
+  // Use a transaction with FOR UPDATE on the contributor row to prevent concurrent
+  // manual enrollments from double-granting credits.
+  const creditGranted = await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT id FROM contributor_champion_contributors WHERE id = ${contributorId} FOR UPDATE`
+    );
+
+    await tx
+      .insert(contributor_champion_memberships)
+      .values({
+        contributor_id: contributorId,
         selected_tier: resolvedTier,
         enrolled_tier: resolvedTier,
         enrolled_at: now,
         credit_amount_microdollars: creditAmountMicrodollars,
         linked_kilo_user_id: input.kiloUserId,
-        updated_at: sql`now()`,
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: contributor_champion_memberships.contributor_id,
+        set: {
+          selected_tier: resolvedTier,
+          enrolled_tier: resolvedTier,
+          enrolled_at: now,
+          credit_amount_microdollars: creditAmountMicrodollars,
+          linked_kilo_user_id: input.kiloUserId,
+          updated_at: sql`now()`,
+        },
+      });
 
-  // Grant initial credits if applicable
-  let creditGranted = false;
-  if (creditAmountUsd > 0 && input.kiloUserId) {
-    const kiloUserRow = await db
-      .select()
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, input.kiloUserId))
-      .limit(1)
-      .then(rows => rows[0]);
-    if (kiloUserRow) {
-      creditGranted = await grantContributorChampionCredits(kiloUserRow, creditAmountUsd);
+    let granted = false;
+    if (creditAmountUsd > 0 && input.kiloUserId) {
+      const kiloUserRow = await tx
+        .select()
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, input.kiloUserId))
+        .limit(1)
+        .then(rows => rows[0]);
+      if (kiloUserRow) {
+        const result = await grantCreditForCategory(kiloUserRow, {
+          credit_category: 'contributor-champion-credits',
+          amount_usd: creditAmountUsd,
+          expiry_hours: CREDIT_EXPIRY_HOURS,
+          counts_as_selfservice: false,
+          dbOrTx: tx,
+        });
+        granted = result.success;
+      }
     }
-  }
 
-  // Update credits_last_granted_at only if credits were actually granted
-  if (creditGranted) {
-    await db
-      .update(contributor_champion_memberships)
-      .set({ credits_last_granted_at: now })
-      .where(eq(contributor_champion_memberships.contributor_id, contributorId));
-  }
+    if (granted) {
+      await tx
+        .update(contributor_champion_memberships)
+        .set({ credits_last_granted_at: now })
+        .where(eq(contributor_champion_memberships.contributor_id, contributorId));
+    }
+
+    return granted;
+  });
 
   return { enrolledTier: resolvedTier, creditAmountUsd, creditGranted };
 }

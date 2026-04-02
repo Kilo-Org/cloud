@@ -1003,7 +1003,7 @@ export default function ContributorChampionsAdminPage() {
                         <TableCell>
                           <div className="flex flex-col gap-1">
                             <Select
-                              value={effectiveTier ?? undefined}
+                              value={effectiveTier ?? '__none__'}
                               onValueChange={nextValue => {
                                 const parsed = normalizeTier(nextValue);
                                 if (!parsed) return;
@@ -1017,6 +1017,9 @@ export default function ContributorChampionsAdminPage() {
                                 <SelectValue placeholder="Choose tier" />
                               </SelectTrigger>
                               <SelectContent>
+                                <SelectItem value="__none__" disabled>
+                                  Choose tier…
+                                </SelectItem>
                                 {contributorTiers.map(tier => (
                                   <SelectItem key={tier} value={tier}>
                                     {tier}

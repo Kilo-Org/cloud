@@ -10,7 +10,6 @@ import {
   syncContributorChampionData,
   upsertContributorSelectedTier,
 } from '@/lib/contributor-champions/service';
-import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
 const TierSchema = z.enum(['contributor', 'ambassador', 'champion']);
@@ -62,23 +61,16 @@ export const contributorChampionsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
-      try {
-        const result = await enrollContributorChampion({
-          contributorId: input.contributorId,
-          tier: input.tier ?? null,
-        });
-        return {
-          success: true,
-          enrolledTier: result.enrolledTier,
-          creditAmountUsd: result.creditAmountUsd,
-          creditGranted: result.creditGranted,
-        };
-      } catch (error) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: error instanceof Error ? error.message : 'Failed to enroll contributor',
-        });
-      }
+      const result = await enrollContributorChampion({
+        contributorId: input.contributorId,
+        tier: input.tier ?? null,
+      });
+      return {
+        success: true,
+        enrolledTier: result.enrolledTier,
+        creditAmountUsd: result.creditAmountUsd,
+        creditGranted: result.creditGranted,
+      };
     }),
 
   enrolledList: adminProcedure.query(async () => {
@@ -101,19 +93,12 @@ export const contributorChampionsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
-      try {
-        const result = await manualEnrollContributor(input);
-        return {
-          success: true,
-          enrolledTier: result.enrolledTier,
-          creditAmountUsd: result.creditAmountUsd,
-          creditGranted: result.creditGranted,
-        };
-      } catch (error) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: error instanceof Error ? error.message : 'Failed to manually enroll contributor',
-        });
-      }
+      const result = await manualEnrollContributor(input);
+      return {
+        success: true,
+        enrolledTier: result.enrolledTier,
+        creditAmountUsd: result.creditAmountUsd,
+        creditGranted: result.creditGranted,
+      };
     }),
 });

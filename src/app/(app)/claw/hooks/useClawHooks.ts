@@ -227,7 +227,8 @@ export function useClawGatewayReady(enabled: boolean) {
 
   const personal = useQuery({
     ...trpc.kiloclaw.gatewayReady.queryOptions(undefined, {
-      refetchInterval: enabled ? 5_000 : false,
+      refetchInterval: query =>
+        enabled && query.state.data?.['status'] !== 502 ? 5_000 : false,
     }),
     enabled: enabled && !organizationId,
   });
@@ -235,7 +236,10 @@ export function useClawGatewayReady(enabled: boolean) {
   const org = useQuery({
     ...trpc.organizations.kiloclaw.gatewayReady.queryOptions(
       { organizationId: organizationId ?? '' },
-      { refetchInterval: enabled ? 5_000 : false }
+      {
+        refetchInterval: query =>
+          enabled && query.state.data?.['status'] !== 502 ? 5_000 : false,
+      }
     ),
     enabled: enabled && !!organizationId,
   });

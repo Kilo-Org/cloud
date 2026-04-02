@@ -83,9 +83,9 @@ function createSessionWithStateCapture(
   const session = createCloudAgentSession({
     kiloSessionId: TEST_KILO_ID,
     resolveSession: async () => ({
+      type: 'cloud-agent' as const,
       kiloSessionId: TEST_KILO_ID,
       cloudAgentSessionId: TEST_CLOUD_AGENT_ID,
-      isLive: true,
     }),
     websocketBaseUrl: 'ws://localhost:9999',
     transport: {
@@ -375,9 +375,9 @@ describe('session state transitions', () => {
     const session = createCloudAgentSession({
       kiloSessionId: TEST_KILO_ID,
       resolveSession: async () => ({
+        type: 'cloud-agent' as const,
         kiloSessionId: TEST_KILO_ID,
         cloudAgentSessionId: TEST_CLOUD_AGENT_ID,
-        isLive: true,
       }),
       websocketBaseUrl: 'ws://localhost:9999',
       transport: {

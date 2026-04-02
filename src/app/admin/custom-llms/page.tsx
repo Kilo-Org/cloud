@@ -175,7 +175,7 @@ export default function AdminCustomLlmsPage() {
             <TableBody>
               {data?.items.length === 0 && (
                 <TableRow>
-                   <TableCell colSpan={5} className="text-muted-foreground text-center">
+                  <TableCell colSpan={5} className="text-muted-foreground text-center">
                     No custom LLMs defined yet.
                   </TableCell>
                 </TableRow>

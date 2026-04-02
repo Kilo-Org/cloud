@@ -5,10 +5,10 @@ import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
 import { ArrowUpCircle, Check, MessageSquare, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
-import { calverAtLeast, cleanVersion, getRunningVersionBadge } from '@/lib/kiloclaw/version';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
-import { useClawControllerVersion, useClawLatestVersion, useClawServiceDegraded } from '../hooks/useClawHooks';
+import { useClawServiceDegraded } from '../hooks/useClawHooks';
+import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
 import { ClawContextProvider, useClawContext } from './ClawContext';
 import { Banner } from '@/components/shared/Banner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -122,35 +122,13 @@ function ClawDashboardInner({
 
   const { data: isServiceDegraded } = useClawServiceDegraded();
 
-  // ── Version / upgrade detection (mirrors SettingsTab logic) ──
-  const { data: controllerVersion } = useClawControllerVersion(!!isRunning);
-  const { data: latestVersion } = useClawLatestVersion();
-  const trackedVersion = cleanVersion(instanceStatus?.openclawVersion);
-  const runningVersion = cleanVersion(controllerVersion?.openclawVersion);
-  const latestAvailableVersion = cleanVersion(latestVersion?.openclawVersion);
-  const isModified = getRunningVersionBadge(runningVersion, trackedVersion) === 'modified';
-  const catalogNewerThanImage =
-    !!trackedVersion &&
-    !!latestAvailableVersion &&
-    latestAvailableVersion !== trackedVersion &&
-    calverAtLeast(latestAvailableVersion, trackedVersion);
-  const hasVersionInfo = !!isRunning && !!trackedVersion && trackedVersion !== ':latest';
-  const variantsMatch =
-    !instanceStatus?.imageVariant ||
-    instanceStatus.imageVariant === 'default' ||
-    instanceStatus.imageVariant === latestVersion?.variant;
-  const imageTagDiffers =
-    hasVersionInfo &&
-    variantsMatch &&
-    !!instanceStatus?.trackedImageTag &&
-    !!latestVersion?.imageTag &&
-    instanceStatus.trackedImageTag !== latestVersion.imageTag;
-  const updateAvailable = catalogNewerThanImage
-    ? !isModified ||
-      (!!runningVersion &&
-        calverAtLeast(latestAvailableVersion, runningVersion) &&
-        latestAvailableVersion !== runningVersion)
-    : imageTagDiffers;
+  const { updateAvailable, catalogNewerThanImage, latestAvailableVersion, latestVersion } =
+    useClawUpdateAvailable({
+      status: instanceStatus?.status ?? null,
+      openclawVersion: instanceStatus?.openclawVersion ?? null,
+      imageVariant: instanceStatus?.imageVariant ?? null,
+      trackedImageTag: instanceStatus?.trackedImageTag ?? null,
+    });
 
   const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
   const instanceYoung =

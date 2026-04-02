@@ -52,6 +52,10 @@ export async function processMessage({
 
     console.error(`[KiloBot] Error during bot run:`, errMsg, error);
 
-    await thread.post(`Sorry, there was an error calling the AI service: ${errMsg.slice(0, 200)}`);
+    const received = thread.createSentMessageFromMessage(message);
+    await Promise.all([
+      received.removeReaction(emoji.eyes).catch(() => {}),
+      thread.post(`Sorry, there was an error calling the AI service: ${errMsg.slice(0, 200)}`),
+    ]);
   }
 }

@@ -80,6 +80,35 @@ function logCallback(message: string, extra?: Record<string, unknown>) {
   console.log('[BotSessionCallback]', message, extra ?? {});
 }
 
+/**
+ * Swap the :eyes: reaction on the original user message to :check: (or just
+ * remove :eyes: on failure). Best-effort — failures are logged but never block.
+ */
+async function swapReaction(
+  requestRow: NonNullable<Awaited<ReturnType<typeof getBotRequest>>>,
+  success: boolean
+): Promise<void> {
+  const messageId = requestRow.platform_message_id;
+  const threadId = requestRow.platform_thread_id;
+  if (!messageId) return;
+
+  try {
+    await bot.initialize();
+    const slackAdapter = bot.getAdapter('slack');
+    const botToken = await getSlackBotToken(requestRow.platform_integration_id);
+    if (!botToken) return;
+
+    await slackAdapter.withBotToken(botToken, async () => {
+      await slackAdapter.removeReaction(threadId, messageId, 'eyes').catch(() => {});
+      if (success) {
+        await slackAdapter.addReaction(threadId, messageId, 'white_check_mark').catch(() => {});
+      }
+    });
+  } catch (error) {
+    console.error('[BotSessionCallback] Failed to swap reaction:', error);
+  }
+}
+
 async function completeBotRequest(params: {
   botRequestId: string;
   expectedCloudAgentSessionId: string;
@@ -375,6 +404,8 @@ ${finalMessage}`;
     markdown: continuation.finalText,
     platformIntegrationId: requestRow.platform_integration_id,
   });
+
+  await swapReaction(requestRow, true);
 }
 
 async function handleFailedCallback(
@@ -419,6 +450,8 @@ async function handleFailedCallback(
     markdown: errorMessage,
     platformIntegrationId: requestRow.platform_integration_id,
   });
+
+  await swapReaction(requestRow, false);
 }
 
 export async function POST(

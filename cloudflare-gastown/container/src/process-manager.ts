@@ -1314,6 +1314,13 @@ export async function drainAll(): Promise<void> {
           saved_at: new Date().toISOString(),
         });
       }
+
+      // 4d: Report the agent as completed so the TownDO can unhook it
+      // and transition the bead. Without this, the bead stays in_progress
+      // and the agent stays working until stale-bead recovery kicks in.
+      if (agent.role !== 'mayor' && agent.role !== 'triage') {
+        await reportAgentCompleted(agent, 'completed', 'container eviction');
+      }
     } catch (err) {
       console.warn(`${DRAIN_LOG} Phase 4: force-save failed for agent ${agent.agentId}:`, err);
     }

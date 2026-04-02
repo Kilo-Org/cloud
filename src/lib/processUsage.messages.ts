@@ -199,10 +199,10 @@ export function parseMessagesMicrodollarUsageFromString(
   const inference_provider = providerMetadata?.gateway?.routing?.finalProvider ?? null;
 
   const responseContent =
-    responseJson?.content
-      .filter(c => c.type === 'text')
+    (responseJson?.content ?? [])
+      .filter((c): c is { type: string; text?: string } => c != null && c.type === 'text')
       .map(c => c.text ?? '')
-      .join('') ?? '';
+      .join('');
 
   const coreProps = {
     messageId: responseJson?.id ?? null,
@@ -240,7 +240,7 @@ export function extractMessagesPromptInfo(body: GatewayMessagesRequest): PromptI
       userPrompt = content;
     } else {
       userPrompt = content
-        .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
+        .filter((c): c is { type: 'text'; text: string } => c != null && c.type === 'text')
         .map(c => c.text)
         .join('\n');
     }

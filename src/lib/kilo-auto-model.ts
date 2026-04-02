@@ -6,11 +6,7 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_NAME,
 } from '@/lib/providers/anthropic';
-import {
-  MINIMAX_CURRENT_MODEL_ID,
-  MINIMAX_CURRENT_MODEL_NAME,
-  minimax_m25_free_model,
-} from '@/lib/providers/minimax';
+import { MINIMAX_CURRENT_MODEL_ID, MINIMAX_CURRENT_MODEL_NAME } from '@/lib/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID, KIMI_CURRENT_MODEL_NAME } from '@/lib/providers/moonshotai';
 import { gpt_oss_20b_free_model, GPT_5_NANO_ID, GPT_5_NANO_NAME } from '@/lib/providers/openai';
 import type {
@@ -21,6 +17,10 @@ import type {
 import { requestContainsImages } from '@/lib/providers/openrouter/request-helpers';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 import type OpenAI from 'openai';
+import {
+  QWEN36_PLUS_PREVIEW_FREE_MODEL_ID,
+  QWEN36_PLUS_PREVIEW_FREE_MODEL_NAME,
+} from '@/lib/providers/qwen';
 
 function stripDisplayName(displayName: string): string {
   const start = displayName.indexOf(': ');
@@ -170,9 +170,9 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
 export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Kilo Auto Free',
-  description: `Free with limited capability. No credits required. Uses ${stripDisplayName(minimax_m25_free_model.display_name)}.`,
-  context_length: minimax_m25_free_model.context_length,
-  max_completion_tokens: minimax_m25_free_model.max_completion_tokens,
+  description: `Free with limited capability. No credits required. Uses ${stripDisplayName(QWEN36_PLUS_PREVIEW_FREE_MODEL_NAME)}.`,
+  context_length: 1_000_000,
+  max_completion_tokens: 32_000,
   prompt_price: '0',
   completion_price: '0',
   input_cache_read_price: '0',
@@ -238,7 +238,7 @@ export async function resolveAutoModel(
   hasImages: boolean
 ): Promise<ResolvedAutoModel> {
   if (model === KILO_AUTO_FREE_MODEL.id) {
-    return { model: minimax_m25_free_model.public_id };
+    return { model: QWEN36_PLUS_PREVIEW_FREE_MODEL_ID };
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {
     return {

@@ -114,7 +114,32 @@ export function ProvisioningStep({
   // and the system's CPU load has settled after boot.
   const { data: gatewayReady } = useClawGatewayReady(instanceRunning);
   const isGatewaySettled = gatewayReady?.ready === true && gatewayReady?.settled === true;
-  const hasGateway502 = gatewayReady?.status === 502;
+
+  // Grace period: tolerate transient 502s during startup (the gateway may not
+  // have bound its port yet). Only treat 502 as terminal after 30 consecutive
+  // seconds to avoid false negatives on healthy instances.
+  const GATEWAY_502_GRACE_MS = 30_000;
+  const first502AtRef = useRef<number | null>(null);
+  const [gateway502Expired, setGateway502Expired] = useState(false);
+
+  useEffect(() => {
+    if (gatewayReady?.status !== 502) {
+      first502AtRef.current = null;
+      setGateway502Expired(false);
+      return;
+    }
+    if (first502AtRef.current === null) {
+      first502AtRef.current = Date.now();
+    }
+    const elapsed = Date.now() - first502AtRef.current;
+    const remaining = GATEWAY_502_GRACE_MS - elapsed;
+    if (remaining <= 0) {
+      setGateway502Expired(true);
+      return;
+    }
+    const timer = setTimeout(() => setGateway502Expired(true), remaining);
+    return () => clearTimeout(timer);
+  }, [gatewayReady]);
 
   // Advance to the next step when config is applied, gateway reports ready,
   // and boot CPU pressure has subsided (settled === true).
@@ -125,7 +150,7 @@ export function ProvisioningStep({
     }
   }, [configReady, isGatewaySettled]);
 
-  if (hasGateway502) {
+  if (gateway502Expired) {
     return <ProvisioningErrorView totalSteps={totalSteps} />;
   }
 

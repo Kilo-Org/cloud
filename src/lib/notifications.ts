@@ -228,6 +228,7 @@ async function generateTeamsTrialNotification(
     },
   ];
 }
+
 async function generateMimoNoLongerFreeNotification(
   user: User,
   _ctx: NotificationContext
@@ -251,7 +252,7 @@ async function generateMimoNoLongerFreeNotification(
         id: 'mimo-no-longer-free-apr-2',
         title: 'MiMo V2 and MiniMax M2.5 no longer free',
         message:
-          'The MiMo V2 and MiniMax M2.5 promotions have ended. Please switch to Kilo Auto Free or another free model.',
+          'The MiMo V2 and MiniMax M2.5 free promotions have ended. Please switch to Kilo Auto Free or another free model.',
         suggestModelId: KILO_AUTO_FREE_MODEL.id,
         showIn: ['cli', 'extension'],
       },

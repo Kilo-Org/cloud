@@ -43,135 +43,7 @@ export const PhaseSchema = z.enum(['commentary', 'final_answer']);
 
 export type Phase = z.infer<typeof PhaseSchema>;
 
-// limited version of the schema, focussed on what is needed for the implementation
-// this approach limits breakages when the API changes and increases efficiency
-export const OpenRouterNonStreamChatCompletionResponseSchema = z.union([
-  // Success response with choices
-  OpenRouterChatCompletionBaseResponseSchema.extend({
-    choices: z.array(
-      z
-        .object({
-          message: z
-            .object({
-              role: z.literal('assistant'),
-              content: z.string().nullable().optional(),
-              reasoning: z.string().nullable().optional(),
-              reasoning_details: ReasoningDetailArraySchema.nullish(),
-              images: ImageResponseArraySchema.nullish(),
-              phase: PhaseSchema.nullable().optional(),
-
-              tool_calls: z
-                .array(
-                  z
-                    .object({
-                      id: z.string().optional().nullable(),
-                      type: z.literal('function'),
-                      function: z
-                        .object({
-                          name: z.string(),
-                          arguments: z.string().optional(),
-                        })
-                        .passthrough(),
-                    })
-                    .passthrough()
-                )
-                .optional(),
-
-              annotations: z
-                .array(
-                  z.union([
-                    // URL citation from web search
-                    // title, start_index, end_index are optional as some upstream providers may omit them
-                    z
-                      .object({
-                        type: z.literal('url_citation'),
-                        url_citation: z
-                          .object({
-                            url: z.string(),
-                            title: z.string().optional(),
-                            start_index: z.number().optional(),
-                            end_index: z.number().optional(),
-                            content: z.string().optional(),
-                          })
-                          .passthrough(),
-                      })
-                      .passthrough(),
-                    // File annotation from FileParserPlugin (old format)
-                    z
-                      .object({
-                        type: z.literal('file_annotation'),
-                        file_annotation: z
-                          .object({
-                            file_id: z.string(),
-                            quote: z.string().optional(),
-                          })
-                          .passthrough(),
-                      })
-                      .passthrough(),
-                    // File annotation from FileParserPlugin (new format)
-                    z
-                      .object({
-                        type: z.literal('file'),
-                        file: z
-                          .object({
-                            hash: z.string(),
-                            name: z.string(),
-                            content: z
-                              .array(
-                                z
-                                  .object({
-                                    type: z.string(),
-                                    text: z.string().optional(),
-                                  })
-                                  .passthrough()
-                              )
-                              .optional(),
-                          })
-                          .passthrough(),
-                      })
-                      .passthrough(),
-                  ])
-                )
-                .nullish(),
-            })
-            .passthrough(),
-          index: z.number().nullish(),
-          logprobs: z
-            .object({
-              content: z
-                .array(
-                  z
-                    .object({
-                      token: z.string(),
-                      logprob: z.number(),
-                      top_logprobs: z.array(
-                        z
-                          .object({
-                            token: z.string(),
-                            logprob: z.number(),
-                          })
-                          .passthrough()
-                      ),
-                    })
-                    .passthrough()
-                )
-                .nullable(),
-            })
-            .passthrough()
-            .nullable()
-            .optional(),
-          finish_reason: z.string().optional().nullable(),
-        })
-        .passthrough()
-    ),
-  }),
-  // Error response (HTTP 200 with error payload)
-  OpenRouterErrorResponseSchema.extend({
-    user_id: z.string().optional(),
-  }),
-]);
-
-export const OpenRouterStreamChatCompletionChunkChoiceSchema = z
+const OpenRouterStreamChatCompletionChunkChoiceSchema = z
   .object({
     delta: z
       .object({
@@ -291,7 +163,7 @@ export type ChatCompletionChunkChoice = z.infer<
 
 // limited version of the schema, focussed on what is needed for the implementation
 // this approach limits breakages when the API changes and increases efficiency
-export const OpenRouterStreamChatCompletionChunkSchema = z.union([
+const OpenRouterStreamChatCompletionChunkSchema = z.union([
   OpenRouterChatCompletionBaseResponseSchema.extend({
     choices: z.array(OpenRouterStreamChatCompletionChunkChoiceSchema),
   }),

@@ -15,5 +15,3 @@ export const OpenRouterErrorResponseSchema = z
     >,
   })
   .passthrough();
-
-export type OpenRouterErrorData = z.infer<typeof OpenRouterErrorResponseSchema>;

@@ -6,14 +6,11 @@ import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/providerHash';
-import { isNull, count, or, desc, eq, and } from 'drizzle-orm';
+import { isNull, count, or, desc, eq } from 'drizzle-orm';
 
-const missingEither = and(
-  isNull(kilocode_users.blocked_reason),
-  or(
-    isNull(kilocode_users.openrouter_upstream_safety_identifier),
-    isNull(kilocode_users.vercel_downstream_safety_identifier)
-  )
+const missingEither = or(
+  isNull(kilocode_users.openrouter_upstream_safety_identifier),
+  isNull(kilocode_users.vercel_downstream_safety_identifier)
 );
 
 export type SafetyIdentifierCountsResponse = {

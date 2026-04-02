@@ -140,16 +140,13 @@ export async function getPausedMonthSet(
     const monthStart = dayjs(`${currentMonth}T00:00:00.000Z`).utc();
     const nextMonthStart = monthStart.add(1, 'month');
 
-    const monthStartIso = monthStart.toISOString();
-    const nextMonthStartIso = nextMonthStart.toISOString();
-
     for (const event of pauseEvents) {
-      const pausedAt = event.paused_at;
-      const resumedAt = event.resumed_at;
+      const pausedAtMs = dayjs(event.paused_at).valueOf();
+      const resumedAtMs = event.resumed_at ? dayjs(event.resumed_at).valueOf() : null;
 
       // paused_at < next_month_start AND (resumed_at IS NULL OR resumed_at >= month_start)
-      const pauseBeforeNextMonth = pausedAt < nextMonthStartIso;
-      const resumeAfterMonthStart = resumedAt === null || resumedAt >= monthStartIso;
+      const pauseBeforeNextMonth = pausedAtMs < nextMonthStart.valueOf();
+      const resumeAfterMonthStart = resumedAtMs === null || resumedAtMs >= monthStart.valueOf();
 
       if (pauseBeforeNextMonth && resumeAfterMonthStart) {
         pausedMonths.add(currentMonth);

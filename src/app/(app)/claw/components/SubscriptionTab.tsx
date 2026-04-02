@@ -18,7 +18,10 @@ export function SubscriptionTab() {
 
   if (!billing) return null;
 
-  if (!billing.subscription) {
+  const subscription = billing.subscription;
+  const showInactiveSubscriptionState = !subscription || subscription.status === 'canceled';
+
+  if (showInactiveSubscriptionState) {
     if (billing.earlybird && billing.earlybird.daysRemaining > 0) {
       return (
         <>

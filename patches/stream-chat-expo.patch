@@ -1,13 +1,18 @@
 diff --git a/src/optionalDependencies/getPhotos.ts b/src/optionalDependencies/getPhotos.ts
-index c0bbe84696a35ae1004aae3ca9b371815f2998c6..b6a59f3e541adfffc0e31bde57ffe7b25e8b8517 100644
+index c0bbe84696a35ae1004aae3ca9b371815f2998c6..fda2be760103d199792d268a1a3bebf1bee9f41c 100644
 --- a/src/optionalDependencies/getPhotos.ts
 +++ b/src/optionalDependencies/getPhotos.ts
-@@ -18,6 +18,20 @@ if (!MediaLibrary) {
+@@ -1,5 +1,6 @@
+ import { Platform } from 'react-native';
+ 
++import { createVideoPlayer } from 'expo-video';
+ import mime from 'mime';
+ 
+ import type { File } from 'stream-chat-react-native-core';
+@@ -18,6 +19,18 @@ if (!MediaLibrary) {
    );
  }
  
-+import { createVideoPlayer } from 'expo-video';
-+
 +const getVideoThumbnail = async (uri: string) => {
 +  const player = createVideoPlayer(uri);
 +  try {
@@ -23,7 +28,7 @@ index c0bbe84696a35ae1004aae3ca9b371815f2998c6..b6a59f3e541adfffc0e31bde57ffe7b2
  import { getLocalAssetUri } from './getLocalAssetUri';
  
  type ReturnType = {
-@@ -55,6 +69,7 @@ export const getPhotos = MediaLibrary
+@@ -55,6 +68,7 @@ export const getPhotos = MediaLibrary
          const assets = await Promise.all(
            results.assets.map(async (asset) => {
              const localUri = await getLocalAssetUri(asset.id);
@@ -31,7 +36,7 @@ index c0bbe84696a35ae1004aae3ca9b371815f2998c6..b6a59f3e541adfffc0e31bde57ffe7b2
              const mimeType =
                mime.getType(asset.filename || asset.uri) ||
                (asset.mediaType === MediaLibrary.MediaType.video ? 'video/*' : 'image/*');
-@@ -63,14 +78,23 @@ export const getPhotos = MediaLibrary
+@@ -63,14 +77,23 @@ export const getPhotos = MediaLibrary
                height: asset.height,
                name: asset.filename,
                size: 0,

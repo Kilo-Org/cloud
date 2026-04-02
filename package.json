@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": "^22"
+    "node": "^24"
   },
   "scripts": {
     "dev": "bash scripts/dev.sh",
@@ -162,7 +162,7 @@
     "@tailwindcss/typography": "^0.5.19",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "catalog:",
-    "@types/node": "^22.19.15",
+    "@types/node": "^24",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@typescript/native-preview": "catalog:",

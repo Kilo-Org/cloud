@@ -1,7 +1,7 @@
 FROM debian:bookworm-slim
 
-# Install Node.js 22 (required by OpenClaw)
-ENV NODE_VERSION=22.22.1
+# Install Node.js 24 (required by OpenClaw)
+ENV NODE_VERSION=24.14.1
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        ca-certificates curl gnupg git xz-utils unzip jq ripgrep rsync zstd \

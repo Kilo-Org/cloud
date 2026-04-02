@@ -28,8 +28,8 @@ ENV PATH="/root/.local/bin:${PATH}"
 # These are fallback versions when .tool-versions is not present
 # Users can override by providing .tool-versions in their project
 
-# Node.js versions (18, 20, 22)
-RUN mise install node@18 node@20 node@22
+# Node.js versions (18, 20, 22, 24)
+RUN mise install node@18 node@20 node@22 node@24
 
 # Ruby versions (3.2, 3.3)
 RUN mise install ruby@3.2 ruby@3.3
@@ -41,7 +41,7 @@ RUN mise install hugo@0.152.2 hugo@0.120.0
 RUN mise install go@1.25.4
 
 # Set default global versions (can be overridden by .tool-versions)
-RUN mise use -g node@22 ruby@3.3 hugo@0.152.2 go@1.25.4
+RUN mise use -g node@24 ruby@3.3 hugo@0.152.2 go@1.25.4
 
 # Build tool versions
 ARG OPENNEXTJS_VERSION=1.14.8

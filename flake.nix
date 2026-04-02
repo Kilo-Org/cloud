@@ -29,8 +29,8 @@
           packages = with pkgs; [
             git
             git-lfs
-            nodejs_22
-            corepack_22
+            nodejs_24
+            corepack_24
             dotenvx
             _1password-cli
             postgresql_18

@@ -1,0 +1,151 @@
+'use client';
+
+import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
+import { Settings } from 'lucide-react';
+import Link from 'next/link';
+import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import { useKiloClawStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { useOrgKiloClawStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
+import { ClawContextProvider, useClawContext } from './ClawContext';
+import { SettingsTab } from './SettingsTab';
+import { BillingWrapper } from './billing/BillingWrapper';
+import { SetPageTitle } from '@/components/SetPageTitle';
+import { Card, CardContent } from '@/components/ui/card';
+
+/**
+ * Standalone settings page content. Sets up the mutation hooks, dirty-secret
+ * tracking, and redeploy/upgrade callbacks that SettingsTab needs.
+ */
+function ClawSettingsInner({ status }: { status: KiloClawDashboardStatus }) {
+  const { organizationId } = useClawContext();
+
+  const personalMutations = useKiloClawMutations();
+  const orgMutations = useOrgKiloClawMutations(organizationId ?? '');
+  const mutations = organizationId ? orgMutations : personalMutations;
+
+  const [dirtySecrets, setDirtySecrets] = useState<Set<string>>(new Set());
+  const onSecretsChanged = useCallback((entryId: string) => {
+    setDirtySecrets(prev => new Set([...prev, entryId]));
+  }, []);
+
+  const onRedeploySuccess = useCallback(() => {
+    setDirtySecrets(new Set());
+  }, []);
+
+  const onRedeploy = useCallback(() => {
+    mutations.restartMachine.mutate(undefined, {
+      onSuccess: () => {
+        toast.success('Redeploying');
+        onRedeploySuccess();
+      },
+      onError: err => {
+        toast.error(err.message, { duration: 10000 });
+      },
+    });
+  }, [mutations.restartMachine, onRedeploySuccess]);
+
+  const onUpgrade = useCallback(() => {
+    mutations.restartMachine.mutate(
+      { imageTag: 'latest' },
+      {
+        onSuccess: () => {
+          toast.success('Upgrading to latest image');
+          onRedeploySuccess();
+        },
+        onError: err => {
+          toast.error(err.message, { duration: 10000 });
+        },
+      }
+    );
+  }, [mutations.restartMachine, onRedeploySuccess]);
+
+  const onRequestUpgrade = useCallback(() => {
+    onUpgrade();
+  }, [onUpgrade]);
+
+  return (
+    <SettingsTab
+      status={status}
+      mutations={mutations}
+      onSecretsChanged={onSecretsChanged}
+      dirtySecrets={dirtySecrets}
+      onRedeploy={onRedeploy}
+      onUpgrade={onUpgrade}
+      onRequestUpgrade={onRequestUpgrade}
+    />
+  );
+}
+
+/**
+ * Wrapper that polls status and handles loading/error/no-instance states
+ * before rendering the settings content.
+ */
+function ClawSettingsWithStatus({ organizationId }: { organizationId?: string }) {
+  const personalStatus = useKiloClawStatus();
+  const orgStatus = useOrgKiloClawStatus(organizationId ?? '');
+  const { data: status, isLoading, error } = organizationId ? orgStatus : personalStatus;
+
+  const clawUrl = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <p className="text-muted-foreground">Loading…</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <p className="text-destructive text-sm">
+            Failed to load status: {error instanceof Error ? error.message : 'Unknown error'}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!status || status.status === null) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <p className="text-muted-foreground">
+            No KiloClaw instance found.{' '}
+            <Link href={clawUrl} className="underline">
+              Go to KiloClaw
+            </Link>{' '}
+            to provision one.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const settingsContent = <ClawSettingsInner status={status} />;
+
+  // Personal context uses BillingWrapper for access-lock dialogs/banners.
+  if (!organizationId) {
+    return <BillingWrapper>{settingsContent}</BillingWrapper>;
+  }
+
+  return settingsContent;
+}
+
+export function ClawSettingsPage({ organizationId }: { organizationId?: string }) {
+  return (
+    <ClawContextProvider organizationId={organizationId}>
+      <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
+        <SetPageTitle
+          title="Settings"
+          icon={<Settings className="text-muted-foreground h-4 w-4" />}
+        />
+        <ClawSettingsWithStatus organizationId={organizationId} />
+      </div>
+    </ClawContextProvider>
+  );
+}

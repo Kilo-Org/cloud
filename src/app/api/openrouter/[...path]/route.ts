@@ -44,6 +44,8 @@ import {
   forbiddenFreeModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
+  kiloClawSignInRequiredResponse,
+  kiloClawRateLimitResponse,
 } from '@/lib/llm-proxy-helpers';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { ENABLE_TOOL_REPAIR, repairTools } from '@/lib/tool-calling';
@@ -242,6 +244,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       console.warn(
         `Free model rate limit exceeded, ${rateLimit.subject}, model: ${originalModelIdLowerCased}, request count: ${rateLimit.result.requestCount}`
       );
+      if (feature === 'kiloclaw' || feature === 'openclaw') {
+        return kiloClawRateLimitResponse();
+      }
       return NextResponse.json(
         {
           error: 'Rate limit exceeded',
@@ -273,6 +278,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     // No valid auth
     if (!isFreeModel(originalModelIdLowerCased)) {
       // Paid model requires authentication
+      if (feature === 'kiloclaw' || feature === 'openclaw') {
+        return kiloClawSignInRequiredResponse();
+      }
       return NextResponse.json(
         {
           error: {

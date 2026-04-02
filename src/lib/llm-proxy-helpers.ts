@@ -236,6 +236,16 @@ export function modelNotAllowedResponse() {
   );
 }
 
+export function kiloClawSignInRequiredResponse() {
+  const error = `You need to sign in to use this model. Visit app.kilo.ai to connect your account, or switch to the free model: /model kilocode/${KILO_AUTO_FREE_MODEL.id}`;
+  return NextResponse.json({ error, message: error }, { status: 401 });
+}
+
+export function kiloClawRateLimitResponse() {
+  const error = `Free model usage limit reached. Sign in at app.kilo.ai for more usage, or try again later. You can also switch to the free model: /model kilocode/${KILO_AUTO_FREE_MODEL.id}`;
+  return NextResponse.json({ error, message: error }, { status: 429 });
+}
+
 export function forbiddenFreeModelResponse(
   header: FraudDetectionHeaders,
   feature: FeatureValue | null

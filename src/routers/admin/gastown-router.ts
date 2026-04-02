@@ -3,6 +3,9 @@ import 'server-only';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
+import { sql, eq } from 'drizzle-orm';
+import { microdollar_usage, microdollar_usage_metadata, feature } from '@kilocode/db/schema';
+import { db } from '@/lib/drizzle';
 import {
   GASTOWN_SERVICE_URL,
   GASTOWN_CF_ACCESS_CLIENT_ID,
@@ -660,6 +663,57 @@ export const adminGastownRouter = createTRPCRouter({
     .output(TownConfigRecord)
     .query(({ input, ctx }) => {
       return gastownGet(ctx.user, `/api/towns/${input.townId}/config`, TownConfigRecord);
+    }),
+
+  /**
+   * Aggregate cost/token usage for 'gastown' feature over the last 7 days.
+   */
+  getAggregateStats: adminProcedure
+    .output(
+      z.object({
+        totalCost: z.number(),
+        totalInputTokens: z.number(),
+        totalOutputTokens: z.number(),
+        totalCacheWriteTokens: z.number(),
+        totalCacheHitTokens: z.number(),
+      })
+    )
+    .query(async () => {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+      const stats = await db
+        .select({
+          totalCost: sql<number>`SUM(${microdollar_usage.cost})`,
+          totalInputTokens: sql<number>`SUM(${microdollar_usage.input_tokens})`,
+          totalOutputTokens: sql<number>`SUM(${microdollar_usage.output_tokens})`,
+          totalCacheWriteTokens: sql<number>`SUM(${microdollar_usage.cache_write_tokens})`,
+          totalCacheHitTokens: sql<number>`SUM(${microdollar_usage.cache_hit_tokens})`,
+        })
+        .from(microdollar_usage)
+        .innerJoin(
+          microdollar_usage_metadata,
+          eq(microdollar_usage.id, microdollar_usage_metadata.id)
+        )
+        .innerJoin(feature, eq(microdollar_usage_metadata.feature_id, feature.feature_id))
+        .where(
+          sql`${feature.feature} = 'gastown' AND ${microdollar_usage.created_at} >= ${sevenDaysAgo}`
+        );
+
+      const result = stats[0] ?? {
+        totalCost: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        totalCacheWriteTokens: 0,
+        totalCacheHitTokens: 0,
+      };
+
+      return {
+        totalCost: Number(result.totalCost || 0),
+        totalInputTokens: Number(result.totalInputTokens || 0),
+        totalOutputTokens: Number(result.totalOutputTokens || 0),
+        totalCacheWriteTokens: Number(result.totalCacheWriteTokens || 0),
+        totalCacheHitTokens: Number(result.totalCacheHitTokens || 0),
+      };
     }),
 
   /**

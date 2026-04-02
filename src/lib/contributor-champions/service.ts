@@ -700,7 +700,9 @@ export async function enrollContributorChampion(input: {
 
   const creditAmountUsd = TIER_CREDIT_USD[resolvedTier];
   const creditAmountMicrodollars = toMicrodollars(creditAmountUsd);
-  const linkedKiloUserId = row.linkedUserId;
+  // Prefer the explicit membership link (set during manual enrollment) over the
+  // email-derived match so re-enrolling a manually enrolled contributor still grants credits.
+  const linkedKiloUserId = row.linkedKiloUserId ?? row.linkedUserId;
 
   const now = new Date().toISOString();
 
@@ -731,6 +733,9 @@ export async function enrollContributorChampion(input: {
           enrolled_at: now,
           credit_amount_microdollars: creditAmountMicrodollars,
           linked_kilo_user_id: linkedKiloUserId,
+          // Preserve existing timestamp — overwriting with null would reset the
+          // 30-day credit cycle, potentially triggering a premature re-grant.
+          credits_last_granted_at: sql`contributor_champion_memberships.credits_last_granted_at`,
           updated_at: sql`now()`,
         },
       });

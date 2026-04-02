@@ -98,6 +98,7 @@ const config = {
       },
     ],
     ['react-native-appsflyer', {}],
+    './plugins/withAndroidManifestFix',
   ],
   experiments: {
     typedRoutes: true,

@@ -83,12 +83,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
       setTargetTier(subscription.tier);
       setTargetCadence(subscription.cadence);
     }
-  }, [
-    isOpen,
-    scheduledChange,
-    subscription.tier,
-    subscription.cadence,
-  ]);
+  }, [isOpen, scheduledChange, subscription.tier, subscription.cadence]);
 
   useEffect(() => {
     if (isOpen && scheduledChange) {

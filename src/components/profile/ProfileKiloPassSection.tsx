@@ -15,7 +15,9 @@ import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/c
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 
 function getShowKiloPassTwoMonthPromo(showFirstMonthPromo: boolean): boolean {
-  return showFirstMonthPromo && dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
+  return (
+    showFirstMonthPromo && dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF)
+  );
 }
 
 export function ProfileKiloPassSection() {

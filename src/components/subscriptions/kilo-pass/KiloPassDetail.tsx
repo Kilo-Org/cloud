@@ -323,8 +323,9 @@ function KiloPassInlineActions({
   hasScheduledChange: boolean;
 }) {
   const { view, actions } = useKiloPassSubscriptionInfo();
-  const [confirmationAction, setConfirmationAction] =
-    useState<KiloPassConfirmationAction | null>(null);
+  const [confirmationAction, setConfirmationAction] = useState<KiloPassConfirmationAction | null>(
+    null
+  );
   const [pendingAction, setPendingAction] = useState<KiloPassConfirmationAction | null>(null);
 
   const confirmationDetails =
@@ -425,11 +426,7 @@ function KiloPassInlineActions({
   );
 }
 
-function BonusStreakContent({
-  subscription,
-}: {
-  subscription: KiloPassSubscription;
-}) {
+function BonusStreakContent({ subscription }: { subscription: KiloPassSubscription }) {
   const trpc = useTRPC();
   const scheduledChangeQuery = useQuery(trpc.kiloPass.getScheduledChange.queryOptions());
   const scheduledChange = scheduledChangeQuery.data?.scheduledChange ?? null;
@@ -545,7 +542,9 @@ function BonusStreakContent({
             <div className="flex items-start gap-2">
               <Calendar className="mt-0.5 h-4 w-4 text-white/40" />
               <div className="text-muted-foreground">
-                <div>{row.labelPrefix}: <span className="text-foreground">{dateLabel}</span></div>
+                <div>
+                  {row.labelPrefix}: <span className="text-foreground">{dateLabel}</span>
+                </div>
                 <div className="mt-1">
                   Adds{' '}
                   <span className="font-mono font-semibold text-amber-300">

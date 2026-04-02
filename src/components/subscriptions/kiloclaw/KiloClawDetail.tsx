@@ -153,7 +153,8 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
       ? {
           price: formatKiloclawPrice(otherPlan),
           cadence: 'Renews every 6 months',
-          summary: 'Lower effective rate at $8.00/month, billed $48.00 upfront for each 6-month term.',
+          summary:
+            'Lower effective rate at $8.00/month, billed $48.00 upfront for each 6-month term.',
         }
       : {
           price: formatKiloclawPrice(otherPlan),
@@ -190,7 +191,9 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
                   <div className="flex-1 rounded-md bg-muted/40 px-3 py-2 text-center">
                     <div className="text-muted-foreground text-xs">Current plan</div>
                     <div className="font-medium">{capitalize(subscription.plan)}</div>
-                    <div className="text-muted-foreground text-xs">{formatKiloclawPrice(subscription.plan)}</div>
+                    <div className="text-muted-foreground text-xs">
+                      {formatKiloclawPrice(subscription.plan)}
+                    </div>
                   </div>
                   <ArrowRight className="text-muted-foreground h-4 w-4 shrink-0" />
                   <div className="flex-1 rounded-md bg-muted/40 px-3 py-2 text-center">
@@ -312,7 +315,10 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-5">
-            <DetailRow label="Instance" value={subscription.instanceName || subscription.instanceId} />
+            <DetailRow
+              label="Instance"
+              value={subscription.instanceName || subscription.instanceId}
+            />
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {primaryDetailRows.map(row => (
@@ -328,34 +334,24 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
               </div>
             ) : null}
           </div>
-
         </CardContent>
       </Card>
 
       <div className="flex flex-wrap gap-2">
         {subscription.plan !== 'trial' ? (
           subscription.scheduledPlan ? (
-            <Button
-              variant="outline"
-              onClick={() => setConfirmationAction('cancelPlanSwitch')}
-            >
+            <Button variant="outline" onClick={() => setConfirmationAction('cancelPlanSwitch')}>
               Cancel Plan Switch
             </Button>
           ) : (
-            <Button
-              variant="outline"
-              onClick={() => setConfirmationAction('switchPlan')}
-            >
+            <Button variant="outline" onClick={() => setConfirmationAction('switchPlan')}>
               Switch to {capitalize(otherPlan)} Plan
             </Button>
           )
         ) : null}
 
         {subscription.cancelAtPeriodEnd ? (
-          <Button
-            variant="outline"
-            onClick={() => setConfirmationAction('reactivate')}
-          >
+          <Button variant="outline" onClick={() => setConfirmationAction('reactivate')}>
             Reactivate
           </Button>
         ) : (
@@ -369,10 +365,7 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
         )}
 
         {subscription.showConversionPrompt ? (
-          <Button
-            variant="outline"
-            onClick={() => setConfirmationAction('switchToCredits')}
-          >
+          <Button variant="outline" onClick={() => setConfirmationAction('switchToCredits')}>
             Switch to Credits
           </Button>
         ) : null}
@@ -412,17 +405,17 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
             setConfirmationAction(null);
           }
         }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{confirmationDetails?.title}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {confirmationDetails?.description}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmationDetails?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmationDetails?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
           {confirmationDetails?.extraContent ?? null}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={pendingConfirmationAction !== null}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={pendingConfirmationAction !== null}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               variant={confirmationDetails?.confirmVariant ?? 'default'}
               onClick={confirmSubscriptionAction}

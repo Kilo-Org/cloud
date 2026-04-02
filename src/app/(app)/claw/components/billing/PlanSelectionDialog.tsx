@@ -328,8 +328,8 @@ function CreditsHowItWorks() {
             <div className="text-muted-foreground flex items-start gap-2 py-0.5 text-xs">
               <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
               <span>
-                First-time subscribers receive <span className="text-emerald-300">50%</span>{' '}
-                free bonus credits for the first two months.
+                First-time subscribers receive <span className="text-emerald-300">50%</span> free
+                bonus credits for the first two months.
               </span>
             </div>
           ) : null}

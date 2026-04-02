@@ -187,10 +187,7 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
               label="Organization"
               value={organizationQuery.data?.name ?? 'Organization'}
             />
-            <DetailRow
-              label="Plan"
-              value={capitalize(organizationQuery.data?.plan ?? 'teams')}
-            />
+            <DetailRow label="Plan" value={capitalize(organizationQuery.data?.plan ?? 'teams')} />
             <DetailRow label="Billing cycle" value={capitalize(currentInterval)} />
             <DetailRow
               label="Price"
@@ -212,8 +209,7 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Seat utilization</span>
               <span>
-                {subscriptionQuery.data?.seatsUsed ?? 0} /{' '}
-                {subscriptionQuery.data?.totalSeats ?? 0}
+                {subscriptionQuery.data?.seatsUsed ?? 0} / {subscriptionQuery.data?.totalSeats ?? 0}
               </span>
             </div>
             <Progress
@@ -240,9 +236,11 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
                     setIsCancelingCycleChange(true);
                     void (async () => {
                       try {
-                        await trpcClient.organizations.subscription.cancelBillingCycleChange.mutate({
-                          organizationId,
-                        });
+                        await trpcClient.organizations.subscription.cancelBillingCycleChange.mutate(
+                          {
+                            organizationId,
+                          }
+                        );
                         toast.success('Billing cycle change canceled');
                         await refreshData();
                       } catch (error) {
@@ -468,17 +466,13 @@ function BillingCycleChangeContent({
         <div className="bg-muted/20 border-border/60 flex-1 rounded-lg border px-3 py-2 text-center">
           <div className="text-muted-foreground text-xs">Current cycle</div>
           <div className="font-medium">{capitalize(currentInterval)}</div>
-          <div className="text-muted-foreground text-xs">
-            ${currentPerSeat.toFixed(2)}/seat/mo
-          </div>
+          <div className="text-muted-foreground text-xs">${currentPerSeat.toFixed(2)}/seat/mo</div>
         </div>
         <ArrowRight className="text-muted-foreground h-4 w-4 shrink-0" />
         <div className="bg-muted/20 border-border/60 flex-1 rounded-lg border px-3 py-2 text-center">
           <div className="text-muted-foreground text-xs">New cycle</div>
           <div className="font-medium">{capitalize(targetInterval)}</div>
-          <div className="text-muted-foreground text-xs">
-            ${targetPerSeat.toFixed(2)}/seat/mo
-          </div>
+          <div className="text-muted-foreground text-xs">${targetPerSeat.toFixed(2)}/seat/mo</div>
         </div>
       </div>
       <p className="text-muted-foreground">

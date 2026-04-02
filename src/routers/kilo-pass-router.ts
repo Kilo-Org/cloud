@@ -473,10 +473,10 @@ export const kiloPassRouter = createTRPCRouter({
     if (subscriptionBase.cadence === KiloPassCadence.Yearly) {
       const usd = computeYearlyCadenceMonthlyBonusUsd(subscriptionBase.tier);
       currentPeriodBonusCreditsUsd = roundToCents(usd);
-      } else {
-        const streakMonths = Math.max(1, subscriptionBase.currentStreakMonths);
-        const shouldShowFirstMonthPromo =
-          streakMonths === 1 && isFirstTimeSubscriberEver && isTwoMonthPromoOfferActive();
+    } else {
+      const streakMonths = Math.max(1, subscriptionBase.currentStreakMonths);
+      const shouldShowFirstMonthPromo =
+        streakMonths === 1 && isFirstTimeSubscriberEver && isTwoMonthPromoOfferActive();
 
       if (shouldShowFirstMonthPromo) {
         const cents = Math.round(baseAmountUsd * KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT * 100);

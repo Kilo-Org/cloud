@@ -191,11 +191,11 @@ export function SeatsSubscribeCard({
                   onChange={event => {
                     const nextValue = Number.parseInt(event.target.value, 10);
                     if (Number.isNaN(nextValue)) return;
-                     seededFromDefaults.current = true;
-                     setSeatCount(Math.max(1, Math.min(100, nextValue)));
-                   }}
-                   className="bg-blue-500/10 h-11 w-24 rounded-xl border-0 text-center text-lg font-semibold shadow-none focus-visible:border-transparent focus-visible:ring-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                 />
+                    seededFromDefaults.current = true;
+                    setSeatCount(Math.max(1, Math.min(100, nextValue)));
+                  }}
+                  className="bg-blue-500/10 h-11 w-24 rounded-xl border-0 text-center text-lg font-semibold shadow-none focus-visible:border-transparent focus-visible:ring-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
 
                 <Button
                   type="button"
@@ -279,7 +279,10 @@ export function SeatsSubscribeCard({
               <h4 className="text-sm font-medium text-white/90">Pay-as-you-go</h4>
               <p className="text-muted-foreground/90 mt-1 text-xs leading-5">
                 Purchase credits as needed. Only pay for what you use with no commitments.{' '}
-                <Link href="/credits" className="text-blue-400/90 hover:text-blue-300 hover:underline">
+                <Link
+                  href="/credits"
+                  className="text-blue-400/90 hover:text-blue-300 hover:underline"
+                >
                   Learn more
                 </Link>
               </p>
@@ -305,7 +308,6 @@ export function SeatsSubscribeCard({
             </a>
           </div>
         </div>
-
       </CardContent>
     </Card>
   );

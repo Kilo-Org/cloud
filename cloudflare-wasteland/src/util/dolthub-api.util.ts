@@ -1,175 +1,149 @@
+/**
+ * DoltHub REST API client for polling wanted board state.
+ *
+ * Uses the DoltHub SQL API to run queries against the wasteland's
+ * upstream Dolt repository, then parses results with Zod.
+ */
 import { z } from 'zod';
 import type { WantedItem } from '../dos/wasteland/wanted-cache';
 
-/**
- * DoltHub SQL API client for polling the wanted board.
- *
- * Uses the DoltHub v1alpha1 query endpoint:
- *   POST https://www.dolthub.com/api/v1alpha1/{owner}/{repo}/{branch}/query
- *
- * The `upstream` string format is `owner/repo` or `owner/repo/branch`.
- * If no branch is specified, defaults to `main`.
- */
-
-const DOLTHUB_API_BASE = 'https://www.dolthub.com/api/v1alpha1';
-const DEFAULT_BRANCH = 'main';
-const MAX_RETRIES = 3;
-const INITIAL_BACKOFF_MS = 1_000;
-
-// ── DoltHub response schema ─────────────────────────────────────────────
-
-const DoltHubColumnSchema = z.object({
-  columnName: z.string(),
-  columnType: z.string(),
-});
-
-const DoltHubQueryResponseSchema = z.object({
-  query_execution_status: z.string(),
-  query_execution_message: z.string().optional(),
-  schema: z.array(DoltHubColumnSchema).optional(),
-  rows: z.array(z.record(z.string(), z.unknown())).optional(),
-});
+const LOG = '[dolthub-api]';
 
 /**
- * Maps a DoltHub row (column-name → value) to our WantedItem shape.
- * DoltHub returns column names matching the Dolt table schema.
+ * Parse an upstream string like "owner/repo" or "owner/repo/branch"
+ * into its constituent parts. Defaults branch to "main" if omitted.
  */
-const DoltHubWantedRowSchema = z
-  .object({
-    item_id: z.string(),
-    title: z.string(),
-    description: z.string().nullish(),
-    bounty: z.coerce.number().int().nullish(),
-    status: z.string().nullish(),
-    claimed_by: z.string().nullish(),
-    claim_id: z.string().nullish(),
-    evidence: z.string().nullish(),
-    created_at: z.string().nullish(),
-    updated_at: z.string().nullish(),
-  })
-  .transform(
-    (row): WantedItem => ({
-      item_id: row.item_id,
-      title: row.title,
-      description: row.description ?? null,
-      bounty: row.bounty ?? null,
-      status: row.status ?? null,
-      claimed_by: row.claimed_by ?? null,
-      claim_id: row.claim_id ?? null,
-      evidence: row.evidence ?? null,
-      created_at: row.created_at ?? null,
-      updated_at: row.updated_at ?? null,
-    })
-  );
-
-// ── Helpers ─────────────────────────────────────────────────────────────
-
 function parseUpstream(upstream: string): { owner: string; repo: string; branch: string } {
   const parts = upstream.split('/');
   if (parts.length < 2) {
-    throw new DoltHubApiError(`Invalid upstream format: "${upstream}". Expected "owner/repo" or "owner/repo/branch".`);
+    throw new Error(`Invalid upstream format: ${upstream} (expected "owner/repo" or "owner/repo/branch")`);
   }
   return {
     owner: parts[0],
     repo: parts[1],
-    branch: parts[2] ?? DEFAULT_BRANCH,
+    branch: parts[2] ?? 'main',
   };
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// ── Errors ──────────────────────────────────────────────────────────────
-
-export class DoltHubApiError extends Error {
-  constructor(
-    message: string,
-    public readonly statusCode?: number,
-    public readonly retryable = false
-  ) {
-    super(message);
-    this.name = 'DoltHubApiError';
-  }
-}
-
-// ── Main fetch function ─────────────────────────────────────────────────
+/** Zod schema for a single row returned by the DoltHub SQL API. */
+const DoltHubWantedRow = z.object({
+  item_id: z.string(),
+  title: z.string(),
+  description: z.string().nullable().default(null),
+  bounty: z.coerce.number().nullable().default(null),
+  status: z.enum(['open', 'claimed', 'done']).default('open'),
+  priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
+  type: z.enum(['feature', 'bug', 'docs', 'other']).default('other'),
+  claimed_by: z.string().nullable().default(null),
+  claim_id: z.string().nullable().default(null),
+  evidence: z.string().nullable().default(null),
+  created_at: z.string().nullable().default(null),
+  updated_at: z.string().nullable().default(null),
+});
 
 /**
- * Polls DoltHub for the wanted board contents.
+ * DoltHub SQL API response shape.
+ * The API returns `{ query_execution_status: string, query_execution_message: string,
+ *   rows: Array<Record<string, unknown>>, schema: ... }`.
+ */
+const DoltHubQueryResponse = z.object({
+  query_execution_status: z.string(),
+  query_execution_message: z.string().optional(),
+  rows: z.array(z.record(z.string(), z.unknown())).default([]),
+});
+
+/** Maximum number of retry attempts for transient errors. */
+const MAX_RETRIES = 3;
+
+/** Base delay (ms) for exponential backoff. */
+const BASE_DELAY_MS = 1000;
+
+/**
+ * Fetch the wanted board from DoltHub's SQL API.
  *
- * Handles:
- * - 429 (rate limiting) with exponential backoff
- * - 503 (DoltHub downtime) with retry
- * - Non-200 responses as errors
+ * @param upstream - DoltHub upstream in "owner/repo" or "owner/repo/branch" format
+ * @param token - Optional DoltHub API token for private repos
+ * @returns Parsed wanted items
  */
 export async function fetchWantedBoard(
   upstream: string,
   token?: string
 ): Promise<WantedItem[]> {
   const { owner, repo, branch } = parseUpstream(upstream);
-  const url = `${DOLTHUB_API_BASE}/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/query`;
+  const url = `https://www.dolthub.com/api/v1alpha1/${owner}/${repo}/${branch}/query`;
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const body = JSON.stringify({
-    query: 'SELECT * FROM wanted ORDER BY created_at DESC',
-  });
-
-  let lastError: Error | undefined;
+  let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    if (attempt > 0) {
-      const backoffMs = INITIAL_BACKOFF_MS * Math.pow(2, attempt - 1);
-      await sleep(backoffMs);
-    }
-
-    let response: Response;
     try {
-      response = await fetch(url, { method: 'POST', headers, body });
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          q: 'SELECT * FROM wanted ORDER BY created_at DESC',
+        }),
+      });
+
+      if (response.status === 429) {
+        // Rate limited — back off exponentially
+        const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+        console.warn(`${LOG} rate limited (429), retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        await sleep(delay);
+        continue;
+      }
+
+      if (response.status === 503) {
+        // DoltHub downtime — back off
+        const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+        console.warn(`${LOG} DoltHub unavailable (503), retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        await sleep(delay);
+        continue;
+      }
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        throw new Error(`DoltHub API error ${response.status}: ${body || response.statusText}`);
+      }
+
+      const json: unknown = await response.json();
+      const parsed = DoltHubQueryResponse.parse(json);
+
+      if (parsed.query_execution_status !== 'Success') {
+        throw new Error(
+          `DoltHub query failed: ${parsed.query_execution_message ?? parsed.query_execution_status}`
+        );
+      }
+
+      return parsed.rows.map(row => DoltHubWantedRow.parse(row));
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      console.warn(`[dolthub-api] fetch attempt ${attempt + 1}/${MAX_RETRIES} failed: ${lastError.message}`);
-      continue;
+
+      // Only retry on network-level errors, not on parse/validation errors
+      if (
+        lastError.message.includes('DoltHub API error 429') ||
+        lastError.message.includes('DoltHub unavailable') ||
+        lastError.message.includes('fetch failed')
+      ) {
+        const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+        console.warn(`${LOG} transient error, retrying in ${delay}ms:`, lastError.message);
+        await sleep(delay);
+        continue;
+      }
+
+      throw lastError;
     }
-
-    if (response.status === 429) {
-      console.warn(`[dolthub-api] rate limited (429), retrying (attempt ${attempt + 1}/${MAX_RETRIES})`);
-      lastError = new DoltHubApiError('DoltHub rate limit exceeded', 429, true);
-      continue;
-    }
-
-    if (response.status === 503) {
-      console.warn(`[dolthub-api] DoltHub unavailable (503), retrying (attempt ${attempt + 1}/${MAX_RETRIES})`);
-      lastError = new DoltHubApiError('DoltHub unavailable', 503, true);
-      continue;
-    }
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      throw new DoltHubApiError(
-        `DoltHub API error: ${response.status} ${response.statusText} — ${text}`,
-        response.status
-      );
-    }
-
-    const rawJson: unknown = await response.json();
-    const parsed = DoltHubQueryResponseSchema.parse(rawJson);
-
-    if (parsed.query_execution_status !== 'Success') {
-      throw new DoltHubApiError(
-        `DoltHub query failed: ${parsed.query_execution_message ?? 'unknown error'}`
-      );
-    }
-
-    const rows = parsed.rows ?? [];
-    return rows.map(row => DoltHubWantedRowSchema.parse(row));
   }
 
-  throw lastError ?? new DoltHubApiError('DoltHub API request failed after retries');
+  throw lastError ?? new Error(`${LOG} exhausted retries`);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }

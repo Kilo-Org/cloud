@@ -1,32 +1,32 @@
-import { DurableObject } from 'cloudflare:workers';
-import { query } from '../util/query.util';
-import { fetchWantedBoard } from '../util/dolthub-api.util';
-import * as configOps from './wasteland/config';
-import * as credentialOps from './wasteland/credentials';
-import * as memberOps from './wasteland/members';
-import * as wantedCacheOps from './wasteland/wanted-cache';
-
-const LOG = '[Wasteland.do]';
-
-/** Alarm fires every 5 minutes for active wastelands. */
-const ALARM_INTERVAL_MS = 5 * 60 * 1_000;
-
-export type WastelandConfig = configOps.WastelandConfigRecord;
-export type InitWastelandInput = configOps.InitWastelandInput;
-export type WastelandCredential = credentialOps.WastelandCredentialRecord;
-export type WastelandMember = memberOps.WastelandMemberRecord;
-export type WantedItem = wantedCacheOps.WantedItem;
-export type WantedItemRecord = wantedCacheOps.WantedItemRecord;
-
 /**
- * WastelandDO — per-wasteland Durable Object storing configuration,
- * encrypted credentials, member registry, and wanted board cache in SQLite.
+ * WastelandDO — per-wasteland Durable Object.
  *
- * Keying: one DO instance per wasteland (keyed by `wasteland_id`).
- *
- * The alarm loop periodically polls DoltHub for wanted board state
- * and caches it locally for fast reads without waking a Container.
+ * Manages config, members, credentials, connected towns, and wanted board cache.
+ * The alarm loop periodically polls DoltHub for wanted board state and caches
+ * results in local SQLite for fast reads.
  */
+import { DurableObject } from 'cloudflare:workers';
+import * as configOps from './wasteland/config';
+import * as memberOps from './wasteland/members';
+import * as credentialOps from './wasteland/credentials';
+import * as connectedTownOps from './wasteland/connected-towns';
+import * as wantedCacheOps from './wasteland/wanted-cache';
+import { fetchWantedBoard } from '../util/dolthub-api.util';
+import type { WastelandConfigRecord } from '../db/tables/wasteland-config.table';
+import type { WastelandMemberRecord } from '../db/tables/wasteland-members.table';
+import type { WastelandCredentialRecord } from '../db/tables/wasteland-credentials.table';
+import type { ConnectedTownRecord } from '../db/tables/wasteland-connected-towns.table';
+import type { WantedCacheRecord } from '../db/tables/wasteland-wanted-cache.table';
+import type {
+  InitializeWastelandInput,
+  UpdateWastelandConfigInput,
+} from './WastelandDO.stub';
+
+const LOG = '[WastelandDO]';
+
+/** Polling interval for the alarm loop: 5 minutes. */
+const ALARM_INTERVAL_MS = 5 * 60 * 1000;
+
 export class WastelandDO extends DurableObject<Env> {
   private sql: SqlStorage;
   private initPromise: Promise<void> | null = null;
@@ -48,124 +48,38 @@ export class WastelandDO extends DurableObject<Env> {
   }
 
   private async initializeDatabase(): Promise<void> {
-    query(this.sql, configOps.createTableWastelandConfig(), []);
-    query(this.sql, credentialOps.createTableWastelandCredentials(), []);
-    query(this.sql, memberOps.createTableWastelandMembers(), []);
-    query(this.sql, wantedCacheOps.createTableWastelandWantedCache(), []);
-    await Promise.resolve();
+    configOps.initConfigTable(this.sql);
+    memberOps.initMembersTable(this.sql);
+    credentialOps.initCredentialsTable(this.sql);
+    connectedTownOps.initConnectedTownsTable(this.sql);
+    wantedCacheOps.initWantedCacheTable(this.sql);
+
+    // Ensure the alarm is running if this wasteland is active
+    await this.armAlarmIfNeeded();
   }
 
-  // ── Config ────────────────────────────────────────────────────────────
-
-  async getConfig(): Promise<WastelandConfig | null> {
-    await this.ensureInitialized();
-    return configOps.getConfig(this.sql);
-  }
-
-  async initializeWasteland(input: InitWastelandInput): Promise<void> {
-    await this.ensureInitialized();
-    console.log(`${LOG} initializeWasteland: id=${input.wasteland_id} name=${input.name}`);
-    configOps.initializeWasteland(this.sql, input);
-
-    // Start the alarm loop shortly after creation so the first poll fires quickly.
-    void this.ctx.storage.setAlarm(Date.now() + 1_000);
-  }
-
-  async updateConfig(
-    update: Partial<Pick<WastelandConfig, 'name' | 'visibility' | 'dolthub_upstream' | 'status'>>
-  ): Promise<void> {
-    await this.ensureInitialized();
-    console.log(`${LOG} updateConfig:`, JSON.stringify(update));
-    configOps.updateConfig(this.sql, update);
-  }
-
-  // ── Credentials ───────────────────────────────────────────────────────
-
-  async storeCredential(
-    userId: string,
-    encryptedToken: string,
-    dolthubOrg: string,
-    rigHandle?: string
-  ): Promise<void> {
-    await this.ensureInitialized();
-    console.log(`${LOG} storeCredential: userId=${userId} org=${dolthubOrg}`);
-    credentialOps.storeCredential(this.sql, userId, encryptedToken, dolthubOrg, rigHandle);
-  }
-
-  async getCredential(userId: string): Promise<WastelandCredential | null> {
-    await this.ensureInitialized();
-    return credentialOps.getCredential(this.sql, userId);
-  }
-
-  async deleteCredential(userId: string): Promise<void> {
-    await this.ensureInitialized();
-    console.log(`${LOG} deleteCredential: userId=${userId}`);
-    credentialOps.deleteCredential(this.sql, userId);
-  }
-
-  // ── Members ───────────────────────────────────────────────────────────
-
-  async addMember(userId: string, role: string, trustLevel: number): Promise<string> {
-    await this.ensureInitialized();
-    console.log(`${LOG} addMember: userId=${userId} role=${role} trustLevel=${trustLevel}`);
-    return memberOps.addMember(this.sql, userId, role, trustLevel);
-  }
-
-  async removeMember(memberId: string): Promise<void> {
-    await this.ensureInitialized();
-    console.log(`${LOG} removeMember: memberId=${memberId}`);
-    memberOps.removeMember(this.sql, memberId);
-  }
-
-  async listMembers(): Promise<WastelandMember[]> {
-    await this.ensureInitialized();
-    return memberOps.listMembers(this.sql);
-  }
-
-  async getMember(userId: string): Promise<WastelandMember | null> {
-    await this.ensureInitialized();
-    return memberOps.getMember(this.sql, userId);
-  }
-
-  // ── Wanted Board (cached reads) ───────────────────────────────────────
-
-  /** Return all cached wanted items. */
-  async browseWanted(): Promise<WantedItemRecord[]> {
-    await this.ensureInitialized();
-    return wantedCacheOps.getCachedWantedItems(this.sql);
-  }
-
-  /** Return a single cached wanted item by ID. */
-  async getWantedItem(itemId: string): Promise<WantedItemRecord | null> {
-    await this.ensureInitialized();
-    return wantedCacheOps.getCachedWantedItem(this.sql, itemId);
-  }
-
-  /** Force-refresh the cache from DoltHub and return the new items. */
-  async refreshWanted(): Promise<WantedItemRecord[]> {
-    await this.ensureInitialized();
-    const config = configOps.getConfig(this.sql);
-    if (!config?.dolthub_upstream) {
-      return [];
-    }
-
-    const items = await fetchWantedBoard(config.dolthub_upstream);
-    wantedCacheOps.cacheWantedItems(this.sql, items);
-    return wantedCacheOps.getCachedWantedItems(this.sql);
-  }
-
-  // ── Alarm ─────────────────────────────────────────────────────────────
+  // ── Alarm ───────────────────────────────────────────────────────────
 
   /**
-   * Periodically polls DoltHub for wanted board state and caches results
-   * in SQLite for fast reads. Re-arms the alarm for the next tick.
+   * Arm the alarm loop if the wasteland is configured and active.
+   * Called after DB init and after config changes that enable polling.
    */
-  async alarm(): Promise<void> {
-    await this.ensureInitialized();
+  private async armAlarmIfNeeded(): Promise<void> {
     const config = configOps.getConfig(this.sql);
     if (!config || config.status !== 'active' || !config.dolthub_upstream) {
-      // No polling for inactive or unconfigured wastelands.
       return;
+    }
+
+    const current = await this.ctx.storage.getAlarm();
+    if (!current || current < Date.now()) {
+      await this.ctx.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS);
+    }
+  }
+
+  async alarm(): Promise<void> {
+    const config = configOps.getConfig(this.sql);
+    if (!config || config.status !== 'active' || !config.dolthub_upstream) {
+      return; // No polling for inactive or unconfigured wastelands
     }
 
     try {
@@ -175,8 +89,129 @@ export class WastelandDO extends DurableObject<Env> {
       console.error(`${LOG} alarm polling failed`, err);
     }
 
-    // Schedule next alarm tick.
+    // Re-arm: poll again in 5 minutes
     await this.ctx.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS);
+  }
+
+  // ── Config RPCs ─────────────────────────────────────────────────────
+
+  async initializeWasteland(input: InitializeWastelandInput): Promise<WastelandConfigRecord> {
+    await this.ensureInitialized();
+    const config = configOps.insertConfig(this.sql, input);
+
+    // Schedule the first alarm 1s after creation if upstream is configured
+    if (input.dolthub_upstream) {
+      await this.ctx.storage.setAlarm(Date.now() + 1000);
+    }
+
+    return config;
+  }
+
+  async getConfig(): Promise<WastelandConfigRecord | null> {
+    await this.ensureInitialized();
+    return configOps.getConfig(this.sql);
+  }
+
+  async updateConfig(input: UpdateWastelandConfigInput): Promise<WastelandConfigRecord> {
+    await this.ensureInitialized();
+    const config = configOps.updateConfig(this.sql, input);
+
+    // If dolthub_upstream was just set, ensure alarm is running
+    if (input.dolthub_upstream !== undefined) {
+      await this.armAlarmIfNeeded();
+    }
+
+    return config;
+  }
+
+  // ── Member RPCs ─────────────────────────────────────────────────────
+
+  async listMembers(): Promise<WastelandMemberRecord[]> {
+    await this.ensureInitialized();
+    return memberOps.listMembers(this.sql);
+  }
+
+  async addMember(userId: string, role: string, trustLevel: number): Promise<string> {
+    await this.ensureInitialized();
+    return memberOps.addMember(this.sql, userId, role, trustLevel);
+  }
+
+  async removeMember(memberId: string): Promise<void> {
+    await this.ensureInitialized();
+    memberOps.removeMember(this.sql, memberId);
+  }
+
+  async getMember(userId: string): Promise<WastelandMemberRecord | null> {
+    await this.ensureInitialized();
+    return memberOps.getMember(this.sql, userId);
+  }
+
+  async updateMember(
+    memberId: string,
+    update: { role?: string; trust_level?: number }
+  ): Promise<WastelandMemberRecord | null> {
+    await this.ensureInitialized();
+    return memberOps.updateMember(this.sql, memberId, update);
+  }
+
+  // ── Credential RPCs ────────────────────────────────────────────────
+
+  async storeCredential(
+    userId: string,
+    encryptedToken: string,
+    dolthubOrg: string,
+    rigHandle?: string
+  ): Promise<WastelandCredentialRecord> {
+    await this.ensureInitialized();
+    return credentialOps.storeCredential(this.sql, userId, encryptedToken, dolthubOrg, rigHandle);
+  }
+
+  async getCredential(userId: string): Promise<WastelandCredentialRecord | null> {
+    await this.ensureInitialized();
+    return credentialOps.getCredential(this.sql, userId);
+  }
+
+  async deleteCredential(userId: string): Promise<void> {
+    await this.ensureInitialized();
+    credentialOps.deleteCredential(this.sql, userId);
+  }
+
+  // ── Connected Towns RPCs ────────────────────────────────────────────
+
+  async connectTown(townId: string, userId: string): Promise<ConnectedTownRecord> {
+    await this.ensureInitialized();
+    const config = configOps.getConfig(this.sql);
+    const wastelandId = config?.wasteland_id ?? '';
+    return connectedTownOps.connectTown(this.sql, townId, wastelandId, userId);
+  }
+
+  async disconnectTown(townId: string): Promise<void> {
+    await this.ensureInitialized();
+    connectedTownOps.disconnectTown(this.sql, townId);
+  }
+
+  async listConnectedTowns(): Promise<ConnectedTownRecord[]> {
+    await this.ensureInitialized();
+    return connectedTownOps.listConnectedTowns(this.sql);
+  }
+
+  // ── Wanted Board RPCs ──────────────────────────────────────────────
+
+  async getWantedBoard(): Promise<WantedCacheRecord[]> {
+    await this.ensureInitialized();
+    return wantedCacheOps.getCachedWantedItems(this.sql);
+  }
+
+  async refreshWantedBoard(): Promise<WantedCacheRecord[]> {
+    await this.ensureInitialized();
+    const config = configOps.getConfig(this.sql);
+    if (!config?.dolthub_upstream) {
+      return wantedCacheOps.getCachedWantedItems(this.sql);
+    }
+
+    const items = await fetchWantedBoard(config.dolthub_upstream);
+    wantedCacheOps.cacheWantedItems(this.sql, items);
+    return wantedCacheOps.getCachedWantedItems(this.sql);
   }
 }
 

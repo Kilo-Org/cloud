@@ -1,35 +1,16 @@
-import { z } from 'zod';
-import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/table';
+/**
+ * Credential management operations for WastelandDO.
+ */
 import { query } from '../../util/query.util';
+import {
+  createTableWastelandCredentials,
+  wasteland_credentials,
+  WastelandCredentialRecord,
+} from '../../db/tables/wasteland-credentials.table';
 
-// ── Schema & Table ──────────────────────────────────────────────────────
-
-export const WastelandCredentialRecord = z.object({
-  user_id: z.string(),
-  encrypted_token: z.string(),
-  dolthub_org: z.string(),
-  rig_handle: z.string().nullable(),
-  connected_at: z.string(),
-});
-
-export type WastelandCredentialRecord = z.output<typeof WastelandCredentialRecord>;
-
-export const wasteland_credentials = getTableFromZodSchema(
-  'wasteland_credentials',
-  WastelandCredentialRecord
-);
-
-export function createTableWastelandCredentials(): string {
-  return getCreateTableQueryFromTable(wasteland_credentials, {
-    user_id: `TEXT PRIMARY KEY`,
-    encrypted_token: `TEXT NOT NULL`,
-    dolthub_org: `TEXT NOT NULL`,
-    rig_handle: `TEXT`,
-    connected_at: `TEXT NOT NULL DEFAULT (datetime('now'))`,
-  });
+export function initCredentialsTable(sql: SqlStorage): void {
+  query(sql, createTableWastelandCredentials(), []);
 }
-
-// ── Operations ──────────────────────────────────────────────────────────
 
 export function storeCredential(
   sql: SqlStorage,
@@ -37,8 +18,8 @@ export function storeCredential(
   encryptedToken: string,
   dolthubOrg: string,
   rigHandle?: string
-): void {
-  const timestamp = new Date().toISOString();
+): WastelandCredentialRecord {
+  const now = new Date().toISOString();
   query(
     sql,
     /* sql */ `
@@ -50,14 +31,15 @@ export function storeCredential(
         ${wasteland_credentials.columns.connected_at}
       ) VALUES (?, ?, ?, ?, ?)
     `,
-    [userId, encryptedToken, dolthubOrg, rigHandle ?? null, timestamp]
+    [userId, encryptedToken, dolthubOrg, rigHandle ?? null, now]
   );
+
+  const credential = getCredential(sql, userId);
+  if (!credential) throw new Error('Failed to read credential after store');
+  return credential;
 }
 
-export function getCredential(
-  sql: SqlStorage,
-  userId: string
-): WastelandCredentialRecord | null {
+export function getCredential(sql: SqlStorage, userId: string): WastelandCredentialRecord | null {
   const rows = [
     ...query(
       sql,
@@ -68,17 +50,14 @@ export function getCredential(
       [userId]
     ),
   ];
-  if (rows.length === 0) return null;
-  return WastelandCredentialRecord.parse(rows[0]);
+  const parsed = WastelandCredentialRecord.array().parse(rows);
+  return parsed[0] ?? null;
 }
 
 export function deleteCredential(sql: SqlStorage, userId: string): void {
   query(
     sql,
-    /* sql */ `
-      DELETE FROM ${wasteland_credentials}
-      WHERE ${wasteland_credentials.user_id} = ?
-    `,
+    /* sql */ `DELETE FROM ${wasteland_credentials} WHERE ${wasteland_credentials.user_id} = ?`,
     [userId]
   );
 }

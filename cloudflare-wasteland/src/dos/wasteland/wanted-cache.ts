@@ -1,54 +1,39 @@
-import { z } from 'zod';
-import { getTableFromZodSchema, getCreateTableQueryFromTable } from '../../util/table';
+/**
+ * Wanted board cache operations for WastelandDO.
+ *
+ * Stores DoltHub-sourced wanted board items in DO-local SQLite for
+ * fast reads without polling DoltHub on every request.
+ */
 import { query } from '../../util/query.util';
+import {
+  createTableWantedCache,
+  wasteland_wanted_cache,
+  WantedCacheRecord,
+} from '../../db/tables/wasteland-wanted-cache.table';
 
-// ── Schema & Table ──────────────────────────────────────────────────────
+export type WantedItem = {
+  item_id: string;
+  title: string;
+  description: string | null;
+  bounty: number | null;
+  status: 'open' | 'claimed' | 'done';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  type: 'feature' | 'bug' | 'docs' | 'other';
+  claimed_by: string | null;
+  claim_id: string | null;
+  evidence: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
 
-export const WantedItemRecord = z.object({
-  item_id: z.string(),
-  title: z.string(),
-  description: z.string().nullable(),
-  bounty: z.number().int().nullable(),
-  status: z.string().nullable(),
-  claimed_by: z.string().nullable(),
-  claim_id: z.string().nullable(),
-  evidence: z.string().nullable(),
-  created_at: z.string().nullable(),
-  updated_at: z.string().nullable(),
-  cached_at: z.string(),
-});
-
-export type WantedItemRecord = z.output<typeof WantedItemRecord>;
-
-export const wasteland_wanted_cache = getTableFromZodSchema(
-  'wasteland_wanted_cache',
-  WantedItemRecord
-);
-
-export function createTableWastelandWantedCache(): string {
-  return getCreateTableQueryFromTable(wasteland_wanted_cache, {
-    item_id: `TEXT PRIMARY KEY`,
-    title: `TEXT NOT NULL`,
-    description: `TEXT`,
-    bounty: `INTEGER`,
-    status: `TEXT`,
-    claimed_by: `TEXT`,
-    claim_id: `TEXT`,
-    evidence: `TEXT`,
-    created_at: `TEXT`,
-    updated_at: `TEXT`,
-    cached_at: `TEXT NOT NULL DEFAULT (datetime('now'))`,
-  });
+/** Create the wasteland_wanted_cache table if it doesn't exist. */
+export function initWantedCacheTable(sql: SqlStorage): void {
+  query(sql, createTableWantedCache(), []);
 }
 
-// ── Operations ──────────────────────────────────────────────────────────
-
-/**
- * Upsert wanted items into the cache. Uses INSERT OR REPLACE to handle
- * both new items and updates to existing ones.
- */
+/** Upsert wanted items into the local SQLite cache. */
 export function cacheWantedItems(sql: SqlStorage, items: WantedItem[]): void {
-  const timestamp = new Date().toISOString();
+  const now = new Date().toISOString();
   for (const item of items) {
     query(
       sql,
@@ -59,33 +44,37 @@ export function cacheWantedItems(sql: SqlStorage, items: WantedItem[]): void {
           ${wasteland_wanted_cache.columns.description},
           ${wasteland_wanted_cache.columns.bounty},
           ${wasteland_wanted_cache.columns.status},
+          ${wasteland_wanted_cache.columns.priority},
+          ${wasteland_wanted_cache.columns.type},
           ${wasteland_wanted_cache.columns.claimed_by},
           ${wasteland_wanted_cache.columns.claim_id},
           ${wasteland_wanted_cache.columns.evidence},
           ${wasteland_wanted_cache.columns.created_at},
           ${wasteland_wanted_cache.columns.updated_at},
           ${wasteland_wanted_cache.columns.cached_at}
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         item.item_id,
         item.title,
-        item.description ?? null,
-        item.bounty ?? null,
-        item.status ?? null,
-        item.claimed_by ?? null,
-        item.claim_id ?? null,
-        item.evidence ?? null,
-        item.created_at ?? null,
-        item.updated_at ?? null,
-        timestamp,
+        item.description,
+        item.bounty,
+        item.status,
+        item.priority,
+        item.type,
+        item.claimed_by,
+        item.claim_id,
+        item.evidence,
+        item.created_at,
+        item.updated_at,
+        now,
       ]
     );
   }
 }
 
-/** Read all cached wanted items, ordered by created_at descending. */
-export function getCachedWantedItems(sql: SqlStorage): WantedItemRecord[] {
+/** Read all cached wanted items, ordered by created_at DESC. */
+export function getCachedWantedItems(sql: SqlStorage): WantedCacheRecord[] {
   const rows = [
     ...query(
       sql,
@@ -96,14 +85,11 @@ export function getCachedWantedItems(sql: SqlStorage): WantedItemRecord[] {
       []
     ),
   ];
-  return WantedItemRecord.array().parse(rows);
+  return WantedCacheRecord.array().parse(rows);
 }
 
-/** Read a single cached wanted item by ID. */
-export function getCachedWantedItem(
-  sql: SqlStorage,
-  itemId: string
-): WantedItemRecord | null {
+/** Read a single cached wanted item by ID, or null if not found. */
+export function getCachedWantedItem(sql: SqlStorage, itemId: string): WantedCacheRecord | null {
   const rows = [
     ...query(
       sql,
@@ -114,31 +100,11 @@ export function getCachedWantedItem(
       [itemId]
     ),
   ];
-  if (rows.length === 0) return null;
-  return WantedItemRecord.parse(rows[0]);
+  const parsed = WantedCacheRecord.array().parse(rows);
+  return parsed[0] ?? null;
 }
 
-/** Delete all cached wanted items. */
+/** Delete all rows from the wanted cache. */
 export function clearCache(sql: SqlStorage): void {
-  query(
-    sql,
-    /* sql */ `DELETE FROM ${wasteland_wanted_cache}`,
-    []
-  );
+  query(sql, /* sql */ `DELETE FROM ${wasteland_wanted_cache}`, []);
 }
-
-// ── Public types ────────────────────────────────────────────────────────
-
-/** Input shape from DoltHub API (before caching). */
-export type WantedItem = {
-  item_id: string;
-  title: string;
-  description?: string | null;
-  bounty?: number | null;
-  status?: string | null;
-  claimed_by?: string | null;
-  claim_id?: string | null;
-  evidence?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};

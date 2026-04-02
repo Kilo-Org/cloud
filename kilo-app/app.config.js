@@ -94,7 +94,7 @@ const config = {
       'expo-tracking-transparency',
       {
         userTrackingPermission:
-          'Allow $(PRODUCT_NAME) to use your data to measure ad performance and show personalized ads.',
+          'This identifier is used to measure the effectiveness of advertising campaigns.',
       },
     ],
     ['react-native-appsflyer', {}],

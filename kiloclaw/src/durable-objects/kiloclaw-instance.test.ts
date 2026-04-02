@@ -6122,11 +6122,11 @@ describe('updateBotIdentity', () => {
     expect(storage._store.get('botEmoji')).toBe('🤖');
   });
 
-  it('writes SOUL.md on running instances', async () => {
+  it('writes IDENTITY.md on running instances', async () => {
     const env = createFakeEnv();
     env.FLY_APP_NAME = 'bot-app';
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ ok: true, path: 'workspace/SOUL.md' }), {
+      new Response(JSON.stringify({ ok: true, path: 'workspace/IDENTITY.md' }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       })

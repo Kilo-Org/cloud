@@ -76,7 +76,7 @@ describe('file routes', () => {
   });
 
   describe('POST /_kilo/bot-identity', () => {
-    it('writes workspace/SOUL.md', async () => {
+    it('writes workspace/IDENTITY.md', async () => {
       vi.mocked(fs.existsSync).mockImplementation(
         (path: any) => typeof path === 'string' && path.endsWith('BOOTSTRAP.md')
       );
@@ -89,12 +89,12 @@ describe('file routes', () => {
 
       expect(res.status).toBe(200);
       expect(atomicWrite).toHaveBeenCalledWith(
-        `${ROOT}/workspace/SOUL.md`,
+        `${ROOT}/workspace/IDENTITY.md`,
         expect.stringContaining('- Name: Milo')
       );
 
       const body = (await res.json()) as any;
-      expect(body.path).toBe('workspace/SOUL.md');
+      expect(body.path).toBe('workspace/IDENTITY.md');
       expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(`${ROOT}/workspace/BOOTSTRAP.md`);
     });
   });

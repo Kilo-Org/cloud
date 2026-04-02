@@ -8,7 +8,7 @@ import { timingSafeTokenEqual } from '../auth';
 import { resolveSafePath, verifyCanonicalized, SafePathError } from '../safe-path';
 import { atomicWrite } from '../atomic-write';
 import { backupFile } from '../backup-file';
-import { formatBotSoulMarkdown } from '../bootstrap';
+import { formatBotIdentityMarkdown } from '../bootstrap';
 
 function computeEtag(content: string): string {
   return crypto.createHash('md5').update(content).digest('hex');
@@ -108,8 +108,8 @@ const BotIdentityBodySchema = z.object({
   botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
 });
 
-const BOT_SOUL_RELATIVE_PATH = 'workspace/SOUL.md';
-const LEGACY_BOT_IDENTITY_RELATIVE_PATHS = ['workspace/BOOTSTRAP.md', 'workspace/IDENTITY.md'];
+const BOT_IDENTITY_RELATIVE_PATH = 'workspace/IDENTITY.md';
+const LEGACY_BOT_IDENTITY_RELATIVE_PATHS = ['workspace/BOOTSTRAP.md'];
 
 export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: string): void {
   app.use('/_kilo/files/*', async (c, next) => {
@@ -143,7 +143,7 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
 
     let targetPath: string;
     try {
-      targetPath = resolveSafePath(BOT_SOUL_RELATIVE_PATH, rootDir);
+      targetPath = resolveSafePath(BOT_IDENTITY_RELATIVE_PATH, rootDir);
     } catch (err) {
       if (err instanceof SafePathError) {
         return c.json({ error: err.message }, 400);
@@ -156,7 +156,7 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
     try {
       atomicWrite(
         targetPath,
-        formatBotSoulMarkdown({
+        formatBotIdentityMarkdown({
           KILOCLAW_BOT_NAME: parsed.data.botName ?? undefined,
           KILOCLAW_BOT_NATURE: parsed.data.botNature ?? undefined,
           KILOCLAW_BOT_VIBE: parsed.data.botVibe ?? undefined,
@@ -175,7 +175,7 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
         }
       }
 
-      return c.json({ ok: true, path: BOT_SOUL_RELATIVE_PATH });
+      return c.json({ ok: true, path: BOT_IDENTITY_RELATIVE_PATH });
     } catch (err) {
       console.error('[files] Failed to write bot identity:', err);
       return c.json({ error: 'Failed to write bot identity' }, 500);

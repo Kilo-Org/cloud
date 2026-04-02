@@ -8,8 +8,8 @@ import {
   configureGitHub,
   configureLinear,
   runOnboardOrDoctor,
-  formatBotSoulMarkdown,
-  writeBotSoulFile,
+  formatBotIdentityMarkdown,
+  writeBotIdentityFile,
   updateToolsMdSection,
   GOG_SECTION_CONFIG,
   KILO_CLI_SECTION_CONFIG,
@@ -554,35 +554,35 @@ describe('configureLinear', () => {
   });
 });
 
-// ---- bot soul file ----
+// ---- bot identity file ----
 
-describe('formatBotSoulMarkdown', () => {
-  it('renders the bot soul markdown with defaults', () => {
-    const result = formatBotSoulMarkdown({});
+describe('formatBotIdentityMarkdown', () => {
+  it('renders the bot identity markdown with defaults', () => {
+    const result = formatBotIdentityMarkdown({});
 
-    expect(result).toContain('# SOUL');
+    expect(result).toContain('# IDENTITY');
     expect(result).toContain('- Name: KiloClaw');
     expect(result).toContain('- Nature: AI executive assistant');
   });
 });
 
-describe('writeBotSoulFile', () => {
-  it('writes workspace/SOUL.md and removes legacy files when present', () => {
+describe('writeBotIdentityFile', () => {
+  it('writes workspace/IDENTITY.md and removes legacy files when present', () => {
     const harness = fakeDeps();
     (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
-      (p: string) =>
-        p === '/root/.openclaw/workspace/BOOTSTRAP.md' ||
-        p === '/root/.openclaw/workspace/IDENTITY.md'
+      (p: string) => p === '/root/.openclaw/workspace/BOOTSTRAP.md'
     );
 
-    writeBotSoulFile({ KILOCLAW_BOT_NAME: 'Milo', KILOCLAW_BOT_NATURE: 'Operator' }, harness.deps);
-
-    expect(harness.renameCalls.some(call => call.to === '/root/.openclaw/workspace/SOUL.md')).toBe(
-      true
+    writeBotIdentityFile(
+      { KILOCLAW_BOT_NAME: 'Milo', KILOCLAW_BOT_NATURE: 'Operator' },
+      harness.deps
     );
+
+    expect(
+      harness.renameCalls.some(call => call.to === '/root/.openclaw/workspace/IDENTITY.md')
+    ).toBe(true);
     expect((harness.deps.unlinkSync as ReturnType<typeof vi.fn>).mock.calls).toEqual([
       ['/root/.openclaw/workspace/BOOTSTRAP.md'],
-      ['/root/.openclaw/workspace/IDENTITY.md'],
     ]);
   });
 });
@@ -638,7 +638,7 @@ describe('runOnboardOrDoctor', () => {
 
     const toolsCopy = harness.copyCalls.find(c => c.dest.endsWith('TOOLS.md'));
     expect(toolsCopy).toBeDefined();
-    expect(harness.renameCalls.some(call => call.to.endsWith('/workspace/SOUL.md'))).toBe(true);
+    expect(harness.renameCalls.some(call => call.to.endsWith('/workspace/IDENTITY.md'))).toBe(true);
   });
 
   it('runs doctor when config exists', () => {
@@ -667,7 +667,7 @@ describe('runOnboardOrDoctor', () => {
     expect(doctorCall?.args).toContain('--fix');
     expect(doctorCall?.args).toContain('--non-interactive');
     expect(env.KILOCLAW_FRESH_INSTALL).toBe('false');
-    expect(harness.renameCalls.some(call => call.to.endsWith('/workspace/SOUL.md'))).toBe(true);
+    expect(harness.renameCalls.some(call => call.to.endsWith('/workspace/IDENTITY.md'))).toBe(true);
   });
 });
 

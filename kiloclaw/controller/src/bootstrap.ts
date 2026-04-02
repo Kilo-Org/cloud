@@ -23,11 +23,8 @@ const WORKSPACE_DIR = '/root/clawd';
 const COMPILE_CACHE_DIR = '/var/tmp/openclaw-compile-cache';
 const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
 const TOOLS_MD_DEST = '/root/.openclaw/workspace/TOOLS.md';
-const SOUL_MD_DEST = '/root/.openclaw/workspace/SOUL.md';
-const LEGACY_BOT_IDENTITY_DESTS = [
-  '/root/.openclaw/workspace/BOOTSTRAP.md',
-  '/root/.openclaw/workspace/IDENTITY.md',
-];
+const IDENTITY_MD_DEST = '/root/.openclaw/workspace/IDENTITY.md';
+const LEGACY_BOT_IDENTITY_DESTS = ['/root/.openclaw/workspace/BOOTSTRAP.md'];
 
 const ENC_PREFIX = 'KILOCLAW_ENC_';
 const VALUE_PREFIX = 'enc:v1:';
@@ -266,9 +263,9 @@ export function generateHooksToken(env: EnvLike): void {
   }
 }
 
-export function formatBotSoulMarkdown(env: EnvLike): string {
+export function formatBotIdentityMarkdown(env: EnvLike): string {
   const lines = [
-    '# SOUL',
+    '# IDENTITY',
     '',
     `- Name: ${env.KILOCLAW_BOT_NAME ?? 'KiloClaw'}`,
     `- Nature: ${env.KILOCLAW_BOT_NATURE ?? 'AI executive assistant'}`,
@@ -281,15 +278,15 @@ export function formatBotSoulMarkdown(env: EnvLike): string {
   return lines.join('\n');
 }
 
-export function writeBotSoulFile(
+export function writeBotIdentityFile(
   env: EnvLike,
   deps: Pick<
     BootstrapDeps,
     'mkdirSync' | 'writeFileSync' | 'renameSync' | 'unlinkSync' | 'existsSync'
   > = defaultDeps
 ): void {
-  deps.mkdirSync(path.dirname(SOUL_MD_DEST), { recursive: true });
-  atomicWrite(SOUL_MD_DEST, formatBotSoulMarkdown(env), {
+  deps.mkdirSync(path.dirname(IDENTITY_MD_DEST), { recursive: true });
+  atomicWrite(IDENTITY_MD_DEST, formatBotIdentityMarkdown(env), {
     writeFileSync: deps.writeFileSync,
     renameSync: deps.renameSync,
     unlinkSync: deps.unlinkSync,
@@ -451,7 +448,7 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     env.KILOCLAW_FRESH_INSTALL = 'false';
   }
 
-  writeBotSoulFile(env, deps);
+  writeBotIdentityFile(env, deps);
 }
 
 // ---- TOOLS.md bounded-section helper ----

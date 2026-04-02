@@ -136,7 +136,8 @@
           "search_and_replace"
         ],
         "excluded_tools": [
-          "apply_diff"
+          "apply_diff",
+          "edit_file"
         ]
       },
       "opencode": {},

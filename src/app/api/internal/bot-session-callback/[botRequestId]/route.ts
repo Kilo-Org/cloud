@@ -164,12 +164,9 @@ async function postSlackThreadMessage(params: {
 }): Promise<void> {
   logCallback('Posting Slack thread message', {
     threadId: params.threadId,
-    markdownPreview: params.markdown.slice(0, 200),
     markdownLength: params.markdown.length,
     platformIntegrationId: params.platformIntegrationId,
   });
-  logCallback('Bot initialized for Slack post', { threadId: params.threadId });
-  const slackAdapter = bot.getAdapter('slack');
 
   const botToken = await getSlackBotToken(params.platformIntegrationId);
   if (!botToken) {
@@ -178,10 +175,8 @@ async function postSlackThreadMessage(params: {
     );
   }
 
-  logCallback('Resolved Slack bot token for callback post', {
-    threadId: params.threadId,
-    platformIntegrationId: params.platformIntegrationId,
-  });
+  await bot.initialize();
+  const slackAdapter = bot.getAdapter('slack');
 
   const posted = await slackAdapter.withBotToken(
     botToken,

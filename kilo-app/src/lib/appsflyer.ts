@@ -1,9 +1,7 @@
 import * as Sentry from '@sentry/react-native';
-import expoConstants from 'expo-constants';
 import appsFlyer from 'react-native-appsflyer';
 
-const devKey = expoConstants.expoConfig?.extra?.appsFlyerDevKey as string | undefined;
-const appId = expoConstants.expoConfig?.extra?.appsFlyerAppId as string | undefined;
+import { APPSFLYER_APP_ID, APPSFLYER_DEV_KEY } from '@/lib/config';
 
 let initialized = false;
 const pendingEvents: { name: string; values: Record<string, string> }[] = [];
@@ -30,15 +28,15 @@ function drainPendingEvents() {
 }
 
 export function initAppsFlyer(): void {
-  if (initialized || !devKey) {
+  if (initialized) {
     return;
   }
 
   appsFlyer.initSdk(
     {
-      devKey,
+      devKey: APPSFLYER_DEV_KEY,
       isDebug: false,
-      appId: appId ?? '',
+      appId: APPSFLYER_APP_ID,
       onInstallConversionDataListener: true,
       timeToWaitForATTUserAuthorization: 10,
     },

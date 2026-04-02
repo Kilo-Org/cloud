@@ -498,6 +498,13 @@
       "when": 1775058751690,
       "tag": "0070_powerful_whizzer",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1775106451684,
+      "tag": "0071_majestic_pestilence",
+      "breakpoints": true
     }
   ]
 }

@@ -55,6 +55,7 @@ import {
   kiloclaw_email_log,
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
+  coding_plan_subscriptions,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, sql } from 'drizzle-orm';
 import { allow_fake_login } from './constants';
@@ -365,7 +366,10 @@ export async function createOrUpdateUser(
   });
 
   // Set up user identification via user ID
-  posthogClient.alias({ distinctId: savedUser.google_user_email, alias: savedUser.id });
+  posthogClient.alias({
+    distinctId: savedUser.google_user_email,
+    alias: savedUser.id,
+  });
 
   await tryVerifyDiscordGuildMembership(args.provider, args.provider_account_id, savedUser.id);
 
@@ -513,7 +517,10 @@ export async function softDeleteUser(userId: string) {
     // trialing — the user may have a running Fly instance, and deleting the
     // row without destroying the instance would orphan it.
     const liveClawSubscriptions = await tx
-      .select({ id: kiloclaw_subscriptions.id, status: kiloclaw_subscriptions.status })
+      .select({
+        id: kiloclaw_subscriptions.id,
+        status: kiloclaw_subscriptions.status,
+      })
       .from(kiloclaw_subscriptions)
       .where(
         and(
@@ -601,6 +608,11 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, userId));
+    // Cancel all coding plan subscriptions before deleting BYOK keys (spec §5.2)
+    await tx
+      .update(coding_plan_subscriptions)
+      .set({ status: 'canceled', canceled_at: sql`now()`, byok_key_id: null })
+      .where(eq(coding_plan_subscriptions.user_id, userId));
     await tx.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, userId));
     await tx.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, userId));
     await tx.delete(webhook_events).where(eq(webhook_events.owned_by_user_id, userId));
@@ -814,7 +826,9 @@ export async function getAllUserProviders(email: string): Promise<{
  * @returns The WorkOS organization, or null if not found
  */
 export async function getWorkOSOrganization(domain: string) {
-  const orgResult = await workos.organizations.listOrganizations({ domains: [domain] });
+  const orgResult = await workos.organizations.listOrganizations({
+    domains: [domain],
+  });
 
   if (orgResult.data.length === 1) {
     return orgResult.data[0];
@@ -881,7 +895,9 @@ async function tryVerifyDiscordGuildMembership(
     if (isMember) {
       await db
         .update(kilocode_users)
-        .set({ discord_server_membership_verified_at: new Date().toISOString() })
+        .set({
+          discord_server_membership_verified_at: new Date().toISOString(),
+        })
         .where(eq(kilocode_users.id, kiloUserId));
     }
   } catch (error) {

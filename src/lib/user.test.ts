@@ -35,6 +35,9 @@ import {
   kiloclaw_cli_runs,
   bot_requests,
   kiloclaw_admin_audit_logs,
+  coding_plan_subscriptions,
+  coding_plan_key_inventory,
+  byok_api_keys,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import { softDeleteUser, SoftDeletePreconditionError, findUserById, findUsersByIds } from './user';
@@ -78,6 +81,9 @@ describe('User', () => {
     await db.delete(user_admin_notes);
     await db.delete(magic_link_tokens);
     await db.delete(bot_requests);
+    await db.delete(coding_plan_subscriptions);
+    await db.delete(coding_plan_key_inventory);
+    await db.delete(byok_api_keys);
     await db.delete(stytch_fingerprints);
     await db.delete(organizations);
     await db.delete(kilocode_users);
@@ -294,7 +300,9 @@ describe('User', () => {
     });
 
     it('should delete organization invitations sent by and addressed to the user', async () => {
-      const user1 = await insertTestUser({ google_user_email: 'invitee@example.com' });
+      const user1 = await insertTestUser({
+        google_user_email: 'invitee@example.com',
+      });
       const user2 = await insertTestUser();
 
       const orgId = randomUUID();
@@ -840,7 +848,9 @@ describe('User', () => {
     });
 
     it('should delete magic_link_tokens by original email', async () => {
-      const user = await insertTestUser({ google_user_email: 'magic@example.com' });
+      const user = await insertTestUser({
+        google_user_email: 'magic@example.com',
+      });
 
       const futureDate = new Date(Date.now() + 1000 * 60 * 60).toISOString();
       await db.insert(magic_link_tokens).values({
@@ -1000,6 +1010,56 @@ describe('User', () => {
       await expect(softDeleteUser(user.id)).rejects.toThrow(SoftDeletePreconditionError);
       const userAfter = await findUserById(user.id);
       expect(userAfter!.google_user_email).toBe(user.google_user_email);
+    });
+
+    it('should cancel coding plan subscriptions and remove BYOK keys on soft delete', async () => {
+      const { encryptApiKey } = await import('@/lib/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+
+      const user = await insertTestUser();
+
+      // Create a BYOK key for a coding plan provider
+      const encrypted = encryptApiKey('test-key-for-gdpr', BYOK_ENCRYPTION_KEY);
+      const [byokKey] = await db
+        .insert(byok_api_keys)
+        .values({
+          kilo_user_id: user.id,
+          provider_id: 'byteplus-coding',
+          encrypted_api_key: encrypted,
+          created_by: user.id,
+        })
+        .returning();
+
+      // Create an active coding plan subscription
+      await db.insert(coding_plan_subscriptions).values({
+        user_id: user.id,
+        provider_id: 'byteplus-coding',
+        byok_key_id: byokKey.id,
+        status: 'active',
+        cost_microdollars: 4_990_000,
+        billing_period_days: 30,
+        current_period_start: new Date().toISOString(),
+        current_period_end: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        credit_renewal_at: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+      });
+
+      await softDeleteUser(user.id);
+
+      // Subscription should be canceled
+      const [sub] = await db
+        .select()
+        .from(coding_plan_subscriptions)
+        .where(eq(coding_plan_subscriptions.user_id, user.id));
+      expect(sub.status).toBe('canceled');
+      expect(sub.canceled_at).not.toBeNull();
+      expect(sub.byok_key_id).toBeNull();
+
+      // BYOK key should be deleted
+      const byokKeys = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.kilo_user_id, user.id));
+      expect(byokKeys).toHaveLength(0);
     });
   });
 

@@ -156,6 +156,16 @@ export const KiloClawPaymentSource = {
 export type KiloClawPaymentSource =
   (typeof KiloClawPaymentSource)[keyof typeof KiloClawPaymentSource];
 
+// --- Coding Plan enums ---
+
+export const CodingPlanSubscriptionStatus = {
+  Active: 'active',
+  Canceled: 'canceled',
+} as const;
+
+export type CodingPlanSubscriptionStatus =
+  (typeof CodingPlanSubscriptionStatus)[keyof typeof CodingPlanSubscriptionStatus];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.reassociate',

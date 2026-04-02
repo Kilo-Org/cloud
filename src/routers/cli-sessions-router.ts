@@ -39,11 +39,12 @@ export const BLOB_TYPES = [
   'git_state',
 ] as const satisfies readonly FileName[];
 
-/** Known platform values that have dedicated filters. "Extension" is everything else. */
+/** Known platform values that have dedicated filters. "Other" is everything else. */
 export const KNOWN_PLATFORMS = [
   'cloud-agent',
   'cloud-agent-web',
   'cli',
+  'vscode',
   'agent-manager',
   'app-builder',
   'slack',
@@ -310,8 +311,8 @@ function buildScopeConditions(opts: {
       ? opts.createdOnPlatform
       : [opts.createdOnPlatform];
 
-    if (platforms.length === 1 && platforms[0] === 'extension') {
-      // "Extension" means everything NOT in the known platforms list
+    if (platforms.length === 1 && platforms[0] === 'other') {
+      // "Other" means everything NOT in the known platforms list
       conditions.push(notInArray(cliSessions.created_on_platform, [...KNOWN_PLATFORMS]));
     } else if (platforms.length === 1) {
       conditions.push(eq(cliSessions.created_on_platform, platforms[0]));

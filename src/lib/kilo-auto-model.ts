@@ -212,7 +212,9 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   input_cache_write_price: undefined,
   supports_images: false,
   roocode_settings: undefined,
-  opencode_settings: undefined,
+  opencode_settings: {
+    ai_sdk_provider: 'openai',
+  },
 };
 
 export const AUTO_MODELS = [

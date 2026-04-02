@@ -7,6 +7,15 @@ const appId = expoConstants.expoConfig?.extra?.appsFlyerAppId as string | undefi
 
 let initialized = false;
 
+function handleError(message: string) {
+  return (details: unknown) => {
+    Sentry.captureException(new Error(`${message}: ${String(details)}`));
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-empty-function -- AppsFlyer SDK requires a success callback
+function noop() {}
+
 export function initAppsFlyer(): void {
   if (initialized || !devKey) {
     return;
@@ -23,9 +32,7 @@ export function initAppsFlyer(): void {
     () => {
       initialized = true;
     },
-    error => {
-      Sentry.captureException(new Error(`AppsFlyer init failed: ${error}`));
-    }
+    handleError('AppsFlyer init failed')
   );
 }
 
@@ -34,12 +41,5 @@ export function trackEvent(name: string, values?: Record<string, string>): void 
     return;
   }
 
-  appsFlyer.logEvent(
-    name,
-    values ?? {},
-    () => {},
-    error => {
-      Sentry.captureException(new Error(`AppsFlyer event "${name}" failed: ${error}`));
-    }
-  );
+  appsFlyer.logEvent(name, values ?? {}, noop, handleError(`AppsFlyer event "${name}" failed`));
 }

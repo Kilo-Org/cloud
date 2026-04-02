@@ -11,6 +11,7 @@ const config = {
   ios: {
     icon: './assets/images/logo.png',
     bundleIdentifier: 'com.kilocode.kiloapp',
+    associatedDomains: ['applinks:app.kilo.ai'],
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       NSMicrophoneUsageDescription:
@@ -36,6 +37,30 @@ const config = {
       monochromeImage: './assets/images/android-icon-foreground.png',
     },
     predictiveBackGestureEnabled: false,
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: [
+          {
+            scheme: 'https',
+            host: 'app.kilo.ai',
+            pathPrefix: '/claw',
+          },
+          {
+            scheme: 'https',
+            host: 'app.kilo.ai',
+            pathPrefix: '/profile',
+          },
+          {
+            scheme: 'https',
+            host: 'app.kilo.ai',
+            pathPrefix: '/organizations',
+          },
+        ],
+        category: ['BROWSABLE', 'DEFAULT'],
+      },
+    ],
   },
   plugins: [
     [

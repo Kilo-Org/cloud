@@ -642,6 +642,11 @@ export class TownDO extends DurableObject<Env> {
     return this._drainNonce;
   }
 
+  /** When the drain started (epoch ms), or null when not draining. */
+  async getDrainStartedAt(): Promise<number | null> {
+    return this._drainStartedAt;
+  }
+
   // ══════════════════════════════════════════════════════════════════
   // Town Configuration
   // ══════════════════════════════════════════════════════════════════
@@ -4133,6 +4138,8 @@ export class TownDO extends DurableObject<Env> {
       type: string;
       message: string;
     }>;
+    draining?: boolean;
+    drainStartedAt?: string;
   }> {
     const currentAlarm = await this.ctx.storage.getAlarm();
     const active = cached?.activeWork ?? this.hasActiveWork();
@@ -4271,6 +4278,10 @@ export class TownDO extends DurableObject<Env> {
       },
       reconciler: this._lastReconcilerMetrics,
       recentEvents,
+      draining: this._draining || undefined,
+      drainStartedAt: this._drainStartedAt
+        ? new Date(this._drainStartedAt).toISOString()
+        : undefined,
     };
   }
 

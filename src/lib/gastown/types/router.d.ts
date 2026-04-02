@@ -59,6 +59,16 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       };
       meta: object;
     }>;
+    getDrainStatus: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        townId: string;
+      };
+      output: {
+        draining: boolean;
+        drainStartedAt: string | null;
+      };
+      meta: object;
+    }>;
     deleteTown: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         townId: string;
@@ -1342,6 +1352,16 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             isAdminViewing: boolean;
             ownerUserId: string | null;
             ownerOrgId: string | null;
+          };
+          meta: object;
+        }>;
+        getDrainStatus: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            townId: string;
+          };
+          output: {
+            draining: boolean;
+            drainStartedAt: string | null;
           };
           meta: object;
         }>;

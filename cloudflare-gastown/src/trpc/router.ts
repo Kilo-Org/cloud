@@ -363,6 +363,22 @@ export const gastownRouter = router({
       return verifyTownOwnership(ctx.env, ctx, input.townId);
     }),
 
+  getDrainStatus: gastownProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .output(z.object({ draining: z.boolean(), drainStartedAt: z.string().nullable() }))
+    .query(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
+      const town = getTownDOStub(ctx.env, input.townId);
+      const [draining, startedAt] = await Promise.all([
+        town.isDraining() as Promise<boolean>,
+        town.getDrainStartedAt() as Promise<number | null>,
+      ]);
+      return {
+        draining,
+        drainStartedAt: startedAt ? new Date(startedAt).toISOString() : null,
+      };
+    }),
+
   /**
    * Check whether the current user is an admin viewing a town they don't own.
    * Used by the frontend to show an admin banner.

@@ -52,12 +52,6 @@ const startTime = Date.now();
 // lets the drain loop nudge agents that transition to running mid-drain.
 let _draining = false;
 
-// Agents that were successfully nudged about eviction in Phase 2/3.
-// Used by handleIdleEvent to decide the drain idle timeout:
-//   nudged agents → 10s (they've been told to wrap up)
-//   un-nudged agents → 120s (nudge may still be in SDK queue)
-const drainNudgedAgents = new Set<string>();
-
 export function isDraining(): boolean {
   return _draining;
 }
@@ -436,16 +430,13 @@ async function handleIdleEvent(agent: ManagedAgent, onExit: () => void): Promise
   }
 
   // No nudges (or fetch error) — (re)start the idle timeout.
-  // During drain:
-  //   - Nudged agents get 10s: they've been told to wrap up, this idle
-  //     means they finished processing the nudge.
-  //   - Un-nudged agents get 120s: the nudge may still be queued in the
-  //     SDK (session.prompt enqueues behind the active turn). The agent
-  //     needs time to finish its turn, then process the nudge.
+  // During drain, use a short idle timeout. Agents aren't nudged — they
+  // complete naturally — so this idle means the agent is done with its
+  // current work and can exit promptly.
   clearIdleTimer(agentId);
   let timeoutMs: number;
   if (_draining) {
-    timeoutMs = drainNudgedAgents.has(agentId) ? 10_000 : 120_000;
+    timeoutMs = 10_000;
   } else {
     timeoutMs =
       agent.role === 'refinery'
@@ -1057,11 +1048,14 @@ export function activeServerCount(): number {
 /**
  * Gracefully drain all running agents before container eviction.
  *
- * 4-phase sequence:
- *   1. Notify TownDO of the eviction (fire-and-forget)
- *   2. Nudge running polecats/refineries to commit & push
- *   3. Poll up to 10 min waiting for agents to finish
- *   4. Force-save any stragglers via WIP git commit + push
+ * 3-phase sequence:
+ *   1. Notify TownDO of the eviction (blocks new dispatch)
+ *   2. Wait up to 5 min for non-mayor agents to finish naturally
+ *   3. Force-save any stragglers via WIP git commit + push
+ *
+ * No nudging — agents complete their current work via gt_done and
+ * exit through the normal idle timeout path. The TownDO's draining
+ * flag prevents new work from being dispatched.
  *
  * Never throws — all errors are logged and swallowed so the caller
  * can always proceed to stopAll() + process.exit().
@@ -1099,87 +1093,25 @@ export async function drainAll(): Promise<void> {
     console.warn(`${DRAIN_LOG} Phase 1: TownDO notification failed, continuing:`, err);
   }
 
-  // ── Phase 2: Directly nudge running non-mayor agents ──────────────────
-  // We use sendMessage() to inject an eviction notice directly into each
-  // agent's SDK session. This is a local call (no round-trip through the
-  // TownDO) so it works even after SIGTERM — the container's HTTP server
-  // is still up but the Cloudflare runtime blocks inbound requests from
-  // other DOs, which breaks the gt_nudge → TownDO → container.fetch() path.
-  const nudgedAgents = new Set<string>();
-
-  const nudgeAgent = async (agent: ManagedAgent): Promise<boolean> => {
-    if (nudgedAgents.has(agent.agentId)) return false;
-    nudgedAgents.add(agent.agentId);
-    drainNudgedAgents.add(agent.agentId);
-
-    if (agent.role === 'mayor' || agent.role === 'triage') return false;
-
-    const nudgeMessage =
-      'URGENT: The container is being evicted. Commit and push all your current changes RIGHT NOW. ' +
-      'Do NOT call gt_done — the system will handle the bead state. ' +
-      'Just git add -A, git commit, and git push your work-in-progress, then stop working.';
-
-    clearIdleTimer(agent.agentId);
-    console.log(
-      `${DRAIN_LOG} Phase 2: nudging ${agent.role} agent ${agent.agentId} (session=${agent.sessionId})`
-    );
-    await sendMessage(agent.agentId, nudgeMessage);
-    console.log(`${DRAIN_LOG} Phase 2: nudge delivered to ${agent.agentId}`);
-    return true;
-  };
+  // ── Phase 2: Wait for agents to finish their current work ─────────────
+  // No nudging — agents complete naturally (call gt_done, go idle, etc.).
+  // The TownDO's draining flag blocks new dispatch so no new work starts.
+  // We just give them time to wrap up, then Phase 3 force-saves stragglers.
+  const DRAIN_WAIT_MS = 5 * 60 * 1000;
+  const pollInterval = 5000;
+  const start = Date.now();
 
   const allAgents = [...agents.values()];
-  const runningAgents = allAgents.filter(a => a.status === 'running' && a.role !== 'mayor');
   console.log(
-    `${DRAIN_LOG} Phase 2: ${runningAgents.length} nudgeable of ${allAgents.length} total agents. ` +
+    `${DRAIN_LOG} Phase 2: waiting up to ${DRAIN_WAIT_MS / 1000}s for non-mayor agents to finish. ` +
       `Statuses: ${allAgents.map(a => `${a.role}:${a.agentId.slice(0, 8)}=${a.status}`).join(', ')}`
   );
 
-  // Fire all nudges in parallel — sendMessage can block if the SDK server
-  // is busy with the agent's current turn. Sequential nudging would delay
-  // later agents until earlier ones unblock.
-  await Promise.allSettled(
-    runningAgents.map(agent =>
-      nudgeAgent(agent).catch(err => {
-        console.warn(
-          `${DRAIN_LOG} Phase 2: failed to nudge ${agent.agentId} (${agent.role}):`,
-          err instanceof Error ? err.message : err
-        );
-      })
-    )
-  );
-
-  // ── Phase 3: Wait up to 10 minutes ──────────────────────────────────
-  // Exclude mayors from the running count — they are persistent and will
-  // never exit on their own. They are frozen in Phase 4 if still running.
-  // Also late-nudge agents that transition from `starting` to `running`
-  // during the wait.
-  const DRAIN_WAIT_MS = 10 * 60 * 1000;
-  const pollInterval = 5000;
-  const start = Date.now();
-  console.log(`${DRAIN_LOG} Phase 3: waiting up to ${DRAIN_WAIT_MS / 1000}s for agents to finish`);
-
   while (Date.now() - start < DRAIN_WAIT_MS) {
-    // Include both `running` and `starting` agents in the wait.
-    // Starting agents may finish their clone/setup and transition to
-    // running during the wait — they'll be late-nudged below.
     const active = [...agents.values()].filter(
       a => (a.status === 'running' || a.status === 'starting') && a.role !== 'mayor'
     );
     if (active.length === 0) break;
-
-    // Late-nudge agents that became running since Phase 2.
-    for (const agent of active) {
-      if (agent.status !== 'running' || nudgedAgents.has(agent.agentId)) continue;
-      try {
-        await nudgeAgent(agent);
-      } catch (err) {
-        console.warn(
-          `${DRAIN_LOG} Phase 3: late nudge failed for ${agent.agentId}:`,
-          err instanceof Error ? err.message : err
-        );
-      }
-    }
 
     console.log(
       `${DRAIN_LOG} Waiting for ${active.length} non-mayor agents: ` +
@@ -1188,7 +1120,7 @@ export async function drainAll(): Promise<void> {
     await new Promise(r => setTimeout(r, pollInterval));
   }
 
-  // ── Phase 4: Force-save remaining agents ────────────────────────────
+  // ── Phase 3: Force-save remaining agents ────────────────────────────
   // Two sub-steps: first freeze all stragglers (cancel idle timers,
   // abort event subscriptions and SDK sessions), then snapshot each
   // worktree. Freezing first prevents the normal completion path
@@ -1198,9 +1130,9 @@ export async function drainAll(): Promise<void> {
     a => a.status === 'running' || a.status === 'starting'
   );
   if (stragglers.length > 0) {
-    console.log(`${DRAIN_LOG} Phase 4: freezing ${stragglers.length} straggler(s)`);
+    console.log(`${DRAIN_LOG} Phase 3: freezing ${stragglers.length} straggler(s)`);
   } else {
-    console.log(`${DRAIN_LOG} Phase 4: all agents finished, no force-save needed`);
+    console.log(`${DRAIN_LOG} Phase 3: all agents finished, no force-save needed`);
   }
 
   // 4a: Freeze — cancel idle timers and abort sessions so no
@@ -1231,13 +1163,13 @@ export async function drainAll(): Promise<void> {
       agent.status = 'exited';
       agent.exitReason = 'container eviction';
       frozen.push(agent);
-      console.log(`${DRAIN_LOG} Phase 4: froze agent ${agent.agentId}`);
+      console.log(`${DRAIN_LOG} Phase 3: froze agent ${agent.agentId}`);
     } catch (err) {
       // Freeze failed — the session may still be writing to the
       // worktree. Skip this agent in 4b to avoid .git/index.lock
       // races and partial snapshots.
       console.warn(
-        `${DRAIN_LOG} Phase 4: failed to freeze agent ${agent.agentId}, skipping snapshot:`,
+        `${DRAIN_LOG} Phase 3: failed to freeze agent ${agent.agentId}, skipping snapshot:`,
         err
       );
     }
@@ -1249,7 +1181,7 @@ export async function drainAll(): Promise<void> {
   // with a still-active SDK session.
   for (const agent of frozen) {
     try {
-      console.log(`${DRAIN_LOG} Phase 4: force-saving agent ${agent.agentId} in ${agent.workdir}`);
+      console.log(`${DRAIN_LOG} Phase 3: force-saving agent ${agent.agentId} in ${agent.workdir}`);
 
       // Check whether a remote named "origin" exists. Lightweight
       // workspaces (mayor/triage) are created with `git init` and
@@ -1268,7 +1200,7 @@ export async function drainAll(): Promise<void> {
 
       if (!hasOrigin && agent.role !== 'mayor' && agent.role !== 'triage') {
         console.warn(
-          `${DRAIN_LOG} Phase 4: no origin remote for ${agent.role} agent ${agent.agentId}, committing locally only (push skipped)`
+          `${DRAIN_LOG} Phase 3: no origin remote for ${agent.role} agent ${agent.agentId}, committing locally only (push skipped)`
         );
       }
 
@@ -1295,7 +1227,7 @@ export async function drainAll(): Promise<void> {
       const stdout = await new Response(proc.stdout).text();
       const stderr = await new Response(proc.stderr).text();
       console.log(
-        `${DRAIN_LOG} Phase 4: agent ${agent.agentId} git save exited ${exitCode}` +
+        `${DRAIN_LOG} Phase 3: agent ${agent.agentId} git save exited ${exitCode}` +
           (stdout ? ` stdout=${stdout.trim()}` : '') +
           (stderr ? ` stderr=${stderr.trim()}` : '')
       );
@@ -1313,7 +1245,7 @@ export async function drainAll(): Promise<void> {
         await branchProc.exited;
 
         console.log(
-          `${DRAIN_LOG} Phase 4: writing eviction context for agent ${agent.agentId}: branch=${branchName}`
+          `${DRAIN_LOG} Phase 3: writing eviction context for agent ${agent.agentId}: branch=${branchName}`
         );
         await writeEvictionCheckpoint(agent, {
           branch: branchName,
@@ -1329,7 +1261,7 @@ export async function drainAll(): Promise<void> {
         await reportAgentCompleted(agent, 'completed', 'container eviction');
       }
     } catch (err) {
-      console.warn(`${DRAIN_LOG} Phase 4: force-save failed for agent ${agent.agentId}:`, err);
+      console.warn(`${DRAIN_LOG} Phase 3: force-save failed for agent ${agent.agentId}:`, err);
     }
   }
 

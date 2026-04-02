@@ -888,6 +888,8 @@ type AlarmStatus = {
     orphanedHooks: number;
   };
   recentEvents: Array<{ time: string; type: string; message: string }>;
+  draining?: boolean;
+  drainStartedAt?: string;
 };
 
 type AgentStatusEvent = {

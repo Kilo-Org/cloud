@@ -27,6 +27,7 @@ type TurnResult = {
   promptTokens: number | null;
   completionTokens: number | null;
   cachedTokens: number | null;
+  cacheWriteTokens: number | null;
 };
 
 // Realistic tool definitions matching what the Kilo Code extension sends.
@@ -290,9 +291,22 @@ async function streamTurn(
   authToken: string,
   model: string,
   taskId: string,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  providerOnly?: string
 ): Promise<TurnResult & { assistantMessage: ChatMessage }> {
   const startTime = Date.now();
+
+  const body: Record<string, unknown> = {
+    model,
+    messages,
+    tools: TOOL_DEFINITIONS,
+    tool_choice: 'none',
+    stream: true,
+    max_tokens: 256,
+  };
+  if (providerOnly) {
+    body.provider = { only: [providerOnly] };
+  }
 
   const response = await fetch(`${baseUrl}/api/openrouter/chat/completions`, {
     method: 'POST',
@@ -302,14 +316,7 @@ async function streamTurn(
       'x-forwarded-for': '127.0.0.1',
       'x-kilocode-taskid': taskId,
     },
-    body: JSON.stringify({
-      model,
-      messages,
-      tools: TOOL_DEFINITIONS,
-      tool_choice: 'none',
-      stream: true,
-      max_tokens: 256,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -331,6 +338,7 @@ async function streamTurn(
   let promptTokens: number | null = null;
   let completionTokens: number | null = null;
   let cachedTokens: number | null = null;
+  let cacheWriteTokens: number | null = null;
 
   await new Promise<void>((resolve, reject) => {
     const parser = createParser({
@@ -354,6 +362,7 @@ async function streamTurn(
             promptTokens = chunk.usage.prompt_tokens ?? null;
             completionTokens = chunk.usage.completion_tokens ?? null;
             cachedTokens = chunk.usage.prompt_tokens_details?.cached_tokens ?? null;
+            cacheWriteTokens = chunk.usage.prompt_tokens_details?.cache_write_tokens ?? null;
           }
         } catch {
           // skip malformed chunks
@@ -395,6 +404,7 @@ async function streamTurn(
     promptTokens,
     completionTokens,
     cachedTokens,
+    cacheWriteTokens,
     assistantMessage: { role: 'assistant', content: responseText },
   };
 }
@@ -409,26 +419,60 @@ function cacheHitRate(promptTokens: number | null, cachedTokens: number | null):
   return `${Math.round((cachedTokens / promptTokens) * 100)}%`;
 }
 
-function printSummary(results: TurnResult[]) {
-  console.log('\n=== Summary ===');
-  console.log('| Turn | Messages | Input  | Output | Cached | Hit Rate |');
-  console.log('|------|----------|--------|--------|--------|----------|');
+function printSummary(results: TurnResult[], label?: string) {
+  console.log(`\n=== Summary${label ? ` (${label})` : ''} ===`);
+  console.log('| Turn | Msgs | Input | Output | Cache Write | Cache Read | Hit Rate |');
+  console.log('|------|------|-------|--------|-------------|------------|----------|');
   for (const r of results) {
-    const input = r.promptTokens !== null ? String(r.promptTokens).padEnd(6) : 'N/A   ';
+    const input = r.promptTokens !== null ? String(r.promptTokens).padEnd(5) : 'N/A  ';
     const output = r.completionTokens !== null ? String(r.completionTokens).padEnd(6) : 'N/A   ';
-    const cached = r.cachedTokens !== null ? String(r.cachedTokens).padEnd(6) : 'N/A   ';
+    const write =
+      r.cacheWriteTokens !== null ? String(r.cacheWriteTokens).padEnd(11) : 'N/A        ';
+    const read = r.cachedTokens !== null ? String(r.cachedTokens).padEnd(10) : 'N/A       ';
     const hitRate = cacheHitRate(r.promptTokens, r.cachedTokens).padEnd(8);
     console.log(
-      `| ${r.turn}    | ${String(r.messageCount).padEnd(8)} | ${input} | ${output} | ${cached} | ${hitRate} |`
+      `| ${r.turn}    | ${String(r.messageCount).padEnd(4)} | ${input} | ${output} | ${write} | ${read} | ${hitRate} |`
     );
   }
+}
 
-  console.log('\nCheck server logs (pnpm dev terminal) for [CacheDiag] entries:');
-  console.log('  - [CacheDiag] shows prefixHash, breakpoint, promptCacheKey (pre-request)');
-  console.log('  - [CacheDiag:response] shows cacheHitTokens, cacheWriteTokens (post-response)');
-  console.log(
-    '\nNote: cacheWriteTokens are only visible server-side, not in the client SSE stream.'
-  );
+async function runSession(
+  baseUrl: string,
+  authToken: string,
+  model: string,
+  providerOnly?: string
+): Promise<TurnResult[]> {
+  const label = providerOnly ?? 'default routing';
+  const taskId = `cache-diag-${Date.now()}`;
+  console.log(`\n--- ${model} via ${label} ---`);
+  console.log(`Task ID: ${taskId}\n`);
+
+  const messages: ChatMessage[] = [SYSTEM_MESSAGE];
+  const results: TurnResult[] = [];
+
+  for (let i = 0; i < TURNS.length; i++) {
+    const turnNum = i + 1;
+    messages.push(TURNS[i]);
+
+    console.log(`Turn ${turnNum}/${TURNS.length}: ${messages.length} messages, sending...`);
+
+    const result = await streamTurn(baseUrl, authToken, model, taskId, messages, providerOnly);
+    result.turn = turnNum;
+
+    console.log(
+      `  Response (${(result.elapsedMs / 1000).toFixed(1)}s): "${truncate(result.responseText, 50)}"`
+    );
+    console.log(
+      `  Usage: input=${result.promptTokens ?? 'N/A'} output=${result.completionTokens ?? 'N/A'} cached_read=${result.cachedTokens ?? 'N/A'} cached_write=${result.cacheWriteTokens ?? 'N/A'}`
+    );
+    console.log(`  Cache hit rate: ${cacheHitRate(result.promptTokens, result.cachedTokens)}\n`);
+
+    messages.push(result.assistantMessage);
+    results.push(result);
+  }
+
+  printSummary(results, label);
+  return results;
 }
 
 /**
@@ -439,15 +483,23 @@ function printSummary(results: TurnResult[]) {
  *
  * @param email - google_user_email of a user in the local DB (required)
  * @param model - OpenRouter model ID (optional, default: anthropic/claude-opus-4.6)
+ * @param provider - OpenRouter provider to force via provider.only (optional,
+ *                   e.g. "amazon-bedrock" or "anthropic"). Omit to use default routing.
+ *                   Use "compare" to run both amazon-bedrock and anthropic back-to-back.
  */
-export async function run(email: string, model?: string): Promise<void> {
+export async function run(email: string, model?: string, provider?: string): Promise<void> {
   if (!email) {
     console.error('Error: email is required');
-    console.log('\nUsage: npx tsx src/scripts/index.ts openrouter test-cache-diag <email> [model]');
+    console.log(
+      '\nUsage: npx tsx src/scripts/index.ts openrouter test-cache-diag <email> [model] [provider]'
+    );
     console.log('\nExamples:');
     console.log('  npx tsx src/scripts/index.ts openrouter test-cache-diag user@example.com');
     console.log(
-      '  npx tsx src/scripts/index.ts openrouter test-cache-diag user@example.com anthropic/claude-sonnet-4.5'
+      '  npx tsx src/scripts/index.ts openrouter test-cache-diag user@example.com anthropic/claude-opus-4.6 anthropic'
+    );
+    console.log(
+      '  npx tsx src/scripts/index.ts openrouter test-cache-diag user@example.com anthropic/claude-opus-4.6 compare'
     );
     process.exit(1);
   }
@@ -461,36 +513,16 @@ export async function run(email: string, model?: string): Promise<void> {
     console.log(`Auth: ${email}`);
     console.log(`Server: ${baseUrl}`);
 
-    const taskId = `cache-diag-${Date.now()}`;
-    console.log(`\n--- ${resolvedModel} ---`);
-    console.log(`Task ID: ${taskId}\n`);
-
-    const messages: ChatMessage[] = [SYSTEM_MESSAGE];
-    const results: TurnResult[] = [];
-
-    for (let i = 0; i < TURNS.length; i++) {
-      const turnNum = i + 1;
-      messages.push(TURNS[i]);
-
-      console.log(`Turn ${turnNum}/${TURNS.length}: ${messages.length} messages, sending...`);
-
-      const result = await streamTurn(baseUrl, authToken, resolvedModel, taskId, messages);
-      result.turn = turnNum;
-
-      console.log(
-        `  Response (${(result.elapsedMs / 1000).toFixed(1)}s): "${truncate(result.responseText, 50)}"`
-      );
-      console.log(
-        `  Usage: input=${result.promptTokens ?? 'N/A'} output=${result.completionTokens ?? 'N/A'} cached=${result.cachedTokens ?? 'N/A'}`
-      );
-      console.log(`  Cache hit rate: ${cacheHitRate(result.promptTokens, result.cachedTokens)}\n`);
-
-      // Append assistant response for next turn
-      messages.push(result.assistantMessage);
-      results.push(result);
+    if (provider === 'compare') {
+      const providers = ['amazon-bedrock', 'anthropic'] as const;
+      for (const p of providers) {
+        await runSession(baseUrl, authToken, resolvedModel, p);
+      }
+    } else {
+      await runSession(baseUrl, authToken, resolvedModel, provider);
     }
 
-    printSummary(results);
+    console.log('\nCheck server logs for [CacheDiag] and [CacheDiag:response] entries.');
   } catch (error) {
     console.error('\nError:', error instanceof Error ? error.message : String(error));
     process.exit(1);

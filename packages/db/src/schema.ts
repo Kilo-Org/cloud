@@ -63,12 +63,7 @@ import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
   StripeSubscriptionStatus,
-  OpenCodeSettings,
   StoredModel,
-  CustomLlmExtraBody,
-  CustomLlmExtraHeaders,
-  CustomLlmProvider,
-  InterleavedFormat,
   GatewayApiKind,
 } from './schema-types';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
@@ -316,40 +311,6 @@ export const kilo_pass_issuances = pgTable(
 
 export type KiloPassIssuance = typeof kilo_pass_issuances.$inferSelect;
 export type NewKiloPassIssuance = typeof kilo_pass_issuances.$inferInsert;
-
-export const kilo_pass_pause_events = pgTable(
-  'kilo_pass_pause_events',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    kilo_pass_subscription_id: uuid()
-      .notNull()
-      .references(() => kilo_pass_subscriptions.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    paused_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    resumes_at: timestamp({ withTimezone: true, mode: 'string' }),
-    resumed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    index('IDX_kilo_pass_pause_events_subscription_id').on(table.kilo_pass_subscription_id),
-    uniqueIndex('UQ_kilo_pass_pause_events_one_open_per_sub')
-      .on(table.kilo_pass_subscription_id)
-      .where(sql`${table.resumed_at} IS NULL`),
-    check(
-      'kilo_pass_pause_events_resumed_at_after_paused_at_check',
-      sql`${table.resumed_at} IS NULL OR ${table.resumed_at} >= ${table.paused_at}`
-    ),
-  ]
-);
-
-export type KiloPassPauseEvent = typeof kilo_pass_pause_events.$inferSelect;
-export type NewKiloPassPauseEvent = typeof kilo_pass_pause_events.$inferInsert;
 
 export const kilo_pass_issuance_items = pgTable(
   'kilo_pass_issuance_items',
@@ -952,31 +913,10 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
 
-export const custom_llm = pgTable('custom_llm', {
-  public_id: text().notNull().primaryKey(),
-  display_name: text().notNull(),
-  context_length: integer().notNull(),
-  max_completion_tokens: integer().notNull(),
-  internal_id: text().notNull(),
-  provider: text().notNull().$type<CustomLlmProvider>(),
-  base_url: text().notNull(),
-  api_key: text().notNull(),
-  organization_ids: jsonb().notNull().$type<string[]>(),
-
-  supports_image_input: boolean(),
-  force_reasoning: boolean(),
-  opencode_settings: jsonb().$type<OpenCodeSettings>(),
-  extra_body: jsonb().$type<CustomLlmExtraBody>(),
-  extra_headers: jsonb().$type<CustomLlmExtraHeaders>(),
-  interleaved_format: text().$type<InterleavedFormat>(),
-});
-
 export const custom_llm2 = pgTable('custom_llm2', {
   public_id: text().notNull().primaryKey(),
   definition: jsonb().notNull().$type<CustomLlmDefinition>(),
 });
-
-export type CustomLlm = typeof custom_llm.$inferSelect;
 
 export const user_admin_notes = pgTable(
   'user_admin_notes',

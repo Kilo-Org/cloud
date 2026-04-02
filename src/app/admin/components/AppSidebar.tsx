@@ -162,6 +162,11 @@ const productEngineeringItems: MenuItem[] = [
     url: '/admin/sync-providers',
     icon: () => <RefreshCw />,
   },
+  {
+    title: () => 'Custom LLMs',
+    url: '/admin/custom-llms',
+    icon: () => <Bot />,
+  },
 ];
 
 const analyticsObservabilityItems: MenuItem[] = [

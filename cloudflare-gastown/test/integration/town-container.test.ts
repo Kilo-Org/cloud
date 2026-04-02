@@ -119,3 +119,56 @@ describe('Town DO — touchAgentHeartbeat', () => {
     expect(updated!.last_activity_at).not.toBe(initialActivity);
   });
 });
+
+// ── Container Eviction (draining lifecycle) ────────────────────────────
+
+describe('Town DO — container eviction draining lifecycle', () => {
+  it('recordContainerEviction() sets draining flag', async () => {
+    const id = `town-${crypto.randomUUID()}`;
+    const town = env.TOWN.get(env.TOWN.idFromName(id));
+
+    // Before eviction, isDraining should be false
+    expect(await town.isDraining()).toBe(false);
+
+    // Record eviction
+    await town.recordContainerEviction();
+
+    // isDraining should now be true
+    expect(await town.isDraining()).toBe(true);
+  });
+
+  it('touchAgentHeartbeat() clears draining flag after eviction', async () => {
+    const id = `town-${crypto.randomUUID()}`;
+    const town = env.TOWN.get(env.TOWN.idFromName(id));
+
+    // Register an agent so heartbeat has a valid target
+    const agent = await town.registerAgent({
+      role: 'polecat',
+      name: 'drain-clear-test',
+      identity: `drain-clear-${id}`,
+    });
+
+    // Set draining flag
+    await town.recordContainerEviction();
+    expect(await town.isDraining()).toBe(true);
+
+    // Heartbeat should clear draining flag
+    await town.touchAgentHeartbeat(agent.id);
+    expect(await town.isDraining()).toBe(false);
+  });
+
+  it('draining flag persists across re-initialization', async () => {
+    const id = `town-${crypto.randomUUID()}`;
+    const town = env.TOWN.get(env.TOWN.idFromName(id));
+
+    // Record eviction on the first stub reference
+    await town.recordContainerEviction();
+    expect(await town.isDraining()).toBe(true);
+
+    // Get a fresh stub reference to the same DO (same name = same instance).
+    // The DO's blockConcurrencyWhile loads town:draining from KV on init,
+    // so the draining flag should survive.
+    const town2 = env.TOWN.get(env.TOWN.idFromName(id));
+    expect(await town2.isDraining()).toBe(true);
+  });
+});

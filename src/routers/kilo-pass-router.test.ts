@@ -27,6 +27,7 @@ import {
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT,
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
 } from '@/lib/kilo-pass/constants';
+import type { BillingHistoryEntry } from '@/lib/subscriptions/subscription-center';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type Stripe from 'stripe';
@@ -35,6 +36,9 @@ type StripeMock = {
   subscriptions: {
     retrieve: ReturnType<typeof jest.fn>;
     update: ReturnType<typeof jest.fn>;
+  };
+  invoices: {
+    list: ReturnType<typeof jest.fn>;
   };
   subscriptionSchedules: {
     create: ReturnType<typeof jest.fn>;
@@ -93,6 +97,22 @@ type KiloPassCaller = {
     creditsAwarded: boolean;
   }>;
   getCustomerPortalUrl: (input: { returnUrl?: string }) => Promise<{ url: string }>;
+  getBillingHistory: (input: { cursor?: string }) => Promise<{
+    entries: BillingHistoryEntry[];
+    hasMore: boolean;
+    cursor: string | null;
+  }>;
+  getCreditHistory: (input: { cursor?: string }) => Promise<{
+    entries: Array<{
+      id: string;
+      date: string;
+      amountUsd: number;
+      kind: KiloPassIssuanceItemKind;
+      description: string;
+    }>;
+    hasMore: boolean;
+    cursor: string | null;
+  }>;
   cancelSubscription: () => Promise<{ success: boolean }>;
   resumeSubscription: () => Promise<{ success: boolean }>;
   scheduleChange: (input: {
@@ -115,6 +135,9 @@ jest.mock('@/lib/stripe-client', () => {
     subscriptions: {
       retrieve: jest.fn(),
       update: jest.fn(),
+    },
+    invoices: {
+      list: jest.fn(),
     },
     subscriptionSchedules: {
       create: jest.fn(),
@@ -145,6 +168,10 @@ jest.mock('@/lib/kilo-pass/stripe-price-ids.server', () => {
     getStripePriceIdForKiloPass: getStripePriceIdForKiloPassMock,
   };
 });
+
+jest.mock('@/lib/rewardful', () => ({
+  getRewardfulReferral: jest.fn(async () => undefined),
+}));
 
 async function insertSubscription(params: {
   kiloUserId: string;
@@ -252,6 +279,7 @@ describe('kiloPassRouter', () => {
     const stripeMock = getStripeMock();
     stripeMock.subscriptions.retrieve.mockReset();
     stripeMock.subscriptions.update.mockReset();
+    stripeMock.invoices.list.mockReset();
     stripeMock.subscriptionSchedules.create.mockReset();
     stripeMock.subscriptionSchedules.update.mockReset();
     stripeMock.subscriptionSchedules.release.mockReset();
@@ -910,6 +938,189 @@ describe('kiloPassRouter', () => {
     });
   });
 
+  describe('getBillingHistory', () => {
+    it('lists Stripe invoices scoped to the Kilo Pass subscription', async () => {
+      const stripeMock = getStripeMock();
+      stripeMock.invoices.list.mockResolvedValue({
+        data: [
+          {
+            id: 'inv_kp_1',
+            created: 1_700_000_000,
+            amount_due: 4900,
+            currency: 'usd',
+            status: 'paid',
+            hosted_invoice_url: 'https://stripe.example.test/inv_kp_1',
+            invoice_pdf: 'https://stripe.example.test/inv_kp_1.pdf',
+            lines: { data: [{ description: 'Kilo Pass Pro monthly' }] },
+          },
+        ],
+        has_more: true,
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-billing-history@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_kp_billing_history',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getBillingHistory({});
+
+      expect(stripeMock.invoices.list).toHaveBeenCalledWith({
+        subscription: 'sub_kp_billing_history',
+        limit: 25,
+      });
+      expect(result).toEqual({
+        entries: [
+          {
+            kind: 'stripe',
+            id: 'inv_kp_1',
+            date: new Date(1_700_000_000 * 1000).toISOString(),
+            amountCents: 4900,
+            currency: 'usd',
+            status: 'paid',
+            invoiceUrl: 'https://stripe.example.test/inv_kp_1',
+            invoicePdfUrl: 'https://stripe.example.test/inv_kp_1.pdf',
+            description: 'Kilo Pass Pro monthly',
+          },
+        ],
+        hasMore: true,
+        cursor: 'inv_kp_1',
+      });
+    });
+
+    it('passes the pagination cursor to Stripe', async () => {
+      const stripeMock = getStripeMock();
+      stripeMock.invoices.list.mockResolvedValue({ data: [], has_more: false });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-billing-history-cursor@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_kp_billing_cursor',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await caller.kiloPass.getBillingHistory({ cursor: 'inv_prev' });
+
+      expect(stripeMock.invoices.list).toHaveBeenCalledWith({
+        subscription: 'sub_kp_billing_cursor',
+        limit: 25,
+        starting_after: 'inv_prev',
+      });
+    });
+  });
+
+  describe('getCreditHistory', () => {
+    it('returns issuance items ordered by newest credit transaction first', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-credit-history@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_kp_credit_history',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const [issuance] = await db
+        .insert(kilo_pass_issuances)
+        .values({
+          kilo_pass_subscription_id: subscriptionId,
+          issue_month: '2026-04-01',
+          source: KiloPassIssuanceSource.StripeInvoice,
+          stripe_invoice_id: 'inv_credit_history',
+        })
+        .returning({ id: kilo_pass_issuances.id });
+
+      if (!issuance) {
+        throw new Error('Failed to insert issuance for credit history test');
+      }
+
+      const [baseTxn] = await db
+        .insert(credit_transactions)
+        .values({
+          id: crypto.randomUUID(),
+          kilo_user_id: user.id,
+          amount_microdollars: 49_000_000,
+          is_free: false,
+          description: 'Base credits',
+          created_at: '2026-04-01T10:00:00.000Z',
+        })
+        .returning({ id: credit_transactions.id });
+      const [bonusTxn] = await db
+        .insert(credit_transactions)
+        .values({
+          id: crypto.randomUUID(),
+          kilo_user_id: user.id,
+          amount_microdollars: 12_000_000,
+          is_free: true,
+          description: 'Bonus credits',
+          created_at: '2026-04-02T10:00:00.000Z',
+        })
+        .returning({ id: credit_transactions.id });
+
+      if (!baseTxn || !bonusTxn) {
+        throw new Error('Failed to insert credit transactions for credit history test');
+      }
+
+      const issuanceId = issuance.id;
+      const baseTxnId = baseTxn.id;
+      const bonusTxnId = bonusTxn.id;
+
+      await db.insert(kilo_pass_issuance_items).values([
+        {
+          kilo_pass_issuance_id: issuanceId,
+          kind: KiloPassIssuanceItemKind.Base,
+          credit_transaction_id: baseTxnId,
+          amount_usd: 49,
+          bonus_percent_applied: null,
+        },
+        {
+          kilo_pass_issuance_id: issuanceId,
+          kind: KiloPassIssuanceItemKind.Bonus,
+          credit_transaction_id: bonusTxnId,
+          amount_usd: 12,
+          bonus_percent_applied: 0.25,
+        },
+      ]);
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getCreditHistory({});
+
+      expect(result).toEqual({
+        entries: [
+          {
+            id: expect.any(String),
+            date: '2026-04-02T10:00:00.000Z',
+            amountUsd: 12,
+            kind: KiloPassIssuanceItemKind.Bonus,
+            description: 'Bonus credits',
+          },
+          {
+            id: expect.any(String),
+            date: '2026-04-01T10:00:00.000Z',
+            amountUsd: 49,
+            kind: KiloPassIssuanceItemKind.Base,
+            description: 'Base credits',
+          },
+        ],
+        hasMore: false,
+        cursor: null,
+      });
+    });
+  });
+
   describe('cancelSubscription', () => {
     it('throws when no Kilo Pass subscription exists', async () => {
       const user = await insertTestUser({
@@ -1110,9 +1321,13 @@ describe('kiloPassRouter', () => {
         ),
       });
       expect(rows).toHaveLength(1);
-      expect(rows[0]?.status).toBe(KiloPassScheduledChangeStatus.NotStarted);
-      expect(rows[0]?.stripe_schedule_id).toBe(scheduleId);
-      expect(new Date(rows[0]?.effective_at ?? '').toISOString()).toBe(
+      const row = rows[0];
+      if (!row) {
+        throw new Error('Expected scheduled change row');
+      }
+      expect(row.status).toBe(KiloPassScheduledChangeStatus.NotStarted);
+      expect(row.stripe_schedule_id).toBe(scheduleId);
+      expect(new Date(row.effective_at).toISOString()).toBe(
         new Date(stripePeriodEndSeconds * 1000).toISOString()
       );
     });
@@ -1292,8 +1507,11 @@ describe('kiloPassRouter', () => {
         where: eq(kilo_pass_scheduled_changes.id, existing.id),
       });
       expect(oldRow).toBeTruthy();
-      expect(oldRow?.deleted_at).not.toBeNull();
-      expect(oldRow?.status).toBe(KiloPassScheduledChangeStatus.Released);
+      if (!oldRow) {
+        throw new Error('Expected historical scheduled change row');
+      }
+      expect(oldRow.deleted_at).not.toBeNull();
+      expect(oldRow.status).toBe(KiloPassScheduledChangeStatus.Released);
 
       const rows = await db.query.kilo_pass_scheduled_changes.findMany({
         where: eq(
@@ -1305,7 +1523,11 @@ describe('kiloPassRouter', () => {
       // We keep historical rows, but enforce a single active scheduled change per subscription.
       const active = rows.filter(r => r.deleted_at === null);
       expect(active).toHaveLength(1);
-      expect(active[0]?.stripe_schedule_id).toBe(newScheduleId);
+      const activeRow = active[0];
+      if (!activeRow) {
+        throw new Error('Expected active scheduled change row');
+      }
+      expect(activeRow.stripe_schedule_id).toBe(newScheduleId);
     });
 
     it('yearly tier upgrade resets billing cycle anchor and does not prorate (remaining credits issued separately)', async () => {
@@ -1348,8 +1570,11 @@ describe('kiloPassRouter', () => {
       });
 
       const updateCall = stripeMock.subscriptionSchedules.update.mock.calls[0];
-      const phases = updateCall?.[1]?.phases;
-      const newPhase = phases?.[1];
+      if (!updateCall) {
+        throw new Error('Expected subscription schedule update call');
+      }
+      const phases = updateCall[1].phases;
+      const newPhase = phases[1];
 
       // Yearly tier upgrades should NOT prorate — remaining credits at the old tier
       // are issued via maybeIssueYearlyRemainingCredits when the new invoice is paid.
@@ -1407,8 +1632,11 @@ describe('kiloPassRouter', () => {
       });
 
       const updateCall = stripeMock.subscriptionSchedules.update.mock.calls[0];
-      const phases = updateCall?.[1]?.phases;
-      const newPhase = phases?.[1];
+      if (!updateCall) {
+        throw new Error('Expected subscription schedule update call');
+      }
+      const phases = updateCall[1].phases;
+      const newPhase = phases[1];
 
       // Cadence changes (monthly→yearly) must reset the billing anchor so Stripe
       // generates an invoice for the new yearly subscription at the transition point.

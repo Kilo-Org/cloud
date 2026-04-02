@@ -11,6 +11,7 @@ export async function OrganizationByPageLayout({
   params,
   render,
   fullBleed = false,
+  roles,
 }: {
   params: Promise<{ id: string }>;
   render: ({
@@ -24,10 +25,11 @@ export async function OrganizationByPageLayout({
   }) => JSX.Element;
   /** When true, skip the PageContainer wrapper (used by gastown fullscreen pages). */
   fullBleed?: boolean;
+  roles?: OrganizationRole[];
 }) {
   const { id } = await params;
   const organizationId = decodeURIComponent(id);
-  const result = await getAuthorizedOrgContext(organizationId);
+  const result = await getAuthorizedOrgContext(organizationId, roles);
   if (!result.success) {
     if (result.nextResponse.status === 401) {
       redirect(await signInUrlWithCallbackPath());

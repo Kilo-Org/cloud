@@ -90,6 +90,11 @@ const nextConfig = {
         destination: '/get-started',
         permanent: true,
       },
+      {
+        source: '/organizations/:id/subscription',
+        destination: '/organizations/:id/subscriptions',
+        permanent: true,
+      },
     ];
   },
 

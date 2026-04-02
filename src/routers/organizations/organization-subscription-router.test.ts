@@ -1,7 +1,41 @@
-import { createCallerForUser } from '@/routers/test-utils';
+import { beforeEach, jest } from '@jest/globals';
+import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
+import { organization_seats_purchases } from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyMock = jest.Mock<(...args: any[]) => any>;
+
+jest.mock('@/lib/stripe-client', () => {
+  const stripeMock = {
+    billingPortal: { sessions: { create: jest.fn() } },
+    invoices: { list: jest.fn() },
+    checkout: { sessions: { create: jest.fn() } },
+    createStripeCustomer: jest.fn(async () => ({ id: 'cus_test_org' })),
+  };
+
+  return {
+    client: stripeMock,
+    createStripeCustomer: stripeMock.createStripeCustomer,
+    __stripeMock: stripeMock,
+  };
+});
+
+type StripeMock = {
+  billingPortal: { sessions: { create: AnyMock } };
+  invoices: { list: AnyMock };
+  checkout: { sessions: { create: AnyMock } };
+  createStripeCustomer: AnyMock;
+};
+
+const stripeMock = jest.requireMock<{ __stripeMock: StripeMock }>(
+  '@/lib/stripe-client'
+).__stripeMock;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let createCallerForUser: (userId: string) => Promise<any>;
 
 // Test users and organization will be created dynamically
 let regularUser: User;
@@ -11,7 +45,25 @@ let _nonMemberUser: User;
 let testOrganization: Organization;
 
 describe('organizations subscription trpc router', () => {
+  beforeEach(() => {
+    stripeMock.billingPortal.sessions.create.mockReset();
+    stripeMock.billingPortal.sessions.create.mockResolvedValue({
+      url: 'https://stripe.example.test/portal',
+    });
+    stripeMock.invoices.list.mockReset();
+    stripeMock.invoices.list.mockResolvedValue({ data: [], has_more: false });
+    stripeMock.checkout.sessions.create.mockReset();
+    stripeMock.checkout.sessions.create.mockResolvedValue({
+      url: 'https://stripe.example.test/checkout',
+    });
+    stripeMock.createStripeCustomer.mockReset();
+    stripeMock.createStripeCustomer.mockImplementation(async () => ({ id: 'cus_test_org' }));
+  });
+
   beforeAll(async () => {
+    const mod = await import('@/routers/test-utils');
+    createCallerForUser = mod.createCallerForUser;
+
     // Create test users using the helper function (no hardcoded emails to avoid cross-run collisions)
     regularUser = await insertTestUser({
       google_user_name: 'Regular Subscription User',
@@ -100,7 +152,6 @@ describe('organizations subscription trpc router', () => {
       const caller = await createCallerForUser(regularUser.id);
 
       // billingCycle is required (Seat Purchase 2) — omitting it must fail validation.
-      // @ts-expect-error intentionally omitting billingCycle to test validation
       const result = caller.organizations.subscription.getSubscriptionStripeUrl({
         organizationId: testOrganization.id,
         seats: 1,
@@ -120,6 +171,93 @@ describe('organizations subscription trpc router', () => {
           organizationId: testOrganization.id,
         })
       ).rejects.toThrow('You do not have the required organizational role to access this feature');
+    });
+  });
+
+  describe('getBillingHistory procedure', () => {
+    it('returns empty history when the organization has no seat purchases', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.organizations.subscription.getBillingHistory({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result).toEqual({ entries: [], hasMore: false, cursor: null });
+      expect(stripeMock.invoices.list).not.toHaveBeenCalled();
+    });
+
+    it('rejects non-owner members', async () => {
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.organizations.subscription.getBillingHistory({
+          organizationId: testOrganization.id,
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+    });
+
+    it('lists organization invoices for the Stripe customer across seat subscriptions', async () => {
+      await db.insert(organization_seats_purchases).values([
+        {
+          organization_id: testOrganization.id,
+          subscription_stripe_id: 'sub_org_old',
+          seat_count: 5,
+          amount_usd: 25,
+          starts_at: '2026-01-01T00:00:00.000Z',
+          expires_at: '2026-02-01T00:00:00.000Z',
+          billing_cycle: 'monthly',
+        },
+        {
+          organization_id: testOrganization.id,
+          subscription_stripe_id: 'sub_org_new',
+          seat_count: 8,
+          amount_usd: 40,
+          starts_at: '2026-02-01T00:00:00.000Z',
+          expires_at: '2026-03-01T00:00:00.000Z',
+          billing_cycle: 'monthly',
+        },
+      ]);
+      stripeMock.invoices.list.mockResolvedValue({
+        data: [
+          {
+            id: 'inv_org_2',
+            created: 1_706_745_600,
+            amount_due: 4000,
+            currency: 'usd',
+            status: 'paid',
+            hosted_invoice_url: 'https://stripe.example.test/inv_org_2',
+            invoice_pdf: 'https://stripe.example.test/inv_org_2.pdf',
+            lines: { data: [{ description: 'Organization seats renewal' }] },
+          },
+        ],
+        has_more: false,
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.organizations.subscription.getBillingHistory({
+        organizationId: testOrganization.id,
+      });
+
+      expect(stripeMock.invoices.list).toHaveBeenCalledWith({
+        customer: 'cus_test_org',
+        limit: 25,
+      });
+      expect(result).toEqual({
+        entries: [
+          {
+            kind: 'stripe',
+            id: 'inv_org_2',
+            date: new Date(1_706_745_600 * 1000).toISOString(),
+            amountCents: 4000,
+            currency: 'usd',
+            status: 'paid',
+            invoiceUrl: 'https://stripe.example.test/inv_org_2',
+            invoicePdfUrl: 'https://stripe.example.test/inv_org_2.pdf',
+            description: 'Organization seats renewal',
+          },
+        ],
+        hasMore: false,
+        cursor: null,
+      });
     });
   });
 

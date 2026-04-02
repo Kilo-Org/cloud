@@ -259,9 +259,9 @@ export default function OrganizationAppSidebar({
     ...(hasOwnerLevelAccess
       ? [
           {
-            title: 'Subscription',
+            title: 'Subscriptions',
             icon: Users,
-            url: `/organizations/${organizationId}/subscription`,
+            url: `/organizations/${organizationId}/subscriptions`,
           },
           {
             title: 'Invoices',
@@ -277,10 +277,7 @@ export default function OrganizationAppSidebar({
       : []),
   ];
 
-  const allUrls = useMemo(
-    () => [...dashboardItems, ...kiloClawItems, ...cloudItems, ...accountItems].map(i => i.url),
-    [dashboardItems, kiloClawItems, cloudItems, accountItems]
-  );
+  const allUrls = [...dashboardItems, ...kiloClawItems, ...cloudItems, ...accountItems].map(item => item.url);
 
   // Determine if we should show the OrganizationSwitcher
   // Hide it when an admin user is viewing an organization they're not a member of

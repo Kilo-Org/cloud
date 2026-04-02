@@ -281,7 +281,9 @@ export default function OrganizationAppSidebar({
       : []),
   ];
 
-  const allUrls = [...dashboardItems, ...kiloClawItems, ...cloudItems, ...accountItems].map(item => item.url);
+  const allUrls = [...dashboardItems, ...kiloClawItems, ...cloudItems, ...accountItems].map(
+    item => item.url
+  );
 
   // Determine if we should show the OrganizationSwitcher
   // Hide it when an admin user is viewing an organization they're not a member of

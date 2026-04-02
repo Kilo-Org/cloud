@@ -77,7 +77,11 @@ export default async function spawnCloudAgentSession(
   let initiateInput: { githubToken?: string; kilocodeOrganizationId?: string };
   const mode: AgentMode = args.mode ?? 'code';
 
-  const isGitLab = 'gitlabProject' in args;
+  if (!args.githubRepo && !args.gitlabProject) {
+    return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
+  }
+
+  const isGitLab = !!args.gitlabProject;
   const prompt =
     mode === 'code'
       ? args.prompt +
@@ -86,7 +90,7 @@ export default async function spawnCloudAgentSession(
           : '\n\nOpen a pull request with your changes and return the PR URL.')
       : args.prompt;
 
-  if ('gitlabProject' in args) {
+  if (args.gitlabProject) {
     // GitLab path: get token + instance URL, build clone URL, use gitUrl/gitToken
     const gitlabToken =
       typeof platformIntegration.owned_by_organization_id === 'string'

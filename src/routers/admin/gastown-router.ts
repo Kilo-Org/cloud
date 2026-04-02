@@ -214,6 +214,12 @@ const AdminAuditLogRecord = z.object({
   performed_at: z.string(),
 });
 
+const AggregateStatsRecord = z.object({
+  total_towns: z.number(),
+  active_agents: z.number(),
+  total_beads: z.number(),
+});
+
 // ── Gastown HTTP client ───────────────────────────────────────────────────────
 
 /**
@@ -412,6 +418,22 @@ export const adminGastownRouter = createTRPCRouter({
       );
 
       return rigLists.flat();
+    }),
+
+  /**
+   * Get aggregate stats for the gastown overview page.
+   * Requires bead 0 admin endpoint.
+   */
+  getAggregateStats: adminProcedure
+    .input(z.object({ townId: z.string().uuid() }))
+    .output(AggregateStatsRecord.nullable())
+    .query(async ({ input, ctx }) => {
+      return gastownTrpcGet(
+        ctx.user,
+        'gastown.adminGetAggregateStats',
+        { townId: input.townId },
+        AggregateStatsRecord
+      );
     }),
 
   // ── Town inspection ───────────────────────────────────────────────────────

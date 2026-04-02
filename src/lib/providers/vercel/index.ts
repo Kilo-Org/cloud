@@ -71,12 +71,15 @@ const getVercelModels_cached = unstable_cache(
 );
 
 async function getVercelModels() {
+  let models = new Array<string>();
+  const startTime = performance.now();
   try {
-    return await getVercelModels_cached();
+    models = await getVercelModels_cached();
   } catch (e) {
     console.error('[getVercelModels]', e);
-    return [];
   }
+  console.debug(`[getVercelModels] took ${performance.now() - startTime}ms`);
+  return models;
 }
 
 export async function shouldRouteToVercel(

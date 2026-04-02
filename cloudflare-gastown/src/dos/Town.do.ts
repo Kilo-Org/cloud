@@ -554,6 +554,8 @@ export class TownDO extends DurableObject<Env> {
   private _draining = false;
   private _drainNonce: string | null = null;
   private _drainStartedAt: number | null = null;
+  /** Instance UUID of the current container, set by the first heartbeat. */
+  private _containerInstanceId: string | null = null;
 
   private get townId(): string {
     return this._townId ?? this.ctx.id.name ?? this.ctx.id.toString();
@@ -1265,10 +1267,33 @@ export class TownDO extends DurableObject<Env> {
       lastEventType?: string | null;
       lastEventAt?: string | null;
       activeTools?: string[];
+      containerInstanceId?: string;
     }
   ): Promise<{ drainNonce: string | null }> {
     agents.touchAgent(this.sql, agentId, watermark);
     await this.armAlarmIfNeeded();
+
+    // If the container instance ID changed, a new container has started.
+    // Clear the drain flag so the UI banner disappears and dispatch resumes.
+    if (watermark?.containerInstanceId) {
+      if (
+        this._draining &&
+        this._containerInstanceId &&
+        watermark.containerInstanceId !== this._containerInstanceId
+      ) {
+        this._draining = false;
+        this._drainNonce = null;
+        this._drainStartedAt = null;
+        await this.ctx.storage.put('town:draining', false);
+        await this.ctx.storage.delete('town:drainNonce');
+        await this.ctx.storage.delete('town:drainStartedAt');
+        console.log(
+          `${TOWN_LOG} heartbeat: new container instance ${watermark.containerInstanceId} (was ${this._containerInstanceId}), clearing drain flag`
+        );
+      }
+      this._containerInstanceId = watermark.containerInstanceId;
+    }
+
     return { drainNonce: this._drainNonce };
   }
 
@@ -3397,40 +3422,20 @@ export class TownDO extends DurableObject<Env> {
       Sentry.captureException(err);
     }
 
-    // Auto-clear drain flag. Two triggers:
-    // 1. No working/stalled non-mayor agents remain — the container is
-    //    gone and all agents have been recovered. Clear immediately so
-    //    the UI banner disappears within one alarm tick (~5s).
-    // 2. Hard timeout (7 min) as a safety net if agent state gets stuck.
-    if (this._draining) {
+    // Safety-net: auto-clear drain flag if it has been active too long.
+    // The primary clear mechanism is the heartbeat instance ID check
+    // (see recordHeartbeat), but this catches edge cases where no
+    // heartbeat arrives (e.g. container failed to start).
+    if (this._draining && this._drainStartedAt) {
       const DRAIN_TIMEOUT_MS = 7 * 60 * 1000;
-      const timedOut = this._drainStartedAt && Date.now() - this._drainStartedAt > DRAIN_TIMEOUT_MS;
-
-      const hasActiveNonMayor =
-        !timedOut &&
-        query(
-          this.sql,
-          /* sql */ `
-            SELECT 1 FROM ${agent_metadata}
-            WHERE ${agent_metadata.status} IN ('working', 'stalled')
-              AND ${agent_metadata.role} != 'mayor'
-            LIMIT 1
-          `,
-          []
-        ).length > 0;
-
-      if (timedOut || !hasActiveNonMayor) {
+      if (Date.now() - this._drainStartedAt > DRAIN_TIMEOUT_MS) {
         this._draining = false;
         this._drainNonce = null;
         this._drainStartedAt = null;
         await this.ctx.storage.put('town:draining', false);
         await this.ctx.storage.delete('town:drainNonce');
         await this.ctx.storage.delete('town:drainStartedAt');
-        logger.info(
-          timedOut
-            ? 'reconciler: drain timeout exceeded, auto-clearing draining flag'
-            : 'reconciler: no active non-mayor agents, clearing draining flag'
-        );
+        logger.info('reconciler: drain timeout exceeded, auto-clearing draining flag');
       }
     }
 

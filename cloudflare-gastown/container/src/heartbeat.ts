@@ -10,6 +10,13 @@ let sessionToken: string | null = null;
 let containerReadyAcknowledged = false;
 
 /**
+ * Unique ID for this container instance. Generated once at import time.
+ * Sent with every heartbeat so the TownDO can detect container restarts
+ * (new instance ID ≠ old one → clear drain flag).
+ */
+const CONTAINER_INSTANCE_ID = crypto.randomUUID();
+
+/**
  * Configure and start the heartbeat reporter.
  * Periodically sends agent status updates to the Gastown worker API,
  * which forwards them to the Rig DO to update `last_activity_at`.
@@ -108,6 +115,7 @@ async function sendHeartbeats(): Promise<void> {
       lastEventAt: agent.lastEventAt ?? null,
       activeTools: agent.activeTools ?? [],
       messageCount: agent.messageCount ?? 0,
+      containerInstanceId: CONTAINER_INSTANCE_ID,
     };
 
     try {

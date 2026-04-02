@@ -235,6 +235,7 @@ const HeartbeatWatermark = z
     lastEventType: z.string().nullable().optional(),
     lastEventAt: z.string().nullable().optional(),
     activeTools: z.array(z.string()).optional(),
+    containerInstanceId: z.string().optional(),
   })
   .passthrough();
 
@@ -273,6 +274,7 @@ export async function handleHeartbeat(
           lastEventType: watermark.lastEventType ?? null,
           lastEventAt: watermark.lastEventAt ?? null,
           activeTools: watermark.activeTools,
+          containerInstanceId: watermark.containerInstanceId,
         }
       : undefined
   );

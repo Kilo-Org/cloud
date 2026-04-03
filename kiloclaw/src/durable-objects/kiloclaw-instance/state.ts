@@ -41,6 +41,7 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.provisionedAt = d.provisionedAt;
     s.startingAt = d.startingAt;
     s.restartingAt = d.restartingAt;
+    s.recoveryStartedAt = d.recoveryStartedAt;
     s.restartUpdateSent = d.restartUpdateSent;
     s.lastStartedAt = d.lastStartedAt;
     s.lastStoppedAt = d.lastStoppedAt;
@@ -66,6 +67,11 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.lastStartErrorAt = d.lastStartErrorAt;
     s.lastRestartErrorMessage = d.lastRestartErrorMessage;
     s.lastRestartErrorAt = d.lastRestartErrorAt;
+    s.pendingRecoveryVolumeId = d.pendingRecoveryVolumeId;
+    s.recoveryPreviousVolumeId = d.recoveryPreviousVolumeId;
+    s.recoveryPreviousVolumeCleanupAfter = d.recoveryPreviousVolumeCleanupAfter;
+    s.lastRecoveryErrorMessage = d.lastRecoveryErrorMessage;
+    s.lastRecoveryErrorAt = d.lastRecoveryErrorAt;
     s.lastBoundMachineRecoveryAt = d.lastBoundMachineRecoveryAt;
     s.instanceFeatures = d.instanceFeatures;
     s.gmailNotificationsEnabled = d.gmailNotificationsEnabled;
@@ -116,6 +122,7 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.provisionedAt = null;
   s.startingAt = null;
   s.restartingAt = null;
+  s.recoveryStartedAt = null;
   s.restartUpdateSent = false;
   s.lastStartedAt = null;
   s.lastStoppedAt = null;
@@ -141,6 +148,11 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.lastStartErrorAt = null;
   s.lastRestartErrorMessage = null;
   s.lastRestartErrorAt = null;
+  s.pendingRecoveryVolumeId = null;
+  s.recoveryPreviousVolumeId = null;
+  s.recoveryPreviousVolumeCleanupAfter = null;
+  s.lastRecoveryErrorMessage = null;
+  s.lastRecoveryErrorAt = null;
   s.lastBoundMachineRecoveryAt = null;
   s.instanceFeatures = [];
   s.gmailNotificationsEnabled = false;
@@ -182,6 +194,7 @@ export function createMutableState(): InstanceMutableState {
     provisionedAt: null,
     startingAt: null,
     restartingAt: null,
+    recoveryStartedAt: null,
     restartUpdateSent: false,
     lastStartedAt: null,
     lastStoppedAt: null,
@@ -207,6 +220,11 @@ export function createMutableState(): InstanceMutableState {
     lastStartErrorAt: null,
     lastRestartErrorMessage: null,
     lastRestartErrorAt: null,
+    pendingRecoveryVolumeId: null,
+    recoveryPreviousVolumeId: null,
+    recoveryPreviousVolumeCleanupAfter: null,
+    lastRecoveryErrorMessage: null,
+    lastRecoveryErrorAt: null,
     lastBoundMachineRecoveryAt: null,
     instanceFeatures: [],
     gmailNotificationsEnabled: false,

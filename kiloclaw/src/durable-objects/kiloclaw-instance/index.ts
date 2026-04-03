@@ -43,12 +43,8 @@ import {
   MAX_CUSTOM_SECRETS,
   type SecretFieldKey,
 } from '@kilocode/kiloclaw-secret-catalog';
-import {
-  parseRegions,
-  prepareRegions,
-  resolveRegions,
-  evictCapacityRegionFromKV,
-} from '../regions';
+import { parseRegions, prepareRegions, resolveRegions } from '../regions';
+import * as regionHelpers from '../regions';
 import { buildMachineConfig, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
 import type { GatewayProcessStatus } from '../gateway-controller-types';
 
@@ -73,6 +69,15 @@ import {
   markRestartSuccessful,
 } from './reconcile';
 import { restoreFromPostgres, markDestroyedInPostgresHelper } from './postgres';
+import {
+  beginUnexpectedStopRecovery,
+  cleanupPendingRecoveryVolumeIfNeeded,
+  cleanupRecoveryPreviousVolume,
+  cleanupRetainedRecoveryVolumeIfDue,
+  failUnexpectedStopRecovery,
+  runUnexpectedStopRecoveryInBackground,
+  type RecoveryRuntime,
+} from './recovery';
 import {
   setupDefaultStreamChatChannel,
   createShortLivedUserToken,
@@ -114,6 +119,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private async scheduleAlarm(): Promise<void> {
     if (!this.s.status) return;
     await this.ctx.storage.setAlarm(nextAlarmTime(this.s.status));
+  }
+
+  private recoveryRuntime(): RecoveryRuntime {
+    return {
+      env: this.env,
+      ctx: this.ctx,
+      state: this.s,
+      loadState: () => this.loadState(),
+      persist: patch => this.persist(patch),
+      scheduleAlarm: () => this.scheduleAlarm(),
+      emitEvent: data => this.emitEvent(data),
+    };
   }
 
   /**
@@ -220,6 +237,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.s.status === 'destroying') {
       throw new Error('Cannot provision: instance is being destroyed');
     }
+    if (this.s.status === 'recovering') {
+      throw new Error('Cannot provision: instance is recovering from an unexpected stop');
+    }
     if (this.s.status === 'restoring') {
       throw new Error('Cannot provision: instance is restoring from snapshot');
     }
@@ -261,7 +281,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         regions,
         {
           onCapacityError: failedRegion => {
-            void evictCapacityRegionFromKV(this.env.KV_CLAW_CACHE, this.env, failedRegion);
+            void regionHelpers.evictCapacityRegionFromKV(
+              this.env.KV_CLAW_CACHE,
+              this.env,
+              failedRegion
+            );
           },
         }
       );
@@ -923,6 +947,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.s.status === 'destroying') {
       throw new Error('Cannot start: instance is being destroyed');
     }
+    if (this.s.status === 'recovering') {
+      throw new Error('Cannot start: instance is recovering from an unexpected stop');
+    }
     if (this.s.status === 'restoring') {
       throw new Error('Cannot start: instance is restoring from snapshot');
     }
@@ -1081,7 +1108,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       // createVolumeWithFallback already evicts on volume-creation failures,
       // but machine-creation 403s bypass that path.
       if (code === 403 && this.s.flyRegion) {
-        await evictCapacityRegionFromKV(this.env.KV_CLAW_CACHE, this.env, this.s.flyRegion);
+        await regionHelpers.evictCapacityRegionFromKV(
+          this.env.KV_CLAW_CACHE,
+          this.env,
+          this.s.flyRegion
+        );
       }
 
       await flyMachines.replaceStrandedVolume(
@@ -1162,6 +1193,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.s.status === 'destroying') {
       throw new Error('Cannot start: instance is being destroyed');
     }
+    if (this.s.status === 'recovering') {
+      throw new Error('Cannot start: instance is recovering from an unexpected stop');
+    }
     if (this.s.status === 'restarting') {
       throw new Error('Cannot start: instance is restarting');
     }
@@ -1225,6 +1259,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.status === 'provisioned' ||
       this.s.status === 'starting' ||
       this.s.status === 'restarting' ||
+      this.s.status === 'recovering' ||
       this.s.status === 'destroying' ||
       this.s.status === 'restoring'
     ) {
@@ -1270,6 +1305,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
     if (this.s.status === 'restoring') {
       throw new Error('Cannot destroy: instance is restoring from snapshot');
+    }
+    if (this.s.status === 'recovering') {
+      throw new Error('Cannot destroy: instance is recovering from an unexpected stop');
     }
 
     const machineUptimeMs = this.s.lastStartedAt ? Date.now() - this.s.lastStartedAt : 0;
@@ -1523,6 +1561,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     lastStartErrorAt: number | null;
     lastRestartErrorMessage: string | null;
     lastRestartErrorAt: number | null;
+    recoveryStartedAt: number | null;
+    pendingRecoveryVolumeId: string | null;
+    recoveryPreviousVolumeId: string | null;
+    recoveryPreviousVolumeCleanupAfter: number | null;
+    lastRecoveryErrorMessage: string | null;
+    lastRecoveryErrorAt: number | null;
     previousVolumeId: string | null;
     restoreStartedAt: string | null;
     pendingRestoreVolumeId: string | null;
@@ -1569,6 +1613,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       lastStartErrorAt: this.s.lastStartErrorAt,
       lastRestartErrorMessage: this.s.lastRestartErrorMessage,
       lastRestartErrorAt: this.s.lastRestartErrorAt,
+      recoveryStartedAt: this.s.recoveryStartedAt,
+      pendingRecoveryVolumeId: this.s.pendingRecoveryVolumeId,
+      recoveryPreviousVolumeId: this.s.recoveryPreviousVolumeId,
+      recoveryPreviousVolumeCleanupAfter: this.s.recoveryPreviousVolumeCleanupAfter,
+      lastRecoveryErrorMessage: this.s.lastRecoveryErrorMessage,
+      lastRecoveryErrorAt: this.s.lastRecoveryErrorAt,
       previousVolumeId: this.s.previousVolumeId,
       restoreStartedAt: this.s.restoreStartedAt,
       pendingRestoreVolumeId: this.s.pendingRestoreVolumeId,
@@ -1619,6 +1669,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return fly.listVolumeSnapshots(flyConfig, this.s.flyVolumeId);
   }
 
+  async cleanupRecoveryPreviousVolume(): Promise<{ ok: true; deletedVolumeId: string | null }> {
+    await this.loadState();
+    return cleanupRecoveryPreviousVolume(this.recoveryRuntime());
+  }
+
   // ── Volume reassociation (admin) ───────────────────────────────────
 
   async listCandidateVolumes(): Promise<{
@@ -1652,6 +1707,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     if (this.s.status === 'restoring') {
       throw new Error('Cannot reassociate: instance is restoring from snapshot');
+    }
+    if (this.s.status === 'recovering') {
+      throw new Error('Cannot reassociate: instance is recovering from an unexpected stop');
     }
     if (this.s.status !== 'stopped') {
       throw new Error('Instance must be stopped before reassociating volume');
@@ -1729,6 +1787,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
     if (this.s.status === 'destroying') {
       throw new Error('Cannot restore: instance is being destroyed');
+    }
+    if (this.s.status === 'recovering') {
+      throw new Error('Cannot restore: instance is recovering from an unexpected stop');
     }
     if (this.s.status === 'restoring') {
       throw new Error('Cannot restore: instance is already restoring');
@@ -2004,6 +2065,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.status === 'destroying' ||
       this.s.status === 'starting' ||
       this.s.status === 'restarting' ||
+      this.s.status === 'recovering' ||
       this.s.status === 'restoring'
     ) {
       return { success: false, error: 'Instance is busy' };
@@ -2251,6 +2313,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
   }
 
+  private async recoverUnexpectedStopInBackground(): Promise<void> {
+    await runUnexpectedStopRecoveryInBackground(this.recoveryRuntime());
+  }
+
   // ========================================================================
   // Alarm (reconciliation loop)
   // ========================================================================
@@ -2281,9 +2347,20 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       return;
     }
 
+    if (this.s.status !== 'recovering') {
+      await cleanupPendingRecoveryVolumeIfNeeded(
+        this.recoveryRuntime(),
+        'alarm_pending_recovery_cleanup'
+      );
+    }
+    await cleanupRetainedRecoveryVolumeIfDue(
+      this.recoveryRuntime(),
+      'alarm_retained_recovery_cleanup'
+    );
+
     try {
       const flyConfig = getFlyConfig(this.env, this.s);
-      await reconcileWithFly(
+      const reconcileResult = await reconcileWithFly(
         flyConfig,
         this.ctx,
         this.s,
@@ -2293,6 +2370,25 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         (userId, sandboxId) =>
           markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
       );
+
+      if (reconcileResult.beginUnexpectedStopRecovery && this.s.status === 'running') {
+        await beginUnexpectedStopRecovery(
+          this.recoveryRuntime(),
+          reconcileResult.beginUnexpectedStopRecovery
+        );
+        this.ctx.waitUntil(this.recoverUnexpectedStopInBackground());
+        return;
+      }
+
+      if (reconcileResult.timedOutUnexpectedStopRecovery && this.s.status === 'recovering') {
+        await failUnexpectedStopRecovery(
+          this.recoveryRuntime(),
+          reconcileResult.timedOutUnexpectedStopRecovery.errorMessage,
+          'alarm_timeout'
+        );
+        await this.scheduleAlarm();
+        return;
+      }
     } catch (err) {
       doError(this.s, 'reconcileWithFly failed', {
         error: toLoggable(err),

@@ -760,6 +760,43 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }
   }),
 
+  cleanupRecoveryPreviousVolume: adminProcedure
+    .input(GatewayProcessSchema)
+    .mutation(async ({ input, ctx }) => {
+      const fallbackMessage = 'Failed to clean up retained recovery volume';
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        const client = new KiloClawInternalClient();
+        const result = await client.cleanupRecoveryPreviousVolume(
+          input.userId,
+          workerInstanceId(instance)
+        );
+
+        if (result.deletedVolumeId) {
+          try {
+            await createKiloClawAdminAuditLog({
+              action: 'kiloclaw.recovery.cleanup_retained_volume',
+              actor_id: ctx.user.id,
+              actor_email: ctx.user.google_user_email,
+              actor_name: ctx.user.google_user_name,
+              target_user_id: input.userId,
+              message: `Retained recovery volume deleted: ${result.deletedVolumeId}`,
+              metadata: {
+                deletedVolumeId: result.deletedVolumeId,
+              },
+            });
+          } catch (auditErr) {
+            console.error('Failed to write audit log for cleanupRecoveryPreviousVolume:', auditErr);
+          }
+        }
+
+        return result;
+      } catch (err) {
+        console.error('Failed to clean up retained recovery volume for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
+
   machineStop: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input }) => {
     const fallbackMessage = 'Failed to stop machine';
     try {

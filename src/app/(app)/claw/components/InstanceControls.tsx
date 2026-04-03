@@ -67,6 +67,7 @@ export function InstanceControls({
   const isProvisioned = status.status === 'provisioned';
   const isStarting = status.status === 'starting';
   const isRestarting = status.status === 'restarting';
+  const isRecovering = status.status === 'recovering';
   const isStopped = status.status === 'stopped';
   const isStartable = isStopped || isProvisioned;
   const isDestroying = status.status === 'destroying';
@@ -249,7 +250,8 @@ export function InstanceControls({
             isAutoStarting ||
             isDestroying ||
             isStarting ||
-            isRestarting
+            isRestarting ||
+            isRecovering
           }
           onClick={() => {
             posthog?.capture('claw_start_instance_clicked', { instance_status: status.status });
@@ -277,7 +279,8 @@ export function InstanceControls({
             mutations.restartOpenClaw.isPending ||
             isDestroying ||
             isStarting ||
-            isRestarting
+            isRestarting ||
+            isRecovering
           }
           onClick={() => {
             posthog?.capture('claw_restart_openclaw_prompted', {
@@ -299,7 +302,8 @@ export function InstanceControls({
             mutations.restartMachine.isPending ||
             isDestroying ||
             isStarting ||
-            isRestarting
+            isRestarting ||
+            isRecovering
           }
           onClick={() => {
             posthog?.capture('claw_redeploy_prompted', { instance_status: status.status });
@@ -319,7 +323,8 @@ export function InstanceControls({
             mutations.runDoctor.isPending ||
             isDestroying ||
             isStarting ||
-            isRestarting
+            isRestarting ||
+            isRecovering
           }
           onClick={() => {
             posthog?.capture('claw_doctor_clicked', { instance_status: status.status });
@@ -333,7 +338,7 @@ export function InstanceControls({
           size="sm"
           variant="outline"
           className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
-          disabled={!isRunning || isDestroying || isStarting || isRestarting}
+          disabled={!isRunning || isDestroying || isStarting || isRestarting || isRecovering}
           onClick={() => {
             posthog?.capture('claw_kilo_run_clicked', { instance_status: status.status });
             setKiloRunOpen(true);
@@ -439,16 +444,16 @@ export function InstanceControls({
                   onError: err => toast.error(err.message, { duration: 10000 }),
                 });
               }}
-              disabled={mutations.restartMachine.isPending || isRestarting}
+              disabled={mutations.restartMachine.isPending || isRestarting || isRecovering}
             >
               {mutations.restartMachine.isPending ? (
                 <>
                   {redeployMode === 'redeploy' ? 'Redeploying' : 'Upgrading'}
                   <AnimatedDots />
                 </>
-              ) : isRestarting ? (
+              ) : isRestarting || isRecovering ? (
                 <>
-                  Restarting
+                  {isRecovering ? 'Recovering' : 'Restarting'}
                   <AnimatedDots />
                 </>
               ) : (

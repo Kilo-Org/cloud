@@ -166,6 +166,7 @@ export type AffiliateProvider = (typeof AffiliateProvider)[keyof typeof Affiliat
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.reassociate',
   'kiloclaw.snapshot.restore',
+  'kiloclaw.recovery.cleanup_retained_volume',
   'kiloclaw.subscription.update_trial_end',
   'kiloclaw.subscription.reset_trial',
   'kiloclaw.machine.start',

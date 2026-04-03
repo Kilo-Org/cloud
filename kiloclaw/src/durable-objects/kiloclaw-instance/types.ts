@@ -57,6 +57,7 @@ export type InstanceMutableState = {
   provisionedAt: number | null;
   startingAt: number | null;
   restartingAt: number | null;
+  recoveryStartedAt: number | null;
   restartUpdateSent: boolean;
   lastStartedAt: number | null;
   lastStoppedAt: number | null;
@@ -82,6 +83,11 @@ export type InstanceMutableState = {
   lastStartErrorAt: number | null;
   lastRestartErrorMessage: string | null;
   lastRestartErrorAt: number | null;
+  pendingRecoveryVolumeId: string | null;
+  recoveryPreviousVolumeId: string | null;
+  recoveryPreviousVolumeCleanupAfter: number | null;
+  lastRecoveryErrorMessage: string | null;
+  lastRecoveryErrorAt: number | null;
   lastBoundMachineRecoveryAt: number | null;
   instanceFeatures: string[];
   gmailNotificationsEnabled: boolean;

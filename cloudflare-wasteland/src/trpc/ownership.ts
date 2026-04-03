@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { getWastelandDOStub } from '../dos/WastelandDO.stub';
+import { getWastelandDOStub } from '../dos/Wasteland.do';
 import type { TRPCContext } from './init';
 
 type WastelandOwnershipResult =

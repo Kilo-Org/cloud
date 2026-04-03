@@ -249,6 +249,7 @@ grep "container\|startAgent\|eviction" /tmp/gastown-wrangler.log | tail -20
 ### Drain Flag Clearing
 
 The TownDO's `_draining` flag is cleared by whichever happens first:
+
 - **Heartbeat instance ID change** (~30s): each container has a UUID. When a new container's heartbeat arrives with a different ID, the drain clears.
 - **Nonce handshake**: the new container calls `/container-ready` with the drain nonce.
 - **Hard timeout** (7 min): safety net if no heartbeat or handshake arrives.
@@ -276,6 +277,7 @@ docker kill $(docker ps -q) 2>/dev/null
 ### Drain Stuck "Waiting for N agents"
 
 Agents show as `running` but aren't doing work. Common causes:
+
 - **`fetchPendingNudges` hanging**: should be skipped during drain (check `_draining` flag)
 - **`server.heartbeat` clearing idle timer**: these events should be in `IDLE_TIMER_IGNORE_EVENTS`
 - **Agent in `starting` status**: `session.prompt()` blocking. Status is set to `running` before the prompt now.
@@ -283,6 +285,7 @@ Agents show as `running` but aren't doing work. Common causes:
 ### Drain Flag Persists After Restart
 
 The drain banner stays visible after the container restarted. Causes:
+
 - **No heartbeats arriving**: container failed to start, no agents registered
 - **`_containerInstanceId` not persisted**: should be in `ctx.storage`
 - Fallback: wait for the 7-minute hard timeout
@@ -290,14 +293,17 @@ The drain banner stays visible after the container restarted. Causes:
 ### Git Credential Errors
 
 Container starts but agents fail at `git clone`:
+
 ```
 Error checking if container is ready: Invalid username
 ```
+
 This means the git token is stale/expired. Refresh credentials in the town settings.
 
 ### Accumulating Escalation Beads
 
 Triage/escalation beads pile up with `rig_id=NULL`. These are by design:
+
 - `type=escalation` beads surface for human attention (merge conflicts, rework)
 - `type=issue` triage beads are handled by `maybeDispatchTriageAgent`
 - GUPP force-stop beads are created by the patrol system for stuck agents

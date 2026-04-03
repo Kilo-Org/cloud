@@ -71,7 +71,9 @@ const REVIEW_JOIN = /* sql */ `
   SELECT ${beads}.*,
          ${review_metadata.branch}, ${review_metadata.target_branch},
          ${review_metadata.merge_commit}, ${review_metadata.pr_url},
-         ${review_metadata.retry_count}
+         ${review_metadata.retry_count},
+         ${review_metadata.auto_merge_ready_since},
+         ${review_metadata.last_feedback_check_at}
   FROM ${beads}
   INNER JOIN ${review_metadata} ON ${beads.bead_id} = ${review_metadata.bead_id}
 `;

@@ -100,9 +100,8 @@ const serviceMeta: Record<string, ServiceMeta> = {
   },
   // kiloclaw
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
-  'kiloclaw-worker-tunnel': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-stripe': { group: 'kiloclaw', dependsOn: [] },
-  kiloclaw: { group: 'kiloclaw', dependsOn: ['postgres', 'kiloclaw-tunnel', 'kiloclaw-worker-tunnel'] },
+  kiloclaw: { group: 'kiloclaw', dependsOn: ['postgres', 'kiloclaw-tunnel'] },
   // observability
   'cloudflare-o11y': { group: 'observability', dependsOn: ['nextjs'] },
   'cloudflare-ai-attribution': { group: 'observability', dependsOn: [] },
@@ -246,19 +245,6 @@ function buildServiceDefs(): ServiceDef[] {
         port: 0,
         dependsOn: meta.dependsOn,
         command: ['tsx', 'dev/local/scripts/start-tunnel.ts', String(nextjsPort)],
-        group: meta.group,
-      });
-      continue;
-    }
-
-    if (name === 'kiloclaw-worker-tunnel') {
-      defs.push({
-        name,
-        type: 'process',
-        dir: '.',
-        port: 0,
-        dependsOn: meta.dependsOn,
-        command: ['tsx', 'dev/local/scripts/start-worker-tunnel.ts'],
         group: meta.group,
       });
       continue;

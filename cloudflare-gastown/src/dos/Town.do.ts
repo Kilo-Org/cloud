@@ -2074,6 +2074,7 @@ export class TownDO extends DurableObject<Env> {
     body?: string;
     priority?: string;
     metadata?: Record<string, unknown>;
+    labels?: string[];
   }): Promise<{ bead: Bead; agent: Agent }> {
     const createdBead = beadOps.createBead(this.sql, {
       type: 'issue',
@@ -2082,6 +2083,7 @@ export class TownDO extends DurableObject<Env> {
       priority: BeadPriority.catch('medium').parse(input.priority ?? 'medium'),
       rig_id: input.rigId,
       metadata: input.metadata,
+      labels: input.labels,
     });
 
     events.insertEvent(this.sql, 'bead_created', {

@@ -24,6 +24,7 @@ const MayorSlingBody = z.object({
   title: z.string().min(1),
   body: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  labels: z.array(z.string()).optional(),
 });
 
 const MayorSlingBatchBody = z

@@ -79,7 +79,12 @@ if (spawnSync('cloudflared', ['version'], { stdio: 'ignore' }).error) {
 
 const modeArg = process.argv[2];
 const modeName: ModeName = modeArg === 'worker' ? 'worker' : 'nextjs';
-const port = process.argv[3] ?? (modeName === 'worker' ? '8795' : '3000');
+// For worker mode: argv[2]='worker', argv[3]=port
+// For nextjs mode: argv[2]=port (no mode prefix)
+const port =
+  modeName === 'worker'
+    ? (process.argv[3] ?? '8795')
+    : (modeArg ?? '3000');
 const mode = TUNNEL_MODES[modeName];
 const conf = loadConf();
 const tunnelName = conf[mode.nameKey] ?? '';
@@ -89,8 +94,7 @@ let args: string[];
 let urlPattern: RegExp | null = null;
 
 if (tunnelName) {
-  const configFile = path.join(os.homedir(), `.cloudflared/${tunnelName}.yml`);
-  args = ['tunnel', '--config', configFile, 'run', tunnelName];
+  args = ['tunnel', 'run', tunnelName];
   console.log(`Named tunnel: ${tunnelName} -> ${tunnelHostname}`);
 
   if (mode.onUrl && tunnelHostname) {

@@ -101,6 +101,7 @@ describe('database schema', () => {
       KiloClawScheduledPlan: ['commit', 'standard'],
       KiloClawScheduledBy: ['auto', 'user'],
       KiloClawSubscriptionStatus: ['trialing', 'active', 'past_due', 'canceled', 'unpaid'],
+      AffiliateProvider: ['impact'],
     };
 
     const actualEnumValues: Record<string, string[]> = {};

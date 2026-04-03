@@ -3,7 +3,7 @@ import { isGemini3Model, isGeminiModel } from '@/lib/providers/google';
 import { isMinimaxModel } from '@/lib/providers/minimax';
 import { isMoonshotModel } from '@/lib/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/providers/openai';
-import { qwen35_plus_free_model } from '@/lib/providers/qwen';
+import { qwen35_plus_free_model, QWEN36_PLUS_FREE_MODEL_ID } from '@/lib/providers/qwen';
 import { isXaiModel } from '@/lib/providers/xai';
 import { isXiaomiModel } from '@/lib/providers/xiaomi';
 import { isZaiModel } from '@/lib/providers/zai';
@@ -80,8 +80,21 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }
-  if (isMoonshotModel(model) || isZaiModel(model) || isXiaomiModel(model)) {
+  if (
+    isMoonshotModel(model) ||
+    isZaiModel(model) ||
+    isXiaomiModel(model) ||
+    model === QWEN36_PLUS_FREE_MODEL_ID
+  ) {
     return REASONING_VARIANTS_BINARY;
+  }
+  if (model === seed_20_pro_free_model.public_id) {
+    return {
+      none: { reasoning: { enabled: false, effort: 'minimal' } },
+      low: { reasoning: { enabled: true, effort: 'low' } },
+      medium: { reasoning: { enabled: true, effort: 'medium' } },
+      high: { reasoning: { enabled: true, effort: 'high' } },
+    };
   }
   if (model.startsWith('inception/mercury-2')) {
     return {

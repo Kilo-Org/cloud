@@ -2,9 +2,15 @@
 # GITHUB_APP_PRIVATE_KEY: The PEM-encoded private key (base64 encoded for env var storage)
 
 GITHUB_APP_ID=
+# @pkcs8
 GITHUB_APP_PRIVATE_KEY=
 
 # GitHub Lite App credentials (for OSS organizations with read-only permissions)
 # Same format as standard app credentials above
 GITHUB_LITE_APP_ID=
+# @pkcs8
 GITHUB_LITE_APP_PRIVATE_KEY=
+
+# GitLab App credentials (optional, used as fallback when metadata lacks client credentials)
+GITLAB_CLIENT_ID=
+GITLAB_CLIENT_SECRET=

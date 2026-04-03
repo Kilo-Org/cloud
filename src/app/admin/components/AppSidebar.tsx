@@ -21,11 +21,13 @@ import {
   UserX,
   Upload,
   Bell,
-  Server,
   Network,
+  RefreshCw,
+  KeyRound,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
+import KiloCrabIcon from '@/components/KiloCrabIcon';
 
 import {
   Sidebar,
@@ -79,6 +81,11 @@ const userManagementItems: MenuItem[] = [
     url: '/admin/blacklisted-domains',
     icon: () => <Shield />,
   },
+  {
+    title: () => 'Safety Identifiers',
+    url: '/admin/safety-identifiers',
+    icon: () => <KeyRound />,
+  },
 ];
 
 const financialItems: MenuItem[] = [
@@ -88,7 +95,7 @@ const financialItems: MenuItem[] = [
     icon: () => <DollarSign />,
   },
   {
-    title: () => 'Bulk Credits',
+    title: () => 'Bulk Credits & Trials',
     url: '/admin/bulk-credits',
     icon: () => <Upload />,
   },
@@ -100,6 +107,11 @@ const financialItems: MenuItem[] = [
 ];
 
 const productEngineeringItems: MenuItem[] = [
+  {
+    title: () => 'KiloClaw',
+    url: '/admin/kiloclaw',
+    icon: () => <KiloCrabIcon className="size-4" />,
+  },
   {
     title: () => 'Community PRs',
     url: '/admin/community-prs',
@@ -131,11 +143,6 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <Blocks />,
   },
   {
-    title: () => 'KiloClaw',
-    url: '/admin/kiloclaw',
-    icon: () => <Server />,
-  },
-  {
     title: () => 'Email Testing',
     url: '/admin/email-testing',
     icon: () => <MailCheck />,
@@ -149,6 +156,16 @@ const productEngineeringItems: MenuItem[] = [
     title: () => 'Gas Town',
     url: '/admin/gastown',
     icon: () => <Network />,
+  },
+  {
+    title: () => 'Sync Providers',
+    url: '/admin/sync-providers',
+    icon: () => <RefreshCw />,
+  },
+  {
+    title: () => 'Custom LLMs',
+    url: '/admin/custom-llms',
+    icon: () => <Bot />,
   },
 ];
 
@@ -182,6 +199,11 @@ const analyticsObservabilityItems: MenuItem[] = [
     title: () => 'Alerting (TTFB)',
     url: '/admin/alerting-ttfb',
     icon: () => <Bell />,
+  },
+  {
+    title: () => 'API Request Log',
+    url: '/admin/api-request-log',
+    icon: () => <Database />,
   },
 ];
 

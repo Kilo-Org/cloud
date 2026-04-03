@@ -156,6 +156,12 @@ export const KiloClawPaymentSource = {
 export type KiloClawPaymentSource =
   (typeof KiloClawPaymentSource)[keyof typeof KiloClawPaymentSource];
 
+export const AffiliateProvider = {
+  Impact: 'impact',
+} as const;
+
+export type AffiliateProvider = (typeof AffiliateProvider)[keyof typeof AffiliateProvider];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.reassociate',
@@ -171,6 +177,7 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.config.restore',
   'kiloclaw.doctor.run',
   'kiloclaw.machine.destroy_fly',
+  'kiloclaw.subscription.bulk_trial_grant',
 ]);
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
@@ -874,19 +881,34 @@ export const CustomLlmExtraHeadersSchema = z.record(z.string(), z.string());
 
 export type CustomLlmExtraHeaders = z.infer<typeof CustomLlmExtraHeadersSchema>;
 
-export const CustomLlmDefinitionSchema = z.object({
-  internal_id: z.string(),
-  display_name: z.string(),
-  context_length: z.number(),
-  max_completion_tokens: z.number(),
-  base_url: z.string(),
-  api_key: z.string(),
-  organization_ids: z.array(z.string()),
-  supports_image_input: z.boolean().optional(),
-  extra_headers: CustomLlmExtraHeadersSchema.optional(),
-  extra_body: CustomLlmExtraBodySchema.optional(),
-  opencode_settings: OpenCodeSettingsSchema.optional(),
+// All price fields are in dollars per token (e.g. "0.000001" = $1 per million tokens),
+// matching the OpenRouter pricing convention.
+export const CustomLlmPricingSchema = z.object({
+  prompt: z.string(),
+  completion: z.string(),
+  input_cache_read: z.string().optional(),
+  input_cache_write: z.string().optional(),
 });
+
+export type CustomLlmPricing = z.infer<typeof CustomLlmPricingSchema>;
+
+export const CustomLlmDefinitionSchema = z
+  .object({
+    internal_id: z.string(),
+    display_name: z.string(),
+    context_length: z.number(),
+    max_completion_tokens: z.number(),
+    base_url: z.string(),
+    api_key: z.string(),
+    organization_ids: z.array(z.string()),
+    supports_image_input: z.boolean().optional(),
+    extra_headers: CustomLlmExtraHeadersSchema.optional(),
+    extra_body: CustomLlmExtraBodySchema.optional(),
+    remove_from_body: z.array(z.string()).optional(),
+    opencode_settings: OpenCodeSettingsSchema.optional(),
+    pricing: CustomLlmPricingSchema.optional(),
+  })
+  .strict();
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
@@ -895,7 +917,7 @@ export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
-  type: z.string().optional(),
+  type: z.enum(['language', 'embedding', 'image']).optional().catch(undefined),
 });
 
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });

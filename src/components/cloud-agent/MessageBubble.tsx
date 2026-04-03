@@ -31,9 +31,13 @@ export function MessageBubble({
   if (message.role === 'user') {
     const displayName = userName ?? 'You';
     return (
-      <div className="flex items-start justify-end gap-2 py-4 md:gap-3">
+      <div className="group/msg flex items-start justify-end gap-2 py-4 md:gap-3">
         <div className="flex flex-1 flex-col items-end space-y-1">
           <div className="flex items-center gap-2">
+            <CopyMessageButton
+              getText={getTextForCopy}
+              className="opacity-0 transition-opacity group-hover/msg:opacity-100"
+            />
             <TimeAgo timestamp={message.timestamp} className="text-muted-foreground text-xs" />
             <span className="text-sm font-medium">{displayName}</span>
           </div>

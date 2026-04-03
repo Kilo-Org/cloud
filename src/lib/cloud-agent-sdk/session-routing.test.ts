@@ -76,9 +76,9 @@ describe('session transport routing', () => {
       const resolveSession = jest.fn(
         (): Promise<ResolvedSession> =>
           Promise.resolve({
+            type: 'cloud-agent',
             kiloSessionId: kiloId('ses-1'),
             cloudAgentSessionId: cloudAgentId('do-456'),
-            isLive: true,
           })
       );
 
@@ -112,14 +112,13 @@ describe('session transport routing', () => {
     });
   });
 
-  describe('resolveSession returning CLI live session', () => {
+  describe('resolveSession returning remote session', () => {
     it('creates CLI live transport and sends subscribe message', async () => {
       const resolveSession = jest.fn(
         (): Promise<ResolvedSession> =>
           Promise.resolve({
+            type: 'remote',
             kiloSessionId: kiloId('ses-1'),
-            cloudAgentSessionId: null,
-            isLive: true,
           })
       );
 
@@ -150,7 +149,7 @@ describe('session transport routing', () => {
     });
   });
 
-  describe('resolveSession returning CLI historical session', () => {
+  describe('resolveSession returning read-only session', () => {
     it('replays snapshot events', async () => {
       const snapshot = makeSnapshot({ id: SES_ID }, [
         {
@@ -164,9 +163,8 @@ describe('session transport routing', () => {
       const resolveSession = jest.fn(
         (): Promise<ResolvedSession> =>
           Promise.resolve({
+            type: 'read-only',
             kiloSessionId: kiloId('ses-1'),
-            cloudAgentSessionId: null,
-            isLive: false,
           })
       );
 
@@ -200,6 +198,12 @@ describe('session transport routing', () => {
       session.destroy();
     });
   });
+
+  // NOTE: The old "completed Cloud Agent session" case (cloudAgentSessionId present
+  // but isLive=false) no longer exists. With the discriminated union, the resolver
+  // decides the session type. A completed cloud agent session is resolved as
+  // 'cloud-agent' (the transport handles completion via snapshot + WebSocket), or
+  // the resolver may choose 'read-only' for sessions without a live DO.
 
   describe('resolveSession failure', () => {
     it('sets error state and fires onError', async () => {
@@ -263,9 +267,9 @@ describe('session transport routing', () => {
       const resolveSession = jest.fn(
         (): Promise<ResolvedSession> =>
           Promise.resolve({
+            type: 'cloud-agent',
             kiloSessionId: kiloId('ses-1'),
             cloudAgentSessionId: cloudAgentId('do-1'),
-            isLive: true,
           })
       );
 
@@ -297,9 +301,9 @@ describe('session transport routing', () => {
       const resolveSession = jest.fn(
         (): Promise<ResolvedSession> =>
           Promise.resolve({
+            type: 'cloud-agent',
             kiloSessionId: kiloId('ses-1'),
             cloudAgentSessionId: cloudAgentId('do-1'),
-            isLive: true,
           })
       );
 
@@ -328,9 +332,9 @@ describe('session transport routing', () => {
       const resolveSession = jest.fn(
         (): Promise<ResolvedSession> =>
           Promise.resolve({
+            type: 'cloud-agent',
             kiloSessionId: kiloId('ses-1'),
             cloudAgentSessionId: cloudAgentId('do-1'),
-            isLive: true,
           })
       );
 
@@ -356,15 +360,14 @@ describe('session transport routing', () => {
       session.destroy();
     });
 
-    it('sets error state when CLI live session lacks required config', async () => {
+    it('sets error state when remote session lacks required config', async () => {
       const onError = jest.fn();
 
       const resolveSession = jest.fn(
         (): Promise<ResolvedSession> =>
           Promise.resolve({
+            type: 'remote',
             kiloSessionId: kiloId('ses-1'),
-            cloudAgentSessionId: null,
-            isLive: true,
           })
       );
 
@@ -379,7 +382,7 @@ describe('session transport routing', () => {
       await Promise.resolve();
 
       expect(onError).toHaveBeenCalledWith(
-        'CloudAgentSession transport.cliWebsocketUrl and getAuthToken are required for live CLI sessions'
+        'CloudAgentSession transport.cliWebsocketUrl and getAuthToken are required for remote CLI sessions'
       );
       expect(session.state.getActivity()).toEqual({ type: 'idle' });
       expect(session.state.getStatus().type).toBe('error');
@@ -387,15 +390,14 @@ describe('session transport routing', () => {
       session.destroy();
     });
 
-    it('sets error state when CLI historical session lacks fetchSnapshot', async () => {
+    it('sets error state when read-only session lacks fetchSnapshot', async () => {
       const onError = jest.fn();
 
       const resolveSession = jest.fn(
         (): Promise<ResolvedSession> =>
           Promise.resolve({
+            type: 'read-only',
             kiloSessionId: kiloId('ses-1'),
-            cloudAgentSessionId: null,
-            isLive: false,
           })
       );
 
@@ -410,7 +412,7 @@ describe('session transport routing', () => {
       await Promise.resolve();
 
       expect(onError).toHaveBeenCalledWith(
-        'CloudAgentSession transport.fetchSnapshot is required for historical CLI sessions'
+        'CloudAgentSession transport.fetchSnapshot is required for read-only sessions'
       );
       expect(session.state.getActivity()).toEqual({ type: 'idle' });
       expect(session.state.getStatus().type).toBe('error');

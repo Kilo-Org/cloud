@@ -7,12 +7,14 @@ import { isRunningInExpoGo } from 'expo';
 import { Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
 import { useEffect } from 'react';
+import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { Toaster } from 'sonner-native';
 
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
+import { initAppsFlyer } from '@/lib/appsflyer';
 import { ContextProvider, useAppContext } from '@/lib/context/context-context';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { queryClient } from '@/lib/query-client';
@@ -122,14 +124,19 @@ function RootLayoutNav() {
     !isLoading &&
     (needsForceUpdate || (!showingForceUpdate && (needsAuth || needsContext || needsAppRedirect)));
 
-  if (isLoading || needsRedirect) {
-    return null;
-  }
+  // Always keep Slot mounted so Expo Router's navigation tree stays
+  // initialised — returning null unmounts it and breaks router.replace.
+  // The native splash screen covers everything during initial load, and
+  // opacity 0 hides the wrong screen during redirects.
+  const hidden = isLoading || needsRedirect;
 
   return (
-    <Animated.View className="flex-1" entering={FadeIn.duration(300)}>
+    <View
+      className={`flex-1 ${hidden ? 'opacity-0' : 'opacity-100'}`}
+      pointerEvents={hidden ? 'none' : 'auto'}
+    >
       <Slot />
-    </Animated.View>
+    </View>
   );
 }
 
@@ -141,6 +148,16 @@ function RootLayout() {
       navigationIntegration.registerNavigationContainer(ref);
     }
   }, [ref]);
+
+  useEffect(() => {
+    async function startAppsFlyer() {
+      if (Platform.OS === 'ios') {
+        await requestTrackingPermissionsAsync();
+      }
+      initAppsFlyer();
+    }
+    void startAppsFlyer();
+  }, []);
 
   return (
     <GestureHandlerRootView className="flex-1">

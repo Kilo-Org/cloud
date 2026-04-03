@@ -278,7 +278,11 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
     case 'transition_bead': {
       try {
-        beadOps.updateBeadStatus(sql, action.bead_id, action.to, action.actor);
+        const failureReason =
+          action.to === 'failed'
+            ? { code: 'reconciler', message: action.reason, source: 'scheduler' }
+            : undefined;
+        beadOps.updateBeadStatus(sql, action.bead_id, action.to, action.actor, failureReason);
       } catch (err) {
         console.warn(`${LOG} transition_bead failed: bead=${action.bead_id} to=${action.to}`, err);
       }
@@ -506,17 +510,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
         }
       }
 
-      // Set agent to working and bead to in_progress synchronously
+      // Set agent to working and bead to in_progress synchronously.
+      // dispatch_attempts are NOT incremented here — scheduling.dispatchAgent()
+      // is the single source of truth for both agent_metadata and bead counters.
       agentOps.updateAgentStatus(sql, agentId, 'working');
-      query(
-        sql,
-        /* sql */ `
-          UPDATE ${agent_metadata}
-          SET ${agent_metadata.columns.dispatch_attempts} = ${agent_metadata.columns.dispatch_attempts} + 1
-          WHERE ${agent_metadata.bead_id} = ?
-        `,
-        [agentId]
-      );
       beadOps.updateBeadStatus(sql, beadId, 'in_progress', agentId);
 
       const capturedAgentId = agentId;

@@ -98,7 +98,7 @@
       "id": "kilo-auto/free",
       "name": "Kilo Auto Free",
       "created": 0,
-      "description": "Free with limited capability. No credits required. Uses MiMo-V2-Pro.",
+      "description": "Free with limited capability. No credits required. Uses MiniMax M2.5.",
       "architecture": {
         "input_modalities": [
           "text"
@@ -110,7 +110,7 @@
       },
       "top_provider": {
         "is_moderated": false,
-        "context_length": 1048576,
+        "context_length": 204800,
         "max_completion_tokens": 131072
       },
       "pricing": {
@@ -123,7 +123,7 @@
         "web_search": "0",
         "internal_reasoning": "0"
       },
-      "context_length": 1048576,
+      "context_length": 204800,
       "supported_parameters": [
         "max_tokens",
         "temperature",
@@ -145,13 +145,13 @@
       "isFree": true
     },
     {
-      "id": "xiaomi/mimo-v2-pro:free",
-      "canonical_slug": "xiaomi/mimo-v2-pro:free",
+      "id": "bytedance-seed/dola-seed-2.0-pro:free",
+      "canonical_slug": "bytedance-seed/dola-seed-2.0-pro:free",
       "hugging_face_id": "",
-      "name": "Xiaomi: MiMo-V2-Pro (free)",
+      "name": "ByteDance Seed: Dola Seed 2.0 Pro (free)",
       "created": 1756238927,
-      "description": "MiMo V2 Pro is a frontier-scale open-source large language model with over 1 trillion parameters, developed in China and optimized specifically for agentic workflows. It excels in frameworks such as OpenClaw, with native 1M-token context support that enables reliable handling of complex, long-horizon, multi-step tasks. In agentic reasoning, tool use, and multi-step execution benchmarks, its performance sits between Claude 4.6 Sonnet and Claude 4.6 Opus.",
-      "context_length": 1048576,
+      "description": "Built for the Agent era, it delivers stable performance in complex reasoning and long-horizon tasks, including multi-step planning, visual-text reasoning, video understanding, and advanced analysis. **Note:** For the free endpoint, all prompts and output are logged to improve the provider's model and its product and services. Please do not upload any personal, confidential, or otherwise sensitive information.",
+      "context_length": 256000,
       "architecture": {
         "modality": "text+image->text",
         "input_modalities": [
@@ -174,8 +174,8 @@
         "input_cache_read": "0.00000000"
       },
       "top_provider": {
-        "context_length": 1048576,
-        "max_completion_tokens": 131072,
+        "context_length": 256000,
+        "max_completion_tokens": 128000,
         "is_moderated": false
       },
       "per_request_limits": null,
@@ -190,17 +190,30 @@
       "preferredIndex": 3,
       "isFree": true,
       "opencode": {
+        "ai_sdk_provider": "openai-compatible",
         "variants": {
-          "instant": {
+          "none": {
             "reasoning": {
               "enabled": false,
-              "effort": "none"
+              "effort": "minimal"
             }
           },
-          "thinking": {
+          "low": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "low"
+            }
+          },
+          "medium": {
             "reasoning": {
               "enabled": true,
               "effort": "medium"
+            }
+          },
+          "high": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "high"
             }
           }
         }
@@ -248,7 +261,7 @@
         "include_reasoning"
       ],
       "default_parameters": {},
-      "preferredIndex": 6,
+      "preferredIndex": 5,
       "isFree": true,
       "opencode": {
         "ai_sdk_provider": "openai"
@@ -613,121 +626,6 @@
       "opencode": {}
     },
     {
-      "id": "minimax/minimax-m2.5:free",
-      "canonical_slug": "minimax/minimax-m2.5:free",
-      "hugging_face_id": "",
-      "name": "MiniMax: MiniMax M2.5 (free)",
-      "created": 1756238927,
-      "description": "MiniMax-M2.5 is a SOTA large language model designed for real-world productivity. Trained in a diverse range of complex real-world digital working environments, M2.5 builds upon the coding expertise of M2.1 to extend into general office work, reaching fluency in generating and operating Word, Excel, and Powerpoint files, context switching between diverse software environments, and working across different agent and human teams. Scoring 80.2% on SWE-Bench Verified, 51.3% on Multi-SWE-Bench, and 76.3% on BrowseComp, M2.5 is also more token efficient than previous generations, having been trained to optimize its actions and output through planning.",
-      "context_length": 204800,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0000000",
-        "completion": "0.0000000",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.00000000"
-      },
-      "top_provider": {
-        "context_length": 204800,
-        "max_completion_tokens": 131072,
-        "is_moderated": false
-      },
-      "per_request_limits": null,
-      "supported_parameters": [
-        "max_tokens",
-        "temperature",
-        "tools",
-        "reasoning",
-        "include_reasoning"
-      ],
-      "default_parameters": {},
-      "isFree": true,
-      "settings": {
-        "included_tools": [
-          "search_and_replace"
-        ],
-        "excluded_tools": [
-          "apply_diff",
-          "edit_file"
-        ]
-      },
-      "opencode": {}
-    },
-    {
-      "id": "xiaomi/mimo-v2-omni:free",
-      "canonical_slug": "xiaomi/mimo-v2-omni:free",
-      "hugging_face_id": "",
-      "name": "Xiaomi: MiMo-V2-Omni (free)",
-      "created": 1756238927,
-      "description": "MiMo-V2-Omni is a frontier omni-modal model that natively processes image, video, and audio inputs within a unified architecture. It combines strong multimodal perception with agentic capability — visual grounding, multi-step planning, tool use, and code execution — making it well-suited for complex real-world tasks that span modalities. 256K context window.",
-      "context_length": 262144,
-      "architecture": {
-        "modality": "text+image->text",
-        "input_modalities": [
-          "text",
-          "image"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.0000000",
-        "completion": "0.0000000",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.00000000"
-      },
-      "top_provider": {
-        "context_length": 262144,
-        "max_completion_tokens": 65536,
-        "is_moderated": false
-      },
-      "per_request_limits": null,
-      "supported_parameters": [
-        "max_tokens",
-        "temperature",
-        "tools",
-        "reasoning",
-        "include_reasoning"
-      ],
-      "default_parameters": {},
-      "isFree": true,
-      "opencode": {
-        "variants": {
-          "instant": {
-            "reasoning": {
-              "enabled": false,
-              "effort": "none"
-            }
-          },
-          "thinking": {
-            "reasoning": {
-              "enabled": true,
-              "effort": "medium"
-            }
-          }
-        }
-      }
-    },
-    {
       "id": "kilo-auto/small",
       "name": "Kilo Auto Small",
       "created": 0,
@@ -763,7 +661,9 @@
         "reasoning",
         "include_reasoning"
       ],
-      "opencode": {},
+      "opencode": {
+        "ai_sdk_provider": "openai"
+      },
       "isFree": false
     }
   ]

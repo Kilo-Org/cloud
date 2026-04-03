@@ -6,7 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
-import { useKiloClawLatestVersion, useKiloClawMyPin } from '@/hooks/useKiloClaw';
+import { useClawLatestVersion, useClawMyPin } from '../hooks/useClawHooks';
+import { useClawContext } from './ClawContext';
 import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
@@ -36,11 +37,17 @@ export function CreateInstanceCard({
   const posthog = usePostHog();
   const trpc = useTRPC();
   const searchParams = useSearchParams();
-  const { data: billingStatus } = useQuery(trpc.kiloclaw.getBillingStatus.queryOptions());
+  const { organizationId } = useClawContext();
+  const isOrgContext = !!organizationId;
+  // Billing status is personal-only; org uses org subscription checks
+  const { data: billingStatus } = useQuery({
+    ...trpc.kiloclaw.getBillingStatus.queryOptions(),
+    enabled: !isOrgContext,
+  });
   const { data: user, isLoading: isLoadingUser } = useUser();
   const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
-  const { data: myPin, isLoading: isLoadingPin, isError: isPinLookupError } = useKiloClawMyPin();
-  const { data: latestVersion, isLoading: isLoadingLatestVersion } = useKiloClawLatestVersion();
+  const { data: myPin, isLoading: isLoadingPin, isError: isPinLookupError } = useClawMyPin();
+  const { data: latestVersion, isLoading: isLoadingLatestVersion } = useClawLatestVersion();
   const [selectedModel, setSelectedModel] = useState('');
   const hasAppliedDefault = useRef(false);
   const latestOpenClawVersion = latestVersion?.openclawVersion;
@@ -162,10 +169,6 @@ export function CreateInstanceCard({
       selected_model: selectedModel,
     });
 
-    // Capture email before the async mutation so the onSuccess closure
-    // doesn't depend on the useUser query still being resolved.
-    const email = user?.google_user_email;
-
     // Enter the onboarding wizard before the mutation fires so the UI
     // shows the wizard immediately instead of racing with status polling.
     onProvisionStart?.();
@@ -175,13 +178,6 @@ export function CreateInstanceCard({
         kilocodeDefaultModel: `kilocode/${selectedModel}`,
       },
       {
-        onSuccess: () => {
-          // Record a Rewardful lead when an affiliate-referred user starts a trial.
-          // No-op if the visitor is not a referral or rw.js didn't load.
-          if (email && typeof window.rewardful === 'function') {
-            window.rewardful('convert', { email });
-          }
-        },
         onError: err => {
           onProvisionFailed?.();
           toast.error(`Failed to create: ${err.message}`);

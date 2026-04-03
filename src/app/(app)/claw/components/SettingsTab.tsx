@@ -16,21 +16,17 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
-import { calverAtLeast, cleanVersion, getRunningVersionBadge } from '@/lib/kiloclaw/version';
+import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
-import {
-  useControllerVersion,
-  useKiloClawConfig,
-  useKiloClawLatestVersion,
-  useKiloClawMyPin,
-} from '@/hooks/useKiloClaw';
-import { useTRPC } from '@/lib/trpc/utils';
+import { useClawConfig, useClawMyPin, useClawGoogleSetupCommand } from '../hooks/useClawHooks';
+import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
+
 import { useDefaultModelSelection } from '../hooks/useDefaultModelSelection';
 import { getSettingsModelOptions } from './modelSupport';
 
@@ -57,8 +53,8 @@ import { VersionPinCard } from './VersionPinCard';
 import { WorkspaceFileEditor } from './WorkspaceFileEditor';
 import { PermissionPresetCards } from './PermissionPresetCards';
 import { CustomSecretsSection } from './CustomSecretsSection';
+import { WebhookIntegrationSection } from './WebhookIntegrationSection';
 import { type ExecPreset, configToExecPreset, execPresetToConfig } from './claw.types';
-
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
 // ---------------------------------------------------------------------------
@@ -247,14 +243,7 @@ function GoogleAccountCard({
   mutations: ClawMutations;
   onRedeploy?: () => void;
 }) {
-  const trpc = useTRPC();
-  const { data: setupData } = useQuery(
-    trpc.kiloclaw.getGoogleSetupCommand.queryOptions(undefined, {
-      enabled: !connected,
-      refetchInterval: 50 * 60 * 1000,
-      refetchOnWindowFocus: false,
-    })
-  );
+  const { data: setupData } = useClawGoogleSetupCommand(!connected);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
@@ -540,21 +529,27 @@ export function SettingsTab({
   onRequestUpgrade?: () => void;
 }) {
   const posthog = usePostHog();
-  const { data: config } = useKiloClawConfig();
+  const { data: config } = useClawConfig();
   const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
   const isRunning = status.status === 'running';
   const {
-    data: controllerVersion,
-    isLoading: isLoadingControllerVersion,
-    isError: isControllerVersionError,
-  } = useControllerVersion(isRunning);
-  const { data: myPin } = useKiloClawMyPin();
-  const { data: latestVersion } = useKiloClawLatestVersion();
+    updateAvailable,
+    catalogNewerThanImage,
+    needsImageUpgrade,
+    isModified,
+    hasVersionInfo,
+    variantsMatch,
+    trackedVersion,
+    runningVersion,
+    latestAvailableVersion,
+    latestVersion,
+    controllerVersion,
+    isLoadingControllerVersion,
+    isControllerVersionError,
+  } = useClawUpdateAvailable(status);
+  const { data: myPin } = useClawMyPin();
   const [confirmDestroy, setConfirmDestroy] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
-  const trackedVersion = cleanVersion(status.openclawVersion);
-  const runningVersion = cleanVersion(controllerVersion?.openclawVersion);
-  const latestAvailableVersion = cleanVersion(latestVersion?.openclawVersion);
   const hasModelSelectionError = isRunning && isControllerVersionError;
   const modelSelectionError = hasModelSelectionError
     ? 'Failed to load the running OpenClaw version. Retry before changing the default model.'
@@ -638,34 +633,7 @@ export function SettingsTab({
     if (!isRunning) setEditConfigOpen(false);
   }, [isRunning]);
 
-  const needsImageUpgrade = isRunning && controllerVersion && !controllerVersion.version;
-  const isModified = getRunningVersionBadge(runningVersion, trackedVersion) === 'modified';
-  const catalogNewerThanImage =
-    !!trackedVersion &&
-    !!latestAvailableVersion &&
-    latestAvailableVersion !== trackedVersion &&
-    calverAtLeast(latestAvailableVersion, trackedVersion);
   const isPinned = !!myPin;
-  const hasVersionInfo = isRunning && trackedVersion && trackedVersion !== ':latest';
-  // Only compare image tags when variants match — latestVersion is always
-  // for the "default" variant, so skip for non-default instances to avoid
-  // false "Update available" badges that would switch their variant.
-  const variantsMatch =
-    !status.imageVariant ||
-    status.imageVariant === 'default' ||
-    status.imageVariant === latestVersion?.variant;
-  const imageTagDiffers =
-    hasVersionInfo &&
-    variantsMatch &&
-    !!status.trackedImageTag &&
-    !!latestVersion?.imageTag &&
-    status.trackedImageTag !== latestVersion.imageTag;
-  const updateAvailable = catalogNewerThanImage
-    ? !isModified ||
-      (!!runningVersion &&
-        calverAtLeast(latestAvailableVersion, runningVersion) &&
-        latestAvailableVersion !== runningVersion)
-    : imageTagDiffers;
 
   return (
     <div className="flex flex-col gap-6">
@@ -769,6 +737,7 @@ export function SettingsTab({
             <VersionPinCard
               trackedImageTag={status.trackedImageTag}
               latestImageTag={variantsMatch ? (latestVersion?.imageTag ?? null) : null}
+              mutations={mutations}
             />
           </div>
         )}
@@ -817,6 +786,9 @@ export function SettingsTab({
         mutations={mutations}
         onRedeploy={onRedeploy}
       />
+
+      {/* ── Webhook Integration ── */}
+      <WebhookIntegrationSection />
 
       {/* ── Messaging Channels ── */}
       <div>

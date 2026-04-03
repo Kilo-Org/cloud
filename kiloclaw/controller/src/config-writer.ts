@@ -148,12 +148,15 @@ export function generateBaseConfig(
   // OpenClaw 2026.2.24+ has a built-in kilocode provider that activates when
   // KILOCODE_API_KEY is in the environment. Stale config entries with the old
   // /api/openrouter/ URL or the production /api/gateway/ URL conflict with it.
+  // For the production /api/gateway/ URL, skip removal when KILOCODE_ORGANIZATION_ID
+  // is set: org-scoped instances need an explicit provider entry (with the production
+  // baseUrl) to carry the org header. The /api/openrouter/ cleanup always runs since
+  // that URL is unconditionally broken.
   if (config.models?.providers?.kilocode) {
     const staleBaseUrl: string = config.models.providers.kilocode.baseUrl || '';
-    if (
-      staleBaseUrl.includes('/api/openrouter/') ||
-      staleBaseUrl === 'https://api.kilo.ai/api/gateway/'
-    ) {
+    const isOpenrouterUrl = staleBaseUrl.includes('/api/openrouter/');
+    const isGatewayUrl = staleBaseUrl === 'https://api.kilo.ai/api/gateway/';
+    if (isOpenrouterUrl || (isGatewayUrl && !env.KILOCODE_ORGANIZATION_ID)) {
       delete config.models.providers.kilocode;
       console.log(`Removed stale kilocode provider config (baseUrl: ${staleBaseUrl})`);
       if (Object.keys(config.models.providers).length === 0) {
@@ -178,6 +181,29 @@ export function generateBaseConfig(
     // Empty array is valid — the built-in kilocode provider fills in its catalog.
     config.models.providers.kilocode.models = config.models.providers.kilocode.models ?? [];
     console.log(`Overriding kilocode base URL: ${env.KILOCODE_API_BASE_URL}`);
+  }
+
+  // Pass org scope to KiloCode provider as request header when available.
+  // This is used by OpenClaw provider requests (not Kilo CLI).
+  // Header name matches ORGANIZATION_ID_HEADER in src/lib/constants.ts.
+  if (env.KILOCODE_ORGANIZATION_ID) {
+    config.models = config.models ?? {};
+    config.models.providers = config.models.providers ?? {};
+    config.models.providers.kilocode = config.models.providers.kilocode ?? {};
+    // Explicit provider entries require a baseUrl per OpenClaw's strict schema.
+    // When KILOCODE_API_BASE_URL already set the URL above, preserve it;
+    // otherwise default to the production gateway URL.
+    config.models.providers.kilocode.baseUrl =
+      config.models.providers.kilocode.baseUrl ?? 'https://api.kilo.ai/api/gateway/';
+    config.models.providers.kilocode.headers = config.models.providers.kilocode.headers ?? {};
+    config.models.providers.kilocode.headers['X-KiloCode-OrganizationId'] =
+      env.KILOCODE_ORGANIZATION_ID;
+    config.models.providers.kilocode.models = config.models.providers.kilocode.models ?? [];
+    console.log('Configured KiloCode organization header from KILOCODE_ORGANIZATION_ID');
+  } else {
+    // Remove stale org header from previous boots (e.g., instance was transferred
+    // from org to personal, or org was deleted).
+    delete config.models?.providers?.kilocode?.headers?.['X-KiloCode-OrganizationId'];
   }
 
   // User-selected default model override.
@@ -298,9 +324,20 @@ export function generateBaseConfig(
       (config.plugins.load.paths as string[]).push(pluginPath);
     }
 
+    // Explicitly allow the non-bundled streamchat plugin so OpenClaw doesn't
+    // warn about auto-loading untrusted plugins when plugins.allow is empty.
+    config.plugins.allow = Array.isArray(config.plugins.allow) ? config.plugins.allow : [];
+    const scEntry = 'openclaw-channel-streamchat';
+    if (!(config.plugins.allow as string[]).includes(scEntry)) {
+      (config.plugins.allow as string[]).push(scEntry);
+    }
+
     config.plugins.entries = config.plugins.entries ?? {};
-    config.plugins.entries.streamchat = config.plugins.entries.streamchat ?? {};
-    config.plugins.entries.streamchat.enabled = true;
+    // Entry key must match the plugin's manifest id (openclaw.plugin.json).
+    // The fork's manifest declares id "openclaw-channel-streamchat" to align
+    // with the idHint that OpenClaw derives from the package name.
+    config.plugins.entries[scEntry] = config.plugins.entries[scEntry] ?? {};
+    config.plugins.entries[scEntry].enabled = true;
   }
 
   // Webhook hooks configuration (required for Gmail push notifications via gog).
@@ -375,12 +412,16 @@ export const DEFAULT_MCPORTER_CONFIG_PATH = '/root/.openclaw/workspace/config/mc
 /**
  * Write mcporter.json with MCP server definitions derived from environment variables.
  * MCPorter is the middleware layer that lets OpenClaw agents call MCP server tools
- * via `mcporter call <server>.<tool>`. This bypasses openclaw.json's strict schema
- * validation, which does not yet support `mcp.servers` (requires OpenClaw >= 2026.3.14).
+ * via `mcporter call <server>.<tool>`.
  *
- * TODO: When the Dockerfile pins OpenClaw >= 2026.3.14, migrate MCP server config
- * into generateBaseConfig() using `config.mcp.servers` in openclaw.json instead.
- * The mcporter approach can then be removed. See PR #48611 in openclaw/openclaw.
+ * The `config.mcp.servers` schema exists in openclaw.json (since v2026.3.14), but
+ * OpenClaw's embedded Pi MCP runtime only supports StdioClientTransport — it has no
+ * HTTP/SSE transport. Since our MCP servers (AgentCard, Linear) are remote HTTP
+ * endpoints, mcporter must stay until OpenClaw adds HTTP transport support.
+ *
+ * TODO: When OpenClaw's Pi MCP bridge gains HTTP/SSE transport, migrate these
+ * definitions into generateBaseConfig() using `config.mcp.servers` and remove
+ * mcporter.
  */
 export function writeMcporterConfig(
   env: EnvLike,

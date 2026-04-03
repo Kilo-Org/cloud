@@ -1,13 +1,14 @@
 # Backend API URL for status callbacks (configured in worker env, not passed in payload)
-API_URL=http://127.0.0.1:3000
+# @url nextjs
+API_URL=http://localhost:3000
 
 # Internal API secret for authentication (shared with backend)
 INTERNAL_API_SECRET=your-secret-here
 
 # Backend auth token for authenticating incoming requests from backend
+# @from CODE_REVIEW_WORKER_AUTH_TOKEN
 BACKEND_AUTH_TOKEN=your-backend-auth-token
 
 # Cloud agent URL for triage execution
-# For local development: use http://127.0.0.1:8788
-# For production: use https://cloud-agent.kilosessions.ai
-CLOUD_AGENT_URL=http://127.0.0.1:8788
+# @url cloud-agent-next
+CLOUD_AGENT_URL=http://localhost:8794

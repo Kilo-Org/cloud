@@ -8,6 +8,47 @@
 import type { ManagedAgent } from './types';
 
 /**
+ * Notify the TownDO that the mayor has finished processing a prompt and
+ * is now waiting for user input. This lets the TownDO transition the
+ * mayor from "working" to "waiting", which drops the alarm to the idle
+ * cadence and stops health-check pings that reset the container's
+ * sleepAfter timer.
+ *
+ * Best-effort: errors are logged but do not propagate.
+ */
+export async function reportMayorWaiting(agent: ManagedAgent): Promise<void> {
+  const apiUrl = agent.gastownApiUrl;
+  const authToken =
+    process.env.GASTOWN_CONTAINER_TOKEN ?? agent.gastownContainerToken ?? agent.gastownSessionToken;
+  if (!apiUrl || !authToken) {
+    console.warn(
+      `Cannot report mayor ${agent.agentId} waiting: no API credentials on agent record`
+    );
+    return;
+  }
+
+  const url = `${apiUrl}/api/towns/${agent.townId}/rigs/${agent.rigId}/agents/${agent.agentId}/waiting`;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({ agentId: agent.agentId, firedAt: Date.now() }),
+    });
+
+    if (!response.ok) {
+      console.warn(
+        `Failed to report mayor ${agent.agentId} waiting: ${response.status} ${response.statusText}`
+      );
+    }
+  } catch (err) {
+    console.warn(`Error reporting mayor ${agent.agentId} waiting:`, err);
+  }
+}
+
+/**
  * Notify the Rig DO that an agent session has completed or failed.
  * Best-effort: errors are logged but do not propagate.
  */

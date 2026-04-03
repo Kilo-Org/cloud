@@ -40,6 +40,7 @@ type SessionConfig = {
   model: string;
   variant?: string | null;
 };
+type ActiveSessionType = 'cloud-agent' | 'remote';
 type StandaloneQuestion = { requestId: string; questions: QuestionInfo[] };
 type StandalonePermission = {
   requestId: string;
@@ -88,13 +89,17 @@ type SessionManagerConfig = {
   cliWebsocketUrl?: string;
   websocketBaseUrl?: string;
   api: CloudAgentApi;
-  prepare: (input: PrepareInput) => Promise<{ cloudAgentSessionId: CloudAgentSessionId }>;
+  prepare: (
+    input: PrepareInput
+  ) => Promise<{ cloudAgentSessionId: CloudAgentSessionId; kiloSessionId: KiloSessionId }>;
   initiate: (input: { cloudAgentSessionId: CloudAgentSessionId }) => Promise<unknown>;
   fetchSession: (kiloSessionId: KiloSessionId) => Promise<FetchedSessionData>;
   onKiloSessionCreated?: (kiloSessionId: KiloSessionId) => void;
   onComplete?: () => void;
   onBranchChanged?: (branch: string) => void;
   onSendFailed?: (messageText: string) => void;
+  onRemoteSessionOpened?: (data: { kiloSessionId: KiloSessionId }) => void;
+  onRemoteSessionMessageSent?: (data: { kiloSessionId: KiloSessionId }) => void;
 };
 
 // Writable/read-only atom aliases for the public atoms record
@@ -224,7 +229,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // Internal atoms
   const sessionStorageAtom = atom<JotaiSessionStorage | null>(null);
   const optimisticMessageAtom = atom<StoredMessage | null>(null);
-  const sessionParentsAtom = atom<Map<string, string | null>>(new Map());
+  const rootSessionIdAtom = atom<string | null>(null);
 
   // Public writable atoms
   const isStreamingAtom = atom(false);
@@ -255,12 +260,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const ids = get(storage.atoms.messageIds);
     const msgMap = get(storage.atoms.messages);
     const partsMap = get(storage.atoms.parts);
-    const parents = get(sessionParentsAtom);
+    const rootSessionId = get(rootSessionIdAtom);
     const out: StoredMessage[] = [];
     for (const id of ids) {
       const info = msgMap.get(id);
       if (!info) continue;
-      if (parents.has(info.sessionID) && parents.get(info.sessionID) !== null) continue;
+      if (rootSessionId !== null && info.sessionID !== rootSessionId) continue;
       out.push({ info, parts: partsMap.get(id) ?? [] });
     }
     const opt = get(optimisticMessageAtom);
@@ -299,6 +304,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // Private mutable state
   let activeSessionId: KiloSessionId | null = null;
   let currentSession: CloudAgentSession | null = null;
+  let activeSessionType: ActiveSessionType | null = null;
   let stateUnsub: (() => void) | null = null;
   let indicatorTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -318,7 +324,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function clearAllAtoms(): void {
     store.set(sessionStorageAtom, null);
     store.set(optimisticMessageAtom, null);
-    store.set(sessionParentsAtom, new Map());
+    store.set(rootSessionIdAtom, null);
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
     store.set(isReadOnlyAtom, false);
@@ -418,6 +424,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
     activeSessionId = kiloSessionId;
+    activeSessionType = null;
     stateUnsub?.();
     stateUnsub = null;
     currentSession?.destroy();
@@ -427,6 +434,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // Clean slate immediately — the user asked to switch, so clear all
     // previous session state and show a loading indicator.
     clearAllAtoms();
+    store.set(rootSessionIdAtom, kiloSessionId);
     store.set(isLoadingAtom, true);
 
     let data: FetchedSessionData;
@@ -469,10 +477,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       websocketBaseUrl: config.websocketBaseUrl,
       storage: jotaiStorage,
       onSessionCreated: info => {
-        const parents = new Map(store.get(sessionParentsAtom));
-        parents.set(info.id, info.parentID ?? null);
-        store.set(sessionParentsAtom, parents);
-        if (!info.parentID) {
+        if (info.parentID == null) {
+          // Adopt the server-reported root session ID so message
+          // filtering works even when switchSession was called with a
+          // cast cloudAgentSessionId (the createAndStart path).
+          store.set(rootSessionIdAtom, info.id);
           store.set(isLoadingAtom, false);
         }
       },
@@ -499,6 +508,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       onPermissionResolved: requestId => {
         const ap = store.get(activePermissionAtom);
         if (ap?.requestId === requestId) store.set(activePermissionAtom, null);
+      },
+      onResolved: resolved => {
+        if (resolved.type === 'cloud-agent') activeSessionType = 'cloud-agent';
+        else if (resolved.type === 'remote') activeSessionType = 'remote';
       },
       onBranchChanged: branch => {
         const currentFetched = store.get(fetchedSessionDataAtom);
@@ -538,6 +551,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // Fallback: clear loading when events flow even if no root
         // session.created was replayed (e.g. CLI snapshot failure).
         store.set(isLoadingAtom, false);
+        if (activeSessionType === 'remote') {
+          config.onRemoteSessionOpened?.({ kiloSessionId });
+        }
       },
     });
     session.connect();
@@ -567,12 +583,18 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     } satisfies StoredMessage);
     try {
       if (!currentSession) throw new Error('No active session');
+      // Snapshot before await — switchSession() can overwrite these while send is in flight.
+      const sessionType = activeSessionType;
+      const kiloSessionId = activeSessionId;
       await currentSession.send({
         prompt: payload.prompt,
         mode: payload.mode,
         model: payload.model,
         variant: payload.variant,
       });
+      if (sessionType === 'remote' && kiloSessionId) {
+        config.onRemoteSessionMessageSent?.({ kiloSessionId });
+      }
     } catch (err) {
       store.set(optimisticMessageAtom, null);
       store.set(failedPromptAtom, payload.prompt);
@@ -583,14 +605,29 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   async function interrupt(): Promise<void> {
     if (!currentSession) return;
+    // Snapshot before await — switchSession()/destroy() can swap currentSession while in flight.
+    const session = currentSession;
+    // Eagerly disable send/interrupt to prevent the user from sending a
+    // message while the async interrupt HTTP call is in flight. We do NOT
+    // call disconnect() — interrupt stops the agent but keeps the transport
+    // alive so the user can continue the session.
+    store.set(canSendAtom, false);
+    store.set(canInterruptAtom, false);
     try {
-      if (currentSession.canInterrupt) {
-        await currentSession.interrupt();
+      if (session.canInterrupt) {
+        await session.interrupt();
       }
-      currentSession.disconnect();
-      setIndicator({ type: 'info', message: 'Session stopped', timestamp: Date.now() });
+      if (currentSession === session) {
+        setIndicator({ type: 'info', message: 'Session stopped', timestamp: Date.now() });
+      }
     } catch {
-      store.set(errorAtom, 'Failed to stop execution');
+      if (currentSession === session) {
+        store.set(canInterruptAtom, session.canInterrupt);
+        const cs = store.get(cloudStatusAtom);
+        const cloudReady = cs === null || cs.type === 'ready';
+        store.set(canSendAtom, session.canSend && cloudReady);
+        store.set(errorAtom, 'Failed to stop execution');
+      }
     }
   }
 
@@ -611,14 +648,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   async function createAndStart(input: PrepareInput): Promise<void> {
     try {
-      const { cloudAgentSessionId } = await config.prepare(input);
+      const { cloudAgentSessionId, kiloSessionId } = await config.prepare(input);
       await config.initiate({ cloudAgentSessionId });
       store.set(sessionIdAtom, cloudAgentSessionId);
-      // In the create flow, the cloud agent session ID doubles as the kilo
-      // session ID for the DB lookup. This is the one boundary where the
-      // two IDs are intentionally the same value.
-      const asKiloId = cloudAgentSessionId as unknown as KiloSessionId;
-      await switchSession(asKiloId);
+      await switchSession(kiloSessionId);
     } catch (err) {
       setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
     }
@@ -635,6 +668,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
     clearAllAtoms();
     activeSessionId = null;
+    activeSessionType = null;
   }
 
   return {

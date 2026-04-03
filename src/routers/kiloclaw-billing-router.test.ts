@@ -21,6 +21,7 @@ import {
   kilocode_users,
   credit_transactions,
   kilo_pass_subscriptions,
+  user_affiliate_attributions,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { sandboxIdFromUserId } from '@/lib/kiloclaw/sandbox-id';
@@ -51,10 +52,6 @@ jest.mock('@/lib/stripe-client', () => {
   };
   return { client: stripeMock, __stripeMock: stripeMock };
 });
-
-jest.mock('@/lib/rewardful', () => ({
-  getRewardfulReferral: jest.fn(),
-}));
 
 jest.mock('@/lib/kiloclaw/stripe-price-ids.server', () => ({
   getStripePriceIdForClawPlan: jest.fn(() => 'price_test_kiloclaw'),
@@ -159,12 +156,6 @@ beforeEach(async () => {
     end_behavior: 'release',
     status: 'active',
   });
-
-  // Reset rewardful mock
-  const { getRewardfulReferral } = jest.requireMock<{
-    getRewardfulReferral: AnyMock;
-  }>('@/lib/rewardful');
-  getRewardfulReferral.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -285,7 +276,7 @@ describe('createSubscriptionCheckout', () => {
     >;
     // Should use intro price
     expect(callArgs.line_items).toEqual([{ price: 'price_standard_intro', quantity: 1 }]);
-    // Should allow promotion codes (for Rewardful promo codes)
+    // Should allow promotion codes on hosted checkout.
     expect(callArgs.allow_promotion_codes).toBe(true);
     // Should NOT have discounts (coupon removed)
     expect(callArgs.discounts).toBeUndefined();
@@ -354,11 +345,12 @@ describe('createSubscriptionCheckout', () => {
     expect(callArgs.discounts).toBeUndefined();
   });
 
-  it('includes client_reference_id when rewardful cookie is set', async () => {
-    const { getRewardfulReferral } = jest.requireMock<{
-      getRewardfulReferral: AnyMock;
-    }>('@/lib/rewardful');
-    getRewardfulReferral.mockResolvedValue('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+  it('includes impactClickId in checkout metadata when attribution exists', async () => {
+    await db.insert(user_affiliate_attributions).values({
+      user_id: user.id,
+      provider: 'impact',
+      tracking_id: 'impact-click-123',
+    });
 
     stripeMock.checkout.sessions.create.mockResolvedValue({
       url: 'https://checkout.stripe.com/test',
@@ -369,7 +361,20 @@ describe('createSubscriptionCheckout', () => {
 
     expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        client_reference_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+        subscription_data: {
+          metadata: {
+            type: 'kiloclaw',
+            plan: 'standard',
+            kiloUserId: user.id,
+            impactClickId: 'impact-click-123',
+          },
+        },
+        metadata: {
+          type: 'kiloclaw',
+          plan: 'standard',
+          kiloUserId: user.id,
+          impactClickId: 'impact-click-123',
+        },
       })
     );
   });
@@ -2186,6 +2191,26 @@ describe('enrollWithCredits', () => {
 // ── Billing Status with Credits ────────────────────────────────────────────
 
 describe('getBillingStatus with credits', () => {
+  async function createKiloPassSubscription(params: {
+    userId: string;
+    status: Stripe.Subscription.Status;
+    cancelAtPeriodEnd?: boolean;
+    endedAt?: string | null;
+  }) {
+    await db.insert(kilo_pass_subscriptions).values({
+      kilo_user_id: params.userId,
+      stripe_subscription_id: `kp-stripe-sub-${crypto.randomUUID()}`,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+      status: params.status,
+      cancel_at_period_end: params.cancelAtPeriodEnd ?? false,
+      started_at: new Date().toISOString(),
+      ended_at: params.endedAt ?? null,
+      current_streak_months: 1,
+      next_yearly_issue_at: null,
+    });
+  }
+
   it('includes hasStripeFunding=true for Stripe-funded subscription', async () => {
     await db.insert(kiloclaw_subscriptions).values({
       user_id: user.id,
@@ -2309,6 +2334,69 @@ describe('getBillingStatus with credits', () => {
     const result = await caller.kiloclaw.getBillingStatus();
 
     expect(result.creditIntroEligible).toBe(false);
+  });
+
+  it('reports hasActiveKiloPass=true for a non-ended Kilo Pass subscription', async () => {
+    await createKiloPassSubscription({
+      userId: user.id,
+      status: 'active',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getBillingStatus();
+
+    expect(result.hasActiveKiloPass).toBe(true);
+  });
+
+  it('reports hasActiveKiloPass=false for an ended Kilo Pass subscription', async () => {
+    await createKiloPassSubscription({
+      userId: user.id,
+      status: 'canceled',
+      endedAt: new Date().toISOString(),
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getBillingStatus();
+
+    expect(result.hasActiveKiloPass).toBe(false);
+  });
+
+  it('includes plan-specific effective balance previews with projected Kilo Pass bonus', async () => {
+    await db
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
+        kilo_pass_threshold: 4_000_000,
+      })
+      .where(eq(kilocode_users.id, user.id));
+
+    await db.insert(kilo_pass_subscriptions).values({
+      kilo_user_id: user.id,
+      stripe_subscription_id: `kp-stripe-sub-${crypto.randomUUID()}`,
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Yearly,
+      status: 'active',
+      cancel_at_period_end: false,
+      started_at: new Date().toISOString(),
+      current_streak_months: 1,
+      next_yearly_issue_at: null,
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getBillingStatus();
+
+    expect(result.creditEnrollmentPreview.standard.costMicrodollars).toBe(4_000_000);
+    expect(result.creditEnrollmentPreview.standard.projectedKiloPassBonusMicrodollars).toBe(
+      9_500_000
+    );
+    expect(result.creditEnrollmentPreview.standard.effectiveBalanceMicrodollars).toBe(9_500_000);
+
+    expect(result.creditEnrollmentPreview.commit.costMicrodollars).toBe(48_000_000);
+    expect(result.creditEnrollmentPreview.commit.projectedKiloPassBonusMicrodollars).toBe(
+      9_500_000
+    );
+    expect(result.creditEnrollmentPreview.commit.effectiveBalanceMicrodollars).toBe(9_500_000);
   });
 });
 

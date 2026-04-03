@@ -24,8 +24,8 @@ type WebhookTriggersHeaderProps = {
 export const WebhookTriggersHeader = memo(function WebhookTriggersHeader({
   createUrl,
   disabled,
-  title = 'Webhook Triggers',
-  description = 'Manage webhook triggers that automatically start cloud agent sessions.',
+  title = 'Webhooks / Triggers',
+  description = 'Automate Cloud Agent sessions and KiloClaw messages via incoming webhooks or recurring schedules.',
   hideCreate = false,
   createLabel = 'Create Trigger',
   badgeLabel = 'new',

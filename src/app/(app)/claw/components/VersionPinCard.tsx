@@ -3,11 +3,8 @@
 import { useState } from 'react';
 import { Pin, PinOff, Info } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  useKiloClawAvailableVersions,
-  useKiloClawMyPin,
-  useKiloClawMutations,
-} from '@/hooks/useKiloClaw';
+import { useClawAvailableVersions, useClawMyPin } from '../hooks/useClawHooks';
+import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -19,16 +16,19 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
+type ClawMutations = ReturnType<typeof useKiloClawMutations>;
+
 export function VersionPinCard({
   trackedImageTag,
   latestImageTag,
+  mutations,
 }: {
   trackedImageTag: string | null;
   latestImageTag: string | null;
+  mutations: ClawMutations;
 }) {
-  const { data: myPin, isLoading: pinLoading } = useKiloClawMyPin();
-  const { data: versions, isLoading: versionsLoading } = useKiloClawAvailableVersions(0, 50);
-  const mutations = useKiloClawMutations();
+  const { data: myPin, isLoading: pinLoading } = useClawMyPin();
+  const { data: versions, isLoading: versionsLoading } = useClawAvailableVersions(0, 50);
 
   const [selectedImageTag, setSelectedImageTag] = useState<string>('');
   const [reason, setReason] = useState('');
@@ -38,9 +38,7 @@ export function VersionPinCard({
   const isPinning = mutations.setMyPin.isPending;
   const isUnpinning = mutations.removeMyPin.isPending;
 
-  // Self-pin: pinned_by matches the pin's user_id (the user pinned themselves)
-  // Admin-pin: pinned_by differs from user_id (an admin pinned this user)
-  const pinnedBySelf = myPin && myPin.pinned_by === myPin.user_id;
+  const pinnedBySelf = myPin?.pinnedBySelf ?? false;
   const pinnedByLabel = pinnedBySelf ? 'You' : 'Kilo Admin';
 
   const handlePin = async () => {

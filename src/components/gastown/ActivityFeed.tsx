@@ -67,8 +67,17 @@ function eventDescription(event: {
       return `${rigPrefix}Agent hooked to bead`;
     case 'unhooked':
       return `${rigPrefix}Agent unhooked from bead`;
-    case 'status_changed':
-      return `${rigPrefix}Status: ${event.old_value ?? '?'} → ${event.new_value ?? '?'}`;
+    case 'status_changed': {
+      const desc = `${rigPrefix}Status: ${event.old_value ?? '?'} → ${event.new_value ?? '?'}`;
+      if (event.new_value === 'failed') {
+        const fr = event.metadata?.failure_reason;
+        if (typeof fr === 'object' && fr !== null && 'message' in fr) {
+          const msg = (fr as Record<string, unknown>).message;
+          if (typeof msg === 'string') return `${desc} — ${msg}`;
+        }
+      }
+      return desc;
+    }
     case 'closed':
       return `${rigPrefix}Bead closed`;
     case 'escalated':

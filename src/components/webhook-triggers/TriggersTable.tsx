@@ -13,12 +13,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Copy, Pencil, Trash2, Check } from 'lucide-react';
+import { Copy, Pencil, Trash2, Check, Clock, Webhook as WebhookIcon } from 'lucide-react';
+import { describeCron } from './describe-cron';
 
 export type TriggerItem = {
   id: string;
   triggerId: string;
-  githubRepo: string;
+  targetType?: string;
+  activationMode?: 'webhook' | 'scheduled' | null;
+  cronExpression?: string | null;
+  cronTimezone?: string | null;
+  githubRepo: string | null;
   isActive: boolean;
   createdAt: string;
   webhookAuthConfigured?: boolean | null;
@@ -62,7 +67,8 @@ export const TriggersTable = memo(function TriggersTable({
         <TableHeader>
           <TableRow>
             <TableHead>Trigger Name</TableHead>
-            <TableHead>GitHub Repo</TableHead>
+            <TableHead>Activation</TableHead>
+            <TableHead>Target</TableHead>
             <TableHead>Status</TableHead>
             {showAuthColumn && <TableHead>Webhook Auth</TableHead>}
             <TableHead>Created</TableHead>
@@ -130,8 +136,35 @@ const TriggerRow = memo(function TriggerRow({
           {trigger.triggerId}
         </Link>
       </TableCell>
-      <TableCell className="text-muted-foreground font-mono text-sm">
-        {trigger.githubRepo}
+      <TableCell>
+        {trigger.activationMode === 'scheduled' ? (
+          <Badge variant="outline" className="gap-1">
+            <Clock className="h-3 w-3" />
+            Scheduled
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="gap-1">
+            <WebhookIcon className="h-3 w-3" />
+            Webhook
+          </Badge>
+        )}
+      </TableCell>
+      <TableCell className="text-muted-foreground text-sm">
+        {trigger.targetType === 'kiloclaw_chat' ? (
+          <Badge variant="outline" className="border-blue-500/30 bg-blue-500/15 text-blue-400">
+            KiloClaw Chat
+          </Badge>
+        ) : (
+          <div className="space-y-0.5">
+            {trigger.githubRepo && <div className="font-mono">{trigger.githubRepo}</div>}
+            {trigger.activationMode === 'scheduled' && trigger.cronExpression && (
+              <div className="text-muted-foreground/60 text-xs">
+                {describeCron(trigger.cronExpression)}
+              </div>
+            )}
+            {!trigger.githubRepo && !trigger.cronExpression && '—'}
+          </div>
+        )}
       </TableCell>
       <TableCell>
         <Badge variant={trigger.isActive ? 'default' : 'secondary'}>
@@ -159,7 +192,7 @@ const TriggerRow = memo(function TriggerRow({
       {hasActions && (
         <TableCell>
           <div className="flex items-center justify-end gap-1">
-            {showCopy && (
+            {showCopy && trigger.activationMode !== 'scheduled' && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -186,7 +219,7 @@ const TriggerRow = memo(function TriggerRow({
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => onDelete(trigger.triggerId, trigger.githubRepo)}
+                onClick={() => onDelete(trigger.triggerId, trigger.githubRepo ?? '')}
                 title="Delete Trigger"
               >
                 <Trash2 className="text-destructive h-4 w-4" />

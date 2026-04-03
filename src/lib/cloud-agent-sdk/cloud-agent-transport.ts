@@ -85,6 +85,19 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           }
         },
         onConnected: () => {},
+        onReconnected: () => {
+          if (expectedGeneration !== lifecycleGeneration) return;
+          stoppedReceived = false;
+          void config.fetchSnapshot(config.kiloSessionId).then(
+            snapshot => {
+              if (expectedGeneration !== lifecycleGeneration) return;
+              replaySnapshot(snapshot);
+            },
+            () => {
+              // Snapshot refetch failure on reconnect — ignore, live events will still flow
+            }
+          );
+        },
         onDisconnected: () => {},
         onUnexpectedDisconnect: () => {
           if (expectedGeneration !== lifecycleGeneration) return;

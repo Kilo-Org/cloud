@@ -367,4 +367,6 @@ export type KiloClawDashboardStatus = PlatformStatusResponse & {
   /** Worker base URL for constructing the "Open" link. Falls back to claw.kilo.ai. */
   workerUrl: string;
   name: string | null;
+  /** Postgres row ID. Used to construct /i/{instanceId} proxy paths for instance-keyed instances. */
+  instanceId: string | null;
 };

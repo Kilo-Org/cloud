@@ -300,6 +300,22 @@ function createAccountInfo(
   return accountInfo;
 }
 
+async function getImpactClickIdFromAuthFlow(): Promise<string | null> {
+  const cookieStore = await cookies();
+  const callbackUrlCookie =
+    cookieStore.get('__Secure-next-auth.callback-url')?.value ??
+    cookieStore.get('next-auth.callback-url')?.value;
+
+  if (!callbackUrlCookie) return null;
+
+  try {
+    const callbackUrl = new URL(callbackUrlCookie, 'http://localhost');
+    return callbackUrl.searchParams.get('im_ref');
+  } catch {
+    return null;
+  }
+}
+
 type ExtendedProfile = Profile & {
   isNewUser?: boolean; // Add isNewUser to the user type
 };
@@ -558,6 +574,8 @@ const authOptions: NextAuthOptions = {
         // For email (magic link) auth, we auto-link to existing users since magic link
         // is verified by email ownership
         const autoLinkToExistingUser = isEmailAuth || isFakeLogin;
+        const impactClickId =
+          !isAccountLinking && !isFakeLogin ? await getImpactClickIdFromAuthFlow() : null;
         const result =
           isAccountLinking && linkingSession
             ? whenOk(
@@ -568,7 +586,8 @@ const authOptions: NextAuthOptions = {
                 accountInfo,
                 verifiedToken?.guid,
                 autoLinkToExistingUser,
-                requestHeaders
+                requestHeaders,
+                impactClickId
               );
 
         if (result.success === false) {

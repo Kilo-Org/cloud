@@ -13,6 +13,7 @@ export type ConnectionConfig = {
   onConnected: () => void;
   onDisconnected: () => void;
   onUnexpectedDisconnect?: () => void;
+  onReconnected?: () => void;
   onError?: (error: StreamError) => void;
   onRefreshTicket?: () => Promise<string>;
   heartbeatTimeoutMs?: number;
@@ -59,6 +60,7 @@ export function createConnection(config: ConnectionConfig): Connection {
   const refreshTicket = config.onRefreshTicket;
 
   return createBaseConnection({
+    stalenessTimeoutMs: config.heartbeatTimeoutMs,
     buildUrl: () => {
       const url = new URL(config.websocketUrl);
       url.searchParams.set('ticket', currentTicket);
@@ -70,10 +72,11 @@ export function createConnection(config: ConnectionConfig): Connection {
       if (parsed.type === 'error') return { type: 'error', message: parsed.error.message };
       return { type: 'event', payload: parsed.event };
     },
-    onEvent: payload => config.onEvent(payload as CloudAgentEvent),
+    onEvent: payload => config.onEvent(payload),
     onConnected: config.onConnected,
     onDisconnected: config.onDisconnected,
     onUnexpectedDisconnect: config.onUnexpectedDisconnect,
+    onReconnected: config.onReconnected,
     onError: config.onError
       ? message =>
           config.onError?.({

@@ -3,6 +3,7 @@ import { db } from '@/lib/drizzle';
 import {
   payment_methods,
   kilocode_users,
+  user_affiliate_attributions,
   user_auth_provider,
   credit_transactions,
   kilo_pass_subscriptions,
@@ -24,6 +25,7 @@ import {
   user_admin_notes,
   magic_link_tokens,
   stytch_fingerprints,
+  kiloclaw_instances,
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   security_findings,
@@ -53,6 +55,7 @@ describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
     await db.delete(user_auth_provider);
+    await db.delete(user_affiliate_attributions);
     await db.delete(payment_methods);
     await db.delete(kilo_pass_issuance_items);
     await db.delete(kilo_pass_issuances);
@@ -91,6 +94,7 @@ describe('User', () => {
         linkedin_url: 'https://linkedin.com/in/testuser',
         github_url: 'https://github.com/testuser',
         openrouter_upstream_safety_identifier: 'openrouter_upstream_safety_identifier',
+        vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
         is_admin: true,
       });
@@ -106,7 +110,12 @@ describe('User', () => {
       expect(softDeleted!.linkedin_url).toBeNull();
       expect(softDeleted!.github_url).toBeNull();
       expect(softDeleted!.discord_server_membership_verified_at).toBeNull();
-      expect(softDeleted!.openrouter_upstream_safety_identifier).toBeNull();
+      expect(softDeleted!.openrouter_upstream_safety_identifier).toBe(
+        'openrouter_upstream_safety_identifier'
+      );
+      expect(softDeleted!.vercel_downstream_safety_identifier).toBe(
+        'vercel_downstream_safety_identifier'
+      );
       expect(softDeleted!.customer_source).toBeNull();
       expect(softDeleted!.api_token_pepper).toBeNull();
       expect(softDeleted!.default_model).toBeNull();
@@ -135,6 +144,33 @@ describe('User', () => {
         .from(user_auth_provider)
         .where(eq(user_auth_provider.kilo_user_id, user.id));
       expect(providers).toHaveLength(0);
+    });
+
+    it('should delete affiliate attributions for the user', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      await db.insert(user_affiliate_attributions).values([
+        { user_id: user1.id, provider: 'impact', tracking_id: 'im_ref_user_1' },
+        { user_id: user2.id, provider: 'impact', tracking_id: 'im_ref_user_2' },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(user_affiliate_attributions)
+          .where(eq(user_affiliate_attributions.user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(user_affiliate_attributions)
+          .where(eq(user_affiliate_attributions.user_id, user2.id))
+          .then(r => r[0].count)
+      ).toBe(1);
     });
 
     it('should delete enrichment_data for the user', async () => {
@@ -865,8 +901,16 @@ describe('User', () => {
         published_at: new Date().toISOString(),
       });
 
+      const [instance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: user.id,
+          sandbox_id: `test-gdpr-pin-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+
       await db.insert(kiloclaw_version_pins).values({
-        user_id: user.id,
+        instance_id: instance.id,
         image_tag: testTag,
         pinned_by: adminUser.id,
         reason: 'test pin',
@@ -878,7 +922,7 @@ describe('User', () => {
         await db
           .select({ count: count() })
           .from(kiloclaw_version_pins)
-          .where(eq(kiloclaw_version_pins.user_id, user.id))
+          .where(eq(kiloclaw_version_pins.instance_id, instance.id))
           .then(r => r[0].count)
       ).toBe(0);
 

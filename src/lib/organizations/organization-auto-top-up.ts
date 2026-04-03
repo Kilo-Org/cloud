@@ -6,7 +6,6 @@ import {
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
 } from '@/lib/autoTopUpConstants';
 import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
-import { getRewardfulReferral } from '@/lib/rewardful';
 
 export async function isOrgAutoTopUpFeatureEnabled(organizationId: string): Promise<boolean> {
   return (
@@ -26,12 +25,10 @@ export async function createOrgAutoTopUpSetupCheckoutSession(
   amountCents: number = DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS
 ): Promise<string | null> {
   const amountDollars = amountCents / 100;
-  const rewardfulReferral = await getRewardfulReferral();
 
   const checkoutSession = await client.checkout.sessions.create({
     mode: 'payment',
     customer: stripeCustomerId,
-    ...(rewardfulReferral && { client_reference_id: rewardfulReferral }),
     billing_address_collection: 'required',
     line_items: [
       {
@@ -48,9 +45,6 @@ export async function createOrgAutoTopUpSetupCheckoutSession(
     ],
     invoice_creation: {
       enabled: true,
-      invoice_data: {
-        metadata: { rewardful: 'false' },
-      },
     },
     customer_update: {
       name: 'auto',

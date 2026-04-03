@@ -421,11 +421,11 @@ describe('ensureEnvKey', () => {
     expect(storage._store.get('envKeySet')).toBe(true);
   });
 
-  it('throws on userId mismatch', async () => {
+  it('throws on ownerKey mismatch', async () => {
     const { appDO } = createAppDO();
     await appDO.ensureApp('user-1');
 
-    await expect(appDO.ensureEnvKey('user-2')).rejects.toThrow('userId mismatch');
+    await expect(appDO.ensureEnvKey('user-2')).rejects.toThrow('ownerKey mismatch');
   });
 });
 
@@ -448,10 +448,10 @@ describe('getEnvKey', () => {
     expect(key).toBeNull();
   });
 
-  it('throws on userId mismatch', async () => {
+  it('throws on ownerKey mismatch', async () => {
     const { appDO } = createAppDO();
     await appDO.ensureApp('user-1');
 
-    await expect(appDO.getEnvKey('user-2')).rejects.toThrow('userId mismatch');
+    await expect(appDO.getEnvKey('user-2')).rejects.toThrow('ownerKey mismatch');
   });
 });

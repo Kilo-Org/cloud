@@ -23,7 +23,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.12.21",
     "@cloudflare/workers-types": "catalog:",
-    "@types/node": "^22.19.15",
+    "@types/node": ">=24 <25",
     "@typescript/native-preview": "catalog:",
     "drizzle-kit": "catalog:",
     "jose": "catalog:",

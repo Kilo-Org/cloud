@@ -1,0 +1,2 @@
+ALTER TABLE "kilocode_users" ADD COLUMN "vercel_downstream_safety_identifier" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_kilocode_users_vercel_downstream_safety_identifier" ON "kilocode_users" USING btree ("vercel_downstream_safety_identifier") WHERE "kilocode_users"."vercel_downstream_safety_identifier" IS NOT NULL;

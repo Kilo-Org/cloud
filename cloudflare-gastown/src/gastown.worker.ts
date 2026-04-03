@@ -36,7 +36,9 @@ import {
   handleAgentDone,
   handleRequestChanges,
   handleAgentCompleted,
+  handleAgentWaiting,
   handleWriteCheckpoint,
+  handleWriteEvictionContext,
   handleCheckMail,
   handleHeartbeat,
   handleGetOrCreateAgent,
@@ -134,6 +136,11 @@ import {
   handleListEscalations,
   handleAcknowledgeEscalation,
 } from './handlers/town-escalations.handler';
+import {
+  handleContainerEviction,
+  handleContainerReady,
+  handleDrainStatus,
+} from './handlers/town-eviction.handler';
 
 export { GastownUserDO } from './dos/GastownUser.do';
 export { GastownOrgDO } from './dos/GastownOrg.do';
@@ -254,6 +261,45 @@ app.post('/debug/towns/:townId/replay-events', async c => {
   // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
   const result = await town.debugReplayEvents(body.from, body.to);
   return c.json(result);
+});
+
+app.get('/debug/towns/:townId/drain-status', async c => {
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const draining = await town.isDraining();
+  // eslint-disable-next-line @typescript-eslint/await-thenable
+  const drainNonce = await town.getDrainNonce();
+  return c.json({ draining, drainNonce });
+});
+
+app.get('/debug/towns/:townId/nudges', async c => {
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const nudges = await town.debugPendingNudges();
+  return c.json({ nudges });
+});
+
+app.post('/debug/towns/:townId/send-message', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const body: { message: string; model?: string } = await c.req.json();
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable
+  const result = await town.sendMayorMessage(
+    body.message,
+    body.model ?? 'anthropic/claude-sonnet-4.6'
+  );
+  return c.json(result);
+});
+
+app.post('/debug/towns/:townId/graceful-stop', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const containerStub = getTownContainerStub(c.env, townId);
+  await containerStub.stop();
+  return c.json({ stopped: true });
 });
 
 // ── Town ID + Auth ──────────────────────────────────────────────────────
@@ -377,9 +423,19 @@ app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/completed', c =>
     handleAgentCompleted(c, c.req.param())
   )
 );
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/waiting', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/waiting', () =>
+    handleAgentWaiting(c, c.req.param())
+  )
+);
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/checkpoint', c =>
   instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/checkpoint', () =>
     handleWriteCheckpoint(c, c.req.param())
+  )
+);
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/eviction-context', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents/:agentId/eviction-context', () =>
+    handleWriteEvictionContext(c, c.req.param())
   )
 );
 app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/mail', c =>
@@ -476,6 +532,27 @@ app.post('/api/towns/:townId/rigs/:rigId/triage/resolve', c =>
   instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/triage/resolve', () =>
     handleResolveTriage(c, c.req.param())
   )
+);
+
+// ── Container Eviction ──────────────────────────────────────────────────
+// Called by the container on SIGTERM. Uses container JWT auth (not kilo
+// user auth), so it must be registered before the kiloAuthMiddleware
+// wildcard below.
+
+app.post('/api/towns/:townId/container-eviction', c =>
+  instrumented(c, 'POST /api/towns/:townId/container-eviction', () =>
+    handleContainerEviction(c, c.req.param())
+  )
+);
+
+app.post('/api/towns/:townId/container-ready', c =>
+  instrumented(c, 'POST /api/towns/:townId/container-ready', () =>
+    handleContainerReady(c, c.req.param())
+  )
+);
+
+app.get('/api/towns/:townId/drain-status', c =>
+  instrumented(c, 'GET /api/towns/:townId/drain-status', () => handleDrainStatus(c, c.req.param()))
 );
 
 // ── Kilo User Auth ──────────────────────────────────────────────────────
@@ -603,6 +680,32 @@ app.get('/api/towns/:townId/config', c =>
 app.patch('/api/towns/:townId/config', c =>
   instrumented(c, 'PATCH /api/towns/:townId/config', () => handleUpdateTownConfig(c, c.req.param()))
 );
+
+// ── Cloudflare Debug ────────────────────────────────────────────────
+// Returns DO IDs and namespace IDs for constructing Cloudflare dashboard URLs.
+// containerDoId is only returned when the container is actually running,
+// so the UI correctly shows a disabled state when the container is stopped.
+
+app.get('/api/towns/:townId/cloudflare-debug', async c => {
+  const townId = c.req.param('townId');
+  const townDoId = c.env.TOWN.idFromName(townId).toString();
+
+  // Check actual container runtime state before returning the DO ID.
+  // idFromName() is deterministic and always returns an ID even when
+  // no container instance is running — we need to gate on getState().
+  const containerStub = getTownContainerStub(c.env, townId);
+  const containerState = await containerStub.getState();
+  const containerRunning =
+    containerState.status === 'running' || containerState.status === 'healthy';
+  const containerDoId = containerRunning
+    ? c.env.TOWN_CONTAINER.idFromName(townId).toString()
+    : null;
+
+  return c.json({
+    success: true,
+    data: { townDoId, containerDoId },
+  });
+});
 
 // ── Town Events ─────────────────────────────────────────────────────────
 

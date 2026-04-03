@@ -257,7 +257,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         requestId: r.data.id,
         permission: r.data.permission,
         patterns: r.data.patterns,
-        metadata: r.data.metadata as Record<string, unknown>,
+        metadata: r.data.metadata,
         always: r.data.always,
       };
     }

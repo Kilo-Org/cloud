@@ -84,17 +84,20 @@ export function WebhookTriggersListContent({ organizationId }: WebhookTriggersLi
     setDeleteTarget(null);
   }, [deleteTarget, deleteTrigger]);
 
-  // GitHub integration missing - show setup prompt
-  if (isIntegrationMissing) {
-    return (
-      <GitHubIntegrationRequired errorMessage={errorMessage} integrationsPath={integrationsPath} />
-    );
-  }
-
   return (
     <>
       {/* Header */}
       <WebhookTriggersHeader createUrl={routes.create} />
+
+      {/* GitHub integration missing - show non-blocking banner */}
+      {isIntegrationMissing && (
+        <div className="mb-4">
+          <GitHubIntegrationRequired
+            errorMessage={errorMessage}
+            integrationsPath={integrationsPath}
+          />
+        </div>
+      )}
 
       {/* Filter */}
       <StatusFilter
@@ -123,7 +126,10 @@ export function WebhookTriggersListContent({ organizationId }: WebhookTriggersLi
       {/* Triggers Table */}
       {!isLoading && !isError && filteredTriggers.length > 0 && (
         <TriggersTable
-          triggers={filteredTriggers}
+          triggers={filteredTriggers.map(t => ({
+            ...t,
+            activationMode: t.activationMode === 'scheduled' ? 'scheduled' : 'webhook',
+          }))}
           onCopyUrl={handleCopyUrl}
           onDelete={handleDeleteClick}
           copiedTriggerId={copiedTriggerId}

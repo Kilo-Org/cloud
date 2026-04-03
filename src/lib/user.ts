@@ -11,6 +11,7 @@ import { reportAuthEvent } from '@/lib/abuse-service';
 import {
   payment_methods,
   kilocode_users,
+  user_affiliate_attributions,
   user_admin_notes,
   user_auth_provider,
   kilo_pass_subscriptions,
@@ -43,7 +44,6 @@ import {
   cloud_agent_code_reviews,
   kiloclaw_instances,
   kiloclaw_access_codes,
-  kiloclaw_version_pins,
   kiloclaw_earlybird_purchases,
   user_period_cache,
   user_feedback,
@@ -68,9 +68,15 @@ import type { TRPCError } from '@trpc/server';
 import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
-import { generateOpenRouterUpstreamSafetyIdentifier } from '@/lib/providerHash';
+import {
+  generateOpenRouterUpstreamSafetyIdentifier,
+  generateVercelDownstreamSafetyIdentifier,
+} from '@/lib/providerHash';
+import { trackSignUp } from '@/lib/impact';
+import { sentryLogger } from '@/lib/utils.server';
 
 const workos = new WorkOS(WORKOS_API_KEY);
+const logImpactWarning = sentryLogger('impact-user', 'warning');
 
 /**
  * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
@@ -206,7 +212,8 @@ export async function createOrUpdateUser(
   args: CreateOrUpdateUserArgs,
   turnstile_guid: UUID | undefined,
   autoLinkToExistingUser: boolean = false,
-  requestHeaders?: Headers
+  requestHeaders?: Headers,
+  impactClickId?: string | null
 ): Promise<Result<{ user: User; isNew: boolean }, AuthErrorType>> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
@@ -317,6 +324,7 @@ export async function createOrUpdateUser(
     is_admin: shouldBeAdmin(args.google_user_email, args.hosted_domain),
     stripe_customer_id: stripeCustomer.id,
     openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),
+    vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
   } satisfies typeof kilocode_users.$inferInsert;
 
   const savedUser = await db.transaction(async tx => {
@@ -332,6 +340,19 @@ export async function createOrUpdateUser(
       display_name: args.display_name ?? null,
       hosted_domain: args.hosted_domain,
     });
+
+    if (impactClickId?.trim()) {
+      await tx
+        .insert(user_affiliate_attributions)
+        .values({
+          user_id: savedUser.id,
+          provider: 'impact',
+          tracking_id: impactClickId.trim(),
+        })
+        .onConflictDoNothing({
+          target: [user_affiliate_attributions.user_id, user_affiliate_attributions.provider],
+        });
+    }
 
     return savedUser;
   });
@@ -363,6 +384,20 @@ export async function createOrUpdateUser(
 
   // Set up user identification via user ID
   posthogClient.alias({ distinctId: savedUser.google_user_email, alias: savedUser.id });
+
+  if (impactClickId?.trim()) {
+    void trackSignUp({
+      clickId: impactClickId,
+      customerId: savedUser.id,
+      customerEmail: savedUser.google_user_email,
+      eventDate: new Date(),
+    }).catch(error => {
+      logImpactWarning('Impact signup tracking failed', {
+        user_id: savedUser.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
 
   await tryVerifyDiscordGuildMembership(args.provider, args.provider_account_id, savedUser.id);
 
@@ -543,7 +578,6 @@ export async function softDeleteUser(userId: string) {
         completed_welcome_form: false,
         cohorts: {},
         is_admin: false,
-        openrouter_upstream_safety_identifier: null,
         customer_source: null,
       })
       .where(eq(kilocode_users.id, userId));
@@ -552,6 +586,9 @@ export async function softDeleteUser(userId: string) {
     await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
     await tx.delete(enrichment_data).where(eq(enrichment_data.user_id, userId));
     await tx.delete(user_admin_notes).where(eq(user_admin_notes.kilo_user_id, userId));
+    await tx
+      .delete(user_affiliate_attributions)
+      .where(eq(user_affiliate_attributions.user_id, userId));
     await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
     await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
 
@@ -615,7 +652,6 @@ export async function softDeleteUser(userId: string) {
     await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
     await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
     await tx.delete(kiloclaw_instances).where(eq(kiloclaw_instances.user_id, userId));
-    await tx.delete(kiloclaw_version_pins).where(eq(kiloclaw_version_pins.user_id, userId));
     await tx
       .delete(kiloclaw_earlybird_purchases)
       .where(eq(kiloclaw_earlybird_purchases.user_id, userId));

@@ -182,19 +182,27 @@ describe('getSignInCallbackUrl', () => {
 
       expect(result).toBe('/users/after-sign-in?source=vscode');
     });
+
+    test('includes im_ref when present', () => {
+      const searchParams = { im_ref: 'impact-click-id-123' };
+      const result = getSignInCallbackUrl(searchParams);
+
+      expect(result).toBe('/users/after-sign-in?im_ref=impact-click-id-123');
+    });
   });
 
   describe('parameter combinations', () => {
     test('handles complex searchParams with multiple values', () => {
       const searchParams = {
         source: 'extension',
+        im_ref: 'impact-click-id-123',
         other: 'value',
         array: ['item1', 'item2'],
         empty: '',
       };
       const result = getSignInCallbackUrl(searchParams);
 
-      expect(result).toBe('/users/after-sign-in?source=extension');
+      expect(result).toBe('/users/after-sign-in?source=extension&im_ref=impact-click-id-123');
     });
   });
 

@@ -21,6 +21,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'stealth',
   'xiaomi',
   'z-ai',
+  'together',
 
   // not real OpenRouter providers
   'corethink',
@@ -78,6 +79,7 @@ export const UserByokTestModels = {
 export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'alibaba',
   'bytedance',
+  'togetherai',
   'vertex',
 ]);
 
@@ -100,6 +102,8 @@ const openRouterToVercelInferenceProviderMapping = {
     VercelNonUserByokInferenceProviderIdSchema.enum.bytedance,
   [OpenRouterInferenceProviderIdSchema.enum['z-ai']]:
     VercelUserByokInferenceProviderIdSchema.enum.zai,
+  [OpenRouterInferenceProviderIdSchema.enum.together]:
+    VercelNonUserByokInferenceProviderIdSchema.enum.togetherai,
 } as Record<string, VercelInferenceProviderId | undefined>;
 
 export function openRouterToVercelInferenceProviderId(providerId: string) {

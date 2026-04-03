@@ -80,11 +80,29 @@ function setCacheControlOnResponsesMessage(message: OpenAI.Responses.ResponseInp
   }
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function containsCacheControl(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(containsCacheControl);
+  }
+  if (!isObjectRecord(value)) {
+    return false;
+  }
+  if (Object.hasOwn(value, 'cache_control')) {
+    return true;
+  }
+  return Object.values(value).some(containsCacheControl);
+}
+
 export function addCacheBreakpoints(request: GatewayRequest) {
   if (
     request.kind === 'chat_completions' &&
     Array.isArray(request.body.messages) &&
-    request.body.messages.length > 1
+    request.body.messages.length > 1 &&
+    !containsCacheControl(request.body.messages)
   ) {
     const lastMessage = request.body.messages.findLast(
       msg => msg.role === 'user' || msg.role === 'tool'
@@ -98,7 +116,8 @@ export function addCacheBreakpoints(request: GatewayRequest) {
   } else if (
     request.kind === 'responses' &&
     Array.isArray(request.body.input) &&
-    request.body.input.length > 1
+    request.body.input.length > 1 &&
+    !containsCacheControl(request.body.input)
   ) {
     const lastMessage = request.body.input.findLast(
       msg => (msg.type === 'message' && msg.role === 'user') || msg.type === 'function_call_output'
@@ -109,6 +128,14 @@ export function addCacheBreakpoints(request: GatewayRequest) {
       );
       setCacheControlOnResponsesMessage(lastMessage);
     }
+  } else if (
+    request.kind === 'messages' &&
+    request.body.messages.length > 1 &&
+    !request.body.cache_control &&
+    !containsCacheControl(request.body.messages)
+  ) {
+    console.debug('[addCacheBreakpoints] setting cache breakpoint on messages request');
+    request.body.cache_control = { type: 'ephemeral' };
   }
 }
 

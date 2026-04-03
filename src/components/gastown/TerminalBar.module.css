@@ -1,0 +1,12 @@
+.fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.fullscreenTransition {
+  transition: all 0.3s ease-in-out;
+}

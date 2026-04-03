@@ -152,6 +152,7 @@ export type HealthResponse = {
   agents: number;
   servers: number;
   uptime: number;
+  draining?: boolean;
 };
 
 // ── Kilo serve instance ─────────────────────────────────────────────────
@@ -318,6 +319,8 @@ export type HeartbeatPayload = {
   lastEventAt: string | null;
   activeTools: string[];
   messageCount: number;
+  /** Unique ID for this container instance, used to detect restarts. */
+  containerInstanceId?: string;
 };
 
 // ── Stream ticket (for WebSocket streaming) ─────────────────────────────

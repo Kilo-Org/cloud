@@ -54,7 +54,7 @@ import type { GatewayProcessStatus } from '../gateway-controller-types';
 
 // Domain modules
 import type { InstanceMutableState, InstanceStatus, DestroyResult } from './types';
-import { getFlyConfig } from './types';
+import { getAppKey, getFlyConfig } from './types';
 import { createMutableState, loadState, storageUpdate } from './state';
 import { nextAlarmTime, doLog, doError, doWarn, toLoggable, createReconcileContext } from './log';
 import { attemptMetadataRecovery } from './reconcile';
@@ -231,13 +231,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       : sandboxIdFromUserId(userId);
     const isNew = !this.s.status;
 
-    // Ensure per-user Fly App exists on first provision only.
+    // Ensure Fly App exists on first provision.
+    // Instance-keyed DOs (ki_ sandboxId) get their own app (inst-{hash}).
+    // Legacy DOs keep their user-scoped app (acct-{hash}).
     if (isNew && !this.s.flyAppName) {
-      const appStub = this.env.KILOCLAW_APP.get(this.env.KILOCLAW_APP.idFromName(userId));
-      const { appName } = await appStub.ensureApp(userId);
+      this.s.orgId = opts?.orgId ?? null;
+      const appKey = getAppKey({ userId, sandboxId });
+      const appStub = this.env.KILOCLAW_APP.get(this.env.KILOCLAW_APP.idFromName(appKey));
+      const { appName } = await appStub.ensureApp(appKey);
       this.s.flyAppName = appName;
       await this.persist({ flyAppName: appName });
-      console.log('[DO] Per-user Fly App ensured:', appName);
+      console.log('[DO] Fly App ensured:', appName, 'key:', appKey);
     }
 
     // Create Fly Volume on first provision.
@@ -1028,6 +1032,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const identity = {
       userId: this.s.userId,
       sandboxId: this.s.sandboxId,
+      orgId: this.s.orgId,
       openclawVersion: this.s.openclawVersion,
       imageVariant: this.s.imageVariant,
     };
@@ -2151,6 +2156,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       const identity = {
         userId: this.s.userId ?? '',
         sandboxId: this.s.sandboxId ?? '',
+        orgId: this.s.orgId,
         openclawVersion: this.s.openclawVersion,
         imageVariant: this.s.imageVariant,
       };

@@ -38,6 +38,7 @@ export type GastownEventData = {
   beadId?: string;
   convoyId?: string;
   role?: string; // 'polecat' | 'refinery' | 'mayor'
+  reason?: string; // dispatch failure reason, triage action, etc.
   beadType?: string;
   durationMs?: number;
   value?: number;
@@ -79,6 +80,7 @@ export function writeEvent(
         data.convoyId ?? '', // blob11
         data.role ?? '', // blob12
         data.beadType ?? '', // blob13
+        data.reason ?? '', // blob14
       ],
       doubles: [
         data.durationMs ?? 0, // double1

@@ -103,6 +103,9 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
     async (formData: TriggerFormData) => {
       await createTrigger({
         triggerId: formData.triggerId,
+        activationMode: formData.activationMode,
+        cronExpression: formData.cronExpression,
+        cronTimezone: formData.cronTimezone,
         githubRepo: formData.githubRepo,
         mode: formData.mode,
         model: formData.model,
@@ -134,40 +137,41 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         <Button variant="ghost" size="sm" asChild>
           <Link href={routes.list}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Webhook Triggers
+            Back to Webhooks / Triggers
           </Link>
         </Button>
       </div>
       <div className="flex items-center gap-3">
         <Webhook className="h-8 w-8" />
-        <h1 className="text-3xl font-bold">Create Webhook Trigger</h1>
+        <h1 className="text-3xl font-bold">Create Trigger</h1>
       </div>
       <p className="text-muted-foreground mt-2">
-        Configure a new webhook trigger to automatically start cloud agent sessions.
+        Configure a new trigger to automatically start cloud agent sessions.
       </p>
     </div>
   );
 
-  // If GitHub integration is missing, show setup prompt
-  if (isGitHubIntegrationMissing) {
-    const integrationMessage =
-      githubRepoData?.errorMessage || 'Connect a GitHub integration to create webhook triggers.';
+  return (
+    <>
+      {headerContent}
 
-    return (
-      <>
-        {headerContent}
-        <Card>
+      {/* GitHub integration missing - non-blocking banner */}
+      {isGitHubIntegrationMissing && (
+        <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-amber-400" />
-              Connect GitHub to create webhook triggers
+              GitHub integration not connected
             </CardTitle>
-            <CardDescription>{integrationMessage}</CardDescription>
+            <CardDescription>
+              {githubRepoData?.errorMessage ||
+                'Connect a GitHub integration to select repositories for webhook triggers.'}
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <p className="text-sm text-gray-300">
-              Webhook triggers require access to your GitHub repositories. Install the GitHub
-              integration to continue.
+              Webhook triggers require access to your GitHub repositories. Scheduled triggers can
+              still be created.
             </p>
             <div className="flex flex-wrap gap-3">
               <LinkButton href={integrationsPath} variant="primary" size="md">
@@ -179,13 +183,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
             </div>
           </CardContent>
         </Card>
-      </>
-    );
-  }
-
-  return (
-    <>
-      {headerContent}
+      )}
 
       {/* Form */}
       <TriggerForm

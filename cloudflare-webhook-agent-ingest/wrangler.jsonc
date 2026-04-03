@@ -32,6 +32,7 @@
     "ENVIRONMENT": "production",
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
     "WEBHOOK_AGENT_URL": "https://hooks.kilosessions.ai",
+    "KILOCLAW_API_URL": "https://claw.kilosessions.ai",
   },
   // PRODUCTION service binding to cloud-agent worker
   "services": [
@@ -90,6 +91,10 @@
       "new_sqlite_classes": ["TriggerDO"],
       "deleted_classes": ["CatcherDO"],
     },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": [],
+    },
   ],
   // PRODUCTION Secrets Store (shared Kilo secrets store)
   "secrets_store_secrets": [
@@ -119,6 +124,7 @@
       "vars": {
         "ENVIRONMENT": "development",
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
+        "KILOCLAW_API_URL": "http://localhost:8795",
         "WEBHOOK_AGENT_URL": "http://localhost:8793",
       },
       // DEV service binding to cloud-agent-dev worker

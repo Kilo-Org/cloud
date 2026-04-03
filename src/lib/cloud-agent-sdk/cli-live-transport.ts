@@ -157,9 +157,9 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             return null;
           }
         },
-        onEvent: (payload: unknown) => {
+        onEvent: payload => {
           console.log('[cli-debug] WebSocket event received: %o', payload);
-          handleInboundMessage(payload as WebInboundMessage);
+          handleInboundMessage(payload);
         },
         onOpen: (ws: WebSocket) => {
           console.log(
@@ -172,6 +172,19 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           ws.send(JSON.stringify({ type: 'subscribe', sessionId: config.kiloSessionId }));
         },
         onConnected: () => {},
+        onReconnected: () => {
+          if (expectedGeneration !== generation) return;
+          if (!config.fetchSnapshot) return;
+          void config.fetchSnapshot(config.kiloSessionId).then(
+            snapshot => {
+              if (expectedGeneration !== generation) return;
+              replaySnapshot(snapshot);
+            },
+            () => {
+              // Snapshot refetch failure on reconnect is non-fatal
+            }
+          );
+        },
         onDisconnected: () => {},
         onError: config.onError,
         isAuthFailure: (event: CloseEvent) => event.code === 4001 || event.code === 1008,

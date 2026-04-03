@@ -23,6 +23,7 @@ import {
   ListChecks,
   Wrench,
   Webhook,
+  Settings,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
@@ -34,6 +35,7 @@ import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
+import KiloCrabIcon from '@/components/KiloCrabIcon';
 
 type OrganizationAppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   organizationId: string;
@@ -120,6 +122,25 @@ export default function OrganizationAppSidebar({
     },
   ];
 
+  // KiloClaw group
+  const kiloClawItems: Array<{
+    title: string;
+    icon: React.ElementType;
+    url: string;
+    className?: string;
+  }> = [
+    {
+      title: 'KiloClaw',
+      icon: KiloCrabIcon,
+      url: `/organizations/${organizationId}/claw`,
+    },
+    {
+      title: 'Settings',
+      icon: Settings,
+      url: `/organizations/${organizationId}/claw/settings`,
+    },
+  ];
+
   // Cloud group
   const cloudItems: Array<{
     title: string;
@@ -143,9 +164,9 @@ export default function OrganizationAppSidebar({
       url: `/organizations/${organizationId}/cloud/sessions`,
     },
     {
-      title: 'Webhooks',
+      title: 'Webhooks / Triggers',
       icon: Webhook,
-      url: `/organizations/${organizationId}/cloud/webhooks`,
+      url: `/organizations/${organizationId}/cloud/triggers`,
     },
     // Gastown requires non-billing_manager role; hide for billing-only users
     ...(currentRole !== 'billing_manager'
@@ -257,8 +278,8 @@ export default function OrganizationAppSidebar({
   ];
 
   const allUrls = useMemo(
-    () => [...dashboardItems, ...cloudItems, ...accountItems].map(i => i.url),
-    [dashboardItems, cloudItems, accountItems]
+    () => [...dashboardItems, ...kiloClawItems, ...cloudItems, ...accountItems].map(i => i.url),
+    [dashboardItems, kiloClawItems, cloudItems, accountItems]
   );
 
   // Determine if we should show the OrganizationSwitcher
@@ -282,6 +303,7 @@ export default function OrganizationAppSidebar({
 
       <SidebarContent>
         <SidebarMenuList label="Dashboard" items={dashboardItems} allUrls={allUrls} />
+        <SidebarMenuList label="KiloClaw" items={kiloClawItems} allUrls={allUrls} />
         {cloudItems.length > 0 && (
           <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
         )}

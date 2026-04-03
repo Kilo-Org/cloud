@@ -16,7 +16,7 @@ import {
   computeUsageTriggeredMonthlyBonusDecision,
   maybeIssueKiloPassBonusFromUsageThreshold,
 } from '@/lib/kilo-pass/usage-triggered-bonus';
-import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
+import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
 import { KiloPassCadence } from '@/lib/kilo-pass/enums';
 import {
@@ -52,13 +52,22 @@ export async function projectPendingKiloPassBonusMicrodollars(params: {
   userId: string;
   microdollarsUsed: number;
   kiloPassThreshold: number | null;
+  subscription?: KiloPassSubscriptionState | null;
 }): Promise<number> {
-  const { userId, microdollarsUsed, kiloPassThreshold } = params;
+  const {
+    userId,
+    microdollarsUsed,
+    kiloPassThreshold,
+    subscription: providedSubscription,
+  } = params;
 
   const effectiveThreshold = getEffectiveKiloPassThreshold(kiloPassThreshold);
   if (effectiveThreshold === null || microdollarsUsed < effectiveThreshold) return 0;
 
-  const subscription = await getKiloPassStateForUser(db, userId);
+  const subscription =
+    providedSubscription !== undefined
+      ? providedSubscription
+      : await getKiloPassStateForUser(db, userId);
   if (!subscription || subscription.status !== 'active') return 0;
 
   const tierConfig = KILO_PASS_TIER_CONFIG[subscription.tier];
@@ -84,6 +93,30 @@ export async function projectPendingKiloPassBonusMicrodollars(params: {
   }
 
   return Math.round(monthlyBaseAmountUsd * bonusPercent * 1_000_000);
+}
+
+export async function getEffectiveCreditBalancePreview(params: {
+  userId: string;
+  balanceMicrodollars: number;
+  microdollarsUsed: number;
+  kiloPassThreshold: number | null;
+  costMicrodollars: number;
+  subscription?: KiloPassSubscriptionState | null;
+}): Promise<{
+  projectedKiloPassBonusMicrodollars: number;
+  effectiveBalanceMicrodollars: number;
+}> {
+  const projectedKiloPassBonusMicrodollars = await projectPendingKiloPassBonusMicrodollars({
+    userId: params.userId,
+    microdollarsUsed: params.microdollarsUsed + params.costMicrodollars,
+    kiloPassThreshold: params.kiloPassThreshold,
+    subscription: params.subscription,
+  });
+
+  return {
+    projectedKiloPassBonusMicrodollars,
+    effectiveBalanceMicrodollars: params.balanceMicrodollars + projectedKiloPassBonusMicrodollars,
+  };
 }
 
 /**
@@ -397,12 +430,15 @@ export async function enrollWithCredits(params: {
   // The deduction increments microdollars_used, so project the post-deduction
   // value to correctly evaluate whether the spend crosses the bonus threshold.
   const balance = user.total_microdollars_acquired - user.microdollars_used;
-  const projectedBonus = await projectPendingKiloPassBonusMicrodollars({
-    userId,
-    microdollarsUsed: user.microdollars_used + costMicrodollars,
-    kiloPassThreshold: user.kilo_pass_threshold,
-  });
-  const effectiveBalance = balance + projectedBonus;
+  const { effectiveBalanceMicrodollars: effectiveBalance } = await getEffectiveCreditBalancePreview(
+    {
+      userId,
+      balanceMicrodollars: balance,
+      microdollarsUsed: user.microdollars_used,
+      kiloPassThreshold: user.kilo_pass_threshold,
+      costMicrodollars,
+    }
+  );
 
   if (effectiveBalance < costMicrodollars) {
     const shortfall = costMicrodollars - effectiveBalance;

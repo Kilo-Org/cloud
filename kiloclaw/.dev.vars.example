@@ -54,7 +54,7 @@ FLY_IMAGE_TAG=latest
 # Used by the worker to self-register the version → image tag mapping in KV,
 # enabling per-user version tracking. Without this, version tracking fields
 # will be null and instances fall back to FLY_IMAGE_TAG directly.
-OPENCLAW_VERSION=2026.2.9
+OPENCLAW_VERSION=2026.3.24
 
 # Legacy fallback for existing instances without per-user apps.
 # New instances get per-user apps (acct-{hash}) created automatically.

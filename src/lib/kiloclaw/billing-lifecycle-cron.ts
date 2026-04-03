@@ -22,6 +22,7 @@ import type {
 import type { TemplateName } from '@/lib/email';
 import { send as sendEmail } from '@/lib/email';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { autoResumeIfSuspended, ensureAutoIntroSchedule } from '@/lib/kiloclaw/stripe-handlers';
 import {
   KILOCLAW_PLAN_COST_MICRODOLLARS,
@@ -34,6 +35,8 @@ import { client as stripe } from '@/lib/stripe-client';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import { NEXTAUTH_URL, KILOCLAW_BILLING_ENFORCEMENT } from '@/lib/config.server';
 import { sentryLogger } from '@/lib/utils.server';
+import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
+import { trackTrialEnd } from '@/lib/impact';
 
 const logInfo = sentryLogger('kiloclaw-billing-cron', 'info');
 const logWarning = sentryLogger('kiloclaw-billing-cron', 'warning');
@@ -675,10 +678,12 @@ export async function runKiloClawBillingLifecycleCron(
       id: kiloclaw_subscriptions.id,
       user_id: kiloclaw_subscriptions.user_id,
       instance_id: kiloclaw_subscriptions.instance_id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
       email: kilocode_users.google_user_email,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'trialing'),
@@ -696,7 +701,10 @@ export async function runKiloClawBillingLifecycleCron(
       // with instance_id=null has nothing to stop.
       if (row.instance_id)
         try {
-          await client.stop(row.user_id, row.instance_id);
+          await client.stop(
+            row.user_id,
+            workerInstanceId({ id: row.instance_id, sandbox_id: row.sandbox_id ?? undefined })
+          );
         } catch (stopError) {
           const isExpected =
             stopError instanceof KiloClawApiError &&
@@ -726,6 +734,16 @@ export async function runKiloClawBillingLifecycleCron(
         .where(eq(kiloclaw_subscriptions.id, row.id));
       summary.sweep1_trial_expiry++;
 
+      const attribution = await getAffiliateAttribution(row.user_id, 'impact');
+      if (attribution) {
+        await trackTrialEnd({
+          clickId: attribution.tracking_id,
+          customerId: row.user_id,
+          customerEmail: row.email,
+          eventDate: new Date(now),
+        });
+      }
+
       await trySendEmail(
         database,
         row.user_id,
@@ -754,10 +772,12 @@ export async function runKiloClawBillingLifecycleCron(
       id: kiloclaw_subscriptions.id,
       user_id: kiloclaw_subscriptions.user_id,
       instance_id: kiloclaw_subscriptions.instance_id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
       email: kilocode_users.google_user_email,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'canceled'),
@@ -770,7 +790,10 @@ export async function runKiloClawBillingLifecycleCron(
     try {
       if (row.instance_id)
         try {
-          await client.stop(row.user_id, row.instance_id);
+          await client.stop(
+            row.user_id,
+            workerInstanceId({ id: row.instance_id, sandbox_id: row.sandbox_id ?? undefined })
+          );
         } catch (stopError) {
           const isExpected =
             stopError instanceof KiloClawApiError &&
@@ -871,10 +894,12 @@ export async function runKiloClawBillingLifecycleCron(
       id: kiloclaw_subscriptions.id,
       user_id: kiloclaw_subscriptions.user_id,
       instance_id: kiloclaw_subscriptions.instance_id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
       email: kilocode_users.google_user_email,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
     .where(
       and(
         lt(kiloclaw_subscriptions.destruction_deadline, now),
@@ -886,7 +911,10 @@ export async function runKiloClawBillingLifecycleCron(
     try {
       if (row.instance_id)
         try {
-          await client.destroy(row.user_id, row.instance_id);
+          await client.destroy(
+            row.user_id,
+            workerInstanceId({ id: row.instance_id, sandbox_id: row.sandbox_id ?? undefined })
+          );
         } catch (destroyError) {
           const isExpected =
             destroyError instanceof KiloClawApiError &&
@@ -961,10 +989,12 @@ export async function runKiloClawBillingLifecycleCron(
       id: kiloclaw_subscriptions.id,
       user_id: kiloclaw_subscriptions.user_id,
       instance_id: kiloclaw_subscriptions.instance_id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
       email: kilocode_users.google_user_email,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'past_due'),
@@ -977,7 +1007,10 @@ export async function runKiloClawBillingLifecycleCron(
     try {
       if (row.instance_id)
         try {
-          await client.stop(row.user_id, row.instance_id);
+          await client.stop(
+            row.user_id,
+            workerInstanceId({ id: row.instance_id, sandbox_id: row.sandbox_id ?? undefined })
+          );
         } catch (stopError) {
           const isExpected =
             stopError instanceof KiloClawApiError &&

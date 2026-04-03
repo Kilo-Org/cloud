@@ -18,7 +18,7 @@ import { getWastelandRegistryStub } from './dos/WastelandRegistry.do';
 // ── DO Exports ──────────────────────────────────────────────────────────
 // Wrangler requires these exports to match the class_name bindings in wrangler.jsonc.
 
-export { WastelandDO } from './dos/WastelandDO.stub';
+export { WastelandDO } from './dos/Wasteland.do';
 export { WastelandContainerDO } from './dos/WastelandContainer.do';
 export { WastelandRegistryDO } from './dos/WastelandRegistry.do';
 

@@ -11,6 +11,7 @@ export type ProviderId =
   | 'martian'
   | 'mistral'
   | 'morph'
+  | 'neuralwatt'
   | 'vercel'
   | 'custom'
   | 'dev-tools';

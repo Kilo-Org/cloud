@@ -88,6 +88,13 @@ export default {
     supportedChatApis: ['chat_completions'],
     transformRequest() {},
   },
+  NEURALWATT: {
+    id: 'neuralwatt',
+    apiUrl: 'https://api.neuralwatt.com/v1',
+    apiKey: getEnvVariable('NEURALWATT_API_KEY'),
+    supportedChatApis: ['chat_completions'],
+    transformRequest() {},
+  },
   VERCEL_AI_GATEWAY: {
     id: 'vercel',
     apiUrl: 'https://ai-gateway.vercel.sh/v1',

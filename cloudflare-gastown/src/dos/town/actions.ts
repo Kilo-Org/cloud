@@ -606,7 +606,12 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
           // Auto-resolve PR feedback: detect unresolved comments and failing CI
           if (refineryConfig.auto_resolve_pr_feedback) {
             const feedback = await ctx.checkPRFeedback(action.pr_url);
-            if (feedback && (feedback.hasUnresolvedComments || feedback.hasFailingChecks)) {
+            if (
+              feedback &&
+              (feedback.hasUnresolvedComments ||
+                feedback.hasFailingChecks ||
+                feedback.hasUncheckedRuns)
+            ) {
               // Check for existing non-terminal feedback bead to prevent duplicates
               const existingFeedback = hasExistingFeedbackBead(sql, action.bead_id);
               if (!existingFeedback) {

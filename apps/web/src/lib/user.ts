@@ -718,14 +718,14 @@ export async function softDeleteUser(userId: string) {
           WHERE m.linked_kilo_user_id = ${userId}
         )`
       );
-    // Also clear events matched by email directly (covers un-enrolled contributors)
+    // Also clear events matched by email directly (covers un-enrolled contributors).
+    // Use originalEmail captured before the user row was anonymized — the subquery
+    // would resolve to the already-overwritten deleted+<id>@deleted.invalid address.
     await tx
       .update(contributor_champion_events)
       .set({ github_author_email: null })
       .where(
-        sql`lower(${contributor_champion_events.github_author_email}) = lower(
-          (SELECT u.google_user_email FROM kilocode_users u WHERE u.id = ${userId})
-        )`
+        sql`lower(${contributor_champion_events.github_author_email}) = lower(${originalEmail})`
       );
     await tx
       .update(contributor_champion_memberships)

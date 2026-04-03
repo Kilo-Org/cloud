@@ -1485,7 +1485,15 @@ platform.get('/debug-status', async c => {
       stub => stub.getDebugState(),
       'getDebugState'
     );
-    console.log('[vol-usage] platform debug-status response disk stats:', JSON.stringify({ userId, instanceId, diskUsedBytes: status.diskUsedBytes, diskTotalBytes: status.diskTotalBytes }));
+    console.log(
+      '[vol-usage] platform debug-status response disk stats:',
+      JSON.stringify({
+        userId,
+        instanceId,
+        diskUsedBytes: status.diskUsedBytes,
+        diskTotalBytes: status.diskTotalBytes,
+      })
+    );
     return c.json(status);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'debug-status');

@@ -170,7 +170,13 @@ export function startCheckin(deps: CheckinDeps): () => void {
       const stats = deps.getSupervisorStats();
       const openclawVersion = await deps.getOpenclawVersion();
       const [currentNetStats, diskStats] = await Promise.all([readNetStats(), readDiskStats()]);
-      console.log('[vol-usage] checkin disk payload:', JSON.stringify({ diskUsedBytes: diskStats?.usedBytes ?? null, diskTotalBytes: diskStats?.totalBytes ?? null }));
+      console.log(
+        '[vol-usage] checkin disk payload:',
+        JSON.stringify({
+          diskUsedBytes: diskStats?.usedBytes ?? null,
+          diskTotalBytes: diskStats?.totalBytes ?? null,
+        })
+      );
 
       const restartsSinceLastCheckin = Math.max(0, stats.restarts - previousRestarts);
       const bandwidthBytesIn = Math.max(0, currentNetStats.bytesIn - previousNetStats.bytesIn);

@@ -324,18 +324,11 @@ export function generateBaseConfig(
       (config.plugins.load.paths as string[]).push(pluginPath);
     }
 
-    // Explicitly allow the non-bundled streamchat plugin so OpenClaw doesn't
-    // warn about auto-loading untrusted plugins when plugins.allow is empty.
-    config.plugins.allow = Array.isArray(config.plugins.allow) ? config.plugins.allow : [];
-    const scEntry = 'openclaw-channel-streamchat';
-    if (!(config.plugins.allow as string[]).includes(scEntry)) {
-      (config.plugins.allow as string[]).push(scEntry);
-    }
-
     config.plugins.entries = config.plugins.entries ?? {};
     // Entry key must match the plugin's manifest id (openclaw.plugin.json).
     // The fork's manifest declares id "openclaw-channel-streamchat" to align
     // with the idHint that OpenClaw derives from the package name.
+    const scEntry = 'openclaw-channel-streamchat';
     config.plugins.entries[scEntry] = config.plugins.entries[scEntry] ?? {};
     config.plugins.entries[scEntry].enabled = true;
   }

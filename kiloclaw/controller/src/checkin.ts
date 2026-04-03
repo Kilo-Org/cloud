@@ -94,6 +94,7 @@ export async function readNetStats(): Promise<NetStats> {
  * Parse the output of `df -B1 --output=avail,size /`. Returns null if unparseable.
  * Columns: avail (available bytes), size (total bytes). Matches the column order used
  * by cloud-agent/src/workspace.ts and cloud-agent-next/src/workspace.ts.
+ * usedBytes is derived as totalBytes - availableBytes (df does not report used directly).
  */
 export function parseDfOutput(raw: string): DiskStats {
   const lines = raw.trim().split('\n');

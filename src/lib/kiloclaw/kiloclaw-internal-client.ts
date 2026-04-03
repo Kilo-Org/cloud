@@ -220,12 +220,7 @@ export class KiloClawInternalClient {
   async getDebugStatus(userId: string, instanceId?: string): Promise<PlatformDebugStatusResponse> {
     const params = new URLSearchParams({ userId });
     if (instanceId) params.set('instanceId', instanceId);
-    const result = await this.request<PlatformDebugStatusResponse>(
-      `/api/platform/debug-status?${params.toString()}`,
-      undefined,
-      { userId }
-    );
-    return result;
+    return this.request(`/api/platform/debug-status?${params.toString()}`, undefined, { userId });
   }
 
   async getRegistryEntries(userId: string, orgId?: string): Promise<RegistryEntriesResponse> {

@@ -35,15 +35,15 @@ describe('nextProductTelemetryDeadline', () => {
 });
 
 describe('parseDfOutput', () => {
-  it('parses valid df --output=avail,size output and derives used from total - avail', () => {
+  it('parses valid df -B1 --output=avail,size output and derives used from total - avail', () => {
     // avail=5368709120, size=10737418240 → used=5368709120
-    const raw = `     Avail 1K-blocks
+    const raw = `     Avail 1B-blocks
 5368709120 10737418240`;
     expect(parseDfOutput(raw)).toEqual({ usedBytes: 5368709120, totalBytes: 10737418240 });
   });
 
   it('returns null when the data line does not match the expected format', () => {
-    expect(parseDfOutput('Avail 1K-blocks\nnot-numbers here')).toBeNull();
+    expect(parseDfOutput('Avail 1B-blocks\nnot-numbers here')).toBeNull();
   });
 
   it('returns null for empty output', () => {
@@ -51,7 +51,7 @@ describe('parseDfOutput', () => {
   });
 
   it('returns null for output with only a header and no data line', () => {
-    expect(parseDfOutput('     Avail 1K-blocks')).toBeNull();
+    expect(parseDfOutput('     Avail 1B-blocks')).toBeNull();
   });
 });
 

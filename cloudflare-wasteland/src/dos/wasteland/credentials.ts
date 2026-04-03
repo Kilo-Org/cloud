@@ -27,13 +27,12 @@ export function storeCredential(
     [userId, encryptedToken, dolthubOrg, rigHandle ?? null, timestamp]
   );
 
-  return getCredential(sql, userId)!;
+  const credential = getCredential(sql, userId);
+  if (!credential) throw new Error('Failed to read back credential after INSERT');
+  return credential;
 }
 
-export function getCredential(
-  sql: SqlStorage,
-  userId: string
-): WastelandCredentialRecord | null {
+export function getCredential(sql: SqlStorage, userId: string): WastelandCredentialRecord | null {
   const rows = [
     ...query(
       sql,

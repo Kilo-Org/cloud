@@ -43,7 +43,7 @@ export class WastelandDO extends DurableObject<Env> {
     super(ctx, env);
     this.sql = ctx.storage.sql;
 
-    ctx.blockConcurrencyWhile(async () => {
+    void ctx.blockConcurrencyWhile(async () => {
       this.initializeDatabase();
     });
   }
@@ -57,11 +57,7 @@ export class WastelandDO extends DurableObject<Env> {
 
     // Hydrate wastelandId from existing config row if present
     const rows = [
-      ...query(
-        this.sql,
-        /* sql */ `SELECT wasteland_id FROM wasteland_config LIMIT 1`,
-        []
-      ),
+      ...query(this.sql, /* sql */ `SELECT wasteland_id FROM wasteland_config LIMIT 1`, []),
     ];
     if (rows.length > 0) {
       this.wastelandId = String((rows[0] as Record<string, unknown>).wasteland_id);
@@ -91,9 +87,7 @@ export class WastelandDO extends DurableObject<Env> {
     return configOps.getConfig(this.sql, this.wastelandId);
   }
 
-  async updateConfig(
-    input: configOps.UpdateWastelandConfigInput
-  ): Promise<WastelandConfigRecord> {
+  async updateConfig(input: configOps.UpdateWastelandConfigInput): Promise<WastelandConfigRecord> {
     if (!this.wastelandId) {
       throw new Error('Wasteland not initialized');
     }

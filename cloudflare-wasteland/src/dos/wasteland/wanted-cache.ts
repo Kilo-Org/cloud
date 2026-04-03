@@ -22,10 +22,7 @@ export function getWantedBoard(sql: SqlStorage): WastelandWantedItemRecord[] {
  * Replace the entire wanted board cache with fresh items.
  * Called after fetching from DoltHub upstream.
  */
-export function replaceWantedBoard(
-  sql: SqlStorage,
-  items: WastelandWantedItemRecord[]
-): void {
+export function replaceWantedBoard(sql: SqlStorage, items: WastelandWantedItemRecord[]): void {
   query(sql, /* sql */ `DELETE FROM ${wasteland_wanted_cache}`, []);
 
   for (const item of items) {

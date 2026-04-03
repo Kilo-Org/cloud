@@ -1,8 +1,5 @@
 import { query } from '../../util/query.util';
-import {
-  wasteland_config,
-  WastelandConfigRecord,
-} from '../../db/tables/wasteland-config.table';
+import { wasteland_config, WastelandConfigRecord } from '../../db/tables/wasteland-config.table';
 
 export type InitializeWastelandInput = {
   wasteland_id: string;
@@ -56,13 +53,12 @@ export function initializeWasteland(
     ]
   );
 
-  return getConfig(sql, input.wasteland_id)!;
+  const config = getConfig(sql, input.wasteland_id);
+  if (!config) throw new Error('Failed to read back config after INSERT');
+  return config;
 }
 
-export function getConfig(
-  sql: SqlStorage,
-  wastelandId: string
-): WastelandConfigRecord | null {
+export function getConfig(sql: SqlStorage, wastelandId: string): WastelandConfigRecord | null {
   const rows = [
     ...query(
       sql,
@@ -105,5 +101,7 @@ export function updateConfig(
     ]
   );
 
-  return getConfig(sql, wastelandId)!;
+  const config = getConfig(sql, wastelandId);
+  if (!config) throw new Error('Failed to read back config after UPDATE');
+  return config;
 }

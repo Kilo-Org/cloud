@@ -493,12 +493,24 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
     };
   }
 
+  // Build PR fixup context if the hooked bead is a PR fixup request
+  let pr_fixup_context: PrimeContext['pr_fixup_context'] = null;
+  if (hookedBead?.labels.includes('gt:pr-fixup') && hookedBead.metadata) {
+    const meta = hookedBead.metadata as Record<string, unknown>;
+    pr_fixup_context = {
+      pr_url: typeof meta.pr_url === 'string' ? meta.pr_url : null,
+      branch: typeof meta.branch === 'string' ? meta.branch : null,
+      target_branch: typeof meta.target_branch === 'string' ? meta.target_branch : null,
+    };
+  }
+
   return {
     agent,
     hooked_bead: hookedBead,
     undelivered_mail: undeliveredMail,
     open_beads: openBeads,
     rework_context,
+    pr_fixup_context,
   };
 }
 

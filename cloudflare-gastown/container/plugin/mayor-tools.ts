@@ -67,6 +67,10 @@ export function createMayorTools(client: MayorGastownClient) {
           .string()
           .describe('JSON-encoded metadata object for additional context')
           .optional(),
+        labels: tool.schema
+          .array(tool.schema.string())
+          .describe('Labels to attach to the bead (e.g. ["gt:pr-fixup"])')
+          .optional(),
       },
       async execute(args) {
         const metadata = args.metadata ? parseJsonObject(args.metadata, 'metadata') : undefined;
@@ -75,6 +79,7 @@ export function createMayorTools(client: MayorGastownClient) {
           title: args.title,
           body: args.body,
           metadata,
+          labels: args.labels,
         });
         return [
           `Task slung successfully.`,

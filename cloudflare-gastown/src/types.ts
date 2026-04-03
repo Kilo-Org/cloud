@@ -171,6 +171,12 @@ export type PrimeContext = {
     original_bead_title: string | null;
     mr_bead_id: string | null;
   } | null;
+  /** Present when the hooked bead is a PR fixup (gt:pr-fixup label). */
+  pr_fixup_context: {
+    pr_url: string | null;
+    branch: string | null;
+    target_branch: string | null;
+  } | null;
 };
 
 // -- Agent done --

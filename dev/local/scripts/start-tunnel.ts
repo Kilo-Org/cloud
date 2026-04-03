@@ -6,10 +6,27 @@ import * as path from 'node:path';
 const repoRoot = path.resolve(import.meta.dirname, '../../..');
 const devVarsPath = path.join(repoRoot, 'kiloclaw/.dev.vars');
 
-type TunnelConfig = {
-  tunnelName: string;
-  tunnelHostname: string;
+type TunnelMode = {
+  nameKey: string;
+  hostnameKey: string;
+  onUrl: ((url: string) => void) | null;
 };
+
+const TUNNEL_MODES = {
+  nextjs: {
+    nameKey: 'TUNNEL_NAME',
+    hostnameKey: 'TUNNEL_HOSTNAME',
+    onUrl: (url: string) =>
+      updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', `${url}/api/gateway/`),
+  },
+  worker: {
+    nameKey: 'WORKER_TUNNEL_NAME',
+    hostnameKey: 'WORKER_TUNNEL_HOSTNAME',
+    onUrl: null,
+  },
+} satisfies Record<string, TunnelMode>;
+
+type ModeName = keyof typeof TUNNEL_MODES;
 
 function parseConfFile(filePath: string): Record<string, string> {
   if (!fs.existsSync(filePath)) return {};
@@ -25,19 +42,10 @@ function parseConfFile(filePath: string): Record<string, string> {
   return result;
 }
 
-function loadTunnelConfig(nameKey: string, hostnameKey: string): TunnelConfig {
+function loadConf(): Record<string, string> {
   const globalPath = path.join(os.homedir(), '.config/kiloclaw/dev-start.conf');
   const localPath = path.join(repoRoot, 'kiloclaw/scripts/.dev-start.conf');
-
-  const merged = {
-    ...parseConfFile(globalPath),
-    ...parseConfFile(localPath),
-  };
-
-  return {
-    tunnelName: merged[nameKey] ?? '',
-    tunnelHostname: merged[hostnameKey] ?? '',
-  };
+  return { ...parseConfFile(globalPath), ...parseConfFile(localPath) };
 }
 
 function updateEnvValue(filePath: string, key: string, value: string): void {
@@ -68,43 +76,32 @@ if (spawnSync('cloudflared', ['version'], { stdio: 'ignore' }).error) {
   process.exit(1);
 }
 
-// Pass "worker" as first arg to run the worker tunnel (wrangler dev on port 8795).
-// Otherwise runs the default Next.js tunnel.
-const isWorkerMode = process.argv[2] === 'worker';
+const modeArg = process.argv[2];
+const modeName: ModeName = modeArg === 'worker' ? 'worker' : 'nextjs';
+const port = process.argv[3] ?? (modeName === 'worker' ? '8795' : '3000');
+const mode = TUNNEL_MODES[modeName];
+const conf = loadConf();
+const tunnelName = conf[mode.nameKey] ?? '';
+const tunnelHostname = conf[mode.hostnameKey] ?? '';
 
-const port = isWorkerMode ? '8795' : (process.argv[2] ?? '3000');
-const config = isWorkerMode
-  ? loadTunnelConfig('WORKER_TUNNEL_NAME', 'WORKER_TUNNEL_HOSTNAME')
-  : loadTunnelConfig('TUNNEL_NAME', 'TUNNEL_HOSTNAME');
-
-let command: string;
 let args: string[];
 let urlPattern: RegExp | null = null;
 
-if (config.tunnelName) {
-  command = 'cloudflared';
-  const configFile = path.join(os.homedir(), `.cloudflared/${config.tunnelName}.yml`);
-  args = ['tunnel', '--config', configFile, 'run', config.tunnelName];
-  console.log(`Named tunnel: ${config.tunnelName} -> ${config.tunnelHostname}`);
+if (tunnelName) {
+  const configFile = path.join(os.homedir(), `.cloudflared/${tunnelName}.yml`);
+  args = ['tunnel', '--config', configFile, 'run', tunnelName];
+  console.log(`Named tunnel: ${tunnelName} -> ${tunnelHostname}`);
 
-  if (!isWorkerMode && config.tunnelHostname) {
-    const apiUrl = `https://${config.tunnelHostname}/api/gateway/`;
-    updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', apiUrl);
+  if (mode.onUrl && tunnelHostname) {
+    mode.onUrl(`https://${tunnelHostname}`);
   }
 } else {
-  if (isWorkerMode) {
-    console.error(
-      'WORKER_TUNNEL_NAME not set in ~/.config/kiloclaw/dev-start.conf or kiloclaw/scripts/.dev-start.conf'
-    );
-    process.exit(1);
-  }
-  command = 'cloudflared';
   args = ['tunnel', '--url', `http://localhost:${port}`];
   urlPattern = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
   console.log(`Starting quick tunnel -> http://localhost:${port}...`);
 }
 
-const child = spawn(command, args, {
+const child = spawn('cloudflared', args, {
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 
@@ -116,11 +113,12 @@ function handleOutput(data: Buffer) {
   if (!match) return;
 
   const url = match[0];
-  const apiUrl = `${url}/api/gateway/`;
-  updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', apiUrl);
+  mode.onUrl?.(url);
 
   console.log(`\nTunnel URL: ${url}`);
-  console.log(`Set KILOCODE_API_BASE_URL=${apiUrl}`);
+  if (mode.onUrl) {
+    console.log(`Set KILOCODE_API_BASE_URL=${url}/api/gateway/`);
+  }
 
   // Only capture once
   urlPattern = null;

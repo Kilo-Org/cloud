@@ -255,13 +255,14 @@ function buildServiceDefs(): ServiceDef[] {
     }
 
     if (name === 'kiloclaw-worker-tunnel') {
+      const workerPort = readWranglerPort(path.join(repoRoot, 'kiloclaw')) + portOffset;
       defs.push({
         name,
         type: 'process',
         dir: '.',
         port: 0,
         dependsOn: meta.dependsOn,
-        command: ['tsx', 'dev/local/scripts/start-tunnel.ts', 'worker'],
+        command: ['tsx', 'dev/local/scripts/start-tunnel.ts', 'worker', String(workerPort)],
         group: meta.group,
       });
       continue;

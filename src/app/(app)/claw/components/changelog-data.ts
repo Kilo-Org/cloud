@@ -13,7 +13,7 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: '2026-04-03',
     description:
-      'Fixed an issue where configuring the plugins.allow section in openclaw.json causes channels to be silently dropped. Tell your agent: "If my openclaw.json has a plugins.allow section and the only entry is \'openclaw-channel-streamchat\', delete the entire plugins.allow section."',
+      'Fixed an issue where the plugins.allow section in openclaw.json caused channels to be silently dropped. If you experience issues with Telegram/Discord/Slack ask your agent: "If my openclaw.json has a plugins.allow section and the only entry is \'openclaw-channel-streamchat\', delete the entire plugins.allow section."',
     category: 'bugfix',
     deployHint: 'redeploy_suggested',
   },

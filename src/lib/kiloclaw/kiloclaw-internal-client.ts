@@ -225,15 +225,6 @@ export class KiloClawInternalClient {
       undefined,
       { userId }
     );
-    console.log(
-      '[vol-usage] internal-client getDebugStatus result disk stats:',
-      JSON.stringify({
-        userId,
-        instanceId,
-        diskUsedBytes: result.diskUsedBytes,
-        diskTotalBytes: result.diskTotalBytes,
-      })
-    );
     return result;
   }
 

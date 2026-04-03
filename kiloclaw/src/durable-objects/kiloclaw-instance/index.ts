@@ -1533,15 +1533,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.loadState();
     const alarmScheduledAt = await this.ctx.storage.getAlarm();
 
-    console.log(
-      '[vol-usage] DO.getDebugState disk stats:',
-      JSON.stringify({
-        diskUsedBytes: this.s.diskUsedBytes,
-        diskTotalBytes: this.s.diskTotalBytes,
-        sandboxId: this.s.sandboxId,
-      })
-    );
-
     return {
       userId: this.s.userId,
       sandboxId: this.s.sandboxId,
@@ -1628,14 +1619,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   /** Persist disk usage reported by the controller checkin. */
   async recordDiskStats(usedBytes: number, totalBytes: number): Promise<void> {
     await this.loadState();
-    console.log(
-      '[vol-usage] DO.recordDiskStats called:',
-      JSON.stringify({ usedBytes, totalBytes, sandboxId: this.s.sandboxId })
-    );
     this.s.diskUsedBytes = usedBytes;
     this.s.diskTotalBytes = totalBytes;
     await this.persist({ diskUsedBytes: usedBytes, diskTotalBytes: totalBytes });
-    console.log('[vol-usage] DO.recordDiskStats persisted');
   }
 
   async listVolumeSnapshots(): Promise<FlyVolumeSnapshot[]> {

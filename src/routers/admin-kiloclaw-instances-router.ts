@@ -220,15 +220,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     try {
       const client = new KiloClawInternalClient();
       workerStatus = await client.getDebugStatus(instance.user_id, workerInstanceId(instance));
-      console.log(
-        '[vol-usage] admin router workerStatus disk stats:',
-        JSON.stringify({
-          instanceId: instance.id,
-          userId: instance.user_id,
-          diskUsedBytes: workerStatus.diskUsedBytes,
-          diskTotalBytes: workerStatus.diskTotalBytes,
-        })
-      );
     } catch (err) {
       workerStatusError =
         err instanceof KiloClawApiError

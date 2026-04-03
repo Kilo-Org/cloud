@@ -12,6 +12,12 @@ export type ChangelogEntry = {
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: '2026-04-03',
+    description: 'Updated OpenClaw to 2026.3.28.',
+    category: 'feature',
+    deployHint: 'redeploy_suggested',
+  },
+  {
+    date: '2026-04-03',
     description:
       'Fixed an issue where the plugins.allow section in openclaw.json caused channels to be silently dropped. If you experience issues with Telegram/Discord/Slack ask your agent: "If my openclaw.json has a plugins.allow section and the only entry is \'openclaw-channel-streamchat\', delete the entire plugins.allow section."',
     category: 'bugfix',

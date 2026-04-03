@@ -42,7 +42,7 @@ RUN npm install -g pnpm
 
 # Install OpenClaw
 # Pin to specific version for reproducible builds
-RUN npm install -g openclaw@2026.3.24 \
+RUN npm install -g openclaw@2026.3.28 \
     && openclaw --version
 
 # Install ClawHub CLI

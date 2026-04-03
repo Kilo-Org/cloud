@@ -141,7 +141,7 @@ docker rm kiloclaw-gateway
 ```bash
 # Check versions
 docker run --rm kiloclaw:test node --version        # v24.14.1
-docker run --rm kiloclaw:test openclaw --version    # 2026.3.24
+docker run --rm kiloclaw:test openclaw --version    # 2026.3.28
 
 # Check directories
 docker run --rm kiloclaw:test ls -la /root/.openclaw

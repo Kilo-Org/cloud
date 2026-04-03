@@ -16,7 +16,11 @@ import * as credentialOps from './wasteland/credentials';
 import * as memberOps from './wasteland/members';
 import * as connectedTownOps from './wasteland/connected-towns';
 
-import type { WastelandConfig, InitWastelandInput, WastelandConfigUpdate } from './wasteland/config';
+import type {
+  WastelandConfig,
+  InitWastelandInput,
+  WastelandConfigUpdate,
+} from './wasteland/config';
 import type { WastelandCredential } from './wasteland/credentials';
 import type { WastelandMember } from './wasteland/members';
 import type { WastelandConnectedTown } from './wasteland/connected-towns';
@@ -172,7 +176,11 @@ export class WastelandDO extends DurableObject<Env> {
     rigHandle?: string
   ): Promise<WastelandCredential> {
     const credential = credentialOps.storeCredential(
-      this.sql, userId, encryptedToken, dolthubOrg, rigHandle ?? null
+      this.sql,
+      userId,
+      encryptedToken,
+      dolthubOrg,
+      rigHandle ?? null
     );
     console.log(`${WL_LOG} stored credential for user ${userId}`);
     return credential;

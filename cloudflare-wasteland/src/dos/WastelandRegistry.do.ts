@@ -10,7 +10,6 @@ import {
 const CountResult = z.object({ cnt: z.coerce.number() });
 
 const LOG = '[WastelandRegistry.do]';
-const CountResult = z.object({ cnt: z.coerce.number() });
 
 /**
  * WastelandRegistryDO — singleton registry that indexes wasteland ownership.
@@ -146,11 +145,7 @@ export class WastelandRegistryDO extends DurableObject<Env> {
   async countAll(): Promise<number> {
     await this.ensureInitialized();
     const rows = [
-      ...query(
-        this.sql,
-        /* sql */ `SELECT COUNT(*) AS cnt FROM ${wasteland_registry}`,
-        []
-      ),
+      ...query(this.sql, /* sql */ `SELECT COUNT(*) AS cnt FROM ${wasteland_registry}`, []),
     ];
     return CountResult.parse(rows[0]).cnt;
   }

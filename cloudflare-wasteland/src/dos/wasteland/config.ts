@@ -43,13 +43,7 @@ export function initConfigTables(sql: SqlStorage): void {
 }
 
 export function getConfig(sql: SqlStorage): WastelandConfig | null {
-  const rows = [
-    ...query(
-      sql,
-      /* sql */ `SELECT * FROM ${wasteland_config} LIMIT 1`,
-      []
-    ),
-  ];
+  const rows = [...query(sql, /* sql */ `SELECT * FROM ${wasteland_config} LIMIT 1`, [])];
   if (rows.length === 0) return null;
   return WastelandConfigRecord.parse(rows[0]);
 }
@@ -109,6 +103,7 @@ export function updateConfig(sql: SqlStorage, update: WastelandConfigUpdate): Wa
           ${wasteland_config.columns.dolthub_upstream} = CASE WHEN ? = 1 THEN ? ELSE ${wasteland_config.columns.dolthub_upstream} END,
           ${wasteland_config.columns.status} = COALESCE(?, ${wasteland_config.columns.status}),
           ${wasteland_config.columns.updated_at} = ?
+      WHERE ${wasteland_config.wasteland_id} = ?
     `,
     [
       update.name ?? null,
@@ -117,11 +112,10 @@ export function updateConfig(sql: SqlStorage, update: WastelandConfigUpdate): Wa
       update.dolthub_upstream !== undefined ? update.dolthub_upstream : null,
       update.status ?? null,
       timestamp,
+      current.wasteland_id,
     ]
   );
 
-  const rows = [
-    ...query(sql, /* sql */ `SELECT * FROM ${wasteland_config} LIMIT 1`, []),
-  ];
+  const rows = [...query(sql, /* sql */ `SELECT * FROM ${wasteland_config} LIMIT 1`, [])];
   return WastelandConfigRecord.parse(rows[0]);
 }

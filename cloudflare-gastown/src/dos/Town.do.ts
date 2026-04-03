@@ -3320,9 +3320,9 @@ export class TownDO extends DurableObject<Env> {
       // Refresh the container-scoped JWT before any work that might
       // trigger API calls. Throttled to once per hour (tokens have 8h
       // expiry, so hourly refresh provides ample safety margin).
-      // Gated on hasRigs (not hasActiveWork) because the container may
-      // still be running with an idle mayor accepting user messages,
-      // even when there are no active beads or agents.
+      // Skips idle towns (no active work) — the container is sleeping
+      // and the token will be refreshed at dispatch time via
+      // ensureContainerToken() in startAgentInContainer().
       try {
         await this.refreshContainerToken();
       } catch (err) {
@@ -3647,6 +3647,12 @@ export class TownDO extends DurableObject<Env> {
    * requests that reset the container's sleepAfter timer (#1409).
    */
   private async refreshContainerToken(): Promise<void> {
+    // Skip if no active work — the container is sleeping and doesn't need
+    // a fresh token. The token will be refreshed when work is next
+    // dispatched (ensureContainerToken is called in startAgentInContainer
+    // at container-dispatch.ts:329).
+    if (!this.hasActiveWork()) return;
+
     const TOKEN_REFRESH_INTERVAL_MS = 60 * 60_000; // 1 hour
     const now = Date.now();
     const lastRefresh = (await this.ctx.storage.get<number>('container:lastTokenRefreshAt')) ?? 0;

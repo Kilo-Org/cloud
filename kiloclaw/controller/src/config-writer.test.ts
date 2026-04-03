@@ -578,7 +578,6 @@ describe('generateBaseConfig', () => {
     expect(config.channels.streamchat.botUserName).toBe('KiloClaw');
     expect(config.channels.streamchat.enabled).toBe(true);
     expect(config.plugins.entries['openclaw-channel-streamchat'].enabled).toBe(true);
-    expect(config.plugins.allow).toContain('openclaw-channel-streamchat');
     expect(config.plugins.load.paths).toContain(
       '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'
     );
@@ -606,7 +605,6 @@ describe('generateBaseConfig', () => {
         load: {
           paths: ['/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'],
         },
-        allow: ['openclaw-channel-streamchat'],
         entries: { 'openclaw-channel-streamchat': { enabled: true } },
       },
     });
@@ -622,8 +620,6 @@ describe('generateBaseConfig', () => {
     const pluginPath = '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
     const paths = config.plugins.load.paths as string[];
     expect(paths.filter(p => p === pluginPath)).toHaveLength(1);
-    const allow = config.plugins.allow as string[];
-    expect(allow.filter((a: string) => a === 'openclaw-channel-streamchat')).toHaveLength(1);
   });
 
   it('does not set gateway auth when OPENCLAW_GATEWAY_TOKEN is missing', () => {

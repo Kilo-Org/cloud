@@ -1,50 +1,51 @@
 FROM --platform=linux/arm64 oven/bun:1-slim
 
 # Install dev toolchain, search tools, build deps, gh CLI, and Node.js
+# Package categories:
+#   version control: git, git-lfs
+#   network/download: curl, wget, ca-certificates, gnupg, unzip
+#   build toolchain: build-essential, autoconf
+#   search tools: ripgrep, jq
+#   compression: bzip2, zstd
+#   SSL/crypto: libssl-dev, libffi-dev
+#   database client libs: libdb-dev, libgdbm-dev, libgdbm6
+#   Python build deps: libbz2-dev, liblzma-dev, libncurses5-dev, libreadline-dev, zlib1g-dev
+#   Ruby build deps: libyaml-dev
+#   image processing: libvips-dev
+#   browser/rendering: libgbm1
+#   C++ stdlib: libc++1
+#   math: libgmp-dev
+#   timezone data: tzdata
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      # Version control
       git \
       git-lfs \
-      # Network / download
       curl \
       wget \
       ca-certificates \
       gnupg \
       unzip \
-      # Build toolchain
       build-essential \
       autoconf \
-      # Search tools
       ripgrep \
       jq \
-      # Compression
       bzip2 \
       zstd \
-      # SSL / crypto
       libssl-dev \
       libffi-dev \
-      # Database client libs
       libdb-dev \
       libgdbm-dev \
       libgdbm6 \
-      # Python build deps (for repos with Python)
       libbz2-dev \
       liblzma-dev \
       libncurses5-dev \
       libreadline-dev \
       zlib1g-dev \
-      # Ruby build deps (for repos with Ruby)
       libyaml-dev \
-      # Image processing (for repos with image pipelines)
       libvips-dev \
-      # Browser/rendering (for repos with Puppeteer, Playwright)
       libgbm1 \
-      # C++ stdlib (for native addons)
       libc++1 \
-      # Math (for native crypto/ML deps)
       libgmp-dev \
-      # Timezone data (for TZ-aware test suites)
       tzdata \
     && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \

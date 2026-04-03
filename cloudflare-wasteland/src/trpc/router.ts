@@ -673,7 +673,7 @@ export const wastelandRouter = router({
         wastelandId: z.string().uuid(),
         title: z.string().min(1).max(256),
         description: z.string().min(1).max(4096),
-        priority: z.enum(['low', 'medium', 'high']).optional(),
+        priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
         type: z.enum(['feature', 'bug', 'docs', 'other']).optional(),
       })
     )

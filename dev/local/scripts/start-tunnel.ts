@@ -25,7 +25,7 @@ function parseConfFile(filePath: string): Record<string, string> {
   return result;
 }
 
-function loadTunnelConfig(): TunnelConfig {
+function loadTunnelConfig(nameKey: string, hostnameKey: string): TunnelConfig {
   const globalPath = path.join(os.homedir(), '.config/kiloclaw/dev-start.conf');
   const localPath = path.join(repoRoot, 'kiloclaw/scripts/.dev-start.conf');
 
@@ -35,8 +35,8 @@ function loadTunnelConfig(): TunnelConfig {
   };
 
   return {
-    tunnelName: merged['TUNNEL_NAME'] ?? '',
-    tunnelHostname: merged['TUNNEL_HOSTNAME'] ?? '',
+    tunnelName: merged[nameKey] ?? '',
+    tunnelHostname: merged[hostnameKey] ?? '',
   };
 }
 
@@ -68,8 +68,14 @@ if (spawnSync('cloudflared', ['version'], { stdio: 'ignore' }).error) {
   process.exit(1);
 }
 
-const port = process.argv[2] ?? '3000';
-const config = loadTunnelConfig();
+// Pass "worker" as first arg to run the worker tunnel (wrangler dev on port 8795).
+// Otherwise runs the default Next.js tunnel.
+const isWorkerMode = process.argv[2] === 'worker';
+
+const port = isWorkerMode ? '8795' : (process.argv[2] ?? '3000');
+const config = isWorkerMode
+  ? loadTunnelConfig('WORKER_TUNNEL_NAME', 'WORKER_TUNNEL_HOSTNAME')
+  : loadTunnelConfig('TUNNEL_NAME', 'TUNNEL_HOSTNAME');
 
 let command: string;
 let args: string[];
@@ -77,14 +83,21 @@ let urlPattern: RegExp | null = null;
 
 if (config.tunnelName) {
   command = 'cloudflared';
-  args = ['tunnel', 'run', config.tunnelName];
+  const configFile = path.join(os.homedir(), `.cloudflared/${config.tunnelName}.yml`);
+  args = ['tunnel', '--config', configFile, 'run', config.tunnelName];
   console.log(`Named tunnel: ${config.tunnelName} -> ${config.tunnelHostname}`);
 
-  if (config.tunnelHostname) {
+  if (!isWorkerMode && config.tunnelHostname) {
     const apiUrl = `https://${config.tunnelHostname}/api/gateway/`;
     updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', apiUrl);
   }
 } else {
+  if (isWorkerMode) {
+    console.error(
+      'WORKER_TUNNEL_NAME not set in ~/.config/kiloclaw/dev-start.conf or kiloclaw/scripts/.dev-start.conf'
+    );
+    process.exit(1);
+  }
   command = 'cloudflared';
   args = ['tunnel', '--url', `http://localhost:${port}`];
   urlPattern = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;

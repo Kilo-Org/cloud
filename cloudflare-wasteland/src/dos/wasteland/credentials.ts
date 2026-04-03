@@ -26,7 +26,7 @@ export function storeCredential(
   encryptedToken: string,
   dolthubOrg: string,
   rigHandle?: string | null
-): void {
+): WastelandCredential {
   const timestamp = now();
   query(
     sql,
@@ -46,6 +46,15 @@ export function storeCredential(
     `,
     [userId, encryptedToken, dolthubOrg, rigHandle ?? null, timestamp]
   );
+
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `SELECT * FROM ${wasteland_credentials} WHERE ${wasteland_credentials.user_id} = ?`,
+      [userId]
+    ),
+  ];
+  return WastelandCredentialRecord.parse(rows[0]);
 }
 
 export function getCredential(sql: SqlStorage, userId: string): WastelandCredential | null {

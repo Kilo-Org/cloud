@@ -54,7 +54,7 @@ export function getConfig(sql: SqlStorage): WastelandConfig | null {
   return WastelandConfigRecord.parse(rows[0]);
 }
 
-export function initializeWasteland(sql: SqlStorage, input: InitWastelandInput): void {
+export function initializeWasteland(sql: SqlStorage, input: InitWastelandInput): WastelandConfig {
   const timestamp = now();
   query(
     sql,
@@ -70,7 +70,7 @@ export function initializeWasteland(sql: SqlStorage, input: InitWastelandInput):
         ${wasteland_config.columns.status},
         ${wasteland_config.columns.created_at},
         ${wasteland_config.columns.updated_at}
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
     `,
     [
       input.wasteland_id,
@@ -80,14 +80,22 @@ export function initializeWasteland(sql: SqlStorage, input: InitWastelandInput):
       input.organization_id ?? null,
       input.dolthub_upstream ?? null,
       input.visibility ?? 'private',
-      'active',
       timestamp,
       timestamp,
     ]
   );
+
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `SELECT * FROM ${wasteland_config} WHERE ${wasteland_config.wasteland_id} = ?`,
+      [input.wasteland_id]
+    ),
+  ];
+  return WastelandConfigRecord.parse(rows[0]);
 }
 
-export function updateConfig(sql: SqlStorage, update: WastelandConfigUpdate): void {
+export function updateConfig(sql: SqlStorage, update: WastelandConfigUpdate): WastelandConfig {
   const current = getConfig(sql);
   if (!current) throw new Error('Cannot update config: wasteland not initialized');
 
@@ -96,20 +104,24 @@ export function updateConfig(sql: SqlStorage, update: WastelandConfigUpdate): vo
     sql,
     /* sql */ `
       UPDATE ${wasteland_config}
-      SET ${wasteland_config.columns.name} = ?,
-          ${wasteland_config.columns.dolthub_upstream} = ?,
-          ${wasteland_config.columns.visibility} = ?,
-          ${wasteland_config.columns.status} = ?,
+      SET ${wasteland_config.columns.name} = COALESCE(?, ${wasteland_config.columns.name}),
+          ${wasteland_config.columns.visibility} = COALESCE(?, ${wasteland_config.columns.visibility}),
+          ${wasteland_config.columns.dolthub_upstream} = CASE WHEN ? = 1 THEN ? ELSE ${wasteland_config.columns.dolthub_upstream} END,
+          ${wasteland_config.columns.status} = COALESCE(?, ${wasteland_config.columns.status}),
           ${wasteland_config.columns.updated_at} = ?
-      WHERE ${wasteland_config.wasteland_id} = ?
     `,
     [
-      update.name ?? current.name,
-      update.dolthub_upstream !== undefined ? update.dolthub_upstream : current.dolthub_upstream,
-      update.visibility ?? current.visibility,
-      update.status ?? current.status,
+      update.name ?? null,
+      update.visibility ?? null,
+      update.dolthub_upstream !== undefined ? 1 : 0,
+      update.dolthub_upstream !== undefined ? update.dolthub_upstream : null,
+      update.status ?? null,
       timestamp,
-      current.wasteland_id,
     ]
   );
+
+  const rows = [
+    ...query(sql, /* sql */ `SELECT * FROM ${wasteland_config} LIMIT 1`, []),
+  ];
+  return WastelandConfigRecord.parse(rows[0]);
 }

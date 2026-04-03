@@ -93,6 +93,25 @@ export function getMemberByUserId(sql: SqlStorage, userId: string): WastelandMem
   return WastelandMemberRecord.parse(rows[0]);
 }
 
+export function updateMember(
+  sql: SqlStorage,
+  memberId: string,
+  update: { role?: string; trust_level?: number }
+): WastelandMember | null {
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${wasteland_members}
+      SET ${wasteland_members.columns.role} = COALESCE(?, ${wasteland_members.columns.role}),
+          ${wasteland_members.columns.trust_level} = COALESCE(?, ${wasteland_members.columns.trust_level})
+      WHERE ${wasteland_members.member_id} = ?
+    `,
+    [update.role ?? null, update.trust_level ?? null, memberId]
+  );
+
+  return getMember(sql, memberId);
+}
+
 export function listMembers(sql: SqlStorage): WastelandMember[] {
   const rows = [
     ...query(

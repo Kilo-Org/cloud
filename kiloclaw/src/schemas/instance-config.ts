@@ -259,7 +259,7 @@ export const PersistedStateSchema = z.object({
   // Tracks whether the "instance ready" email has been sent for this provision lifecycle.
   // Set to true on first low-load checkin; reset on DO wipe (destroy + re-provision).
   instanceReadyEmailSent: z.boolean().default(false),
-  // Disk usage reported by the controller checkin (updated every ~5 min while running).
+  // Disk usage reported by the controller checkin.
   diskUsedBytes: z.number().int().nullable().default(null),
   diskTotalBytes: z.number().int().nullable().default(null),
   // Metadata for custom (non-catalog) secrets: env var name → { configPath? }.

@@ -204,8 +204,6 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
     } catch (err) {
       console.error('[controller] recordDiskStats failed (non-fatal):', err);
     }
-  } else {
-    console.warn('[vol-usage] disk stats missing from checkin payload — skipping recordDiskStats');
   }
 
   // Instance readiness detection: when load drops below threshold, send a

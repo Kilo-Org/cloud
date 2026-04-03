@@ -201,8 +201,10 @@ describe('buildRefinerySystemPrompt with existingPrUrl', () => {
     expect(prompt).toContain('https://github.com/org/repo/pull/42');
     expect(prompt).toContain('gh pr review');
     expect(prompt).toContain('gh pr diff');
+    expect(prompt).toContain('gh pr comment');
     expect(prompt).toContain('Do NOT merge the PR');
     expect(prompt).not.toContain('gh pr create');
+    expect(prompt).toContain('Do NOT use `gh pr review --approve`');
   });
 
   it('includes gates in PR-review prompt', () => {

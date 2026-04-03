@@ -155,8 +155,9 @@ Review the diff on the PR:
 ### Step 3: Submit Your Review
 
 **If everything passes (gates + code review):**
-1. Approve the PR:
-   \`gh pr review ${params.prUrl} --approve --body "Code review passed. All quality gates pass."\`
+1. Leave a comment on the PR noting that the review passed:
+   \`gh pr comment ${params.prUrl} --body "Refinery code review passed. All quality gates pass."\`
+   Do NOT use \`gh pr review --approve\` — the bot account cannot approve its own PRs.
 2. Call \`gt_done\` with branch="${params.branch}" and pr_url="${params.prUrl}".
 
 **If quality gates fail or code review finds issues:**

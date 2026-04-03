@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Test configuration - stripped down for vitest-pool-workers
+  "name": "wasteland-test",
+  "main": "src/wasteland.worker.ts",
+  "compatibility_date": "2026-02-24",
+  "compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "WASTELAND", "class_name": "WastelandDO" },
+      { "name": "WASTELAND_CONTAINER", "class_name": "WastelandContainerDO" },
+      { "name": "WASTELAND_REGISTRY", "class_name": "WastelandRegistryDO" },
+    ],
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["WastelandDO", "WastelandContainerDO"],
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["WastelandRegistryDO"],
+    },
+  ],
+
+  // Test secrets — plain text vars used in place of secrets_store_secrets
+  "vars": {
+    "ENVIRONMENT": "development",
+    "KILO_API_URL": "http://localhost:3000",
+    "WASTELAND_API_URL": "http://localhost:8787",
+    "WASTELAND_JWT_SECRET": "test-jwt-secret-must-be-at-least-32-chars-long",
+    "NEXTAUTH_SECRET": "test-nextauth-secret-must-be-at-least-32-chars",
+    "WASTELAND_ENCRYPTION_KEY": "test-encryption-key-with-high-entropy-0xDEADBEEF",
+  },
+}

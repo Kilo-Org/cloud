@@ -24,10 +24,7 @@ jest.mock('@/lib/config.server', () => ({
 }));
 
 jest.mock('@/lib/fetchWithBackoff', () => ({
-  fetchWithBackoff: (
-    input: Parameters<typeof import('@/lib/fetchWithBackoff').fetchWithBackoff>[0],
-    init?: Parameters<typeof import('@/lib/fetchWithBackoff').fetchWithBackoff>[1]
-  ) => fetch(input, init) as Promise<Response>,
+  fetchWithBackoff: jest.fn(),
 }));
 
 const mockedFetchWithBackoff = jest.mocked(fetchWithBackoff);

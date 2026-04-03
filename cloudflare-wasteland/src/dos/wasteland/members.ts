@@ -14,10 +14,7 @@ export const WastelandMemberRecord = z.object({
 
 export type WastelandMemberRecord = z.output<typeof WastelandMemberRecord>;
 
-export const wasteland_members = getTableFromZodSchema(
-  'wasteland_members',
-  WastelandMemberRecord
-);
+export const wasteland_members = getTableFromZodSchema('wasteland_members', WastelandMemberRecord);
 
 export function createTableWastelandMembers(): string {
   return getCreateTableQueryFromTable(wasteland_members, {
@@ -80,10 +77,7 @@ export function listMembers(sql: SqlStorage): WastelandMemberRecord[] {
   return WastelandMemberRecord.array().parse(rows);
 }
 
-export function getMember(
-  sql: SqlStorage,
-  userId: string
-): WastelandMemberRecord | null {
+export function getMember(sql: SqlStorage, userId: string): WastelandMemberRecord | null {
   const rows = [
     ...query(
       sql,

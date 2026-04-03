@@ -51,13 +51,7 @@ export type InitWastelandInput = {
 // ── Operations ──────────────────────────────────────────────────────────
 
 export function getConfig(sql: SqlStorage): WastelandConfigRecord | null {
-  const rows = [
-    ...query(
-      sql,
-      /* sql */ `SELECT * FROM ${wasteland_config} LIMIT 1`,
-      []
-    ),
-  ];
+  const rows = [...query(sql, /* sql */ `SELECT * FROM ${wasteland_config} LIMIT 1`, [])];
   if (rows.length === 0) return null;
   return WastelandConfigRecord.parse(rows[0]);
 }
@@ -96,7 +90,10 @@ export function initializeWasteland(sql: SqlStorage, input: InitWastelandInput):
 
 export function updateConfig(
   sql: SqlStorage,
-  update: Partial<Pick<WastelandConfigRecord, 'name' | 'visibility' | 'dolthub_upstream' | 'status'>>
+  wastelandId: string,
+  update: Partial<
+    Pick<WastelandConfigRecord, 'name' | 'visibility' | 'dolthub_upstream' | 'status'>
+  >
 ): void {
   const timestamp = new Date().toISOString();
   query(
@@ -109,6 +106,7 @@ export function updateConfig(
         ${wasteland_config.columns.dolthub_upstream} = COALESCE(?, ${wasteland_config.columns.dolthub_upstream}),
         ${wasteland_config.columns.status} = COALESCE(?, ${wasteland_config.columns.status}),
         ${wasteland_config.columns.updated_at} = ?
+      WHERE ${wasteland_config.wasteland_id} = ?
     `,
     [
       update.name ?? null,
@@ -116,6 +114,7 @@ export function updateConfig(
       update.dolthub_upstream ?? null,
       update.status ?? null,
       timestamp,
+      wastelandId,
     ]
   );
 }

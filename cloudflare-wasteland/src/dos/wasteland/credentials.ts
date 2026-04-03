@@ -54,10 +54,7 @@ export function storeCredential(
   );
 }
 
-export function getCredential(
-  sql: SqlStorage,
-  userId: string
-): WastelandCredentialRecord | null {
+export function getCredential(sql: SqlStorage, userId: string): WastelandCredentialRecord | null {
   const rows = [
     ...query(
       sql,

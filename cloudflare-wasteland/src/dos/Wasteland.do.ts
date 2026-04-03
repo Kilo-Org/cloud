@@ -19,40 +19,40 @@ export type WastelandMember = memberOps.WastelandMemberRecord;
  */
 export class WastelandDO extends DurableObject<Env> {
   private sql: SqlStorage;
-  private initPromise: Promise<void> | null = null;
+  private initialized = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.sql = ctx.storage.sql;
 
-    void ctx.blockConcurrencyWhile(async () => {
-      await this.ensureInitialized();
+    void ctx.blockConcurrencyWhile(() => {
+      this.ensureInitialized();
+      return Promise.resolve();
     });
   }
 
-  private async ensureInitialized(): Promise<void> {
-    if (!this.initPromise) {
-      this.initPromise = this.initializeDatabase();
+  private ensureInitialized(): void {
+    if (!this.initialized) {
+      this.initializeDatabase();
+      this.initialized = true;
     }
-    await this.initPromise;
   }
 
-  private async initializeDatabase(): Promise<void> {
+  private initializeDatabase(): void {
     query(this.sql, configOps.createTableWastelandConfig(), []);
     query(this.sql, credentialOps.createTableWastelandCredentials(), []);
     query(this.sql, memberOps.createTableWastelandMembers(), []);
-    await Promise.resolve();
   }
 
   // ── Config ────────────────────────────────────────────────────────────
 
   async getConfig(): Promise<WastelandConfig | null> {
-    await this.ensureInitialized();
+    this.ensureInitialized();
     return configOps.getConfig(this.sql);
   }
 
   async initializeWasteland(input: InitWastelandInput): Promise<void> {
-    await this.ensureInitialized();
+    this.ensureInitialized();
     console.log(`${LOG} initializeWasteland: id=${input.wasteland_id} name=${input.name}`);
     configOps.initializeWasteland(this.sql, input);
   }
@@ -60,9 +60,13 @@ export class WastelandDO extends DurableObject<Env> {
   async updateConfig(
     update: Partial<Pick<WastelandConfig, 'name' | 'visibility' | 'dolthub_upstream' | 'status'>>
   ): Promise<void> {
-    await this.ensureInitialized();
-    console.log(`${LOG} updateConfig:`, JSON.stringify(update));
-    configOps.updateConfig(this.sql, update);
+    this.ensureInitialized();
+    const config = configOps.getConfig(this.sql);
+    if (!config) {
+      throw new Error('Cannot update config: wasteland not initialized');
+    }
+    console.log(`${LOG} updateConfig: wastelandId=${config.wasteland_id}`, JSON.stringify(update));
+    configOps.updateConfig(this.sql, config.wasteland_id, update);
   }
 
   // ── Credentials ───────────────────────────────────────────────────────
@@ -73,18 +77,18 @@ export class WastelandDO extends DurableObject<Env> {
     dolthubOrg: string,
     rigHandle?: string
   ): Promise<void> {
-    await this.ensureInitialized();
+    this.ensureInitialized();
     console.log(`${LOG} storeCredential: userId=${userId} org=${dolthubOrg}`);
     credentialOps.storeCredential(this.sql, userId, encryptedToken, dolthubOrg, rigHandle);
   }
 
   async getCredential(userId: string): Promise<WastelandCredential | null> {
-    await this.ensureInitialized();
+    this.ensureInitialized();
     return credentialOps.getCredential(this.sql, userId);
   }
 
   async deleteCredential(userId: string): Promise<void> {
-    await this.ensureInitialized();
+    this.ensureInitialized();
     console.log(`${LOG} deleteCredential: userId=${userId}`);
     credentialOps.deleteCredential(this.sql, userId);
   }
@@ -92,24 +96,24 @@ export class WastelandDO extends DurableObject<Env> {
   // ── Members ───────────────────────────────────────────────────────────
 
   async addMember(userId: string, role: string, trustLevel: number): Promise<string> {
-    await this.ensureInitialized();
+    this.ensureInitialized();
     console.log(`${LOG} addMember: userId=${userId} role=${role} trustLevel=${trustLevel}`);
     return memberOps.addMember(this.sql, userId, role, trustLevel);
   }
 
   async removeMember(memberId: string): Promise<void> {
-    await this.ensureInitialized();
+    this.ensureInitialized();
     console.log(`${LOG} removeMember: memberId=${memberId}`);
     memberOps.removeMember(this.sql, memberId);
   }
 
   async listMembers(): Promise<WastelandMember[]> {
-    await this.ensureInitialized();
+    this.ensureInitialized();
     return memberOps.listMembers(this.sql);
   }
 
   async getMember(userId: string): Promise<WastelandMember | null> {
-    await this.ensureInitialized();
+    this.ensureInitialized();
     return memberOps.getMember(this.sql, userId);
   }
 

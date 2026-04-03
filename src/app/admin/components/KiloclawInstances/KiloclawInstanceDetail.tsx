@@ -1632,8 +1632,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 {data.workerStatus?.diskUsedBytes != null &&
                 data.workerStatus?.diskTotalBytes != null ? (
                   <span>
-                    {formatBytes(data.workerStatus.diskUsedBytes)} /{' '}
-                    {formatBytes(data.workerStatus.diskTotalBytes)}
+                    {formatBytes(data.workerStatus.diskUsedBytes)} used /{' '}
+                    {formatBytes(data.workerStatus.diskTotalBytes)} total (
+                    {Math.round(
+                      (data.workerStatus.diskUsedBytes / data.workerStatus.diskTotalBytes) * 100
+                    )}
+                    %)
                   </span>
                 ) : (
                   '—'

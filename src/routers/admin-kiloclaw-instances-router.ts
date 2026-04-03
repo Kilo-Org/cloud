@@ -227,7 +227,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           : err instanceof Error
             ? err.message
             : 'Failed to fetch worker status';
-      console.error('[vol-usage] admin router getDebugStatus error:', workerStatusError);
     }
 
     return {

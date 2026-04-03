@@ -443,12 +443,17 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
 // Top-level reconcile
 // ════════════════════════════════════════════════════════════════════
 
-export function reconcile(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
+export function reconcile(
+  sql: SqlStorage,
+  opts?: { draining?: boolean; refineryCodeReview?: boolean }
+): Action[] {
   const draining = opts?.draining ?? false;
   const actions: Action[] = [];
   actions.push(...reconcileAgents(sql, { draining }));
   actions.push(...reconcileBeads(sql, { draining }));
-  actions.push(...reconcileReviewQueue(sql, { draining }));
+  actions.push(
+    ...reconcileReviewQueue(sql, { draining, refineryCodeReview: opts?.refineryCodeReview })
+  );
   actions.push(...reconcileConvoys(sql));
   actions.push(...reconcileGUPP(sql, { draining }));
   actions.push(...reconcileGC(sql));
@@ -1008,7 +1013,10 @@ export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): 
 // refinery dispatch
 // ════════════════════════════════════════════════════════════════════
 
-export function reconcileReviewQueue(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
+export function reconcileReviewQueue(
+  sql: SqlStorage,
+  opts?: { draining?: boolean; refineryCodeReview?: boolean }
+): Action[] {
   const draining = opts?.draining ?? false;
   const actions: Action[] = [];
 
@@ -1125,6 +1133,49 @@ export function reconcileReviewQueue(sql: SqlStorage, opts?: { draining?: boolea
       }
     }
   }
+
+  // When refinery code review is disabled, skip refinery dispatch (Rules 5–6)
+  // for MR beads that already have a pr_url (polecat created the PR).
+  // Transition them straight to in_progress so poll_pr can handle auto-merge.
+  // MR beads without a pr_url (direct merge strategy) still need the refinery.
+  const refineryCodeReview = opts?.refineryCodeReview ?? true;
+
+  if (!refineryCodeReview) {
+    const openMrsWithPr = z
+      .object({ bead_id: z.string() })
+      .array()
+      .parse([
+        ...query(
+          sql,
+          /* sql */ `
+            SELECT b.${beads.columns.bead_id}
+            FROM ${beads} b
+            INNER JOIN ${review_metadata} rm
+              ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
+            WHERE b.${beads.columns.type} = 'merge_request'
+              AND b.${beads.columns.status} = 'open'
+              AND rm.${review_metadata.columns.pr_url} IS NOT NULL
+          `,
+          []
+        ),
+      ]);
+    for (const { bead_id } of openMrsWithPr) {
+      actions.push({
+        type: 'transition_bead',
+        bead_id,
+        from: 'open',
+        to: 'in_progress',
+        reason: 'refinery code review disabled — skip to poll_pr',
+        actor: 'system',
+      });
+    }
+  }
+
+  // Rules 5–6 only apply when refinery code review is enabled.
+  // When disabled, open MR beads with pr_url are fast-tracked above.
+  if (!refineryCodeReview) {
+    // Skip refinery dispatch — jump to Rule 7
+  } else {
 
   // Rule 5: Pop open MR bead for idle refinery
   // Get all rigs that have open MR beads
@@ -1355,6 +1406,48 @@ export function reconcileReviewQueue(sql: SqlStorage, opts?: { draining?: boolea
       agent_id: ref.bead_id,
       bead_id: ref.current_hook_bead_id,
       rig_id: mr.rig_id ?? ref.rig_id ?? '',
+    });
+  }
+
+  } // end refineryCodeReview gate (Rules 5–6)
+
+  // Rule 7: Working refinery hooked to a terminal MR bead — stop it.
+  // This catches the race where auto-merge closes the MR bead while the
+  // refinery is still running in the container. Without this, the refinery
+  // can post review comments on an already-merged PR.
+  const workingRefineries = AgentRow.array().parse([
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${agent_metadata.bead_id}, ${agent_metadata.role},
+               ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
+               ${agent_metadata.dispatch_attempts},
+               ${agent_metadata.last_activity_at},
+               b.${beads.columns.rig_id}
+        FROM ${agent_metadata}
+        LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}
+        WHERE ${agent_metadata.columns.role} = 'refinery'
+          AND ${agent_metadata.status} IN ('working', 'stalled')
+          AND ${agent_metadata.current_hook_bead_id} IS NOT NULL
+      `,
+      []
+    ),
+  ]);
+
+  for (const ref of workingRefineries) {
+    if (!ref.current_hook_bead_id) continue;
+    const mr = beadOps.getBead(sql, ref.current_hook_bead_id);
+    if (!mr || (mr.status !== 'closed' && mr.status !== 'failed')) continue;
+
+    actions.push({
+      type: 'stop_agent',
+      agent_id: ref.bead_id,
+      reason: `MR bead ${ref.current_hook_bead_id} is ${mr.status}`,
+    });
+    actions.push({
+      type: 'unhook_agent',
+      agent_id: ref.bead_id,
+      reason: `MR bead ${mr.status} — cleanup`,
     });
   }
 

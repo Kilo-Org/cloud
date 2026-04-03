@@ -258,6 +258,9 @@ export const TownConfigSchema = z.object({
       gates: z.array(z.string()).default([]),
       auto_merge: z.boolean().default(true),
       require_clean_merge: z.boolean().default(true),
+      /** When enabled, the refinery agent reviews PRs and adds GitHub review
+       *  comments. Disable if you use an external code-review bot. */
+      code_review: z.boolean().default(true),
       /** When enabled, a polecat is automatically dispatched to address
        *  unresolved review comments and failing CI checks on open PRs. */
       auto_resolve_pr_feedback: z.boolean().default(false),
@@ -340,6 +343,7 @@ export const TownConfigUpdateSchema = z.object({
       gates: z.array(z.string()).optional(),
       auto_merge: z.boolean().optional(),
       require_clean_merge: z.boolean().optional(),
+      code_review: z.boolean().optional(),
       auto_resolve_pr_feedback: z.boolean().optional(),
       auto_merge_delay_minutes: z.number().int().min(0).nullable().optional(),
     })

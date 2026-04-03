@@ -68,4 +68,40 @@ describe('buildPolecatSystemPrompt', () => {
     const prompt = buildPolecatSystemPrompt({ ...params, gates: [] });
     expect(prompt).not.toContain('## Pre-Submission Gates');
   });
+
+  it('should forbid PR creation when mergeStrategy is not set', () => {
+    const prompt = buildPolecatSystemPrompt(params);
+    expect(prompt).toContain('Do NOT create pull requests');
+    expect(prompt).toContain('Do NOT pass a `pr_url` to `gt_done`');
+    expect(prompt).not.toContain('## Pull Request Creation');
+  });
+
+  it('should forbid PR creation when mergeStrategy is direct', () => {
+    const prompt = buildPolecatSystemPrompt({ ...params, mergeStrategy: 'direct' });
+    expect(prompt).toContain('Do NOT create pull requests');
+    expect(prompt).not.toContain('## Pull Request Creation');
+  });
+
+  it('should include PR creation instructions when mergeStrategy is pr', () => {
+    const prompt = buildPolecatSystemPrompt({
+      ...params,
+      mergeStrategy: 'pr',
+      targetBranch: 'main',
+    });
+    expect(prompt).toContain('## Pull Request Creation');
+    expect(prompt).toContain('gh pr create');
+    expect(prompt).toContain('--base main');
+    expect(prompt).toContain('pr_url');
+    expect(prompt).not.toContain('Do NOT create pull requests');
+    expect(prompt).not.toContain('Do NOT pass a `pr_url` to `gt_done`');
+  });
+
+  it('should use the provided targetBranch in PR creation instructions', () => {
+    const prompt = buildPolecatSystemPrompt({
+      ...params,
+      mergeStrategy: 'pr',
+      targetBranch: 'develop',
+    });
+    expect(prompt).toContain('--base develop');
+  });
 });

@@ -32,6 +32,7 @@ import * as events from './town/events';
 import * as reconciler from './town/reconciler';
 import { applyAction } from './town/actions';
 import type { Action, ApplyActionContext, PRFeedbackCheckResult } from './town/actions';
+import { buildPolecatSystemPrompt } from '../prompts/polecat-system.prompt';
 import { buildRefinerySystemPrompt } from '../prompts/refinery-system.prompt';
 import { GitHubPRStatusSchema, GitLabMRStatusSchema } from '../util/platform-pr.util';
 
@@ -278,11 +279,17 @@ export class TownDO extends DurableObject<Env> {
         const bead = beadOps.getBead(this.sql, beadId);
         if (!agent || !bead) return false;
 
-        // Build refinery-specific system prompt with branch/target info
         let systemPromptOverride: string | undefined;
+        const townConfig = await this.getTownConfig();
+
+        // Build refinery-specific system prompt with branch/target info.
+        // When the MR bead already has a pr_url (polecat created the PR),
+        // the refinery reviews the existing PR and adds GitHub comments
+        // instead of creating a new PR.
         if (agent.role === 'refinery' && bead.type === 'merge_request') {
           const reviewMeta = reviewQueue.getReviewMetadata(this.sql, beadId);
-          const townConfig = await this.getTownConfig();
+          const existingPrUrl =
+            typeof reviewMeta?.pr_url === 'string' ? reviewMeta.pr_url : undefined;
           systemPromptOverride = buildRefinerySystemPrompt({
             identity: agent.identity,
             rigId,
@@ -295,7 +302,33 @@ export class TownDO extends DurableObject<Env> {
                 ? bead.metadata.source_agent_id
                 : 'unknown',
             mergeStrategy: townConfig.merge_strategy ?? 'direct',
+            existingPrUrl,
           });
+        }
+
+        // When merge_strategy is 'pr', polecats create the PR themselves.
+        // Exception: review-then-land convoy intermediate beads merge directly
+        // into the convoy feature branch (the refinery handles that).
+        if (agent.role === 'polecat' && townConfig.merge_strategy === 'pr') {
+          const convoyId = beadOps.getConvoyForBead(this.sql, beadId);
+          const convoyMergeMode = convoyId
+            ? beadOps.getConvoyMergeMode(this.sql, convoyId)
+            : null;
+          const isReviewThenLandIntermediate =
+            convoyMergeMode === 'review-then-land' && convoyId !== beadId;
+
+          if (!isReviewThenLandIntermediate) {
+            const rig = rigs.getRig(this.sql, rigId);
+            systemPromptOverride = buildPolecatSystemPrompt({
+              agentName: agent.name,
+              rigId,
+              townId: this.townId,
+              identity: agent.identity,
+              gates: townConfig.refinery?.gates ?? [],
+              mergeStrategy: 'pr',
+              targetBranch: rig?.default_branch ?? 'main',
+            });
+          }
         }
 
         return scheduling.dispatchAgent(schedulingCtx, agent, bead, {
@@ -3470,7 +3503,11 @@ export class TownDO extends DurableObject<Env> {
     // Phase 1: Reconcile — compute desired state vs actual state
     const sideEffects: Array<() => Promise<void>> = [];
     try {
-      const actions = reconciler.reconcile(this.sql, { draining: this._draining });
+      const townConfig = await this.getTownConfig();
+      const actions = reconciler.reconcile(this.sql, {
+        draining: this._draining,
+        refineryCodeReview: townConfig.refinery?.code_review ?? true,
+      });
       metrics.actionsEmitted = actions.length;
       for (const a of actions) {
         metrics.actionsByType[a.type] = (metrics.actionsByType[a.type] ?? 0) + 1;
@@ -4173,16 +4210,17 @@ export class TownDO extends DurableObject<Env> {
               r =>
                 r.status === 'completed' && r.conclusion !== 'success' && r.conclusion !== 'skipped'
             );
-            // All checks pass = at least one check, all returned runs completed
-            // successfully, and no unpaginated runs exist
+            // All checks pass when:
+            // - No check-runs exist (repo has no CI — nothing to fail), OR
+            // - All returned runs completed successfully and no unpaginated runs exist
             allChecksPass =
-              runs.length > 0 &&
-              !hasMorePages &&
-              runs.every(
-                r =>
-                  r.status === 'completed' &&
-                  (r.conclusion === 'success' || r.conclusion === 'skipped')
-              );
+              runs.length === 0 ||
+              (!hasMorePages &&
+                runs.every(
+                  r =>
+                    r.status === 'completed' &&
+                    (r.conclusion === 'success' || r.conclusion === 'skipped')
+                ));
           }
         }
       }
@@ -4641,7 +4679,10 @@ export class TownDO extends DurableObject<Env> {
       }
 
       // Run reconciler against the resulting state
-      const actions = reconciler.reconcile(this.sql);
+      const tc = await this.getTownConfig();
+      const actions = reconciler.reconcile(this.sql, {
+        refineryCodeReview: tc.refinery?.code_review ?? true,
+      });
 
       // Capture a state snapshot before rollback
       const agentSnapshot = [
@@ -4720,7 +4761,10 @@ export class TownDO extends DurableObject<Env> {
       }
 
       // Phase 1: Reconcile against now-current state
-      const actions = reconciler.reconcile(this.sql);
+      const tc2 = await this.getTownConfig();
+      const actions = reconciler.reconcile(this.sql, {
+        refineryCodeReview: tc2.refinery?.code_review ?? true,
+      });
       const pendingEventCount = events.pendingEventCount(this.sql);
       const actionsByType: Record<string, number> = {};
       for (const a of actions) {

@@ -3,8 +3,19 @@ import { TownConfigSchema } from '../../types';
 import { _parsePrUrl as parsePrUrl } from './actions';
 import { TownEventType } from '../../db/tables/town-events.table';
 import { ReviewMetadataRecord } from '../../db/tables/review-metadata.table';
+import { buildRefinerySystemPrompt } from '../../prompts/refinery-system.prompt';
 
 describe('TownConfigSchema refinery extensions', () => {
+  it('defaults code_review to true', () => {
+    const config = TownConfigSchema.parse({ refinery: {} });
+    expect(config.refinery?.code_review).toBe(true);
+  });
+
+  it('accepts code_review = false', () => {
+    const config = TownConfigSchema.parse({ refinery: { code_review: false } });
+    expect(config.refinery?.code_review).toBe(false);
+  });
+
   it('defaults auto_resolve_pr_feedback to false', () => {
     const config = TownConfigSchema.parse({});
     expect(config.refinery).toBeUndefined();
@@ -160,5 +171,47 @@ describe('config deep merge for refinery extensions', () => {
     expect(merged.auto_resolve_pr_feedback).toBe(true);
     expect(merged.auto_merge_delay_minutes).toBe(15);
     expect(merged.gates).toEqual(['npm run test:all']);
+  });
+});
+
+describe('buildRefinerySystemPrompt with existingPrUrl', () => {
+  const baseParams = {
+    identity: 'refinery-alpha',
+    rigId: 'rig-1',
+    townId: 'town-1',
+    gates: ['pnpm test'],
+    branch: 'gt/toast/abc123',
+    targetBranch: 'main',
+    polecatAgentId: 'polecat-1',
+    mergeStrategy: 'pr' as const,
+  };
+
+  it('produces standard PR-creation prompt when no existingPrUrl', () => {
+    const prompt = buildRefinerySystemPrompt(baseParams);
+    expect(prompt).toContain('gh pr create');
+    expect(prompt).toContain('create a pull request');
+    expect(prompt).not.toContain('Pull Request:');
+  });
+
+  it('produces PR-review prompt when existingPrUrl is set', () => {
+    const prompt = buildRefinerySystemPrompt({
+      ...baseParams,
+      existingPrUrl: 'https://github.com/org/repo/pull/42',
+    });
+    expect(prompt).toContain('https://github.com/org/repo/pull/42');
+    expect(prompt).toContain('gh pr review');
+    expect(prompt).toContain('gh pr diff');
+    expect(prompt).toContain('Do NOT merge the PR');
+    expect(prompt).not.toContain('gh pr create');
+  });
+
+  it('includes gates in PR-review prompt', () => {
+    const prompt = buildRefinerySystemPrompt({
+      ...baseParams,
+      gates: ['pnpm test', 'pnpm lint'],
+      existingPrUrl: 'https://github.com/org/repo/pull/42',
+    });
+    expect(prompt).toContain('pnpm test');
+    expect(prompt).toContain('pnpm lint');
   });
 });

@@ -267,6 +267,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
   const [maxPolecats, setMaxPolecats] = useState<number | undefined>(undefined);
   const [refineryGates, setRefineryGates] = useState<string[]>([]);
   const [autoMerge, setAutoMerge] = useState(true);
+  const [refineryCodeReview, setRefineryCodeReview] = useState(true);
   const [autoResolvePrFeedback, setAutoResolvePrFeedback] = useState(false);
   const [autoMergeDelayMinutes, setAutoMergeDelayMinutes] = useState<number | null>(null);
   const [mergeStrategy, setMergeStrategy] = useState<'direct' | 'pr'>('direct');
@@ -294,6 +295,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
     setMaxPolecats(cfg.max_polecats_per_rig);
     setRefineryGates(cfg.refinery?.gates ?? []);
     setAutoMerge(cfg.refinery?.auto_merge ?? true);
+    setRefineryCodeReview(cfg.refinery?.code_review ?? true);
     setAutoResolvePrFeedback(cfg.refinery?.auto_resolve_pr_feedback ?? false);
     setAutoMergeDelayMinutes(cfg.refinery?.auto_merge_delay_minutes ?? null);
     setMergeStrategy(cfg.merge_strategy === 'pr' ? 'pr' : 'direct');
@@ -349,6 +351,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
         refinery: {
           gates: refineryGates.filter(g => g.trim()),
           auto_merge: autoMerge,
+          code_review: refineryCodeReview,
           require_clean_merge: true,
           auto_resolve_pr_feedback: autoResolvePrFeedback,
           auto_merge_delay_minutes: autoMergeDelayMinutes,
@@ -814,6 +817,20 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                     <Label className="text-sm text-white/70">Auto-merge</Label>
                     <p className="text-[11px] text-white/30">
                       Automatically merge when all gates pass.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                  <Switch
+                    checked={refineryCodeReview}
+                    onCheckedChange={setRefineryCodeReview}
+                  />
+                  <div>
+                    <Label className="text-sm text-white/70">Refinery code review</Label>
+                    <p className="text-[11px] text-white/30">
+                      The refinery agent reviews PRs and adds GitHub review comments. Disable if
+                      you already use an external code-review bot.
                     </p>
                   </div>
                 </div>

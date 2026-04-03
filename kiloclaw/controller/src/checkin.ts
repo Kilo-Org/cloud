@@ -113,8 +113,12 @@ export function parseDfOutput(raw: string): DiskStats {
 export async function readDiskStats(): Promise<DiskStats> {
   try {
     const { stdout } = await execFileAsync('df', ['-B1', '--output=avail,size', '/']);
-    return parseDfOutput(stdout);
-  } catch {
+    const result = parseDfOutput(stdout);
+    console.log('[vol-usage] readDiskStats raw stdout:', JSON.stringify(stdout));
+    console.log('[vol-usage] readDiskStats parsed:', JSON.stringify(result));
+    return result;
+  } catch (err) {
+    console.error('[vol-usage] readDiskStats error:', err);
     return null;
   }
 }
@@ -166,6 +170,7 @@ export function startCheckin(deps: CheckinDeps): () => void {
       const stats = deps.getSupervisorStats();
       const openclawVersion = await deps.getOpenclawVersion();
       const [currentNetStats, diskStats] = await Promise.all([readNetStats(), readDiskStats()]);
+      console.log('[vol-usage] checkin disk payload:', JSON.stringify({ diskUsedBytes: diskStats?.usedBytes ?? null, diskTotalBytes: diskStats?.totalBytes ?? null }));
 
       const restartsSinceLastCheckin = Math.max(0, stats.restarts - previousRestarts);
       const bandwidthBytesIn = Math.max(0, currentNetStats.bytesIn - previousNetStats.bytesIn);

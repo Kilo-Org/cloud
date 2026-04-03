@@ -198,12 +198,17 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
   }
 
   // Persist disk stats from the checkin payload into the DO (best-effort).
+  console.log('[vol-usage] checkin received disk stats:', JSON.stringify({ sandboxId: data.sandboxId, diskUsedBytes: data.diskUsedBytes ?? null, diskTotalBytes: data.diskTotalBytes ?? null }));
   if (data.diskUsedBytes != null && data.diskTotalBytes != null) {
     try {
+      console.log('[vol-usage] calling recordDiskStats on DO:', JSON.stringify({ usedBytes: data.diskUsedBytes, totalBytes: data.diskTotalBytes }));
       await stub.recordDiskStats(data.diskUsedBytes, data.diskTotalBytes);
+      console.log('[vol-usage] recordDiskStats completed');
     } catch (err) {
       console.error('[controller] recordDiskStats failed (non-fatal):', err);
     }
+  } else {
+    console.warn('[vol-usage] disk stats missing from checkin payload — skipping recordDiskStats');
   }
 
   // Instance readiness detection: when load drops below threshold, send a

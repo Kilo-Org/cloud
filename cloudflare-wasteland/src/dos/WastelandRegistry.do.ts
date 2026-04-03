@@ -144,11 +144,7 @@ export class WastelandRegistryDO extends DurableObject<Env> {
   async countAll(): Promise<number> {
     await this.ensureInitialized();
     const rows = [
-      ...query(
-        this.sql,
-        /* sql */ `SELECT COUNT(*) AS cnt FROM ${wasteland_registry}`,
-        []
-      ),
+      ...query(this.sql, /* sql */ `SELECT COUNT(*) AS cnt FROM ${wasteland_registry}`, []),
     ];
     return CountResult.parse(rows[0]).cnt;
   }

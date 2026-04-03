@@ -47,7 +47,6 @@ export type UpdateWastelandConfigInput = {
   status?: 'active' | 'deleted';
 };
 
-
 /** Shape for a wanted board item returned from the DoltHub-backed cache. */
 export type WantedItemResult = {
   item_id: string;
@@ -189,9 +188,7 @@ export class WastelandDO extends DurableObject<Env> {
 
   async getConfig(): Promise<WastelandConfigResult | null> {
     await this.ensureInitialized();
-    const rows = [
-      ...query(this.sql, /* sql */ `SELECT * FROM ${wasteland_config} LIMIT 1`, []),
-    ];
+    const rows = [...query(this.sql, /* sql */ `SELECT * FROM ${wasteland_config} LIMIT 1`, [])];
     if (rows.length === 0) return null;
     return WastelandConfigRecord.parse(rows[0]);
   }
@@ -221,9 +218,7 @@ export class WastelandDO extends DurableObject<Env> {
       ]
     );
 
-    const rows = [
-      ...query(this.sql, /* sql */ `SELECT * FROM ${wasteland_config} LIMIT 1`, []),
-    ];
+    const rows = [...query(this.sql, /* sql */ `SELECT * FROM ${wasteland_config} LIMIT 1`, [])];
     return WastelandConfigRecord.parse(rows[0]);
   }
 

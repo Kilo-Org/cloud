@@ -10,7 +10,6 @@ import {
 const CountResult = z.object({ cnt: z.coerce.number() });
 
 const LOG = '[WastelandRegistry.do]';
-const CountResult = z.object({ cnt: z.coerce.number() });
 
 /**
  * WastelandRegistryDO — singleton registry that indexes wasteland ownership.

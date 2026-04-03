@@ -142,7 +142,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   const SIDEBAR_WIDTH = 40;
 
   // --- Start capture services first (tunnel, stripe) and wait for output ---
-  const captureServiceSet = new Set(['kiloclaw-tunnel', 'kiloclaw-stripe', 'app-builder-tunnel']);
+  const captureServiceSet = new Set(['kiloclaw-tunnel', 'kiloclaw-worker-tunnel', 'kiloclaw-stripe', 'app-builder-tunnel']);
   const captureServices = serviceNames.filter(n => captureServiceSet.has(n));
   const otherServices = serviceNames.filter(n => !captureServiceSet.has(n));
 

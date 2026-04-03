@@ -149,16 +149,15 @@ export const wastelandRouter = router({
     )
     .output(z.array(RpcWastelandOutput))
     .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        verifyOrgAccess(ctx, input.organizationId);
+      }
+
       const registryStub = getWastelandRegistryStub(ctx.env);
 
       const entries = input.organizationId
         ? await registryStub.listByOrg(input.organizationId)
         : await registryStub.listByUser(ctx.userId);
-
-      // If listing org wastelands, verify the user has org membership
-      if (input.organizationId) {
-        verifyOrgAccess(ctx, input.organizationId);
-      }
 
       // Resolve each wasteland's full config from its DO
       const results = await Promise.all(
@@ -484,8 +483,7 @@ export const wastelandRouter = router({
     .input(z.object({ wastelandId: z.string().uuid() }))
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      // Users can only delete their own credentials — no ownership
-      // check needed beyond auth (userId comes from the JWT).
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
       await stub.deleteCredential(ctx.userId);
 

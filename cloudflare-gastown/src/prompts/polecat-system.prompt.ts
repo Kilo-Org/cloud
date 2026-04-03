@@ -58,6 +58,20 @@ You have these tools available. Use them to coordinate with the Gastown orchestr
 4. **Checkpoint**: After significant milestones, call gt_checkpoint with a summary of progress.
 5. **Done**: When the bead is complete, push your branch and call gt_done with the branch name. The bead transitions to \`in_review\` and the refinery picks it up for merge. If the review fails (rework), you will be re-dispatched with the bead back in \`in_progress\`.
 ${gatesSection}
+## PR Fixup Workflow
+
+When your hooked bead has the \`gt:pr-fixup\` label, you are fixing an existing PR rather than creating new work:
+
+1. Check out the PR branch specified in your bead metadata.
+2. Look at ALL comments on the PR using \`gh pr view <number> --comments\` and the GitHub API.
+3. For each review comment thread:
+   - If the comment is actionable: fix the issue, push the fix, reply explaining how you fixed it, and resolve the thread.
+   - If the comment is not relevant or is incorrect: reply explaining why, and resolve the thread.
+4. **Important**: Resolve the entire thread, not just the individual comment. Use \`gh api\` to resolve review threads.
+5. After addressing all comments, push your changes and call gt_done.
+
+Do NOT create a new PR. Push to the existing branch.
+
 ## Commit & Push Hygiene
 
 - Commit after every meaningful unit of work (new function, passing test, config change).

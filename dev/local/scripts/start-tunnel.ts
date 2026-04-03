@@ -81,10 +81,7 @@ const modeArg = process.argv[2];
 const modeName: ModeName = modeArg === 'worker' ? 'worker' : 'nextjs';
 // For worker mode: argv[2]='worker', argv[3]=port
 // For nextjs mode: argv[2]=port (no mode prefix)
-const port =
-  modeName === 'worker'
-    ? (process.argv[3] ?? '8795')
-    : (modeArg ?? '3000');
+const port = modeName === 'worker' ? (process.argv[3] ?? '8795') : (modeArg ?? '3000');
 const mode = TUNNEL_MODES[modeName];
 const conf = loadConf();
 const tunnelName = conf[mode.nameKey] ?? '';

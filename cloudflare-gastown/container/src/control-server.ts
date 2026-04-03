@@ -126,11 +126,17 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-// Log method, path, status, and duration for every request
+/** Paths polled too frequently to log on every request. */
+const QUIET_PATHS = new Set(['/health']);
+
+// Log method, path, status, and duration for every request (except noisy health polls)
 app.use('*', async (c, next) => {
+  const path = c.req.path;
+  if (QUIET_PATHS.has(path)) {
+    return next();
+  }
   const start = performance.now();
   const method = c.req.method;
-  const path = c.req.path;
   console.log(`[control-server] --> ${method} ${path}`);
   await next();
   const duration = (performance.now() - start).toFixed(1);

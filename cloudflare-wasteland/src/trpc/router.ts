@@ -130,6 +130,16 @@ export const wastelandRouter = router({
         name: input.name,
       });
 
+      // Inject WL_UPSTREAM into the container so it can auto-join on cold start
+      if (input.dolthubUpstream) {
+        const container = getWastelandContainerStub(ctx.env, wastelandId);
+        await container.setEnvVar('WL_UPSTREAM', input.dolthubUpstream);
+      }
+
+      // Arm the WastelandDO alarm for periodic health monitoring
+      const wastelandStub = getWastelandDOStub(ctx.env, wastelandId);
+      await wastelandStub.armAlarm();
+
       meterEvent(ctx.env, {
         event: 'billing.wasteland_created',
         userId: ctx.userId,
@@ -388,6 +398,16 @@ export const wastelandRouter = router({
         ...(input.dolthubUpstream !== undefined ? { dolthub_upstream: input.dolthubUpstream } : {}),
       });
 
+      // Sync WL_UPSTREAM to the container when upstream changes
+      if (input.dolthubUpstream !== undefined) {
+        const container = getWastelandContainerStub(ctx.env, input.wastelandId);
+        if (input.dolthubUpstream) {
+          await container.setEnvVar('WL_UPSTREAM', input.dolthubUpstream);
+        } else {
+          await container.deleteEnvVar('WL_UPSTREAM');
+        }
+      }
+
       meterEvent(ctx.env, {
         event: 'billing.api_operation',
         userId: ctx.userId,
@@ -433,12 +453,15 @@ export const wastelandRouter = router({
         input.rigHandle
       );
 
-      // If the caller is the wasteland owner, inject the token into
-      // the container so it's available in the OS environment.
+      // If the caller is the wasteland owner, inject the token and upstream
+      // into the container so they're available in the OS environment.
       const config = await stub.getConfig();
       if (config && config.owner_user_id === ctx.userId) {
         const container = getWastelandContainerStub(ctx.env, input.wastelandId);
         await container.setEnvVar('DOLTHUB_TOKEN', input.dolthubToken);
+        if (config.dolthub_upstream) {
+          await container.setEnvVar('WL_UPSTREAM', config.dolthub_upstream);
+        }
       }
 
       meterEvent(ctx.env, {

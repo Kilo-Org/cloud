@@ -183,6 +183,15 @@ const startTime = Date.now();
 let lastOperationTimestamp: string | null = null;
 let cachedWlVersion: string | null = null;
 
+/** Whether the server has finished startup initialization (auto-join if needed). */
+let isReady = false;
+/** Whether this boot required a cold-start recovery (auto re-join). */
+let isColdStartRecovery = false;
+/** Cached result of wl configuration check — set once during autoJoinOnStartup. */
+let wlConfigured = false;
+/** Error message if the auto-join attempt failed. */
+let joinError: string | null = null;
+
 async function getWlVersion(): Promise<string> {
   if (cachedWlVersion) return cachedWlVersion;
   try {
@@ -196,6 +205,56 @@ async function getWlVersion(): Promise<string> {
 
 function uptimeSeconds(): number {
   return Math.floor((Date.now() - startTime) / 1000);
+}
+
+// ---------------------------------------------------------------------------
+// Cold-start auto-join
+// ---------------------------------------------------------------------------
+
+/** Check whether the wl CLI has local state configured by running `wl config show`. */
+async function isWlConfiguredCheck(): Promise<boolean> {
+  try {
+    const result = await execWl(['config', 'show'], {});
+    return result.exitCode === 0 && result.stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * On startup, check if wl is configured. If not and WL_UPSTREAM is set,
+ * auto-run `wl join` to recover from a container eviction.
+ */
+async function autoJoinOnStartup(): Promise<void> {
+  const configured = await isWlConfiguredCheck();
+  wlConfigured = configured;
+
+  if (configured) {
+    log.info('auto-join: wl CLI already configured — skipping join');
+    isReady = true;
+    return;
+  }
+
+  const upstream = process.env.WL_UPSTREAM;
+  if (!upstream) {
+    log.warn('auto-join: wl not configured and WL_UPSTREAM not set — server will accept requests but wl commands may fail');
+    isReady = true;
+    return;
+  }
+
+  log.info('auto-join: cold start detected — running wl join', { upstream });
+  isColdStartRecovery = true;
+
+  const result = await execWl(['join', upstream], { WL_UPSTREAM: upstream });
+  if (result.exitCode !== 0) {
+    joinError = result.stderr.trim() || `exit code ${result.exitCode}`;
+    log.error('auto-join: wl join failed', { upstream, exitCode: result.exitCode, stderr: result.stderr });
+  } else {
+    wlConfigured = true;
+    log.info('auto-join: wl join succeeded — cold start recovery complete', { upstream });
+  }
+
+  isReady = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -521,9 +580,13 @@ async function handleStatus(req: Request): Promise<Response> {
 async function handleHealth(): Promise<Response> {
   const wlVersion = await getWlVersion();
   return jsonResponse({
-    status: 'ok',
+    status: isReady ? 'ok' : 'initializing',
     wl_version: wlVersion,
-    uptime: uptimeSeconds(),
+    wl_configured: wlConfigured,
+    last_operation: lastOperationTimestamp,
+    uptime_seconds: uptimeSeconds(),
+    cold_start_recovery: isColdStartRecovery,
+    join_error: joinError,
   });
 }
 
@@ -569,6 +632,20 @@ const server = Bun.serve({
       return errorResponse('Not found', 404);
     }
 
+    // Allow health checks through even before ready — they report initialization status
+    if (!isReady && url.pathname !== '/health') {
+      return new Response(
+        JSON.stringify({ error: 'Server initializing — cold start recovery in progress' }),
+        {
+          status: 503,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': '5',
+          },
+        }
+      );
+    }
+
     try {
       return await handler(req);
     } catch (err) {
@@ -583,6 +660,9 @@ const server = Bun.serve({
 });
 
 log.info('wasteland control server started', { port: server.port });
+
+// Run auto-join on startup — sets isReady when done
+void autoJoinOnStartup();
 
 // ---------------------------------------------------------------------------
 // Heartbeat — log status every 60 seconds

@@ -113,7 +113,7 @@ export function parseDfOutput(raw: string): DiskStats {
  */
 export async function readDiskStats(): Promise<DiskStats> {
   try {
-    const { stdout } = await execFileAsync('df', ['-B1', '--output=avail,size', '/']);
+    const { stdout } = await execFileAsync('df', ['-B1', '--output=avail,size', '/root']);
     return parseDfOutput(stdout);
   } catch {
     return null;

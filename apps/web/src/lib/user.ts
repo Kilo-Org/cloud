@@ -61,6 +61,7 @@ import {
    user_push_tokens,
    contributor_champion_events,
    contributor_champion_memberships,
+   contributor_champion_contributors,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, sql } from 'drizzle-orm';
 import { allow_fake_login } from './constants';
@@ -731,6 +732,11 @@ export async function softDeleteUser(userId: string) {
       .update(contributor_champion_memberships)
       .set({ linked_kilo_user_id: null })
       .where(eq(contributor_champion_memberships.linked_kilo_user_id, userId));
+    // Clear manual_email for manually-enrolled contributors linked to this user
+    await tx
+      .update(contributor_champion_contributors)
+      .set({ manual_email: null })
+      .where(eq(contributor_champion_contributors.manual_email, originalEmail));
 
     // ── 4. Nullify FK references ─────────────────────────────────────────
     await tx

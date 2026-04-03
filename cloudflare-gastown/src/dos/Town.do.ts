@@ -3317,12 +3317,11 @@ export class TownDO extends DurableObject<Env> {
         });
       }
 
-      // Refresh the container-scoped JWT before any work that might
-      // trigger API calls. Throttled to once per hour (tokens have 8h
-      // expiry, so hourly refresh provides ample safety margin).
-      // Gated on hasRigs (not hasActiveWork) because the container may
-      // still be running with an idle mayor accepting user messages,
-      // even when there are no active beads or agents.
+      // Refresh the container-scoped JWT. Throttled to once per hour (tokens
+      // have 8h expiry). Skips when no active work AND no alive mayor — the
+      // container is sleeping and the token will be refreshed at dispatch time.
+      // Keeps refreshing for waiting mayors since sendMayorMessage reuses the
+      // container without calling ensureContainerToken.
       try {
         await this.refreshContainerToken();
       } catch (err) {
@@ -3647,6 +3646,19 @@ export class TownDO extends DurableObject<Env> {
    * requests that reset the container's sleepAfter timer (#1409).
    */
   private async refreshContainerToken(): Promise<void> {
+    // Skip if no active work AND no alive mayor — the container is sleeping
+    // and doesn't need a fresh token. The token will be refreshed when work
+    // is next dispatched (ensureContainerToken is called in
+    // startAgentInContainer at container-dispatch.ts:329).
+    // However, a waiting mayor IS alive in the container and needs a valid
+    // token for GT tool calls when the user sends the next message
+    // (sendMayorMessage → sendMessageToAgent does NOT call ensureContainerToken).
+    const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
+    const mayorAlive =
+      mayor &&
+      (mayor.status === 'working' || mayor.status === 'stalled' || mayor.status === 'waiting');
+    if (!this.hasActiveWork() && !mayorAlive) return;
+
     const TOKEN_REFRESH_INTERVAL_MS = 60 * 60_000; // 1 hour
     const now = Date.now();
     const lastRefresh = (await this.ctx.storage.get<number>('container:lastTokenRefreshAt')) ?? 0;

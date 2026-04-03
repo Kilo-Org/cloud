@@ -1,18 +1,62 @@
 FROM oven/bun:1-slim
 
-# Install git, gh CLI, and Node.js (required by @kilocode/cli which uses #!/usr/bin/env node)
+# Install dev toolchain, search tools, build deps, gh CLI, and Node.js
+# Package categories:
+#   version control: git, git-lfs
+#   network/download: curl, wget, ca-certificates, gnupg, unzip
+#   build toolchain: build-essential, autoconf
+#   search tools: ripgrep, jq
+#   compression: bzip2, zstd
+#   SSL/crypto: libssl-dev, libffi-dev
+#   database client libs: libdb-dev, libgdbm-dev, libgdbm6
+#   Python build deps: libbz2-dev, liblzma-dev, libncurses5-dev, libreadline-dev, zlib1g-dev
+#   Ruby build deps: libyaml-dev
+#   image processing: libvips-dev
+#   browser/rendering: libgbm1
+#   C++ stdlib: libc++1
+#   math: libgmp-dev
+#   timezone data: tzdata
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends git git-lfs curl ca-certificates && \
-    curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
-    apt-get install -y --no-install-recommends nodejs && \
-    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-      -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-      > /etc/apt/sources.list.d/github-cli.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends gh && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends \
+      git \
+      git-lfs \
+      curl \
+      wget \
+      ca-certificates \
+      gnupg \
+      unzip \
+      build-essential \
+      autoconf \
+      ripgrep \
+      jq \
+      bzip2 \
+      zstd \
+      libssl-dev \
+      libffi-dev \
+      libdb-dev \
+      libgdbm-dev \
+      libgdbm6 \
+      libbz2-dev \
+      liblzma-dev \
+      libncurses5-dev \
+      libreadline-dev \
+      zlib1g-dev \
+      libyaml-dev \
+      libvips-dev \
+      libgbm1 \
+      libc++1 \
+      libgmp-dev \
+      tzdata \
+    && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+         -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+         > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends gh \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN git lfs install --system
 

@@ -394,6 +394,7 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
         title: buildFeedbackBeadTitle(prNumber, repo, hasUnresolvedComments, hasFailingChecks),
         body: buildFeedbackPrompt(prNumber, repo, branch, hasUnresolvedComments, hasFailingChecks),
         rig_id: mrBead.rig_id ?? undefined,
+        parent_bead_id: mrBeadId,
         labels: ['gt:pr-feedback'],
         metadata: {
           pr_feedback_for: mrBeadId,

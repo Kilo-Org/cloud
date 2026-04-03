@@ -1753,6 +1753,7 @@ export class TownDO extends DurableObject<Env> {
       body: input.feedback,
       priority: sourceBead?.priority ?? 'medium',
       rig_id: mrBead.rig_id ?? undefined,
+      parent_bead_id: mrBead.bead_id,
       labels: ['gt:rework'],
       metadata: {
         rework_for: sourceBeadId,

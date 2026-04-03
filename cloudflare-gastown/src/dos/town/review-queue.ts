@@ -577,6 +577,17 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
     return;
   }
 
+  // PR-fixup beads skip the review queue. The polecat pushed fixup commits
+  // to an existing PR branch — no separate review is needed.
+  if (hookedBead?.labels.includes('gt:pr-fixup')) {
+    console.log(
+      `[review-queue] agentDone: pr-fixup bead ${agent.current_hook_bead_id} — closing directly (skip review)`
+    );
+    closeBead(sql, agent.current_hook_bead_id, agentId);
+    unhookBead(sql, agentId);
+    return;
+  }
+
   if (agent.role === 'refinery') {
     // The refinery handles merging (direct strategy) or PR creation (pr strategy)
     // itself. When it calls gt_done:

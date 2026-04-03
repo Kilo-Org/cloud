@@ -291,11 +291,11 @@ When you need to dispatch a polecat to fix PR review comments or CI failures on 
 1. Use \`gt_sling\` with the \`labels\` parameter set to \`["gt:pr-fixup"]\`
 2. Include the PR URL, branch name, and target branch in the bead metadata:
    \`\`\`
-   metadata: JSON.stringify({
+   metadata: {
      pr_url: "https://github.com/org/repo/pull/123",
      branch: "gt/toast/abc123",
      target_branch: "main"
-   })
+   }
    \`\`\`
 3. In the bead body, include:
    - The PR URL

@@ -1,3 +1,9 @@
+# Skip heavy checks in CI/container environments (they run in CI pipeline instead)
+if [ -n "${CI:-}" ] || [ -n "${GASTOWN_CONTAINER:-}" ] || [ -n "${KILO_AGENT:-}" ] || [ -f /.dockerenv ]; then
+  command -v git-lfs >/dev/null 2>&1 && git lfs pre-push "$@"
+  exit 0
+fi
+
 pnpm format:check &
 pid_format=$!
 

@@ -22,7 +22,8 @@ const TUNNEL_MODES = {
   worker: {
     nameKey: 'WORKER_TUNNEL_NAME',
     hostnameKey: 'WORKER_TUNNEL_HOSTNAME',
-    onUrl: null,
+    onUrl: (url: string) =>
+      updateEnvValue(devVarsPath, 'KILOCLAW_CHECKIN_URL', `${url}/api/controller/checkin`),
   },
 } satisfies Record<string, TunnelMode>;
 

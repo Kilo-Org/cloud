@@ -24,6 +24,27 @@ services:
       - redis_data:/data
     restart: unless-stopped
 
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    profiles: ['grafana']
+    environment:
+      TERM: linux
+      GF_PLUGINS_PREINSTALL: grafana-clock-panel,grafana-polystat-panel,vertamedia-clickhouse-datasource
+      CF_ACCOUNT_ID: ${CF_ACCOUNT_ID:-e115e769bcdd4c3d66af59d3332cb394}
+      CF_AE_TOKEN: ${CF_AE_TOKEN:-}
+      GRAFANA_CLICKHOUSE_SECURE: ${GRAFANA_CLICKHOUSE_SECURE:-true}
+      GRAFANA_CLICKHOUSE_SKIP_TLS_VERIFY: ${GRAFANA_CLICKHOUSE_SKIP_TLS_VERIFY:-false}
+    ports:
+      - '4000:3000'
+    volumes:
+      - grafana_storage:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+
 volumes:
   postgres_data:
   redis_data:
+  grafana_storage:

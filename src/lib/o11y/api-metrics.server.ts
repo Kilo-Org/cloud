@@ -58,7 +58,7 @@ export function getTokensFromCompletionUsage(
 }
 
 export function getToolsAvailable(request: GatewayRequest): string[] {
-  if (!request.body.tools) return [];
+  if (!Array.isArray(request.body.tools)) return [];
 
   if (request.kind === 'responses') {
     return request.body.tools.map((tool): string => {

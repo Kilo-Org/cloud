@@ -1019,6 +1019,7 @@ export function reconcileReviewQueue(
   opts?: { draining?: boolean; refineryCodeReview?: boolean }
 ): Action[] {
   const draining = opts?.draining ?? false;
+  const refineryCodeReview = opts?.refineryCodeReview ?? true;
   const actions: Action[] = [];
 
   // Town-level circuit breaker
@@ -1116,7 +1117,10 @@ export function reconcileReviewQueue(
 
     // Rule 4: PR-strategy MR beads orphaned (refinery dispatched then died, stale >30min)
     // Only in_progress — open beads are just waiting for the refinery to pop them.
+    // Skip when refinery code review is disabled: poll_pr keeps the bead alive via
+    // updated_at touches, and no refinery is expected to be working on it.
     if (
+      refineryCodeReview &&
       mr.status === 'in_progress' &&
       mr.pr_url &&
       staleMs(mr.updated_at, ORPHANED_PR_REVIEW_TIMEOUT_MS)
@@ -1139,8 +1143,6 @@ export function reconcileReviewQueue(
   // for MR beads that already have a pr_url (polecat created the PR).
   // Transition them straight to in_progress so poll_pr can handle auto-merge.
   // MR beads without a pr_url (direct merge strategy) still need the refinery.
-  const refineryCodeReview = opts?.refineryCodeReview ?? true;
-
   if (!refineryCodeReview) {
     const openMrsWithPr = z
       .object({ bead_id: z.string() })

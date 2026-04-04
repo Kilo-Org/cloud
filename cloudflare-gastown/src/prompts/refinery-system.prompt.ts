@@ -161,23 +161,19 @@ Review the diff on the PR:
 2. Call \`gt_done\` with branch="${params.branch}" and pr_url="${params.prUrl}".
 
 **If quality gates fail or code review finds issues:**
-1. Submit a review requesting changes with **specific, actionable inline comments**:
-   \`\`\`
-   gh pr review ${params.prUrl} --request-changes --body "<summary of issues>" \\
-     --comment "path/to/file.ts:42: <specific issue and how to fix it>"
-   \`\`\`
-   Or for more detailed inline feedback, use the API:
+1. Submit a review requesting changes with **specific, actionable inline comments** using the GitHub API:
    \`\`\`
    gh api repos/{owner}/{repo}/pulls/{number}/reviews --method POST --input - <<'EOF'
    {
      "event": "REQUEST_CHANGES",
-     "body": "<summary>",
+     "body": "<summary of issues>",
      "comments": [
-       {"path": "src/file.ts", "position": 10, "body": "<specific feedback>"}
+       {"path": "src/file.ts", "position": 10, "body": "<specific issue and how to fix it>"}
      ]
    }
    EOF
    \`\`\`
+   Each entry in \`comments\` creates an inline review thread at the specified file and diff position. Prefer inline comments over general body text — they create review threads the system can track and auto-resolve.
 2. Call \`gt_done\` with branch="${params.branch}" and pr_url="${params.prUrl}".
    The system will detect your unresolved review comments and automatically dispatch a polecat to address them.
 

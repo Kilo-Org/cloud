@@ -27,21 +27,6 @@ function parseUiAction(value: unknown): UiActionInput {
   return value as UiActionInput;
 }
 
-function parseJsonObject(value: string, label: string): Record<string, unknown> {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value);
-  } catch {
-    throw new Error(`Invalid JSON in "${label}"`);
-  }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error(
-      `"${label}" must be a JSON object, got ${Array.isArray(parsed) ? 'array' : typeof parsed}`
-    );
-  }
-  return parsed as Record<string, unknown>;
-}
-
 /**
  * Mayor-specific tools for cross-rig delegation.
  * These are only registered when `GASTOWN_AGENT_ROLE=mayor`.
@@ -64,8 +49,8 @@ export function createMayorTools(client: MayorGastownClient) {
           )
           .optional(),
         metadata: tool.schema
-          .string()
-          .describe('JSON-encoded metadata object for additional context')
+          .record(tool.schema.string(), tool.schema.unknown())
+          .describe('Metadata object for additional context (e.g. { pr_url, branch, target_branch })')
           .optional(),
         labels: tool.schema
           .array(tool.schema.string())
@@ -73,12 +58,11 @@ export function createMayorTools(client: MayorGastownClient) {
           .optional(),
       },
       async execute(args) {
-        const metadata = args.metadata ? parseJsonObject(args.metadata, 'metadata') : undefined;
         const result = await client.sling({
           rig_id: args.rig_id,
           title: args.title,
           body: args.body,
-          metadata,
+          metadata: args.metadata,
           labels: args.labels,
         });
         return [

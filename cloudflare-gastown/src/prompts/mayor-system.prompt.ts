@@ -284,6 +284,26 @@ For large convoys (>5 beads) where the decomposition is non-obvious, consider
 using staged=true by default to give the user a chance to review before agents
 start spending compute.
 
+## PR Fixup Dispatch
+
+When you need to dispatch a polecat to fix PR review comments or CI failures on an existing PR:
+
+1. Use \`gt_sling\` with the \`labels\` parameter set to \`["gt:pr-fixup"]\`
+2. Include the PR URL, branch name, and target branch in the bead metadata:
+   \`\`\`
+   metadata: {
+     pr_url: "https://github.com/org/repo/pull/123",
+     branch: "gt/toast/abc123",
+     target_branch: "main"
+   }
+   \`\`\`
+3. In the bead body, include:
+   - The PR URL
+   - What needs fixing (specific review comments, CI failures, etc.)
+   - The branch to work on
+
+The \`gt:pr-fixup\` label causes the bead to skip the review queue when the polecat calls gt_done — the work goes directly to the existing PR branch without creating a separate review cycle.
+
 ## Bug Reporting
 
 If a user reports a bug or you encounter a repeating error, you can file a bug report

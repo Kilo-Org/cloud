@@ -4896,6 +4896,29 @@ export class TownDO extends DurableObject<Env> {
     ];
   }
 
+  async debugGetBead(beadId: string): Promise<unknown> {
+    const bead = beadOps.getBead(this.sql, beadId);
+    if (!bead) return { error: 'bead not found' };
+
+    const reviewMeta = reviewQueue.getReviewMetadata(this.sql, beadId);
+    const deps = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${bead_dependencies.bead_id},
+                 ${bead_dependencies.depends_on_bead_id},
+                 ${bead_dependencies.dependency_type}
+          FROM ${bead_dependencies}
+          WHERE ${bead_dependencies.bead_id} = ?
+             OR ${bead_dependencies.depends_on_bead_id} = ?
+        `,
+        [beadId, beadId]
+      ),
+    ];
+
+    return { bead, reviewMetadata: reviewMeta ?? null, dependencies: deps };
+  }
+
   async debugAgentMetadata(): Promise<unknown[]> {
     return [
       ...query(

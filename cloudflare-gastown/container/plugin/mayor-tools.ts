@@ -50,7 +50,9 @@ export function createMayorTools(client: MayorGastownClient) {
           .optional(),
         metadata: tool.schema
           .record(tool.schema.string(), tool.schema.unknown())
-          .describe('Metadata object for additional context (e.g. { pr_url, branch, target_branch })')
+          .describe(
+            'Metadata object for additional context (e.g. { pr_url, branch, target_branch })'
+          )
           .optional(),
         labels: tool.schema
           .array(tool.schema.string())

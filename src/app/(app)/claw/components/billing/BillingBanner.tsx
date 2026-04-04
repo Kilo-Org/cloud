@@ -1,8 +1,7 @@
 'use client';
 
 import { AlertCircle, AlertTriangle, ArrowRightLeft, Clock, CreditCard } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { Banner } from '@/components/shared/Banner';
 import type { ClawBannerState, ClawBillingStatus } from './billing-types';
 import { deriveBannerState, formatBillingDate } from './billing-types';
 
@@ -17,42 +16,22 @@ type BillingBannerProps = {
   onUpdatePaymentClick: () => void;
 };
 
-function getBannerStyles(state: ClawBannerState) {
+type BannerColorValue = 'blue' | 'amber' | 'red';
+
+function getBannerColor(state: ClawBannerState): BannerColorValue | null {
   switch (state) {
     case 'trial_active':
-      return {
-        bg: 'bg-blue-500/10',
-        border: 'border-blue-500/30',
-        text: 'text-blue-400',
-        icon: 'text-blue-400',
-      };
     case 'subscription_converting':
-      return {
-        bg: 'bg-blue-500/10',
-        border: 'border-blue-500/30',
-        text: 'text-blue-400',
-        icon: 'text-blue-400',
-      };
+      return 'blue';
     case 'trial_ending_soon':
     case 'earlybird_ending_soon':
     case 'subscription_canceling':
-      return {
-        bg: 'bg-amber-500/10',
-        border: 'border-amber-500/30',
-        text: 'text-amber-400',
-        icon: 'text-amber-400',
-      };
+      return 'amber';
     case 'trial_ending_very_soon':
     case 'trial_expires_today':
     case 'subscription_past_due':
-      return {
-        bg: 'bg-red-500/10',
-        border: 'border-red-500/30',
-        text: 'text-red-400',
-        icon: 'text-red-400',
-      };
+      return 'red';
     case 'earlybird_active':
-      // No top banner for active earlybird — handled by SubscriptionCard
       return null;
     default:
       return null;
@@ -160,8 +139,8 @@ export function BillingBanner({
 
   if (state === 'subscribed' || state === 'none') return null;
 
-  const styles = getBannerStyles(state);
-  if (!styles) return null;
+  const color = getBannerColor(state);
+  if (!color) return null;
 
   const content = getBannerContent(state, billing);
   if (!content) return null;
@@ -183,28 +162,19 @@ export function BillingBanner({
   }
 
   return (
-    <div
-      className={cn(
-        'flex w-full items-center gap-4 rounded-xl border p-4',
-        styles.bg,
-        styles.border,
-        styles.text
-      )}
-    >
-      <div className={cn('flex shrink-0 items-center', styles.icon)}>
-        <Icon className="h-6 w-6" />
-      </div>
-
-      <div className="flex-1">
-        <div className="mb-0.5 text-sm font-bold">{content.title}</div>
-        <p className="text-muted-foreground text-sm">{content.message}</p>
-      </div>
-
+    <Banner color={color}>
+      <Banner.Icon>
+        <Icon />
+      </Banner.Icon>
+      <Banner.Content>
+        <Banner.Title>{content.title}</Banner.Title>
+        <Banner.Description>{content.message}</Banner.Description>
+      </Banner.Content>
       {content.cta && (
-        <Button onClick={handleCta} variant="primary" className="shrink-0">
-          {content.cta}
-        </Button>
+        <Banner.Action>
+          <Banner.Button onClick={handleCta}>{content.cta}</Banner.Button>
+        </Banner.Action>
       )}
-    </div>
+    </Banner>
   );
 }

@@ -1,8 +1,8 @@
 'use client';
 
-import { AlertTriangle, Info, type LucideIcon } from 'lucide-react';
-import { Button } from '@/components/Button';
+import { AlertTriangle, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Banner } from '@/components/shared/Banner';
 import { setReturnUrlAndRedirect } from './InsufficientBalanceBanner.actions';
 import { usePathname } from 'next/navigation';
 
@@ -10,36 +10,6 @@ import { usePathname } from 'next/navigation';
 export const MIN_BALANCE_DOLLARS_DEFAULT = 1;
 
 type ColorScheme = 'warning' | 'info';
-
-type ColorSchemeConfig = {
-  border: string;
-  bg: string;
-  text: string;
-  iconColor: string;
-  Icon: LucideIcon;
-  buttonVariant: 'warning' | 'secondary';
-  buttonClassName?: string;
-};
-
-const colorSchemes: Record<ColorScheme, ColorSchemeConfig> = {
-  warning: {
-    border: 'border-yellow-500/50',
-    bg: 'bg-yellow-500/10',
-    text: 'text-yellow-100',
-    iconColor: 'text-yellow-400',
-    Icon: AlertTriangle,
-    buttonVariant: 'warning',
-  },
-  info: {
-    border: 'border-blue-500/50',
-    bg: 'bg-blue-500/10',
-    text: 'text-blue-100',
-    iconColor: 'text-blue-400',
-    Icon: Info,
-    buttonVariant: 'secondary',
-    buttonClassName: 'border-blue-500/50 bg-blue-500/20 hover:bg-blue-500/30',
-  },
-};
 
 type ProductNameContent = {
   type: 'productName';
@@ -72,6 +42,11 @@ type InsufficientBalanceBannerProps = {
   content: ContentConfig;
 };
 
+const bannerColors: Record<ColorScheme, 'amber' | 'blue'> = {
+  warning: 'amber',
+  info: 'blue',
+};
+
 /**
  * Banner for balance-related messages. Can be used for insufficient balance warnings
  * or informational messages about limited access.
@@ -87,7 +62,6 @@ export function InsufficientBalanceBanner({
   const creditsUrl = organizationId ? `/organizations/${organizationId}` : '/credits';
 
   const handleAddCreditsClick = async () => {
-    // Set the return URL cookie before redirecting
     const redirectUrl = await setReturnUrlAndRedirect(pathname, creditsUrl);
     window.location.href = redirectUrl;
   };
@@ -100,10 +74,9 @@ export function InsufficientBalanceBanner({
   });
 
   const isCompact = variant === 'compact';
-  const scheme = colorSchemes[colorScheme];
-  const { Icon } = scheme;
+  const color = bannerColors[colorScheme];
+  const IconComponent = colorScheme === 'warning' ? AlertTriangle : Info;
 
-  // Derive display values based on content type
   const displayTitle = (() => {
     if (content.type === 'custom') {
       return content.title;
@@ -138,73 +111,39 @@ export function InsufficientBalanceBanner({
 
   if (isCompact) {
     return (
-      <div
-        className={cn(
-          'flex w-full flex-col gap-3 rounded-lg border p-3',
-          scheme.border,
-          scheme.bg,
-          scheme.text
-        )}
-      >
-        {/* Header row */}
+      <Banner color={color} className={cn('flex-col gap-3 rounded-lg p-3 sm:items-start')}>
         <div className="flex items-center gap-2">
-          <Icon className={cn('h-4 w-4 shrink-0', scheme.iconColor)} />
+          <IconComponent className="h-4 w-4 shrink-0" />
           <span className="text-sm font-bold">{displayTitle}</span>
           <span className="text-xs opacity-70">({formattedBalance})</span>
         </div>
-
-        {/* Action row */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex w-full items-center justify-between gap-2">
           <p className="text-xs opacity-80">{displayCompactActionText}</p>
-          <Button
-            variant={scheme.buttonVariant}
-            size="sm"
-            className={cn('shrink-0', scheme.buttonClassName)}
-            onClick={handleAddCreditsClick}
-          >
+          <Banner.Button onClick={handleAddCreditsClick} className="shrink-0 text-xs">
             Add Credits
-          </Button>
+          </Banner.Button>
         </div>
-      </div>
+      </Banner>
     );
   }
 
   return (
-    <div
-      className={cn(
-        'flex w-full items-center gap-4 rounded-lg border p-4',
-        scheme.border,
-        scheme.bg,
-        scheme.text
-      )}
-    >
-      {/* Icon */}
-      <div className={cn('flex shrink-0 items-center', scheme.iconColor)}>
-        <Icon className="h-6 w-6" />
-      </div>
-
-      {/* Content */}
-      <div className="flex-1">
-        <div className="mb-1 flex items-center gap-2 text-sm">
-          <span className="font-bold">{displayTitle}</span>
-          <span className="flex gap-1 opacity-70">
-            <span>•</span>
-            <span>
-              {balanceLabel}: {formattedBalance}
-            </span>
+    <Banner color={color} className="rounded-lg">
+      <Banner.Icon>
+        <IconComponent />
+      </Banner.Icon>
+      <Banner.Content>
+        <Banner.Title>
+          {displayTitle}
+          <span className="ml-2 opacity-70">
+            &bull; {balanceLabel}: {formattedBalance}
           </span>
-        </div>
-        {displayDescription && <p className="text-sm">{displayDescription}</p>}
-      </div>
-
-      {/* Add Credits button */}
-      <Button
-        variant={scheme.buttonVariant}
-        className={cn('shrink-0', scheme.buttonClassName)}
-        onClick={handleAddCreditsClick}
-      >
-        Add Credits
-      </Button>
-    </div>
+        </Banner.Title>
+        <Banner.Description>{displayDescription}</Banner.Description>
+      </Banner.Content>
+      <Banner.Action>
+        <Banner.Button onClick={handleAddCreditsClick}>Add Credits</Banner.Button>
+      </Banner.Action>
+    </Banner>
   );
 }

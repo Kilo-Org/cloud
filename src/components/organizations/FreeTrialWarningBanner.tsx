@@ -1,15 +1,14 @@
 'use client';
 
-import { Button } from '@/components/Button';
-import type { ButtonVariant } from '@/components/Button';
 import { AlertCircle, AlertTriangle, Clock } from 'lucide-react';
+import { Banner } from '@/components/shared/Banner';
 import { getOrgTrialStatusFromDays } from '@/lib/organizations/trial-utils';
 import type {
   OrgTrialStatus,
   OrganizationRole,
   OrganizationWithMembers,
 } from '@/lib/organizations/organization-types';
-import { capitalize, cn } from '@/lib/utils';
+import { capitalize } from '@/lib/utils';
 
 type FreeTrialWarningBannerProps = {
   organization: OrganizationWithMembers;
@@ -18,80 +17,46 @@ type FreeTrialWarningBannerProps = {
   onUpgradeClick: () => void;
 };
 
-function getStylesForState(state: OrgTrialStatus, planName: string) {
-  switch (state) {
-    case 'trial_active':
-      return {
-        bg: 'bg-blue-500/10',
-        border: 'border-blue-500/50',
-        text: 'text-blue-100',
-        icon: 'text-blue-400',
-        title: `Free Kilo ${planName} Trial Active`,
-      };
-    case 'trial_ending_soon':
-      return {
-        bg: 'bg-orange-500/10',
-        border: 'border-orange-500/50',
-        text: 'text-orange-100',
-        icon: 'text-orange-400',
-        title: `Free Kilo ${planName} Trial Ending Soon`,
-      };
-    case 'trial_ending_very_soon':
-      return {
-        bg: 'bg-red-500/10',
-        border: 'border-red-500/50',
-        text: 'text-red-100',
-        icon: 'text-red-400',
-        title: `Free Kilo ${planName} Trial Ending Very Soon`,
-      };
-    case 'trial_expires_today':
-      return {
-        bg: 'bg-red-600/20',
-        border: 'border-red-600',
-        text: 'text-red-100',
-        icon: 'text-red-400',
-        title: `Free Kilo ${planName} Trial Ends Today`,
-      };
-    case 'trial_expired_soft':
-    case 'trial_expired_hard':
-      return {
-        bg: 'bg-red-600/20',
-        border: 'border-red-600',
-        text: 'text-red-100',
-        icon: 'text-red-400',
-        title: `Free Kilo ${planName} Trial Has Ended`,
-      };
-    case 'subscribed':
-      return {
-        bg: 'bg-gray-500/10',
-        border: 'border-gray-500/50',
-        text: 'text-gray-100',
-        icon: 'text-gray-400',
-        title: 'Trial Status',
-      };
-  }
-}
+type BannerColorValue = 'blue' | 'amber' | 'red';
 
-function getIconForState(state: OrgTrialStatus, className?: string) {
-  const Icon =
-    state === 'trial_active' ? Clock : state === 'trial_ending_soon' ? AlertCircle : AlertTriangle;
-  return <Icon className={className} />;
-}
-
-function getButtonVariantForState(state: OrgTrialStatus): ButtonVariant {
+function getBannerColor(state: OrgTrialStatus): BannerColorValue {
   switch (state) {
     case 'trial_active':
       return 'blue';
     case 'trial_ending_soon':
-      return 'warning';
+      return 'amber';
     case 'trial_ending_very_soon':
     case 'trial_expires_today':
     case 'trial_expired_soft':
     case 'trial_expired_hard':
-      return 'danger';
+      return 'red';
     case 'subscribed':
-      return 'primary';
+      return 'blue';
   }
+}
+
+function getTitleForState(state: OrgTrialStatus, planName: string) {
+  switch (state) {
+    case 'trial_active':
+      return `Free Kilo ${planName} Trial Active`;
+    case 'trial_ending_soon':
+      return `Free Kilo ${planName} Trial Ending Soon`;
+    case 'trial_ending_very_soon':
+      return `Free Kilo ${planName} Trial Ending Very Soon`;
+    case 'trial_expires_today':
+      return `Free Kilo ${planName} Trial Ends Today`;
+    case 'trial_expired_soft':
+    case 'trial_expired_hard':
+      return `Free Kilo ${planName} Trial Has Ended`;
+    case 'subscribed':
+      return 'Trial Status';
+  }
+}
+
+function getIconForState(state: OrgTrialStatus) {
+  if (state === 'trial_active') return Clock;
+  if (state === 'trial_ending_soon') return AlertCircle;
+  return AlertTriangle;
 }
 
 function getTrialMessage(daysRemaining: number, isOwner: boolean): string {
@@ -123,47 +88,33 @@ export function FreeTrialWarningBanner({
 }: FreeTrialWarningBannerProps) {
   const state = getOrgTrialStatusFromDays(daysRemaining);
   const planName = capitalize(organization.plan);
-  const styles = getStylesForState(state, planName);
+  const title = getTitleForState(state, planName);
   const isOwner = userRole === 'owner';
-  const buttonVariant = getButtonVariantForState(state);
   const message = getTrialMessage(daysRemaining, isOwner);
+  const Icon = getIconForState(state);
+  const color = getBannerColor(state);
 
   return (
-    <div
-      className={cn(
-        'flex w-full items-center gap-4 border-b p-4',
-        styles.bg,
-        styles.border,
-        styles.text
-      )}
-    >
-      {/* Icon */}
-      <div className={cn('flex shrink-0 items-center', styles.icon)}>
-        {getIconForState(state, 'h-6 w-6')}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1">
-        <div className="mb-1 flex items-center gap-2 text-sm">
-          <span className="font-bold">{styles.title}</span>
+    <Banner color={color}>
+      <Banner.Icon>
+        <Icon />
+      </Banner.Icon>
+      <Banner.Content>
+        <Banner.Title>
+          {title}
           {daysRemaining > 0 && (
-            <span className="flex gap-1 opacity-70">
-              <span>•</span>
-              <span>
-                {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} left
-              </span>
+            <span className="ml-2 opacity-70">
+              &bull; {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} left
             </span>
           )}
-        </div>
-        <p className="text-sm">{message}</p>
-      </div>
-
-      {/* Upgrade button for owners */}
+        </Banner.Title>
+        <Banner.Description>{message}</Banner.Description>
+      </Banner.Content>
       {isOwner && (
-        <Button onClick={onUpgradeClick} variant={buttonVariant} className="shrink-0">
-          Upgrade Now
-        </Button>
+        <Banner.Action>
+          <Banner.Button onClick={onUpgradeClick}>Upgrade Now</Banner.Button>
+        </Banner.Action>
       )}
-    </div>
+    </Banner>
   );
 }

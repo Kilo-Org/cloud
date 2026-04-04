@@ -199,40 +199,40 @@ type ConvoyRow = z.infer<typeof ConvoyRow>;
  *
  * See reconciliation-spec.md §5.2.
  */
-export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
+export function applyEvent(sql: SqlStorage, event: TownEventRecord): Action[] {
   const payload = event.payload;
 
   switch (event.event_type) {
     case 'agent_done': {
       if (!event.agent_id) {
         console.warn(`${LOG} applyEvent: agent_done missing agent_id`);
-        return;
+        return [];
       }
       const branch = typeof payload.branch === 'string' ? payload.branch : '';
       const pr_url = typeof payload.pr_url === 'string' ? payload.pr_url : undefined;
       const summary = typeof payload.summary === 'string' ? payload.summary : undefined;
 
       reviewQueue.agentDone(sql, event.agent_id, { branch, pr_url, summary });
-      return;
+      return [];
     }
 
     case 'agent_completed': {
       if (!event.agent_id) {
         console.warn(`${LOG} applyEvent: agent_completed missing agent_id`);
-        return;
+        return [];
       }
       const status =
         payload.status === 'completed' || payload.status === 'failed' ? payload.status : 'failed';
       const reason = typeof payload.reason === 'string' ? payload.reason : undefined;
 
       reviewQueue.agentCompleted(sql, event.agent_id, { status, reason });
-      return;
+      return [];
     }
 
     case 'pr_status_changed': {
       if (!event.bead_id) {
         console.warn(`${LOG} applyEvent: pr_status_changed missing bead_id`);
-        return;
+        return [];
       }
       const pr_state = payload.pr_state;
       if (pr_state === 'merged') {
@@ -248,19 +248,19 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
           message: 'PR closed without merge',
         });
       }
-      return;
+      return [];
     }
 
     case 'bead_created': {
       // No state change needed — bead already exists in DB.
       // Reconciler will pick it up as unassigned on next pass.
-      return;
+      return [];
     }
 
     case 'bead_cancelled': {
       if (!event.bead_id) {
         console.warn(`${LOG} applyEvent: bead_cancelled missing bead_id`);
-        return;
+        return [];
       }
       const cancelStatus =
         payload.cancel_status === 'closed' || payload.cancel_status === 'failed'
@@ -269,32 +269,44 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
 
       beadOps.updateBeadStatus(sql, event.bead_id, cancelStatus, 'system');
 
-      // Unhook any agent hooked to this bead
+      // Unhook any agent hooked to this bead, then stop working agents
       const hookedAgentRows = z
-        .object({ bead_id: z.string() })
+        .object({ bead_id: z.string(), status: z.string() })
         .array()
         .parse([
           ...query(
             sql,
             /* sql */ `
-            SELECT ${agent_metadata.bead_id}
+            SELECT ${agent_metadata.bead_id}, ${agent_metadata.status}
             FROM ${agent_metadata}
             WHERE ${agent_metadata.current_hook_bead_id} = ?
           `,
             [event.bead_id]
           ),
         ]);
+
+      const stopActions: Action[] = [];
       for (const row of hookedAgentRows) {
+        const wasWorking = row.status === 'working' || row.status === 'stalled';
         agents.unhookBead(sql, row.bead_id);
+        // Stop the agent's container if it was actively working —
+        // avoids waiting 90s for the heartbeat timeout.
+        if (wasWorking) {
+          stopActions.push({
+            type: 'stop_agent',
+            agent_id: row.bead_id,
+            reason: `bead ${event.bead_id} cancelled`,
+          });
+        }
       }
-      return;
+      return stopActions;
     }
 
     case 'convoy_started': {
       const convoyId = typeof payload.convoy_id === 'string' ? payload.convoy_id : null;
       if (!convoyId) {
         console.warn(`${LOG} applyEvent: convoy_started missing convoy_id`);
-        return;
+        return [];
       }
       query(
         sql,
@@ -305,15 +317,15 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
         `,
         [convoyId]
       );
-      return;
+      return [];
     }
 
     case 'container_status': {
-      if (!event.agent_id) return;
+      if (!event.agent_id) return [];
 
       const containerStatus = payload.status as string;
       const agent = agents.getAgent(sql, event.agent_id);
-      if (!agent) return;
+      if (!agent) return [];
 
       // Only act on working/stalled agents whose container has stopped.
       // For 'not_found': skip if the agent was dispatched recently (#1358).
@@ -324,7 +336,7 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
       // agents are caught by reconcileAgents after 90s of no heartbeats.
       if (containerStatus === 'not_found' && agent.last_activity_at) {
         const ageSec = (Date.now() - new Date(agent.last_activity_at).getTime()) / 1000;
-        if (ageSec < 180) return; // 3-minute grace for cold starts
+        if (ageSec < 180) return []; // 3-minute grace for cold starts
       }
 
       if (
@@ -354,34 +366,34 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
           agents.updateAgentStatus(sql, event.agent_id, 'idle');
         }
       }
-      return;
+      return [];
     }
 
     case 'container_eviction': {
       // Draining flag is managed by the TownDO via KV storage.
       // The reconciler reads it from there; no SQL state change needed here.
       // The event is recorded for audit trail.
-      return;
+      return [];
     }
 
     case 'nudge_timeout': {
       // GUPP violations are handled by reconcileGUPP on the next pass.
       // The event just records the fact for audit trail.
-      return;
+      return [];
     }
 
     case 'pr_feedback_detected': {
       const mrBeadId = typeof payload.mr_bead_id === 'string' ? payload.mr_bead_id : null;
       if (!mrBeadId) {
         console.warn(`${LOG} applyEvent: pr_feedback_detected missing mr_bead_id`);
-        return;
+        return [];
       }
 
       const mrBead = beadOps.getBead(sql, mrBeadId);
-      if (!mrBead || mrBead.status === 'closed' || mrBead.status === 'failed') return;
+      if (!mrBead || mrBead.status === 'closed' || mrBead.status === 'failed') return [];
 
       // Check for existing non-terminal feedback bead to prevent duplicates
-      if (hasExistingPrFeedbackBead(sql, mrBeadId)) return;
+      if (hasExistingPrFeedbackBead(sql, mrBeadId)) return [];
 
       const prUrl = typeof payload.pr_url === 'string' ? payload.pr_url : '';
       const prNumber = typeof payload.pr_number === 'number' ? payload.pr_number : 0;
@@ -420,18 +432,18 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
 
       // Feedback bead blocks the MR bead (same pattern as rework beads)
       beadOps.insertDependency(sql, mrBeadId, feedbackBead.bead_id, 'blocks');
-      return;
+      return [];
     }
 
     case 'pr_auto_merge': {
       const mrBeadId = typeof payload.mr_bead_id === 'string' ? payload.mr_bead_id : null;
       if (!mrBeadId) {
         console.warn(`${LOG} applyEvent: pr_auto_merge missing mr_bead_id`);
-        return;
+        return [];
       }
 
       const mrBead = beadOps.getBead(sql, mrBeadId);
-      if (!mrBead || mrBead.status === 'closed' || mrBead.status === 'failed') return;
+      if (!mrBead || mrBead.status === 'closed' || mrBead.status === 'failed') return [];
 
       // The actual merge is handled by the merge_pr side effect generated by
       // the reconciler on the next tick when it sees this event has been processed.
@@ -446,11 +458,12 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
         `,
         [new Date().toISOString(), mrBeadId]
       );
-      return;
+      return [];
     }
 
     default: {
       console.warn(`${LOG} applyEvent: unknown event type: ${event.event_type}`);
+      return [];
     }
   }
 }

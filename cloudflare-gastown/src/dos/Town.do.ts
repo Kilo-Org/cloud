@@ -3460,6 +3460,9 @@ export class TownDO extends DurableObject<Env> {
     };
 
     // Phase 0: Drain events and apply state transitions
+    // Events may return actions (e.g. stop_agent on bead cancellation)
+    // that are merged into the Phase 1 action list.
+    const eventActions: Action[] = [];
     try {
       const pending = events.drainEvents(this.sql);
       metrics.eventsDrained = pending.length;
@@ -3491,7 +3494,8 @@ export class TownDO extends DurableObject<Env> {
         }
 
         try {
-          reconciler.applyEvent(this.sql, event);
+          const actions = reconciler.applyEvent(this.sql, event);
+          eventActions.push(...actions);
           events.markProcessed(this.sql, event.event_id);
         } catch (err) {
           const retryCount = events.incrementRetryCount(this.sql, event.event_id);
@@ -3555,10 +3559,13 @@ export class TownDO extends DurableObject<Env> {
     const sideEffects: Array<() => Promise<void>> = [];
     try {
       const townConfig = await this.getTownConfig();
-      const actions = reconciler.reconcile(this.sql, {
-        draining: this._draining,
-        refineryCodeReview: townConfig.refinery?.code_review ?? true,
-      });
+      const actions = [
+        ...eventActions,
+        ...reconciler.reconcile(this.sql, {
+          draining: this._draining,
+          refineryCodeReview: townConfig.refinery?.code_review ?? true,
+        }),
+      ];
       metrics.actionsEmitted = actions.length;
       for (const a of actions) {
         metrics.actionsByType[a.type] = (metrics.actionsByType[a.type] ?? 0) + 1;
@@ -4781,15 +4788,19 @@ export class TownDO extends DurableObject<Env> {
       ]);
 
       // Apply each event to reconstruct state transitions
+      const replayEventActions: Action[] = [];
       for (const event of rangeEvents) {
-        reconciler.applyEvent(this.sql, event);
+        replayEventActions.push(...reconciler.applyEvent(this.sql, event));
       }
 
       // Run reconciler against the resulting state
       const tc = await this.getTownConfig();
-      const actions = reconciler.reconcile(this.sql, {
-        refineryCodeReview: tc.refinery?.code_review ?? true,
-      });
+      const actions = [
+        ...replayEventActions,
+        ...reconciler.reconcile(this.sql, {
+          refineryCodeReview: tc.refinery?.code_review ?? true,
+        }),
+      ];
 
       // Capture a state snapshot before rollback
       const agentSnapshot = [
@@ -4862,16 +4873,20 @@ export class TownDO extends DurableObject<Env> {
     try {
       // Phase 0: Drain and apply pending events (same as real alarm loop)
       const pending = events.drainEvents(this.sql);
+      const dryRunEventActions: Action[] = [];
       for (const event of pending) {
-        reconciler.applyEvent(this.sql, event);
+        dryRunEventActions.push(...reconciler.applyEvent(this.sql, event));
         events.markProcessed(this.sql, event.event_id);
       }
 
       // Phase 1: Reconcile against now-current state
       const tc2 = await this.getTownConfig();
-      const actions = reconciler.reconcile(this.sql, {
-        refineryCodeReview: tc2.refinery?.code_review ?? true,
-      });
+      const actions = [
+        ...dryRunEventActions,
+        ...reconciler.reconcile(this.sql, {
+          refineryCodeReview: tc2.refinery?.code_review ?? true,
+        }),
+      ];
       const pendingEventCount = events.pendingEventCount(this.sql);
       const actionsByType: Record<string, number> = {};
       for (const a of actions) {

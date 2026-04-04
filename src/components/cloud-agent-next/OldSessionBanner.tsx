@@ -1,8 +1,7 @@
 'use client';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { Info } from 'lucide-react';
+import { Banner } from '@/components/shared/Banner';
 
 type OldSessionBannerProps = {
   onStartNewSession: () => void;
@@ -10,18 +9,20 @@ type OldSessionBannerProps = {
 
 export function OldSessionBanner({ onStartNewSession }: OldSessionBannerProps) {
   return (
-    <Alert variant="warning" className="mb-4">
-      <Info className="h-4 w-4" />
-      <AlertTitle>Legacy Session</AlertTitle>
-      <AlertDescription>
-        <p className="mb-3">
+    <Banner color="amber" className="mb-4">
+      <Banner.Icon>
+        <Info />
+      </Banner.Icon>
+      <Banner.Content>
+        <Banner.Title>Legacy Session</Banner.Title>
+        <Banner.Description>
           This is a legacy session displayed in read-only mode. You can start a new session to
           continue working.
-        </p>
-        <Button size="sm" variant="outline" onClick={onStartNewSession}>
-          Start New Session
-        </Button>
-      </AlertDescription>
-    </Alert>
+        </Banner.Description>
+      </Banner.Content>
+      <Banner.Action>
+        <Banner.Button onClick={onStartNewSession}>Start New Session</Banner.Button>
+      </Banner.Action>
+    </Banner>
   );
 }

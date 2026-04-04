@@ -2,10 +2,11 @@
 
 import { createContext, useContext } from 'react';
 import Link from 'next/link';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
-type BannerColor = 'emerald' | 'amber' | 'blue' | 'red';
+type BannerColor = 'emerald' | 'amber' | 'blue' | 'red' | 'green';
 
 const colorMap: Record<BannerColor, { border: string; bg: string; text: string; button: string }> =
   {
@@ -32,6 +33,12 @@ const colorMap: Record<BannerColor, { border: string; bg: string; text: string; 
       bg: 'bg-red-500/10',
       text: 'text-red-400',
       button: 'bg-red-500 text-primary-foreground hover:bg-red-500/90',
+    },
+    green: {
+      border: 'border-green-500/30',
+      bg: 'bg-green-500/10',
+      text: 'text-green-400',
+      button: 'bg-green-500 text-primary-foreground hover:bg-green-500/90',
     },
   };
 
@@ -134,6 +141,27 @@ function BannerButton({
   );
 }
 
+function BannerDismiss({
+  onDismiss,
+  className,
+}: {
+  onDismiss: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      onClick={onDismiss}
+      className={cn(
+        'shrink-0 rounded-full p-1 opacity-70 transition-opacity hover:opacity-100',
+        className
+      )}
+      aria-label="Dismiss"
+    >
+      <X className="h-4 w-4" />
+    </button>
+  );
+}
+
 export const Banner = Object.assign(BannerRoot, {
   Icon: BannerIcon,
   Content: BannerContent,
@@ -141,4 +169,5 @@ export const Banner = Object.assign(BannerRoot, {
   Description: BannerDescription,
   Action: BannerAction,
   Button: BannerButton,
+  Dismiss: BannerDismiss,
 });

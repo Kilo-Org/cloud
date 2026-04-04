@@ -53,6 +53,13 @@ describe('parseDfOutput', () => {
   it('returns null for output with only a header and no data line', () => {
     expect(parseDfOutput('     Avail 1B-blocks')).toBeNull();
   });
+
+  it('clamps usedBytes to 0 when avail > total', () => {
+    // Some filesystems with compression can report avail > size
+    const raw = `     Avail 1B-blocks
+10737418240 5368709120`;
+    expect(parseDfOutput(raw)).toEqual({ usedBytes: 0, totalBytes: 5368709120 });
+  });
 });
 
 describe('parseNetDevText', () => {

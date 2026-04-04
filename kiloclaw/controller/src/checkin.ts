@@ -103,7 +103,7 @@ export function parseDfOutput(raw: string): DiskStats {
   if (!match) return null;
   const availableBytes = parseInt(match[1], 10);
   const totalBytes = parseInt(match[2], 10);
-  return { usedBytes: totalBytes - availableBytes, totalBytes };
+  return { usedBytes: Math.max(0, totalBytes - availableBytes), totalBytes };
 }
 
 /**

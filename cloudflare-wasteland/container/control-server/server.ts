@@ -86,7 +86,7 @@ const PostBodySchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
   bounty: z.number().optional(),
-  priority: z.enum(['low', 'medium', 'high']).optional(),
+  priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   type: z.enum(['feature', 'bug', 'docs', 'other']).optional(),
 });
 

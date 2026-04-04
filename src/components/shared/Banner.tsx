@@ -109,7 +109,7 @@ function BannerDescription({
 }
 
 function BannerAction({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn('flex w-full shrink-0 gap-2 sm:w-auto', className)}>{children}</div>;
+  return <div className={cn('flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row', className)}>{children}</div>;
 }
 
 function BannerButton({

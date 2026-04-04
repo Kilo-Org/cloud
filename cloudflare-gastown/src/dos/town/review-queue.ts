@@ -304,12 +304,34 @@ export function completeReviewWithResult(
 
   if (input.status === 'merged') {
     const mergeTimestamp = now();
-    console.log(
-      `[review-queue] completeReviewWithResult MERGED: entry_id=${input.entry_id} ` +
-        `entry.bead_id (source)=${entry.bead_id} entry.id (MR)=${entry.id} — ` +
-        `calling closeBead on source`
-    );
-    closeBead(sql, entry.bead_id, entry.agent_id);
+    // Only close the source bead if it's in a review state (in_review).
+    // If the source bead is still open/in_progress, the polecat may not have
+    // finished or this is a stale MR bead from before auto-merge was deployed.
+    const sourceRows = z
+      .object({ status: z.string() })
+      .array()
+      .parse([
+        ...query(
+          sql,
+          /* sql */ `SELECT ${beads.columns.status} FROM ${beads} WHERE ${beads.bead_id} = ?`,
+          [entry.bead_id]
+        ),
+      ]);
+    const sourceStatus = sourceRows[0]?.status;
+    if (sourceStatus === 'in_review') {
+      console.log(
+        `[review-queue] completeReviewWithResult MERGED: entry_id=${input.entry_id} ` +
+          `entry.bead_id (source)=${entry.bead_id} entry.id (MR)=${entry.id} — ` +
+          `closing source bead (was in_review)`
+      );
+      closeBead(sql, entry.bead_id, entry.agent_id);
+    } else {
+      console.warn(
+        `[review-queue] completeReviewWithResult MERGED: entry_id=${input.entry_id} ` +
+          `source bead ${entry.bead_id} is ${sourceStatus ?? 'not found'} — ` +
+          `NOT closing (expected in_review)`
+      );
+    }
 
     // Close ALL other open/in_progress/failed MR beads for the same
     // source bead. During rework cycles, multiple MR beads accumulate.

@@ -1202,7 +1202,8 @@ export function reconcileReviewQueue(
     // Skip refinery dispatch — jump to Rule 7
   } else {
     // Rule 5: Pop open MR bead for idle refinery
-    // Get all rigs that have open MR beads
+    // Get all rigs that have open MR beads (including NULL rig_id beads
+    // which use COALESCE to a sentinel so they're included in the loop).
     const rigsWithOpenMrs = z
       .object({ rig_id: z.string() })
       .array()
@@ -1210,17 +1211,18 @@ export function reconcileReviewQueue(
         ...query(
           sql,
           /* sql */ `
-        SELECT DISTINCT b.${beads.columns.rig_id}
+        SELECT DISTINCT COALESCE(b.${beads.columns.rig_id}, '__null_rig__') AS ${beads.columns.rig_id}
         FROM ${beads} b
         WHERE b.${beads.columns.type} = 'merge_request'
           AND b.${beads.columns.status} = 'open'
-          AND b.${beads.columns.rig_id} IS NOT NULL
       `,
           []
         ),
       ]);
 
     for (const { rig_id } of rigsWithOpenMrs) {
+      const isNullRig = rig_id === '__null_rig__';
+
       // Check if rig already has an in_progress MR that needs the refinery.
       // PR-strategy MR beads (pr_url IS NOT NULL) don't need the refinery —
       // the merge is handled by the user/CI via the PR. Only direct-strategy
@@ -1228,62 +1230,119 @@ export function reconcileReviewQueue(
       const inProgressCount = z
         .object({ cnt: z.number() })
         .array()
-        .parse([
-          ...query(
-            sql,
-            /* sql */ `
-          SELECT count(*) as cnt FROM ${beads} b
-          INNER JOIN ${review_metadata} rm
-            ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
-          WHERE b.${beads.columns.type} = 'merge_request'
-            AND b.${beads.columns.status} = 'in_progress'
-            AND b.${beads.columns.rig_id} = ?
-            AND rm.${review_metadata.columns.pr_url} IS NULL
-        `,
-            [rig_id]
-          ),
-        ]);
+        .parse(
+          isNullRig
+            ? [
+                ...query(
+                  sql,
+                  /* sql */ `
+            SELECT count(*) as cnt FROM ${beads} b
+            INNER JOIN ${review_metadata} rm
+              ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
+            WHERE b.${beads.columns.type} = 'merge_request'
+              AND b.${beads.columns.status} = 'in_progress'
+              AND b.${beads.columns.rig_id} IS NULL
+              AND rm.${review_metadata.columns.pr_url} IS NULL
+          `,
+                  []
+                ),
+              ]
+            : [
+                ...query(
+                  sql,
+                  /* sql */ `
+            SELECT count(*) as cnt FROM ${beads} b
+            INNER JOIN ${review_metadata} rm
+              ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
+            WHERE b.${beads.columns.type} = 'merge_request'
+              AND b.${beads.columns.status} = 'in_progress'
+              AND b.${beads.columns.rig_id} = ?
+              AND rm.${review_metadata.columns.pr_url} IS NULL
+          `,
+                  [rig_id]
+                ),
+              ]
+        );
       if ((inProgressCount[0]?.cnt ?? 0) > 0) continue;
 
-      // Check if the refinery for this rig is idle and unhooked
-      const refinery = AgentRow.array().parse([
-        ...query(
-          sql,
-          /* sql */ `
-          SELECT ${agent_metadata.bead_id}, ${agent_metadata.role},
-                 ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
-                 ${agent_metadata.dispatch_attempts},
-                 ${agent_metadata.last_activity_at},
-                 b.${beads.columns.rig_id}
-          FROM ${agent_metadata}
-          LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}
-          WHERE ${agent_metadata.columns.role} = 'refinery'
-            AND b.${beads.columns.rig_id} = ?
-          LIMIT 1
-        `,
-          [rig_id]
-        ),
-      ]);
+      // Check if the refinery for this rig is idle and unhooked.
+      // For NULL rig beads, use any idle refinery.
+      const refinery = AgentRow.array().parse(
+        isNullRig
+          ? [
+              ...query(
+                sql,
+                /* sql */ `
+            SELECT ${agent_metadata.bead_id}, ${agent_metadata.role},
+                   ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
+                   ${agent_metadata.dispatch_attempts},
+                   ${agent_metadata.last_activity_at},
+                   b.${beads.columns.rig_id}
+            FROM ${agent_metadata}
+            LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}
+            WHERE ${agent_metadata.columns.role} = 'refinery'
+            LIMIT 1
+          `,
+                []
+              ),
+            ]
+          : [
+              ...query(
+                sql,
+                /* sql */ `
+            SELECT ${agent_metadata.bead_id}, ${agent_metadata.role},
+                   ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
+                   ${agent_metadata.dispatch_attempts},
+                   ${agent_metadata.last_activity_at},
+                   b.${beads.columns.rig_id}
+            FROM ${agent_metadata}
+            LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}
+            WHERE ${agent_metadata.columns.role} = 'refinery'
+              AND b.${beads.columns.rig_id} = ?
+            LIMIT 1
+          `,
+                [rig_id]
+              ),
+            ]
+      );
 
       // Get oldest open MR for this rig
       const oldestMr = z
         .object({ bead_id: z.string() })
         .array()
-        .parse([
-          ...query(
-            sql,
-            /* sql */ `
-          SELECT ${beads.bead_id}
-          FROM ${beads}
-          WHERE ${beads.type} = 'merge_request'
-            AND ${beads.status} = 'open'
-            AND ${beads.rig_id} = ?
-          ORDER BY ${beads.columns.created_at} ASC
-          LIMIT 1
-        `,
-            [rig_id]
-          ),
-        ]);
+        .parse(
+          isNullRig
+            ? [
+                ...query(
+                  sql,
+                  /* sql */ `
+            SELECT ${beads.bead_id}
+            FROM ${beads}
+            WHERE ${beads.type} = 'merge_request'
+              AND ${beads.status} = 'open'
+              AND ${beads.columns.rig_id} IS NULL
+            ORDER BY ${beads.columns.created_at} ASC
+            LIMIT 1
+          `,
+                  []
+                ),
+              ]
+            : [
+                ...query(
+                  sql,
+                  /* sql */ `
+            SELECT ${beads.bead_id}
+            FROM ${beads}
+            WHERE ${beads.type} = 'merge_request'
+              AND ${beads.status} = 'open'
+              AND ${beads.rig_id} = ?
+            ORDER BY ${beads.columns.created_at} ASC
+            LIMIT 1
+          `,
+                  [rig_id]
+                ),
+              ]
+        );
 
       if (oldestMr.length === 0) continue;
 

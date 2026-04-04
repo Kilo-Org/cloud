@@ -9,16 +9,6 @@ function parseJsonArg(value: string, label: string): unknown {
   }
 }
 
-function parseJsonObject(value: string, label: string): Record<string, unknown> {
-  const parsed = parseJsonArg(value, label);
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error(
-      `"${label}" must be a JSON object, got ${Array.isArray(parsed) ? 'array' : typeof parsed}`
-    );
-  }
-  return Object.fromEntries(Object.entries(parsed as object));
-}
-
 export function createTools(client: GastownClient) {
   return {
     gt_prime: tool({
@@ -155,17 +145,16 @@ export function createTools(client: GastownClient) {
           .describe('Severity level (defaults to medium)')
           .optional(),
         metadata: tool.schema
-          .string()
-          .describe('JSON-encoded metadata object for additional context')
+          .record(tool.schema.string(), tool.schema.unknown())
+          .describe('Metadata object for additional context')
           .optional(),
       },
       async execute(args) {
-        const metadata = args.metadata ? parseJsonObject(args.metadata, 'metadata') : undefined;
         const bead = await client.createEscalation({
           title: args.title,
           body: args.body,
           priority: args.priority,
-          metadata,
+          metadata: args.metadata,
         });
         return `Escalation created: ${bead.bead_id} (priority: ${bead.priority})`;
       },

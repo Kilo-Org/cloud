@@ -1396,12 +1396,18 @@ export function reconcileReviewQueue(
     // Only in_progress — open beads with a pr_url are still waiting in the normal
     // review queue and haven't been claimed by a refinery yet, so they aren't orphaned.
     // Skip when refinery code review is disabled: poll_pr keeps the bead alive via
-    // updated_at touches, and no refinery is expected to be working on it.
+    // last_poll_at touches, and no refinery is expected to be working on it.
+    // Use last_poll_at (set by poll_pr) instead of updated_at so that unrelated
+    // metadata/status changes don't reset the staleness clock. Fall back to
+    // updated_at for old beads that predate the last_poll_at field.
     if (
       refineryCodeReview &&
       mr.status === 'in_progress' &&
       mr.pr_url &&
-      staleMs(mr.updated_at, ORPHANED_PR_REVIEW_TIMEOUT_MS)
+      staleMs(
+        typeof mr.metadata?.last_poll_at === 'string' ? mr.metadata.last_poll_at : mr.updated_at,
+        ORPHANED_PR_REVIEW_TIMEOUT_MS
+      )
     ) {
       const workingAgent = hasWorkingAgentHooked(sql, mr.bead_id);
       if (!workingAgent) {

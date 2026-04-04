@@ -1101,9 +1101,14 @@ export function getMergeQueueData(sql: SqlStorage, params: MergeQueueParams): Me
     if (row.status === 'failed') {
       failedReviews.push(item);
     } else if (row.pr_url && row.status === 'in_progress') {
-      // in_progress with pr_url = PR created, awaiting human merge
-      if (row.updated_at < staleThreshold) {
-        item.staleSince = row.updated_at;
+      // in_progress with pr_url = PR created, awaiting human merge.
+      // Use last_poll_at (set by poll_pr) instead of updated_at so that
+      // unrelated metadata/status changes don't make PRs look stale.
+      // Fall back to updated_at for old beads that predate last_poll_at.
+      const lastActivity =
+        typeof row.metadata.last_poll_at === 'string' ? row.metadata.last_poll_at : row.updated_at;
+      if (lastActivity < staleThreshold) {
+        item.staleSince = lastActivity;
         stalePRs.push(item);
       } else {
         openPRs.push(item);

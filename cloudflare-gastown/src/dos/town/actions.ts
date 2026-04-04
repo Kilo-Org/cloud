@@ -570,16 +570,25 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
       const capturedAgentId = agentId;
       return async () => {
-        // Best-effort dispatch. If it fails, roll the agent back to
-        // 'idle' so the reconciler can retry on the next tick. The bead
-        // stays 'in_progress' — no separate recovery needed (§5.4).
-        await ctx.dispatchAgent(capturedAgentId, beadId, rigId).catch(err => {
+        // Best-effort dispatch. If it fails (thrown error or resolved
+        // false), roll the agent back to 'idle' so the reconciler can
+        // retry on the next tick. The bead stays 'in_progress' — no
+        // separate recovery needed (§5.4).
+        let accepted = false;
+        try {
+          accepted = await ctx.dispatchAgent(capturedAgentId, beadId, rigId);
+        } catch (err) {
           console.warn(
-            `${LOG} dispatch_agent: container start failed for agent=${capturedAgentId} bead=${beadId}, rolling back to idle`,
+            `${LOG} dispatch_agent: container start threw for agent=${capturedAgentId} bead=${beadId}, rolling back to idle`,
             err
           );
+        }
+        if (!accepted) {
+          console.warn(
+            `${LOG} dispatch_agent: container did not accept start for agent=${capturedAgentId} bead=${beadId}, rolling back to idle`
+          );
           agentOps.updateAgentStatus(sql, capturedAgentId, 'idle');
-        });
+        }
       };
     }
 

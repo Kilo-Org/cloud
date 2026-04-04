@@ -1393,13 +1393,13 @@ export function reconcileReviewQueue(
     }
 
     // Rule 4: PR-strategy MR beads orphaned (refinery dispatched then died, stale >30min)
-    // Applies to both in_progress and open beads with a pr_url — an open bead with a
-    // pr_url that sits stale >30min indicates the refinery never picked it up.
+    // Only in_progress — open beads with a pr_url are still waiting in the normal
+    // review queue and haven't been claimed by a refinery yet, so they aren't orphaned.
     // Skip when refinery code review is disabled: poll_pr keeps the bead alive via
     // updated_at touches, and no refinery is expected to be working on it.
     if (
       refineryCodeReview &&
-      (mr.status === 'in_progress' || mr.status === 'open') &&
+      mr.status === 'in_progress' &&
       mr.pr_url &&
       staleMs(mr.updated_at, ORPHANED_PR_REVIEW_TIMEOUT_MS)
     ) {

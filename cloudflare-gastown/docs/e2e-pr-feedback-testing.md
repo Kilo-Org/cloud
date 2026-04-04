@@ -31,12 +31,12 @@ REPO="${REPO:-jrf0110/mega-todo-app5}"
 
 Check these settings in the town settings UI:
 
-| Setting | Required Value |
-|---|---|
-| Merge strategy | `pr` (Pull Request) |
-| Auto-merge | enabled |
-| Auto-resolve PR feedback | enabled |
-| Auto-merge delay | 2 minutes (or preferred delay) |
+| Setting                  | Required Value                 |
+| ------------------------ | ------------------------------ |
+| Merge strategy           | `pr` (Pull Request)            |
+| Auto-merge               | enabled                        |
+| Auto-resolve PR feedback | enabled                        |
+| Auto-merge delay         | 2 minutes (or preferred delay) |
 
 ### Verify Clean State
 
@@ -115,6 +115,7 @@ gh pr list --repo $REPO --state open --limit 5 --json number,title,headRefName,c
 ```
 
 Record the PR number:
+
 ```bash
 PR_NUMBER=<number>
 ```
@@ -329,25 +330,25 @@ for pr in prs:
 
 ### Single Bead
 
-| Step | Duration |
-|---|---|
-| Mayor slings bead | ~30s |
-| Polecat works + creates PR | 2-5 min |
-| Refinery reviews PR, adds comments | 2-5 min |
+| Step                                 | Duration              |
+| ------------------------------------ | --------------------- |
+| Mayor slings bead                    | ~30s                  |
+| Polecat works + creates PR           | 2-5 min               |
+| Refinery reviews PR, adds comments   | 2-5 min               |
 | Feedback detected + polecat resolves | 2-5 min (if comments) |
-| Auto-merge grace period | 2 min (configured) |
-| **Total** | **8-17 min** |
+| Auto-merge grace period              | 2 min (configured)    |
+| **Total**                            | **8-17 min**          |
 
 ### 3-Bead Convoy (review-and-merge)
 
-| Step | Duration |
-|---|---|
-| Mayor creates convoy + 3 beads | ~1 min |
-| 3 polecats work in parallel + create PRs | 2-5 min |
-| 3 refinery reviews (sequential per rig) | 5-15 min |
-| Feedback resolution cycles | 2-5 min each (if needed) |
-| Auto-merge per PR | 2 min grace each |
-| **Total** | **15-30 min** |
+| Step                                     | Duration                 |
+| ---------------------------------------- | ------------------------ |
+| Mayor creates convoy + 3 beads           | ~1 min                   |
+| 3 polecats work in parallel + create PRs | 2-5 min                  |
+| 3 refinery reviews (sequential per rig)  | 5-15 min                 |
+| Feedback resolution cycles               | 2-5 min each (if needed) |
+| Auto-merge per PR                        | 2 min grace each         |
+| **Total**                                | **15-30 min**            |
 
 ---
 
@@ -356,6 +357,7 @@ for pr in prs:
 ### Polecat Doesn't Create PR
 
 If the polecat pushes but doesn't create a PR:
+
 - Check the polecat's system prompt includes "Pull Request Creation" section
 - Verify `merge_strategy` is `pr` in town settings
 - Check wrangler logs for the polecat's agent output
@@ -363,6 +365,7 @@ If the polecat pushes but doesn't create a PR:
 ### Refinery Tries to Create a New PR
 
 If the refinery creates a duplicate PR instead of reviewing the existing one:
+
 - Check that `review_metadata.pr_url` is set on the MR bead (polecat should have passed it)
 - The refinery prompt switches to "PR review mode" only when `existingPrUrl` is set
 

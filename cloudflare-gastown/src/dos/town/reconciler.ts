@@ -1193,38 +1193,37 @@ export function reconcileReviewQueue(
   if (!refineryCodeReview) {
     // Skip refinery dispatch — jump to Rule 7
   } else {
-
-  // Rule 5: Pop open MR bead for idle refinery
-  // Get all rigs that have open MR beads
-  const rigsWithOpenMrs = z
-    .object({ rig_id: z.string() })
-    .array()
-    .parse([
-      ...query(
-        sql,
-        /* sql */ `
+    // Rule 5: Pop open MR bead for idle refinery
+    // Get all rigs that have open MR beads
+    const rigsWithOpenMrs = z
+      .object({ rig_id: z.string() })
+      .array()
+      .parse([
+        ...query(
+          sql,
+          /* sql */ `
         SELECT DISTINCT b.${beads.columns.rig_id}
         FROM ${beads} b
         WHERE b.${beads.columns.type} = 'merge_request'
           AND b.${beads.columns.status} = 'open'
           AND b.${beads.columns.rig_id} IS NOT NULL
       `,
-        []
-      ),
-    ]);
+          []
+        ),
+      ]);
 
-  for (const { rig_id } of rigsWithOpenMrs) {
-    // Check if rig already has an in_progress MR that needs the refinery.
-    // PR-strategy MR beads (pr_url IS NOT NULL) don't need the refinery —
-    // the merge is handled by the user/CI via the PR. Only direct-strategy
-    // MRs (no pr_url, refinery merges to main itself) block the queue.
-    const inProgressCount = z
-      .object({ cnt: z.number() })
-      .array()
-      .parse([
-        ...query(
-          sql,
-          /* sql */ `
+    for (const { rig_id } of rigsWithOpenMrs) {
+      // Check if rig already has an in_progress MR that needs the refinery.
+      // PR-strategy MR beads (pr_url IS NOT NULL) don't need the refinery —
+      // the merge is handled by the user/CI via the PR. Only direct-strategy
+      // MRs (no pr_url, refinery merges to main itself) block the queue.
+      const inProgressCount = z
+        .object({ cnt: z.number() })
+        .array()
+        .parse([
+          ...query(
+            sql,
+            /* sql */ `
           SELECT count(*) as cnt FROM ${beads} b
           INNER JOIN ${review_metadata} rm
             ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
@@ -1233,16 +1232,16 @@ export function reconcileReviewQueue(
             AND b.${beads.columns.rig_id} = ?
             AND rm.${review_metadata.columns.pr_url} IS NULL
         `,
-          [rig_id]
-        ),
-      ]);
-    if ((inProgressCount[0]?.cnt ?? 0) > 0) continue;
+            [rig_id]
+          ),
+        ]);
+      if ((inProgressCount[0]?.cnt ?? 0) > 0) continue;
 
-    // Check if the refinery for this rig is idle and unhooked
-    const refinery = AgentRow.array().parse([
-      ...query(
-        sql,
-        /* sql */ `
+      // Check if the refinery for this rig is idle and unhooked
+      const refinery = AgentRow.array().parse([
+        ...query(
+          sql,
+          /* sql */ `
           SELECT ${agent_metadata.bead_id}, ${agent_metadata.role},
                  ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
                  ${agent_metadata.dispatch_attempts},
@@ -1254,18 +1253,18 @@ export function reconcileReviewQueue(
             AND b.${beads.columns.rig_id} = ?
           LIMIT 1
         `,
-        [rig_id]
-      ),
-    ]);
+          [rig_id]
+        ),
+      ]);
 
-    // Get oldest open MR for this rig
-    const oldestMr = z
-      .object({ bead_id: z.string() })
-      .array()
-      .parse([
-        ...query(
-          sql,
-          /* sql */ `
+      // Get oldest open MR for this rig
+      const oldestMr = z
+        .object({ bead_id: z.string() })
+        .array()
+        .parse([
+          ...query(
+            sql,
+            /* sql */ `
           SELECT ${beads.bead_id}
           FROM ${beads}
           WHERE ${beads.type} = 'merge_request'
@@ -1274,70 +1273,70 @@ export function reconcileReviewQueue(
           ORDER BY ${beads.columns.created_at} ASC
           LIMIT 1
         `,
-          [rig_id]
-        ),
-      ]);
+            [rig_id]
+          ),
+        ]);
 
-    if (oldestMr.length === 0) continue;
+      if (oldestMr.length === 0) continue;
 
-    // Skip dispatch if the town is draining (container eviction in progress)
-    if (draining) {
-      console.log(`${LOG} Town is draining, skipping dispatch for bead ${oldestMr[0].bead_id}`);
-      continue;
-    }
+      // Skip dispatch if the town is draining (container eviction in progress)
+      if (draining) {
+        console.log(`${LOG} Town is draining, skipping dispatch for bead ${oldestMr[0].bead_id}`);
+        continue;
+      }
 
-    // Town-level circuit breaker suppresses dispatch
-    if (circuitBreakerOpen) continue;
+      // Town-level circuit breaker suppresses dispatch
+      if (circuitBreakerOpen) continue;
 
-    // If no refinery exists or it's busy, emit a dispatch_agent with empty
-    // agent_id — applyAction will create the refinery via getOrCreateAgent.
-    if (refinery.length === 0) {
+      // If no refinery exists or it's busy, emit a dispatch_agent with empty
+      // agent_id — applyAction will create the refinery via getOrCreateAgent.
+      if (refinery.length === 0) {
+        actions.push({
+          type: 'transition_bead',
+          bead_id: oldestMr[0].bead_id,
+          from: 'open',
+          to: 'in_progress',
+          reason: 'popped for review (creating refinery)',
+          actor: 'system',
+        });
+        actions.push({
+          type: 'dispatch_agent',
+          agent_id: '',
+          bead_id: oldestMr[0].bead_id,
+          rig_id,
+        });
+        continue;
+      }
+
+      const ref = refinery[0];
+      if (ref.status !== 'idle' || ref.current_hook_bead_id) continue;
+
       actions.push({
         type: 'transition_bead',
         bead_id: oldestMr[0].bead_id,
         from: 'open',
         to: 'in_progress',
-        reason: 'popped for review (creating refinery)',
+        reason: 'popped for review',
         actor: 'system',
       });
       actions.push({
+        type: 'hook_agent',
+        agent_id: ref.bead_id,
+        bead_id: oldestMr[0].bead_id,
+      });
+      actions.push({
         type: 'dispatch_agent',
-        agent_id: '',
+        agent_id: ref.bead_id,
         bead_id: oldestMr[0].bead_id,
         rig_id,
       });
-      continue;
     }
 
-    const ref = refinery[0];
-    if (ref.status !== 'idle' || ref.current_hook_bead_id) continue;
-
-    actions.push({
-      type: 'transition_bead',
-      bead_id: oldestMr[0].bead_id,
-      from: 'open',
-      to: 'in_progress',
-      reason: 'popped for review',
-      actor: 'system',
-    });
-    actions.push({
-      type: 'hook_agent',
-      agent_id: ref.bead_id,
-      bead_id: oldestMr[0].bead_id,
-    });
-    actions.push({
-      type: 'dispatch_agent',
-      agent_id: ref.bead_id,
-      bead_id: oldestMr[0].bead_id,
-      rig_id,
-    });
-  }
-
-  // Rule 6: Idle refinery hooked to in_progress MR — needs re-dispatch
-  const idleRefineries = AgentRow.array().parse([
-    ...query(
-      sql,
-      /* sql */ `
+    // Rule 6: Idle refinery hooked to in_progress MR — needs re-dispatch
+    const idleRefineries = AgentRow.array().parse([
+      ...query(
+        sql,
+        /* sql */ `
         SELECT ${agent_metadata.bead_id}, ${agent_metadata.role},
                ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
                ${agent_metadata.dispatch_attempts},
@@ -1349,83 +1348,82 @@ export function reconcileReviewQueue(
           AND ${agent_metadata.status} = 'idle'
           AND ${agent_metadata.current_hook_bead_id} IS NOT NULL
       `,
-      []
-    ),
-  ]);
+        []
+      ),
+    ]);
 
-  for (const ref of idleRefineries) {
-    if (!ref.current_hook_bead_id) continue;
+    for (const ref of idleRefineries) {
+      if (!ref.current_hook_bead_id) continue;
 
-    // Read the bead's dispatch_attempts for the per-bead circuit breaker
-    const mrRows = z
-      .object({
-        status: z.string(),
-        type: z.string(),
-        rig_id: z.string().nullable(),
-        dispatch_attempts: z.number(),
-        last_dispatch_attempt_at: z.string().nullable(),
-      })
-      .array()
-      .parse([
-        ...query(
-          sql,
-          /* sql */ `
+      // Read the bead's dispatch_attempts for the per-bead circuit breaker
+      const mrRows = z
+        .object({
+          status: z.string(),
+          type: z.string(),
+          rig_id: z.string().nullable(),
+          dispatch_attempts: z.number(),
+          last_dispatch_attempt_at: z.string().nullable(),
+        })
+        .array()
+        .parse([
+          ...query(
+            sql,
+            /* sql */ `
           SELECT ${beads.status}, ${beads.type}, ${beads.rig_id},
                  ${beads.dispatch_attempts}, ${beads.last_dispatch_attempt_at}
           FROM ${beads}
           WHERE ${beads.bead_id} = ?
         `,
-          [ref.current_hook_bead_id]
-        ),
-      ]);
+            [ref.current_hook_bead_id]
+          ),
+        ]);
 
-    if (mrRows.length === 0) continue;
-    const mr = mrRows[0];
-    if (mr.type !== 'merge_request' || mr.status !== 'in_progress') continue;
+      if (mrRows.length === 0) continue;
+      const mr = mrRows[0];
+      if (mr.type !== 'merge_request' || mr.status !== 'in_progress') continue;
 
-    if (draining) {
-      console.log(
-        `${LOG} Town is draining, skipping dispatch for bead ${ref.current_hook_bead_id}`
-      );
-      continue;
-    }
+      if (draining) {
+        console.log(
+          `${LOG} Town is draining, skipping dispatch for bead ${ref.current_hook_bead_id}`
+        );
+        continue;
+      }
 
-    // Per-bead dispatch cap — check before cooldown so max-attempt MR
-    // beads are failed immediately rather than waiting for the cooldown.
-    if (mr.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
+      // Per-bead dispatch cap — check before cooldown so max-attempt MR
+      // beads are failed immediately rather than waiting for the cooldown.
+      if (mr.dispatch_attempts >= MAX_DISPATCH_ATTEMPTS) {
+        actions.push({
+          type: 'transition_bead',
+          bead_id: ref.current_hook_bead_id,
+          from: null,
+          to: 'failed',
+          reason: `refinery max dispatch attempts exceeded (${mr.dispatch_attempts})`,
+          actor: 'system',
+        });
+        actions.push({
+          type: 'unhook_agent',
+          agent_id: ref.bead_id,
+          reason: 'max dispatch attempts',
+        });
+        continue;
+      }
+
+      // Exponential backoff using bead's last_dispatch_attempt_at
+      const cooldownMs = getDispatchCooldownMs(mr.dispatch_attempts);
+      if (!staleMs(mr.last_dispatch_attempt_at, cooldownMs)) continue;
+
+      // Town-level circuit breaker suppresses dispatch
+      if (circuitBreakerOpen) continue;
+
+      // Container status is checked at apply time (async). In shadow mode,
+      // we just note that a dispatch is needed.
       actions.push({
-        type: 'transition_bead',
-        bead_id: ref.current_hook_bead_id,
-        from: null,
-        to: 'failed',
-        reason: `refinery max dispatch attempts exceeded (${mr.dispatch_attempts})`,
-        actor: 'system',
-      });
-      actions.push({
-        type: 'unhook_agent',
+        type: 'dispatch_agent',
         agent_id: ref.bead_id,
-        reason: 'max dispatch attempts',
+        bead_id: ref.current_hook_bead_id,
+        rig_id: mr.rig_id ?? ref.rig_id ?? '',
       });
-      continue;
     }
-
-    // Exponential backoff using bead's last_dispatch_attempt_at
-    const cooldownMs = getDispatchCooldownMs(mr.dispatch_attempts);
-    if (!staleMs(mr.last_dispatch_attempt_at, cooldownMs)) continue;
-
-    // Town-level circuit breaker suppresses dispatch
-    if (circuitBreakerOpen) continue;
-
-    // Container status is checked at apply time (async). In shadow mode,
-    // we just note that a dispatch is needed.
-    actions.push({
-      type: 'dispatch_agent',
-      agent_id: ref.bead_id,
-      bead_id: ref.current_hook_bead_id,
-      rig_id: mr.rig_id ?? ref.rig_id ?? '',
-    });
-  }
-
   } // end refineryCodeReview gate (Rules 5–6)
 
   // Rule 7: Working refinery hooked to a terminal MR bead — stop it.

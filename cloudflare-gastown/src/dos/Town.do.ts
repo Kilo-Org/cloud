@@ -311,9 +311,7 @@ export class TownDO extends DurableObject<Env> {
         // into the convoy feature branch (the refinery handles that).
         if (agent.role === 'polecat' && townConfig.merge_strategy === 'pr') {
           const convoyId = beadOps.getConvoyForBead(this.sql, beadId);
-          const convoyMergeMode = convoyId
-            ? beadOps.getConvoyMergeMode(this.sql, convoyId)
-            : null;
+          const convoyMergeMode = convoyId ? beadOps.getConvoyMergeMode(this.sql, convoyId) : null;
           const isReviewThenLandIntermediate =
             convoyMergeMode === 'review-then-land' && convoyId !== beadId;
 

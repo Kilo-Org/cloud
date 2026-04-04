@@ -822,15 +822,12 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                 </div>
 
                 <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                  <Switch
-                    checked={refineryCodeReview}
-                    onCheckedChange={setRefineryCodeReview}
-                  />
+                  <Switch checked={refineryCodeReview} onCheckedChange={setRefineryCodeReview} />
                   <div>
                     <Label className="text-sm text-white/70">Refinery code review</Label>
                     <p className="text-[11px] text-white/30">
-                      The refinery agent reviews PRs and adds GitHub review comments. Disable if
-                      you already use an external code-review bot.
+                      The refinery agent reviews PRs and adds GitHub review comments. Disable if you
+                      already use an external code-review bot.
                     </p>
                   </div>
                 </div>

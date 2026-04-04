@@ -295,7 +295,6 @@ app.post('/debug/towns/:townId/send-message', async c => {
 });
 
 app.get('/debug/towns/:townId/beads/:beadId', async c => {
-  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
   const townId = c.req.param('townId');
   const beadId = c.req.param('beadId');
   const town = getTownDOStub(c.env, townId);

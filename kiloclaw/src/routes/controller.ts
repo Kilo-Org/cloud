@@ -197,13 +197,11 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
     waitUntil(telemetryPromise);
   }
 
-  // Persist disk stats from the checkin payload into the DO (best-effort).
-  if (data.diskUsedBytes != null && data.diskTotalBytes != null) {
-    try {
-      await stub.recordDiskStats(data.diskUsedBytes, data.diskTotalBytes);
-    } catch (err) {
-      console.error('[controller] recordDiskStats failed (non-fatal):', err);
-    }
+  // Persist disk stats (best-effort). Missing/null pair clears DO storage so the admin UI does not show stale usage.
+  try {
+    await stub.recordDiskStats(data.diskUsedBytes ?? null, data.diskTotalBytes ?? null);
+  } catch (err) {
+    console.error('[controller] recordDiskStats failed (non-fatal):', err);
   }
 
   // Instance readiness detection: when load drops below threshold, send a

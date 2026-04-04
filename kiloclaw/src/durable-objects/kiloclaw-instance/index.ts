@@ -1616,12 +1616,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return { shouldNotify: true, userId: this.s.userId };
   }
 
-  /** Persist disk usage reported by the controller checkin. */
-  async recordDiskStats(usedBytes: number, totalBytes: number): Promise<void> {
+  /** Persist disk usage from controller checkin, or clear when the pair is missing/null. */
+  async recordDiskStats(usedBytes: number | null, totalBytes: number | null): Promise<void> {
     await this.loadState();
     this.s.diskUsedBytes = usedBytes;
     this.s.diskTotalBytes = totalBytes;
-    await this.persist({ diskUsedBytes: usedBytes, diskTotalBytes: totalBytes });
+    await this.persist({
+      diskUsedBytes: this.s.diskUsedBytes,
+      diskTotalBytes: this.s.diskTotalBytes,
+    });
   }
 
   async listVolumeSnapshots(): Promise<FlyVolumeSnapshot[]> {

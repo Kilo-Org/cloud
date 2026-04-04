@@ -53,6 +53,7 @@ const CIRCUIT_BREAKER_WINDOW_MINUTES = 30;
  * beads that eventually succeeded (status = 'closed').
  */
 function checkDispatchCircuitBreaker(sql: SqlStorage): Action[] {
+  const cutoff = new Date(Date.now() - CIRCUIT_BREAKER_WINDOW_MINUTES * 60_000).toISOString();
   const rows = z
     .object({ failure_count: z.number() })
     .array()
@@ -62,11 +63,11 @@ function checkDispatchCircuitBreaker(sql: SqlStorage): Action[] {
         /* sql */ `
           SELECT count(*) as failure_count
           FROM ${beads}
-          WHERE ${beads.last_dispatch_attempt_at} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-${CIRCUIT_BREAKER_WINDOW_MINUTES} minutes')
+          WHERE ${beads.last_dispatch_attempt_at} > ?
             AND ${beads.dispatch_attempts} > 0
             AND ${beads.status} != 'closed'
         `,
-        []
+        [cutoff]
       ),
     ]);
 

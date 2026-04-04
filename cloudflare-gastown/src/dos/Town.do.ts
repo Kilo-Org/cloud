@@ -4127,7 +4127,8 @@ export class TownDO extends DurableObject<Env> {
     }
 
     const [, owner, repo, numberStr] = ghMatch;
-    const token = townConfig.git_auth.github_token;
+    // Token fallback: github_token → github_cli_pat (same chain as checkPRStatus)
+    const token = townConfig.git_auth?.github_token ?? townConfig.github_cli_pat;
     if (!token) return null;
 
     const headers = {
@@ -4305,9 +4306,10 @@ export class TownDO extends DurableObject<Env> {
     }
 
     const [, owner, repo, numberStr] = ghMatch;
-    const token = townConfig.git_auth.github_token;
+    // Token fallback: github_token → github_cli_pat (same chain as checkPRStatus)
+    const token = townConfig.git_auth?.github_token ?? townConfig.github_cli_pat;
     if (!token) {
-      console.warn(`${TOWN_LOG} mergePR: no github_token configured`);
+      console.warn(`${TOWN_LOG} mergePR: no GitHub token configured`);
       return false;
     }
 

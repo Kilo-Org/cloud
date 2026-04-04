@@ -99,6 +99,8 @@ function syncTownConfigToProcessEnv(): void {
   const orgId = cfg.organization_id;
   if (typeof orgId === 'string' && orgId) {
     process.env.GASTOWN_ORGANIZATION_ID = orgId;
+  } else {
+    delete process.env.GASTOWN_ORGANIZATION_ID;
   }
 }
 

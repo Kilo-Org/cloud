@@ -755,7 +755,8 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               }
             }
           } else {
-            // Null result (e.g. no GitHub token) — increment consecutive null counter
+            // Null result — GitHub API unreachable (token missing, expired, rate-limited, or 5xx).
+            // Increment consecutive null counter; fail the bead after PR_POLL_NULL_THRESHOLD.
             query(
               sql,
               /* sql */ `
@@ -795,12 +796,15 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                   UPDATE ${beads}
                   SET ${beads.columns.metadata} = json_set(
                     COALESCE(${beads.columns.metadata}, '{}'),
-                    '$.failureReason', 'no_github_token',
-                    '$.failureMessage', 'Cannot poll PR status — no GitHub token configured. Please add a token in town settings.'
+                    '$.failureReason', 'pr_poll_failed',
+                    '$.failureMessage', ?
                   )
                   WHERE ${beads.bead_id} = ?
                 `,
-                [action.bead_id]
+                [
+                  `Cannot poll PR status — GitHub API returned null ${nullCount} consecutive times. Check that a valid GitHub token is configured in town settings and that the GitHub API is reachable.`,
+                  action.bead_id,
+                ]
               );
             }
           }

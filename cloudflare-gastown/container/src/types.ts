@@ -80,6 +80,8 @@ export const UpdateAgentModelRequest = z.object({
   smallModel: z.string().optional(),
   /** Pre-formatted conversation history to inject into the new session prompt. */
   conversationHistory: z.string().optional(),
+  /** Organization ID — ensures org billing context is preserved across model changes. */
+  organizationId: z.string().optional(),
 });
 export type UpdateAgentModelRequest = z.infer<typeof UpdateAgentModelRequest>;
 
@@ -133,6 +135,10 @@ export type ManagedAgent = {
   model: string | null;
   /** Full env dict from buildAgentEnv, stored so model hot-swap can replay it. */
   startupEnv: Record<string, string>;
+  /** AbortController for the in-flight startup sequence. Aborted when a
+   *  restart is requested while the agent is still in 'starting' status,
+   *  preventing orphaned sessions from leaking. */
+  startupAbortController: AbortController | null;
 };
 
 export type AgentStatusResponse = {

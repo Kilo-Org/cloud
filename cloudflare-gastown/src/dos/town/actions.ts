@@ -291,6 +291,12 @@ export type ApplyActionContext = {
 
 const LOG = '[actions]';
 
+/** Fail MR bead after this many consecutive null poll results (#1632). */
+const PR_POLL_NULL_THRESHOLD = 10;
+
+/** Minimum interval between PR polls per MR bead (ms) (#1632). */
+export const PR_POLL_INTERVAL_MS = 60_000; // 1 minute
+
 function now(): string {
   return new Date().toISOString();
 }
@@ -576,166 +582,229 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     }
 
     case 'poll_pr': {
-      // Touch updated_at synchronously so the bead doesn't look stale
-      // to Rule 4 (orphaned PR review, 30 min timeout). Without this,
-      // active polling keeps the PR alive but updated_at was set once
-      // at PR creation and never refreshed, causing a false "orphaned"
-      // failure after 30 minutes.
+      // Touch updated_at and record last_poll_at synchronously so the bead
+      // doesn't look stale to Rule 4 (orphaned PR review, 30 min timeout).
+      // Without this, active polling keeps the PR alive but updated_at was
+      // set once at PR creation and never refreshed, causing a false
+      // "orphaned" failure after 30 minutes.
+      const timestamp = now();
       query(
         sql,
         /* sql */ `
           UPDATE ${beads}
-          SET ${beads.columns.updated_at} = ?
+          SET ${beads.columns.updated_at} = ?,
+              ${beads.columns.metadata} = json_set(
+                COALESCE(${beads.columns.metadata}, '{}'),
+                '$.last_poll_at', ?
+              )
           WHERE ${beads.bead_id} = ?
         `,
-        [now(), action.bead_id]
+        [timestamp, timestamp, action.bead_id]
       );
 
       return async () => {
         try {
           const status = await ctx.checkPRStatus(action.pr_url);
-          if (status && status !== 'open') {
-            ctx.insertEvent('pr_status_changed', {
-              bead_id: action.bead_id,
-              payload: { pr_url: action.pr_url, pr_state: status },
-            });
-            return;
-          }
+          if (status !== null) {
+            // Any non-null result resets the consecutive null counter
+            query(
+              sql,
+              /* sql */ `
+                UPDATE ${beads}
+                SET ${beads.columns.metadata} = json_set(
+                  COALESCE(${beads.columns.metadata}, '{}'),
+                  '$.poll_null_count', 0
+                )
+                WHERE ${beads.bead_id} = ?
+              `,
+              [action.bead_id]
+            );
+            if (status !== 'open') {
+              ctx.insertEvent('pr_status_changed', {
+                bead_id: action.bead_id,
+                payload: { pr_url: action.pr_url, pr_state: status },
+              });
+              return;
+            }
 
-          // PR is open — check for feedback and auto-merge if configured
-          const townConfig = await ctx.getTownConfig();
-          const refineryConfig = townConfig.refinery;
-          if (!refineryConfig) return;
+            // PR is open — check for feedback and auto-merge if configured
+            const townConfig = await ctx.getTownConfig();
+            const refineryConfig = townConfig.refinery;
+            if (!refineryConfig) return;
 
-          // Auto-resolve PR feedback: detect unresolved comments and failing CI
-          if (refineryConfig.auto_resolve_pr_feedback) {
-            const feedback = await ctx.checkPRFeedback(action.pr_url);
+            // Auto-resolve PR feedback: detect unresolved comments and failing CI
+            if (refineryConfig.auto_resolve_pr_feedback) {
+              const feedback = await ctx.checkPRFeedback(action.pr_url);
+              if (
+                feedback &&
+                (feedback.hasUnresolvedComments ||
+                  feedback.hasFailingChecks ||
+                  feedback.hasUncheckedRuns)
+              ) {
+                const existingFeedback = hasExistingFeedbackBead(sql, action.bead_id);
+                if (!existingFeedback) {
+                  const prMeta = parsePrUrl(action.pr_url);
+                  const rmRows = z
+                    .object({ branch: z.string() })
+                    .array()
+                    .parse([
+                      ...query(
+                        sql,
+                        /* sql */ `
+                          SELECT ${review_metadata.columns.branch}
+                          FROM ${review_metadata}
+                          WHERE ${review_metadata.bead_id} = ?
+                        `,
+                        [action.bead_id]
+                      ),
+                    ]);
+                  const branch = rmRows[0]?.branch ?? '';
+
+                  ctx.insertEvent('pr_feedback_detected', {
+                    bead_id: action.bead_id,
+                    payload: {
+                      mr_bead_id: action.bead_id,
+                      pr_url: action.pr_url,
+                      pr_number: prMeta?.prNumber ?? 0,
+                      repo: prMeta?.repo ?? '',
+                      branch,
+                      has_unresolved_comments: feedback.hasUnresolvedComments,
+                      has_failing_checks: feedback.hasFailingChecks,
+                      has_unchecked_runs: feedback.hasUncheckedRuns,
+                    },
+                  });
+                }
+
+                query(
+                  sql,
+                  /* sql */ `
+                    UPDATE ${review_metadata}
+                    SET ${review_metadata.columns.last_feedback_check_at} = ?
+                    WHERE ${review_metadata.bead_id} = ?
+                  `,
+                  [now(), action.bead_id]
+                );
+              }
+            }
+
+            // Auto-merge timer: track grace period when everything is green.
+            // Requires both auto_merge enabled AND a delay configured.
             if (
-              feedback &&
-              (feedback.hasUnresolvedComments ||
-                feedback.hasFailingChecks ||
-                feedback.hasUncheckedRuns)
+              refineryConfig.auto_merge !== false &&
+              refineryConfig.auto_merge_delay_minutes !== null &&
+              refineryConfig.auto_merge_delay_minutes !== undefined
             ) {
-              // Check for existing non-terminal feedback bead to prevent duplicates
-              const existingFeedback = hasExistingFeedbackBead(sql, action.bead_id);
-              if (!existingFeedback) {
-                // Parse PR URL for repo/number metadata
-                const prMeta = parsePrUrl(action.pr_url);
-                const rmRows = z
-                  .object({ branch: z.string() })
+              const feedback = await ctx.checkPRFeedback(action.pr_url);
+              if (!feedback) return;
+
+              const allGreen =
+                !feedback.hasUnresolvedComments &&
+                !feedback.hasFailingChecks &&
+                feedback.allChecksPass;
+
+              if (allGreen) {
+                const readySinceRows = z
+                  .object({ auto_merge_ready_since: z.string().nullable() })
                   .array()
                   .parse([
                     ...query(
                       sql,
                       /* sql */ `
-                        SELECT ${review_metadata.columns.branch}
+                        SELECT ${review_metadata.columns.auto_merge_ready_since}
                         FROM ${review_metadata}
                         WHERE ${review_metadata.bead_id} = ?
                       `,
                       [action.bead_id]
                     ),
                   ]);
-                const branch = rmRows[0]?.branch ?? '';
 
-                ctx.insertEvent('pr_feedback_detected', {
-                  bead_id: action.bead_id,
-                  payload: {
-                    mr_bead_id: action.bead_id,
-                    pr_url: action.pr_url,
-                    pr_number: prMeta?.prNumber ?? 0,
-                    repo: prMeta?.repo ?? '',
-                    branch,
-                    has_unresolved_comments: feedback.hasUnresolvedComments,
-                    has_failing_checks: feedback.hasFailingChecks,
-                    has_unchecked_runs: feedback.hasUncheckedRuns,
-                  },
-                });
-              }
+                const readySince = readySinceRows[0]?.auto_merge_ready_since;
 
-              // Update last_feedback_check_at
-              query(
-                sql,
-                /* sql */ `
-                  UPDATE ${review_metadata}
-                  SET ${review_metadata.columns.last_feedback_check_at} = ?
-                  WHERE ${review_metadata.bead_id} = ?
-                `,
-                [now(), action.bead_id]
-              );
-            }
-          }
-
-          // Auto-merge timer: track grace period when everything is green.
-          // Requires both auto_merge enabled AND a delay configured.
-          if (
-            refineryConfig.auto_merge !== false &&
-            refineryConfig.auto_merge_delay_minutes !== null &&
-            refineryConfig.auto_merge_delay_minutes !== undefined
-          ) {
-            const feedback = await ctx.checkPRFeedback(action.pr_url);
-            if (!feedback) return;
-
-            const allGreen =
-              !feedback.hasUnresolvedComments &&
-              !feedback.hasFailingChecks &&
-              feedback.allChecksPass;
-
-            if (allGreen) {
-              // Check if timer is already running
-              const readySinceRows = z
-                .object({ auto_merge_ready_since: z.string().nullable() })
-                .array()
-                .parse([
-                  ...query(
+                if (!readySince) {
+                  query(
                     sql,
                     /* sql */ `
-                      SELECT ${review_metadata.columns.auto_merge_ready_since}
-                      FROM ${review_metadata}
+                      UPDATE ${review_metadata}
+                      SET ${review_metadata.columns.auto_merge_ready_since} = ?
                       WHERE ${review_metadata.bead_id} = ?
                     `,
-                    [action.bead_id]
-                  ),
-                ]);
-
-              const readySince = readySinceRows[0]?.auto_merge_ready_since;
-
-              if (!readySince) {
-                // First tick where everything is green — start the timer
+                    [now(), action.bead_id]
+                  );
+                } else {
+                  const elapsed = Date.now() - new Date(readySince).getTime();
+                  if (elapsed >= refineryConfig.auto_merge_delay_minutes * 60_000) {
+                    ctx.insertEvent('pr_auto_merge', {
+                      bead_id: action.bead_id,
+                      payload: {
+                        mr_bead_id: action.bead_id,
+                        pr_url: action.pr_url,
+                      },
+                    });
+                  }
+                }
+              } else {
                 query(
                   sql,
                   /* sql */ `
                     UPDATE ${review_metadata}
-                    SET ${review_metadata.columns.auto_merge_ready_since} = ?
+                    SET ${review_metadata.columns.auto_merge_ready_since} = NULL
                     WHERE ${review_metadata.bead_id} = ?
                   `,
-                  [now(), action.bead_id]
+                  [action.bead_id]
                 );
-              } else {
-                const elapsed = Date.now() - new Date(readySince).getTime();
-                if (elapsed >= refineryConfig.auto_merge_delay_minutes * 60_000) {
-                  // Grace period elapsed — emit merge event
-                  ctx.insertEvent('pr_auto_merge', {
-                    bead_id: action.bead_id,
-                    payload: {
-                      mr_bead_id: action.bead_id,
-                      pr_url: action.pr_url,
-                    },
-                  });
-                }
               }
-            } else {
-              // Not all green — reset the timer
+            }
+          } else {
+            // Null result (e.g. no GitHub token) — increment consecutive null counter
+            query(
+              sql,
+              /* sql */ `
+                UPDATE ${beads}
+                SET ${beads.columns.metadata} = json_set(
+                  COALESCE(${beads.columns.metadata}, '{}'),
+                  '$.poll_null_count',
+                  COALESCE(
+                    json_extract(${beads.columns.metadata}, '$.poll_null_count'),
+                    0
+                  ) + 1
+                )
+                WHERE ${beads.bead_id} = ?
+              `,
+              [action.bead_id]
+            );
+            const rows = [
+              ...query(
+                sql,
+                /* sql */ `
+                  SELECT json_extract(${beads.columns.metadata}, '$.poll_null_count') AS null_count
+                  FROM ${beads}
+                  WHERE ${beads.bead_id} = ?
+                `,
+                [action.bead_id]
+              ),
+            ];
+            const nullCount = Number(rows[0]?.null_count ?? 0);
+            if (nullCount >= PR_POLL_NULL_THRESHOLD) {
+              console.warn(
+                `${LOG} poll_pr: ${nullCount} consecutive null results for bead=${action.bead_id}, failing`
+              );
+              beadOps.updateBeadStatus(sql, action.bead_id, 'failed', 'system');
               query(
                 sql,
                 /* sql */ `
-                  UPDATE ${review_metadata}
-                  SET ${review_metadata.columns.auto_merge_ready_since} = NULL
-                  WHERE ${review_metadata.bead_id} = ?
+                  UPDATE ${beads}
+                  SET ${beads.columns.metadata} = json_set(
+                    COALESCE(${beads.columns.metadata}, '{}'),
+                    '$.failureReason', 'no_github_token',
+                    '$.failureMessage', 'Cannot poll PR status — no GitHub token configured. Please add a token in town settings.'
+                  )
+                  WHERE ${beads.bead_id} = ?
                 `,
                 [action.bead_id]
               );
             }
           }
+          // status === 'open' — no action needed, poll again next tick
         } catch (err) {
           console.warn(`${LOG} poll_pr failed: bead=${action.bead_id} url=${action.pr_url}`, err);
         }

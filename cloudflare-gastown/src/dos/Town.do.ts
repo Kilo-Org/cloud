@@ -2425,6 +2425,11 @@ export class TownDO extends DurableObject<Env> {
       // before restarting the SDK server (tokens, git identity, etc.).
       const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
 
+      // Resolve townConfig to thread the organization_id into the request body
+      // (belt-and-suspenders: ensures org billing survives even if X-Town-Config
+      // header parsing fails on the container side).
+      const townConfig = await config.getTownConfig(this.ctx.storage);
+
       const updated = await dispatch.updateAgentModelInContainer(
         this.env,
         townId,
@@ -2432,7 +2437,8 @@ export class TownDO extends DurableObject<Env> {
         model,
         smallModel,
         conversationHistory || undefined,
-        containerConfig
+        containerConfig,
+        townConfig.organization_id
       );
       if (updated) {
         console.log(
@@ -4007,9 +4013,24 @@ export class TownDO extends DurableObject<Env> {
     const ghMatch = prUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
     if (ghMatch) {
       const [, owner, repo, numberStr] = ghMatch;
-      const token = townConfig.git_auth.github_token;
+      // Fix 1 & 2: Token fallback chain — github_token → github_cli_pat → platform integration
+      let token = townConfig.git_auth.github_token ?? townConfig.github_cli_pat;
       if (!token) {
-        console.warn(`${TOWN_LOG} checkPRStatus: no github_token configured, cannot poll ${prUrl}`);
+        // Try resolving from GitHub App installation as final fallback
+        const integrationId = townConfig.git_auth.platform_integration_id;
+        if (integrationId && this.env.GIT_TOKEN_SERVICE) {
+          try {
+            token = await this.env.GIT_TOKEN_SERVICE.getToken(integrationId);
+          } catch (err) {
+            console.warn(
+              `${TOWN_LOG} checkPRStatus: platform integration token lookup failed for ${integrationId}`,
+              err
+            );
+          }
+        }
+      }
+      if (!token) {
+        console.warn(`${TOWN_LOG} checkPRStatus: no github token available, cannot poll ${prUrl}`);
         return null;
       }
 

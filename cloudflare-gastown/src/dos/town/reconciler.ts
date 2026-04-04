@@ -30,6 +30,7 @@ import * as reviewQueue from './review-queue';
 import * as agents from './agents';
 import * as beadOps from './beads';
 import { getRig } from './rigs';
+import { PR_POLL_INTERVAL_MS } from './actions';
 import type { Action } from './actions';
 import type { TownEventRecord } from '../../db/tables/town-events.table';
 
@@ -1046,6 +1047,7 @@ export function reconcileReviewQueue(
       /* sql */ `
         SELECT b.${beads.columns.bead_id}, b.${beads.columns.status},
                b.${beads.columns.rig_id}, b.${beads.columns.updated_at},
+               b.${beads.columns.metadata},
                rm.${review_metadata.columns.pr_url},
                b.${beads.columns.assignee_agent_bead_id},
                b.${beads.columns.metadata}
@@ -1059,14 +1061,20 @@ export function reconcileReviewQueue(
   ]);
 
   for (const mr of mrBeads) {
-    // Rule 1: PR-strategy MR beads in_progress need polling
+    // Rule 1: PR-strategy MR beads in_progress need polling.
+    // Rate-limit: skip if polled less than PR_POLL_INTERVAL_MS ago (#1632).
     if (mr.status === 'in_progress' && mr.pr_url) {
-      // Always poll for status changes (merged/closed by human, etc.)
-      actions.push({
-        type: 'poll_pr',
-        bead_id: mr.bead_id,
-        pr_url: mr.pr_url,
-      });
+      const lastPollAt: unknown = mr.metadata?.last_poll_at;
+      const msSinceLastPoll =
+        typeof lastPollAt === 'string' ? Date.now() - new Date(lastPollAt).getTime() : Infinity;
+
+      if (msSinceLastPoll >= PR_POLL_INTERVAL_MS) {
+        actions.push({
+          type: 'poll_pr',
+          bead_id: mr.bead_id,
+          pr_url: mr.pr_url,
+        });
+      }
       // If auto-merge is pending, also attempt the merge
       if (mr.metadata?.auto_merge_pending) {
         actions.push({
@@ -2009,6 +2017,7 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
   const violations: Violation[] = [];
 
   // Invariant 7: Working agents must have hooks
+  // Mayors are always 'working' and intentionally have no hook — exclude them.
   const unhookedWorkers = z
     .object({ bead_id: z.string() })
     .array()
@@ -2020,6 +2029,7 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
         FROM ${agent_metadata}
         WHERE ${agent_metadata.status} = 'working'
           AND ${agent_metadata.current_hook_bead_id} IS NULL
+          AND ${agent_metadata.role} != 'mayor'
       `,
         []
       ),
@@ -2031,26 +2041,27 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
     });
   }
 
-  // Invariant 5: Convoy beads should not be in_progress
-  const inProgressConvoys = z
-    .object({ bead_id: z.string() })
+  // Invariant 5: Convoy beads should not be in unexpected states.
+  // Valid transient states: open, in_progress, in_review, closed.
+  const badStateConvoys = z
+    .object({ bead_id: z.string(), status: z.string() })
     .array()
     .parse([
       ...query(
         sql,
         /* sql */ `
-        SELECT ${beads.bead_id}
+        SELECT ${beads.bead_id}, ${beads.status}
         FROM ${beads}
         WHERE ${beads.type} = 'convoy'
-          AND ${beads.status} = 'in_progress'
+          AND ${beads.status} NOT IN ('open', 'in_progress', 'in_review', 'closed')
       `,
         []
       ),
     ]);
-  for (const c of inProgressConvoys) {
+  for (const c of badStateConvoys) {
     violations.push({
       invariant: 5,
-      message: `Convoy bead ${c.bead_id} is in_progress (should only be open or closed)`,
+      message: `Convoy bead ${c.bead_id} is in unexpected state '${c.status}'`,
     });
   }
 

@@ -676,7 +676,8 @@ export async function updateAgentModelInContainer(
   model: string,
   smallModel?: string,
   conversationHistory?: string,
-  containerConfig?: Record<string, unknown>
+  containerConfig?: Record<string, unknown>,
+  organizationId?: string
 ): Promise<boolean> {
   try {
     const container = getTownContainerStub(env, townId);
@@ -691,6 +692,7 @@ export async function updateAgentModelInContainer(
         model,
         ...(smallModel ? { smallModel } : {}),
         ...(conversationHistory ? { conversationHistory } : {}),
+        ...(organizationId ? { organizationId } : {}),
       }),
     });
     return response.ok;

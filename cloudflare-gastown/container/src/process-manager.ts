@@ -620,6 +620,14 @@ export async function startAgent(
     console.log(
       `${MANAGER_LOG} startAgent: stopping existing session for ${request.agentId} (status=${existing.status})`
     );
+
+    // If the agent is still starting, abort the in-flight startup to prevent
+    // an orphaned session from being created after stopAgent returns.
+    if (existing.status === 'starting' && existing.startupAbortController) {
+      console.log(`${MANAGER_LOG} startAgent: aborting in-flight startup for ${request.agentId}`);
+      existing.startupAbortController.abort();
+    }
+
     await stopAgent(request.agentId).catch(err => {
       console.warn(
         `${MANAGER_LOG} startAgent: failed to stop existing session for ${request.agentId}`,
@@ -629,6 +637,7 @@ export async function startAgent(
   }
 
   const now = new Date().toISOString();
+  const startupAbortController = new AbortController();
   const agent: ManagedAgent = {
     agentId: request.agentId,
     rigId: request.rigId,
@@ -653,14 +662,21 @@ export async function startAgent(
     completionCallbackUrl: request.envVars?.GASTOWN_COMPLETION_CALLBACK_URL ?? null,
     model: request.model ?? null,
     startupEnv: env,
+    startupAbortController,
   };
   agents.set(request.agentId, agent);
 
+  const { signal } = startupAbortController;
   let sessionCounted = false;
   try {
     // 1. Ensure SDK server is running for this workdir
     const { client, port } = await ensureSDKServer(workdir, env);
     agent.serverPort = port;
+
+    // Check if startup was cancelled while waiting for the SDK server
+    if (signal.aborted) {
+      throw new StartupAbortedError(request.agentId);
+    }
 
     // Track session count on the SDK instance
     const instance = sdkInstances.get(workdir);
@@ -671,6 +687,10 @@ export async function startAgent(
 
     // 2. Create a session
     const sessionResult = await client.session.create({ body: {} });
+
+    // Parse and store the session ID immediately so the catch block can
+    // abort an orphaned session if startupAbortController fires during
+    // the await above.
     const rawSession: unknown = sessionResult.data ?? sessionResult;
     const parsed = SessionResponse.safeParse(rawSession);
     if (!parsed.success) {
@@ -683,6 +703,12 @@ export async function startAgent(
     }
     const sessionId = parsed.data.id;
     agent.sessionId = sessionId;
+
+    // Now check if startup was cancelled while creating the session.
+    // agent.sessionId is already set, so the catch block will abort it.
+    if (signal.aborted) {
+      throw new StartupAbortedError(request.agentId);
+    }
 
     // 3. Subscribe to events (async, runs in background)
     void subscribeToEvents(client, agent, request);
@@ -705,6 +731,11 @@ export async function startAgent(
       modelParam = { providerID: 'kilo', modelID: request.model };
     }
 
+    // Final abort check before sending the prompt
+    if (signal.aborted) {
+      throw new StartupAbortedError(request.agentId);
+    }
+
     await client.session.prompt({
       path: { id: sessionId },
       body: {
@@ -722,6 +753,7 @@ export async function startAgent(
       sessionCounted = false;
       throw new Error('Event stream failed during initial prompt');
     }
+    agent.startupAbortController = null;
 
     agent.messageCount = 1;
 
@@ -735,7 +767,39 @@ export async function startAgent(
 
     return agent;
   } catch (err) {
+    // On abort, clean up silently — the new startAgent invocation will
+    // proceed with a fresh entry.
+    if (err instanceof StartupAbortedError) {
+      console.log(`${MANAGER_LOG} startAgent: startup aborted for ${request.agentId}, cleaning up`);
+      if (sessionCounted) {
+        const instance = sdkInstances.get(workdir);
+        if (instance) {
+          // Abort the orphaned session if one was created before the abort
+          if (agent.sessionId) {
+            try {
+              await instance.client.session.abort({ path: { id: agent.sessionId } });
+            } catch (abortErr) {
+              console.error(
+                `${MANAGER_LOG} startAgent: failed to abort orphaned session ${agent.sessionId}:`,
+                abortErr
+              );
+            }
+          }
+          instance.sessionCount--;
+          if (instance.sessionCount <= 0) {
+            instance.server.close();
+            sdkInstances.delete(workdir);
+          }
+        }
+      }
+      if (agents.get(request.agentId) === agent) {
+        agents.delete(request.agentId);
+      }
+      throw err;
+    }
+
     agent.status = 'failed';
+    agent.startupAbortController = null;
     agent.exitReason = err instanceof Error ? err.message : String(err);
     if (sessionCounted) {
       const instance = sdkInstances.get(workdir);
@@ -746,12 +810,31 @@ export async function startAgent(
 }
 
 /**
+ * Thrown when a startup sequence is cancelled via AbortController.
+ * Distinct from other errors so the catch block can clean up without
+ * marking the agent as failed (a new startup is taking over).
+ */
+class StartupAbortedError extends Error {
+  constructor(agentId: string) {
+    super(`Startup aborted for agent ${agentId}`);
+    this.name = 'StartupAbortedError';
+  }
+}
+
+/**
  * Stop an agent by aborting its session.
  */
 export async function stopAgent(agentId: string): Promise<void> {
   const agent = agents.get(agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);
   if (agent.status !== 'running' && agent.status !== 'starting') return;
+
+  // If still starting, abort the in-flight startup so session.create()
+  // doesn't produce an orphaned session after we return.
+  if (agent.startupAbortController) {
+    agent.startupAbortController.abort();
+    agent.startupAbortController = null;
+  }
 
   agent.status = 'stopping';
 
@@ -839,6 +922,12 @@ export async function sendMessage(agentId: string, prompt: string): Promise<void
  * by `buildKiloConfigContent` at agent startup.
  */
 function extractOrganizationId(): string | undefined {
+  // Primary source: standalone env var set by control-server on /agents/start
+  // and updated on every PATCH /model via X-Town-Config.
+  const envOrgId = process.env.GASTOWN_ORGANIZATION_ID;
+  if (envOrgId) return envOrgId;
+
+  // Fallback: extract from KILO_CONFIG_CONTENT (legacy path)
   const raw = process.env.KILO_CONFIG_CONTENT;
   if (!raw) return undefined;
   try {

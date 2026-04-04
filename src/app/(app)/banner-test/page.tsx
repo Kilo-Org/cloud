@@ -26,7 +26,7 @@ export default function BannerTestPage() {
       {/* ═══════════════════════════════════════════════════
           1a. OldSessionBanner
           ═══════════════════════════════════════════════════ */}
-      <section className="space-y-3">
+      <section id="section-old-session" className="space-y-3">
         <h2 className="text-lg font-semibold text-muted-foreground">1a. OldSessionBanner</h2>
 
         {/* BEFORE */}
@@ -69,7 +69,7 @@ export default function BannerTestPage() {
       {/* ═══════════════════════════════════════════════════
           1b. ErrorBanner
           ═══════════════════════════════════════════════════ */}
-      <section className="space-y-3">
+      <section id="section-error" className="space-y-3">
         <h2 className="text-lg font-semibold text-muted-foreground">1b. ErrorBanner</h2>
 
         {/* BEFORE */}
@@ -115,7 +115,7 @@ export default function BannerTestPage() {
       {/* ═══════════════════════════════════════════════════
           1c. AdminViewingBanner
           ═══════════════════════════════════════════════════ */}
-      <section className="space-y-3">
+      <section id="section-admin-viewing" className="space-y-3">
         <h2 className="text-lg font-semibold text-muted-foreground">1c. AdminViewingBanner</h2>
 
         {/* BEFORE */}
@@ -156,7 +156,7 @@ export default function BannerTestPage() {
       {/* ═══════════════════════════════════════════════════
           1d. BillingBanner — 3 states
           ═══════════════════════════════════════════════════ */}
-      <section className="space-y-3">
+      <section id="section-billing-active" className="space-y-3">
         <h2 className="text-lg font-semibold text-muted-foreground">1d. BillingBanner — trial_active</h2>
 
         {/* BEFORE */}
@@ -190,7 +190,7 @@ export default function BannerTestPage() {
         </div>
       </section>
 
-      <section className="space-y-3">
+      <section id="section-billing-ending" className="space-y-3">
         <h2 className="text-lg font-semibold text-muted-foreground">1d. BillingBanner — trial_ending_soon</h2>
 
         {/* BEFORE */}
@@ -224,7 +224,7 @@ export default function BannerTestPage() {
         </div>
       </section>
 
-      <section className="space-y-3">
+      <section id="section-billing-pastdue" className="space-y-3">
         <h2 className="text-lg font-semibold text-muted-foreground">1d. BillingBanner — subscription_past_due</h2>
 
         {/* BEFORE */}
@@ -261,7 +261,7 @@ export default function BannerTestPage() {
       {/* ═══════════════════════════════════════════════════
           1e. FreeTrialWarningBanner — 2 states
           ═══════════════════════════════════════════════════ */}
-      <section className="space-y-3">
+      <section id="section-freetrial-active" className="space-y-3">
         <h2 className="text-lg font-semibold text-muted-foreground">1e. FreeTrialWarningBanner — trial_active</h2>
 
         {/* BEFORE */}
@@ -301,7 +301,7 @@ export default function BannerTestPage() {
         </div>
       </section>
 
-      <section className="space-y-3">
+      <section id="section-freetrial-ending" className="space-y-3">
         <h2 className="text-lg font-semibold text-muted-foreground">1e. FreeTrialWarningBanner — trial_ending_very_soon</h2>
 
         {/* BEFORE */}
@@ -344,7 +344,7 @@ export default function BannerTestPage() {
       {/* ═══════════════════════════════════════════════════
           1f. InsufficientBalanceBanner — 2 variants
           ═══════════════════════════════════════════════════ */}
-      <section className="space-y-3">
+      <section id="section-insufficient-default" className="space-y-3">
         <h2 className="text-lg font-semibold text-muted-foreground">1f. InsufficientBalanceBanner — default</h2>
 
         {/* BEFORE */}
@@ -384,7 +384,7 @@ export default function BannerTestPage() {
         </div>
       </section>
 
-      <section className="space-y-3">
+      <section id="section-insufficient-compact" className="space-y-3">
         <h2 className="text-lg font-semibold text-muted-foreground">1f. InsufficientBalanceBanner — compact</h2>
 
         {/* BEFORE */}

@@ -1,22 +1,10 @@
-import { Suspense } from 'react';
-import { WebhookRequestsContent } from '@/app/(app)/cloud/webhooks/[triggerId]/requests/WebhookRequestsContent';
-import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
+import { redirect } from 'next/navigation';
 
-export default async function OrganizationWebhookRequestsPage({
-  params,
-}: {
+type Props = {
   params: Promise<{ id: string; triggerId: string }>;
-}) {
-  return (
-    <OrganizationByPageLayout
-      params={params}
-      render={({ organization }) => (
-        <Suspense
-          fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}
-        >
-          <WebhookRequestsContent params={params} organizationId={organization.id} />
-        </Suspense>
-      )}
-    />
-  );
+};
+
+export default async function OrganizationWebhookRequestsPage({ params }: Props) {
+  const { id, triggerId } = await params;
+  redirect(`/organizations/${id}/cloud/triggers/${triggerId}/requests`);
 }

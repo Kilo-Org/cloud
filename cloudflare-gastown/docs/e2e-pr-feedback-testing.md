@@ -383,3 +383,113 @@ If the refinery creates a duplicate PR instead of reviewing the existing one:
 
 - In `review-and-merge` mode, each bead is independent — no sequencing dependencies.
 - In `review-then-land` mode, beads with `blocks` dependencies wait for their predecessors. Intermediate beads do NOT create PRs (the refinery merges directly to the feature branch).
+
+### Container Networking (Local Dev)
+
+The wrangler container runtime occasionally fails to route DO `container.fetch()` to the container's port 8080 — `send-message` returns `sessionStatus: "idle"` even though Docker shows the container as healthy. Workarounds:
+
+1. **Have a human start wrangler** via the terminal (not `nohup`). The TTY seems to help with container proxy setup.
+2. **Kill all containers and restart wrangler cleanly** — stale proxy state can prevent new connections.
+3. **Wait 30-60s after wrangler starts** before sending messages — the container needs time to fully initialize.
+4. The `GET /health` endpoint returning 200 does NOT mean the DO-to-container path works. The DO's `container.fetch()` uses a different routing mechanism.
+
+---
+
+## Debug Endpoints
+
+### Inspect a Bead
+
+Get full bead details including review_metadata and dependencies:
+
+```bash
+curl -s $BASE/debug/towns/$TOWN_ID/beads/<bead_id> | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+bead = d.get('bead', {})
+print(f'Type: {bead.get(\"type\")}  Status: {bead.get(\"status\")}')
+print(f'Title: {bead.get(\"title\")}')
+print(f'Parent: {bead.get(\"parent_bead_id\", \"NULL\")}')
+rm = d.get('reviewMetadata')
+if rm:
+    print(f'PR URL: {rm.get(\"pr_url\")}')
+    print(f'Branch: {rm.get(\"branch\")} -> {rm.get(\"target_branch\")}')
+    print(f'Auto-merge ready since: {rm.get(\"auto_merge_ready_since\", \"NULL\")}')
+    print(f'Last feedback check: {rm.get(\"last_feedback_check_at\", \"NULL\")}')
+deps = d.get('dependencies', [])
+if deps:
+    print(f'Dependencies ({len(deps)}):')
+    for dep in deps:
+        print(f'  {dep[\"bead_id\"][:8]} -> {dep[\"depends_on_bead_id\"][:8]} ({dep[\"dependency_type\"]})')
+"
+```
+
+### Verify Bead Chain (parent_bead_id linkage)
+
+After a rework or feedback cycle, verify the chain:
+
+```bash
+# Get the MR bead
+MR_ID=<mr_bead_id>
+curl -s $BASE/debug/towns/$TOWN_ID/beads/$MR_ID | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+deps = d.get('dependencies', [])
+print('MR bead dependencies:')
+for dep in deps:
+    print(f'  {dep[\"dependency_type\"]}: {dep[\"depends_on_bead_id\"][:12]}')
+"
+# Then check a rework/feedback bead's parent
+REWORK_ID=<rework_bead_id>
+curl -s $BASE/debug/towns/$TOWN_ID/beads/$REWORK_ID | python3 -c "
+import sys, json
+bead = json.load(sys.stdin).get('bead', {})
+print(f'parent_bead_id: {bead.get(\"parent_bead_id\", \"NULL\")}')
+# Should match the MR bead ID
+"
+```
+
+---
+
+## Test C: Code Review Toggle (refinery disabled)
+
+Tests the `refinery.code_review` setting — when disabled, MR beads skip the refinery and go directly to `poll_pr`.
+
+### C.1. Disable Code Review
+
+In the town settings UI, set **Refinery code review** to disabled (unchecked).
+
+### C.2. Send Work
+
+```bash
+curl -s -m 120 -X POST $BASE/debug/towns/$TOWN_ID/send-message \
+  -H "Content-Type: application/json" \
+  -d "{\"message\": \"Create a bead for this task on the $RIG_ID rig: Add src/utils/type-guards.ts with functions: isString, isNumber, isArray, isObject, isNonNullable. Each with JSDoc. Commit and push.\"}"
+```
+
+### C.3. Verify MR Bead Skips Refinery
+
+Watch for the MR bead to go directly from `open` to `in_progress` without a refinery being dispatched:
+
+```bash
+for i in $(seq 1 60); do
+  STATUS=$(curl -s $BASE/debug/towns/$TOWN_ID/status)
+  echo "$(date +%H:%M:%S)"
+  echo "$STATUS" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+for b in d.get('beadSummary', []):
+    if b.get('type') == 'merge_request':
+        print(f'  MR: {b.get(\"status\",\"?\"):12s} {str(b.get(\"title\",\"\"))[:50]}')
+for am in d.get('agentMeta', []):
+    if am.get('role') == 'refinery' and am.get('status') != 'idle':
+        print(f'  WARNING: refinery is {am.get(\"status\")} — should be idle!')
+" 2>/dev/null
+  sleep 15
+done
+```
+
+**Expected:** The MR bead transitions from `open` → `in_progress` by the reconciler (not the refinery). No refinery agents should become `working`. The `poll_pr` action should start immediately.
+
+### C.4. Re-enable Code Review
+
+After testing, re-enable **Refinery code review** in town settings.

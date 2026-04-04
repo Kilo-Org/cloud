@@ -12,6 +12,11 @@ import {
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
 import { triggerIdSchema, triggerIdCreateSchema } from '@/lib/webhook-trigger-validation';
 import {
+  validateCronExpression,
+  enforcesMinimumInterval,
+  isValidTimezone,
+} from '@/lib/cron-validation';
+import {
   createWorkerTrigger,
   getWorkerTrigger,
   updateWorkerTrigger,
@@ -47,8 +52,50 @@ const WebhookTriggerCreateInput = z
         secret: z.string().trim().min(1, 'Webhook auth secret is required'),
       })
       .optional(),
+    // Activation mode: 'webhook' (default) or 'scheduled' (cron-based). Immutable after creation.
+    activationMode: z.enum(['webhook', 'scheduled']).default('webhook'),
+    cronExpression: z.string().max(100).optional(),
+    cronTimezone: z.string().max(50).optional().default('UTC'),
   })
   .superRefine((data, ctx) => {
+    if (data.activationMode === 'scheduled') {
+      if (!data.cronExpression) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Cron expression is required for scheduled triggers',
+          path: ['cronExpression'],
+        });
+      } else {
+        const validation = validateCronExpression(data.cronExpression);
+        if (!validation.valid) {
+          ctx.addIssue({
+            code: 'custom',
+            message: validation.error ?? 'Invalid cron expression',
+            path: ['cronExpression'],
+          });
+        } else if (!enforcesMinimumInterval(data.cronExpression, data.cronTimezone ?? 'UTC')) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Schedule interval must be at least 1 minute',
+            path: ['cronExpression'],
+          });
+        }
+      }
+      if (data.cronTimezone && !isValidTimezone(data.cronTimezone)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Invalid timezone',
+          path: ['cronTimezone'],
+        });
+      }
+      if (data.webhookAuth) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Webhook auth is not applicable for scheduled triggers',
+          path: ['webhookAuth'],
+        });
+      }
+    }
     if (data.targetType === 'cloud_agent') {
       if (!data.githubRepo)
         ctx.addIssue({ code: 'custom', message: 'GitHub repo is required', path: ['githubRepo'] });
@@ -70,23 +117,52 @@ const WebhookTriggerCreateInput = z
 
 // Note: targetType and kiloclawInstanceId are immutable after creation.
 // To change the target type or instance, delete and recreate the trigger.
-const WebhookTriggerUpdateInput = z.object({
-  triggerId: triggerIdSchema,
-  organizationId: z.string().uuid().optional(),
-  mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
-  model: z.string().min(1).optional(),
-  promptTemplate: z.string().min(1).max(10000).optional(),
-  profileId: z.string().uuid().optional(),
-  autoCommit: z.boolean().nullable().optional(),
-  condenseOnComplete: z.boolean().nullable().optional(),
-  isActive: z.boolean().optional(),
-  webhookAuth: z
-    .object({
-      header: z.string().trim().min(1).nullable().optional(),
-      secret: z.string().trim().min(1).nullable().optional(),
-    })
-    .optional(),
-});
+const WebhookTriggerUpdateInput = z
+  .object({
+    triggerId: triggerIdSchema,
+    organizationId: z.string().uuid().optional(),
+    mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
+    model: z.string().min(1).optional(),
+    promptTemplate: z.string().min(1).max(10000).optional(),
+    profileId: z.string().uuid().optional(),
+    autoCommit: z.boolean().nullable().optional(),
+    condenseOnComplete: z.boolean().nullable().optional(),
+    isActive: z.boolean().optional(),
+    webhookAuth: z
+      .object({
+        header: z.string().trim().min(1).nullable().optional(),
+        secret: z.string().trim().min(1).nullable().optional(),
+      })
+      .optional(),
+    // activationMode is immutable — not included in update
+    cronExpression: z.string().max(100).optional(),
+    cronTimezone: z.string().max(50).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.cronExpression !== undefined) {
+      const validation = validateCronExpression(data.cronExpression);
+      if (!validation.valid) {
+        ctx.addIssue({
+          code: 'custom',
+          message: validation.error ?? 'Invalid cron expression',
+          path: ['cronExpression'],
+        });
+      } else if (!enforcesMinimumInterval(data.cronExpression, data.cronTimezone ?? 'UTC')) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Schedule interval must be at least 1 minute',
+          path: ['cronExpression'],
+        });
+      }
+    }
+    if (data.cronTimezone !== undefined && !isValidTimezone(data.cronTimezone)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Invalid timezone',
+        path: ['cronTimezone'],
+      });
+    }
+  });
 
 /**
  * Helper to verify trigger ownership via PostgreSQL.
@@ -186,6 +262,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       z.object({
         organizationId: z.string().uuid().optional(),
         targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).optional(),
+        activationMode: z.enum(['webhook', 'scheduled']).optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -203,9 +280,12 @@ export const webhookTriggersRouter = createTRPCRouter({
             eq(cloud_agent_webhook_triggers.user_id, userId),
             isNull(cloud_agent_webhook_triggers.organization_id)
           );
-      const whereClause = input.targetType
-        ? and(ownerFilter, eq(cloud_agent_webhook_triggers.target_type, input.targetType))
-        : ownerFilter;
+      const filters = [ownerFilter];
+      if (input.targetType)
+        filters.push(eq(cloud_agent_webhook_triggers.target_type, input.targetType));
+      if (input.activationMode)
+        filters.push(eq(cloud_agent_webhook_triggers.activation_mode, input.activationMode));
+      const whereClause = and(...filters);
 
       const triggers = await db
         .select({
@@ -215,6 +295,9 @@ export const webhookTriggersRouter = createTRPCRouter({
           githubRepo: cloud_agent_webhook_triggers.github_repo,
           kiloclawInstanceId: cloud_agent_webhook_triggers.kiloclaw_instance_id,
           isActive: cloud_agent_webhook_triggers.is_active,
+          activationMode: cloud_agent_webhook_triggers.activation_mode,
+          cronExpression: cloud_agent_webhook_triggers.cron_expression,
+          cronTimezone: cloud_agent_webhook_triggers.cron_timezone,
           createdAt: cloud_agent_webhook_triggers.created_at,
           updatedAt: cloud_agent_webhook_triggers.updated_at,
         })
@@ -360,10 +443,13 @@ export const webhookTriggersRouter = createTRPCRouter({
           user_id: input.organizationId ? null : userId,
           organization_id: input.organizationId ?? null,
           target_type: input.targetType,
+          activation_mode: input.activationMode,
           kiloclaw_instance_id: input.kiloclawInstanceId ?? null,
           github_repo: input.githubRepo ?? null,
           is_active: true,
           profile_id: input.profileId ?? null,
+          cron_expression: input.cronExpression ?? null,
+          cron_timezone: input.cronTimezone ?? 'UTC',
         })
         .returning();
       dbRecord = inserted;
@@ -397,6 +483,9 @@ export const webhookTriggersRouter = createTRPCRouter({
           autoCommit: input.autoCommit,
           condenseOnComplete: input.condenseOnComplete,
           webhookAuth: input.webhookAuth,
+          activationMode: input.activationMode,
+          cronExpression: input.cronExpression,
+          cronTimezone: input.cronTimezone,
         }
       );
     } catch (error) {
@@ -447,6 +536,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       id: dbRecord.id,
       triggerId: input.triggerId,
       targetType: input.targetType,
+      activationMode: input.activationMode,
       githubRepo: input.githubRepo ?? null,
       isActive: true,
       createdAt: dbRecord.created_at,
@@ -484,6 +574,8 @@ export const webhookTriggersRouter = createTRPCRouter({
       input.condenseOnComplete,
       input.isActive,
       input.webhookAuth,
+      input.cronExpression,
+      input.cronTimezone,
     ].some(value => value !== undefined);
 
     if (!hasUpdates) {
@@ -495,6 +587,8 @@ export const webhookTriggersRouter = createTRPCRouter({
 
     // Build update payload
     // Use null to explicitly clear fields, undefined to leave unchanged
+    // Cron fields only apply to scheduled triggers — ignore for webhook triggers
+    const isScheduledTrigger = dbTrigger.activation_mode === 'scheduled';
     const updatePayload: Parameters<typeof updateWorkerTrigger>[3] = {
       mode: input.mode,
       model: input.model,
@@ -504,6 +598,8 @@ export const webhookTriggersRouter = createTRPCRouter({
       autoCommit: input.autoCommit,
       condenseOnComplete: input.condenseOnComplete,
       webhookAuth: input.webhookAuth,
+      cronExpression: isScheduledTrigger ? input.cronExpression : undefined,
+      cronTimezone: isScheduledTrigger ? input.cronTimezone : undefined,
     };
 
     // Update in worker
@@ -535,6 +631,12 @@ export const webhookTriggersRouter = createTRPCRouter({
       .set({
         ...(input.isActive !== undefined ? { is_active: input.isActive } : {}),
         ...(input.profileId !== undefined ? { profile_id: input.profileId } : {}),
+        ...(isScheduledTrigger && input.cronExpression !== undefined
+          ? { cron_expression: input.cronExpression }
+          : {}),
+        ...(isScheduledTrigger && input.cronTimezone !== undefined
+          ? { cron_timezone: input.cronTimezone }
+          : {}),
         updated_at: new Date().toISOString(),
       })
       .where(eq(cloud_agent_webhook_triggers.id, dbTrigger.id));

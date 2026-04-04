@@ -1,21 +1,10 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { Suspense } from 'react';
-import { PageContainer } from '@/components/layouts/PageContainer';
-import { EditWebhookTriggerContent } from './EditWebhookTriggerContent';
-
-type EditWebhookTriggerPageProps = {
+type Props = {
   params: Promise<{ triggerId: string }>;
 };
 
-export default function EditWebhookTriggerPage({ params }: EditWebhookTriggerPageProps) {
-  return (
-    <PageContainer>
-      <Suspense
-        fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}
-      >
-        <EditWebhookTriggerContent params={params} />
-      </Suspense>
-    </PageContainer>
-  );
+export default async function EditWebhookTriggerPage({ params }: Props) {
+  const { triggerId } = await params;
+  redirect(`/cloud/triggers/${triggerId}`);
 }

@@ -31,6 +31,10 @@ export default function getSignInCallbackUrl(searchParams?: NextAppSearchParams)
     callbackParams.set('source', searchParams?.source);
   }
 
+  if (typeof searchParams?.im_ref === 'string' && searchParams?.im_ref) {
+    callbackParams.set('im_ref', searchParams.im_ref);
+  }
+
   // Always route through /users/after-sign-in to ensure stytch verification check
   if (
     typeof searchParams?.callbackPath === 'string' &&

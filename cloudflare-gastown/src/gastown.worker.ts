@@ -294,6 +294,16 @@ app.post('/debug/towns/:townId/send-message', async c => {
   return c.json(result);
 });
 
+app.get('/debug/towns/:townId/beads/:beadId', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const beadId = c.req.param('beadId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable
+  const result = await town.debugGetBead(beadId);
+  return c.json(result);
+});
+
 app.post('/debug/towns/:townId/graceful-stop', async c => {
   if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
   const townId = c.req.param('townId');

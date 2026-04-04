@@ -105,6 +105,27 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+/** Both values must be present, finite, non-negative, and total > 0 (safe percentage). */
+function formatVolumeUsageLine(used: number | null | undefined, total: number | null | undefined) {
+  if (
+    used == null ||
+    total == null ||
+    !Number.isFinite(used) ||
+    !Number.isFinite(total) ||
+    used < 0 ||
+    total <= 0
+  ) {
+    return '—';
+  }
+  const raw = (used / total) * 100;
+  const pct = raw % 1 === 0 ? raw.toFixed(0) : (Math.round(raw * 10) / 10).toFixed(1);
+  return (
+    <span>
+      {formatBytes(used)} used / {formatBytes(total)} total ({pct}%)
+    </span>
+  );
+}
+
 function formatUptime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const hours = Math.floor(mins / 60);
@@ -1622,6 +1643,16 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   </span>
                 ) : (
                   '—'
+                )}
+              </DetailField>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <HardDrive className="text-muted-foreground h-4 w-4 shrink-0" />
+              <DetailField label="Volume Usage">
+                {formatVolumeUsageLine(
+                  data.workerStatus?.diskUsedBytes,
+                  data.workerStatus?.diskTotalBytes
                 )}
               </DetailField>
             </div>

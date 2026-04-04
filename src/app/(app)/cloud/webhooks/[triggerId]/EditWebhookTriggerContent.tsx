@@ -11,7 +11,11 @@ import { getWebhookRoutes } from '@/lib/webhook-routes';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { TriggerForm, type TriggerFormData } from '@/components/webhook-triggers/TriggerForm';
+import {
+  TriggerForm,
+  type TriggerFormData,
+  type TriggerFormProps,
+} from '@/components/webhook-triggers/TriggerForm';
 import type { GitHubRepository } from '@/components/webhook-triggers/types';
 import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
@@ -87,10 +91,13 @@ export function EditWebhookTriggerContent({
   );
 
   // Transform trigger data to form initial data
-  const initialData = useMemo(() => {
+  const initialData: TriggerFormProps['initialData'] = useMemo(() => {
     if (!triggerData) return undefined;
     return {
       triggerId: triggerData.triggerId,
+      activationMode: triggerData.activationMode === 'scheduled' ? 'scheduled' : 'webhook',
+      cronExpression: triggerData.cronExpression,
+      cronTimezone: triggerData.cronTimezone,
       githubRepo: triggerData.githubRepo ?? '',
       mode: (triggerData.mode ?? 'code') as AgentMode,
       model: triggerData.model ?? '',
@@ -141,6 +148,8 @@ export function EditWebhookTriggerContent({
     async (formData: TriggerFormData) => {
       await updateTrigger({
         triggerId: formData.triggerId,
+        cronExpression: formData.cronExpression,
+        cronTimezone: formData.cronTimezone,
         mode: formData.mode,
         model: formData.model,
         promptTemplate: formData.promptTemplate,
@@ -214,7 +223,7 @@ export function EditWebhookTriggerContent({
             <Button variant="ghost" size="sm" asChild>
               <Link href={routes.list}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Webhook Triggers
+                Back to Webhooks / Triggers
               </Link>
             </Button>
           </div>
@@ -262,7 +271,7 @@ export function EditWebhookTriggerContent({
           <Button variant="ghost" size="sm" asChild>
             <Link href={routes.list}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Webhook Triggers
+              Back to Webhooks / Triggers
             </Link>
           </Button>
         </div>
@@ -294,7 +303,7 @@ export function EditWebhookTriggerContent({
           </Button>
           {isKiloclawChat && (
             <Button variant="outline" size="sm" asChild>
-              <Link href="/claw#settings">Manage in KiloClaw Settings</Link>
+              <Link href="/claw/settings">Manage in KiloClaw Settings</Link>
             </Button>
           )}
         </div>

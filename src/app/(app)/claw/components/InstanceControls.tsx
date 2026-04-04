@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ArrowUpCircle,
   Check,
   Cpu,
   HardDrive,
@@ -16,6 +17,7 @@ import {
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import { Banner } from '@/components/shared/Banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +32,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { RunDoctorDialog } from './RunDoctorDialog';
 import { StartKiloCliRunDialog } from './StartKiloCliRunDialog';
@@ -76,6 +79,35 @@ export function InstanceControls({
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [confirmRedeploy, setConfirmRedeploy] = useState(false);
   const [redeployMode, setRedeployMode] = useState<'redeploy' | 'upgrade'>('redeploy');
+
+  const { updateAvailable, catalogNewerThanImage, latestAvailableVersion, latestVersion } =
+    useClawUpdateAvailable(status);
+
+  const upgradeVersion = latestAvailableVersion ?? latestVersion?.imageTag ?? '';
+  const dismissKey = `claw-upgrade-banner-dismissed:${upgradeVersion}`;
+
+  const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+  const isDismissedInStorage = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const raw = localStorage.getItem(dismissKey);
+    if (!raw) return false;
+    return Date.now() - Number(raw) < TWENTY_FOUR_HOURS_MS;
+  }, [dismissKey]);
+
+  const [manuallyDismissed, setManuallyDismissed] = useState(false);
+
+  // Reset the in-session dismiss flag when the target version changes.
+  useEffect(() => {
+    setManuallyDismissed(false);
+  }, [dismissKey]);
+
+  const dismissBanner = useCallback(() => {
+    localStorage.setItem(dismissKey, String(Date.now()));
+    setManuallyDismissed(true);
+  }, [dismissKey]);
+
+  const showUpgradeBanner = updateAvailable && !isDismissedInStorage && !manuallyDismissed;
 
   const handleSaveName = () => {
     const trimmed = nameValue.trim();
@@ -172,6 +204,40 @@ export function InstanceControls({
           </Badge>
         </div>
       </div>
+      {showUpgradeBanner && (
+        <Banner color="amber" className="mb-4">
+          <Banner.Icon>
+            <ArrowUpCircle />
+          </Banner.Icon>
+          <Banner.Content>
+            <Banner.Title>
+              {catalogNewerThanImage
+                ? `A newer OpenClaw version (${latestAvailableVersion}) is available`
+                : `A newer image (${latestVersion?.imageTag ?? 'unknown'}) is available`}
+            </Banner.Title>
+            <Banner.Description>
+              Upgrade your instance to get the latest features and fixes.
+            </Banner.Description>
+          </Banner.Content>
+          <Banner.Button
+            className="text-white"
+            onClick={() => {
+              setRedeployMode('upgrade');
+              setConfirmRedeploy(true);
+            }}
+          >
+            Upgrade now
+          </Banner.Button>
+          <button
+            type="button"
+            onClick={dismissBanner}
+            className="text-amber-400/60 hover:text-amber-400 transition-colors"
+            aria-label="Dismiss upgrade banner"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </Banner>
+      )}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <Button
           size="sm"

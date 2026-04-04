@@ -95,6 +95,8 @@ export type InstanceMutableState = {
   preRestoreStatus: InstanceStatus | null;
   pendingRestoreVolumeId: string | null;
   instanceReadyEmailSent: boolean;
+  diskUsedBytes: number | null;
+  diskTotalBytes: number | null;
   customSecretMeta: PersistedState['customSecretMeta'];
   // Stream Chat default channel (auto-provisioned)
   streamChatApiKey: string | null;

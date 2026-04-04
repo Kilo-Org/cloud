@@ -42,6 +42,7 @@ import {
   KiloClawScheduledBy,
   KiloClawSubscriptionStatus,
   KiloClawPaymentSource,
+  AffiliateProvider,
 } from './schema-types';
 import type { CustomLlmDefinition, KiloClawAdminAuditAction } from './schema-types';
 import type {
@@ -108,6 +109,7 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
   KiloClawSubscriptionStatus,
+  AffiliateProvider,
 } as const;
 
 export const credit_transactions = pgTable(
@@ -221,6 +223,29 @@ export const kilocode_users = pgTable(
 );
 
 export type User = typeof kilocode_users.$inferSelect;
+
+export const user_affiliate_attributions = pgTable(
+  'user_affiliate_attributions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    provider: text().notNull().$type<AffiliateProvider>(),
+    tracking_id: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_user_affiliate_attributions_user_provider').on(table.user_id, table.provider),
+    index('IDX_user_affiliate_attributions_user_id').on(table.user_id),
+    enumCheck('user_affiliate_attributions_provider_check', table.provider, AffiliateProvider),
+  ]
+);
+
+export type UserAffiliateAttribution = typeof user_affiliate_attributions.$inferSelect;
 
 export const kilo_pass_subscriptions = pgTable(
   'kilo_pass_subscriptions',
@@ -1856,6 +1881,11 @@ export const cloud_agent_webhook_triggers = pgTable(
     target_type: text('target_type').notNull().default('cloud_agent'),
     // KiloClaw Chat target: which instance to send messages to
     kiloclaw_instance_id: uuid('kiloclaw_instance_id').references(() => kiloclaw_instances.id),
+    // Activation mode: 'webhook' (default) or 'scheduled' (cron-based)
+    activation_mode: text('activation_mode').notNull().default('webhook'),
+    // Scheduled trigger fields (only applicable when activation_mode = 'scheduled')
+    cron_expression: text('cron_expression'),
+    cron_timezone: text('cron_timezone').default('UTC'),
     // Cloud Agent target fields (nullable — only required when target_type = 'cloud_agent')
     github_repo: text('github_repo'),
     is_active: boolean('is_active').notNull().default(true),
@@ -1908,6 +1938,14 @@ export const cloud_agent_webhook_triggers = pgTable(
       sql`(
         ${table.target_type} != 'kiloclaw_chat' OR
         ${table.kiloclaw_instance_id} IS NOT NULL
+      )`
+    ),
+    // Scheduled triggers require cron_expression
+    check(
+      'CHK_cloud_agent_webhook_triggers_scheduled_fields',
+      sql`(
+        ${table.activation_mode} != 'scheduled' OR
+        ${table.cron_expression} IS NOT NULL
       )`
     ),
   ]

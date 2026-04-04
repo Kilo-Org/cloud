@@ -1,5 +1,9 @@
+import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { loadavg } from 'node:os';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 import { z } from 'zod';
 import type { OpenclawVersionInfo } from './openclaw-version';
 import type { ProductTelemetry } from './product-telemetry';
@@ -16,6 +20,8 @@ export const PRODUCT_TELEMETRY_INTERVAL_MS = 24 * 60 * 60 * 1000;
 export const PRODUCT_TELEMETRY_JITTER_MS = 2 * 60 * 60 * 1000;
 
 export type NetStats = { bytesIn: number; bytesOut: number };
+
+export type DiskStats = { usedBytes: number; totalBytes: number } | null;
 
 const NetStatsSchema = z.object({
   bytesIn: z.number().int().min(0),
@@ -85,6 +91,36 @@ export async function readNetStats(): Promise<NetStats> {
 }
 
 /**
+ * Parse the output of `df -B1 --output=avail,size /`. Returns null if unparseable.
+ * Columns: avail (available bytes), size (total bytes). Matches the column order used
+ * by cloud-agent/src/workspace.ts and cloud-agent-next/src/workspace.ts.
+ * usedBytes is derived as totalBytes - availableBytes (df does not report used directly).
+ */
+export function parseDfOutput(raw: string): DiskStats {
+  const lines = raw.trim().split('\n');
+  const dataLine = lines[lines.length - 1]?.trim();
+  const match = dataLine?.match(/^(\d+)\s+(\d+)$/);
+  if (!match) return null;
+  const availableBytes = parseInt(match[1], 10);
+  const totalBytes = parseInt(match[2], 10);
+  return { usedBytes: Math.max(0, totalBytes - availableBytes), totalBytes };
+}
+
+/**
+ * Read disk usage for the root filesystem via `df`.
+ * Returns null on any error — non-fatal for checkin.
+ * Keep in sync with: cloud-agent/src/workspace.ts, cloud-agent-next/src/workspace.ts
+ */
+export async function readDiskStats(): Promise<DiskStats> {
+  try {
+    const { stdout } = await execFileAsync('df', ['-B1', '--output=avail,size', '/root']);
+    return parseDfOutput(stdout);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Compute the next product-telemetry deadline: base interval + uniform jitter
  * in the range [-JITTER, +JITTER].
  */
@@ -130,7 +166,7 @@ export function startCheckin(deps: CheckinDeps): () => void {
 
       const stats = deps.getSupervisorStats();
       const openclawVersion = await deps.getOpenclawVersion();
-      const currentNetStats = await readNetStats();
+      const [currentNetStats, diskStats] = await Promise.all([readNetStats(), readDiskStats()]);
 
       const restartsSinceLastCheckin = Math.max(0, stats.restarts - previousRestarts);
       const bandwidthBytesIn = Math.max(0, currentNetStats.bytesIn - previousNetStats.bytesIn);
@@ -181,6 +217,8 @@ export function startCheckin(deps: CheckinDeps): () => void {
             bandwidthBytesIn,
             bandwidthBytesOut,
             lastExitReason,
+            diskUsedBytes: diskStats?.usedBytes ?? null,
+            diskTotalBytes: diskStats?.totalBytes ?? null,
             productTelemetry,
           }),
         });

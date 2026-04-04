@@ -42,7 +42,7 @@ RUN npm install -g pnpm
 
 # Install OpenClaw
 # Pin to specific version for reproducible builds
-RUN npm install -g openclaw@2026.3.24 \
+RUN npm install -g openclaw@2026.3.28 \
     && openclaw --version
 
 # Install ClawHub CLI
@@ -52,7 +52,8 @@ RUN npm install -g clawhub
 RUN npm install -g mcporter@0.7.3
 
 # Install Stream Chat channel plugin for OpenClaw (installed from GitHub, not npm)
-RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#catrielmuller/attach-support
+ARG STREAM_CHAT_CACHE_BUSTER=1
+RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#fix/plugin-name-resolution
 
 # Install summarize (web page summarization CLI)
 RUN npm install -g @steipete/summarize@0.12.0

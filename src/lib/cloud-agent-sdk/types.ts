@@ -108,11 +108,10 @@ export type ServiceStateSnapshot = {
 // Session resolution — determines session type and transport routing
 // ---------------------------------------------------------------------------
 
-export type ResolvedSession = {
-  kiloSessionId: KiloSessionId;
-  cloudAgentSessionId: CloudAgentSessionId | null; // null = CLI session
-  isLive: boolean;
-};
+export type ResolvedSession =
+  | { type: 'remote'; kiloSessionId: KiloSessionId }
+  | { type: 'cloud-agent'; kiloSessionId: KiloSessionId; cloudAgentSessionId: CloudAgentSessionId }
+  | { type: 'read-only'; kiloSessionId: KiloSessionId };
 
 // ---------------------------------------------------------------------------
 // Historical session snapshot — used by CLI historical transport

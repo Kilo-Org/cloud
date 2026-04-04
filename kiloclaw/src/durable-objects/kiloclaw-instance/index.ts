@@ -1527,6 +1527,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     restoreStartedAt: string | null;
     pendingRestoreVolumeId: string | null;
     instanceReadyEmailSent: boolean;
+    diskUsedBytes: number | null;
+    diskTotalBytes: number | null;
   }> {
     await this.loadState();
     const alarmScheduledAt = await this.ctx.storage.getAlarm();
@@ -1573,6 +1575,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       restoreStartedAt: this.s.restoreStartedAt,
       pendingRestoreVolumeId: this.s.pendingRestoreVolumeId,
       instanceReadyEmailSent: this.s.instanceReadyEmailSent,
+      diskUsedBytes: this.s.diskUsedBytes,
+      diskTotalBytes: this.s.diskTotalBytes,
     };
   }
 
@@ -1610,6 +1614,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     return { shouldNotify: true, userId: this.s.userId };
+  }
+
+  /** Persist disk usage from controller checkin, or clear when the pair is missing/null. */
+  async recordDiskStats(usedBytes: number | null, totalBytes: number | null): Promise<void> {
+    await this.loadState();
+    this.s.diskUsedBytes = usedBytes;
+    this.s.diskTotalBytes = totalBytes;
+    await this.persist({
+      diskUsedBytes: this.s.diskUsedBytes,
+      diskTotalBytes: this.s.diskTotalBytes,
+    });
   }
 
   async listVolumeSnapshots(): Promise<FlyVolumeSnapshot[]> {

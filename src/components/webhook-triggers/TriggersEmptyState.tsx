@@ -45,10 +45,10 @@ export const TriggersEmptyState = memo(function TriggersEmptyState({
   return (
     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12">
       <Webhook className="text-muted-foreground h-12 w-12" />
-      <h3 className="mt-4 text-lg font-semibold">No webhook triggers yet</h3>
+      <h3 className="mt-4 text-lg font-semibold">No triggers yet</h3>
       <p className="text-muted-foreground mt-1 max-w-md text-center">
-        Create your first webhook trigger to automatically start cloud agent sessions when receiving
-        webhooks from GitHub or other services.
+        Create your first trigger to automatically start cloud agent sessions via webhooks or on a
+        recurring schedule.
       </p>
       <Button asChild className="mt-4">
         <Link href={createUrl}>

@@ -15,6 +15,7 @@ import { withDORetry } from '../util/do-retry';
 import { internalApiMiddleware } from '../util/auth';
 import { clampRequestLimit } from '../util/constants';
 import { decodeUserIdFromPath, encodeUserIdForPath } from '../util/user-id-encoding';
+import { validateCronExpression, enforcesMinimumInterval, isValidTimezone } from '../util/cron';
 
 const api = new Hono<HonoContext>();
 
@@ -180,8 +181,49 @@ const TriggerConfigInput = z
         secret: z.string().trim().min(1, 'webhookAuth.secret is required'),
       })
       .optional(),
+    activationMode: z.enum(['webhook', 'scheduled']).default('webhook'),
+    cronExpression: z.string().max(100).optional(),
+    cronTimezone: z.string().max(50).optional().default('UTC'),
   })
   .superRefine((data, ctx) => {
+    if (data.activationMode === 'scheduled') {
+      if (!data.cronExpression) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'cronExpression is required for scheduled triggers',
+          path: ['cronExpression'],
+        });
+      } else {
+        const validation = validateCronExpression(data.cronExpression);
+        if (!validation.valid) {
+          ctx.addIssue({
+            code: 'custom',
+            message: validation.error ?? 'Invalid cron expression',
+            path: ['cronExpression'],
+          });
+        } else if (!enforcesMinimumInterval(data.cronExpression, data.cronTimezone ?? 'UTC')) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Schedule interval must be at least 1 minute',
+            path: ['cronExpression'],
+          });
+        }
+      }
+      if (data.cronTimezone && !isValidTimezone(data.cronTimezone)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Invalid timezone',
+          path: ['cronTimezone'],
+        });
+      }
+      if (data.webhookAuth) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'webhookAuth is not applicable for scheduled triggers',
+          path: ['webhookAuth'],
+        });
+      }
+    }
     if (data.targetType === 'cloud_agent') {
       if (!data.githubRepo)
         ctx.addIssue({
@@ -222,21 +264,50 @@ const TriggerConfigInput = z
 // null = explicitly clear the field, undefined = leave unchanged
 // Note: targetType and kiloclawInstanceId are intentionally excluded — they are
 // immutable after creation. To change target type or instance, delete and recreate.
-const TriggerConfigUpdateInput = z.object({
-  mode: z.string().trim().min(1).optional(),
-  model: z.string().trim().min(1).optional(),
-  promptTemplate: z.string().trim().min(1).optional(),
-  isActive: z.boolean().optional(),
-  profileId: z.string().uuid().optional(),
-  autoCommit: z.boolean().nullable().optional(),
-  condenseOnComplete: z.boolean().nullable().optional(),
-  webhookAuth: z
-    .object({
-      header: z.string().trim().min(1).nullable().optional(),
-      secret: z.string().trim().min(1).nullable().optional(),
-    })
-    .optional(),
-});
+const TriggerConfigUpdateInput = z
+  .object({
+    mode: z.string().trim().min(1).optional(),
+    model: z.string().trim().min(1).optional(),
+    promptTemplate: z.string().trim().min(1).optional(),
+    isActive: z.boolean().optional(),
+    profileId: z.string().uuid().optional(),
+    autoCommit: z.boolean().nullable().optional(),
+    condenseOnComplete: z.boolean().nullable().optional(),
+    webhookAuth: z
+      .object({
+        header: z.string().trim().min(1).nullable().optional(),
+        secret: z.string().trim().min(1).nullable().optional(),
+      })
+      .optional(),
+    // activationMode is immutable — not included here
+    cronExpression: z.string().max(100).optional(),
+    cronTimezone: z.string().max(50).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.cronExpression !== undefined) {
+      const validation = validateCronExpression(data.cronExpression);
+      if (!validation.valid) {
+        ctx.addIssue({
+          code: 'custom',
+          message: validation.error ?? 'Invalid cron expression',
+          path: ['cronExpression'],
+        });
+      } else if (!enforcesMinimumInterval(data.cronExpression, data.cronTimezone ?? 'UTC')) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Schedule interval must be at least 1 minute',
+          path: ['cronExpression'],
+        });
+      }
+    }
+    if (data.cronTimezone !== undefined && !isValidTimezone(data.cronTimezone)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Invalid timezone',
+        path: ['cronTimezone'],
+      });
+    }
+  });
 
 async function handleCreateTrigger(
   c: RouteContext,

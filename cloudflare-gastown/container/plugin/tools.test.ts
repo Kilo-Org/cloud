@@ -232,32 +232,17 @@ describe('tools', () => {
       expect(result).toContain('priority: high');
     });
 
-    it('parses metadata JSON string', async () => {
-      await tools.gt_escalate.execute({ title: 'Test', metadata: '{"key": "value"}' }, CTX);
+    it('passes metadata object through to createEscalation', async () => {
+      await tools.gt_escalate.execute(
+        { title: 'Test', metadata: { key: 'value', nested: 123 } },
+        CTX
+      );
       expect(client.createEscalation).toHaveBeenCalledWith({
         title: 'Test',
         body: undefined,
         priority: undefined,
-        metadata: { key: 'value' },
+        metadata: { key: 'value', nested: 123 },
       });
-    });
-
-    it('throws on invalid metadata JSON', async () => {
-      await expect(
-        tools.gt_escalate.execute({ title: 'Test', metadata: 'not json' }, CTX)
-      ).rejects.toThrow('Invalid JSON in "metadata"');
-    });
-
-    it('throws when metadata is a JSON array instead of object', async () => {
-      await expect(
-        tools.gt_escalate.execute({ title: 'Test', metadata: '[1, 2]' }, CTX)
-      ).rejects.toThrow('"metadata" must be a JSON object, got array');
-    });
-
-    it('throws when metadata is a JSON string instead of object', async () => {
-      await expect(
-        tools.gt_escalate.execute({ title: 'Test', metadata: '"hello"' }, CTX)
-      ).rejects.toThrow('"metadata" must be a JSON object, got string');
     });
   });
 

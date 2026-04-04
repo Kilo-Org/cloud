@@ -22,15 +22,10 @@ import { toast } from 'sonner';
 import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
-import { calverAtLeast, cleanVersion, getRunningVersionBadge } from '@/lib/kiloclaw/version';
+import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
-import {
-  useClawControllerVersion,
-  useClawConfig,
-  useClawLatestVersion,
-  useClawMyPin,
-  useClawGoogleSetupCommand,
-} from '../hooks/useClawHooks';
+import { useClawConfig, useClawMyPin, useClawGoogleSetupCommand } from '../hooks/useClawHooks';
+import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
 
 import { useDefaultModelSelection } from '../hooks/useDefaultModelSelection';
 import { getSettingsModelOptions } from './modelSupport';
@@ -538,17 +533,23 @@ export function SettingsTab({
   const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
   const isRunning = status.status === 'running';
   const {
-    data: controllerVersion,
-    isLoading: isLoadingControllerVersion,
-    isError: isControllerVersionError,
-  } = useClawControllerVersion(isRunning);
+    updateAvailable,
+    catalogNewerThanImage,
+    needsImageUpgrade,
+    isModified,
+    hasVersionInfo,
+    variantsMatch,
+    trackedVersion,
+    runningVersion,
+    latestAvailableVersion,
+    latestVersion,
+    controllerVersion,
+    isLoadingControllerVersion,
+    isControllerVersionError,
+  } = useClawUpdateAvailable(status);
   const { data: myPin } = useClawMyPin();
-  const { data: latestVersion } = useClawLatestVersion();
   const [confirmDestroy, setConfirmDestroy] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
-  const trackedVersion = cleanVersion(status.openclawVersion);
-  const runningVersion = cleanVersion(controllerVersion?.openclawVersion);
-  const latestAvailableVersion = cleanVersion(latestVersion?.openclawVersion);
   const hasModelSelectionError = isRunning && isControllerVersionError;
   const modelSelectionError = hasModelSelectionError
     ? 'Failed to load the running OpenClaw version. Retry before changing the default model.'
@@ -632,34 +633,7 @@ export function SettingsTab({
     if (!isRunning) setEditConfigOpen(false);
   }, [isRunning]);
 
-  const needsImageUpgrade = isRunning && controllerVersion && !controllerVersion.version;
-  const isModified = getRunningVersionBadge(runningVersion, trackedVersion) === 'modified';
-  const catalogNewerThanImage =
-    !!trackedVersion &&
-    !!latestAvailableVersion &&
-    latestAvailableVersion !== trackedVersion &&
-    calverAtLeast(latestAvailableVersion, trackedVersion);
   const isPinned = !!myPin;
-  const hasVersionInfo = isRunning && trackedVersion && trackedVersion !== ':latest';
-  // Only compare image tags when variants match — latestVersion is always
-  // for the "default" variant, so skip for non-default instances to avoid
-  // false "Update available" badges that would switch their variant.
-  const variantsMatch =
-    !status.imageVariant ||
-    status.imageVariant === 'default' ||
-    status.imageVariant === latestVersion?.variant;
-  const imageTagDiffers =
-    hasVersionInfo &&
-    variantsMatch &&
-    !!status.trackedImageTag &&
-    !!latestVersion?.imageTag &&
-    status.trackedImageTag !== latestVersion.imageTag;
-  const updateAvailable = catalogNewerThanImage
-    ? !isModified ||
-      (!!runningVersion &&
-        calverAtLeast(latestAvailableVersion, runningVersion) &&
-        latestAvailableVersion !== runningVersion)
-    : imageTagDiffers;
 
   return (
     <div className="flex flex-col gap-6">

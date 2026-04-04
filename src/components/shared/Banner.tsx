@@ -107,20 +107,29 @@ function BannerAction({ children, className }: { children: React.ReactNode; clas
 
 function BannerButton({
   href,
+  onClick,
   children,
   className,
 }: {
-  href: string;
+  href?: string;
+  onClick?: () => void;
   children: React.ReactNode;
   className?: string;
 }) {
   const { colors } = useContext(BannerContext);
+  const btnClass = cn('w-full shrink-0 sm:w-auto [&>*]:h-4 [&>*]:w-4', colors?.button, className);
+
+  if (href) {
+    return (
+      <Button asChild className={btnClass}>
+        <Link href={href}>{children}</Link>
+      </Button>
+    );
+  }
+
   return (
-    <Button
-      asChild
-      className={cn('w-full shrink-0 sm:w-auto [&>*]:h-4 [&>*]:w-4', colors?.button, className)}
-    >
-      <Link href={href}>{children}</Link>
+    <Button className={btnClass} onClick={onClick}>
+      {children}
     </Button>
   );
 }

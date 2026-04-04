@@ -15,6 +15,13 @@
       "when": 1774972769067,
       "tag": "0001_dear_tombstone",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1775061371502,
+      "tag": "0002_first_mephisto",
+      "breakpoints": true
     }
   ]
 }

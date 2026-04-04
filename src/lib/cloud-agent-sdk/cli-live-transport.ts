@@ -172,6 +172,19 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           ws.send(JSON.stringify({ type: 'subscribe', sessionId: config.kiloSessionId }));
         },
         onConnected: () => {},
+        onReconnected: () => {
+          if (expectedGeneration !== generation) return;
+          if (!config.fetchSnapshot) return;
+          void config.fetchSnapshot(config.kiloSessionId).then(
+            snapshot => {
+              if (expectedGeneration !== generation) return;
+              replaySnapshot(snapshot);
+            },
+            () => {
+              // Snapshot refetch failure on reconnect is non-fatal
+            }
+          );
+        },
         onDisconnected: () => {},
         onError: config.onError,
         isAuthFailure: (event: CloseEvent) => event.code === 4001 || event.code === 1008,

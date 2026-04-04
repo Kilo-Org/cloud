@@ -110,9 +110,9 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       url: '/cloud/sessions',
     },
     {
-      title: 'Webhooks',
+      title: 'Webhooks / Triggers',
       icon: Webhook,
-      url: '/cloud/webhooks',
+      url: '/cloud/triggers',
     },
     {
       title: 'Code Reviewer',

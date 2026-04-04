@@ -116,17 +116,10 @@ export default function RootLayout({
           <GoogleTagManager gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
         )}
 
-        {process.env.NEXT_PUBLIC_REWARDFUL_ID && (
-          <>
-            <Script id="rewardful-queue" strategy="beforeInteractive">
-              {`(function(w,r){w._rwq=r;w[r]=w[r]||function(){(w[r].q=w[r].q||[]).push(arguments)}})(window,'rewardful');rewardful('ready',function(){if(Rewardful.referral){document.cookie='rewardful_referral='+encodeURIComponent(Rewardful.referral)+';path=/;max-age=5184000;SameSite=Lax'+(location.protocol==='https:'?';Secure':'')}});`}
-            </Script>
-            <Script
-              strategy="beforeInteractive"
-              src="https://r.wdfl.co/rw.js"
-              data-rewardful={process.env.NEXT_PUBLIC_REWARDFUL_ID}
-            />
-          </>
+        {process.env.NEXT_PUBLIC_IMPACT_UTT_ID && (
+          <Script id="impact-utt" strategy="beforeInteractive">
+            {`(function(a,b,c,d,e,f,g){e.ire_o=c;e[c]=e[c]||function(){(e[c].a=e[c].a||[]).push(arguments)};f=d.createElement(b);g=d.getElementsByTagName(b)[0];f.async=1;f.src=a;g.parentNode.insertBefore(f,g);})('https://utt.impactcdn.com/${process.env.NEXT_PUBLIC_IMPACT_UTT_ID}.js','script','ire',document,window);`}
+          </Script>
         )}
       </body>
     </html>

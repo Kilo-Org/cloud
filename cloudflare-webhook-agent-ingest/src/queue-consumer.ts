@@ -114,7 +114,11 @@ async function processKiloclawChatMessage(
   env: Env
 ): Promise<void> {
   // Skip if already delivered (idempotency guard for queue retries)
-  if (request.processStatus === 'success' || request.processStatus === 'failed') {
+  if (
+    request.processStatus === 'success' ||
+    request.processStatus === 'failed' ||
+    request.processStatus === 'inprogress'
+  ) {
     logger.info('KiloClaw Chat request already processed, skipping', {
       requestId: webhook.requestId,
       currentStatus: request.processStatus,
@@ -408,7 +412,7 @@ async function processWebhookMessage(
         model: triggerModel,
         githubRepo: triggerGithubRepo,
         callbackTarget,
-        createdOnPlatform: 'webhook',
+        createdOnPlatform: request.method === 'SCHEDULED' ? 'scheduled' : 'webhook',
       };
 
       if (triggerConfig.orgId) {

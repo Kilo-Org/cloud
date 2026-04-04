@@ -4054,6 +4054,28 @@ export class TownDO extends DurableObject<Env> {
   }
 
   /**
+   * Resolve a GitHub API token from the town config.
+   * Fallback chain: github_token → github_cli_pat → platform integration (GitHub App).
+   */
+  private async resolveGitHubToken(townConfig: TownConfig): Promise<string | null> {
+    let token = townConfig.git_auth?.github_token ?? townConfig.github_cli_pat;
+    if (!token) {
+      const integrationId = townConfig.git_auth?.platform_integration_id;
+      if (integrationId && this.env.GIT_TOKEN_SERVICE) {
+        try {
+          token = await this.env.GIT_TOKEN_SERVICE.getToken(integrationId);
+        } catch (err) {
+          console.warn(
+            `${TOWN_LOG} resolveGitHubToken: platform integration token lookup failed for ${integrationId}`,
+            err
+          );
+        }
+      }
+    }
+    return token ?? null;
+  }
+
+  /**
    * Check the status of a PR/MR via its URL.
    * Returns 'open', 'merged', or 'closed' (null if cannot determine).
    */
@@ -4065,24 +4087,10 @@ export class TownDO extends DurableObject<Env> {
     const ghMatch = prUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
     if (ghMatch) {
       const [, owner, repo, numberStr] = ghMatch;
-      // Fix 1 & 2: Token fallback chain — github_token → github_cli_pat → platform integration
-      let token = townConfig.git_auth.github_token ?? townConfig.github_cli_pat;
+      const token = await this.resolveGitHubToken(townConfig);
       if (!token) {
-        // Try resolving from GitHub App installation as final fallback
-        const integrationId = townConfig.git_auth.platform_integration_id;
-        if (integrationId && this.env.GIT_TOKEN_SERVICE) {
-          try {
-            token = await this.env.GIT_TOKEN_SERVICE.getToken(integrationId);
-          } catch (err) {
-            console.warn(
-              `${TOWN_LOG} checkPRStatus: platform integration token lookup failed for ${integrationId}`,
-              err
-            );
-          }
-        }
-      }
-      if (!token) {
-        console.warn(`${TOWN_LOG} checkPRStatus: no github token available, cannot poll ${prUrl}`);
+        console.warn(`${TOWN_LOG} checkPRStatus: no GitHub token available, cannot poll ${prUrl}`);
+
         return null;
       }
 
@@ -4179,7 +4187,7 @@ export class TownDO extends DurableObject<Env> {
     }
 
     const [, owner, repo, numberStr] = ghMatch;
-    const token = townConfig.git_auth.github_token;
+    const token = await this.resolveGitHubToken(townConfig);
     if (!token) return null;
 
     const headers = {
@@ -4357,9 +4365,9 @@ export class TownDO extends DurableObject<Env> {
     }
 
     const [, owner, repo, numberStr] = ghMatch;
-    const token = townConfig.git_auth.github_token;
+    const token = await this.resolveGitHubToken(townConfig);
     if (!token) {
-      console.warn(`${TOWN_LOG} mergePR: no github_token configured`);
+      console.warn(`${TOWN_LOG} mergePR: no GitHub token available`);
       return false;
     }
 
@@ -4954,6 +4962,29 @@ export class TownDO extends DurableObject<Env> {
         []
       ),
     ];
+  }
+
+  async debugGetBead(beadId: string): Promise<unknown> {
+    const bead = beadOps.getBead(this.sql, beadId);
+    if (!bead) return { error: 'bead not found' };
+
+    const reviewMeta = reviewQueue.getReviewMetadata(this.sql, beadId);
+    const deps = [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${bead_dependencies.bead_id},
+                 ${bead_dependencies.depends_on_bead_id},
+                 ${bead_dependencies.dependency_type}
+          FROM ${bead_dependencies}
+          WHERE ${bead_dependencies.bead_id} = ?
+             OR ${bead_dependencies.depends_on_bead_id} = ?
+        `,
+        [beadId, beadId]
+      ),
+    ];
+
+    return { bead, reviewMetadata: reviewMeta ?? null, dependencies: deps };
   }
 
   async debugAgentMetadata(): Promise<unknown[]> {

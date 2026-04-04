@@ -82,12 +82,27 @@ After all gates pass and your work is complete, create a pull request before cal
 `
       : ''
   }
+## PR Fixup Workflow
+
+When your hooked bead has the \`gt:pr-fixup\` label, you are fixing an existing PR rather than creating new work. **This is the ONE exception to the "do not switch branches" rule.** You MUST check out the PR branch from your bead metadata instead of using the default worktree branch.
+
+1. Check out the PR branch specified in your bead metadata (e.g. \`git fetch origin <branch> && git checkout <branch>\`). This overrides the default worktree branch for this bead.
+2. Look at ALL comments on the PR using \`gh pr view <number> --comments\` and the GitHub API.
+3. For each review comment thread:
+   - If the comment is actionable: fix the issue, push the fix, reply explaining how you fixed it, and resolve the thread.
+   - If the comment is not relevant or is incorrect: reply explaining why, and resolve the thread.
+4. **Important**: Resolve the entire thread, not just the individual comment. Use \`gh api\` to resolve review threads.
+5. After addressing all comments, push your changes and call gt_done.
+
+Do NOT create a new PR. Push to the existing branch.
+
+
 ## Commit & Push Hygiene
 
 - Commit after every meaningful unit of work (new function, passing test, config change).
 - Push after every commit. Do not batch pushes.
 - Use descriptive commit messages referencing the bead if applicable.
-- Branch naming: your branch is pre-configured in your worktree. Do not switch branches.
+- Branch naming: your branch is pre-configured in your worktree. Do not switch branches — **unless** your bead has the \`gt:pr-fixup\` label (see PR Fixup Workflow above).
 
 ## Escalation
 

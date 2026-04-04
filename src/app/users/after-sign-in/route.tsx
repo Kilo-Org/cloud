@@ -2,9 +2,15 @@ import { getProfileRedirectPath, getUserFromAuth } from '@/lib/user.server';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
 import PostHogClient from '@/lib/posthog';
+import { getAffiliateAttribution, recordAffiliateAttribution } from '@/lib/affiliate-attribution';
+import { shouldTrackImpactSignupFallback } from '@/lib/impact-affiliate-utils';
+import { trackSignUp } from '@/lib/impact';
 import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { APP_URL } from '@/lib/constants';
+import { sentryLogger } from '@/lib/utils.server';
+
+const logImpactWarning = sentryLogger('impact-after-sign-in', 'warning');
 
 /**
  * Resolves a product identifier from the signup entry point. Returns null when
@@ -24,7 +30,10 @@ function resolveSignupProduct(callbackPath: string | null, hasSource: boolean): 
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
-  const { user } = await getUserFromAuth({ adminOnly: false, DANGEROUS_allowBlockedUsers: true });
+  const { user, isNewUser } = await getUserFromAuth({
+    adminOnly: false,
+    DANGEROUS_allowBlockedUsers: true,
+  });
 
   let responsePath: string;
 
@@ -74,6 +83,43 @@ export async function GET(request: NextRequest) {
       }
     } else {
       responsePath = maybeInterceptWithSurvey(user, responsePath);
+    }
+  }
+
+  const impactClickId = url.searchParams.get('im_ref')?.trim();
+  if (user && impactClickId) {
+    const existingAttribution = await getAffiliateAttribution(user.id, 'impact');
+
+    if (!existingAttribution) {
+      await recordAffiliateAttribution({
+        userId: user.id,
+        provider: 'impact',
+        trackingId: impactClickId,
+      });
+
+      if (
+        shouldTrackImpactSignupFallback({
+          isNewUser,
+          hasValidationStytch: user.has_validation_stytch,
+          userCreatedAt: user.created_at,
+        })
+      ) {
+        after(async () => {
+          try {
+            await trackSignUp({
+              clickId: impactClickId,
+              customerId: user.id,
+              customerEmail: user.google_user_email,
+              eventDate: new Date(),
+            });
+          } catch (error) {
+            logImpactWarning('Impact signup fallback tracking failed', {
+              user_id: user.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        });
+      }
     }
   }
 

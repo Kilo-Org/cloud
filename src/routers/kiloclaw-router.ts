@@ -31,8 +31,10 @@ import {
   kiloclaw_instances,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
+  cloud_agent_webhook_triggers,
 } from '@kilocode/db/schema';
 import { and, eq, ne, desc, isNotNull, isNull, inArray, sql } from 'drizzle-orm';
+import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import {
@@ -48,7 +50,7 @@ import {
 
 import { client as stripe } from '@/lib/stripe-client';
 import { APP_URL } from '@/lib/constants';
-import { getRewardfulReferral } from '@/lib/rewardful';
+import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { clawAccessProcedure } from '@/lib/kiloclaw/access-gate';
 import {
   getStripePriceIdForClawPlan,
@@ -72,6 +74,7 @@ import {
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
 import PostHogClient from '@/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
+import { trackTrialStart } from '@/lib/impact';
 
 /**
  * Error codes whose messages may contain raw internal details (e.g. filesystem
@@ -523,6 +526,23 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
           trial_ends_at: trialEndsAt.toISOString(),
         },
       });
+
+      void (async () => {
+        const attribution = await getAffiliateAttribution(userId, 'impact');
+        if (!attribution) return;
+
+        await trackTrialStart({
+          clickId: attribution.tracking_id,
+          customerId: userId,
+          customerEmail: userEmail,
+          eventDate: now,
+        });
+      })().catch(error => {
+        sentryLogger('kiloclaw-impact', 'warning')('Impact trial start tracking failed', {
+          user_id: userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
     }
     return;
   }
@@ -781,6 +801,39 @@ export const kiloclawRouter = createTRPCRouter({
             sql`${kiloclaw_email_log.email_type} LIKE 'claw_instance_ready:%'`
           )
         );
+
+      // Clean up webhook/scheduled triggers for the destroyed instance.
+      // Delete from worker DOs first (best-effort), then from PostgreSQL.
+      if (destroyedRow) {
+        const orphanedTriggers = await db
+          .select({
+            triggerId: cloud_agent_webhook_triggers.trigger_id,
+            userId: cloud_agent_webhook_triggers.user_id,
+            organizationId: cloud_agent_webhook_triggers.organization_id,
+          })
+          .from(cloud_agent_webhook_triggers)
+          .where(eq(cloud_agent_webhook_triggers.kiloclaw_instance_id, destroyedRow.id));
+
+        for (const t of orphanedTriggers) {
+          await deleteWorkerTrigger(
+            t.userId ?? undefined,
+            t.organizationId ?? undefined,
+            t.triggerId
+          ).catch(err => {
+            console.warn(
+              '[kiloclaw] Failed to delete worker trigger on destroy:',
+              t.triggerId,
+              err
+            );
+          });
+        }
+
+        if (orphanedTriggers.length > 0) {
+          await db
+            .delete(cloud_agent_webhook_triggers)
+            .where(eq(cloud_agent_webhook_triggers.kiloclaw_instance_id, destroyedRow.id));
+        }
+      }
     } catch (cleanupError) {
       console.error('[kiloclaw] Post-destroy cleanup failed:', cleanupError);
     }
@@ -1415,12 +1468,9 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
 
-      const rewardfulReferral = await getRewardfulReferral();
-
       const session = await stripe.checkout.sessions.create({
         mode: 'payment',
         customer: stripeCustomerId,
-        ...(rewardfulReferral && { client_reference_id: rewardfulReferral }),
         billing_address_collection: 'required',
         line_items: [{ price: STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID, quantity: 1 }],
         ...(STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID
@@ -1981,12 +2031,11 @@ export const kiloclawRouter = createTRPCRouter({
           ? getStripePriceIdForClawPlanIntro('standard')
           : getStripePriceIdForClawPlan(input.plan);
 
-      const rewardfulReferral = await getRewardfulReferral();
+      const attribution = await getAffiliateAttribution(ctx.user.id, 'impact');
 
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
         customer: stripeCustomerId,
-        ...(rewardfulReferral && { client_reference_id: rewardfulReferral }),
         billing_address_collection: 'required',
         line_items: [{ price: priceId, quantity: 1 }],
         allow_promotion_codes: true,
@@ -1995,9 +2044,19 @@ export const kiloclawRouter = createTRPCRouter({
         success_url: `${APP_URL}/payments/kiloclaw/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${APP_URL}/claw?checkout=cancelled`,
         subscription_data: {
-          metadata: { type: 'kiloclaw', plan: input.plan, kiloUserId: ctx.user.id },
+          metadata: {
+            type: 'kiloclaw',
+            plan: input.plan,
+            kiloUserId: ctx.user.id,
+            impactClickId: attribution?.tracking_id ?? '',
+          },
         },
-        metadata: { type: 'kiloclaw', plan: input.plan, kiloUserId: ctx.user.id },
+        metadata: {
+          type: 'kiloclaw',
+          plan: input.plan,
+          kiloUserId: ctx.user.id,
+          impactClickId: attribution?.tracking_id ?? '',
+        },
       });
 
       return { url: typeof session.url === 'string' ? session.url : null };
@@ -2130,12 +2189,9 @@ export const kiloclawRouter = createTRPCRouter({
         cadence: kiloPassCadence,
       });
 
-      const rewardfulReferral = await getRewardfulReferral();
-
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
         customer: stripeCustomerId,
-        ...(rewardfulReferral && { client_reference_id: rewardfulReferral }),
         allow_promotion_codes: true,
         billing_address_collection: 'required',
         line_items: [{ price: priceId, quantity: 1 }],
@@ -2155,7 +2211,6 @@ export const kiloclawRouter = createTRPCRouter({
             kiloUserId: ctx.user.id,
             tier: kiloPassTier,
             cadence: kiloPassCadence,
-            rewardful: 'false',
           },
         },
         metadata: {

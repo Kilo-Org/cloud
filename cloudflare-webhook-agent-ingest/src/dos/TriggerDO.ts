@@ -26,6 +26,7 @@ import {
   type WebhookAuthInput,
 } from '../util/webhook-auth';
 import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
+import { computeNextCronTime } from '../util/cron';
 
 export type { ProcessStatus, RequestUpdates } from '../db/types';
 
@@ -47,6 +48,11 @@ export const TriggerConfig = z.object({
   condenseOnComplete: z.boolean().optional(),
   webhookAuthHeader: z.string().optional(),
   webhookAuthSecretHash: z.string().optional(),
+  activationMode: z.enum(['webhook', 'scheduled']).default('webhook'),
+  cronExpression: z.string().nullable().optional(),
+  cronTimezone: z.string().nullable().optional().default('UTC'),
+  lastScheduledAt: z.string().nullable().optional(),
+  nextScheduledAt: z.string().nullable().optional(),
 });
 
 export type TriggerConfig = z.infer<typeof TriggerConfig>;
@@ -70,6 +76,7 @@ export type CapturedRequest = {
   processStatus: ProcessStatus;
   cloudAgentSessionId: string | null;
   errorMessage: string | null;
+  triggerSource: string;
 };
 
 type ConfigureInput = {
@@ -83,6 +90,9 @@ type ConfigureInput = {
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   webhookAuth?: WebhookAuthInput;
+  activationMode?: 'webhook' | 'scheduled';
+  cronExpression?: string;
+  cronTimezone?: string;
 };
 
 type WebhookAuthUpdateInput = {
@@ -99,6 +109,8 @@ type UpdateConfigInput = {
   autoCommit?: boolean | null;
   condenseOnComplete?: boolean | null;
   webhookAuth?: WebhookAuthUpdateInput;
+  cronExpression?: string;
+  cronTimezone?: string;
 };
 
 export class TriggerDO extends DurableObject<Env> {
@@ -143,6 +155,9 @@ export class TriggerDO extends DurableObject<Env> {
       condenseOnComplete: configOverrides.condenseOnComplete,
       webhookAuthHeader: webhookAuth?.header,
       webhookAuthSecretHash: webhookAuth?.secretHash,
+      activationMode: configOverrides.activationMode ?? 'webhook',
+      cronExpression: configOverrides.cronExpression ?? null,
+      cronTimezone: configOverrides.cronTimezone ?? 'UTC',
     };
 
     await this.ctx.storage.put('config', config);
@@ -166,6 +181,9 @@ export class TriggerDO extends DurableObject<Env> {
         config.condenseOnComplete !== undefined ? (config.condenseOnComplete ? 1 : 0) : null,
       webhook_auth_header: webhookAuth?.header ?? null,
       webhook_auth_secret_hash: webhookAuth?.secretHash ?? null,
+      activation_mode: config.activationMode,
+      cron_expression: config.cronExpression ?? null,
+      cron_timezone: config.cronTimezone ?? 'UTC',
     };
 
     // On conflict, update all fields except the PK and created_at (preserve original creation time)
@@ -180,12 +198,18 @@ export class TriggerDO extends DurableObject<Env> {
       })
       .run();
 
+    // Set initial alarm for scheduled triggers
+    if (config.activationMode === 'scheduled' && config.cronExpression) {
+      await this.scheduleNextAlarm(config);
+    }
+
     logger.info('Trigger configured', {
       triggerId,
       namespace,
       userId,
       orgId,
       profileId: config.profileId,
+      activationMode: config.activationMode,
     });
 
     return { success: true };
@@ -223,6 +247,11 @@ export class TriggerDO extends DurableObject<Env> {
         record.condense_on_complete !== null ? record.condense_on_complete === 1 : undefined,
       webhookAuthHeader: record.webhook_auth_header ?? undefined,
       webhookAuthSecretHash: record.webhook_auth_secret_hash ?? undefined,
+      activationMode: record.activation_mode === 'scheduled' ? 'scheduled' : 'webhook',
+      cronExpression: record.cron_expression ?? null,
+      cronTimezone: record.cron_timezone ?? 'UTC',
+      lastScheduledAt: record.last_scheduled_at ?? null,
+      nextScheduledAt: record.next_scheduled_at ?? null,
     };
   }
 
@@ -271,6 +300,8 @@ export class TriggerDO extends DurableObject<Env> {
       ),
       webhookAuthHeader: webhookAuth?.header,
       webhookAuthSecretHash: webhookAuth?.secretHash,
+      cronExpression: updates.cronExpression ?? existingConfig.cronExpression,
+      cronTimezone: updates.cronTimezone ?? existingConfig.cronTimezone,
     };
 
     await this.ctx.storage.put('config', updatedConfig);
@@ -293,9 +324,36 @@ export class TriggerDO extends DurableObject<Env> {
             : null,
         webhook_auth_header: webhookAuth?.header ?? null,
         webhook_auth_secret_hash: webhookAuth?.secretHash ?? null,
+        cron_expression: updatedConfig.cronExpression ?? null,
+        cron_timezone: updatedConfig.cronTimezone ?? 'UTC',
       })
       .where(eq(triggerConfigTable.trigger_id, updatedConfig.triggerId))
       .run();
+
+    // Alarm lifecycle for scheduled triggers
+    if (updatedConfig.activationMode === 'scheduled') {
+      if (!updatedConfig.isActive) {
+        // Deactivated — clear alarm, retry flag, and stale next-run display
+        await this.ctx.storage.deleteAlarm();
+        await this.ctx.storage.delete('alarmRetry');
+        updatedConfig.nextScheduledAt = null;
+        this.db
+          .update(triggerConfigTable)
+          .set({ next_scheduled_at: null })
+          .where(eq(triggerConfigTable.trigger_id, updatedConfig.triggerId))
+          .run();
+        await this.ctx.storage.put('config', updatedConfig);
+      } else if (
+        updates.isActive === true ||
+        updates.cronExpression !== undefined ||
+        updates.cronTimezone !== undefined
+      ) {
+        // Reactivated or cron expression changed — reschedule
+        await this.ctx.storage.deleteAlarm();
+        await this.ctx.storage.delete('alarmRetry');
+        await this.scheduleNextAlarm(updatedConfig);
+      }
+    }
 
     logger.info('Trigger config updated', {
       triggerId: updatedConfig.triggerId,
@@ -561,6 +619,146 @@ export class TriggerDO extends DurableObject<Env> {
     return { success: true };
   }
 
+  async alarm(): Promise<void> {
+    const config = await this.getConfig();
+    if (!config || !config.isActive || config.activationMode !== 'scheduled') {
+      return; // Deactivated or mode changed — don't reschedule
+    }
+
+    // If this is a DST retry alarm (no cron occurrence matched), just try to reschedule
+    // without creating a request. The flag is cleared by scheduleNextAlarm on success.
+    const isRetry = (await this.ctx.storage.get<boolean>('alarmRetry')) ?? false;
+    if (isRetry) {
+      await this.ctx.storage.delete('alarmRetry');
+      await this.scheduleNextAlarm(config);
+      return;
+    }
+
+    // Check in-flight limit (same as webhook path)
+    const inflightRows = this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(requestsTable)
+      .where(inArray(requestsTable.process_status, ['captured', 'inprogress']))
+      .all();
+    const inflightCount = inflightRows[0]?.count ?? 0;
+
+    if (inflightCount >= MAX_INFLIGHT_REQUESTS) {
+      logger.warn('Scheduled run skipped: too many in-flight', {
+        triggerId: config.triggerId,
+      });
+      await this.scheduleNextAlarm(config); // Still reschedule
+      return;
+    }
+
+    // Create synthetic request
+    const requestId = crypto.randomUUID();
+    const timestamp = new Date().toISOString();
+
+    this.db
+      .insert(requestsTable)
+      .values({
+        id: requestId,
+        timestamp,
+        method: 'SCHEDULED',
+        path: '/',
+        query_string: null,
+        headers: '{}',
+        body: '{}',
+        content_type: null,
+        source_ip: null,
+        process_status: 'captured',
+        trigger_source: 'scheduled',
+      })
+      .run();
+
+    // Overflow cleanup (same as captureRequest)
+    this.db.run(sql`
+      DELETE FROM ${requestsTable}
+      WHERE ${requestsTable.id} IN (
+        SELECT ${requestsTable.id} FROM ${requestsTable}
+        WHERE ${requestsTable.process_status} NOT IN ('inprogress')
+        ORDER BY ${requestsTable.created_at} DESC
+        LIMIT -1 OFFSET ${MAX_REQUESTS}
+      )
+    `);
+
+    // Enqueue to existing delivery queue
+    try {
+      await enqueueWebhookDelivery(this.env.WEBHOOK_DELIVERY_QUEUE, {
+        namespace: config.namespace,
+        triggerId: config.triggerId,
+        requestId,
+      });
+    } catch (enqueueError) {
+      logger.error('Failed to enqueue scheduled delivery, marking request as failed', {
+        requestId,
+        error: enqueueError instanceof Error ? enqueueError.message : String(enqueueError),
+      });
+
+      this.db
+        .update(requestsTable)
+        .set({
+          process_status: 'failed',
+          completed_at: new Date().toISOString(),
+          error_message: `Queue enqueue failed: ${enqueueError instanceof Error ? enqueueError.message : String(enqueueError)}`,
+        })
+        .where(eq(requestsTable.id, requestId))
+        .run();
+    }
+
+    // Update last_scheduled_at — use updated config for scheduleNextAlarm
+    const updatedConfig = { ...config, lastScheduledAt: timestamp };
+    this.db
+      .update(triggerConfigTable)
+      .set({ last_scheduled_at: timestamp })
+      .where(eq(triggerConfigTable.trigger_id, config.triggerId))
+      .run();
+    await this.ctx.storage.put('config', updatedConfig);
+
+    logger.info('Scheduled trigger fired', {
+      triggerId: config.triggerId,
+      requestId,
+    });
+
+    // Reschedule next run
+    await this.scheduleNextAlarm(updatedConfig);
+  }
+
+  private async scheduleNextAlarm(config: TriggerConfig): Promise<void> {
+    if (!config.cronExpression || config.activationMode !== 'scheduled') return;
+
+    const nextTime = computeNextCronTime(config.cronExpression, config.cronTimezone ?? 'UTC');
+    if (!nextTime) {
+      // DST spring-forward can skip an occurrence. Schedule a retry in 1 hour
+      // so the trigger doesn't stop forever. Set a flag so alarm() knows this
+      // is a reschedule retry, not a real cron fire.
+      logger.error('Failed to compute next cron time, retrying in 1 hour', {
+        triggerId: config.triggerId,
+      });
+      await this.ctx.storage.put('alarmRetry', true);
+      await this.ctx.storage.setAlarm(Date.now() + 3_600_000);
+      return;
+    }
+
+    // Successfully computed next time — clear any stale retry flag so it doesn't
+    // cause alarm() to skip the next real cron fire.
+    await this.ctx.storage.delete('alarmRetry');
+
+    // Add jitter to prevent thundering herd on popular cron times (±30s)
+    const jitterMs = Math.floor(Math.random() * 60_000) - 30_000;
+    const alarmTime = Math.max(nextTime.getTime() + jitterMs, Date.now() + 60_000);
+    await this.ctx.storage.setAlarm(alarmTime);
+
+    // Persist for UI display (use original cron time, not jittered time)
+    const nextScheduledAt = nextTime.toISOString();
+    this.db
+      .update(triggerConfigTable)
+      .set({ next_scheduled_at: nextScheduledAt })
+      .where(eq(triggerConfigTable.trigger_id, config.triggerId))
+      .run();
+    await this.ctx.storage.put('config', { ...config, nextScheduledAt });
+  }
+
   async deleteTrigger(): Promise<{ success: boolean }> {
     await this.ctx.storage.deleteAll();
 
@@ -620,6 +818,7 @@ function recordToCapturedRequest(record: RequestRow): CapturedRequest {
     processStatus: record.process_status,
     cloudAgentSessionId: record.cloud_agent_session_id,
     errorMessage: record.error_message,
+    triggerSource: record.trigger_source,
   };
 }
 

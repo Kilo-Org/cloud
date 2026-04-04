@@ -37,32 +37,32 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       store: storeRef.current,
 
       resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
+        // 1. Check if the session is in the active sessions list (remote CLI)
+        try {
+          const active = await trpcClient.activeSessions.list.query();
+          if (active.sessions.some(s => s.id === kiloSessionId)) {
+            return { type: 'remote', kiloSessionId };
+          }
+        } catch {
+          // Active sessions unavailable — fall through to other checks
+        }
+
+        // 2. Check if the session has a cloud agent session ID
         try {
           const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
           if (session.cloud_agent_session_id) {
             return {
+              type: 'cloud-agent',
               kiloSessionId,
               cloudAgentSessionId: session.cloud_agent_session_id as CloudAgentSessionId,
-              isLive: true,
             };
           }
-          // CLI session — check if live
-          let isLive = false;
-          try {
-            const active = await trpcClient.activeSessions.list.query();
-            isLive = active.sessions.some(s => s.id === kiloSessionId);
-          } catch {
-            /* not live */
-          }
-          return { kiloSessionId, cloudAgentSessionId: null, isLive };
         } catch {
-          // Not found — treat as cloud agent session ID directly (backward compat)
-          return {
-            kiloSessionId,
-            cloudAgentSessionId: kiloSessionId as unknown as CloudAgentSessionId,
-            isLive: true,
-          };
+          // Session not found — fall through to read-only
         }
+
+        // 3. Fallback: read-only historical session
+        return { type: 'read-only', kiloSessionId };
       },
 
       getTicket: async (sessionId: CloudAgentSessionId): Promise<string> => {

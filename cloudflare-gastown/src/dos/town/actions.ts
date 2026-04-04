@@ -632,9 +632,17 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             const refineryConfig = townConfig.refinery;
             if (!refineryConfig) return;
 
+            // Fetch PR feedback once and reuse for both auto-resolve and
+            // auto-merge checks, avoiding a duplicate GitHub API call.
+            const needsFeedback =
+              refineryConfig.auto_resolve_pr_feedback ||
+              (refineryConfig.auto_merge !== false &&
+                refineryConfig.auto_merge_delay_minutes !== null &&
+                refineryConfig.auto_merge_delay_minutes !== undefined);
+            const feedback = needsFeedback ? await ctx.checkPRFeedback(action.pr_url) : null;
+
             // Auto-resolve PR feedback: detect unresolved comments and failing CI
             if (refineryConfig.auto_resolve_pr_feedback) {
-              const feedback = await ctx.checkPRFeedback(action.pr_url);
               if (
                 feedback &&
                 (feedback.hasUnresolvedComments ||
@@ -694,7 +702,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               refineryConfig.auto_merge_delay_minutes !== null &&
               refineryConfig.auto_merge_delay_minutes !== undefined
             ) {
-              const feedback = await ctx.checkPRFeedback(action.pr_url);
               if (!feedback) return;
 
               const allGreen =

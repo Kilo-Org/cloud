@@ -478,10 +478,20 @@ export function reconcile(
 ): Action[] {
   const draining = opts?.draining ?? false;
   const actions: Action[] = [];
+
+  // Evaluate the dispatch circuit breaker once per reconcile tick and pass
+  // the result to sub-functions that need it, avoiding duplicate COUNT queries.
+  const circuitBreakerActions = checkDispatchCircuitBreaker(sql);
+  const circuitBreakerOpen = circuitBreakerActions.length > 0;
+
   actions.push(...reconcileAgents(sql, { draining }));
-  actions.push(...reconcileBeads(sql, { draining }));
+  actions.push(...reconcileBeads(sql, { draining, circuitBreakerOpen, circuitBreakerActions }));
   actions.push(
-    ...reconcileReviewQueue(sql, { draining, refineryCodeReview: opts?.refineryCodeReview })
+    ...reconcileReviewQueue(sql, {
+      draining,
+      refineryCodeReview: opts?.refineryCodeReview,
+      circuitBreakerOpen,
+    })
   );
   actions.push(...reconcileConvoys(sql));
   actions.push(...reconcileGUPP(sql, { draining }));
@@ -634,14 +644,21 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
 // reconcileBeads — handle unassigned beads, lost agents, stale reviews
 // ════════════════════════════════════════════════════════════════════
 
-export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
+export function reconcileBeads(
+  sql: SqlStorage,
+  opts?: {
+    draining?: boolean;
+    circuitBreakerOpen?: boolean;
+    circuitBreakerActions?: Action[];
+  }
+): Action[] {
   const draining = opts?.draining ?? false;
   const actions: Action[] = [];
 
-  // Town-level circuit breaker: if too many dispatch failures in the
-  // window, skip all dispatch_agent actions and escalate to mayor.
-  const circuitBreakerActions = checkDispatchCircuitBreaker(sql);
-  const circuitBreakerOpen = circuitBreakerActions.length > 0;
+  // Circuit breaker state is hoisted to reconcile() and passed in to
+  // avoid duplicate COUNT queries per tick.
+  const circuitBreakerActions = opts?.circuitBreakerActions ?? checkDispatchCircuitBreaker(sql);
+  const circuitBreakerOpen = opts?.circuitBreakerOpen ?? circuitBreakerActions.length > 0;
 
   // Rule 1: Open issue beads with no assignee, no blockers, not staged, not triage
   const unassigned = BeadRow.array().parse([
@@ -1044,14 +1061,16 @@ export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): 
 
 export function reconcileReviewQueue(
   sql: SqlStorage,
-  opts?: { draining?: boolean; refineryCodeReview?: boolean }
+  opts?: { draining?: boolean; refineryCodeReview?: boolean; circuitBreakerOpen?: boolean }
 ): Action[] {
   const draining = opts?.draining ?? false;
   const refineryCodeReview = opts?.refineryCodeReview ?? true;
   const actions: Action[] = [];
 
-  // Town-level circuit breaker
-  const circuitBreakerOpen = checkDispatchCircuitBreaker(sql).length > 0;
+  // Circuit breaker state is hoisted to reconcile() and passed in to
+  // avoid duplicate COUNT queries per tick.
+  const circuitBreakerOpen =
+    opts?.circuitBreakerOpen ?? checkDispatchCircuitBreaker(sql).length > 0;
 
   // Get all MR beads that need attention
   const mrBeads = MrBeadRow.array().parse([

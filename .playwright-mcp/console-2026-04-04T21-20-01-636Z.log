@@ -1,0 +1,4 @@
+[      63ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:4000/node_modules/.vite/deps/react-dom_client.js?v=e662cd04:14336
+[   98475ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:4000/src/App.tsx?t=1775337700004:0
+[   98475ms] [ERROR] [vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:4000/@vite/client:904
+[  174392ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:4000/node_modules/.vite/deps/react-dom_client.js?v=e662cd04:14336

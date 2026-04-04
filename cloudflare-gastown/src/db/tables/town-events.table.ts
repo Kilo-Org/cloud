@@ -13,6 +13,13 @@ export const TownEventType = z.enum([
   'nudge_timeout',
   'pr_feedback_detected',
   'pr_auto_merge',
+  // Events emitted by async side-effect handlers to defer SQL writes to the
+  // next alarm tick's synchronous event drain (B3 fix).
+  'auto_merge_cleared',
+  'poll_null_result',
+  'poll_nonnull_result',
+  'poll_feedback_checked',
+  'poll_auto_merge_update',
 ]);
 
 export type TownEventType = z.output<typeof TownEventType>;

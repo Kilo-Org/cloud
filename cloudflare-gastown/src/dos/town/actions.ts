@@ -14,7 +14,6 @@ import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { convoy_metadata } from '../../db/tables/convoy-metadata.table';
 import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
 import { agent_nudges } from '../../db/tables/agent-nudges.table';
-import { review_metadata } from '../../db/tables/review-metadata.table';
 import { query } from '../../util/query.util';
 import * as beadOps from './beads';
 import * as agentOps from './agents';
@@ -292,7 +291,7 @@ export type ApplyActionContext = {
 const LOG = '[actions]';
 
 /** Fail MR bead after this many consecutive null poll results (#1632). */
-const PR_POLL_NULL_THRESHOLD = 10;
+export const PR_POLL_NULL_THRESHOLD = 10;
 
 /** Minimum interval between PR polls per MR bead (ms) (#1632). */
 export const PR_POLL_INTERVAL_MS = 60_000; // 1 minute
@@ -606,19 +605,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
         try {
           const status = await ctx.checkPRStatus(action.pr_url);
           if (status !== null) {
-            // Any non-null result resets the consecutive null counter
-            query(
-              sql,
-              /* sql */ `
-                UPDATE ${beads}
-                SET ${beads.columns.metadata} = json_set(
-                  COALESCE(${beads.columns.metadata}, '{}'),
-                  '$.poll_null_count', 0
-                )
-                WHERE ${beads.bead_id} = ?
-              `,
-              [action.bead_id]
-            );
+            // Emit event to reset the consecutive null counter synchronously
+            ctx.insertEvent('poll_nonnull_result', {
+              bead_id: action.bead_id,
+            });
             if (status !== 'open') {
               ctx.insertEvent('pr_status_changed', {
                 bead_id: action.bead_id,
@@ -641,7 +631,8 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 refineryConfig.auto_merge_delay_minutes !== undefined);
             const feedback = needsFeedback ? await ctx.checkPRFeedback(action.pr_url) : null;
 
-            // Auto-resolve PR feedback: detect unresolved comments and failing CI
+            // Auto-resolve PR feedback: detect unresolved comments and failing CI.
+            // Emit events so SQL writes happen on the next synchronous tick.
             if (refineryConfig.auto_resolve_pr_feedback) {
               if (
                 feedback &&
@@ -649,54 +640,24 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                   feedback.hasFailingChecks ||
                   feedback.hasUncheckedRuns)
               ) {
-                const existingFeedback = hasExistingFeedbackBead(sql, action.bead_id);
-                if (!existingFeedback) {
-                  const prMeta = parsePrUrl(action.pr_url);
-                  const rmRows = z
-                    .object({ branch: z.string() })
-                    .array()
-                    .parse([
-                      ...query(
-                        sql,
-                        /* sql */ `
-                          SELECT ${review_metadata.columns.branch}
-                          FROM ${review_metadata}
-                          WHERE ${review_metadata.bead_id} = ?
-                        `,
-                        [action.bead_id]
-                      ),
-                    ]);
-                  const branch = rmRows[0]?.branch ?? '';
-
-                  ctx.insertEvent('pr_feedback_detected', {
-                    bead_id: action.bead_id,
-                    payload: {
-                      mr_bead_id: action.bead_id,
-                      pr_url: action.pr_url,
-                      pr_number: prMeta?.prNumber ?? 0,
-                      repo: prMeta?.repo ?? '',
-                      branch,
-                      has_unresolved_comments: feedback.hasUnresolvedComments,
-                      has_failing_checks: feedback.hasFailingChecks,
-                      has_unchecked_runs: feedback.hasUncheckedRuns,
-                    },
-                  });
-                }
-
-                query(
-                  sql,
-                  /* sql */ `
-                    UPDATE ${review_metadata}
-                    SET ${review_metadata.columns.last_feedback_check_at} = ?
-                    WHERE ${review_metadata.bead_id} = ?
-                  `,
-                  [now(), action.bead_id]
-                );
+                const prMeta = parsePrUrl(action.pr_url);
+                ctx.insertEvent('poll_feedback_checked', {
+                  bead_id: action.bead_id,
+                  payload: {
+                    pr_url: action.pr_url,
+                    pr_number: prMeta?.prNumber ?? 0,
+                    repo: prMeta?.repo ?? '',
+                    has_unresolved_comments: feedback.hasUnresolvedComments,
+                    has_failing_checks: feedback.hasFailingChecks,
+                    has_unchecked_runs: feedback.hasUncheckedRuns,
+                  },
+                });
               }
             }
 
-            // Auto-merge timer: track grace period when everything is green.
-            // Requires both auto_merge enabled AND a delay configured.
+            // Auto-merge timer: emit event with all_green status so the
+            // synchronous event handler can update auto_merge_ready_since
+            // and emit pr_auto_merge when the delay has elapsed.
             if (
               refineryConfig.auto_merge !== false &&
               refineryConfig.auto_merge_delay_minutes !== null &&
@@ -709,107 +670,21 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 !feedback.hasFailingChecks &&
                 feedback.allChecksPass;
 
-              if (allGreen) {
-                const readySinceRows = z
-                  .object({ auto_merge_ready_since: z.string().nullable() })
-                  .array()
-                  .parse([
-                    ...query(
-                      sql,
-                      /* sql */ `
-                        SELECT ${review_metadata.columns.auto_merge_ready_since}
-                        FROM ${review_metadata}
-                        WHERE ${review_metadata.bead_id} = ?
-                      `,
-                      [action.bead_id]
-                    ),
-                  ]);
-
-                const readySince = readySinceRows[0]?.auto_merge_ready_since;
-
-                if (!readySince) {
-                  query(
-                    sql,
-                    /* sql */ `
-                      UPDATE ${review_metadata}
-                      SET ${review_metadata.columns.auto_merge_ready_since} = ?
-                      WHERE ${review_metadata.bead_id} = ?
-                    `,
-                    [now(), action.bead_id]
-                  );
-                } else {
-                  const elapsed = Date.now() - new Date(readySince).getTime();
-                  if (elapsed >= refineryConfig.auto_merge_delay_minutes * 60_000) {
-                    ctx.insertEvent('pr_auto_merge', {
-                      bead_id: action.bead_id,
-                      payload: {
-                        mr_bead_id: action.bead_id,
-                        pr_url: action.pr_url,
-                      },
-                    });
-                  }
-                }
-              } else {
-                query(
-                  sql,
-                  /* sql */ `
-                    UPDATE ${review_metadata}
-                    SET ${review_metadata.columns.auto_merge_ready_since} = NULL
-                    WHERE ${review_metadata.bead_id} = ?
-                  `,
-                  [action.bead_id]
-                );
-              }
+              ctx.insertEvent('poll_auto_merge_update', {
+                bead_id: action.bead_id,
+                payload: {
+                  pr_url: action.pr_url,
+                  all_green: allGreen,
+                  auto_merge_delay_minutes: refineryConfig.auto_merge_delay_minutes,
+                },
+              });
             }
           } else {
-            // Null result (e.g. no GitHub token) — increment consecutive null counter
-            query(
-              sql,
-              /* sql */ `
-                UPDATE ${beads}
-                SET ${beads.columns.metadata} = json_set(
-                  COALESCE(${beads.columns.metadata}, '{}'),
-                  '$.poll_null_count',
-                  COALESCE(
-                    json_extract(${beads.columns.metadata}, '$.poll_null_count'),
-                    0
-                  ) + 1
-                )
-                WHERE ${beads.bead_id} = ?
-              `,
-              [action.bead_id]
-            );
-            const rows = [
-              ...query(
-                sql,
-                /* sql */ `
-                  SELECT json_extract(${beads.columns.metadata}, '$.poll_null_count') AS null_count
-                  FROM ${beads}
-                  WHERE ${beads.bead_id} = ?
-                `,
-                [action.bead_id]
-              ),
-            ];
-            const nullCount = Number(rows[0]?.null_count ?? 0);
-            if (nullCount >= PR_POLL_NULL_THRESHOLD) {
-              console.warn(
-                `${LOG} poll_pr: ${nullCount} consecutive null results for bead=${action.bead_id}, failing`
-              );
-              beadOps.updateBeadStatus(sql, action.bead_id, 'failed', 'system');
-              query(
-                sql,
-                /* sql */ `
-                  UPDATE ${beads}
-                  SET ${beads.columns.metadata} = json_set(
-                    COALESCE(${beads.columns.metadata}, '{}'),
-                    '$.failureReason', 'no_github_token',
-                    '$.failureMessage', 'Cannot poll PR status — no GitHub token configured. Please add a token in town settings.'
-                  )
-                  WHERE ${beads.bead_id} = ?
-                `,
-                [action.bead_id]
-              );
-            }
+            // Null result (e.g. no GitHub token) — emit event so null counter
+            // is incremented synchronously on the next tick
+            ctx.insertEvent('poll_null_result', {
+              bead_id: action.bead_id,
+            });
           }
           // status === 'open' — no action needed, poll again next tick
         } catch (err) {
@@ -865,25 +740,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             console.log(
               `${LOG} merge_pr: fresh feedback check found issues, aborting merge for bead=${action.bead_id}`
             );
-            query(
-              sql,
-              /* sql */ `
-                UPDATE ${beads}
-                SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.auto_merge_pending'),
-                    ${beads.columns.updated_at} = ?
-                WHERE ${beads.bead_id} = ?
-              `,
-              [now(), action.bead_id]
-            );
-            query(
-              sql,
-              /* sql */ `
-                UPDATE ${review_metadata}
-                SET ${review_metadata.columns.auto_merge_ready_since} = NULL
-                WHERE ${review_metadata.bead_id} = ?
-              `,
-              [action.bead_id]
-            );
+            ctx.insertEvent('auto_merge_cleared', {
+              bead_id: action.bead_id,
+              payload: { reason: 'fresh_feedback' },
+            });
             return;
           }
 
@@ -895,53 +755,22 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             });
           } else {
             // Merge failed (405/409: branch protection, merge conflict, stale head, etc.)
-            // Clear auto_merge_pending so we resume normal polling on the next tick.
-            // Also reset the auto_merge_ready_since timer so it re-evaluates freshness.
-            query(
-              sql,
-              /* sql */ `
-                UPDATE ${beads}
-                SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.auto_merge_pending'),
-                    ${beads.columns.updated_at} = ?
-                WHERE ${beads.bead_id} = ?
-              `,
-              [now(), action.bead_id]
-            );
-            query(
-              sql,
-              /* sql */ `
-                UPDATE ${review_metadata}
-                SET ${review_metadata.columns.auto_merge_ready_since} = NULL
-                WHERE ${review_metadata.bead_id} = ?
-              `,
-              [action.bead_id]
-            );
+            // Emit event to clear auto_merge_pending on the next synchronous tick.
+            ctx.insertEvent('auto_merge_cleared', {
+              bead_id: action.bead_id,
+              payload: { reason: 'merge_failed' },
+            });
             console.warn(
-              `${LOG} merge_pr: merge failed, cleared auto_merge_pending for bead=${action.bead_id}`
+              `${LOG} merge_pr: merge failed, emitted auto_merge_cleared for bead=${action.bead_id}`
             );
           }
         } catch (err) {
           console.warn(`${LOG} merge_pr failed: bead=${action.bead_id} url=${action.pr_url}`, err);
-          // Clear pending flag on unexpected errors too
-          query(
-            sql,
-            /* sql */ `
-              UPDATE ${beads}
-              SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.auto_merge_pending'),
-                  ${beads.columns.updated_at} = ?
-              WHERE ${beads.bead_id} = ?
-            `,
-            [now(), action.bead_id]
-          );
-          query(
-            sql,
-            /* sql */ `
-              UPDATE ${review_metadata}
-              SET ${review_metadata.columns.auto_merge_ready_since} = NULL
-              WHERE ${review_metadata.bead_id} = ?
-            `,
-            [action.bead_id]
-          );
+          // Emit event to clear pending flag on unexpected errors too
+          ctx.insertEvent('auto_merge_cleared', {
+            bead_id: action.bead_id,
+            payload: { reason: 'merge_error' },
+          });
         }
       };
     }

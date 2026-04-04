@@ -316,6 +316,19 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     // ── Bead mutations ──────────────────────────────────────────
 
     case 'transition_bead': {
+      // When `from` is specified, verify the bead is in the expected state
+      // before transitioning. This guards against concurrent rule firings
+      // producing unexpected transitions. (H3, S1 — reconciliation-spec §4)
+      if (action.from !== null) {
+        const currentBead = beadOps.getBead(sql, action.bead_id);
+        if (currentBead && currentBead.status !== action.from) {
+          console.warn(
+            `${LOG} transition_bead: expected from=${action.from} but bead is ${currentBead.status}, skipping (bead=${action.bead_id})`
+          );
+          return null;
+        }
+      }
+
       try {
         const failureReason =
           action.to === 'failed'

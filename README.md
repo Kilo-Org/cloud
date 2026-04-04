@@ -1,10 +1,10 @@
 # kilocode-backend
 
-## Getting Started
+## 🚀 Getting Started
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for a complete local development setup guide (prerequisites, project setup, database, environment variables, and more).
 
-## Environment Variables
+## 🔑 Environment Variables
 
 Environment variables are managed through Vercel. For local development, pull the latest ones using:
 
@@ -34,13 +34,13 @@ import { getEnvVariable } from '@/lib/dotenvx';
 console.info(getEnvVariable('FOO')); // bar
 ```
 
-## External resources
+## 🔗 External Resources
 
 - [Google Cloud OAuth setup](https://console.cloud.google.com/auth/clients?project=kilocode)
 - [Vercel project](https://vercel.com/kilocode/kilocode-backend)
 - [Supabase project](https://vercel.com/kilocode/kilocode-backend)
 
-## API Token Authentication
+## 🔐 API Token Authentication
 
 This application uses JWT (JSON Web Tokens) for API authentication. When a user generates a token through the `/api/token` endpoint, they receive a signed JWT that includes:
 
@@ -76,7 +76,7 @@ In March 2025, the token format was updated to version 2, which includes the fol
 
 This change standardizes the naming convention across the application and improves clarity
 
-## Model Selection Component
+## 🧩 Model Selection Component
 
 The [`ModelSelector`](src/components/models/ModelSelector.tsx:33) component provides a comprehensive interface for selecting AI models and providers. It works by fetching model and provider data from the database through the OpenRouter integration.
 
@@ -100,7 +100,7 @@ pnpm script:run openrouter sync-providers-backup
 
 This script ([`sync-providers-backup.ts`](src/scripts/openrouter/sync-providers-backup.ts)) fetches the latest provider information and models from OpenRouter's API and generates the backup JSON file.
 
-## Dependency Graphs
+## 📊 Dependency Graphs
 
 You can generate dependency graphs for any source file using [dependency-cruiser](https://github.com/sverweij/dependency-cruiser). This requires `graphviz` to be installed (`brew install graphviz` on macOS).
 
@@ -118,14 +118,14 @@ npx depcruise src/app/users/sign_in/page.tsx --include-only "^src" --output-type
 
 The `--include-only "^src"` flag limits the graph to files within the `src` directory, excluding external dependencies.
 
-## Learn More
+## 📖 Learn More
 
 To learn more about Next.js, take a look at the following resources:
 
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-## Testing with Read Replica
+## 🧪 Testing with Read Replica
 
 The application supports read replicas for multi-region deployment. To test this locally:
 
@@ -159,7 +159,7 @@ Setting `VERCEL_REGION` to a US region (`sfo1`, `iad1`, `pdx1`, or `cle1`) will 
 
 **Note:** This is a simplified setup where both databases are independent (not actually replicating). This allows testing the code paths and connection logic without setting up true PostgreSQL streaming replication. For production, Supabase handles the actual replication.
 
-## Proxy to production
+## ⚡ Proxy to Production
 
 > ‼️ Use this with caution!
 
@@ -175,7 +175,7 @@ Login with the fake-login provider with an email like:
 my-fullname@admin.example.com
 ```
 
-## Local development behind HTTPS tunnel
+## 🔒 Local Development behind HTTPS Tunnel
 
 To test the app behind an HTTPS tunnel, you can use `ngrok`. First, install it:
 
@@ -202,7 +202,7 @@ Then restart the dev server, and you should be able to access the app behind the
 
 Some OAuth providers restrict `redirect_uri` to be HTTPS, and others explicitly block `localhost` for security reasons.
 
-## Common errors
+## ⚠️ Common Errors
 
 ### Error - Duplicate Vercel Project Causing MaxDuration Errors on PRs
 

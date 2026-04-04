@@ -548,18 +548,18 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                   </FieldGroup>
 
                   <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                    <Switch
-                      checked={disableAiCoauthor}
-                      onCheckedChange={setDisableAiCoauthor}
-                      disabled={!gitAuthorName}
-                    />
-                    <div>
+                    <div className="flex-1">
                       <Label className="text-sm text-white/70">Disable AI co-authorship</Label>
                       <p className="text-[11px] text-white/30">
                         When enabled, the AI agent&apos;s Co-authored-by trailer is omitted from
                         commits. Only takes effect when Author Name is set.
                       </p>
                     </div>
+                    <Switch
+                      checked={disableAiCoauthor}
+                      onCheckedChange={setDisableAiCoauthor}
+                      disabled={!gitAuthorName}
+                    />
                   </div>
                 </div>
               </SettingsSection>
@@ -727,11 +727,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                 index={5}
               >
                 <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                  <Switch
-                    checked={stagedConvoysDefault}
-                    onCheckedChange={setStagedConvoysDefault}
-                  />
-                  <div>
+                  <div className="flex-1">
                     <Label className="text-sm text-white/70">Stage convoys by default</Label>
                     <p className="text-[11px] text-white/30">
                       When enabled, new convoys are created in staged mode — agents are not
@@ -739,6 +735,10 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                       chance to review and adjust the plan before execution begins.
                     </p>
                   </div>
+                  <Switch
+                    checked={stagedConvoysDefault}
+                    onCheckedChange={setStagedConvoysDefault}
+                  />
                 </div>
               </SettingsSection>
 
@@ -812,38 +812,38 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                 )}
 
                 <div className="mt-4 flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                  <Switch checked={autoMerge} onCheckedChange={setAutoMerge} />
-                  <div>
+                  <div className="flex-1">
                     <Label className="text-sm text-white/70">Auto-merge</Label>
                     <p className="text-[11px] text-white/30">
                       Automatically merge when all gates pass.
                     </p>
                   </div>
+                  <Switch checked={autoMerge} onCheckedChange={setAutoMerge} />
                 </div>
 
                 <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                  <Switch checked={refineryCodeReview} onCheckedChange={setRefineryCodeReview} />
-                  <div>
+                  <div className="flex-1">
                     <Label className="text-sm text-white/70">Refinery code review</Label>
                     <p className="text-[11px] text-white/30">
                       The refinery agent reviews PRs and adds GitHub review comments. Disable if you
                       already use an external code-review bot.
                     </p>
                   </div>
+                  <Switch checked={refineryCodeReview} onCheckedChange={setRefineryCodeReview} />
                 </div>
 
                 <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                  <Switch
-                    checked={autoResolvePrFeedback}
-                    onCheckedChange={setAutoResolvePrFeedback}
-                  />
-                  <div>
+                  <div className="flex-1">
                     <Label className="text-sm text-white/70">Auto-resolve PR feedback</Label>
                     <p className="text-[11px] text-white/30">
                       When enabled, a polecat is automatically dispatched to address unresolved
                       review comments and failing CI checks on open PRs.
                     </p>
                   </div>
+                  <Switch
+                    checked={autoResolvePrFeedback}
+                    onCheckedChange={setAutoResolvePrFeedback}
+                  />
                 </div>
 
                 {autoResolvePrFeedback && (

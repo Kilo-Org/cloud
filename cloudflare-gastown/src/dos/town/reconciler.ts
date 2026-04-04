@@ -388,11 +388,25 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
       const branch = typeof payload.branch === 'string' ? payload.branch : '';
       const hasUnresolvedComments = payload.has_unresolved_comments === true;
       const hasFailingChecks = payload.has_failing_checks === true;
+      const hasUncheckedRuns = payload.has_unchecked_runs === true;
 
       const feedbackBead = beadOps.createBead(sql, {
         type: 'issue',
-        title: buildFeedbackBeadTitle(prNumber, repo, hasUnresolvedComments, hasFailingChecks),
-        body: buildFeedbackPrompt(prNumber, repo, branch, hasUnresolvedComments, hasFailingChecks),
+        title: buildFeedbackBeadTitle(
+          prNumber,
+          repo,
+          hasUnresolvedComments,
+          hasFailingChecks,
+          hasUncheckedRuns
+        ),
+        body: buildFeedbackPrompt(
+          prNumber,
+          repo,
+          branch,
+          hasUnresolvedComments,
+          hasFailingChecks,
+          hasUncheckedRuns
+        ),
         rig_id: mrBead.rig_id ?? undefined,
         parent_bead_id: mrBeadId,
         labels: ['gt:pr-feedback'],
@@ -1905,11 +1919,13 @@ function buildFeedbackBeadTitle(
   prNumber: number,
   repo: string,
   hasComments: boolean,
-  hasFailingChecks: boolean
+  hasFailingChecks: boolean,
+  hasUncheckedRuns = false
 ): string {
   const parts: string[] = [];
   if (hasComments) parts.push('review comments');
   if (hasFailingChecks) parts.push('failing CI');
+  if (hasUncheckedRuns && !hasFailingChecks) parts.push('unchecked CI runs');
   const shortRepo = repo.includes('/') ? repo.split('/').pop() : repo;
   return `Address ${parts.join(' & ')} on PR #${prNumber}${shortRepo ? ` (${shortRepo})` : ''}`;
 }
@@ -1920,7 +1936,8 @@ function buildFeedbackPrompt(
   repo: string,
   branch: string,
   hasComments: boolean,
-  hasFailingChecks: boolean
+  hasFailingChecks: boolean,
+  hasUncheckedRuns = false
 ): string {
   const lines: string[] = [];
   lines.push(`You are addressing feedback on PR #${prNumber} on ${repo}, branch ${branch}.`);
@@ -1931,10 +1948,18 @@ function buildFeedbackPrompt(
     lines.push(
       'Address the review comments first, then fix the CI failures, as comment fixes may also resolve some CI issues.'
     );
+  } else if (hasComments && hasUncheckedRuns) {
+    lines.push(
+      'This PR has unresolved review comments and more than 100 CI check-runs (not all could be inspected). Address the review comments and verify CI status.'
+    );
   } else if (hasComments) {
     lines.push('This PR has unresolved review comments.');
   } else if (hasFailingChecks) {
     lines.push('This PR has failing CI checks.');
+  } else if (hasUncheckedRuns) {
+    lines.push(
+      'This PR has more than 100 CI check-runs. Not all could be inspected by the system. Check `gh pr checks` for the full status and fix any failures.'
+    );
   }
 
   lines.push('');

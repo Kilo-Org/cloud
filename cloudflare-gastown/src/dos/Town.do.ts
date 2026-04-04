@@ -4237,6 +4237,34 @@ export class TownDO extends DurableObject<Env> {
                     (r.conclusion === 'success' || r.conclusion === 'skipped')
                 ));
           }
+
+          // Also check combined commit statuses (legacy status API).
+          // Some repos gate merges with commit statuses that don't appear
+          // in check-runs. If any status is pending/failure/error, block.
+          if (allChecksPass) {
+            const statusRes = await fetch(
+              `https://api.github.com/repos/${owner}/${repo}/commits/${sha}/status`,
+              { headers }
+            );
+            if (statusRes.ok) {
+              const statusRaw: unknown = await statusRes.json();
+              const statusData = z
+                .object({
+                  state: z.string(),
+                  total_count: z.number(),
+                })
+                .safeParse(statusRaw);
+              if (statusData.success && statusData.data.total_count > 0) {
+                const combinedState = statusData.data.state;
+                if (combinedState !== 'success') {
+                  allChecksPass = false;
+                  if (combinedState === 'failure' || combinedState === 'error') {
+                    hasFailingChecks = true;
+                  }
+                }
+              }
+            }
+          }
         }
       }
     } catch (err) {

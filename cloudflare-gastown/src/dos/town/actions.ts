@@ -281,7 +281,11 @@ export type ApplyActionContext = {
   emitEvent: (data: Record<string, unknown>) => void;
   /** Get the current town config (read lazily). */
   getTownConfig: () => Promise<{
-    refinery?: { auto_resolve_pr_feedback?: boolean; auto_merge_delay_minutes?: number | null };
+    refinery?: {
+      auto_merge?: boolean;
+      auto_resolve_pr_feedback?: boolean;
+      auto_merge_delay_minutes?: number | null;
+    };
   }>;
 };
 
@@ -643,6 +647,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                     branch,
                     has_unresolved_comments: feedback.hasUnresolvedComments,
                     has_failing_checks: feedback.hasFailingChecks,
+                    has_unchecked_runs: feedback.hasUncheckedRuns,
                   },
                 });
               }
@@ -660,8 +665,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             }
           }
 
-          // Auto-merge timer: track grace period when everything is green
+          // Auto-merge timer: track grace period when everything is green.
+          // Requires both auto_merge enabled AND a delay configured.
           if (
+            refineryConfig.auto_merge !== false &&
             refineryConfig.auto_merge_delay_minutes !== null &&
             refineryConfig.auto_merge_delay_minutes !== undefined
           ) {

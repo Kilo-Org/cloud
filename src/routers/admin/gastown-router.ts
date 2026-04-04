@@ -141,6 +141,9 @@ const TownConfigRecord = z.object({
       gates: z.array(z.string()),
       auto_merge: z.boolean(),
       require_clean_merge: z.boolean(),
+      code_review: z.boolean(),
+      auto_resolve_pr_feedback: z.boolean(),
+      auto_merge_delay_minutes: z.number().nullable(),
     })
     .optional(),
   alarm_interval_active: z.number().optional(),

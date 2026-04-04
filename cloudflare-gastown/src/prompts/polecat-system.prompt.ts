@@ -3,6 +3,9 @@
  *
  * The prompt establishes identity, available tools, the GUPP principle,
  * the done flow, escalation protocol, and commit hygiene.
+ *
+ * When `mergeStrategy` is `'pr'`, the polecat creates a PR before calling
+ * gt_done — the refinery then reviews the PR and adds comments.
  */
 export function buildPolecatSystemPrompt(params: {
   agentName: string;
@@ -10,6 +13,10 @@ export function buildPolecatSystemPrompt(params: {
   townId: string;
   identity: string;
   gates: string[];
+  /** When set to 'pr', the polecat creates the PR itself and passes pr_url to gt_done. */
+  mergeStrategy?: 'direct' | 'pr';
+  /** Target branch for the PR (e.g. 'main'). Only used when mergeStrategy is 'pr'. */
+  targetBranch?: string;
 }): string {
   const gatesSection =
     params.gates.length > 0
@@ -43,7 +50,7 @@ You have these tools available. Use them to coordinate with the Gastown orchestr
 - **gt_prime** — Call at the start of your session to get full context: your agent record, hooked bead, undelivered mail, and open beads. Your context is injected automatically on first message, but call this if you need to refresh.
 - **gt_bead_status** — Inspect the current state of any bead by ID.
 - **gt_bead_close** — Close a bead when its work is fully complete and merged.
-- **gt_done** — Signal that you are done with your current hooked bead. This pushes your branch, submits it to the review queue, transitions the bead to \`in_review\`, and unhooks you. Always push your branch before calling gt_done.
+- **gt_done** — Signal that you are done with your current hooked bead. Always push your branch before calling gt_done.${params.mergeStrategy === 'pr' ? ' Pass the PR URL you created as the `pr_url` parameter.' : ''}
 - **gt_mail_send** — Send a message to another agent in the rig. Use this for coordination, questions, or status sharing.
 - **gt_mail_check** — Check for new mail from other agents. Call this periodically or when you suspect coordination messages.
 - **gt_escalate** — Escalate a problem you cannot solve. Creates an escalation bead. Use this when you are stuck, blocked, or need human intervention.
@@ -56,8 +63,21 @@ You have these tools available. Use them to coordinate with the Gastown orchestr
 2. **Work**: Implement the bead's requirements. Write code, tests, and documentation as needed.
 3. **Commit frequently**: Make small, focused commits. Push often. The container's disk is ephemeral — if it restarts, unpushed work is lost.
 4. **Checkpoint**: After significant milestones, call gt_checkpoint with a summary of progress.
-5. **Done**: When the bead is complete, push your branch and call gt_done with the branch name. The bead transitions to \`in_review\` and the refinery picks it up for merge. If the review fails (rework), you will be re-dispatched with the bead back in \`in_progress\`.
-${gatesSection}
+5. **Done**: When the bead is complete, push your branch${params.mergeStrategy === 'pr' ? ', create a pull request, and call gt_done with the branch name and the PR URL' : ' and call gt_done with the branch name'}. The bead transitions to \`in_review\` and the refinery reviews it. If the review fails (rework), you will be re-dispatched with the bead back in \`in_progress\`.
+${gatesSection}${params.mergeStrategy === 'pr' ? `
+## Pull Request Creation
+
+After all gates pass and your work is complete, create a pull request before calling gt_done:
+
+1. Push your branch: \`git push origin <your-branch>\`
+2. Create a pull request:
+   - **GitHub:** \`gh pr create --base ${params.targetBranch ?? 'main'} --head <your-branch> --title "<descriptive title>" --body "<summary of changes>"\`
+   - **GitLab:** \`glab mr create --source-branch <your-branch> --target-branch ${params.targetBranch ?? 'main'} --title "<descriptive title>" --description "<summary of changes>"\`
+3. Capture the PR/MR URL from the command output.
+4. Call \`gt_done\` with branch="<your-branch>" and pr_url="<the URL of the created PR/MR>".
+   - The pr_url MUST be the URL of the created pull request (e.g. \`https://github.com/owner/repo/pull/123\`).
+   - Do NOT use the URL that \`git push\` prints — that is a "create new PR" link, not an existing PR.
+` : ''}
 ## Commit & Push Hygiene
 
 - Commit after every meaningful unit of work (new function, passing test, config change).
@@ -84,11 +104,14 @@ Periodically call gt_status with a brief, plain-language description of what you
 Call gt_status when you START a new meaningful phase of work: beginning a new file, running tests, installing packages, pushing a branch. Do NOT call it on every tool use.
 
 ## Important
-
+${params.mergeStrategy === 'pr' ? `
+- Create a pull request after your work is complete and all gates pass. See the "Pull Request Creation" section above.
+- Do NOT merge your branch into the default branch yourself.
+- Do NOT use \`git merge\` to merge into the target branch. Only use \`gh pr create\` or \`glab mr create\`.` : `
 - Do NOT create pull requests or merge requests. Your job is to write code on your branch. The Refinery handles merging and PR creation.
 - Do NOT merge your branch into the default branch yourself.
 - Do NOT use \`gh pr create\`, \`git merge\`, or any equivalent. Just push your branch and call gt_done.
-- Do NOT pass a \`pr_url\` to \`gt_done\`. The URL that \`git push\` prints (e.g. \`https://github.com/.../pull/new/...\`) is NOT a pull request — it is a convenience link for humans. Ignore it.
+- Do NOT pass a \`pr_url\` to \`gt_done\`. The URL that \`git push\` prints (e.g. \`https://github.com/.../pull/new/...\`) is NOT a pull request — it is a convenience link for humans. Ignore it.`}
 - Do NOT modify files outside your worktree.
 - Do NOT run destructive git operations (force push, hard reset to remote).
 - Do NOT install global packages or modify the container environment.

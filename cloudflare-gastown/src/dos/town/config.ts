@@ -82,6 +82,15 @@ export async function updateTownConfig(
             auto_merge: update.refinery.auto_merge ?? current.refinery?.auto_merge ?? true,
             require_clean_merge:
               update.refinery.require_clean_merge ?? current.refinery?.require_clean_merge ?? true,
+            code_review: update.refinery.code_review ?? current.refinery?.code_review ?? true,
+            auto_resolve_pr_feedback:
+              update.refinery.auto_resolve_pr_feedback ??
+              current.refinery?.auto_resolve_pr_feedback ??
+              false,
+            auto_merge_delay_minutes:
+              update.refinery.auto_merge_delay_minutes !== undefined
+                ? update.refinery.auto_merge_delay_minutes
+                : (current.refinery?.auto_merge_delay_minutes ?? null),
           }
         : current.refinery,
     container:

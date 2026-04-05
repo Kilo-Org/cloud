@@ -632,14 +632,22 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             const refineryConfig = townConfig.refinery;
             if (!refineryConfig) return;
 
+            // Hoist checkPRFeedback: call at most once per poll_pr tick
+            // and reuse the result for both auto-resolve and auto-merge.
+            const needsFeedbackCheck =
+              refineryConfig.auto_resolve_pr_feedback ||
+              (refineryConfig.auto_merge !== false &&
+                refineryConfig.auto_merge_delay_minutes !== null &&
+                refineryConfig.auto_merge_delay_minutes !== undefined);
+
+            const feedback = needsFeedbackCheck ? await ctx.checkPRFeedback(action.pr_url) : null;
+
             // Auto-resolve PR feedback: detect unresolved comments and failing CI
-            if (refineryConfig.auto_resolve_pr_feedback) {
-              const feedback = await ctx.checkPRFeedback(action.pr_url);
+            if (refineryConfig.auto_resolve_pr_feedback && feedback) {
               if (
-                feedback &&
-                (feedback.hasUnresolvedComments ||
-                  feedback.hasFailingChecks ||
-                  feedback.hasUncheckedRuns)
+                feedback.hasUnresolvedComments ||
+                feedback.hasFailingChecks ||
+                feedback.hasUncheckedRuns
               ) {
                 const existingFeedback = hasExistingFeedbackBead(sql, action.bead_id);
                 if (!existingFeedback) {
@@ -694,7 +702,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               refineryConfig.auto_merge_delay_minutes !== null &&
               refineryConfig.auto_merge_delay_minutes !== undefined
             ) {
-              const feedback = await ctx.checkPRFeedback(action.pr_url);
               if (!feedback) return;
 
               const allGreen =

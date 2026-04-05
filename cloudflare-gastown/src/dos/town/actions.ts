@@ -641,39 +641,37 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                   feedback.hasFailingChecks ||
                   feedback.hasUncheckedRuns)
               ) {
-                const existingFeedback = hasExistingFeedbackBead(sql, action.bead_id);
-                if (!existingFeedback) {
-                  const prMeta = parsePrUrl(action.pr_url);
-                  const rmRows = z
-                    .object({ branch: z.string() })
-                    .array()
-                    .parse([
-                      ...query(
-                        sql,
-                        /* sql */ `
+                // Dedup is handled by the reconciler's pr_feedback_detected event handler
+                const prMeta = parsePrUrl(action.pr_url);
+                const rmRows = z
+                  .object({ branch: z.string() })
+                  .array()
+                  .parse([
+                    ...query(
+                      sql,
+                      /* sql */ `
                           SELECT ${review_metadata.columns.branch}
                           FROM ${review_metadata}
                           WHERE ${review_metadata.bead_id} = ?
                         `,
-                        [action.bead_id]
-                      ),
-                    ]);
-                  const branch = rmRows[0]?.branch ?? '';
+                      [action.bead_id]
+                    ),
+                  ]);
+                const branch = rmRows[0]?.branch ?? '';
 
-                  ctx.insertEvent('pr_feedback_detected', {
-                    bead_id: action.bead_id,
-                    payload: {
-                      mr_bead_id: action.bead_id,
-                      pr_url: action.pr_url,
-                      pr_number: prMeta?.prNumber ?? 0,
-                      repo: prMeta?.repo ?? '',
-                      branch,
-                      has_unresolved_comments: feedback.hasUnresolvedComments,
-                      has_failing_checks: feedback.hasFailingChecks,
-                      has_unchecked_runs: feedback.hasUncheckedRuns,
-                    },
-                  });
-                }
+                ctx.insertEvent('pr_feedback_detected', {
+                  bead_id: action.bead_id,
+                  payload: {
+                    mr_bead_id: action.bead_id,
+                    pr_url: action.pr_url,
+                    pr_number: prMeta?.prNumber ?? 0,
+                    repo: prMeta?.repo ?? '',
+                    branch,
+                    has_unresolved_comments: feedback.hasUnresolvedComments,
+                    has_failing_checks: feedback.hasFailingChecks,
+                    has_unchecked_runs: feedback.hasUncheckedRuns,
+                  },
+                });
 
                 query(
                   sql,
@@ -1020,26 +1018,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-/** Check if an MR bead already has a non-terminal feedback bead blocking it. */
-function hasExistingFeedbackBead(sql: SqlStorage, mrBeadId: string): boolean {
-  const rows = [
-    ...query(
-      sql,
-      /* sql */ `
-        SELECT 1 FROM ${bead_dependencies} bd
-        INNER JOIN ${beads} fb ON fb.${beads.columns.bead_id} = bd.${bead_dependencies.columns.depends_on_bead_id}
-        WHERE bd.${bead_dependencies.columns.bead_id} = ?
-          AND bd.${bead_dependencies.columns.dependency_type} = 'blocks'
-          AND fb.${beads.columns.labels} LIKE '%gt:pr-feedback%'
-          AND fb.${beads.columns.status} NOT IN ('closed', 'failed')
-        LIMIT 1
-      `,
-      [mrBeadId]
-    ),
-  ];
-  return rows.length > 0;
-}
-
 /** Parse a GitHub/GitLab PR URL to extract repo and PR number. */
 function parsePrUrl(prUrl: string): { repo: string; prNumber: number } | null {
   // GitHub: https://github.com/{owner}/{repo}/pull/{number}
@@ -1056,4 +1034,4 @@ function parsePrUrl(prUrl: string): { repo: string; prNumber: number } | null {
 }
 
 // Exported for testing
-export { hasExistingFeedbackBead as _hasExistingFeedbackBead, parsePrUrl as _parsePrUrl };
+export { parsePrUrl as _parsePrUrl };

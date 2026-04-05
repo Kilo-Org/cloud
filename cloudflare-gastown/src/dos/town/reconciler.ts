@@ -36,6 +36,10 @@ import type { TownEventRecord } from '../../db/tables/town-events.table';
 
 const LOG = '[reconciler]';
 
+function now(): string {
+  return new Date().toISOString();
+}
+
 // ── Circuit breaker ─────────────────────────────────────────────────
 
 /** Number of dispatch failures in a 30-min window to trip the town-level breaker. */
@@ -444,7 +448,7 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
               ${beads.columns.updated_at} = ?
           WHERE ${beads.bead_id} = ?
         `,
-        [new Date().toISOString(), mrBeadId]
+        [now(), mrBeadId]
       );
       return;
     }

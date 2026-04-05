@@ -1196,10 +1196,31 @@ export function reconcileReviewQueue(
     }
   }
 
-  // Rules 5–6 only apply when refinery code review is enabled.
-  // When disabled, open MR beads with pr_url are fast-tracked above.
-  if (!refineryCodeReview) {
-    // Skip refinery dispatch — jump to Rule 7
+  // When refinery code review is disabled, only skip Rules 5-6 if ALL
+  // open MR beads have a pr_url (meaning poll_pr handles them).
+  // MR beads without pr_url still need the refinery for direct merges.
+  const hasOpenMrsWithoutPrUrl =
+    !refineryCodeReview &&
+    z
+      .object({ cnt: z.number() })
+      .array()
+      .parse([
+        ...query(
+          sql,
+          /* sql */ `
+            SELECT count(*) AS cnt FROM ${beads} b
+            LEFT JOIN ${review_metadata} rm
+              ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
+            WHERE b.${beads.columns.type} = 'merge_request'
+              AND b.${beads.columns.status} = 'open'
+              AND rm.${review_metadata.columns.pr_url} IS NULL
+          `,
+          []
+        ),
+      ])[0]?.cnt > 0;
+
+  if (!refineryCodeReview && !hasOpenMrsWithoutPrUrl) {
+    // All open MR beads have pr_url — skip refinery dispatch, poll_pr handles them
   } else {
     // Rule 5: Pop open MR bead for idle refinery
     // Get all rigs that have open MR beads

@@ -8,39 +8,46 @@ import { Button } from '@/components/ui/button';
 
 type BannerColor = 'emerald' | 'amber' | 'blue' | 'red' | 'green';
 
-const colorMap: Record<BannerColor, { border: string; bg: string; text: string; button: string }> =
-  {
-    emerald: {
-      border: 'border-emerald-500/30',
-      bg: 'bg-emerald-500/10',
-      text: 'text-emerald-400',
-      button: 'bg-emerald-500 text-primary-foreground hover:bg-emerald-500/90',
-    },
-    amber: {
-      border: 'border-amber-500/30',
-      bg: 'bg-amber-500/10',
-      text: 'text-amber-400',
-      button: 'bg-amber-500 text-primary-foreground hover:bg-amber-500/90',
-    },
-    blue: {
-      border: 'border-blue-500/30',
-      bg: 'bg-blue-500/10',
-      text: 'text-blue-400',
-      button: 'bg-blue-500 text-primary-foreground hover:bg-blue-500/90',
-    },
-    red: {
-      border: 'border-red-500/30',
-      bg: 'bg-red-500/10',
-      text: 'text-red-400',
-      button: 'bg-red-500 text-primary-foreground hover:bg-red-500/90',
-    },
-    green: {
-      border: 'border-green-500/30',
-      bg: 'bg-green-500/10',
-      text: 'text-green-400',
-      button: 'bg-green-500 text-primary-foreground hover:bg-green-500/90',
-    },
-  };
+const colorMap: Record<
+  BannerColor,
+  { border: string; bg: string; text: string; button: string; outlineButton: string }
+> = {
+  emerald: {
+    border: 'border-emerald-500/30',
+    bg: 'bg-emerald-500/10',
+    text: 'text-emerald-400',
+    button: 'bg-emerald-500 text-primary-foreground hover:bg-emerald-500/90',
+    outlineButton: 'border border-emerald-500/40 bg-transparent text-emerald-400 hover:bg-emerald-500/10',
+  },
+  amber: {
+    border: 'border-amber-500/30',
+    bg: 'bg-amber-500/10',
+    text: 'text-amber-400',
+    button: 'bg-amber-500 text-primary-foreground hover:bg-amber-500/90',
+    outlineButton: 'border border-amber-500/40 bg-transparent text-amber-400 hover:bg-amber-500/10',
+  },
+  blue: {
+    border: 'border-blue-500/30',
+    bg: 'bg-blue-500/10',
+    text: 'text-blue-400',
+    button: 'bg-blue-500 text-primary-foreground hover:bg-blue-500/90',
+    outlineButton: 'border border-blue-500/40 bg-transparent text-blue-400 hover:bg-blue-500/10',
+  },
+  red: {
+    border: 'border-red-500/30',
+    bg: 'bg-red-500/10',
+    text: 'text-red-400',
+    button: 'bg-red-500 text-primary-foreground hover:bg-red-500/90',
+    outlineButton: 'border border-red-500/40 bg-transparent text-red-400 hover:bg-red-500/10',
+  },
+  green: {
+    border: 'border-green-500/30',
+    bg: 'bg-green-500/10',
+    text: 'text-green-400',
+    button: 'bg-green-500 text-primary-foreground hover:bg-green-500/90',
+    outlineButton: 'border border-green-500/40 bg-transparent text-green-400 hover:bg-green-500/10',
+  },
+};
 
 const BannerContext = createContext<{ colors?: (typeof colorMap)[BannerColor] }>({});
 
@@ -128,7 +135,7 @@ function BannerButton({
   const { colors } = useContext(BannerContext);
   const btnClass = cn(
     'w-full shrink-0 sm:w-auto [&>*]:h-4 [&>*]:w-4',
-    variant === 'primary' ? colors?.button : 'bg-transparent border border-current/30 hover:bg-current/10',
+    variant === 'primary' ? colors?.button : colors?.outlineButton,
     className
   );
 

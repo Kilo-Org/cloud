@@ -972,7 +972,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                               const v = parseInt(e.target.value, 10);
                               setAutoMergeDelayMinutes(Number.isNaN(v) ? null : Math.max(0, v));
                             }}
-                            className="w-20 border-white/[0.08] bg-white/[0.03] text-center font-mono text-xs text-white/85"
+                            className="h-[26px] w-[60px] border-white/[0.08] bg-white/[0.03] text-center font-mono text-xs text-white/85"
                           />
                           <span className="text-[11px] text-white/30">minutes</span>
                         </div>

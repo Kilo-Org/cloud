@@ -89,7 +89,6 @@ export const entries: Entry[] = [
               <Banner.Button onClick={() => {}}>Retry</Banner.Button>
               <Banner.Button onClick={() => {}}>Dismiss</Banner.Button>
             </Banner.Action>
-            <Banner.Dismiss onDismiss={() => {}} />
           </Banner>
         ),
       },

@@ -200,7 +200,7 @@ describe('buildRefinerySystemPrompt with existingPrUrl', () => {
     });
     expect(prompt).toContain('https://github.com/org/repo/pull/42');
     expect(prompt).toContain('gh pr diff');
-    expect(prompt).toContain('gt_mail_send');
+    expect(prompt).toContain('gt_request_changes');
     expect(prompt).toContain('Do NOT merge the PR');
     expect(prompt).not.toContain('gh pr create');
     expect(prompt).toContain('Do NOT create a new PR');

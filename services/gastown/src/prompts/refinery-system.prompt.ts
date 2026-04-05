@@ -157,12 +157,12 @@ function buildPRReviewPrompt(params: {
    Each entry in \`comments\` creates an inline review thread at the specified file and diff position.
 2. Call \`gt_done\` with branch="${params.branch}" and pr_url="${params.prUrl}".
    The system will detect your unresolved review comments and automatically dispatch a polecat to address them.`
-    : `1. Call \`gt_mail_send\` to send a REWORK_REQUEST to the polecat agent (ID: ${params.polecatAgentId}) with:
+    : `1. Call \`gt_request_changes\` with a detailed description of the issues:
    - Which gate failed and the exact error output
    - Specific files and line numbers that need changes
    - Clear instructions on what to fix
-2. Call \`gt_escalate\` with severity "low" to record the rework request.
-3. Do NOT call \`gt_done\` — your session will end automatically. The system detects that no merge or PR was performed and marks the review as needing rework.`;
+   This creates a rework bead that dispatches a polecat to fix the issues.
+2. Call \`gt_done\` with branch="${params.branch}" and pr_url="${params.prUrl}".`;
 
   const tools = isCommentMode
     ? `- \`gt_prime\` — Get your role context and current assignment
@@ -171,7 +171,7 @@ function buildPRReviewPrompt(params: {
 - \`gt_checkpoint\` — Save progress for crash recovery`
     : `- \`gt_prime\` — Get your role context and current assignment
 - \`gt_done\` — Signal your review is complete (pass pr_url="${params.prUrl}")
-- \`gt_mail_send\` — Send rework request to the polecat
+- \`gt_request_changes\` — Request rework from the polecat (creates a rework bead)
 - \`gt_escalate\` — Record issues for visibility
 - \`gt_checkpoint\` — Save progress for crash recovery`;
 

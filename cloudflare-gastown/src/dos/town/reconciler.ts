@@ -30,8 +30,9 @@ import * as reviewQueue from './review-queue';
 import * as agents from './agents';
 import * as beadOps from './beads';
 import { getRig } from './rigs';
-import { PR_POLL_INTERVAL_MS } from './actions';
+import { PR_POLL_INTERVAL_MS, PR_POLL_NULL_THRESHOLD } from './actions';
 import type { Action } from './actions';
+import { insertEvent } from './events';
 import type { TownEventRecord } from '../../db/tables/town-events.table';
 
 const LOG = '[reconciler]';
@@ -387,7 +388,25 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
       const prUrl = typeof payload.pr_url === 'string' ? payload.pr_url : '';
       const prNumber = typeof payload.pr_number === 'number' ? payload.pr_number : 0;
       const repo = typeof payload.repo === 'string' ? payload.repo : '';
-      const branch = typeof payload.branch === 'string' ? payload.branch : '';
+      // Read branch from payload if provided, otherwise look it up from review_metadata
+      let branch = typeof payload.branch === 'string' ? payload.branch : '';
+      if (!branch) {
+        const rmRows = z
+          .object({ branch: z.string() })
+          .array()
+          .parse([
+            ...query(
+              sql,
+              /* sql */ `
+                SELECT ${review_metadata.columns.branch}
+                FROM ${review_metadata}
+                WHERE ${review_metadata.bead_id} = ?
+              `,
+              [mrBeadId]
+            ),
+          ]);
+        branch = rmRows[0]?.branch ?? '';
+      }
       const hasUnresolvedComments = payload.has_unresolved_comments === true;
       const hasFailingChecks = payload.has_failing_checks === true;
       const hasUncheckedRuns = payload.has_unchecked_runs === true;
@@ -446,6 +465,202 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
           WHERE ${beads.bead_id} = ?
         `,
         [new Date().toISOString(), mrBeadId]
+      );
+      return;
+    }
+
+    case 'auto_merge_cleared': {
+      if (!event.bead_id) {
+        console.warn(`${LOG} applyEvent: auto_merge_cleared missing bead_id`);
+        return;
+      }
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.auto_merge_pending'),
+              ${beads.columns.updated_at} = ?
+          WHERE ${beads.bead_id} = ?
+        `,
+        [new Date().toISOString(), event.bead_id]
+      );
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${review_metadata}
+          SET ${review_metadata.columns.auto_merge_ready_since} = NULL
+          WHERE ${review_metadata.bead_id} = ?
+        `,
+        [event.bead_id]
+      );
+      return;
+    }
+
+    case 'poll_pr_nonnull': {
+      if (!event.bead_id) {
+        console.warn(`${LOG} applyEvent: poll_pr_nonnull missing bead_id`);
+        return;
+      }
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.metadata} = json_set(
+            COALESCE(${beads.columns.metadata}, '{}'),
+            '$.poll_null_count', 0
+          )
+          WHERE ${beads.bead_id} = ?
+        `,
+        [event.bead_id]
+      );
+      return;
+    }
+
+    case 'poll_pr_null': {
+      if (!event.bead_id) {
+        console.warn(`${LOG} applyEvent: poll_pr_null missing bead_id`);
+        return;
+      }
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.metadata} = json_set(
+            COALESCE(${beads.columns.metadata}, '{}'),
+            '$.poll_null_count',
+            COALESCE(
+              json_extract(${beads.columns.metadata}, '$.poll_null_count'),
+              0
+            ) + 1
+          )
+          WHERE ${beads.bead_id} = ?
+        `,
+        [event.bead_id]
+      );
+      const rows = z
+        .object({ null_count: z.number().nullable() })
+        .array()
+        .parse([
+          ...query(
+            sql,
+            /* sql */ `
+              SELECT json_extract(${beads.columns.metadata}, '$.poll_null_count') AS null_count
+              FROM ${beads}
+              WHERE ${beads.bead_id} = ?
+            `,
+            [event.bead_id]
+          ),
+        ]);
+      const nullCount = Number(rows[0]?.null_count ?? 0);
+      if (nullCount >= PR_POLL_NULL_THRESHOLD) {
+        console.warn(
+          `${LOG} poll_pr_null: ${nullCount} consecutive null results for bead=${event.bead_id}, failing`
+        );
+        beadOps.updateBeadStatus(sql, event.bead_id, 'failed', 'system');
+        query(
+          sql,
+          /* sql */ `
+            UPDATE ${beads}
+            SET ${beads.columns.metadata} = json_set(
+              COALESCE(${beads.columns.metadata}, '{}'),
+              '$.failureReason', 'pr_poll_failed',
+              '$.failureMessage', ?
+            )
+            WHERE ${beads.bead_id} = ?
+          `,
+          [
+            `Cannot poll PR status — GitHub API returned null ${nullCount} consecutive times. Check that a valid GitHub token is configured in town settings and that the GitHub API is reachable.`,
+            event.bead_id,
+          ]
+        );
+      }
+      return;
+    }
+
+    case 'poll_pr_feedback_checked': {
+      if (!event.bead_id) {
+        console.warn(`${LOG} applyEvent: poll_pr_feedback_checked missing bead_id`);
+        return;
+      }
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${review_metadata}
+          SET ${review_metadata.columns.last_feedback_check_at} = ?
+          WHERE ${review_metadata.bead_id} = ?
+        `,
+        [new Date().toISOString(), event.bead_id]
+      );
+      return;
+    }
+
+    case 'auto_merge_timer_set': {
+      if (!event.bead_id) {
+        console.warn(`${LOG} applyEvent: auto_merge_timer_set missing bead_id`);
+        return;
+      }
+      const delayMinutes =
+        typeof payload.auto_merge_delay_minutes === 'number'
+          ? payload.auto_merge_delay_minutes
+          : null;
+      if (delayMinutes === null) {
+        console.warn(`${LOG} applyEvent: auto_merge_timer_set missing auto_merge_delay_minutes`);
+        return;
+      }
+      const readySinceRows = z
+        .object({ auto_merge_ready_since: z.string().nullable() })
+        .array()
+        .parse([
+          ...query(
+            sql,
+            /* sql */ `
+              SELECT ${review_metadata.columns.auto_merge_ready_since}
+              FROM ${review_metadata}
+              WHERE ${review_metadata.bead_id} = ?
+            `,
+            [event.bead_id]
+          ),
+        ]);
+      const readySince = readySinceRows[0]?.auto_merge_ready_since;
+      if (!readySince) {
+        query(
+          sql,
+          /* sql */ `
+            UPDATE ${review_metadata}
+            SET ${review_metadata.columns.auto_merge_ready_since} = ?
+            WHERE ${review_metadata.bead_id} = ?
+          `,
+          [new Date().toISOString(), event.bead_id]
+        );
+      } else {
+        const elapsed = Date.now() - new Date(readySince).getTime();
+        if (elapsed >= delayMinutes * 60_000) {
+          const prUrl = typeof payload.pr_url === 'string' ? payload.pr_url : '';
+          insertEvent(sql, 'pr_auto_merge', {
+            bead_id: event.bead_id,
+            payload: {
+              mr_bead_id: event.bead_id,
+              pr_url: prUrl,
+            },
+          });
+        }
+      }
+      return;
+    }
+
+    case 'auto_merge_timer_reset': {
+      if (!event.bead_id) {
+        console.warn(`${LOG} applyEvent: auto_merge_timer_reset missing bead_id`);
+        return;
+      }
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${review_metadata}
+          SET ${review_metadata.columns.auto_merge_ready_since} = NULL
+          WHERE ${review_metadata.bead_id} = ?
+        `,
+        [event.bead_id]
       );
       return;
     }

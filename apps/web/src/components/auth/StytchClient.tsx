@@ -31,7 +31,6 @@ export const StytchClient = ({ children }: React.PropsWithChildren) => {
     <>
       <Script
         id="stytch-telemetry"
-        // @ts-expect-error — pnpm module isolation causes ScriptProps to lose ScriptHTMLAttributes
         src={telemetryJsUri}
         strategy="afterInteractive"
         onLoad={async () => {

@@ -32,7 +32,7 @@ import { writeEvent, eventContextFromState } from '../../utils/analytics';
 
 export type ReconcileWithFlyResult = {
   beginUnexpectedStopRecovery?: {
-    flyState: 'stopped' | 'created';
+    flyState: 'stopped';
     failCount: number;
   };
   timedOutUnexpectedStopRecovery?: {
@@ -827,7 +827,7 @@ export async function syncStatusWithFly(
   }
 
   // failed is definitively terminal — transition immediately without waiting for
-  // SELF_HEAL_THRESHOLD consecutive checks like we do for stopped/created.
+  // the unexpected-stop recovery confirmation path used for stopped.
   if (flyState === 'failed' && state.status !== 'stopped') {
     const wasStarting = state.status === 'starting';
     rctx.log('sync_status_failed', {
@@ -853,7 +853,7 @@ export async function syncStatusWithFly(
     return {};
   }
 
-  if ((flyState === 'stopped' || flyState === 'created') && state.status === 'running') {
+  if (flyState === 'stopped' && state.status === 'running') {
     state.healthCheckFailCount++;
     await ctx.storage.put(storageUpdate({ healthCheckFailCount: state.healthCheckFailCount }));
 

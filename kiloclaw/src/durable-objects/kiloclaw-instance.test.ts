@@ -813,6 +813,21 @@ describe('reconciliation: machine status sync', () => {
     expect(storage._store.get('recoveryStartedAt')).not.toBeNull();
   });
 
+  it("does not trigger unexpected-stop recovery when Fly reports 'created'", async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'created', config: {} });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.alarm();
+
+    expect(waitUntilPromises).toHaveLength(0);
+    expect(storage._store.get('status')).toBe('running');
+    expect(storage._store.get('healthCheckFailCount')).toBe(0);
+    expect(storage._store.get('recoveryStartedAt')).toBeUndefined();
+  });
+
   it('does not relaunch automatic recovery on subsequent alarms while already recovering', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
     await seedRecovering(storage, {

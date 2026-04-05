@@ -71,8 +71,8 @@ export const ALARM_INTERVAL_IDLE_MS = 30 * 60 * 1000; // 30 min
 /** Random jitter added to alarm scheduling to prevent Fly API bursts */
 export const ALARM_JITTER_MS = 60 * 1000; // 0-60s
 
-/** Consecutive failed health checks before marking a running instance as stopped */
-export const SELF_HEAL_THRESHOLD = 5;
+/** Consecutive Fly `stopped` confirmations before triggering unexpected-stop recovery */
+export const SELF_HEAL_THRESHOLD = 1;
 
 /** Retain a replaced volume for rollback/debug only when snapshots exist. */
 export const PREVIOUS_VOLUME_RETENTION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days

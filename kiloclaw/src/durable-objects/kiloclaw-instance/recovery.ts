@@ -126,7 +126,7 @@ export async function cleanupRetainedRecoveryVolumeIfDue(
 
 export async function beginUnexpectedStopRecovery(
   runtime: RecoveryRuntime,
-  trigger: { flyState: 'stopped' | 'created'; failCount: number }
+  trigger: { flyState: 'stopped'; failCount: number }
 ): Promise<void> {
   const { state } = runtime;
   const recoveryStartedAt = Date.now();

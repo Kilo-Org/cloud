@@ -632,14 +632,24 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             const refineryConfig = townConfig.refinery;
             if (!refineryConfig) return;
 
+            const needsAutoResolve = !!refineryConfig.auto_resolve_pr_feedback;
+            const autoMergeDelayMinutes =
+              refineryConfig.auto_merge !== false
+                ? (refineryConfig.auto_merge_delay_minutes ?? null)
+                : null;
+
+            // Single checkPRFeedback call shared by both auto-resolve and auto-merge paths
+            const feedback =
+              needsAutoResolve || autoMergeDelayMinutes !== null
+                ? await ctx.checkPRFeedback(action.pr_url)
+                : null;
+
             // Auto-resolve PR feedback: detect unresolved comments and failing CI
-            if (refineryConfig.auto_resolve_pr_feedback) {
-              const feedback = await ctx.checkPRFeedback(action.pr_url);
+            if (needsAutoResolve && feedback) {
               if (
-                feedback &&
-                (feedback.hasUnresolvedComments ||
-                  feedback.hasFailingChecks ||
-                  feedback.hasUncheckedRuns)
+                feedback.hasUnresolvedComments ||
+                feedback.hasFailingChecks ||
+                feedback.hasUncheckedRuns
               ) {
                 const existingFeedback = hasExistingFeedbackBead(sql, action.bead_id);
                 if (!existingFeedback) {
@@ -689,12 +699,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
             // Auto-merge timer: track grace period when everything is green.
             // Requires both auto_merge enabled AND a delay configured.
-            if (
-              refineryConfig.auto_merge !== false &&
-              refineryConfig.auto_merge_delay_minutes !== null &&
-              refineryConfig.auto_merge_delay_minutes !== undefined
-            ) {
-              const feedback = await ctx.checkPRFeedback(action.pr_url);
+            if (autoMergeDelayMinutes !== null) {
               if (!feedback) return;
 
               const allGreen =
@@ -732,7 +737,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                   );
                 } else {
                   const elapsed = Date.now() - new Date(readySince).getTime();
-                  if (elapsed >= refineryConfig.auto_merge_delay_minutes * 60_000) {
+                  if (elapsed >= autoMergeDelayMinutes * 60_000) {
                     ctx.insertEvent('pr_auto_merge', {
                       bead_id: action.bead_id,
                       payload: {

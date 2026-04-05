@@ -286,10 +286,10 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): Action[] {
             [event.bead_id]
           ),
         ]);
-      const stopActions: Action[] = [];
+      const eventActions: Action[] = [];
       for (const row of hookedAgentRows) {
         if (row.status === 'working' || row.status === 'stalled') {
-          stopActions.push({
+          eventActions.push({
             type: 'stop_agent',
             agent_id: row.bead_id,
             reason: `bead ${event.bead_id} cancelled`,
@@ -297,7 +297,7 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): Action[] {
         }
         agents.unhookBead(sql, row.bead_id);
       }
-      return stopActions;
+      return eventActions;
     }
 
     case 'convoy_started': {

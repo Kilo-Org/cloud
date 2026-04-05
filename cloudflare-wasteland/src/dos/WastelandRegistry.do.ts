@@ -7,8 +7,6 @@ import {
   WastelandRegistryRecord,
 } from '../db/tables/wasteland-registry.table';
 
-const CountResult = z.object({ cnt: z.coerce.number() });
-
 const LOG = '[WastelandRegistry.do]';
 const CountResult = z.object({ cnt: z.coerce.number() });
 

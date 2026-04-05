@@ -558,18 +558,18 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
       const capturedAgentId = agentId;
       return async () => {
-        // Best-effort dispatch. dispatchAgent resolves false (never rejects)
-        // on failure, so we check the return value. On failure, roll the
-        // agent back to 'idle' immediately so the reconciler can retry
-        // dispatch on the next tick without waiting for heartbeat timeout
-        // (90s). The bead stays 'in_progress' so it remains eligible for
-        // re-dispatch. (§5.4)
+        // Best-effort dispatch. dispatchAgent returns false on timeout
+        // races where the container may still be starting, so we do NOT
+        // roll back to idle here — that would cause a duplicate dispatch.
+        // If the agent truly didn't start, reconcileAgents catches it
+        // after the heartbeat timeout and transitions to idle. If it did
+        // start, heartbeats keep it alive. See scheduling.ts (#1358).
         const started = await ctx.dispatchAgent(capturedAgentId, beadId, rigId);
         if (!started) {
           console.warn(
-            `${LOG} dispatch_agent: container start failed for agent=${capturedAgentId} bead=${beadId}, rolling back to idle`
+            `${LOG} dispatch_agent: container start returned false for agent=${capturedAgentId} bead=${beadId}, ` +
+              `leaving as working (possible timeout race)`
           );
-          agentOps.updateAgentStatus(sql, capturedAgentId, 'idle');
         }
       };
     }

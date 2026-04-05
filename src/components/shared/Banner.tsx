@@ -126,12 +126,14 @@ function BannerAction({ children, className }: { children: React.ReactNode; clas
 
 function BannerButton({
   href,
+  target,
   onClick,
   children,
   className,
   variant = 'primary',
 }: {
   href?: string;
+  target?: string;
   onClick?: () => void;
   children: React.ReactNode;
   className?: string;
@@ -155,7 +157,12 @@ function BannerButton({
   if (href) {
     return (
       <Button asChild className={btnClass}>
-        <Link href={href}>{children}</Link>
+        <Link
+          href={href}
+          {...(target === '_blank' ? { target, rel: 'noopener noreferrer' } : { target })}
+        >
+          {children}
+        </Link>
       </Button>
     );
   }

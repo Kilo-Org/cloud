@@ -52,6 +52,7 @@ const CIRCUIT_BREAKER_WINDOW_MINUTES = 30;
  * beads that eventually succeeded (status = 'closed').
  */
 function checkDispatchCircuitBreaker(sql: SqlStorage): Action[] {
+  const cutoff = new Date(Date.now() - CIRCUIT_BREAKER_WINDOW_MINUTES * 60_000).toISOString();
   const rows = z
     .object({ failure_count: z.number() })
     .array()
@@ -61,11 +62,11 @@ function checkDispatchCircuitBreaker(sql: SqlStorage): Action[] {
         /* sql */ `
           SELECT count(*) as failure_count
           FROM ${beads}
-          WHERE ${beads.last_dispatch_attempt_at} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-${CIRCUIT_BREAKER_WINDOW_MINUTES} minutes')
+          WHERE ${beads.last_dispatch_attempt_at} > ?
             AND ${beads.dispatch_attempts} > 0
             AND ${beads.status} != 'closed'
         `,
-        []
+        [cutoff]
       ),
     ]);
 
@@ -1049,8 +1050,7 @@ export function reconcileReviewQueue(
                b.${beads.columns.rig_id}, b.${beads.columns.updated_at},
                b.${beads.columns.metadata},
                rm.${review_metadata.columns.pr_url},
-               b.${beads.columns.assignee_agent_bead_id},
-               b.${beads.columns.metadata}
+               b.${beads.columns.assignee_agent_bead_id}
         FROM ${beads} b
         INNER JOIN ${review_metadata} rm ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
         WHERE b.${beads.columns.type} = 'merge_request'

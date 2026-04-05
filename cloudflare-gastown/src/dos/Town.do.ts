@@ -3467,19 +3467,59 @@ export class TownDO extends DurableObject<Env> {
         logger.info('reconciler: draining events', { count: pending.length });
       }
       for (const event of pending) {
+        // Skip events that have already exceeded the retry limit (poisoned on a prior tick)
+        if (event.retry_count >= events.MAX_EVENT_RETRIES) {
+          events.markPoisoned(this.sql, event.event_id, 'retry limit reached on prior tick');
+          logger.error('reconciler: skipping poison event (already at retry limit)', {
+            eventId: event.event_id,
+            eventType: event.event_type,
+            retryCount: event.retry_count,
+          });
+          Sentry.captureMessage('Poison event skipped in reconciler', {
+            level: 'error',
+            extra: {
+              eventId: event.event_id,
+              eventType: event.event_type,
+              retryCount: event.retry_count,
+            },
+          });
+          continue;
+        }
+
         try {
           reconciler.applyEvent(this.sql, event);
           events.markProcessed(this.sql, event.event_id);
         } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          const newRetryCount = events.incrementRetryCount(this.sql, event.event_id);
+
           logger.error('reconciler: applyEvent failed', {
             eventId: event.event_id,
             eventType: event.event_type,
-            error: err instanceof Error ? err.message : String(err),
+            retryCount: newRetryCount,
+            error: errorMessage,
           });
-          // Event stays unprocessed — will be retried on the next alarm tick.
-          // Mark it processed anyway after 3 consecutive failures to prevent
-          // a poison event from blocking the entire queue forever.
-          // For now, we skip it and let the next tick retry.
+
+          if (newRetryCount >= events.MAX_EVENT_RETRIES) {
+            events.markPoisoned(this.sql, event.event_id, errorMessage);
+            logger.error('reconciler: event poisoned after max retries', {
+              eventId: event.event_id,
+              eventType: event.event_type,
+              retryCount: newRetryCount,
+              agentId: event.agent_id,
+              beadId: event.bead_id,
+              payload: event.payload,
+            });
+            Sentry.captureException(err, {
+              extra: {
+                eventId: event.event_id,
+                eventType: event.event_type,
+                retryCount: newRetryCount,
+                agentId: event.agent_id,
+                beadId: event.bead_id,
+              },
+            });
+          }
         }
       }
     } catch (err) {

@@ -35,6 +35,7 @@ export const TownEventRecord = z.object({
     .pipe(z.record(z.string(), z.unknown())),
   created_at: z.string(),
   processed_at: z.string().nullable(),
+  retry_count: z.number().default(0),
 });
 
 export type TownEventRecord = z.output<typeof TownEventRecord>;
@@ -50,7 +51,13 @@ export function createTableTownEvents(): string {
     payload: `text not null default '{}'`,
     created_at: `text not null`,
     processed_at: `text`,
+    retry_count: `integer not null default 0`,
   });
+}
+
+/** Idempotent ALTER statements for existing databases. */
+export function migrateTownEvents(): string[] {
+  return [`ALTER TABLE town_events ADD COLUMN retry_count integer not null default 0`];
 }
 
 export function getIndexesTownEvents(): string[] {

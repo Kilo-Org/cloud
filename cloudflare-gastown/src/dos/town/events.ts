@@ -11,6 +11,7 @@ import {
   TownEventRecord,
   createTableTownEvents,
   getIndexesTownEvents,
+  migrateTownEvents,
 } from '../../db/tables/town-events.table';
 import type { TownEventType } from '../../db/tables/town-events.table';
 import { query } from '../../util/query.util';
@@ -19,6 +20,9 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
+/** Maximum number of retries before an event is marked as poisoned. */
+export const MAX_EVENT_RETRIES = 3;
+
 function now(): string {
   return new Date().toISOString();
 }
@@ -26,6 +30,16 @@ function now(): string {
 /** Create the town_events table and indexes. Idempotent. */
 export function initTownEventsTable(sql: SqlStorage): void {
   query(sql, createTableTownEvents(), []);
+
+  // Migrations: add columns to existing tables (idempotent)
+  for (const stmt of migrateTownEvents()) {
+    try {
+      query(sql, stmt, []);
+    } catch {
+      // Column already exists — expected after first run
+    }
+  }
+
   for (const idx of getIndexesTownEvents()) {
     query(sql, idx, []);
   }
@@ -150,7 +164,7 @@ export function drainEvents(sql: SqlStorage): TownEventRecord[] {
         SELECT ${town_events.event_id}, ${town_events.event_type},
                ${town_events.agent_id}, ${town_events.bead_id},
                ${town_events.payload}, ${town_events.created_at},
-               ${town_events.processed_at}
+               ${town_events.processed_at}, ${town_events.retry_count}
         FROM ${town_events}
         WHERE ${town_events.processed_at} IS NULL
         ORDER BY ${town_events.created_at} ASC
@@ -194,6 +208,46 @@ export function pruneOldEvents(sql: SqlStorage, retentionMs: number): number {
     ),
   ];
   return deleted.length;
+}
+
+/**
+ * Increment the retry_count for an event and return the new count.
+ * Used to track how many times an event has failed to apply.
+ */
+export function incrementRetryCount(sql: SqlStorage, eventId: string): number {
+  const rows = [
+    ...query(
+      sql,
+      /* sql */ `
+        UPDATE ${town_events}
+        SET ${town_events.columns.retry_count} = ${town_events.columns.retry_count} + 1
+        WHERE ${town_events.event_id} = ?
+        RETURNING ${town_events.columns.retry_count}
+      `,
+      [eventId]
+    ),
+  ];
+  const parsed = z.object({ retry_count: z.number() }).array().parse(rows);
+  return parsed[0]?.retry_count ?? 0;
+}
+
+/**
+ * Mark an event as poisoned — processed with a payload indicating failure.
+ * Prevents the event from being retried again.
+ */
+export function markPoisoned(sql: SqlStorage, eventId: string, errorMessage: string): void {
+  query(
+    sql,
+    /* sql */ `
+      UPDATE ${town_events}
+      SET ${town_events.columns.processed_at} = ?,
+          ${town_events.columns.payload} = json_set(
+            ${town_events.columns.payload}, '$.poisoned', 1, '$.poison_error', ?
+          )
+      WHERE ${town_events.event_id} = ?
+    `,
+    [now(), errorMessage, eventId]
+  );
 }
 
 /** Count unprocessed events (useful for metrics). */

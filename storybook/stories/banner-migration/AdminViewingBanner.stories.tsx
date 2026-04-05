@@ -18,8 +18,10 @@ export const Before: Story = {
       <AlertTitle className="text-amber-800 dark:text-amber-200">Viewing as admin</AlertTitle>
       <AlertDescription className="text-amber-700 dark:text-amber-300">
         This town belongs to org{' '}
-        <code className="rounded bg-amber-100 px-1 py-0.5 text-xs dark:bg-amber-900/40">org_abc123</code>.
-        Changes to settings and destructive actions are restricted.
+        <code className="rounded bg-amber-100 px-1 py-0.5 text-xs dark:bg-amber-900/40">
+          org_abc123
+        </code>
+        . Changes to settings and destructive actions are restricted.
       </AlertDescription>
     </Alert>
   ),
@@ -28,13 +30,17 @@ export const Before: Story = {
 export const After: Story = {
   render: () => (
     <Banner color="amber">
-      <Banner.Icon><ShieldAlert /></Banner.Icon>
+      <Banner.Icon>
+        <ShieldAlert />
+      </Banner.Icon>
       <Banner.Content>
         <Banner.Title>Viewing as admin</Banner.Title>
         <Banner.Description>
           This town belongs to org{' '}
-          <code className="rounded bg-amber-100 px-1 py-0.5 text-xs dark:bg-amber-900/40">org_abc123</code>.
-          Changes to settings and destructive actions are restricted.
+          <code className="rounded bg-amber-100 px-1 py-0.5 text-xs dark:bg-amber-900/40">
+            org_abc123
+          </code>
+          . Changes to settings and destructive actions are restricted.
         </Banner.Description>
       </Banner.Content>
     </Banner>

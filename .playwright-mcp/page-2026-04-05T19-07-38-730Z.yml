@@ -8,29 +8,35 @@
         - navigation [ref=e10]:
             - generic [ref=e11]: Components
             - button "OldSessionBanner" [ref=e12] [cursor=pointer]
-            - button "ErrorBanner" [ref=e13] [cursor=pointer]
+            - button "ErrorBanner" [active] [ref=e13] [cursor=pointer]
             - button "AdminViewingBanner" [ref=e14] [cursor=pointer]
             - button "BillingBanner" [ref=e15] [cursor=pointer]
             - button "FreeTrialWarningBanner" [ref=e16] [cursor=pointer]
             - button "InsufficientBalanceBanner" [ref=e17] [cursor=pointer]
         - main [ref=e18]:
-            - heading "OldSessionBanner" [level=2] [ref=e19]
+            - heading "ErrorBanner" [level=2] [ref=e43]
             - paragraph [ref=e20]:
-                - code [ref=e21]: src/components/cloud-agent-next/OldSessionBanner.tsx
+                - code [ref=e21]: src/components/cloud-agent-next/ErrorBanner.tsx
             - generic [ref=e22]:
                 - generic [ref=e23]:
                     - generic [ref=e24]: Before
                     - alert [ref=e25]:
-                        - img [ref=e26]
-                        - generic [ref=e28]: Legacy Session
+                        - img [ref=e44]
+                        - generic [ref=e28]: Error
                         - generic [ref=e29]:
-                            - paragraph [ref=e30]: This is a legacy session displayed in read-only mode. You can start a new session to continue working.
-                            - button "Start New Session" [ref=e31] [cursor=pointer]
+                            - paragraph [ref=e30]: Something went wrong while loading the session.
+                            - generic [ref=e46]:
+                                - button "Retry" [ref=e47] [cursor=pointer]
+                                - button "Dismiss" [ref=e48] [cursor=pointer]
+                        - button "Dismiss" [ref=e49]:
+                            - img [ref=e50]
                 - generic [ref=e32]:
                     - generic [ref=e33]: After
                     - generic [ref=e34]:
-                        - img [ref=e36]
+                        - img [ref=e53]
                         - generic [ref=e38]:
-                            - paragraph [ref=e39]: Legacy Session
-                            - paragraph [ref=e40]: This is a legacy session displayed in read-only mode. You can start a new session to continue working.
-                        - button "Start New Session" [ref=e42] [cursor=pointer]
+                            - paragraph [ref=e39]: Error
+                            - paragraph [ref=e40]: Something went wrong while loading the session.
+                        - generic [ref=e41]:
+                            - button "Retry" [ref=e55] [cursor=pointer]
+                            - button "Dismiss" [ref=e56] [cursor=pointer]

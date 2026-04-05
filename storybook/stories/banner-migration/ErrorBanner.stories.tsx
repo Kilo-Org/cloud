@@ -20,8 +20,12 @@ export const Before: Story = {
       <AlertDescription>
         <p className="mb-3">Something went wrong while loading the session.</p>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => {}}>Retry</Button>
-          <Button size="sm" variant="ghost" onClick={() => {}}>Dismiss</Button>
+          <Button size="sm" variant="outline" onClick={() => {}}>
+            Retry
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => {}}>
+            Dismiss
+          </Button>
         </div>
       </AlertDescription>
       <button
@@ -37,7 +41,9 @@ export const Before: Story = {
 export const After: Story = {
   render: () => (
     <Banner color="red">
-      <Banner.Icon><AlertCircle /></Banner.Icon>
+      <Banner.Icon>
+        <AlertCircle />
+      </Banner.Icon>
       <Banner.Content>
         <Banner.Title>Error</Banner.Title>
         <Banner.Description>Something went wrong while loading the session.</Banner.Description>

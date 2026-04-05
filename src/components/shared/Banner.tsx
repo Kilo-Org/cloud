@@ -17,7 +17,8 @@ const colorMap: Record<
     bg: 'bg-emerald-500/10',
     text: 'text-emerald-400',
     button: 'bg-emerald-500 text-primary-foreground hover:bg-emerald-500/90',
-    outlineButton: 'border border-emerald-500/40 bg-transparent text-emerald-400 hover:bg-emerald-500/10',
+    outlineButton:
+      'border border-emerald-500/40 bg-transparent text-emerald-400 hover:bg-emerald-500/10',
   },
   amber: {
     border: 'border-amber-500/30',
@@ -116,7 +117,11 @@ function BannerDescription({
 }
 
 function BannerAction({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn('flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row', className)}>{children}</div>;
+  return (
+    <div className={cn('flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row', className)}>
+      {children}
+    </div>
+  );
 }
 
 function BannerButton({
@@ -162,13 +167,7 @@ function BannerButton({
   );
 }
 
-function BannerDismiss({
-  onDismiss,
-  className,
-}: {
-  onDismiss: () => void;
-  className?: string;
-}) {
+function BannerDismiss({ onDismiss, className }: { onDismiss: () => void; className?: string }) {
   return (
     <button
       onClick={onDismiss}

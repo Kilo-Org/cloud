@@ -22,7 +22,7 @@ function IsolatedFrame({ width, children }: { width: number; children: React.Rea
 
       // Copy all stylesheets from parent into iframe
       const parentStyles = document.querySelectorAll('style, link[rel="stylesheet"]');
-      parentStyles.forEach((node) => {
+      parentStyles.forEach(node => {
         doc.head.appendChild(node.cloneNode(true));
       });
 
@@ -91,12 +91,10 @@ function PreviewPanel({
 
   return (
     <div className={`rounded-xl border ${borderColor} p-4`}>
-      <div className={`text-[10px] uppercase tracking-widest ${labelColor} mb-3 font-semibold`}>{label}</div>
-      {width ? (
-        <IsolatedFrame width={width}>{content}</IsolatedFrame>
-      ) : (
-        content
-      )}
+      <div className={`text-[10px] uppercase tracking-widest ${labelColor} mb-3 font-semibold`}>
+        {label}
+      </div>
+      {width ? <IsolatedFrame width={width}>{content}</IsolatedFrame> : content}
     </div>
   );
 }
@@ -133,11 +131,16 @@ export function App() {
       <div className="flex flex-1">
         {/* Sidebar */}
         <nav className="w-56 shrink-0 border-r border-white/10 p-2">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground px-2 py-1 mb-1">Components</div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground px-2 py-1 mb-1">
+            Components
+          </div>
           {entries.map((entry, i) => (
             <button
               key={entry.name}
-              onClick={() => { setActiveTab(i); setActiveVariant(0); }}
+              onClick={() => {
+                setActiveTab(i);
+                setActiveVariant(0);
+              }}
               className={`w-full cursor-pointer rounded px-2 py-1.5 text-left text-sm transition-colors ${
                 i === activeTab
                   ? 'bg-white/10 text-white font-medium'

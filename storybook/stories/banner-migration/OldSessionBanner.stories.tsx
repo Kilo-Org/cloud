@@ -33,7 +33,9 @@ export const Before: Story = {
 export const After: Story = {
   render: () => (
     <Banner color="amber">
-      <Banner.Icon><Info /></Banner.Icon>
+      <Banner.Icon>
+        <Info />
+      </Banner.Icon>
       <Banner.Content>
         <Banner.Title>Legacy Session</Banner.Title>
         <Banner.Description>

@@ -87,7 +87,8 @@ Refactor the repo from a flat layout (where the root is both the pnpm workspace 
 │   ├── dev.sh
 │   ├── lint-all.sh
 │   ├── prepare.sh
-│   └── typecheck-all.sh
+│   ├── typecheck-all.sh
+│   └── worktree-prepare.sh
 │
 ├── .oxlintrc.json                               # Shared lint config (stays at root)
 ├── .oxfmtrc.json                                # Shared format config (stays at root)
@@ -96,7 +97,7 @@ Refactor the repo from a flat layout (where the root is both the pnpm workspace 
 ├── pnpm-workspace.yaml                          # Updated workspace globs
 ├── knip.ts                                      # Workspace-level knip config (if needed)
 ├── .github/workflows/                           # Updated path references
-├── docs/ / plans/ / patches/ / prototypes/
+├── .plans/ / docs/ / plans/ / patches/ / prototypes/
 ├── .nvmrc / .npmrc / .gitignore / .prettierignore / etc.
 └── ... (other repo-wide configs)
 ```
@@ -163,10 +164,14 @@ This is the highest-risk change. Everything below must happen atomically (single
   - Keep `prepare` (husky), `preinstall` (only-allow pnpm)
   - Keep workspace-wide scripts (e.g., `typecheck` delegated to `scripts/typecheck-all.sh`)
   - Remove all Next.js deps
-  - Keep `pnpm.patchedDependencies` at root -- the `@storybook/nextjs` patch is consumed by `apps/storybook/`, not `apps/web/`, and pnpm resolves patched dependencies at workspace scope
-  - Keep `pnpm.overrides` that are workspace-wide
+  - Keep `pnpm.patchedDependencies` at root -- pnpm resolves patches at workspace scope. Current patches: `@storybook/nextjs` (consumed by `apps/storybook/`), `@gorhom/bottom-sheet` and `stream-chat-react-native-core` (consumed by `apps/mobile/`)
+  - Keep `pnpm.overrides` at root (workspace-wide)
+  - Keep `pnpm.onlyBuiltDependencies` at root -- the current list includes entries consumed by multiple workspaces (`@swc/core`, `esbuild`, `workerd`, etc.) and mobile-specific entries (`protobufjs`, `stream-chat-react-native-core`). All stay at root since pnpm resolves this at workspace scope.
 
-**Update `scripts/typecheck-all.sh`:** Replace all `kilocode-backend` references with `web` — the script hardcodes the package name in `--filter '!kilocode-backend'` exclusions (lines 47, 57, 89) and a name-match skip (line 78). Without this, the script will fail to exclude the web app from recursive workspace typechecks and may re-enter the root `typecheck` alias.
+**Update `scripts/typecheck-all.sh`:**
+
+1. Replace all `kilocode-backend` references with `web` — the script hardcodes the package name in `--filter '!kilocode-backend'` exclusions (lines 47, 57, 89) and a name-match skip (line 78). Without this, the script will fail to exclude the web app from recursive workspace typechecks and may re-enter the root `typecheck` alias.
+2. Update the root typecheck command (line 42: `tsgo --noEmit`) to point to the moved tsconfig: `tsgo --noEmit -p apps/web/tsconfig.json`. After the move, there is no root `tsconfig.json`, so the bare `tsgo --noEmit` invocation would fail.
 
 **Fix path references in moved configs:**
 
@@ -271,6 +276,13 @@ catalog:
   # ... (unchanged)
 ```
 
+**Update scripts that parse `pnpm-workspace.yaml`:**
+
+After switching to globs, `changed-workspaces.sh` and `lint-all.sh` will break — both read `pnpm-workspace.yaml` entries literally (e.g., `apps/*` becomes a string, not expanded). Rewrite both scripts to expand glob entries:
+
+- `changed-workspaces.sh` (line 35): Replace `grep '^ *- ' pnpm-workspace.yaml | sed ...` with glob-aware resolution. The simplest approach is to use `pnpm ls --json -r --depth -1` to get the list of workspace directories, which already handles glob expansion. Alternatively, expand globs in bash before iterating.
+- `lint-all.sh` (lines 14-36): Same issue — the `while read` loop reads entries literally. Switch to `pnpm ls --json -r --depth -1` or expand globs with bash before checking for `src/` dirs.
+
 ### Phase 7: Update GitHub Actions workflows
 
 **ci.yml:**
@@ -285,7 +297,7 @@ catalog:
 
 **deploy-production.yml:**
 
-- Update `.next/cache` path (3 occurrences)
+- Update `.next/cache` path (2 occurrences: deploy-app and deploy-global-app jobs)
 - Update `dorny/paths-filter` for kiloclaw: `services/kiloclaw/**`
 - Update Vercel link/build/deploy to use correct working directory
 
@@ -298,8 +310,8 @@ catalog:
 
 **deploy-kiloclaw.yml:**
 
-- Update all `kiloclaw` -> `services/kiloclaw`
-- Update Docker context and Dockerfile paths
+- Update all `kiloclaw` -> `services/kiloclaw` (~15 references including `working-directory`, hash computation paths, Docker build context/file, wrangler `workingDirectory`, and `sed` commands that parse the Dockerfile)
+- Paths to update include: `kiloclaw/Dockerfile`, `kiloclaw/controller/`, `kiloclaw/container/`, `kiloclaw/skills/`, `kiloclaw/openclaw-pairing-list.js`, `kiloclaw/openclaw-device-pairing-list.js`
 
 **bump-openclaw.yml:**
 
@@ -312,6 +324,7 @@ catalog:
 **kilo-app-ci.yml:**
 
 - Update `kilo-app/` references -> `apps/mobile/`
+- Update `src/routers/**` path filter -> `apps/web/src/routers/**` (this workflow triggers on root `src/routers/` changes because the mobile app depends on tRPC routers)
 
 **kilo-app-release.yml:**
 
@@ -324,7 +337,7 @@ The new root package.json should contain:
 - `"name": "kilocode-monorepo"` (or similar)
 - `"private": true`
 - `"packageManager": "pnpm@10.27.0"`
-- `"engines": { "node": "^22" }`
+- `"engines": { "node": ">=24 <25" }`
 - `"scripts"`: workspace-wide scripts plus aliases for CI entrypoints:
   - `"prepare": "husky"`
   - `"preinstall": "npx only-allow pnpm"`
@@ -337,8 +350,9 @@ The new root package.json should contain:
   - `"test:e2e": "pnpm --filter web run test:e2e"` -- used by chromatic.yml
   - `"dependency-cycle-check": "pnpm --filter web run dependency-cycle-check"` -- used by ci.yml
 - Minimal `devDependencies`: `husky`, shared tooling only
-- Keep `pnpm.patchedDependencies` at root (includes `@storybook/nextjs` patch consumed by `apps/storybook/`)
+- Keep `pnpm.patchedDependencies` at root (includes `@storybook/nextjs` patch for `apps/storybook/`, plus `@gorhom/bottom-sheet` and `stream-chat-react-native-core` patches for `apps/mobile/`)
 - Keep `pnpm.overrides` at root
+- Keep `pnpm.onlyBuiltDependencies` at root
 - Keep `scripts/` directory at root for workspace-wide shell scripts
 
 **Important:** CI workflows call several root scripts directly (`pnpm drizzle check`, `pnpm drizzle migrate`, `pnpm test:e2e`, `pnpm run dependency-cycle-check`). These must either remain as root aliases that delegate to the correct workspace, or the workflows must be updated to use `pnpm --filter` commands. The alias approach is safer since it avoids simultaneous workflow changes.
@@ -382,7 +396,7 @@ These cannot be done in code and must be done manually:
 | CI workflows fail on first run                | Have the workflow updates in the same commit as the directory moves                                                                                                               |
 | `.env` not found by Next.js                   | Next.js loads `.env` from its project root -- moving it to `apps/web/.env` is correct                                                                                             |
 | EAS builds break for kilo-app                 | Coordinate with mobile team; update EAS config post-merge if needed                                                                                                               |
-| `scripts/` shell scripts have hardcoded paths | Audit `scripts/*.sh` for workspace path assumptions (e.g., `changed-workspaces.sh` uses pnpm workspace paths that may change)                                                     |
+| `scripts/` shell scripts have hardcoded paths | Rewrite `changed-workspaces.sh` and `lint-all.sh` to expand workspace globs (Phase 6). Update `typecheck-all.sh` root tsgo path (Phase 2).                                        |
 | Lint scripts break across all workspaces      | Every workspace's `lint` script hardcodes its root-relative path. Rewrite all 20+ `package.json` lint entries and `scripts/lint-all.sh` in the same commit as the directory moves |
 | Root CI entrypoints disappear                 | Keep root aliases (`drizzle`, `test:e2e`, `dependency-cycle-check`) that delegate to the correct workspace, so workflows don't need simultaneous updates                          |
 | Merge conflict volume at execution time       | Execute the restructure on a fresh branch from main, not incrementally on a long-lived branch                                                                                     |

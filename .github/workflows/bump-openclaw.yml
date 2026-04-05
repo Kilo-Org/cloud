@@ -15,15 +15,15 @@ jobs:
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
-          sparse-checkout: kiloclaw/Dockerfile
+          sparse-checkout: services/kiloclaw/Dockerfile
           sparse-checkout-cone-mode: false
 
       - name: Get current pinned version
         id: current
         run: |
-          version=$(grep -oP 'openclaw@\K[0-9]+\.[0-9]+\.[0-9]+' kiloclaw/Dockerfile || true)
+          version=$(grep -oP 'openclaw@\K[0-9]+\.[0-9]+\.[0-9]+' services/kiloclaw/Dockerfile || true)
           if [ -z "$version" ]; then
-            echo "::error::Failed to extract openclaw version from kiloclaw/Dockerfile"
+            echo "::error::Failed to extract openclaw version from services/kiloclaw/Dockerfile"
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"

@@ -25,7 +25,7 @@ node_modules/
 .tmp/
 
 # next.js
-/.next/
+.next/
 /out/
 
 # production
@@ -40,10 +40,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 /.dev-logs/
-/dev/.dev-logs/
-/dev/*/.dev-logs/
-/dev/fixtures/
-/dev/*/fixtures/
+/apps/web/dev/.dev-logs/
+/apps/web/dev/*/.dev-logs/
+/apps/web/dev/fixtures/
+/apps/web/dev/*/fixtures/
 
 # env files (can opt-in for committing if needed)
 .env*.local*
@@ -76,13 +76,13 @@ TMP_CI_commit_msg.txt
 .direnv
 
 # Playwright
-/test-results/
-/playwright-report/
-/playwright/.auth/
+test-results/
+playwright-report/
+playwright/.auth/
 
 # Generated screenshot stories
-/storybook/stories/generated/
-/storybook/public/screenshots/
+/apps/storybook/stories/generated/
+/apps/storybook/public/screenshots/
 run-milvus-test.sh
 
 # Cloudflare

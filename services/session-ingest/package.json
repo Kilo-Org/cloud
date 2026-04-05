@@ -1,0 +1,34 @@
+{
+  "name": "cloudflare-session-ingest",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy --minify",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.workers.config.ts",
+    "test:integration:watch": "vitest --config vitest.workers.config.ts",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/session-ingest/src"
+  },
+  "dependencies": {
+    "@kilocode/db": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
+    "@streamparser/json": "^0.0.22",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.21",
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": ">=24 <25",
+    "@typescript/native-preview": "catalog:",
+    "drizzle-kit": "catalog:",
+    "jose": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "^3.2.4",
+    "wrangler": "catalog:"
+  }
+}

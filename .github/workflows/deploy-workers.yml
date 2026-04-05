@@ -6,29 +6,29 @@ on:
   workflow_dispatch:
     inputs:
       worker:
-        description: 'Worker folder to deploy (e.g. cloudflare-app-builder)'
+        description: 'Worker folder to deploy (e.g. services/app-builder)'
         required: true
         type: choice
         options:
-          - cloud-agent
-          - cloud-agent-next
-          - cloudflare-ai-attribution
-          - cloudflare-app-builder
-          - cloudflare-auto-fix-infra
-          - cloudflare-auto-triage-infra
-          - cloudflare-code-review-infra
-          - cloudflare-db-proxy
-          - cloudflare-deploy-infra/builder
-          - cloudflare-deploy-infra/dispatcher
-          - cloudflare-gastown
-          - cloudflare-git-token-service
-          - cloudflare-gmail-push
-          - cloudflare-images-mcp
-          - cloudflare-o11y
-          - cloudflare-security-auto-analysis
-          - cloudflare-security-sync
-          - cloudflare-session-ingest
-          - cloudflare-webhook-agent-ingest
+          - services/cloud-agent
+          - services/cloud-agent-next
+          - services/ai-attribution
+          - services/app-builder
+          - services/auto-fix-infra
+          - services/auto-triage-infra
+          - services/code-review-infra
+          - services/db-proxy
+          - services/deploy-infra/builder
+          - services/deploy-infra/dispatcher
+          - services/gastown
+          - services/git-token-service
+          - services/gmail-push
+          - services/images-mcp
+          - services/o11y
+          - services/security-auto-analysis
+          - services/security-sync
+          - services/session-ingest
+          - services/webhook-agent-ingest
 
 permissions:
   contents: read
@@ -93,25 +93,25 @@ jobs:
           # that were only touched in earlier commits of the same push.
           BASE_SHA="${{ github.event.before }}"
           WORKERS=(
-            cloud-agent
-            cloud-agent-next
-            cloudflare-ai-attribution
-            cloudflare-app-builder
-            cloudflare-auto-fix-infra
-            cloudflare-auto-triage-infra
-            cloudflare-code-review-infra
-            cloudflare-db-proxy
-            cloudflare-deploy-infra/builder
-            cloudflare-deploy-infra/dispatcher
-            cloudflare-gastown
-            cloudflare-git-token-service
-            cloudflare-gmail-push
-            cloudflare-images-mcp
-            cloudflare-o11y
-            cloudflare-security-auto-analysis
-            cloudflare-security-sync
-            cloudflare-session-ingest
-            cloudflare-webhook-agent-ingest
+            services/cloud-agent
+            services/cloud-agent-next
+            services/ai-attribution
+            services/app-builder
+            services/auto-fix-infra
+            services/auto-triage-infra
+            services/code-review-infra
+            services/db-proxy
+            services/deploy-infra/builder
+            services/deploy-infra/dispatcher
+            services/gastown
+            services/git-token-service
+            services/gmail-push
+            services/images-mcp
+            services/o11y
+            services/security-auto-analysis
+            services/security-sync
+            services/session-ingest
+            services/webhook-agent-ingest
           )
 
           CHANGED=()

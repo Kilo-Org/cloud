@@ -1,0 +1,24 @@
+{
+  "name": "cloudflare-git-token-service",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "dev:test": "wrangler dev --config wrangler.test.jsonc",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/git-token-service/src",
+    "types": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts"
+  },
+  "dependencies": {
+    "@kilocode/db": "workspace:*",
+    "@octokit/auth-app": "catalog:",
+    "drizzle-orm": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

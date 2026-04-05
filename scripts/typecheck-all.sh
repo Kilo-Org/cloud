@@ -39,12 +39,12 @@ else
 fi
 
 # 2. Root typecheck (always — it's fast with incremental tsgo)
-tsgo --noEmit
+tsgo --noEmit -p apps/web/tsconfig.json
 
 # 3. Workspace typecheck
 if ! $changes_only; then
   echo "[typecheck] checking all workspace packages"
-  pnpm -r --filter '!kilocode-backend' --filter '!@kilocode/trpc' run typecheck
+  pnpm -r --filter '!web' --filter '!@kilocode/trpc' run typecheck
   exit 0
 fi
 
@@ -54,7 +54,7 @@ fi
 if git diff --name-only "$base" -- pnpm-workspace.yaml | grep -q .; then
   echo "[typecheck] pnpm-workspace.yaml changed, rebuilding trpc and running full workspace typecheck"
   pnpm --filter @kilocode/trpc run build
-  pnpm -r --filter '!kilocode-backend' --filter '!@kilocode/trpc' run typecheck
+  pnpm -r --filter '!web' --filter '!@kilocode/trpc' run typecheck
   exit 0
 fi
 
@@ -75,7 +75,7 @@ while IFS= read -r dir; do
   [ -f "$dir/package.json" ] || continue
   name=$(node -e "console.log(require('./$dir/package.json').name || '')" 2>/dev/null)
   [ -z "$name" ] && continue
-  [[ "$name" == "kilocode-backend" ]] && continue
+  [[ "$name" == "web" ]] && continue
   [[ "$name" == "@kilocode/trpc" ]] && continue
   pnpm_filters+=(--filter "$name...")
 done <<< "$changed_dirs"
@@ -86,4 +86,4 @@ if [ ${#pnpm_filters[@]} -eq 0 ]; then
 fi
 
 echo "[typecheck] checking affected packages: ${pnpm_filters[*]}"
-pnpm -r "${pnpm_filters[@]}" --filter '!kilocode-backend' --filter '!@kilocode/trpc' run typecheck
+pnpm -r "${pnpm_filters[@]}" --filter '!web' --filter '!@kilocode/trpc' run typecheck

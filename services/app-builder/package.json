@@ -1,0 +1,39 @@
+{
+  "name": "app-builder",
+  "version": "1.0.0",
+  "description": "App Builder",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/app-builder/src",
+    "test": "vitest run",
+    "test:git": "tsx src/_integration_tests/test-git-integration.ts",
+    "test:git-head": "tsx src/_integration_tests/test-git-head-and-history.ts",
+    "test:git-all": "tsx src/_integration_tests/test-git-integration.ts && tsx src/_integration_tests/test-git-head-and-history.ts"
+  },
+  "dependencies": {
+    "@ashishkumar472/cf-git": "1.0.5",
+    "@kilocode/worker-utils": "workspace:*",
+    "diff": "^8.0.3",
+    "drizzle-orm": "catalog:",
+    "jsonwebtoken": "catalog:",
+    "workers-tagged-logger": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/containers": "0.1.1",
+    "@cloudflare/sandbox": "0.7.13",
+    "@cloudflare/workers-types": "catalog:",
+    "@types/jsonwebtoken": "catalog:",
+    "@types/node": ">=24 <25",
+    "@typescript/native-preview": "catalog:",
+    "drizzle-kit": "catalog:",
+    "tsx": "^4.21.0",
+    "typescript": "catalog:",
+    "vitest": "^4.1.0",
+    "wrangler": "catalog:"
+  }
+}

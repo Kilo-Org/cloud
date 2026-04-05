@@ -108,7 +108,7 @@ jobs:
 
       - name: Install Storybook dependencies
         run: |
-          cd storybook
+          cd apps/storybook
           pnpm install --frozen-lockfile
 
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
@@ -118,12 +118,12 @@ jobs:
 
       - name: Generate Stories from Playwright Screenshots
         run: |
-          cd storybook
+          cd apps/storybook
           pnpm generate-screenshot-stories
 
       - name: Build Storybook
         run: |
-          cd storybook
+          cd apps/storybook
           pnpm build-storybook
 
       - name: Run Chromatic
@@ -132,8 +132,8 @@ jobs:
         continue-on-error: true
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-          storybookBaseDir: storybook/
-          storybookBuildDir: storybook/storybook-static
+          storybookBaseDir: apps/storybook/
+          storybookBuildDir: apps/storybook/storybook-static
           onlyChanged: true
           exitOnceUploaded: ${{ github.event_name == 'pull_request' }}
           exitZeroOnChanges: true

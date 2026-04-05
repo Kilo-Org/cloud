@@ -4,17 +4,17 @@ on:
   push:
     branches: [main]
     paths:
-      - 'kilo-app/**'
+      - 'apps/mobile/**'
       - 'packages/trpc/**'
-      - 'src/routers/**'
+      - 'apps/web/src/routers/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/kilo-app-ci.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'kilo-app/**'
+      - 'apps/mobile/**'
       - 'packages/trpc/**'
-      - 'src/routers/**'
+      - 'apps/web/src/routers/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/kilo-app-ci.yml'
 
@@ -102,7 +102,7 @@ jobs:
       - name: Format check
         run: |
           pnpm --filter kilo-app run format:check || {
-            echo "::error::oxfmt formatting check failed. Run 'cd kilo-app && pnpm format' locally and commit the changes."
+            echo "::error::oxfmt formatting check failed. Run 'cd apps/mobile && pnpm format' locally and commit the changes."
             exit 1
           }
 

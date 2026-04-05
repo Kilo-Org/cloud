@@ -27,9 +27,9 @@ export default {
     {
       name: 'resolve-aliases',
       resolveId(source) {
-        // Resolve @/* path aliases to the tsc output
+        // Resolve @/* path aliases to the tsc output (apps/web/src after monorepo restructure)
         if (source.startsWith('@/')) {
-          return resolveDts(path.resolve(tscOut, 'src', source.slice(2)));
+          return resolveDts(path.resolve(tscOut, 'apps/web/src', source.slice(2)));
         }
         // Resolve @kilocode/db sub-path imports
         if (source === '@kilocode/db' || source.startsWith('@kilocode/db/')) {

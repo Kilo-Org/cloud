@@ -1,0 +1,24 @@
+{
+  "name": "cloudflare-security-sync",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --env dev",
+    "deploy:prod": "wrangler deploy",
+    "deploy:dev": "wrangler deploy --env dev",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/security-sync/src",
+    "types": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts"
+  },
+  "dependencies": {
+    "@kilocode/db": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": ">=24 <25",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "wrangler": "^4.73.0"
+  }
+}

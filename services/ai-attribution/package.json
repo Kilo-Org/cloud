@@ -1,0 +1,36 @@
+{
+  "name": "cloudflare-ai-attribution",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for tracking AI attributions in Kilo Code",
+  "main": "src/workers/ai-attribution.worker.ts",
+  "scripts": {
+    "dev": "wrangler dev --env dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/ai-attribution/src",
+    "test": "jest"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "durable-objects",
+    "ai-tracking"
+  ],
+  "author": "Kilo Code",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@typescript/native-preview": "catalog:",
+    "drizzle-kit": "catalog:",
+    "jest": "^29.7.0",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
+  },
+  "dependencies": {
+    "@kilocode/worker-utils": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "workers-tagged-logger": "catalog:",
+    "zod": "catalog:"
+  }
+}

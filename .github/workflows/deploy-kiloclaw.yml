@@ -29,7 +29,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        working-directory: kiloclaw
+        working-directory: services/kiloclaw
         run: pnpm install --frozen-lockfile
 
       # ── Compute source content hash ─────────────────────────────
@@ -51,7 +51,7 @@ jobs:
       #   - wrangler.jsonc     (worker config)
       - name: Compute source content hash
         id: image-hash
-        working-directory: kiloclaw
+        working-directory: services/kiloclaw
         run: |
           # Validate all expected paths exist before hashing
           for path in Dockerfile controller container skills \
@@ -126,8 +126,8 @@ jobs:
         if: steps.check-image.outputs.exists != 'true'
         uses: useblacksmith/build-push-action@cbd1f60d194a98cb3be5523b15134501eaf0fbf3 # v2.1.0
         with:
-          context: kiloclaw
-          file: kiloclaw/Dockerfile
+          context: services/kiloclaw
+          file: services/kiloclaw/Dockerfile
           platforms: linux/amd64
           push: true
           tags: |
@@ -157,7 +157,7 @@ jobs:
       - name: Extract OpenClaw version
         id: openclaw-version
         run: |
-          VERSION=$(sed -n 's/.*openclaw@\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' kiloclaw/Dockerfile | head -1)
+          VERSION=$(sed -n 's/.*openclaw@\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' services/kiloclaw/Dockerfile | head -1)
           if [ -z "$VERSION" ]; then
             echo "::error::Failed to extract OpenClaw version from Dockerfile"
             exit 1
@@ -171,7 +171,7 @@ jobs:
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: kiloclaw
+          workingDirectory: services/kiloclaw
           command: >-
             deploy
             --var FLY_IMAGE_TAG:${{ steps.image-hash.outputs.tag }}

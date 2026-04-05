@@ -1,0 +1,30 @@
+{
+  "name": "cloudflare-db-proxy",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/db-proxy/src",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@kilocode/encryption": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
+    "hono": "catalog:",
+    "workers-tagged-logger": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.21",
+    "@types/jest": "^30.0.0",
+    "@types/node": ">=24 <25",
+    "@typescript/native-preview": "catalog:",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.6",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

@@ -1,0 +1,22 @@
+apiVersion: 1
+
+datasources:
+  - name: kilo-cloudflare-analytics-engine
+    uid: kiloclaw-clickhouse
+    type: vertamedia-clickhouse-datasource
+    access: proxy
+    isDefault: true
+    editable: true
+    jsonData:
+      dataSourceUrl: https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/analytics_engine/sql
+      secure: ${GRAFANA_CLICKHOUSE_SECURE}
+      username: ''
+      defaultDatabase: default
+      tlsSkipVerify: ${GRAFANA_CLICKHOUSE_SKIP_TLS_VERIFY}
+      dialTimeout: 10
+      httpHeaderName1: Authorization
+      queryTimeout: 60
+      validateSql: false
+    secureJsonData:
+      httpHeaderValue1: Bearer ${CF_AE_TOKEN}
+      xHeaderKey: Bearer ${CF_AE_TOKEN}

@@ -1,0 +1,26 @@
+{
+  "extends": "../web/tsconfig.json",
+  "compilerOptions": {
+    "checkJs": false,
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ES2020"
+  },
+  "include": [
+    "../web/src/**/*",
+    "../web/.next/types/**/*.ts",
+    ".storybook/**/*",
+    "stories/**/*",
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "storybook-static",
+    "../web/src/**/*.test.ts",
+    "../web/src/**/*.test.tsx",
+    "../web/src/tests/**",
+    "../web/src/**/*test-utils*",
+    "../web/tests/**"
+  ]
+}

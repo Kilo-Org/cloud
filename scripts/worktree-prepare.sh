@@ -4,7 +4,7 @@ set -euo pipefail
 # project, and copying .env.development.local from the main worktree.
 
 MAIN_WORKTREE="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
-ENV_FILE=".env.development.local"
+ENV_FILE="apps/web/.env.development.local"
 
 if command -v nvm &>/dev/null || [ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]; then
   echo "==> Switching to correct Node version…"

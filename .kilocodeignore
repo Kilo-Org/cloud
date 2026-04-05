@@ -1,3 +1,3 @@
 .env*.local*
 .env.keys
-src/db/migrations/**/*.json
+packages/db/src/migrations/**/*.json

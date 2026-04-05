@@ -5,11 +5,11 @@ dist/
 **/dist-types/
 out/
 .api/
-storybook/storybook-static/
+apps/storybook/storybook-static/
 
 #approval tests
-src/tests/sample
-src/tests/req_sample
+apps/web/src/tests/sample
+apps/web/src/tests/req_sample
 
 **/*.approved.json
 **/*.approved.md

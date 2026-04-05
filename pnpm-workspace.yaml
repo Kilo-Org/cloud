@@ -1,34 +1,12 @@
 packages:
-  - packages/db
-  - packages/worker-utils
-  - packages/encryption
-  - packages/trpc
-  - storybook
-  - cloudflare-deploy-infra/builder
-  - cloudflare-deploy-infra/dispatcher
-  - cloudflare-code-review-infra
-  - cloudflare-auto-triage-infra
-  - cloudflare-auto-fix-infra
-  - cloud-agent
-  - cloud-agent/wrapper
-  - cloud-agent-next
-  - cloud-agent-next/wrapper
-  - cloudflare-app-builder
-  - cloudflare-images-mcp
-  - cloudflare-ai-attribution
-  - cloudflare-db-proxy
-  - cloudflare-webhook-agent-ingest
-  - cloudflare-session-ingest
-  - cloudflare-o11y
-  - cloudflare-git-token-service
-  - cloudflare-security-sync
-  - cloudflare-security-auto-analysis
-  - kiloclaw
-  - kiloclaw/packages/secret-catalog
-  - cloudflare-gastown
-  - cloudflare-gastown/container
-  - cloudflare-gmail-push
-  - kilo-app
+  - apps/*
+  - services/*
+  - services/cloud-agent/wrapper
+  - services/cloud-agent-next/wrapper
+  - services/gastown/container
+  - services/deploy-infra/builder
+  - services/deploy-infra/dispatcher
+  - packages/*
 
 catalog:
   '@cloudflare/workers-types': ^4.20260313.1

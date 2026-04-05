@@ -38,7 +38,7 @@ jobs:
           echo "Last release tag: $LAST_TAG"
 
           # Check for changes in kilo-app or trpc since that tag
-          CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- kilo-app/ packages/trpc/ pnpm-lock.yaml)
+          CHANGES=$(git diff --name-only "$LAST_TAG"..HEAD -- apps/mobile/ packages/trpc/ pnpm-lock.yaml)
 
           if [ -z "$CHANGES" ]; then
             echo "No changes since $LAST_TAG — skipping build"
@@ -75,7 +75,7 @@ jobs:
         run: pnpm install --global eas-cli@latest
 
       - name: Build and submit
-        working-directory: kilo-app
+        working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas build --profile production --platform all --submit --non-interactive

@@ -6,7 +6,7 @@ set -euo pipefail
 #
 # Usage:
 #   scripts/changed-workspaces.sh                                    # all changed workspaces with tests
-#   scripts/changed-workspaces.sh --exclude cloud-agent --exclude cloud-agent-next  # skip specific dirs
+#   scripts/changed-workspaces.sh --exclude services/cloud-agent --exclude services/cloud-agent-next  # skip specific dirs
 
 excludes=()
 while [[ $# -gt 0 ]]; do
@@ -31,8 +31,15 @@ if [ -n "$base" ]; then
   fi
 fi
 
-# Read workspace dirs from pnpm-workspace.yaml
-workspace_dirs=$(grep '^ *- ' pnpm-workspace.yaml | sed 's/^ *- //')
+# Read workspace dirs using pnpm (handles glob expansion in pnpm-workspace.yaml)
+workspace_dirs=$(pnpm ls --json -r --depth -1 2>/dev/null | node -e "
+  const pkgs = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+  for (const p of pkgs) {
+    if (!p.path) continue;
+    const rel = require('path').relative(process.cwd(), p.path);
+    if (rel && rel !== '.') console.log(rel);
+  }
+")
 
 # Collect entries as newline-delimited "name\tdir" pairs, then serialize to JSON once
 entries=""

@@ -1,0 +1,386 @@
+import type { EncryptedEnvelope } from '@/lib/encryption';
+import type { SecretFieldKey } from '@kilocode/kiloclaw-secret-catalog';
+
+/** Mirrors the worker's ImageVersionEntry schema (KV stored version metadata) */
+export type ImageVersionEntry = {
+  openclawVersion: string;
+  variant: string;
+  imageTag: string;
+  imageDigest: string | null;
+  publishedAt: string;
+};
+
+/** Input to POST /api/platform/provision */
+export type ProvisionInput = {
+  envVars?: Record<string, string>;
+  encryptedSecrets?: Record<string, EncryptedEnvelope>;
+  channels?: {
+    telegramBotToken?: EncryptedEnvelope;
+    discordBotToken?: EncryptedEnvelope;
+    slackBotToken?: EncryptedEnvelope;
+    slackAppToken?: EncryptedEnvelope;
+  };
+  kilocodeApiKey?: string;
+  kilocodeApiKeyExpiresAt?: string;
+  kilocodeDefaultModel?: string;
+  pinnedImageTag?: string;
+};
+
+export type KiloCodeConfigPatchInput = {
+  kilocodeApiKey?: string | null;
+  kilocodeApiKeyExpiresAt?: string | null;
+  kilocodeDefaultModel?: string | null;
+};
+
+export type KiloCodeConfigResponse = {
+  kilocodeApiKey: string | null;
+  kilocodeApiKeyExpiresAt: string | null;
+  kilocodeDefaultModel: string | null;
+};
+
+/** Input to PATCH /api/platform/channels */
+export type ChannelsPatchInput = {
+  channels: {
+    telegramBotToken?: EncryptedEnvelope | null;
+    discordBotToken?: EncryptedEnvelope | null;
+    slackBotToken?: EncryptedEnvelope | null;
+    slackAppToken?: EncryptedEnvelope | null;
+  };
+};
+
+/** Response from PATCH /api/platform/channels */
+export type ChannelsPatchResponse = {
+  telegram: boolean;
+  discord: boolean;
+  slackBot: boolean;
+  slackApp: boolean;
+};
+
+/** Input to PATCH /api/platform/secrets */
+export type SecretsPatchInput = {
+  secrets: Record<string, EncryptedEnvelope | null>;
+  meta?: Record<string, { configPath?: string }>;
+};
+
+/** Response from PATCH /api/platform/secrets */
+export type SecretsPatchResponse = {
+  /** Catalog field keys that have a value set after the patch */
+  configured: SecretFieldKey[];
+};
+
+/** A pending channel pairing request (e.g. from Telegram DM) */
+export type PairingRequest = {
+  code: string;
+  id: string;
+  channel: string;
+  meta?: unknown;
+  createdAt?: string;
+};
+
+/** Response from GET /api/platform/pairing */
+export type PairingListResponse = {
+  requests: PairingRequest[];
+};
+
+/** Response from POST /api/platform/pairing/approve */
+export type PairingApproveResponse = {
+  success: boolean;
+  message: string;
+};
+
+/** A pending device pairing request (e.g. Control UI or node) */
+export type DevicePairingRequest = {
+  requestId: string;
+  deviceId: string;
+  role?: string;
+  platform?: string;
+  clientId?: string;
+  ts?: number;
+};
+
+/** Response from GET /api/platform/device-pairing */
+export type DevicePairingListResponse = {
+  requests: DevicePairingRequest[];
+};
+
+/** Response from POST /api/platform/device-pairing/approve */
+export type DevicePairingApproveResponse = {
+  success: boolean;
+  message: string;
+};
+
+/** Fly Machine guest spec (CPU/memory configuration) */
+export type MachineSize = {
+  cpus: number;
+  memory_mb: number;
+  cpu_kind?: 'shared' | 'performance';
+};
+
+/** Response from POST /api/platform/restore-volume-snapshot */
+export type RestoreVolumeSnapshotResponse = {
+  acknowledged: boolean;
+  previousVolumeId: string;
+};
+
+/** Response from GET /api/platform/status and GET /api/kiloclaw/status */
+export type PlatformStatusResponse = {
+  userId: string | null;
+  sandboxId: string | null;
+  status:
+    | 'provisioned'
+    | 'starting'
+    | 'restarting'
+    | 'recovering'
+    | 'running'
+    | 'stopped'
+    | 'destroying'
+    | 'restoring'
+    | null;
+  provisionedAt: number | null;
+  lastStartedAt: number | null;
+  lastStoppedAt: number | null;
+  envVarCount: number;
+  secretCount: number;
+  channelCount: number;
+  flyAppName: string | null;
+  flyMachineId: string | null;
+  flyVolumeId: string | null;
+  flyRegion: string | null;
+  machineSize: MachineSize | null;
+  openclawVersion: string | null;
+  imageVariant: string | null;
+  trackedImageTag: string | null;
+  trackedImageDigest: string | null;
+  googleConnected: boolean;
+  gmailNotificationsEnabled: boolean;
+  execSecurity: string | null;
+  execAsk: string | null;
+};
+
+/** A single registry DO's entries + migration status. */
+export type RegistryResult = {
+  registryKey: string;
+  entries: Array<{
+    instanceId: string;
+    doKey: string;
+    assignedUserId: string;
+    createdAt: string;
+    destroyedAt: string | null;
+  }>;
+  migrated: boolean;
+};
+
+/** Response from GET /api/platform/registry-entries (admin only). */
+export type RegistryEntriesResponse = {
+  registries: RegistryResult[];
+};
+
+/** Response from GET /api/platform/debug-status (internal/admin only). */
+export type PlatformDebugStatusResponse = PlatformStatusResponse & {
+  orgId: string | null;
+  pendingDestroyMachineId: string | null;
+  pendingDestroyVolumeId: string | null;
+  pendingPostgresMarkOnFinalize: boolean;
+  lastMetadataRecoveryAt: number | null;
+  lastLiveCheckAt: number | null;
+  alarmScheduledAt: number | null;
+  lastDestroyErrorOp: 'machine' | 'volume' | 'recover' | null;
+  lastDestroyErrorStatus: number | null;
+  lastDestroyErrorMessage: string | null;
+  lastDestroyErrorAt: number | null;
+  lastRestartErrorMessage: string | null;
+  lastRestartErrorAt: number | null;
+  recoveryStartedAt: number | null;
+  pendingRecoveryVolumeId: string | null;
+  recoveryPreviousVolumeId: string | null;
+  recoveryPreviousVolumeCleanupAfter: number | null;
+  lastRecoveryErrorMessage: string | null;
+  lastRecoveryErrorAt: number | null;
+  previousVolumeId: string | null;
+  restoreStartedAt: string | null;
+  pendingRestoreVolumeId: string | null;
+  instanceReadyEmailSent: boolean;
+  diskUsedBytes: number | null;
+  diskTotalBytes: number | null;
+};
+
+export type CleanupRecoveryPreviousVolumeResponse = {
+  ok: true;
+  deletedVolumeId: string | null;
+};
+
+/** A Fly volume snapshot. */
+export type VolumeSnapshot = {
+  id: string;
+  created_at: string;
+  digest: string;
+  retention_days: number;
+  size: number;
+  status: string;
+  volume_size: number;
+};
+
+/** Response from GET /api/platform/volume-snapshots */
+export type VolumeSnapshotsResponse = {
+  snapshots: VolumeSnapshot[];
+};
+
+/** Response from GET /api/kiloclaw/config */
+export type UserConfigResponse = {
+  envVarKeys: string[];
+  secretCount: number;
+  kilocodeDefaultModel: string | null;
+  hasKiloCodeApiKey: boolean;
+  kilocodeApiKeyExpiresAt?: string | null;
+  /** Per catalog entry ID → whether all fields for that entry are configured. */
+  configuredSecrets: Record<string, boolean>;
+  /** Env var names of user-defined custom (non-catalog) secrets. */
+  customSecretKeys: string[];
+  /** Metadata for custom secrets (config paths, etc.). */
+  customSecretMeta: Record<string, { configPath?: string }>;
+};
+
+/** Response from POST /api/platform/doctor */
+export type DoctorResponse = {
+  success: boolean;
+  output: string;
+};
+
+/** Response from POST /api/platform/kilo-cli-run/start */
+export type KiloCliRunStartResponse = {
+  ok: boolean;
+  startedAt: string;
+};
+
+/** Response from GET /api/platform/kilo-cli-run/status */
+export type KiloCliRunStatusResponse = {
+  hasRun: boolean;
+  status: 'running' | 'completed' | 'failed' | 'cancelled' | null;
+  output: string | null;
+  exitCode: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  prompt: string | null;
+};
+
+/** Response from POST /api/admin/machine/restart */
+export type RestartMachineResponse = {
+  success: boolean;
+  message?: string;
+  error?: string;
+};
+
+/** Response from GET /api/platform/gateway/status */
+export type GatewayProcessStatusResponse = {
+  state: 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed' | 'shutting_down';
+  pid: number | null;
+  uptime: number;
+  restarts: number;
+  lastExit: {
+    code: number | null;
+    signal: string | null;
+    at: string;
+  } | null;
+};
+
+/** Response from POST /api/platform/gateway/{start|stop|restart} */
+export type GatewayProcessActionResponse = {
+  ok: boolean;
+};
+
+/** Response from POST /api/platform/config/restore */
+export type ConfigRestoreResponse = {
+  ok: boolean;
+  signaled: boolean;
+};
+
+/** Response from GET /api/platform/gateway/ready (opaque — shape depends on OpenClaw version) */
+export type GatewayReadyResponse = Record<string, unknown>;
+
+/** Response from GET /api/platform/controller-version. Null fields = old controller. */
+export type ControllerVersionResponse = {
+  version: string | null;
+  commit: string | null;
+  openclawVersion?: string | null;
+  openclawCommit?: string | null;
+};
+
+/** Response from GET /api/platform/openclaw-config */
+export type OpenclawConfigResponse = {
+  config: Record<string, unknown>;
+  etag: string;
+};
+
+/** Input to POST /api/platform/google-credentials */
+export type GoogleCredentialsInput = {
+  googleCredentials: {
+    gogConfigTarball: EncryptedEnvelope;
+    email?: string;
+  };
+};
+
+/** Response from POST/DELETE /api/platform/google-credentials */
+export type GoogleCredentialsResponse = {
+  googleConnected: boolean;
+};
+
+/** Response from POST/DELETE /api/platform/gmail-notifications */
+export type GmailNotificationsResponse = {
+  gmailNotificationsEnabled: boolean;
+};
+
+/** A candidate volume for admin volume reassociation. */
+export type CandidateVolume = {
+  id: string;
+  name: string;
+  state: 'created' | 'attached' | 'detached';
+  size_gb: number;
+  region: string;
+  attached_machine_id: string | null;
+  created_at: string;
+  isCurrent: boolean;
+};
+
+/** Response from GET /api/platform/candidate-volumes */
+export type CandidateVolumesResponse = {
+  currentVolumeId: string | null;
+  volumes: CandidateVolume[];
+};
+
+/** Response from POST /api/platform/reassociate-volume */
+export type ReassociateVolumeResponse = {
+  previousVolumeId: string | null;
+  newVolumeId: string;
+  newRegion: string;
+};
+
+/** Response from GET /api/platform/regions */
+export type RegionsResponse = {
+  regions: string[];
+  source: 'kv' | 'env' | 'default';
+  raw: string;
+};
+
+/** Response from PUT /api/platform/regions */
+export type UpdateRegionsResponse = {
+  ok: true;
+  regions: string[];
+  raw: string;
+};
+
+/** Stream Chat credentials for a user's KiloClaw channel */
+export type ChatCredentials = {
+  apiKey: string;
+  userId: string;
+  userToken: string;
+  channelId: string;
+} | null;
+
+/** Combined status returned by tRPC getStatus */
+export type KiloClawDashboardStatus = PlatformStatusResponse & {
+  /** Worker base URL for constructing the "Open" link. Falls back to claw.kilo.ai. */
+  workerUrl: string;
+  name: string | null;
+  /** Postgres row ID. Used to construct /i/{instanceId} proxy paths for instance-keyed instances. */
+  instanceId: string | null;
+};

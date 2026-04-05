@@ -1,3 +1,4 @@
+import { describe, it } from '@jest/globals';
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateDrizzleJson, generateMigration } from 'drizzle-kit/api';

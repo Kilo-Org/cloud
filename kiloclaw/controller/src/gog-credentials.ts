@@ -7,6 +7,7 @@
  * 3. Sets GOG_KEYRING_BACKEND, GOG_KEYRING_PASSWORD, GOG_ACCOUNT env vars
  */
 import path from 'node:path';
+import { formatFileError } from './file-error';
 
 const GOG_CONFIG_DIR = '/root/.config/gogcli';
 
@@ -56,7 +57,9 @@ export function patchGogHistoryId(opts: {
   const stateFilePath = path.join(configDir, 'state', 'gmail-watch', `${sanitized}.json`);
 
   if (!deps.existsSync(stateFilePath)) {
-    console.warn(`[gog] State file not found, skipping historyId patch: ${stateFilePath}`);
+    console.warn(
+      `[gog] OS file read error for "${stateFilePath}": file or directory not found (ENOENT). This is a host filesystem issue, not a gateway error. Skipping historyId patch.`
+    );
     return;
   }
 
@@ -64,8 +67,8 @@ export function patchGogHistoryId(opts: {
   try {
     const raw = deps.readFileSync(stateFilePath, 'utf-8');
     parsed = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    console.warn(`[gog] Failed to parse state file, skipping historyId patch: ${stateFilePath}`);
+  } catch (err) {
+    console.warn(`[gog] ${formatFileError(err, stateFilePath)}, skipping historyId patch`);
     return;
   }
 
@@ -90,8 +93,8 @@ export function patchGogHistoryId(opts: {
     console.log(
       `[gog] Patched historyId in ${stateFilePath}: ${String(fileHistoryId)} → ${historyId}`
     );
-  } catch {
-    console.warn(`[gog] Failed to write state file: ${stateFilePath}`);
+  } catch (err) {
+    console.warn(`[gog] ${formatFileError(err, stateFilePath, 'write')}`);
   }
 }
 

@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import { formatFileError, isEnoent } from './file-error';
 
 const execFileAsync = promisify(execFile);
 
@@ -286,18 +287,20 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
         anySuccess = true;
       } else {
         const err = result.reason;
-        const msg = errorMessage(err);
+        const pairingFilePath = path.join(resolveCredentialsDir(), `${channels[i]}-pairing.json`);
         const priorRequests = channelCache.requests.filter(r => r.channel === channels[i]);
         if (priorRequests.length > 0) {
           anyHadPriorData = true;
-          console.warn(`[pairing-cache] WARNING: keeping stale data for ${channels[i]}: ${msg}`);
+          const detail = formatFileError(err, pairingFilePath);
+          console.warn(`[pairing-cache] WARNING: keeping stale data for ${channels[i]}: ${detail}`);
           allRequests.push(...priorRequests);
-        } else if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        } else if (isEnoent(err)) {
           // Cold-start: file not written yet — silently ignore
         } else {
           // Unexpected failure (permissions, corrupt JSON, etc.) with no prior data
           anyUnexpectedColdFailure = true;
-          console.log(`[pairing-cache] channel ${channels[i]}: read failed: ${msg}`);
+          const detail = formatFileError(err, pairingFilePath);
+          console.log(`[pairing-cache] channel ${channels[i]}: ${detail}`);
         }
       }
     }
@@ -350,14 +353,15 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
       console.log(`[pairing-cache] devices: read ok, ${requests.length} pending`);
       return true;
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      if (isEnoent(err)) {
         // File absent means no pending requests (e.g. last request was approved/expired).
         if (gen === deviceGeneration) {
           deviceCache = { requests: [], lastUpdated: nowImpl() };
         }
         return true;
       }
-      console.error(`[pairing-cache] device refresh failed: ${errorMessage(err)}`);
+      const detail = formatFileError(err, resolveDevicePendingPath());
+      console.error(`[pairing-cache] device refresh failed: ${detail}`);
       return false;
     }
   };

@@ -9,6 +9,7 @@ import { execFileSync as nodeExecFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { formatFileError } from './file-error';
 
 const DEFAULT_CONFIG_PATH = '/root/.openclaw/openclaw.json';
 
@@ -116,7 +117,7 @@ export function generateBaseConfig(
         `Failed to parse existing config at ${configPath}: ${err instanceof Error ? err.message : String(err)}`
       );
     }
-    console.log('No existing config file, starting with empty config');
+    console.log(formatFileError(err, configPath) + ' — starting with empty config');
   }
 
   config.gateway = config.gateway ?? {};
@@ -429,8 +430,8 @@ export function writeMcporterConfig(
     if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
       existing = parsed as Record<string, unknown>;
     }
-  } catch {
-    // No existing config or unreadable — start fresh
+  } catch (err) {
+    console.log(formatFileError(err, configPath) + ' — starting with fresh mcporter config');
   }
 
   const existingServers =

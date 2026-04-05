@@ -355,7 +355,7 @@ export function createSessionManagementHandlers() {
             if (errorMsg.includes('ENOENT') || errorMsg.includes('not found')) {
               throw new TRPCError({
                 code: 'NOT_FOUND',
-                message: `No log file found for session ${sessionId}. The CLI may not have generated logs yet.`,
+                message: `OS file read error for "${logFilePath}": file not found (ENOENT). The CLI may not have generated logs yet for session ${sessionId}. This is a host filesystem issue, not an application error.`,
               });
             }
 
@@ -363,7 +363,7 @@ export function createSessionManagementHandlers() {
 
             throw new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
-              message: `Failed to read log file: ${errorMsg}`,
+              message: `OS file read error for "${logFilePath}": ${errorMsg}. This is a host filesystem issue, not an application error.`,
             });
           }
         });
@@ -631,7 +631,7 @@ export function createSessionManagementHandlers() {
             if (errorMsg.includes('ENOENT') || errorMsg.includes('not found')) {
               throw new TRPCError({
                 code: 'NOT_FOUND',
-                message: `No wrapper log file found for execution ${executionId}. The wrapper may not have started or may have crashed before logging.`,
+                message: `OS file read error for "${logFilePath}": file not found (ENOENT). The wrapper may not have started or may have crashed before logging (execution ${executionId}). This is a host filesystem issue, not an application error.`,
               });
             }
 
@@ -639,7 +639,7 @@ export function createSessionManagementHandlers() {
 
             throw new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
-              message: `Failed to read wrapper log file: ${errorMsg}`,
+              message: `OS file read error for "${logFilePath}": ${errorMsg}. This is a host filesystem issue, not an application error.`,
             });
           }
         });

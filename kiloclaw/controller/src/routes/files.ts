@@ -5,6 +5,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { getBearerToken } from './gateway';
 import { timingSafeTokenEqual } from '../auth';
+import { formatFileError } from '../file-error';
 import { resolveSafePath, verifyCanonicalized, SafePathError } from '../safe-path';
 import { atomicWrite } from '../atomic-write';
 import { backupFile } from '../backup-file';
@@ -76,7 +77,11 @@ function resolveAndValidateFile(
   }
 
   if (!fs.existsSync(resolved)) {
-    return { code: 'file_not_found', error: 'File does not exist', status: 404 };
+    return {
+      code: 'file_not_found',
+      error: `OS file read error for "${resolved}": file or directory not found (ENOENT). This is a host filesystem issue, not a gateway error.`,
+      status: 404,
+    };
   }
 
   // Canonicalize to catch symlinked ancestors escaping the root
@@ -128,7 +133,14 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
       );
     }
 
-    const content = fs.readFileSync(result, 'utf-8');
+    let content: string;
+    try {
+      content = fs.readFileSync(result, 'utf-8');
+    } catch (err) {
+      const detail = formatFileError(err, result);
+      console.error('[files] read failed:', detail);
+      return c.json({ error: detail }, 500);
+    }
     return c.json({ content, etag: computeEtag(content) });
   });
 
@@ -176,8 +188,9 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
     try {
       atomicWrite(result, body.content);
     } catch (err) {
-      console.error('[files] atomicWrite failed:', err);
-      return c.json({ error: 'Failed to write file' }, 500);
+      const detail = formatFileError(err, result, 'write');
+      console.error('[files] atomicWrite failed:', detail);
+      return c.json({ error: detail }, 500);
     }
 
     const newEtag = computeEtag(body.content);

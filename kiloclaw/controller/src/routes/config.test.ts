@@ -413,7 +413,7 @@ describe('/_kilo/config/read routes', () => {
       expect: {
         status: 500,
         bodyContains: {
-          error: expect.stringContaining('Failed to read config'),
+          error: expect.stringContaining('OS file read error'),
         },
       },
     });
@@ -608,7 +608,7 @@ describe('/_kilo/config/replace routes', () => {
       },
       expect: {
         status: 500,
-        bodyContains: { error: expect.stringContaining('Failed to replace config') },
+        bodyContains: { error: expect.stringContaining('OS file write error') },
         mocks: {
           backup: mock => {
             expect(mock).toHaveBeenCalledOnce();
@@ -633,7 +633,7 @@ describe('/_kilo/config/replace routes', () => {
       }),
       expect: {
         status: 500,
-        bodyContains: { error: expect.stringContaining('Failed to replace config') },
+        bodyContains: { error: expect.stringContaining('OS file write error') },
         mocks: {
           backup: mock => {
             expect(mock).toHaveBeenCalledOnce();

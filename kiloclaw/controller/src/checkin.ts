@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { loadavg } from 'node:os';
 import { promisify } from 'node:util';
+import { formatFileError } from './file-error';
 
 const execFileAsync = promisify(execFile);
 import { z } from 'zod';
@@ -85,7 +86,8 @@ export async function readNetStats(): Promise<NetStats> {
   try {
     const raw = await readFile('/proc/net/dev', 'utf8');
     return parseNetDevText(raw);
-  } catch {
+  } catch (err) {
+    console.warn(`[checkin] ${formatFileError(err, '/proc/net/dev')}, returning zero stats`);
     return { bytesIn: 0, bytesOut: 0 };
   }
 }

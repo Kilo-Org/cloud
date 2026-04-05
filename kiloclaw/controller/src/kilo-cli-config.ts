@@ -14,6 +14,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { formatFileError } from './file-error';
 
 export const KILO_CONFIG_DIR = '/root/.config/kilo';
 export const CONFIG_FILE = 'opencode.json';
@@ -100,7 +101,7 @@ export function writeKiloCliConfig(
         deps.writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
       }
     } catch (err) {
-      console.error('[kilo-cli] Failed to patch config (corrupt JSON?), skipping:', err);
+      console.error(`[kilo-cli] ${formatFileError(err, configPath)}, skipping config patch`);
     }
   }
 

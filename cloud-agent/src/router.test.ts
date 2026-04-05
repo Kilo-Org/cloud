@@ -771,7 +771,7 @@ describe('router sessionId validation', () => {
           mockSession.readFile.mockRejectedValue(new Error('ENOENT: no such file or directory'));
 
           await expect(caller.getSessionLogs({ sessionId })).rejects.toThrow(TRPCError);
-          await expect(caller.getSessionLogs({ sessionId })).rejects.toThrow('No log file found');
+          await expect(caller.getSessionLogs({ sessionId })).rejects.toThrow('OS file read error');
         });
       });
 

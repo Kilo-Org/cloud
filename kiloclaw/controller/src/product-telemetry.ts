@@ -9,6 +9,7 @@
  */
 import fs from 'node:fs';
 import { z } from 'zod';
+import { formatFileError } from './file-error';
 import { detectChannels } from './pairing-cache';
 
 export { detectChannels };
@@ -67,7 +68,8 @@ export function collectProductTelemetry(
   let raw: unknown;
   try {
     raw = JSON.parse(deps.readConfigFile());
-  } catch {
+  } catch (err) {
+    console.warn(`[product-telemetry] ${formatFileError(err, CONFIG_PATH)}, returning defaults`);
     return empty;
   }
 

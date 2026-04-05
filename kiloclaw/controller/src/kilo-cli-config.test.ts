@@ -212,8 +212,7 @@ describe('writeKiloCliConfig', () => {
     expect(result).toBe(true);
     expect(written).toHaveLength(0); // no write on corrupt JSON
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[kilo-cli] Failed to patch config'),
-      expect.any(Error)
+      expect.stringContaining('[kilo-cli] OS file read error')
     );
     consoleSpy.mockRestore();
   });

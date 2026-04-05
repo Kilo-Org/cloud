@@ -4,6 +4,7 @@ import type { Hono } from 'hono';
 import { z } from 'zod';
 import { atomicWrite } from '../atomic-write';
 import { timingSafeTokenEqual } from '../auth';
+import { formatFileError } from '../file-error';
 import type { Supervisor } from '../supervisor';
 import { backupConfigFile, writeBaseConfig } from '../config-writer';
 import { getBearerToken } from './gateway';
@@ -81,12 +82,9 @@ export function registerConfigRoutes(
       const etag = computeEtag(raw);
       return c.json({ config, etag });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error('[controller] /_kilo/config/read failed:', message);
-      return c.json(
-        { code: 'config_read_failed', error: `Failed to read config: ${message}` },
-        500
-      );
+      const detail = formatFileError(err, CONFIG_PATH);
+      console.error('[controller] /_kilo/config/read failed:', detail);
+      return c.json({ code: 'config_read_failed', error: detail }, 500);
     }
   });
 
@@ -161,12 +159,9 @@ export function registerConfigRoutes(
       console.log('[controller] Config replaced');
       return c.json({ ok: true });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error('[controller] Failed to replace config:', message);
-      return c.json(
-        { code: 'config_replace_failed', error: `Failed to replace config: ${message}` },
-        500
-      );
+      const detail = formatFileError(err, CONFIG_PATH, 'write');
+      console.error('[controller] Failed to replace config:', detail);
+      return c.json({ code: 'config_replace_failed', error: detail }, 500);
     }
   });
 
@@ -196,9 +191,9 @@ export function registerConfigRoutes(
       console.log('[controller] Config patched:', JSON.stringify(patch));
       return c.json({ ok: true });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error('[controller] Failed to patch config:', message);
-      return c.json({ error: `Failed to patch config: ${message}` }, 500);
+      const detail = formatFileError(err, CONFIG_PATH, 'write');
+      console.error('[controller] Failed to patch config:', detail);
+      return c.json({ error: detail }, 500);
     }
   });
 }

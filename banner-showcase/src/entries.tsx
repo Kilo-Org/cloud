@@ -86,8 +86,8 @@ export const entries: Entry[] = [
               <Banner.Description>Something went wrong while loading the session.</Banner.Description>
             </Banner.Content>
             <Banner.Action>
-              <Banner.Button onClick={() => {}}>Retry</Banner.Button>
-              <Banner.Button variant="outline" onClick={() => {}}>Dismiss</Banner.Button>
+              <Banner.Button variant="secondary" onClick={() => {}}>Retry</Banner.Button>
+              <Banner.Button variant="ghost" onClick={() => {}}>Dismiss</Banner.Button>
             </Banner.Action>
           </Banner>
         ),

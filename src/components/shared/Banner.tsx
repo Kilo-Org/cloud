@@ -130,12 +130,20 @@ function BannerButton({
   onClick?: () => void;
   children: React.ReactNode;
   className?: string;
-  variant?: 'primary' | 'outline';
+  variant?: 'primary' | 'outline' | 'secondary' | 'ghost';
 }) {
   const { colors } = useContext(BannerContext);
+
+  const variantClasses = {
+    primary: colors?.button,
+    outline: colors?.outlineButton,
+    secondary: 'bg-white/10 text-white hover:bg-white/15',
+    ghost: 'bg-transparent text-white/70 hover:text-white hover:bg-white/5',
+  };
+
   const btnClass = cn(
     'w-full shrink-0 sm:w-auto [&>*]:h-4 [&>*]:w-4',
-    variant === 'primary' ? colors?.button : colors?.outlineButton,
+    variantClasses[variant],
     className
   );
 

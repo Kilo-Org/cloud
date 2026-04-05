@@ -558,15 +558,16 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
       const capturedAgentId = agentId;
       return async () => {
-        // Best-effort dispatch. If it fails, the agent stays 'working'
-        // and the bead stays 'in_progress'. The reconciler detects the
-        // mismatch on the next tick (idle agent hooked to in_progress
-        // bead) and retries dispatch.
+        // Best-effort dispatch. On failure, roll the agent back to 'idle'
+        // immediately so the reconciler can retry dispatch on the next tick
+        // without waiting for the 90-second heartbeat timeout (§5.4).
+        // The bead stays 'in_progress' — no rollback needed there.
         await ctx.dispatchAgent(capturedAgentId, beadId, rigId).catch(err => {
           console.warn(
             `${LOG} dispatch_agent: container start failed for agent=${capturedAgentId} bead=${beadId}`,
             err
           );
+          agentOps.updateAgentStatus(sql, capturedAgentId, 'idle');
         });
       };
     }

@@ -199,9 +199,11 @@ gh api repos/$REPO/pulls/$PR_NUMBER/comments --jq 'length'
 - Auto-merge fires after ~2 min delay
 - PR merged on GitHub, no post-merge comments
 
-### Known Issue (2026-04-05)
+### Known Issues (2026-04-05)
 
-**Bug: Refinery dispatches despite `code_review=false`.** The reconciler's `code_review` bypass only works for MR beads that already have a `pr_url` in `review_metadata`. When a new MR bead is created by the polecat's `review_submitted` event, there's a timing window where the MR bead exists but has no `pr_url` yet. During this window, the reconciler falls through to Rule 5 and dispatches the refinery. See reconciler.ts lines 1197-1223.
+**Bug: Refinery dispatches despite `code_review=false` (persists after round 1 fix).** The reconciler's `code_review` bypass only works for MR beads that already have a `pr_url` in `review_metadata`. The polecat does not pass `pr_url` when creating the MR bead (see Bug 2 in round 2 results below), so the MR bead always starts with `pr_url=null`. The reconciler falls through and dispatches the refinery. Confirmed in round 2 testing — PR #38 was created by the refinery, not the polecat.
+
+**Bug: Polecat does not create GitHub PRs (NEW, round 2).** When `merge_strategy=pr`, the polecat pushes branches but does not call `gh pr create`. The MR bead is created with `pr_url=null`. This blocks the entire PR-based merge flow when `code_review=false` (no one creates the PR) and causes the refinery to enter a rework loop when `code_review=true` (no PR to review).
 
 ---
 
@@ -923,3 +925,206 @@ print(f'parent_bead_id: {bead.get(\"parent_bead_id\", \"NULL\")}')
 # Should match the MR bead ID
 "
 ```
+
+---
+
+## E2E Test Results — Round 2 (2026-04-05)
+
+### Summary
+
+| Scenario | Config | Result | PR | Notes |
+|----------|--------|--------|----|-------|
+| 1: No review + auto-merge | `code_review=false`, `auto_merge=true` | **PASS (with bug)** | #38 MERGED | Refinery dispatched despite `code_review=false` (bug persists). PR merged after rework. |
+| 2: Refinery review (rework mode) | `code_review=true`, `review_mode=rework` | **FAIL** | None created | Polecat pushed branch but never created PR. Refinery stuck in rework-request loop 35+ min. |
+| 3: Human feedback + auto-resolve | `code_review=false`, `auto_resolve_pr_feedback=true` | **FAIL** | None created | Same as Scenario 2: polecat pushed branch but no PR. MR bead stuck at `open`. |
+
+### Bugs Found
+
+#### Bug 1 (PERSISTS from round 1): Refinery dispatches despite `code_review=false`
+
+**Scenario:** 1
+**Severity:** Medium
+**Status:** Not fixed — the round 1 fix was insufficient.
+
+When `code_review=false` and `merge_strategy=pr`, the refinery is still dispatched to review MR beads. The reconciler's `code_review` bypass only works for MR beads that already have a `pr_url` in `review_metadata`. When the polecat creates the MR bead via `review_submitted`, the MR bead initially has `pr_url=null`. During this window, the reconciler falls through to the standard dispatch rule and sends the refinery.
+
+In Scenario 1, the refinery happened to create the PR and complete a rework cycle, so the PR eventually merged. But this added ~3 minutes of unnecessary work and the refinery should not have been involved at all.
+
+**Evidence:**
+- 19:44:59Z: MR bead created with `pr_url=null`, reconciler action `dispatch_agent: 1`
+- 19:45:12Z: refinery `working` hook=8b5d6506
+- 19:45:42Z: refinery created rework bead "Rework: Add src/utils/set-helpers.ts..."
+- 19:48:02Z: PR #38 merged after rework cycle
+
+**Root cause location:** reconciler.ts, MR bead dispatch rules — the `code_review=false` check requires `pr_url` to be set, but the polecat doesn't pass `pr_url` in `review_submitted`.
+
+#### Bug 2 (NEW): Polecat does not create GitHub PRs
+
+**Scenarios:** 2, 3 (and likely 1 — the refinery created it instead)
+**Severity:** Critical — blocks the entire PR-based merge flow
+**Status:** New
+
+The polecat pushes branches to GitHub successfully but does NOT call `gh pr create`. The MR bead is created via `review_submitted` with `pr_url=null`. In the bead body, the polecat reports the commit was pushed, but no PR creation is mentioned.
+
+**Evidence:**
+- Scenario 2: branch `gt/toast/fa318809` exists on GitHub, 0 PRs associated
+- Scenario 3: branch `gt/toast/4464f47b` exists on GitHub, 0 PRs associated
+- Scenario 1: branch `gt/toast/38cba536` had PR #38, but that was created by the refinery (not the polecat)
+
+**Impact:** Without a `pr_url`:
+- The `code_review=false` fast-track in the reconciler can't proceed to auto-merge
+- The refinery (when dispatched) has no PR to review, leading to Bug 3
+- Human feedback can't be added because there's no PR to comment on
+
+**Likely cause:** The polecat's system prompt or tooling may have changed. The polecat calls `gt_done` with a branch but not a `pr_url`. Need to verify the polecat's tool definitions include PR creation tooling, and that `merge_strategy=pr` is being communicated to the polecat agent.
+
+#### Bug 3 (NEW): Refinery stuck in rework-request loop
+
+**Scenario:** 2
+**Severity:** High
+**Status:** New
+
+When `code_review=true` and the refinery is dispatched to an MR bead with `pr_url=null`, the refinery enters a loop where it:
+1. Reviews the diff (via git, not via GitHub PR)
+2. Calls `gt_request_changes` to create a rework request
+3. Continues working instead of unhoking and completing
+4. After a delay (~10 min), calls `gt_request_changes` again with duplicate content
+5. Creates duplicate rework/escalation beads
+
+**Evidence:**
+- 19:50:03Z: MR bead created with `pr_url=null`
+- 19:51:00Z: refinery "Code review found gaps in test coverage; preparing rework request"
+- 19:51:13Z: First rework request + escalation bead created
+- 20:02:01Z: Second rework request + escalation bead created (duplicate)
+- 20:12:35Z: Third rework request + escalation bead (scope mismatch)
+- 20:25+Z: refinery still `working` on same hook after 35+ minutes
+
+**Impact:** Accumulates orphaned escalation/rework beads. Refinery is stuck indefinitely. GUPP patrol should eventually force-stop but hasn't triggered in the observed window.
+
+#### Bug 4 (NEW): Duplicate rework/escalation beads
+
+**Scenario:** 2
+**Severity:** Medium
+**Status:** New (related to Bug 3)
+
+The `gt_request_changes` tool call is not idempotent. Each call creates new rework and escalation beads even when the refinery is re-issuing the same request for the same MR bead. After 35 minutes, Scenario 2 accumulated:
+- 5 escalation beads (all "Rework requested: missing tests...")
+- 5 "Escalation (low)" issue beads
+- 3 REWORK_REQUEST message beads
+
+These all remain `open` and clutter the bead queue.
+
+### Detailed Scenario Timelines
+
+#### Scenario 1: code_review=false + auto_merge (PASS with bugs)
+
+```
+Config: merge_strategy=pr, code_review=false, auto_resolve_pr_feedback=false,
+        auto_merge=true, auto_merge_delay_minutes=2
+Task:   "Add src/utils/set-helpers.ts with union, intersection, difference,
+         symmetricDifference, isSubset"
+```
+
+| Time (UTC) | Event |
+|------------|-------|
+| 19:38:42 | Task sent to mayor |
+| 19:38:47 | Issue bead created, mayor hooks it |
+| 19:43:51 | Mayor unhooks, polecat dispatched |
+| 19:43:56 | Polecat hooks bead, starts implementing |
+| 19:44:28 | Polecat: "Set helper file added; committing and pushing" |
+| 19:44:43 | Polecat: "Creating pull request" |
+| 19:44:59 | MR bead created (`pr_url=null`). **BUG: refinery dispatched** |
+| 19:45:42 | Refinery requests rework, rework bead created |
+| 19:45:57 | Polecat dispatched for rework |
+| 19:46:58 | Rework bead: refinery calls `gt_done`, `poll_pr` starts |
+| 19:48:02 | **PR #38 merged** by kiloconnect-development bot |
+| 19:48:13 | All beads closed |
+
+**Duration:** ~9.5 min (would be ~5 min without unnecessary refinery rework)
+**PR:** #38 on branch `gt/toast/38cba536` — MERGED
+**Post-merge comments:** None (clean)
+
+#### Scenario 2: code_review=true + review_mode=rework (FAIL — stuck)
+
+```
+Config: merge_strategy=pr, code_review=true, review_mode=rework,
+        auto_resolve_pr_feedback=false, auto_merge=true, auto_merge_delay_minutes=2
+Task:   "Add src/utils/promise-helpers.ts with delay, retry, timeout,
+         allSettledWithErrors, race"
+```
+
+| Time (UTC) | Event |
+|------------|-------|
+| 19:49:20 | Task sent to mayor |
+| 19:49:35 | Issue bead created, polecat dispatched |
+| 19:49:44 | Polecat: "Implementing promise helper utilities" |
+| 19:50:03 | MR bead created (`pr_url=null`). Refinery dispatched (expected). |
+| 19:51:00 | Refinery: "Code review found gaps in test coverage" |
+| 19:51:13 | First rework request + escalation beads (2 each) |
+| 20:02:01 | **Second rework request** (duplicate) — refinery still working |
+| 20:12:35 | Third rework request (scope mismatch) |
+| 20:25+ | **Refinery still stuck** on MR bead after 35+ min |
+
+**Duration:** 35+ min (never completed)
+**PR:** None created on GitHub
+**Branch:** `gt/toast/fa318809` exists on GitHub but has no PR
+**Orphaned beads:** 5 escalation + 5 escalation(low) issue + 3 REWORK_REQUEST message
+
+#### Scenario 3: code_review=false + auto_resolve + human feedback (FAIL — stuck)
+
+```
+Config: merge_strategy=pr, code_review=false, auto_resolve_pr_feedback=true,
+        auto_merge=true, auto_merge_delay_minutes=2
+Task:   "Add src/utils/regex-helpers.ts with escapeRegex, isValidRegex,
+         matchAll, replaceAll, extractGroups"
+```
+
+| Time (UTC) | Event |
+|------------|-------|
+| 20:13:09 | Task sent to mayor |
+| 20:13:25 | Issue bead created, polecat dispatched |
+| 20:14:01 | Polecat: "Implementing regex helper utilities" |
+| 20:14:05 | MR bead created (`pr_url=null`), polecat unhooks |
+| 20:14:17 | MR bead status=`open`, no assignee, no dispatch |
+| 20:25+ | **MR bead still `open`** — no one picks it up |
+
+**Duration:** 10+ min (never completed)
+**PR:** None created on GitHub
+**Branch:** `gt/toast/4464f47b` exists on GitHub but has no PR
+**Human feedback test:** Could not proceed — no PR to add comments to
+
+### Config Commands Used
+
+```bash
+BASE=http://localhost:8803
+TOWN_ID=a093a551-ff4d-4c36-9274-252df66128fd
+
+# Scenario 1
+curl -s -X PATCH $BASE/debug/towns/$TOWN_ID/config \
+  -H "Content-Type: application/json" \
+  -d '{"merge_strategy":"pr","refinery":{"code_review":false,"auto_merge":true,"auto_resolve_pr_feedback":false,"auto_merge_delay_minutes":2,"review_mode":"rework"}}'
+
+# Scenario 2
+curl -s -X PATCH $BASE/debug/towns/$TOWN_ID/config \
+  -H "Content-Type: application/json" \
+  -d '{"merge_strategy":"pr","refinery":{"code_review":true,"auto_merge":true,"auto_resolve_pr_feedback":false,"auto_merge_delay_minutes":2,"review_mode":"rework"}}'
+
+# Scenario 3
+curl -s -X PATCH $BASE/debug/towns/$TOWN_ID/config \
+  -H "Content-Type: application/json" \
+  -d '{"merge_strategy":"pr","refinery":{"code_review":false,"auto_merge":true,"auto_resolve_pr_feedback":true,"auto_merge_delay_minutes":2,"review_mode":"rework"}}'
+```
+
+### Recommended Fixes (Priority Order)
+
+1. **Bug 2 (Critical): Polecat must create PRs.** When `merge_strategy=pr`, the polecat's `review_submitted` event must include a `pr_url`. Either:
+   - Ensure the polecat system prompt instructs PR creation via `gh pr create` before calling `gt_done`
+   - Or have the MR bead creation logic (in `review_submitted` handler) create the PR server-side using the branch name and GitHub token
+
+2. **Bug 1 (Medium): Reconciler fast-track for `code_review=false`.** The reconciler's MR bead dispatch logic should not require `pr_url` to honor `code_review=false`. When `code_review=false`, the MR bead should be fast-tracked to `in_progress` regardless of `pr_url` presence.
+
+3. **Bug 3 (High): Refinery should bail when no PR exists.** If the refinery is dispatched to an MR bead with `pr_url=null`, it should either:
+   - Create the PR itself (current Scenario 1 behavior, which accidentally worked)
+   - Or fail gracefully and unhook with an error message
+
+4. **Bug 4 (Medium): Deduplicate rework requests.** The `gt_request_changes` tool should check if an active rework request already exists for the same MR bead before creating a new one.

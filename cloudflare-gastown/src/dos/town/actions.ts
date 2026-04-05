@@ -318,6 +318,22 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
     case 'transition_bead': {
       try {
+        // When `from` is specified, guard against stale transitions from concurrent rule firings
+        if (action.from != null) {
+          const bead = beadOps.getBead(sql, action.bead_id);
+          if (!bead) {
+            console.warn(
+              `${LOG} transition_bead skipped: bead=${action.bead_id} not found (expected from=${action.from})`
+            );
+            return null;
+          }
+          if (bead.status !== action.from) {
+            console.warn(
+              `${LOG} transition_bead skipped: bead=${action.bead_id} current=${bead.status} expected=${action.from} to=${action.to}`
+            );
+            return null;
+          }
+        }
         const failureReason =
           action.to === 'failed'
             ? { code: 'reconciler', message: action.reason, source: 'scheduler' }

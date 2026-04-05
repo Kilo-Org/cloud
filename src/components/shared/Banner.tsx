@@ -62,7 +62,7 @@ function BannerRoot({
       <div
         role={role}
         className={cn(
-          'flex w-full flex-wrap items-start gap-3 rounded-xl border p-4 sm:items-center sm:gap-4',
+          'relative flex w-full flex-wrap items-start gap-3 rounded-xl border p-4 sm:items-center sm:gap-4',
           colors?.border,
           colors?.bg,
           colors?.text,
@@ -152,7 +152,7 @@ function BannerDismiss({
     <button
       onClick={onDismiss}
       className={cn(
-        'shrink-0 rounded-full p-1 opacity-70 transition-opacity hover:opacity-100',
+        'absolute right-3 top-3 rounded-full p-1 opacity-70 transition-opacity hover:opacity-100',
         className
       )}
       aria-label="Dismiss"

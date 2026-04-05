@@ -206,6 +206,101 @@ export async function failUnexpectedStopRecovery(
   });
 }
 
+export async function completeUnexpectedStopRecovery(runtime: RecoveryRuntime): Promise<void> {
+  const { state, ctx, env } = runtime;
+
+  if (!state.flyMachineId) {
+    throw new Error('Cannot complete unexpected stop recovery: missing replacement machine');
+  }
+  if (!state.flyVolumeId) {
+    throw new Error('Cannot complete unexpected stop recovery: missing source volume');
+  }
+  if (!state.pendingRecoveryVolumeId) {
+    throw new Error('Cannot complete unexpected stop recovery: missing replacement volume');
+  }
+
+  const flyConfig = getFlyConfig(env, state);
+  const oldVolumeId = state.flyVolumeId;
+  const recoveryVolumeId = state.pendingRecoveryVolumeId;
+
+  const recoveryVolume = await fly.getVolume(flyConfig, recoveryVolumeId);
+  const recoveryVolumeRegion = recoveryVolume.region;
+
+  await gateway.waitForHealthy(state, env, flyConfig.appName, state.flyMachineId);
+
+  let retainedRecoveryVolumeId: string | null = null;
+  let retainedRecoveryVolumeCleanupAfter: number | null = null;
+  try {
+    const snapshots = await fly.listVolumeSnapshots(flyConfig, oldVolumeId);
+    if (snapshots.length > 0) {
+      retainedRecoveryVolumeId = oldVolumeId;
+      retainedRecoveryVolumeCleanupAfter = Date.now() + PREVIOUS_VOLUME_RETENTION_MS;
+    } else {
+      try {
+        await flyMachines.deleteVolumeAndAttachedMachine(
+          flyConfig,
+          oldVolumeId,
+          'unexpected_stop_recovery_immediate_cleanup',
+          state.sandboxId ?? undefined
+        );
+      } catch (cleanupErr) {
+        doWarn(state, 'old recovery source volume cleanup failed; retrying via alarm', {
+          volumeId: oldVolumeId,
+          error: toLoggable(cleanupErr),
+        });
+        retainedRecoveryVolumeId = oldVolumeId;
+        retainedRecoveryVolumeCleanupAfter = Date.now();
+      }
+    }
+  } catch (snapshotErr) {
+    doWarn(state, 'failed to inspect old volume snapshots; retaining for TTL cleanup', {
+      volumeId: oldVolumeId,
+      error: toLoggable(snapshotErr),
+    });
+    retainedRecoveryVolumeId = oldVolumeId;
+    retainedRecoveryVolumeCleanupAfter = Date.now() + PREVIOUS_VOLUME_RETENTION_MS;
+  }
+
+  const postStatus = await ctx.storage.get('status');
+  if (postStatus !== 'recovering') return;
+
+  const now = Date.now();
+  const durationMs = state.recoveryStartedAt ? now - state.recoveryStartedAt : undefined;
+  state.status = 'running';
+  state.flyVolumeId = recoveryVolumeId;
+  state.flyRegion = recoveryVolumeRegion ?? state.flyRegion;
+  state.recoveryStartedAt = null;
+  state.pendingRecoveryVolumeId = null;
+  state.recoveryPreviousVolumeId = retainedRecoveryVolumeId;
+  state.recoveryPreviousVolumeCleanupAfter = retainedRecoveryVolumeCleanupAfter;
+  state.healthCheckFailCount = 0;
+  state.lastStartedAt = now;
+  state.lastRecoveryErrorMessage = null;
+  state.lastRecoveryErrorAt = null;
+  await runtime.persist({
+    status: 'running',
+    flyMachineId: state.flyMachineId,
+    flyVolumeId: recoveryVolumeId,
+    flyRegion: state.flyRegion,
+    recoveryStartedAt: null,
+    pendingRecoveryVolumeId: null,
+    recoveryPreviousVolumeId: retainedRecoveryVolumeId,
+    recoveryPreviousVolumeCleanupAfter: retainedRecoveryVolumeCleanupAfter,
+    healthCheckFailCount: 0,
+    lastStartedAt: now,
+    lastRecoveryErrorMessage: null,
+    lastRecoveryErrorAt: null,
+  });
+
+  runtime.emitEvent({
+    event: 'instance.unexpected_stop_recovery_succeeded',
+    status: 'running',
+    label: 'alarm_relocated',
+    durationMs,
+  });
+  await runtime.scheduleAlarm();
+}
+
 export async function runUnexpectedStopRecoveryInBackground(
   runtime: RecoveryRuntime
 ): Promise<void> {
@@ -306,90 +401,37 @@ export async function runUnexpectedStopRecoveryInBackground(
 
     const previousRegion = state.flyRegion;
     state.flyRegion = recoveryVolumeRegion ?? oldVolumeRegion ?? previousRegion;
-    await flyMachines.createNewMachine(
-      flyConfig,
-      ctx,
-      state,
-      machineConfig,
-      minSecretsVersion,
-      env.FLY_REGION
-    );
+    try {
+      await flyMachines.createNewMachine(
+        flyConfig,
+        ctx,
+        state,
+        machineConfig,
+        minSecretsVersion,
+        env.FLY_REGION
+      );
+    } catch (err) {
+      const isStartupTimeout = err instanceof fly.FlyApiError && err.status === 408;
+      if (!isStartupTimeout || !state.flyMachineId) {
+        throw err;
+      }
+
+      doWarn(
+        state,
+        'unexpected stop recovery timed out waiting for replacement machine startup; reconcile will continue',
+        {
+          error: toLoggable(err),
+          flyMachineId: state.flyMachineId,
+          pendingRecoveryVolumeId: recoveryVolumeId,
+        }
+      );
+      await runtime.scheduleAlarm();
+      return;
+    }
     if (!state.flyMachineId) {
       throw new Error('Unexpected stop recovery created no machine');
     }
-    await gateway.waitForHealthy(state, env, flyConfig.appName, state.flyMachineId);
-
-    let retainedRecoveryVolumeId: string | null = null;
-    let retainedRecoveryVolumeCleanupAfter: number | null = null;
-    try {
-      const snapshots = await fly.listVolumeSnapshots(flyConfig, oldVolumeId);
-      if (snapshots.length > 0) {
-        retainedRecoveryVolumeId = oldVolumeId;
-        retainedRecoveryVolumeCleanupAfter = Date.now() + PREVIOUS_VOLUME_RETENTION_MS;
-      } else {
-        try {
-          await flyMachines.deleteVolumeAndAttachedMachine(
-            flyConfig,
-            oldVolumeId,
-            'unexpected_stop_recovery_immediate_cleanup',
-            state.sandboxId ?? undefined
-          );
-        } catch (cleanupErr) {
-          doWarn(state, 'old recovery source volume cleanup failed; retrying via alarm', {
-            volumeId: oldVolumeId,
-            error: toLoggable(cleanupErr),
-          });
-          retainedRecoveryVolumeId = oldVolumeId;
-          retainedRecoveryVolumeCleanupAfter = Date.now();
-        }
-      }
-    } catch (snapshotErr) {
-      doWarn(state, 'failed to inspect old volume snapshots; retaining for TTL cleanup', {
-        volumeId: oldVolumeId,
-        error: toLoggable(snapshotErr),
-      });
-      retainedRecoveryVolumeId = oldVolumeId;
-      retainedRecoveryVolumeCleanupAfter = Date.now() + PREVIOUS_VOLUME_RETENTION_MS;
-    }
-
-    const postStatus = await ctx.storage.get('status');
-    if (postStatus !== 'recovering') return;
-
-    const now = Date.now();
-    const durationMs = state.recoveryStartedAt ? now - state.recoveryStartedAt : undefined;
-    state.status = 'running';
-    state.flyVolumeId = recoveryVolumeId;
-    state.flyRegion = recoveryVolumeRegion ?? state.flyRegion;
-    state.recoveryStartedAt = null;
-    state.pendingRecoveryVolumeId = null;
-    state.recoveryPreviousVolumeId = retainedRecoveryVolumeId;
-    state.recoveryPreviousVolumeCleanupAfter = retainedRecoveryVolumeCleanupAfter;
-    state.healthCheckFailCount = 0;
-    state.lastStartedAt = now;
-    state.lastRecoveryErrorMessage = null;
-    state.lastRecoveryErrorAt = null;
-    await runtime.persist({
-      status: 'running',
-      flyMachineId: state.flyMachineId,
-      flyVolumeId: recoveryVolumeId,
-      flyRegion: state.flyRegion,
-      recoveryStartedAt: null,
-      pendingRecoveryVolumeId: null,
-      recoveryPreviousVolumeId: retainedRecoveryVolumeId,
-      recoveryPreviousVolumeCleanupAfter: retainedRecoveryVolumeCleanupAfter,
-      healthCheckFailCount: 0,
-      lastStartedAt: now,
-      lastRecoveryErrorMessage: null,
-      lastRecoveryErrorAt: null,
-    });
-
-    runtime.emitEvent({
-      event: 'instance.unexpected_stop_recovery_succeeded',
-      status: 'running',
-      label: 'alarm_relocated',
-      durationMs,
-    });
-    await runtime.scheduleAlarm();
+    await completeUnexpectedStopRecovery(runtime);
   } catch (err) {
     doError(state, 'unexpected stop recovery failed', {
       error: toLoggable(err),

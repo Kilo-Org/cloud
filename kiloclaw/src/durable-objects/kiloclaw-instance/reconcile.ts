@@ -35,6 +35,11 @@ export type ReconcileWithFlyResult = {
     flyState: 'stopped';
     failCount: number;
   };
+  completeUnexpectedStopRecovery?: true;
+  failedUnexpectedStopRecovery?: {
+    errorMessage: string;
+    label: string;
+  };
   timedOutUnexpectedStopRecovery?: {
     errorMessage: string;
     durationMs?: number;
@@ -90,7 +95,7 @@ export async function reconcileWithFly(
   }
 
   if (state.status === 'recovering') {
-    return reconcileRecovering(state, rctx);
+    return reconcileRecovering(flyConfig, state, rctx);
   }
 
   const { reconciled: machineReconciled, result } = await reconcileMachine(
@@ -878,12 +883,74 @@ export async function syncStatusWithFly(
 }
 
 async function reconcileRecovering(
+  flyConfig: FlyClientConfig,
   state: InstanceMutableState,
   rctx: ReconcileContext
 ): Promise<ReconcileWithFlyResult> {
   const recoveryStartedAt = state.recoveryStartedAt;
   const isTimedOut =
     recoveryStartedAt !== null && Date.now() - recoveryStartedAt > RECOVERING_TIMEOUT_MS;
+
+  if (state.flyMachineId) {
+    try {
+      const machine = await fly.getMachine(flyConfig, state.flyMachineId);
+
+      if (machine.state === 'started') {
+        rctx.log('unexpected_stop_recovery_machine_started', {
+          machine_id: state.flyMachineId,
+          old_state: 'recovering',
+          new_state: 'running',
+        });
+        return { completeUnexpectedStopRecovery: true };
+      }
+
+      if (
+        machine.state === 'stopped' ||
+        machine.state === 'failed' ||
+        machine.state === 'destroyed'
+      ) {
+        const errorMessage = `unexpected stop recovery replacement machine entered ${machine.state}`;
+        rctx.log('unexpected_stop_recovery_terminal_machine_state', {
+          machine_id: state.flyMachineId,
+          fly_state: machine.state,
+          error: errorMessage,
+          old_state: 'recovering',
+          new_state: 'stopped',
+        });
+        return {
+          failedUnexpectedStopRecovery: {
+            errorMessage,
+            label: `alarm_${machine.state}`,
+          },
+        };
+      }
+
+      rctx.log('unexpected_stop_recovery_waiting_for_start', {
+        machine_id: state.flyMachineId,
+        fly_state: machine.state,
+      });
+    } catch (err) {
+      if (fly.isFlyNotFound(err)) {
+        const errorMessage = 'unexpected stop recovery replacement machine disappeared';
+        rctx.log('unexpected_stop_recovery_machine_gone', {
+          machine_id: state.flyMachineId,
+          error: errorMessage,
+          old_state: 'recovering',
+          new_state: 'stopped',
+        });
+        return {
+          failedUnexpectedStopRecovery: {
+            errorMessage,
+            label: 'alarm_machine_gone',
+          },
+        };
+      }
+
+      doError(state, 'reconcileRecovering: transient error checking replacement machine', {
+        error: toLoggable(err),
+      });
+    }
+  }
 
   if (!isTimedOut) return {};
 

@@ -72,6 +72,7 @@ import { restoreFromPostgres, markDestroyedInPostgresHelper } from './postgres';
 import {
   beginUnexpectedStopRecovery,
   cleanupPendingRecoveryVolumeIfNeeded,
+  completeUnexpectedStopRecovery,
   cleanupRecoveryPreviousVolume,
   cleanupRetainedRecoveryVolumeIfDue,
   failUnexpectedStopRecovery,
@@ -2377,6 +2378,33 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           reconcileResult.beginUnexpectedStopRecovery
         );
         this.ctx.waitUntil(this.recoverUnexpectedStopInBackground());
+        return;
+      }
+
+      if (reconcileResult.completeUnexpectedStopRecovery && this.s.status === 'recovering') {
+        try {
+          await completeUnexpectedStopRecovery(this.recoveryRuntime());
+        } catch (err) {
+          doError(this.s, 'completeUnexpectedStopRecovery failed during alarm reconcile', {
+            error: toLoggable(err),
+          });
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          await failUnexpectedStopRecovery(
+            this.recoveryRuntime(),
+            errorMessage,
+            'alarm_reconcile_complete'
+          );
+        }
+        return;
+      }
+
+      if (reconcileResult.failedUnexpectedStopRecovery && this.s.status === 'recovering') {
+        await failUnexpectedStopRecovery(
+          this.recoveryRuntime(),
+          reconcileResult.failedUnexpectedStopRecovery.errorMessage,
+          reconcileResult.failedUnexpectedStopRecovery.label
+        );
+        await this.scheduleAlarm();
         return;
       }
 

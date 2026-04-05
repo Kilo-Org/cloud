@@ -311,6 +311,25 @@ app.post('/debug/towns/:townId/graceful-stop', async c => {
   return c.json({ stopped: true });
 });
 
+app.get('/debug/towns/:townId/config', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const cfg = await town.getTownConfig();
+  return c.json(cfg);
+});
+
+app.patch('/debug/towns/:townId/config', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const body = await c.req.json();
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const result = await town.updateTownConfig(body);
+  return c.json(result);
+});
+
 // ── Town ID + Auth ──────────────────────────────────────────────────────
 // All rig routes live under /api/towns/:townId/rigs/:rigId so the townId
 // is always available from the URL path.

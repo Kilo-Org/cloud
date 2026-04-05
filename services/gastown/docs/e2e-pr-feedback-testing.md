@@ -27,39 +27,469 @@ RIG_ID="${RIG_ID:-mega-todo-app5}"
 REPO="${REPO:-jrf0110/mega-todo-app5}"
 ```
 
-## 1. Verify Town Settings
+## Pre-Flight Checklist
 
-Check these settings in the town settings UI:
+Run this before EACH scenario to validate town state.
 
-| Setting                  | Required Value                 |
-| ------------------------ | ------------------------------ |
-| Merge strategy           | `pr` (Pull Request)            |
-| Auto-merge               | enabled                        |
-| Auto-resolve PR feedback | enabled                        |
-| Auto-merge delay         | 2 minutes (or preferred delay) |
+### 1. Verify/Update Town Settings via Debug API
 
-### Verify Clean State
+The debug config endpoint (dev only) allows reading and updating town configuration without auth:
+
+```bash
+# Read current settings
+curl -s $BASE/debug/towns/$TOWN_ID/config | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+print('merge_strategy:', d.get('merge_strategy'))
+ref = d.get('refinery', {})
+print('refinery.code_review:', ref.get('code_review'))
+print('refinery.auto_merge:', ref.get('auto_merge'))
+print('refinery.auto_resolve_pr_feedback:', ref.get('auto_resolve_pr_feedback'))
+print('refinery.auto_merge_delay_minutes:', ref.get('auto_merge_delay_minutes'))
+print('refinery.review_mode:', ref.get('review_mode'))
+"
+```
+
+Update settings with PATCH (partial update, unspecified fields preserved):
+
+```bash
+curl -s -X PATCH $BASE/debug/towns/$TOWN_ID/config \
+  -H "Content-Type: application/json" \
+  -d '{
+    "merge_strategy": "pr",
+    "refinery": {
+      "code_review": false,
+      "auto_merge": true,
+      "auto_resolve_pr_feedback": true,
+      "auto_merge_delay_minutes": 2,
+      "review_mode": "rework"
+    }
+  }'
+```
+
+### 2. Verify Clean State
 
 ```bash
 curl -s $BASE/debug/towns/$TOWN_ID/status | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
 alarm = d.get('alarmStatus', {})
-print('Agents:', json.dumps(alarm.get('agents', {})))
-print('Beads:', json.dumps(alarm.get('beads', {})))
+agents = alarm.get('agents', {})
+beads = alarm.get('beads', {})
+recon = alarm.get('reconciler', {})
+print('Agents:', json.dumps(agents))
+print('Beads:', json.dumps(beads))
+print(f'Reconciler: violations={recon.get(\"invariantViolations\", \"?\")}, pending={recon.get(\"pendingEventCount\", \"?\")}')
 summary = d.get('beadSummary', [])
 if summary:
     print(f'WARNING: {len(summary)} non-terminal bead(s)')
     for b in summary:
-        print(f'  {b.get(\"type\",\"?\"):16s} {b.get(\"status\",\"?\"):12s} {str(b.get(\"title\",\"\"))[:60]}')
+        assignee = b.get('assignee_agent_bead_id') or 'none'
+        print(f'  {b.get(\"type\",\"?\"):16s} {b.get(\"status\",\"?\"):12s} {assignee[:12]:14s} {str(b.get(\"title\",\"\"))[:50]}')
 else:
     print('Clean state.')
+active = [am for am in d.get('agentMeta', []) if am.get('status') != 'idle']
+if active:
+    print(f'Active agents ({len(active)}):')
+    for am in active:
+        print(f'  {am[\"role\"]:12s} {am[\"status\"]:10s}')
 "
 ```
 
+### 3. Wait for Active Agents to Settle
+
+If agents are still working from a previous test, wait:
+
+```bash
+for i in $(seq 1 20); do
+  WORKING=$(curl -s $BASE/debug/towns/$TOWN_ID/status | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+w = d.get('alarmStatus', {}).get('agents', {}).get('working', 0)
+print(w)
+" 2>/dev/null)
+  echo "$(date +%H:%M:%S) working=$WORKING"
+  if [ "$WORKING" -le 1 ]; then echo "Settled"; break; fi
+  sleep 15
+done
+```
+
+Note: The mayor often stays `working` for extended periods while processing stale triage beads. It's safe to proceed with `working=1` if only the mayor is active.
+
 ---
 
-## Test A: Single Bead Flow
+## Scenario 1: Auto-Merge Without Code Review
+
+**Settings:** `merge_strategy=pr`, `code_review=false`, `auto_resolve_pr_feedback=false`, `auto_merge=true`, `auto_merge_delay_minutes=2`
+
+**Goal:** Verify that with code review disabled, the polecat creates a PR and it auto-merges without refinery involvement.
+
+### 1.1. Configure Settings
+
+```bash
+curl -s -X PATCH $BASE/debug/towns/$TOWN_ID/config \
+  -H "Content-Type: application/json" \
+  -d '{
+    "merge_strategy": "pr",
+    "refinery": {
+      "code_review": false,
+      "auto_merge": true,
+      "auto_resolve_pr_feedback": false,
+      "auto_merge_delay_minutes": 2,
+      "review_mode": "rework"
+    }
+  }' | python3 -c "
+import sys, json; d = json.load(sys.stdin); ref = d.get('refinery', {})
+print(f'code_review={ref.get(\"code_review\")} auto_merge={ref.get(\"auto_merge\")} delay={ref.get(\"auto_merge_delay_minutes\")}')
+"
+```
+
+### 1.2. Send Work
+
+```bash
+curl -s -m 120 -X POST $BASE/debug/towns/$TOWN_ID/send-message \
+  -H "Content-Type: application/json" \
+  -d "{\"message\": \"Create a bead for this task on the $RIG_ID rig: Add a new file src/utils/color-helpers.ts with 3 simple utility functions (hexToRgb, rgbToHex, lightenColor). Each function should have JSDoc comments. Commit and push when done.\"}"
+```
+
+### 1.3. Monitor Until Complete
+
+```bash
+for i in $(seq 1 60); do
+  STATUS=$(curl -s $BASE/debug/towns/$TOWN_ID/status)
+  echo "$(date +%H:%M:%S)"
+  echo "$STATUS" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+for b in d.get('beadSummary', []):
+    title = b.get('title', '') or ''
+    if 'color' in title.lower() or b.get('type') == 'merge_request':
+        print(f'  {b.get(\"type\",\"?\"):16s} {b.get(\"status\",\"?\"):12s} {title[:60]}')
+for am in d.get('agentMeta', []):
+    if am.get('status') != 'idle':
+        hook = str(am.get('current_hook_bead_id') or 'NULL')[:12]
+        print(f'  {am.get(\"role\",\"?\"):12s} status={am.get(\"status\",\"?\"):10s} hook={hook}')
+for e in d.get('alarmStatus', {}).get('recentEvents', [])[:3]:
+    t = e.get('type', '')
+    msg = e.get('message', '')
+    if 'color' in msg.lower() or 'pr_' in t or 'merge' in t.lower():
+        print(f'  EVT: {t:20s} {msg[:60]}')
+" 2>/dev/null
+  sleep 15
+done
+```
+
+### 1.4. Verify
+
+```bash
+# Check PR was merged
+gh pr list --repo $REPO --state merged --limit 3 --json number,title,mergedAt,mergedBy
+
+# Check no stray post-merge comments
+PR_NUMBER=<number>
+gh api repos/$REPO/issues/$PR_NUMBER/comments --jq 'length'
+gh api repos/$REPO/pulls/$PR_NUMBER/comments --jq 'length'
+```
+
+### Expected Outcome
+
+- Polecat creates PR (not refinery)
+- No refinery agent becomes `working`
+- MR bead transitions `open` → `in_progress` (fast-tracked by reconciler)
+- Auto-merge fires after ~2 min delay
+- PR merged on GitHub, no post-merge comments
+
+### Known Issue (2026-04-05)
+
+**Bug: Refinery dispatches despite `code_review=false`.** The reconciler's `code_review` bypass only works for MR beads that already have a `pr_url` in `review_metadata`. When a new MR bead is created by the polecat's `review_submitted` event, there's a timing window where the MR bead exists but has no `pr_url` yet. During this window, the reconciler falls through to Rule 5 and dispatches the refinery. See reconciler.ts lines 1197-1223.
+
+---
+
+## Scenario 2: Refinery Review (Rework Mode) + Auto-Merge
+
+**Settings:** `merge_strategy=pr`, `code_review=true`, `review_mode=rework`, `auto_resolve_pr_feedback=false`, `auto_merge=true`, `auto_merge_delay_minutes=2`
+
+**Goal:** Verify the full review pipeline: polecat pushes code, refinery reviews and creates PR, optional rework, then auto-merge.
+
+### 2.1. Configure Settings
+
+```bash
+curl -s -X PATCH $BASE/debug/towns/$TOWN_ID/config \
+  -H "Content-Type: application/json" \
+  -d '{
+    "merge_strategy": "pr",
+    "refinery": {
+      "code_review": true,
+      "auto_merge": true,
+      "auto_resolve_pr_feedback": false,
+      "auto_merge_delay_minutes": 2,
+      "review_mode": "rework"
+    }
+  }' | python3 -c "
+import sys, json; d = json.load(sys.stdin); ref = d.get('refinery', {})
+print(f'code_review={ref.get(\"code_review\")} review_mode={ref.get(\"review_mode\")} auto_merge={ref.get(\"auto_merge\")}')
+"
+```
+
+### 2.2. Send Work
+
+```bash
+curl -s -m 120 -X POST $BASE/debug/towns/$TOWN_ID/send-message \
+  -H "Content-Type: application/json" \
+  -d "{\"message\": \"Create a bead for this task on the $RIG_ID rig: Add a new file src/utils/date-helpers.ts with 3 utility functions (formatDate, daysBetween, isLeapYear). Each function should have JSDoc comments. Commit and push when done.\"}"
+```
+
+### 2.3. Monitor Until Complete
+
+```bash
+for i in $(seq 1 80); do
+  STATUS=$(curl -s $BASE/debug/towns/$TOWN_ID/status)
+  echo "$(date +%H:%M:%S)"
+  echo "$STATUS" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+for b in d.get('beadSummary', []):
+    title = b.get('title', '') or ''
+    if 'date' in title.lower() or b.get('type') == 'merge_request':
+        marker = ' <-- REWORK' if 'Rework' in title else ''
+        print(f'  {b.get(\"type\",\"?\"):16s} {b.get(\"status\",\"?\"):12s} {title[:55]}{marker}')
+for am in d.get('agentMeta', []):
+    if am.get('status') != 'idle' and am.get('role') != 'mayor':
+        hook = str(am.get('current_hook_bead_id') or 'NULL')[:12]
+        print(f'  {am.get(\"role\",\"?\"):12s} status={am.get(\"status\",\"?\"):10s} hook={hook}')
+for e in d.get('alarmStatus', {}).get('recentEvents', [])[:5]:
+    t = e.get('type', '')
+    msg = e.get('message', '')
+    if 'date' in msg.lower() or 'pr_' in t or 'rework' in msg.lower() or 'review' in t:
+        print(f'  EVT: {t:24s} {msg[:70]}')
+" 2>/dev/null
+  ALL_DONE=$(echo "$STATUS" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+beads = d.get('beadSummary', [])
+relevant = [b for b in beads if 'date' in str(b.get('title','')).lower()]
+if not relevant: print('DONE')
+" 2>/dev/null)
+  if [ "$ALL_DONE" = "DONE" ]; then echo "=== SCENARIO 2 COMPLETE ==="; break; fi
+  sleep 15
+done
+```
+
+### 2.4. Verify
+
+```bash
+# Check PR was merged
+gh pr list --repo $REPO --state merged --limit 3 --json number,title,mergedAt
+
+# Check for rework beads (if refinery requested changes)
+# Look for beads titled "Rework: ..." with parent_bead_id matching the MR bead
+MR_BEAD_ID=<mr_bead_id>
+curl -s $BASE/debug/towns/$TOWN_ID/beads/$MR_BEAD_ID | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+rm = d.get('reviewMetadata')
+if rm:
+    print(f'PR URL: {rm.get(\"pr_url\")}')
+deps = d.get('dependencies', [])
+for dep in deps:
+    print(f'  {dep[\"dependency_type\"]}: {dep[\"depends_on_bead_id\"][:12]}')
+"
+
+# Check no stray post-merge comments
+PR_NUMBER=<number>
+MERGE_TIME=$(gh pr view $PR_NUMBER --repo $REPO --json mergedAt --jq '.mergedAt')
+gh api repos/$REPO/pulls/$PR_NUMBER/comments \
+  --jq ".[] | select(.created_at > \"$MERGE_TIME\") | {created_at, body: (.body[:80])}"
+```
+
+### Expected Outcome
+
+- Polecat pushes code and calls `gt_done`
+- MR bead created as `open`
+- Refinery dispatched, reviews diff, calls `gt_done` (with `pr_url`)
+- If refinery requests changes: rework bead created with `parent_bead_id = MR bead`
+- If refinery approves: MR bead → `in_progress`, `poll_pr` starts
+- Auto-merge fires after ~2 min delay
+- No stray post-merge comments
+
+### Expected Timeline
+
+| Step                         | Duration     |
+| ---------------------------- | ------------ |
+| Mayor slings bead            | ~30s         |
+| Polecat works + pushes code  | 2-5 min      |
+| Refinery reviews, creates PR | 1-3 min      |
+| Rework cycle (if needed)     | 2-5 min      |
+| Auto-merge grace period      | 2 min        |
+| **Total**                    | **6-15 min** |
+
+---
+
+## Scenario 3: Human Feedback + Auto-Resolve + Auto-Merge
+
+**Settings:** `merge_strategy=pr`, `code_review=false`, `auto_resolve_pr_feedback=true`, `auto_merge=true`, `auto_merge_delay_minutes=2`
+
+**Goal:** Verify the human feedback loop: polecat creates PR, human adds review comment, system detects and resolves it, then auto-merges.
+
+### 3.1. Configure Settings
+
+```bash
+curl -s -X PATCH $BASE/debug/towns/$TOWN_ID/config \
+  -H "Content-Type: application/json" \
+  -d '{
+    "merge_strategy": "pr",
+    "refinery": {
+      "code_review": false,
+      "auto_merge": true,
+      "auto_resolve_pr_feedback": true,
+      "auto_merge_delay_minutes": 2,
+      "review_mode": "rework"
+    }
+  }' | python3 -c "
+import sys, json; d = json.load(sys.stdin); ref = d.get('refinery', {})
+print(f'code_review={ref.get(\"code_review\")} auto_resolve={ref.get(\"auto_resolve_pr_feedback\")} auto_merge={ref.get(\"auto_merge\")}')
+"
+```
+
+### 3.2. Send Work
+
+```bash
+curl -s -m 120 -X POST $BASE/debug/towns/$TOWN_ID/send-message \
+  -H "Content-Type: application/json" \
+  -d "{\"message\": \"Create a bead for this task on the $RIG_ID rig: Add a new file src/utils/array-helpers.ts with 3 utility functions (unique, flatten, chunk). Each function should have JSDoc comments and handle edge cases. Commit and push when done.\"}"
+```
+
+### 3.3. Wait for PR Creation
+
+Monitor until the PR appears on GitHub:
+
+```bash
+for i in $(seq 1 40); do
+  PR_EXISTS=$(gh pr list --repo $REPO --state open --json number,headRefName,title \
+    --jq '.[] | select(.title | test("array|Array"; "i")) | .number' 2>/dev/null | head -1)
+  echo "$(date +%H:%M:%S) PR=$PR_EXISTS"
+  if [ -n "$PR_EXISTS" ]; then echo "=== PR #$PR_EXISTS FOUND ==="; break; fi
+  sleep 15
+done
+PR_NUMBER=$PR_EXISTS
+```
+
+### 3.4. Add Human Review Comment
+
+Get the diff to find a valid position, then add a review with inline feedback:
+
+```bash
+# View diff to find a valid file and position
+gh pr diff $PR_NUMBER --repo $REPO | head -30
+
+# Add a review with inline comment (creates a review thread)
+gh api repos/$REPO/pulls/$PR_NUMBER/reviews \
+  --method POST \
+  --input - <<EOF
+{
+  "event": "REQUEST_CHANGES",
+  "body": "The unique function needs input validation.",
+  "comments": [
+    {
+      "path": "src/utils/array-helpers.ts",
+      "position": 8,
+      "body": "Please add input validation for null and undefined values - throw a TypeError with a descriptive message if the input is not an array."
+    }
+  ]
+}
+EOF
+```
+
+**Important:** You must use inline comments (with `path` and `position`) to create review threads. The `checkPRFeedback` function detects **unresolved review threads** via GitHub GraphQL, not review state. A `REQUEST_CHANGES` review without inline comments does NOT create detectable threads.
+
+### 3.5. Monitor Feedback Resolution and Auto-Merge
+
+```bash
+for i in $(seq 1 80); do
+  STATUS=$(curl -s $BASE/debug/towns/$TOWN_ID/status)
+  echo "$(date +%H:%M:%S)"
+  echo "$STATUS" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+for b in d.get('beadSummary', []):
+    title = b.get('title', '') or ''
+    if 'array' in title.lower() or 'Address' in title or '#$PR_NUMBER' in title:
+        marker = ' <-- FEEDBACK' if 'Address' in title else ''
+        print(f'  {b.get(\"type\",\"?\"):16s} {b.get(\"status\",\"?\"):12s} {title[:55]}{marker}')
+for am in d.get('agentMeta', []):
+    if am.get('status') != 'idle' and am.get('role') != 'mayor':
+        hook = str(am.get('current_hook_bead_id') or 'NULL')[:12]
+        print(f'  {am.get(\"role\",\"?\"):12s} status={am.get(\"status\",\"?\"):10s} hook={hook}')
+for e in d.get('alarmStatus', {}).get('recentEvents', [])[:5]:
+    t = e.get('type', '')
+    msg = e.get('message', '')
+    if 'array' in msg.lower() or 'Address' in msg or 'feedback' in msg.lower():
+        print(f'  EVT: {t:24s} {msg[:70]}')
+" 2>/dev/null
+  ALL_DONE=$(echo "$STATUS" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+beads = d.get('beadSummary', [])
+relevant = [b for b in beads if 'array' in str(b.get('title','')).lower() or 'Address' in str(b.get('title',''))]
+if not relevant: print('DONE')
+" 2>/dev/null)
+  if [ "$ALL_DONE" = "DONE" ]; then echo "=== SCENARIO 3 COMPLETE ==="; break; fi
+  sleep 15
+done
+```
+
+### 3.6. Verify
+
+```bash
+# Check PR was merged
+gh pr view $PR_NUMBER --repo $REPO --json state,mergedAt,mergedBy
+
+# Verify review thread was resolved
+gh api graphql -f query='query {
+  repository(owner: "'$(echo $REPO | cut -d/ -f1)'", name: "'$(echo $REPO | cut -d/ -f2)'") {
+    pullRequest(number: '$PR_NUMBER') {
+      reviewThreads(first: 100) {
+        nodes { isResolved, comments(first: 3) { nodes { body, author { login }, createdAt } } }
+      }
+    }
+  }
+}'
+
+# Check no stray post-merge comments
+MERGE_TIME=$(gh pr view $PR_NUMBER --repo $REPO --json mergedAt --jq '.mergedAt')
+gh api repos/$REPO/pulls/$PR_NUMBER/comments \
+  --jq ".[] | select(.created_at > \"$MERGE_TIME\") | {created_at, body: (.body[:80])}"
+```
+
+### Expected Outcome
+
+- Polecat creates PR
+- Human adds REQUEST_CHANGES review with inline comment
+- `poll_pr` detects unresolved review thread within ~30s
+- Feedback bead created: "Address review comments on PR #N"
+- Feedback bead has `parent_bead_id` = MR bead
+- Polecat dispatched to resolve feedback
+- Polecat pushes fix and resolves review thread on GitHub
+- Auto-merge fires after ~2 min delay
+- PR merged, no post-merge comments
+
+### Expected Timeline
+
+| Step                           | Duration          |
+| ------------------------------ | ----------------- |
+| Mayor slings bead              | ~30s              |
+| Polecat works + creates PR     | 2-5 min           |
+| Human adds review comment      | manual            |
+| Feedback detected by poll_pr   | ~30s (poll cycle) |
+| Polecat resolves feedback      | 1-3 min           |
+| Auto-merge grace period        | 2 min             |
+| **Total (from human comment)** | **4-6 min**       |
+
+---
+
+## Test A: Single Bead Flow (Full Pipeline)
+
+This is the original comprehensive test that exercises the full pipeline: polecat → refinery review → human feedback → auto-resolve → auto-merge.
 
 ### A.1. Send Work to the Mayor
 
@@ -326,18 +756,39 @@ for pr in prs:
 
 ---
 
-## Expected Timeline
+## Expected Timelines
 
-### Single Bead
+### Scenario 1 (No Review + Auto-Merge)
 
-| Step                                 | Duration              |
-| ------------------------------------ | --------------------- |
-| Mayor slings bead                    | ~30s                  |
-| Polecat works + creates PR           | 2-5 min               |
-| Refinery reviews PR, adds comments   | 2-5 min               |
-| Feedback detected + polecat resolves | 2-5 min (if comments) |
-| Auto-merge grace period              | 2 min (configured)    |
-| **Total**                            | **8-17 min**          |
+| Step                       | Duration    |
+| -------------------------- | ----------- |
+| Mayor slings bead          | ~30s        |
+| Polecat works + creates PR | 2-5 min     |
+| Auto-merge grace period    | 2 min       |
+| **Total**                  | **5-8 min** |
+
+### Scenario 2 (Refinery Review + Auto-Merge)
+
+| Step                          | Duration     |
+| ----------------------------- | ------------ |
+| Mayor slings bead             | ~30s         |
+| Polecat works + pushes code   | 2-5 min      |
+| Refinery reviews + creates PR | 1-3 min      |
+| Rework cycle (if needed)      | 2-5 min      |
+| Auto-merge grace period       | 2 min        |
+| **Total**                     | **6-15 min** |
+
+### Scenario 3 (Human Feedback + Auto-Resolve + Auto-Merge)
+
+| Step                       | Duration     |
+| -------------------------- | ------------ |
+| Mayor slings bead          | ~30s         |
+| Polecat works + creates PR | 2-5 min      |
+| Human adds review comment  | manual       |
+| Feedback detected          | ~30s         |
+| Polecat resolves feedback  | 1-3 min      |
+| Auto-merge grace period    | 2 min        |
+| **Total (from task sent)** | **8-12 min** |
 
 ### 3-Bead Convoy (review-and-merge)
 
@@ -362,6 +813,12 @@ If the polecat pushes but doesn't create a PR:
 - Verify `merge_strategy` is `pr` in town settings
 - Check wrangler logs for the polecat's agent output
 
+### Refinery Dispatches Despite `code_review=false`
+
+The reconciler's `code_review` bypass (reconciler.ts ~line 1167) only fast-tracks MR beads that already have a `pr_url` in `review_metadata`. When a new MR bead is created, there's a timing window where the MR bead exists but has no `pr_url`, causing the reconciler to dispatch the refinery via Rule 5.
+
+**Root cause:** The polecat calls `review_submitted` which creates the MR bead, but the `pr_url` is set asynchronously. During the gap, the reconciler treats it as a direct-merge MR (no `pr_url`), bypassing the `code_review=false` skip.
+
 ### Refinery Tries to Create a New PR
 
 If the refinery creates a duplicate PR instead of reviewing the existing one:
@@ -384,6 +841,10 @@ If the refinery creates a duplicate PR instead of reviewing the existing one:
 - In `review-and-merge` mode, each bead is independent — no sequencing dependencies.
 - In `review-then-land` mode, beads with `blocks` dependencies wait for their predecessors. Intermediate beads do NOT create PRs (the refinery merges directly to the feature branch).
 
+### Mayor Creates Duplicate Beads
+
+When the mayor is already working (e.g., processing stale triage beads) and receives a new message, it may create duplicate beads for the same task. This leads to duplicate PRs and orphaned beads. Wait for the mayor to be idle before sending new tasks.
+
 ### Container Networking (Local Dev)
 
 The wrangler container runtime occasionally fails to route DO `container.fetch()` to the container's port 8080 — `send-message` returns `sessionStatus: "idle"` even though Docker shows the container as healthy. Workarounds:
@@ -396,6 +857,21 @@ The wrangler container runtime occasionally fails to route DO `container.fetch()
 ---
 
 ## Debug Endpoints
+
+All `/debug/` endpoints are unauthenticated in development. In production, they're protected by Cloudflare Access.
+
+| Method  | Path                                     | Description                                              |
+| ------- | ---------------------------------------- | -------------------------------------------------------- |
+| `GET`   | `/debug/towns/:townId/status`            | Primary status: agents, beads, alarm, patrol, reconciler |
+| `GET`   | `/debug/towns/:townId/config`            | Read town config (dev only)                              |
+| `PATCH` | `/debug/towns/:townId/config`            | Update town config (dev only, partial update)            |
+| `POST`  | `/debug/towns/:townId/reconcile-dry-run` | Run reconciler without applying actions                  |
+| `POST`  | `/debug/towns/:townId/replay-events`     | Replay events from time range                            |
+| `GET`   | `/debug/towns/:townId/drain-status`      | Drain flag + nonce                                       |
+| `GET`   | `/debug/towns/:townId/nudges`            | Pending agent nudges                                     |
+| `POST`  | `/debug/towns/:townId/send-message`      | Send message to mayor (dev only)                         |
+| `GET`   | `/debug/towns/:townId/beads/:beadId`     | Full bead details + review metadata + dependencies       |
+| `POST`  | `/debug/towns/:townId/graceful-stop`     | Trigger SIGTERM on container (dev only)                  |
 
 ### Inspect a Bead
 
@@ -447,49 +923,3 @@ print(f'parent_bead_id: {bead.get(\"parent_bead_id\", \"NULL\")}')
 # Should match the MR bead ID
 "
 ```
-
----
-
-## Test C: Code Review Toggle (refinery disabled)
-
-Tests the `refinery.code_review` setting — when disabled, MR beads skip the refinery and go directly to `poll_pr`.
-
-### C.1. Disable Code Review
-
-In the town settings UI, set **Refinery code review** to disabled (unchecked).
-
-### C.2. Send Work
-
-```bash
-curl -s -m 120 -X POST $BASE/debug/towns/$TOWN_ID/send-message \
-  -H "Content-Type: application/json" \
-  -d "{\"message\": \"Create a bead for this task on the $RIG_ID rig: Add src/utils/type-guards.ts with functions: isString, isNumber, isArray, isObject, isNonNullable. Each with JSDoc. Commit and push.\"}"
-```
-
-### C.3. Verify MR Bead Skips Refinery
-
-Watch for the MR bead to go directly from `open` to `in_progress` without a refinery being dispatched:
-
-```bash
-for i in $(seq 1 60); do
-  STATUS=$(curl -s $BASE/debug/towns/$TOWN_ID/status)
-  echo "$(date +%H:%M:%S)"
-  echo "$STATUS" | python3 -c "
-import sys, json
-d = json.load(sys.stdin)
-for b in d.get('beadSummary', []):
-    if b.get('type') == 'merge_request':
-        print(f'  MR: {b.get(\"status\",\"?\"):12s} {str(b.get(\"title\",\"\"))[:50]}')
-for am in d.get('agentMeta', []):
-    if am.get('role') == 'refinery' and am.get('status') != 'idle':
-        print(f'  WARNING: refinery is {am.get(\"status\")} — should be idle!')
-" 2>/dev/null
-  sleep 15
-done
-```
-
-**Expected:** The MR bead transitions from `open` → `in_progress` by the reconciler (not the refinery). No refinery agents should become `working`. The `poll_pr` action should start immediately.
-
-### C.4. Re-enable Code Review
-
-After testing, re-enable **Refinery code review** in town settings.

@@ -1160,12 +1160,12 @@ export function reconcileReviewQueue(
     }
   }
 
-  // When refinery code review is disabled, skip refinery dispatch (Rules 5–6)
-  // for MR beads that already have a pr_url (polecat created the PR).
-  // Transition them straight to in_progress so poll_pr can handle auto-merge.
-  // MR beads without a pr_url (direct merge strategy) still need the refinery.
+  // When refinery code review is disabled, transition ALL open MR beads
+  // to in_progress (skipping the refinery entirely). For beads with pr_url,
+  // poll_pr will handle auto-merge. For beads without pr_url (polecat failed
+  // to create PR), the orphan timeout will catch them.
   if (!refineryCodeReview) {
-    const openMrsWithPr = z
+    const openMrs = z
       .object({ bead_id: z.string() })
       .array()
       .parse([
@@ -1174,16 +1174,13 @@ export function reconcileReviewQueue(
           /* sql */ `
             SELECT b.${beads.columns.bead_id}
             FROM ${beads} b
-            INNER JOIN ${review_metadata} rm
-              ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
             WHERE b.${beads.columns.type} = 'merge_request'
               AND b.${beads.columns.status} = 'open'
-              AND rm.${review_metadata.columns.pr_url} IS NOT NULL
           `,
           []
         ),
       ]);
-    for (const { bead_id } of openMrsWithPr) {
+    for (const { bead_id } of openMrs) {
       actions.push({
         type: 'transition_bead',
         bead_id,
@@ -1195,31 +1192,8 @@ export function reconcileReviewQueue(
     }
   }
 
-  // When refinery code review is disabled, only skip Rules 5-6 if ALL
-  // open MR beads have a pr_url (meaning poll_pr handles them).
-  // MR beads without pr_url still need the refinery for direct merges.
-  const hasOpenMrsWithoutPrUrl =
-    !refineryCodeReview &&
-    z
-      .object({ cnt: z.number() })
-      .array()
-      .parse([
-        ...query(
-          sql,
-          /* sql */ `
-            SELECT count(*) AS cnt FROM ${beads} b
-            LEFT JOIN ${review_metadata} rm
-              ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
-            WHERE b.${beads.columns.type} = 'merge_request'
-              AND b.${beads.columns.status} = 'open'
-              AND rm.${review_metadata.columns.pr_url} IS NULL
-          `,
-          []
-        ),
-      ])[0]?.cnt > 0;
-
-  if (!refineryCodeReview && !hasOpenMrsWithoutPrUrl) {
-    // All open MR beads have pr_url — skip refinery dispatch, poll_pr handles them
+  if (!refineryCodeReview) {
+    // Skip refinery dispatch entirely — Rules 5-6 not needed
   } else {
     // Rule 5: Pop open MR bead for idle refinery
     // Get all rigs that have open MR beads

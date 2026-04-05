@@ -1,4 +1,4 @@
-import { Check, Loader2 } from 'lucide-react';
+import { ArrowRight, Check, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -49,20 +49,22 @@ export function UpdatePanel(props: UpdatePanelProps) {
 
   return (
     <div className="grid gap-4">
-      <div className="bg-muted/20 border-border/60 rounded-lg border px-3 py-2">
-        <div className="text-sm font-semibold">Current plan</div>
-        <div className="text-muted-foreground text-sm">
-          {currentTierLabel} · {currentCadenceLabel}
+      <div className="flex items-center gap-3">
+        <div className="bg-muted/20 border-border/60 flex-1 rounded-lg border px-3 py-2 text-center">
+          <div className="text-muted-foreground text-xs">Current plan</div>
+          <div className="text-sm font-semibold">
+            {currentTierLabel} · {currentCadenceLabel}
+          </div>
+          <div className="text-xs font-semibold text-white">{currentPriceLabel}</div>
         </div>
-        <div className="text-sm font-semibold text-white">{currentPriceLabel}</div>
-      </div>
-
-      <div className="bg-muted/20 border-border/60 rounded-lg border px-3 py-2">
-        <div className="text-sm font-semibold">New plan</div>
-        <div className="text-muted-foreground text-sm">
-          {getTierName(targetTier)} · {getCadenceLabel(targetCadence)}
+        <ArrowRight className="text-muted-foreground h-4 w-4 flex-none" />
+        <div className="bg-muted/20 border-border/60 flex-1 rounded-lg border px-3 py-2 text-center">
+          <div className="text-muted-foreground text-xs">New plan</div>
+          <div className="text-sm font-semibold">
+            {getTierName(targetTier)} · {getCadenceLabel(targetCadence)}
+          </div>
+          <div className="text-xs font-semibold text-white">{newPriceLabel}</div>
         </div>
-        <div className="text-sm font-semibold text-white">{newPriceLabel}</div>
       </div>
 
       <div className="grid gap-2">

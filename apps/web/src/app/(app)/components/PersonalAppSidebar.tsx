@@ -2,6 +2,7 @@
 
 import { Sidebar, SidebarContent, SidebarHeader } from '@/components/ui/sidebar';
 import { useUser } from '@/hooks/useUser';
+import { useMemo } from 'react';
 import {
   Code,
   Coins,
@@ -25,8 +26,8 @@ import {
   Webhook,
   Factory,
   Settings,
+  CreditCard,
 } from 'lucide-react';
-import { useMemo } from 'react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
 import SidebarMenuList from './SidebarMenuList';
@@ -168,6 +169,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     url: string;
     className?: string;
   }> = [
+    {
+      title: 'Subscriptions',
+      icon: CreditCard,
+      url: '/subscriptions',
+    },
     ...(ENABLE_DEPLOY_FEATURE
       ? [
           {

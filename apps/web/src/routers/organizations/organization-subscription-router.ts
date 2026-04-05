@@ -32,6 +32,10 @@ import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/
 import { BillingCycleSchema } from '@/lib/organizations/organization-types';
 import { successResult } from '@/lib/maybe-result';
 import { client } from '@/lib/stripe-client';
+import {
+  billingHistoryResponseSchema,
+  mapStripeInvoiceToBillingHistoryEntry,
+} from '@/lib/subscriptions/subscription-center';
 
 const SubscriptionRequestSchema = OrganizationIdInputSchema.extend({
   seats: z.number().int().min(1).max(100),
@@ -64,6 +68,10 @@ const UpdateSeatCountResponseSchema = z.object({
   paymentIntentClientSecret: z.string().optional(),
 });
 
+const CursorInputSchema = OrganizationIdInputSchema.extend({
+  cursor: z.string().optional(),
+});
+
 const ChangeBillingCycleInputSchema = OrganizationIdInputSchema.extend({
   targetCycle: BillingCycleSchema,
 });
@@ -79,7 +87,7 @@ const ResubscribeDefaultsResponseSchema = z.object({
 });
 
 export const organizationsSubscriptionRouter = createTRPCRouter({
-  get: organizationMemberProcedure
+  get: organizationBillingProcedure
     .input(OrganizationIdInputSchema)
     .output(OrganizationSubscriptionResponseSchema)
     .query(async ({ input }): Promise<OrganizationSubscriptionResponse> => {
@@ -335,6 +343,31 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       });
 
       return { url: session.url };
+    }),
+
+  getBillingHistory: organizationBillingProcedure
+    .input(CursorInputSchema)
+    .output(billingHistoryResponseSchema)
+    .query(async ({ input }) => {
+      const latestPurchase = await getMostRecentSeatPurchase(input.organizationId);
+      if (!latestPurchase) {
+        return { entries: [], hasMore: false, cursor: null };
+      }
+
+      const customerId = await getOrCreateStripeCustomerIdForOrganization(input.organizationId);
+
+      const invoices = await client.invoices.list({
+        customer: customerId,
+        subscription: latestPurchase.subscription_stripe_id,
+        limit: 25,
+        ...(input.cursor ? { starting_after: input.cursor } : {}),
+      });
+
+      return {
+        entries: invoices.data.map(mapStripeInvoiceToBillingHistoryEntry),
+        hasMore: invoices.has_more,
+        cursor: invoices.has_more ? (invoices.data.at(-1)?.id ?? null) : null,
+      };
     }),
 
   changeBillingCycle: organizationBillingMutationProcedure

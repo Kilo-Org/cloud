@@ -183,33 +183,37 @@ if [ ! -f "$KILOCLAW_DIR/.dev.vars" ]; then
   cp "$KILOCLAW_DIR/.dev.vars.example" "$KILOCLAW_DIR/.dev.vars"
 fi
 
-# ---------- Backfill missing .dev.vars keys from template ----------
+DEV_VARS_FILE="$KILOCLAW_DIR/.dev.vars"
+DEV_VARS_TEMPLATE="$KILOCLAW_DIR/.dev.vars.example"
 
+# Set or update a key=value pair in .dev.vars (simple single-line values only).
 set_dev_var() {
   local key="$1" value="$2"
-  local file="$KILOCLAW_DIR/.dev.vars"
-  if grep -q "^${key}=" "$file" 2>/dev/null; then
-    sed -i '' "s|^${key}=.*|${key}=${value}|" "$file"
+  if grep -q "^${key}=" "$DEV_VARS_FILE"; then
+    sed "s|^${key}=.*|${key}=${value}|" "$DEV_VARS_FILE" > "$DEV_VARS_FILE.tmp"
+    mv "$DEV_VARS_FILE.tmp" "$DEV_VARS_FILE"
   else
-    echo "${key}=${value}" >> "$file"
+    echo "${key}=${value}" >> "$DEV_VARS_FILE"
   fi
 }
 
+# Back-fill any keys present in .dev.vars.example but missing from .dev.vars.
+# This keeps .dev.vars up-to-date when new variables are added to the template
+# without overwriting values the developer has already customised.
 backfill_dev_vars_from_example() {
-  local example="$KILOCLAW_DIR/.dev.vars.example"
-  local target="$KILOCLAW_DIR/.dev.vars"
-  [ -f "$example" ] || return 0
-  while IFS= read -r line; do
+  if [ ! -f "$DEV_VARS_TEMPLATE" ]; then
+    return
+  fi
+  while IFS='=' read -r key _value; do
     # Skip blank lines and comments
-    case "$line" in
-      ''|'#'*) continue ;;
+    case "$key" in
+      ''|\#*) continue ;;
     esac
-    local key="${line%%=*}"
-    if ! grep -q "^${key}=" "$target" 2>/dev/null; then
-      echo "$line" >> "$target"
-      echo "    Added missing key: $key"
+    if ! grep -q "^${key}=" "$DEV_VARS_FILE"; then
+      echo "    Adding missing key from template: $key"
+      grep "^${key}=" "$DEV_VARS_TEMPLATE" >> "$DEV_VARS_FILE"
     fi
-  done < "$example"
+  done < "$DEV_VARS_TEMPLATE"
 }
 
 backfill_dev_vars_from_example
@@ -405,7 +409,7 @@ if ! docker info &>/dev/null; then
   echo "Start Docker Desktop (or 'dockerd') and retry."
   exit 1
 fi
-if ! (cd "$MONOREPO_ROOT" && docker compose -f dev/docker-compose.yml up -d --wait); then
+if ! (cd "$MONOREPO_ROOT" && docker compose -f apps/web/dev/docker-compose.yml up -d --wait); then
   echo ""
   echo "ERROR: 'docker compose up' failed."
   echo "Check 'docker compose -f dev/docker-compose.yml logs' for details."
@@ -415,13 +419,13 @@ fi
 # Extra safety: wait for Postgres to accept connections (handles first-run init)
 echo "==> Waiting for Postgres to accept connections..."
 for i in $(seq 1 30); do
-  if docker exec "$(docker compose -f "$MONOREPO_ROOT/dev/docker-compose.yml" ps -q postgres)" \
+  if docker exec "$(docker compose -f "$MONOREPO_ROOT/apps/web/dev/docker-compose.yml" ps -q postgres)" \
     pg_isready -U postgres -q 2>/dev/null; then
     break
   fi
   if [ "$i" -eq 30 ]; then
     echo "ERROR: Postgres did not become ready within 30 seconds."
-    echo "Check: docker compose -f dev/docker-compose.yml logs postgres"
+    echo "Check: docker compose -f apps/web/dev/docker-compose.yml logs postgres"
     exit 1
   fi
   sleep 1
@@ -433,8 +437,8 @@ if ! (cd "$MONOREPO_ROOT" && pnpm drizzle migrate); then
   echo ""
   echo "ERROR: Database migrations failed."
   echo "The database container may not be ready yet. Check:"
-  echo "  docker compose -f dev/docker-compose.yml ps"
-  echo "  docker compose -f dev/docker-compose.yml logs"
+  echo "  docker compose -f apps/web/dev/docker-compose.yml ps"
+  echo "  docker compose -f apps/web/dev/docker-compose.yml logs"
   exit 1
 fi
 
@@ -466,8 +470,9 @@ STORED_IMAGE_HASH="$(grep '^FLY_IMAGE_CONTENT_HASH=' "$KILOCLAW_DIR/.dev.vars" \
   | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//' || true)"
 
 if [ -z "$STORED_IMAGE_HASH" ]; then
-  echo "==> No FLY_IMAGE_CONTENT_HASH in .dev.vars — seeding with current hash"
-  echo "    to avoid an accidental image push on first run."
+  echo "==> No FLY_IMAGE_CONTENT_HASH found in .dev.vars."
+  echo "    Seeding current hash to avoid an accidental image push."
+  echo "    Pass --has-controller-changes or run ./scripts/push-dev.sh to force a rebuild."
   set_dev_var FLY_IMAGE_CONTENT_HASH "$CURRENT_IMAGE_HASH"
   STORED_IMAGE_HASH="$CURRENT_IMAGE_HASH"
 fi

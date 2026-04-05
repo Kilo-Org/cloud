@@ -224,6 +224,15 @@ export default function OrganizationAppSidebar({
     url: string;
     className?: string;
   }> = [
+    ...(hasOwnerLevelAccess
+      ? [
+          {
+            title: 'Subscriptions',
+            icon: Users,
+            url: `/organizations/${organizationId}/subscriptions`,
+          },
+        ]
+      : []),
     ...(ENABLE_DEPLOY_FEATURE
       ? [
           {
@@ -259,11 +268,6 @@ export default function OrganizationAppSidebar({
     ...(hasOwnerLevelAccess
       ? [
           {
-            title: 'Subscription',
-            icon: Users,
-            url: `/organizations/${organizationId}/subscription`,
-          },
-          {
             title: 'Invoices',
             icon: CreditCard,
             url: `/organizations/${organizationId}/payment-details`,
@@ -277,9 +281,8 @@ export default function OrganizationAppSidebar({
       : []),
   ];
 
-  const allUrls = useMemo(
-    () => [...dashboardItems, ...kiloClawItems, ...cloudItems, ...accountItems].map(i => i.url),
-    [dashboardItems, kiloClawItems, cloudItems, accountItems]
+  const allUrls = [...dashboardItems, ...kiloClawItems, ...cloudItems, ...accountItems].map(
+    item => item.url
   );
 
   // Determine if we should show the OrganizationSwitcher

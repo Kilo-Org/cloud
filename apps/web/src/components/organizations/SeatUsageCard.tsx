@@ -1,11 +1,12 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, ArrowUpRight } from 'lucide-react';
+import Link from 'next/link';
+import { Users } from 'lucide-react';
 import { ErrorCard } from '../ErrorCard';
 import { LoadingCard } from '../LoadingCard';
 import { useUserOrganizationRole } from '@/components/organizations/OrganizationContext';
-import { LinkButton } from '@/components/Button';
+import { Button } from '@/components/ui/button';
 import { SeatsUsageProgress } from './SeatsUsageProgress';
 import {
   useOrganizationSeatUsage,
@@ -83,14 +84,11 @@ export function SeatUsageCard({ organizationId }: Props) {
             <CardTitle>Seat Usage</CardTitle>
           </div>
           {(currentUserRole === 'owner' || currentUserRole === 'billing_manager') && (
-            <LinkButton
-              href={`/organizations/${organizationId}/subscription`}
-              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm transition-colors"
-              variant="link"
-            >
-              Manage
-              <ArrowUpRight className="h-3 w-3" />
-            </LinkButton>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/organizations/${organizationId}/subscriptions/seats`}>
+                Manage Subscription
+              </Link>
+            </Button>
           )}
         </div>
         <CardDescription className="text-xs">

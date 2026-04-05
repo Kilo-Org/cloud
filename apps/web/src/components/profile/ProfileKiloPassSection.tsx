@@ -14,6 +14,12 @@ import { recommendKiloPassTierFromAverageMonthlyUsageUsd } from '@/lib/kilo-pass
 import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/constants';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 
+function getShowKiloPassTwoMonthPromo(showFirstMonthPromo: boolean): boolean {
+  return (
+    showFirstMonthPromo && dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF)
+  );
+}
+
 export function ProfileKiloPassSection() {
   const trpc = useTRPC();
   const query = useQuery(trpc.kiloPass.getState.queryOptions());
@@ -59,8 +65,7 @@ export function ProfileKiloPassSection() {
   if (!activeSubscription) {
     const pending = checkoutMutation.isPending;
     const showFirstMonthPromo = query.data.isEligibleForFirstMonthPromo;
-    const showSecondMonthPromo =
-      showFirstMonthPromo && dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
+    const showSecondMonthPromo = getShowKiloPassTwoMonthPromo(showFirstMonthPromo);
     const averageMonthlyUsageUsd = averageMonthlyUsageQuery.data?.averageMonthlyUsageUsd;
     const recommendedTier =
       typeof averageMonthlyUsageUsd === 'number'

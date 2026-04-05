@@ -273,7 +273,7 @@ export function DeploymentsTable() {
                       <Link
                         href={`/admin/users/${encodeURIComponent(deployment.owned_by_user_id)}`}
                         className="text-blue-600 hover:underline"
-                        onClick={e => e.stopPropagation()}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
                       >
                         {deployment.owner_email}
                       </Link>
@@ -281,7 +281,7 @@ export function DeploymentsTable() {
                       <Link
                         href={`/admin/organizations/${deployment.owned_by_organization_id}`}
                         className="text-blue-600 hover:underline"
-                        onClick={e => e.stopPropagation()}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
                       >
                         {deployment.owner_org_name}
                       </Link>

@@ -1,6 +1,7 @@
 import { withSentryConfig } from '@sentry/nextjs';
 import createMDX from '@next/mdx';
 import { statSync } from 'fs';
+import { resolve } from 'path';
 import NextBundleAnalyzer from '@next/bundle-analyzer';
 
 const withBundleAnalyzer = NextBundleAnalyzer({
@@ -22,6 +23,12 @@ validateGitLfs();
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+
+  // In a monorepo, Turbopack can't resolve `next/package.json` from apps/web/src/app
+  // because dependencies are hoisted to the workspace root.
+  turbopack: {
+    root: resolve(import.meta.dirname, '../..'),
+  },
 
   devIndicators: { position: 'bottom-right' },
 

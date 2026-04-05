@@ -5,14 +5,15 @@
  */
 
 import * as React from 'react';
-import Link from 'next/link';
+import Link, { type LinkProps } from 'next/link';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
-export interface CardLinkFooterProps extends React.ComponentProps<typeof Link> {
-  className?: string;
-  children: React.ReactNode;
-}
+export type CardLinkFooterProps = LinkProps &
+  Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, keyof LinkProps> & {
+    className?: string;
+    children: React.ReactNode;
+  };
 
 /**
  * CardLinkFooter component with liquid ripple effect on hover.

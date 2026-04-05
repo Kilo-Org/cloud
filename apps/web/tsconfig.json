@@ -35,6 +35,7 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": [
+    "next-env.d.ts",
     "src/**/*",
     "tests/**/*",
     ".next/types/**/*.ts",

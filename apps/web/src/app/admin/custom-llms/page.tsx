@@ -248,7 +248,7 @@ export default function AdminCustomLlmsPage() {
                     height="400px"
                     defaultLanguage="json"
                     value={editor.definitionJson}
-                    onChange={value =>
+                    onChange={(value: string | undefined) =>
                       setEditor(prev => ({
                         ...prev,
                         definitionJson: value ?? '',

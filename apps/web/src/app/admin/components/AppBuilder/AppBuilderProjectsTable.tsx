@@ -313,7 +313,7 @@ export function AppBuilderProjectsTable() {
                       <Link
                         href={`/admin/users/${encodeURIComponent(project.owned_by_user_id)}`}
                         className="text-blue-600 hover:underline"
-                        onClick={e => e.stopPropagation()}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
                       >
                         {project.owner_email || project.owned_by_user_id}
                       </Link>
@@ -321,7 +321,7 @@ export function AppBuilderProjectsTable() {
                       <Link
                         href={`/admin/organizations/${project.owned_by_organization_id}`}
                         className="text-blue-600 hover:underline"
-                        onClick={e => e.stopPropagation()}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
                       >
                         {project.owner_org_name || project.owned_by_organization_id}
                       </Link>

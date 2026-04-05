@@ -530,7 +530,7 @@ export function PrimaryChartView({
                 <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#666', strokeWidth: 1 }} />
                 {seriesKeys.length > 1 && (
                   <Legend
-                    onClick={e => {
+                    onClick={(e: { value?: string }) => {
                       if (e.value) toggleSeries(e.value);
                     }}
                     wrapperStyle={{ cursor: 'pointer', paddingTop: '10px', fontSize: '11px' }}

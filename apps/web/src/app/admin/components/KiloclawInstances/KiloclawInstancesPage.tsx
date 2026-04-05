@@ -525,7 +525,7 @@ export function KiloclawInstancesPage() {
                     <Link
                       href={`/admin/users/${encodeURIComponent(instance.user_id)}`}
                       className="text-blue-600 hover:underline"
-                      onClick={e => e.stopPropagation()}
+                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
                     >
                       {instance.user_email || instance.user_id}
                     </Link>

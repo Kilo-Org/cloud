@@ -1,13 +1,14 @@
 'use client';
 
 import { Suspense, lazy, useState, useCallback, useEffect, useRef } from 'react';
+import type { DiffEditorProps, EditorProps } from '@monaco-editor/react';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-const Editor = lazy(() => import('@monaco-editor/react'));
-const DiffEditor = lazy(() =>
+const Editor = lazy<React.ComponentType<EditorProps>>(() => import('@monaco-editor/react'));
+const DiffEditor = lazy<React.ComponentType<DiffEditorProps>>(() =>
   import('@monaco-editor/react').then(mod => ({ default: mod.DiffEditor }))
 );
 
@@ -91,12 +92,15 @@ export function FileEditorPane({
   const [editedContent, setEditedContent] = useState<string | null>(null);
   const etagRef = useRef<string | undefined>(undefined);
 
-  useEffect(() => {
+  // Reset editor state when filePath changes (without an effect + dependency the linter flags).
+  const prevFilePathRef = useRef(filePath);
+  if (prevFilePathRef.current !== filePath) {
+    prevFilePathRef.current = filePath;
     setEditedContent(null);
     setShowDiff(false);
     etagRef.current = undefined;
     savedContentRef.current = null;
-  }, [filePath]);
+  }
 
   useEffect(() => {
     if (data?.etag) {

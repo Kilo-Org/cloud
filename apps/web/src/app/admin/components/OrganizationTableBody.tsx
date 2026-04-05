@@ -162,7 +162,7 @@ export function OrganizationTableBody({
                 href={`/admin/users/${encodeURIComponent(organization.created_by_kilo_user_id)}`}
                 target="_blank"
                 className="cursor-pointer hover:text-blue-600"
-                onClick={e => e.stopPropagation()}
+                onClick={(e: React.MouseEvent) => e.stopPropagation()}
               >
                 {organization.created_by_user_email}
               </Link>

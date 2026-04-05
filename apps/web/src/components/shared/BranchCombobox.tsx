@@ -158,7 +158,7 @@ export function BranchCombobox({
                   <CommandItem
                     key={branch.name}
                     value={branch.name}
-                    onSelect={currentValue => {
+                    onSelect={(currentValue: string) => {
                       onValueChange(currentValue);
                       setOpen(false);
                     }}

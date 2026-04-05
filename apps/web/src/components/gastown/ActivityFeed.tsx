@@ -207,7 +207,7 @@ export function ActivityFeedView({
               onClick={clickable ? () => onEventClick?.(event) : undefined}
               onKeyDown={
                 clickable
-                  ? e => {
+                  ? (e: React.KeyboardEvent) => {
                       if (e.key === 'Enter' || e.key === ' ') onEventClick?.(event);
                     }
                   : undefined

@@ -1,9 +1,10 @@
 'use client';
 
 import { Suspense, lazy, useState, useEffect } from 'react';
+import type { EditorProps } from '@monaco-editor/react';
 import { Loader2 } from 'lucide-react';
 
-const Editor = lazy(() => import('@monaco-editor/react'));
+const Editor = lazy<React.ComponentType<EditorProps>>(() => import('@monaco-editor/react'));
 
 type MonacoJsonEditorProps = {
   value: string;
@@ -46,7 +47,7 @@ export function MonacoJsonEditor({
           height={height}
           defaultLanguage="json"
           value={value || placeholder}
-          onChange={newValue => onChange(newValue ?? '')}
+          onChange={(newValue: string | undefined) => onChange(newValue ?? '')}
           theme="vs-dark"
           options={{
             minimap: { enabled: false },

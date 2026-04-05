@@ -83,6 +83,10 @@ export async function updateTownConfig(
             require_clean_merge:
               update.refinery.require_clean_merge ?? current.refinery?.require_clean_merge ?? true,
             code_review: update.refinery.code_review ?? current.refinery?.code_review ?? true,
+            code_review_comments:
+              update.refinery.code_review_comments ??
+              current.refinery?.code_review_comments ??
+              true,
             auto_resolve_pr_feedback:
               update.refinery.auto_resolve_pr_feedback ??
               current.refinery?.auto_resolve_pr_feedback ??

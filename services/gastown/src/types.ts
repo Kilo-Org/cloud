@@ -264,9 +264,17 @@ export const TownConfigSchema = z.object({
       gates: z.array(z.string()).default([]),
       auto_merge: z.boolean().default(true),
       require_clean_merge: z.boolean().default(true),
-      /** When enabled, the refinery agent reviews PRs and adds GitHub review
-       *  comments. Disable if you use an external code-review bot. */
+      /** When enabled, the refinery agent reviews PRs (runs gates, checks
+       *  the diff, and may request changes or approve). When disabled, the
+       *  refinery is completely skipped for PR-strategy MR beads — the PR
+       *  goes straight to poll_pr for auto-merge/auto-resolve. */
       code_review: z.boolean().default(true),
+      /** When enabled AND code_review is enabled, the refinery posts its
+       *  review as GitHub review comments on the PR. When disabled, the
+       *  refinery still reviews but uses internal rework requests (gt_request_changes)
+       *  instead of GitHub comments. Disable if you use an external code-review bot
+       *  and don't want the refinery's comments cluttering the PR. */
+      code_review_comments: z.boolean().default(true),
       /** When enabled, a polecat is automatically dispatched to address
        *  unresolved review comments and failing CI checks on open PRs. */
       auto_resolve_pr_feedback: z.boolean().default(false),
@@ -292,6 +300,11 @@ export const TownConfigSchema = z.object({
 
   /** When true, all convoys are created as staged by default (agents not dispatched until started). */
   staged_convoys_default: z.boolean().default(false),
+
+  /** Default merge mode for new convoys.
+   *  - 'review-then-land': beads merge into a convoy feature branch, then a single landing PR is created (default)
+   *  - 'review-and-merge': each bead gets its own PR directly to the target branch */
+  convoy_merge_mode: z.enum(['review-then-land', 'review-and-merge']).default('review-then-land'),
 
   /** GitHub PAT used exclusively for `gh` CLI operations (PRs, issues, etc.).
    *  Git clone/push still uses the integration token from git_auth. */
@@ -350,6 +363,7 @@ export const TownConfigUpdateSchema = z.object({
       auto_merge: z.boolean().optional(),
       require_clean_merge: z.boolean().optional(),
       code_review: z.boolean().optional(),
+      code_review_comments: z.boolean().optional(),
       auto_resolve_pr_feedback: z.boolean().optional(),
       auto_merge_delay_minutes: z.number().int().min(0).nullable().optional(),
     })
@@ -362,6 +376,7 @@ export const TownConfigUpdateSchema = z.object({
     })
     .optional(),
   staged_convoys_default: z.boolean().optional(),
+  convoy_merge_mode: z.enum(['review-then-land', 'review-and-merge']).optional(),
   github_cli_pat: z.string().optional(),
   git_author_name: z.string().optional(),
   git_author_email: z.string().optional(),

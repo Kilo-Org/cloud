@@ -268,10 +268,14 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
   const [refineryGates, setRefineryGates] = useState<string[]>([]);
   const [autoMerge, setAutoMerge] = useState(true);
   const [refineryCodeReview, setRefineryCodeReview] = useState(true);
+  const [refineryCodeReviewComments, setRefineryCodeReviewComments] = useState(true);
   const [autoResolvePrFeedback, setAutoResolvePrFeedback] = useState(false);
   const [autoMergeDelayMinutes, setAutoMergeDelayMinutes] = useState<number | null>(null);
   const [mergeStrategy, setMergeStrategy] = useState<'direct' | 'pr'>('direct');
   const [stagedConvoysDefault, setStagedConvoysDefault] = useState(false);
+  const [convoyMergeMode, setConvoyMergeMode] = useState<'review-then-land' | 'review-and-merge'>(
+    'review-then-land'
+  );
   const [githubCliPat, setGithubCliPat] = useState('');
   const [gitAuthorName, setGitAuthorName] = useState('');
   const [gitAuthorEmail, setGitAuthorEmail] = useState('');
@@ -296,10 +300,14 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
     setRefineryGates(cfg.refinery?.gates ?? []);
     setAutoMerge(cfg.refinery?.auto_merge ?? true);
     setRefineryCodeReview(cfg.refinery?.code_review ?? true);
+    setRefineryCodeReviewComments(cfg.refinery?.code_review_comments ?? true);
     setAutoResolvePrFeedback(cfg.refinery?.auto_resolve_pr_feedback ?? false);
     setAutoMergeDelayMinutes(cfg.refinery?.auto_merge_delay_minutes ?? null);
     setMergeStrategy(cfg.merge_strategy === 'pr' ? 'pr' : 'direct');
     setStagedConvoysDefault(cfg.staged_convoys_default ?? false);
+    setConvoyMergeMode(
+      cfg.convoy_merge_mode === 'review-and-merge' ? 'review-and-merge' : 'review-then-land'
+    );
     setGithubCliPat(cfg.github_cli_pat ?? '');
     savedGithubCliPatRef.current = cfg.github_cli_pat ?? '';
     savedGithubTokenRef.current = cfg.git_auth?.github_token ?? '';
@@ -352,10 +360,12 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
           gates: refineryGates.filter(g => g.trim()),
           auto_merge: autoMerge,
           code_review: refineryCodeReview,
+          code_review_comments: refineryCodeReviewComments,
           require_clean_merge: true,
           auto_resolve_pr_feedback: autoResolvePrFeedback,
           auto_merge_delay_minutes: autoMergeDelayMinutes,
         },
+        convoy_merge_mode: convoyMergeMode,
       },
     });
   }
@@ -740,6 +750,41 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                     onCheckedChange={setStagedConvoysDefault}
                   />
                 </div>
+
+                <div className="mt-3">
+                  <Label className="text-sm text-white/70">Default merge mode</Label>
+                  <p className="mb-2 text-[11px] text-white/30">
+                    Controls how convoy beads are merged.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setConvoyMergeMode('review-then-land')}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-xs transition-colors ${
+                        convoyMergeMode === 'review-then-land'
+                          ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-300'
+                          : 'border-white/[0.06] bg-white/[0.02] text-white/40 hover:border-white/10'
+                      }`}
+                    >
+                      <div className="font-medium">Review then land</div>
+                      <div className="mt-0.5 text-[10px] opacity-60">
+                        Beads merge into a feature branch. One landing PR at the end.
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setConvoyMergeMode('review-and-merge')}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-xs transition-colors ${
+                        convoyMergeMode === 'review-and-merge'
+                          ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-300'
+                          : 'border-white/[0.06] bg-white/[0.02] text-white/40 hover:border-white/10'
+                      }`}
+                    >
+                      <div className="font-medium">Review and merge</div>
+                      <div className="mt-0.5 text-[10px] opacity-60">
+                        Each bead gets its own PR. Auto-merge applies per PR.
+                      </div>
+                    </button>
+                  </div>
+                </div>
               </SettingsSection>
 
               {/* ── Merge Strategy ──────────────────────────────────── */}
@@ -825,12 +870,31 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                   <div className="flex-1">
                     <Label className="text-sm text-white/70">Refinery code review</Label>
                     <p className="text-[11px] text-white/30">
-                      The refinery agent reviews PRs and adds GitHub review comments. Disable if you
-                      already use an external code-review bot.
+                      The refinery agent reviews PRs — runs quality gates, checks the diff, and may
+                      request rework. When disabled, PRs skip the refinery entirely.
                     </p>
                   </div>
                   <Switch checked={refineryCodeReview} onCheckedChange={setRefineryCodeReview} />
                 </div>
+
+                {refineryCodeReview && (
+                  <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                    <div className="flex-1">
+                      <Label className="text-sm text-white/70">
+                        Post review as GitHub comments
+                      </Label>
+                      <p className="text-[11px] text-white/30">
+                        The refinery posts its findings as GitHub review comments on the PR. Disable
+                        if you use an external code-review bot and don&apos;t want duplicate
+                        comments.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={refineryCodeReviewComments}
+                      onCheckedChange={setRefineryCodeReviewComments}
+                    />
+                  </div>
+                )}
 
                 <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
                   <div className="flex-1">

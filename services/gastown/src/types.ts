@@ -264,17 +264,14 @@ export const TownConfigSchema = z.object({
       gates: z.array(z.string()).default([]),
       auto_merge: z.boolean().default(true),
       require_clean_merge: z.boolean().default(true),
-      /** When enabled, the refinery agent reviews PRs (runs gates, checks
-       *  the diff, and may request changes or approve). When disabled, the
-       *  refinery is completely skipped for PR-strategy MR beads — the PR
-       *  goes straight to poll_pr for auto-merge/auto-resolve. */
+      /** When enabled, the refinery agent reviews code (runs gates, checks
+       *  the diff). When disabled, the refinery is completely skipped —
+       *  MR beads go straight to poll_pr for auto-merge/auto-resolve. */
       code_review: z.boolean().default(true),
-      /** When enabled AND code_review is enabled, the refinery posts its
-       *  review as GitHub review comments on the PR. When disabled, the
-       *  refinery still reviews but uses internal rework requests (gt_request_changes)
-       *  instead of GitHub comments. Disable if you use an external code-review bot
-       *  and don't want the refinery's comments cluttering the PR. */
-      code_review_comments: z.boolean().default(true),
+      /** Controls how the refinery communicates review findings:
+       *  - 'rework': creates internal rework beads via gt_request_changes (default)
+       *  - 'comments': posts GitHub review comments on the PR (requires merge_strategy: 'pr') */
+      review_mode: z.enum(['rework', 'comments']).default('rework'),
       /** When enabled, a polecat is automatically dispatched to address
        *  unresolved review comments and failing CI checks on open PRs. */
       auto_resolve_pr_feedback: z.boolean().default(false),
@@ -363,7 +360,7 @@ export const TownConfigUpdateSchema = z.object({
       auto_merge: z.boolean().optional(),
       require_clean_merge: z.boolean().optional(),
       code_review: z.boolean().optional(),
-      code_review_comments: z.boolean().optional(),
+      review_mode: z.enum(['rework', 'comments']).optional(),
       auto_resolve_pr_feedback: z.boolean().optional(),
       auto_merge_delay_minutes: z.number().int().min(0).nullable().optional(),
     })

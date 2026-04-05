@@ -288,12 +288,12 @@ export class TownDO extends DurableObject<Env> {
         // instead of creating a new PR.
         if (agent.role === 'refinery' && bead.type === 'merge_request') {
           const reviewMeta = reviewQueue.getReviewMetadata(this.sql, beadId);
-          // Only pass existingPrUrl when code_review_comments is enabled.
-          // When disabled, the refinery uses the standard review flow
+          // Only pass existingPrUrl when review_mode is 'comments'.
+          // In 'rework' mode, the refinery uses the standard review flow
           // (gt_request_changes internally) instead of posting GitHub comments.
-          const codeReviewComments = townConfig.refinery?.code_review_comments ?? true;
+          const reviewMode = townConfig.refinery?.review_mode ?? 'rework';
           const existingPrUrl =
-            codeReviewComments && typeof reviewMeta?.pr_url === 'string'
+            reviewMode === 'comments' && typeof reviewMeta?.pr_url === 'string'
               ? reviewMeta.pr_url
               : undefined;
           systemPromptOverride = buildRefinerySystemPrompt({
@@ -312,27 +312,19 @@ export class TownDO extends DurableObject<Env> {
           });
         }
 
-        // When merge_strategy is 'pr', polecats create the PR themselves.
-        // Exception: review-then-land convoy intermediate beads merge directly
-        // into the convoy feature branch (the refinery handles that).
+        // When merge_strategy is 'pr', polecats always create the PR themselves
+        // and pass pr_url to gt_done.
         if (agent.role === 'polecat' && townConfig.merge_strategy === 'pr') {
-          const convoyId = beadOps.getConvoyForBead(this.sql, beadId);
-          const convoyMergeMode = convoyId ? beadOps.getConvoyMergeMode(this.sql, convoyId) : null;
-          const isReviewThenLandIntermediate =
-            convoyMergeMode === 'review-then-land' && convoyId !== beadId;
-
-          if (!isReviewThenLandIntermediate) {
-            const rig = rigs.getRig(this.sql, rigId);
-            systemPromptOverride = buildPolecatSystemPrompt({
-              agentName: agent.name,
-              rigId,
-              townId: this.townId,
-              identity: agent.identity,
-              gates: townConfig.refinery?.gates ?? [],
-              mergeStrategy: 'pr',
-              targetBranch: rig?.default_branch ?? 'main',
-            });
-          }
+          const rig = rigs.getRig(this.sql, rigId);
+          systemPromptOverride = buildPolecatSystemPrompt({
+            agentName: agent.name,
+            rigId,
+            townId: this.townId,
+            identity: agent.identity,
+            gates: townConfig.refinery?.gates ?? [],
+            mergeStrategy: 'pr',
+            targetBranch: rig?.default_branch ?? 'main',
+          });
         }
 
         return scheduling.dispatchAgent(schedulingCtx, agent, bead, {

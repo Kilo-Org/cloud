@@ -38,7 +38,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 KILOCLAW_DIR="$(dirname "$SCRIPT_DIR")"
-MONOREPO_ROOT="$(cd "$KILOCLAW_DIR/.." && pwd)"
+MONOREPO_ROOT="$(cd "$KILOCLAW_DIR/../.." && pwd)"
+APPS_WEB_DIR="$MONOREPO_ROOT/apps/web"
 
 # ---------- OS detection ----------
 
@@ -195,7 +196,7 @@ if [ ! -d "$MONOREPO_ROOT/.vercel" ] || [ ! -f "$MONOREPO_ROOT/.vercel/project.j
 fi
 
 echo "==> Pulling development environment from Vercel..."
-if ! (cd "$MONOREPO_ROOT" && vercel env pull --environment=development); then
+if ! (cd "$MONOREPO_ROOT" && vercel env pull --environment=development "$APPS_WEB_DIR/.env.local" && vercel env pull --environment=development); then
   echo ""
   echo "ERROR: 'vercel env pull' failed."
   echo "Check your Vercel authentication: vercel login"
@@ -206,17 +207,17 @@ fi
 # Comment out POSTGRES_REPLICA_EU_URL unless --with-replica is passed.
 # In local dev this connection string is unreachable and causes startup hangs.
 if [ "$WITH_REPLICA" = false ]; then
-  if grep -q '^POSTGRES_REPLICA_EU_URL=' "$MONOREPO_ROOT/.env.local"; then
+  if grep -q '^POSTGRES_REPLICA_EU_URL=' "$APPS_WEB_DIR/.env.local"; then
     echo "==> Commenting out POSTGRES_REPLICA_EU_URL in .env.local (pass --with-replica to keep it)"
     sed 's/^POSTGRES_REPLICA_EU_URL=/# POSTGRES_REPLICA_EU_URL=/' \
-      "$MONOREPO_ROOT/.env.local" > "$MONOREPO_ROOT/.env.local.tmp"
-    mv "$MONOREPO_ROOT/.env.local.tmp" "$MONOREPO_ROOT/.env.local"
+      "$APPS_WEB_DIR/.env.local" > "$APPS_WEB_DIR/.env.local.tmp"
+    mv "$APPS_WEB_DIR/.env.local.tmp" "$APPS_WEB_DIR/.env.local"
   fi
 fi
 
 # ---------- Sync shared secrets from .env.local into .dev.vars ----------
 
-ENV_LOCAL="$MONOREPO_ROOT/.env.local"
+ENV_LOCAL="$APPS_WEB_DIR/.env.local"
 if [ ! -f "$ENV_LOCAL" ]; then
   echo ""
   echo "ERROR: .env.local not found after 'vercel env pull'."
@@ -373,7 +374,7 @@ if ! docker info &>/dev/null; then
   echo "Start Docker Desktop (or 'dockerd') and retry."
   exit 1
 fi
-if ! (cd "$MONOREPO_ROOT" && docker compose -f dev/docker-compose.yml up -d --wait); then
+if ! (cd "$MONOREPO_ROOT" && docker compose -f apps/web/dev/docker-compose.yml up -d --wait); then
   echo ""
   echo "ERROR: 'docker compose up' failed."
   echo "Check 'docker compose -f dev/docker-compose.yml logs' for details."
@@ -383,13 +384,13 @@ fi
 # Extra safety: wait for Postgres to accept connections (handles first-run init)
 echo "==> Waiting for Postgres to accept connections..."
 for i in $(seq 1 30); do
-  if docker exec "$(docker compose -f "$MONOREPO_ROOT/dev/docker-compose.yml" ps -q postgres)" \
+  if docker exec "$(docker compose -f "$MONOREPO_ROOT/apps/web/dev/docker-compose.yml" ps -q postgres)" \
     pg_isready -U postgres -q 2>/dev/null; then
     break
   fi
   if [ "$i" -eq 30 ]; then
     echo "ERROR: Postgres did not become ready within 30 seconds."
-    echo "Check: docker compose -f dev/docker-compose.yml logs postgres"
+    echo "Check: docker compose -f apps/web/dev/docker-compose.yml logs postgres"
     exit 1
   fi
   sleep 1
@@ -401,8 +402,8 @@ if ! (cd "$MONOREPO_ROOT" && pnpm drizzle migrate); then
   echo ""
   echo "ERROR: Database migrations failed."
   echo "The database container may not be ready yet. Check:"
-  echo "  docker compose -f dev/docker-compose.yml ps"
-  echo "  docker compose -f dev/docker-compose.yml logs"
+  echo "  docker compose -f apps/web/dev/docker-compose.yml ps"
+  echo "  docker compose -f apps/web/dev/docker-compose.yml logs"
   exit 1
 fi
 
@@ -767,7 +768,7 @@ fi
 
 # ---------- Launch processes ----------
 
-NEXTJS_CMD="${NVM_PREFIX}cd '$MONOREPO_ROOT' && pnpm dev"
+NEXTJS_CMD="${NVM_PREFIX}cd '$MONOREPO_ROOT/apps/web' && pnpm dev"
 WORKER_CMD="${NVM_PREFIX}sleep 2 && cd '$KILOCLAW_DIR' && pnpm run dev"
 
 case "$DISPLAY_MODE" in

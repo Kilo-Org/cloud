@@ -117,14 +117,20 @@ function BannerButton({
   onClick,
   children,
   className,
+  variant = 'primary',
 }: {
   href?: string;
   onClick?: () => void;
   children: React.ReactNode;
   className?: string;
+  variant?: 'primary' | 'outline';
 }) {
   const { colors } = useContext(BannerContext);
-  const btnClass = cn('w-full shrink-0 sm:w-auto [&>*]:h-4 [&>*]:w-4', colors?.button, className);
+  const btnClass = cn(
+    'w-full shrink-0 sm:w-auto [&>*]:h-4 [&>*]:w-4',
+    variant === 'primary' ? colors?.button : 'bg-transparent border border-current/30 hover:bg-current/10',
+    className
+  );
 
   if (href) {
     return (

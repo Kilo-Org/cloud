@@ -23,7 +23,7 @@ export function ErrorBanner({ title = 'Error', message, onRetry, onDismiss }: Er
       {(onRetry ?? onDismiss) && (
         <Banner.Action>
           {onRetry && <Banner.Button onClick={onRetry}>Retry</Banner.Button>}
-          {onDismiss && <Banner.Button onClick={onDismiss}>Dismiss</Banner.Button>}
+          {onDismiss && <Banner.Button variant="outline" onClick={onDismiss}>Dismiss</Banner.Button>}
         </Banner.Action>
       )}
     </Banner>

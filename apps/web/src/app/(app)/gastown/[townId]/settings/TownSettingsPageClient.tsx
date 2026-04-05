@@ -898,16 +898,21 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                         </div>
                       </button>
                       <button
-                        onClick={() => setReviewMode('comments')}
+                        onClick={() => mergeStrategy === 'pr' && setReviewMode('comments')}
+                        disabled={mergeStrategy !== 'pr'}
                         className={`flex-1 rounded-lg border px-3 py-2 text-xs transition-colors ${
                           reviewMode === 'comments'
                             ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-300'
-                            : 'border-white/[0.06] bg-white/[0.02] text-white/40 hover:border-white/10'
+                            : mergeStrategy !== 'pr'
+                              ? 'cursor-not-allowed border-white/[0.03] bg-white/[0.01] text-white/20'
+                              : 'border-white/[0.06] bg-white/[0.02] text-white/40 hover:border-white/10'
                         }`}
                       >
                         <div className="font-medium">PR comments</div>
                         <div className="mt-0.5 text-[10px] opacity-60">
-                          Posts GitHub review comments on the PR.
+                          {mergeStrategy !== 'pr'
+                            ? 'Requires Pull Request merge strategy.'
+                            : 'Posts GitHub review comments on the PR.'}
                         </div>
                       </button>
                     </div>

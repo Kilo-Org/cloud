@@ -1049,8 +1049,7 @@ export function reconcileReviewQueue(
                b.${beads.columns.rig_id}, b.${beads.columns.updated_at},
                b.${beads.columns.metadata},
                rm.${review_metadata.columns.pr_url},
-               b.${beads.columns.assignee_agent_bead_id},
-               b.${beads.columns.metadata}
+               b.${beads.columns.assignee_agent_bead_id}
         FROM ${beads} b
         INNER JOIN ${review_metadata} rm ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
         WHERE b.${beads.columns.type} = 'merge_request'
@@ -1491,6 +1490,15 @@ export function reconcileReviewQueue(
     actions.push({
       type: 'unhook_agent',
       agent_id: ref.bead_id,
+      reason: `MR bead ${mr.status} — cleanup`,
+    });
+    // Transition to idle immediately so the agent doesn't spend a tick
+    // in an inconsistent working+unhooked state.
+    actions.push({
+      type: 'transition_agent',
+      agent_id: ref.bead_id,
+      from: ref.status,
+      to: 'idle',
       reason: `MR bead ${mr.status} — cleanup`,
     });
   }

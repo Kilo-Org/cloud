@@ -21,8 +21,8 @@
     "**/dist/**",
     "**/.wrangler/**",
     "supabase/functions/**",
-    "**/types/opencode.gen.ts",
-    "**/gastown/types/**"
+    "src/types/opencode.gen.ts",
+    "src/lib/gastown/types/**"
   ],
   "rules": {
     "constructor-super": "off",
@@ -161,7 +161,13 @@
       }
     },
     {
-      "files": ["services/**/*.ts", "packages/**/*.ts"],
+      "files": [
+        "cloud-agent/**/*.ts",
+        "cloud-agent-next/**/*.ts",
+        "cloudflare-*/**/*.ts",
+        "kiloclaw/**/*.ts",
+        "packages/**/*.ts"
+      ],
       "rules": {
         "@typescript-eslint/no-empty-object-type": "error",
         "@typescript-eslint/await-thenable": "error",
@@ -185,21 +191,14 @@
     },
     {
       "files": [
-        "services/cloud-agent/src/session/queries/*.ts",
-        "services/cloud-agent-next/src/session/queries/*.ts",
-        "services/gastown/**/*.ts",
-        "services/webhook-agent-ingest/**/*.ts",
-        "services/kiloclaw/**/*.ts"
+        "cloud-agent/src/session/queries/*.ts",
+        "cloud-agent-next/src/session/queries/*.ts",
+        "cloudflare-gastown/**/*.ts",
+        "cloudflare-webhook-agent-ingest/**/*.ts",
+        "kiloclaw/**/*.ts"
       ],
       "rules": {
         "@typescript-eslint/restrict-template-expressions": "off"
-      }
-    },
-    {
-      "files": ["services/gmail-push/**/*.ts"],
-      "rules": {
-        "@typescript-eslint/no-unsafe-call": "off",
-        "@typescript-eslint/no-unsafe-member-access": "off"
       }
     }
   ]

@@ -32,9 +32,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
@@ -46,29 +43,28 @@ jobs:
         with:
           filters: |
             kilocode_backend:
-              - 'apps/web/src/**'
-              - 'apps/web/package.json'
-              - 'apps/web/tsconfig.json'
-              - 'apps/web/tsconfig.*.json'
-              - 'apps/web/next.config.mjs'
-              - 'apps/web/jest.config.ts'
-              - 'apps/web/postcss.config.mjs'
-              - 'apps/web/sentry.*'
+              - 'src/**'
               - 'packages/db/**'
               - 'packages/encryption/**'
               - 'packages/trpc/**'
               - 'packages/worker-utils/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
+              - 'tsconfig.json'
+              - 'tsconfig.*.json'
+              - 'next.config.mjs'
+              - 'jest.config.ts'
+              - 'postcss.config.mjs'
+              - 'sentry.*'
             cloud_agent:
-              - 'services/cloud-agent/**'
+              - 'cloud-agent/**'
             cloud_agent_next:
-              - 'services/cloud-agent-next/**'
+              - 'cloud-agent-next/**'
 
       - name: Detect changed workspaces with tests
         id: workspaces
         run: |
-          matrix=$(scripts/changed-workspaces.sh --exclude services/cloud-agent --exclude services/cloud-agent-next --exclude apps/web)
+          matrix=$(scripts/changed-workspaces.sh --exclude cloud-agent --exclude cloud-agent-next)
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   typecheck:
@@ -252,13 +248,12 @@ jobs:
         with:
           path: |
             ~/.npm
-            ${{ github.workspace }}/apps/web/.next/cache
+            ${{ github.workspace }}/.next/cache
           key: ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
 
       - name: Setup Vercel ENV
-        working-directory: apps/web
         run: |
           pnpm install --global vercel@latest
           vercel link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
@@ -299,7 +294,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build wrapper bundle
-        working-directory: services/cloud-agent/wrapper
+        working-directory: cloud-agent/wrapper
         run: bun run build.ts
 
       - name: Run cloud-agent tests
@@ -334,7 +329,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build wrapper bundle
-        working-directory: services/cloud-agent-next/wrapper
+        working-directory: cloud-agent-next/wrapper
         run: bun run build.ts
 
       - name: Run cloud-agent-next tests

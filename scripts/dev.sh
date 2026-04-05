@@ -29,9 +29,8 @@ PORT=$(node -e "
   tryPort(${TARGET_PORT}, 10).then(p => console.log(p));
 ")
 
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-echo "$PORT" > "$REPO_ROOT/.dev-port"
-echo "Dev server starting on port $PORT (written to $REPO_ROOT/.dev-port)"
+echo "$PORT" > .dev-port
+echo "Dev server starting on port $PORT (written to .dev-port)"
 
 export PORT
 export NEXTAUTH_URL="${NEXTAUTH_URL:-${APP_URL_OVERRIDE:-http://localhost:$PORT}}"

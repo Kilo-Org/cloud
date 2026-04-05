@@ -1160,12 +1160,12 @@ export function reconcileReviewQueue(
     }
   }
 
-  // When refinery code review is disabled, transition ALL open MR beads
-  // to in_progress (skipping the refinery entirely). For beads with pr_url,
-  // poll_pr will handle auto-merge. For beads without pr_url (polecat failed
-  // to create PR), the orphan timeout will catch them.
+  // When refinery code review is disabled, fast-track open MR beads that
+  // have a pr_url to in_progress so poll_pr handles them. MR beads without
+  // pr_url (direct merge strategy) still need the refinery for the merge
+  // operation itself — Rules 5-6 handle those.
   if (!refineryCodeReview) {
-    const openMrs = z
+    const openMrsWithPr = z
       .object({ bead_id: z.string() })
       .array()
       .parse([
@@ -1174,13 +1174,16 @@ export function reconcileReviewQueue(
           /* sql */ `
             SELECT b.${beads.columns.bead_id}
             FROM ${beads} b
+            INNER JOIN ${review_metadata} rm
+              ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
             WHERE b.${beads.columns.type} = 'merge_request'
               AND b.${beads.columns.status} = 'open'
+              AND rm.${review_metadata.columns.pr_url} IS NOT NULL
           `,
           []
         ),
       ]);
-    for (const { bead_id } of openMrs) {
+    for (const { bead_id } of openMrsWithPr) {
       actions.push({
         type: 'transition_bead',
         bead_id,
@@ -1192,9 +1195,12 @@ export function reconcileReviewQueue(
     }
   }
 
-  if (!refineryCodeReview) {
-    // Skip refinery dispatch entirely — Rules 5-6 not needed
-  } else {
+  // Rules 5-6: Refinery dispatch for open MR beads.
+  // Always runs for direct-merge MR beads (refinery performs the merge).
+  // When code_review=false AND merge_strategy=pr, MR beads with pr_url
+  // were fast-tracked above, so only direct-merge MR beads remain for
+  // Rules 5-6.
+  {
     // Rule 5: Pop open MR bead for idle refinery
     // Get all rigs that have open MR beads
     const rigsWithOpenMrs = z

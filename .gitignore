@@ -83,9 +83,6 @@ TMP_CI_commit_msg.txt
 # Generated screenshot stories
 /storybook/stories/generated/
 /storybook/public/screenshots/
-
-# Ephemeral PR-scoped stories (not committed, local preview only)
-/storybook/stories/_pr/
 run-milvus-test.sh
 
 # Cloudflare

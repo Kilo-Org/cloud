@@ -1,5 +1,4 @@
 packages:
-  - banner-showcase
   - packages/db
   - packages/worker-utils
   - packages/encryption

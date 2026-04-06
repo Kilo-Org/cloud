@@ -13,7 +13,7 @@ import {
   resolveRegions,
   evictCapacityRegionFromKV,
 } from '../regions';
-import { guestFromSize, volumeNameFromSandboxId } from '../machine-config';
+import { guestFromSize, volumeNameFromSandboxId, METADATA_KEY_SANDBOX_ID } from '../machine-config';
 import type { InstanceMutableState } from './types';
 import { storageUpdate } from './state';
 import { reconcileLog, doError, doWarn, toLoggable } from './log';
@@ -261,6 +261,64 @@ export async function createNewMachine(
 
   await fly.waitForState(flyConfig, machine.id, 'started', STARTUP_TIMEOUT_SECONDS);
   console.log('[DO] Machine started');
+}
+
+/**
+ * Delete a volume, force-destroying any attached machine first.
+ */
+export async function deleteVolumeAndAttachedMachine(
+  flyConfig: FlyClientConfig,
+  volumeId: string,
+  reason: string,
+  expectedSandboxId?: string
+): Promise<void> {
+  let attachedMachineId: string | null = null;
+
+  try {
+    const volume = await fly.getVolume(flyConfig, volumeId);
+    attachedMachineId = volume.attached_machine_id;
+  } catch (err) {
+    if (fly.isFlyNotFound(err)) return;
+    throw err;
+  }
+
+  if (attachedMachineId) {
+    if (expectedSandboxId) {
+      try {
+        const attachedMachine = await fly.getMachine(flyConfig, attachedMachineId);
+        const attachedSandboxId = attachedMachine.config.metadata?.[METADATA_KEY_SANDBOX_ID];
+        if (attachedSandboxId !== expectedSandboxId) {
+          throw new Error(
+            `Refusing to destroy attached machine ${attachedMachineId} for volume ${volumeId}: expected sandbox ${expectedSandboxId}, found ${attachedSandboxId ?? 'unknown'}`
+          );
+        }
+      } catch (err) {
+        if (!fly.isFlyNotFound(err)) throw err;
+      }
+    }
+
+    try {
+      await fly.destroyMachine(flyConfig, attachedMachineId, true);
+      reconcileLog(reason, 'destroy_machine_for_volume_cleanup', {
+        fly_app_name: flyConfig.appName,
+        machine_id: attachedMachineId,
+        volume_id: volumeId,
+      });
+    } catch (err) {
+      if (!fly.isFlyNotFound(err)) throw err;
+    }
+  }
+
+  try {
+    await fly.deleteVolume(flyConfig, volumeId);
+    reconcileLog(reason, 'delete_volume', {
+      fly_app_name: flyConfig.appName,
+      volume_id: volumeId,
+    });
+  } catch (err) {
+    if (fly.isFlyNotFound(err)) return;
+    throw err;
+  }
 }
 
 /**

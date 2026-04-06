@@ -119,6 +119,7 @@ import {
   SELF_HEAL_THRESHOLD,
   STARTING_TIMEOUT_MS,
   RESTARTING_TIMEOUT_MS,
+  RECOVERING_TIMEOUT_MS,
   STALE_PROVISION_THRESHOLD_MS,
 } from '../config';
 
@@ -309,6 +310,18 @@ async function seedRestarting(
     status: 'restarting',
     flyMachineId: 'machine-1',
     restartingAt: Date.now(),
+    ...overrides,
+  });
+}
+
+async function seedRecovering(
+  storage: ReturnType<typeof createFakeStorage>,
+  overrides: Record<string, unknown> = {}
+) {
+  await seedProvisioned(storage, {
+    status: 'recovering',
+    flyMachineId: null,
+    recoveryStartedAt: Date.now(),
     ...overrides,
   });
 }
@@ -778,7 +791,7 @@ describe('destroy error tracking', () => {
 });
 
 describe('reconciliation: machine status sync', () => {
-  it('syncs DO status from running to stopped after threshold failures', async () => {
+  it('transitions running to recovering after threshold failures and launches recovery once', async () => {
     const { storage } = createInstance();
     await seedRunning(storage);
 
@@ -788,12 +801,56 @@ describe('reconciliation: machine status sync', () => {
 
     // Need SELF_HEAL_THRESHOLD consecutive alarms
     for (let i = 0; i < SELF_HEAL_THRESHOLD; i++) {
-      const { instance: inst } = createInstance(storage);
+      const { instance: inst, waitUntilPromises } = createInstance(storage);
       await inst.alarm();
+      if (i === SELF_HEAL_THRESHOLD - 1) {
+        expect(waitUntilPromises).toHaveLength(1);
+      }
     }
 
-    expect(storage._store.get('status')).toBe('stopped');
+    expect(storage._store.get('status')).toBe('recovering');
     expect(storage._store.get('healthCheckFailCount')).toBe(0);
+    expect(storage._store.get('recoveryStartedAt')).not.toBeNull();
+  });
+
+  it("does not trigger unexpected-stop recovery when Fly reports 'created'", async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'created', config: {} });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.alarm();
+
+    expect(waitUntilPromises).toHaveLength(0);
+    expect(storage._store.get('status')).toBe('running');
+    expect(storage._store.get('healthCheckFailCount')).toBe(0);
+    expect(storage._store.get('recoveryStartedAt')).toBeUndefined();
+  });
+
+  it('does not relaunch automatic recovery on subsequent alarms while already recovering', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRecovering(storage, {
+      flyMachineId: 'machine-new',
+    });
+
+    await instance.alarm();
+
+    expect(waitUntilPromises).toHaveLength(0);
+  });
+
+  it('does not clean up a pending recovery volume while recovery is still in progress', async () => {
+    const { instance, storage } = createInstance();
+    await seedRecovering(storage, {
+      pendingRecoveryVolumeId: 'vol-recovery',
+      recoveryStartedAt: Date.now(),
+    });
+
+    await instance.alarm();
+
+    expect(flyClient.getVolume).not.toHaveBeenCalledWith(expect.anything(), 'vol-recovery');
+    expect(flyClient.deleteVolume).not.toHaveBeenCalledWith(expect.anything(), 'vol-recovery');
+    expect(storage._store.get('pendingRecoveryVolumeId')).toBe('vol-recovery');
   });
 
   it('resets fail count when machine is healthy', async () => {
@@ -809,6 +866,447 @@ describe('reconciliation: machine status sync', () => {
     await instance.alarm();
 
     expect(storage._store.get('healthCheckFailCount')).toBe(0);
+  });
+});
+
+describe('unexpected stop recovery', () => {
+  it('relocates to a different region, preserves the old volume when snapshots exist, and returns to running', async () => {
+    const env = createFakeEnv();
+    env.FLY_REGION = 'iad,ord,cdg';
+    const { storage } = createInstance(undefined, env);
+    await seedRunning(storage);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopped', config: {} });
+    (flyClient.getVolume as Mock).mockImplementation(async (_config: unknown, volumeId: string) => {
+      if (volumeId === 'vol-1') {
+        return {
+          id: 'vol-1',
+          name: 'sandbox-1',
+          state: 'detached',
+          size_gb: 10,
+          region: 'iad',
+          attached_machine_id: null,
+          created_at: new Date().toISOString(),
+        };
+      }
+      if (volumeId === 'vol-recovery') {
+        return {
+          id: 'vol-recovery',
+          name: 'sandbox-1',
+          state: 'detached',
+          size_gb: 10,
+          region: 'ord',
+          attached_machine_id: null,
+          created_at: new Date().toISOString(),
+        };
+      }
+      throw new Error(`unexpected volume lookup ${volumeId}`);
+    });
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-recovery',
+      region: 'ord',
+    });
+    (flyClient.createMachine as Mock).mockResolvedValue({
+      id: 'machine-recovery',
+      region: 'ord',
+    });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.listVolumeSnapshots as Mock).mockResolvedValue([
+      { id: 'snap-1', created_at: new Date().toISOString() },
+    ]);
+
+    let finalWaitUntilPromises: Promise<unknown>[] = [];
+    for (let i = 0; i < SELF_HEAL_THRESHOLD; i++) {
+      const { instance, waitUntilPromises } = createInstance(storage, env);
+      await instance.alarm();
+      finalWaitUntilPromises = waitUntilPromises;
+    }
+
+    await Promise.all(finalWaitUntilPromises);
+
+    expect((flyClient.createVolumeWithFallback as Mock).mock.calls[0][2]).toEqual(
+      expect.arrayContaining(['ord', 'cdg'])
+    );
+    expect((flyClient.createVolumeWithFallback as Mock).mock.calls[0][2]).not.toContain('iad');
+    expect(storage._store.get('status')).toBe('running');
+    expect(storage._store.get('flyMachineId')).toBe('machine-recovery');
+    expect(storage._store.get('flyVolumeId')).toBe('vol-recovery');
+    expect(storage._store.get('flyRegion')).toBe('ord');
+    expect(storage._store.get('pendingRecoveryVolumeId')).toBeNull();
+    expect(storage._store.get('recoveryPreviousVolumeId')).toBe('vol-1');
+    expect(storage._store.get('recoveryPreviousVolumeCleanupAfter')).toBeGreaterThan(Date.now());
+    expect(flyClient.deleteVolume).not.toHaveBeenCalledWith(expect.anything(), 'vol-1');
+  });
+
+  it('hands off to recovering reconcile when replacement machine startup times out', async () => {
+    const { instance, storage } = createInstance();
+    await seedRecovering(storage, {
+      flyMachineId: 'machine-old',
+      flyVolumeId: 'vol-1',
+      flyRegion: 'iad',
+    });
+
+    (flyClient.getVolume as Mock).mockImplementation(async (_config: unknown, volumeId: string) => {
+      if (volumeId === 'vol-1') {
+        return {
+          id: 'vol-1',
+          name: 'sandbox-1',
+          state: 'detached',
+          size_gb: 10,
+          region: 'iad',
+          attached_machine_id: null,
+          created_at: new Date().toISOString(),
+        };
+      }
+      if (volumeId === 'vol-recovery') {
+        return {
+          id: 'vol-recovery',
+          name: 'sandbox-1',
+          state: 'detached',
+          size_gb: 10,
+          region: 'ord',
+          attached_machine_id: null,
+          created_at: new Date().toISOString(),
+        };
+      }
+      throw new Error(`unexpected volume lookup ${volumeId}`);
+    });
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-recovery',
+      region: 'ord',
+    });
+    (flyClient.createMachine as Mock).mockResolvedValue({
+      id: 'machine-recovery',
+      region: 'ord',
+    });
+    (flyClient.waitForState as Mock).mockRejectedValue(
+      new FlyApiError(
+        'Fly API waitForState(started) failed (408): {"error":"deadline_exceeded"}',
+        408,
+        '{"error":"deadline_exceeded"}'
+      )
+    );
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+
+    await (
+      instance as unknown as { recoverUnexpectedStopInBackground: () => Promise<void> }
+    ).recoverUnexpectedStopInBackground();
+
+    expect(storage._store.get('status')).toBe('recovering');
+    expect(storage._store.get('flyMachineId')).toBe('machine-recovery');
+    expect(storage._store.get('flyVolumeId')).toBe('vol-1');
+    expect(storage._store.get('pendingRecoveryVolumeId')).toBe('vol-recovery');
+    expect(storage._store.get('lastRecoveryErrorMessage')).toBeUndefined();
+    expect(flyClient.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('stays recovering when reconcile sees the replacement machine still in created state', async () => {
+    const { instance, storage } = createInstance();
+    await seedRecovering(storage, {
+      flyMachineId: 'machine-recovery',
+      flyVolumeId: 'vol-1',
+      pendingRecoveryVolumeId: 'vol-recovery',
+      recoveryStartedAt: Date.now(),
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'created', config: {} });
+
+    await instance.alarm();
+
+    expect(storage._store.get('status')).toBe('recovering');
+    expect(storage._store.get('pendingRecoveryVolumeId')).toBe('vol-recovery');
+    expect(flyClient.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('completes recovery from alarm reconcile once the replacement machine reaches started', async () => {
+    const { instance, storage } = createInstance();
+    await seedRecovering(storage, {
+      flyMachineId: 'machine-recovery',
+      flyVolumeId: 'vol-1',
+      pendingRecoveryVolumeId: 'vol-recovery',
+      recoveryStartedAt: Date.now(),
+      flyRegion: 'iad',
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'started', config: {} });
+    (flyClient.getVolume as Mock).mockImplementation(async (_config: unknown, volumeId: string) => {
+      if (volumeId === 'vol-recovery') {
+        return {
+          id: 'vol-recovery',
+          name: 'sandbox-1',
+          state: 'detached',
+          size_gb: 10,
+          region: 'ord',
+          attached_machine_id: null,
+          created_at: new Date().toISOString(),
+        };
+      }
+      if (volumeId === 'vol-1') {
+        return {
+          id: 'vol-1',
+          name: 'sandbox-1',
+          state: 'detached',
+          size_gb: 10,
+          region: 'iad',
+          attached_machine_id: null,
+          created_at: new Date().toISOString(),
+        };
+      }
+      throw new Error(`unexpected volume lookup ${volumeId}`);
+    });
+    (flyClient.listVolumeSnapshots as Mock).mockResolvedValue([]);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    await instance.alarm();
+
+    expect(storage._store.get('status')).toBe('running');
+    expect(storage._store.get('flyMachineId')).toBe('machine-recovery');
+    expect(storage._store.get('flyVolumeId')).toBe('vol-recovery');
+    expect(storage._store.get('flyRegion')).toBe('ord');
+    expect(storage._store.get('pendingRecoveryVolumeId')).toBeNull();
+    expect(storage._store.get('recoveryPreviousVolumeId')).toBeNull();
+    expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-1');
+  });
+
+  it('fails recovery through shared cleanup when reconcile sees the replacement machine is gone', async () => {
+    const { instance, storage } = createInstance();
+    await seedRecovering(storage, {
+      flyMachineId: 'machine-recovery',
+      flyVolumeId: 'vol-1',
+      pendingRecoveryVolumeId: 'vol-recovery',
+      recoveryStartedAt: Date.now(),
+    });
+
+    (flyClient.getMachine as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-recovery',
+      name: 'sandbox-1',
+      state: 'detached',
+      size_gb: 10,
+      region: 'ord',
+      attached_machine_id: null,
+      created_at: new Date().toISOString(),
+    });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    await instance.alarm();
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(storage._store.get('pendingRecoveryVolumeId')).toBeNull();
+    expect(storage._store.get('lastRecoveryErrorMessage')).toBe(
+      'unexpected stop recovery replacement machine disappeared'
+    );
+    expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-recovery');
+  });
+
+  it('deletes the old volume immediately when it has no snapshots, force-destroying any attached machine first', async () => {
+    const { instance, storage } = createInstance();
+    await seedRecovering(storage, {
+      flyMachineId: 'machine-1',
+      flyVolumeId: 'vol-1',
+      flyRegion: 'iad',
+    });
+
+    (flyClient.getVolume as Mock).mockImplementation(async (_config: unknown, volumeId: string) => {
+      if (volumeId === 'vol-1') {
+        return {
+          id: 'vol-1',
+          name: 'sandbox-1',
+          state: 'attached',
+          size_gb: 10,
+          region: 'iad',
+          attached_machine_id: 'machine-attached',
+          created_at: new Date().toISOString(),
+        };
+      }
+      if (volumeId === 'vol-recovery') {
+        return {
+          id: 'vol-recovery',
+          name: 'sandbox-1',
+          state: 'detached',
+          size_gb: 10,
+          region: 'ord',
+          attached_machine_id: null,
+          created_at: new Date().toISOString(),
+        };
+      }
+      throw new Error(`unexpected volume lookup ${volumeId}`);
+    });
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-recovery',
+      region: 'ord',
+    });
+    (flyClient.createMachine as Mock).mockResolvedValue({
+      id: 'machine-recovery',
+      region: 'ord',
+    });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      config: { metadata: { kiloclaw_sandbox_id: 'sandbox-1' } },
+    });
+    (flyClient.listVolumeSnapshots as Mock).mockResolvedValue([]);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    await (
+      instance as unknown as { recoverUnexpectedStopInBackground: () => Promise<void> }
+    ).recoverUnexpectedStopInBackground();
+
+    expect(flyClient.destroyMachine).toHaveBeenCalledWith(expect.anything(), 'machine-1', true);
+    expect(flyClient.destroyMachine).toHaveBeenCalledWith(
+      expect.anything(),
+      'machine-attached',
+      true
+    );
+    expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-1');
+    expect(storage._store.get('status')).toBe('running');
+    expect(storage._store.get('recoveryPreviousVolumeId')).toBeNull();
+    expect(storage._store.get('recoveryPreviousVolumeCleanupAfter')).toBeNull();
+  });
+
+  it('cleans up retained recovery volumes after the TTL, force-destroying any attached machine first', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      flyMachineId: null,
+      flyVolumeId: 'vol-current',
+      recoveryPreviousVolumeId: 'vol-old',
+      recoveryPreviousVolumeCleanupAfter: Date.now() - 1_000,
+    });
+
+    (flyClient.getVolume as Mock).mockImplementation(async (_config: unknown, volumeId: string) => {
+      if (volumeId === 'vol-old') {
+        return {
+          id: 'vol-old',
+          name: 'sandbox-1',
+          state: 'attached',
+          size_gb: 10,
+          region: 'iad',
+          attached_machine_id: 'machine-old',
+          created_at: new Date().toISOString(),
+        };
+      }
+      return {
+        id: 'vol-current',
+        name: 'sandbox-1',
+        state: 'detached',
+        size_gb: 10,
+        region: 'iad',
+        attached_machine_id: null,
+        created_at: new Date().toISOString(),
+      };
+    });
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      config: { metadata: { kiloclaw_sandbox_id: 'sandbox-1' } },
+    });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    await instance.alarm();
+
+    expect(flyClient.destroyMachine).toHaveBeenCalledWith(expect.anything(), 'machine-old', true);
+    expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-old');
+    expect(storage._store.get('recoveryPreviousVolumeId')).toBeNull();
+    expect(storage._store.get('recoveryPreviousVolumeCleanupAfter')).toBeNull();
+  });
+
+  it('allows admin cleanup of a retained recovery volume and clears the retention fields', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'running',
+      recoveryPreviousVolumeId: 'vol-old',
+      recoveryPreviousVolumeCleanupAfter: Date.now() + 60_000,
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-old',
+      name: 'sandbox-1',
+      state: 'attached',
+      size_gb: 10,
+      region: 'iad',
+      attached_machine_id: 'machine-old',
+      created_at: new Date().toISOString(),
+    });
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      config: { metadata: { kiloclaw_sandbox_id: 'sandbox-1' } },
+    });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    const result = await instance.cleanupRecoveryPreviousVolume();
+
+    expect(result).toEqual({ ok: true, deletedVolumeId: 'vol-old' });
+    expect(flyClient.destroyMachine).toHaveBeenCalledWith(expect.anything(), 'machine-old', true);
+    expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-old');
+    expect(storage._store.get('recoveryPreviousVolumeId')).toBeNull();
+    expect(storage._store.get('recoveryPreviousVolumeCleanupAfter')).toBeNull();
+  });
+
+  it('times out recovering instances through the shared failure cleanup path', async () => {
+    const { instance, storage } = createInstance();
+    await seedRecovering(storage, {
+      flyMachineId: 'machine-recovery',
+      pendingRecoveryVolumeId: 'vol-recovery',
+      recoveryStartedAt: Date.now() - RECOVERING_TIMEOUT_MS - 1_000,
+    });
+
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-recovery',
+      name: 'sandbox-1',
+      state: 'detached',
+      size_gb: 10,
+      region: 'ord',
+      attached_machine_id: null,
+      created_at: new Date().toISOString(),
+    });
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    await instance.alarm();
+
+    expect(flyClient.destroyMachine).toHaveBeenCalledWith(
+      expect.anything(),
+      'machine-recovery',
+      true
+    );
+    expect(flyClient.deleteVolume).toHaveBeenCalledWith(expect.anything(), 'vol-recovery');
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(storage._store.get('pendingRecoveryVolumeId')).toBeNull();
+    expect(storage._store.get('lastRecoveryErrorMessage')).toBe(
+      'unexpected stop recovery timed out'
+    );
+  });
+
+  it('refuses retained volume cleanup when the attached machine belongs to a different sandbox', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'running',
+      recoveryPreviousVolumeId: 'vol-old',
+      recoveryPreviousVolumeCleanupAfter: Date.now() + 60_000,
+    });
+
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-old',
+      name: 'sandbox-1',
+      state: 'attached',
+      size_gb: 10,
+      region: 'iad',
+      attached_machine_id: 'machine-other',
+      created_at: new Date().toISOString(),
+    });
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      config: { metadata: { kiloclaw_sandbox_id: 'sandbox-other' } },
+    });
+
+    await expect(instance.cleanupRecoveryPreviousVolume()).rejects.toThrow(
+      'Refusing to destroy attached machine machine-other'
+    );
+    expect(flyClient.destroyMachine).not.toHaveBeenCalled();
+    expect(flyClient.deleteVolume).not.toHaveBeenCalled();
+    expect(storage._store.get('recoveryPreviousVolumeId')).toBe('vol-old');
+    expect(storage._store.get('recoveryPreviousVolumeCleanupAfter')).not.toBeNull();
   });
 });
 

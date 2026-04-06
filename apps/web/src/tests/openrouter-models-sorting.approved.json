@@ -631,7 +631,7 @@
       "hugging_face_id": "",
       "name": "Arcee AI: Trinity Large Thinking (free)",
       "created": 1756238927,
-      "description": "A powerful open source reasoning model from Arcee AI with strong performance in agentic workloads, complex reasoning, and multi-step planning. **Note:** For the free endpoint, all prompts and output are logged to improve the provider's model and its product and services. Please do not upload any personal, confidential, or otherwise sensitive information.",
+      "description": "A powerful open source reasoning model from Arcee AI. Strong performance in multi-turn tool use, context coherence, and instruction following across long-horizon agent runs in tools like OpenClaw and KiloClaw. **Note:** For the free endpoint, all prompts and output are logged to improve the provider's model and its product and services. Please do not upload any personal, confidential, or otherwise sensitive information.",
       "context_length": 262144,
       "architecture": {
         "modality": "text->text",

@@ -22,6 +22,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
+    "typeRoots": ["./node_modules/@types"],
     "plugins": [
       {
         "name": "next"

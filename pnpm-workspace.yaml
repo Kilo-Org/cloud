@@ -4,6 +4,7 @@ packages:
   - services/cloud-agent/wrapper
   - services/cloud-agent-next/wrapper
   - services/gastown/container
+  - services/wasteland/container/control-server
   - services/deploy-infra/builder
   - services/deploy-infra/dispatcher
   - packages/*

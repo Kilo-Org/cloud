@@ -118,6 +118,12 @@ import {
   handleMayorUiAction,
   handleMayorGetPendingNudges,
 } from './handlers/mayor-tools.handler';
+import {
+  handleWastelandBrowse,
+  handleWastelandClaim,
+  handleWastelandPost,
+  handleWastelandDone,
+} from './handlers/wasteland-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { townAuthMiddleware } from './middleware/town-auth.middleware';
 import { orgAuthMiddleware } from './middleware/org-auth.middleware';
@@ -949,6 +955,30 @@ app.post('/api/mayor/:townId/tools/escalations/:escalationId/acknowledge', c =>
 );
 app.post('/api/mayor/:townId/tools/convoys/:convoyId/start', c =>
   handleMayorConvoyStart(c, c.req.param())
+);
+
+// ── Wasteland Tools ──────────────────────────────────────────────────────
+// Mayor tools for interacting with hosted Wastelands. Auth is handled by
+// the `/api/mayor/:townId/tools/*` wildcard middleware above.
+app.get('/api/mayor/:townId/tools/wasteland/:wastelandId/browse', c =>
+  instrumented(c, 'GET /api/mayor/:townId/tools/wasteland/:wastelandId/browse', () =>
+    handleWastelandBrowse(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/:wastelandId/claim', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/:wastelandId/claim', () =>
+    handleWastelandClaim(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/:wastelandId/post', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/:wastelandId/post', () =>
+    handleWastelandPost(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/:wastelandId/done', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/:wastelandId/done', () =>
+    handleWastelandDone(c, c.req.param())
+  )
 );
 // ── tRPC ────────────────────────────────────────────────────────────────
 // Serve the gastown tRPC router directly. The frontend tRPC client

@@ -60,6 +60,7 @@ declare namespace Cloudflare {
 		CF_VERSION_METADATA?: WorkerVersionMetadata;
 		SENTRY_DSN?: string; // worker secret
 		SENTRY_RELEASE?: string; // deploy-time --var
+		GITHUB_OAUTH_CLIENT_ID?: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

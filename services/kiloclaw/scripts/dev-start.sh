@@ -183,41 +183,6 @@ if [ ! -f "$KILOCLAW_DIR/.dev.vars" ]; then
   cp "$KILOCLAW_DIR/.dev.vars.example" "$KILOCLAW_DIR/.dev.vars"
 fi
 
-DEV_VARS_FILE="$KILOCLAW_DIR/.dev.vars"
-DEV_VARS_TEMPLATE="$KILOCLAW_DIR/.dev.vars.example"
-
-# Set or update a key=value pair in .dev.vars (simple single-line values only).
-set_dev_var() {
-  local key="$1" value="$2"
-  if grep -q "^${key}=" "$DEV_VARS_FILE"; then
-    sed "s|^${key}=.*|${key}=${value}|" "$DEV_VARS_FILE" > "$DEV_VARS_FILE.tmp"
-    mv "$DEV_VARS_FILE.tmp" "$DEV_VARS_FILE"
-  else
-    echo "${key}=${value}" >> "$DEV_VARS_FILE"
-  fi
-}
-
-# Back-fill any keys present in .dev.vars.example but missing from .dev.vars.
-# This keeps .dev.vars up-to-date when new variables are added to the template
-# without overwriting values the developer has already customised.
-backfill_dev_vars_from_example() {
-  if [ ! -f "$DEV_VARS_TEMPLATE" ]; then
-    return
-  fi
-  while IFS='=' read -r key _value; do
-    # Skip blank lines and comments
-    case "$key" in
-      ''|\#*) continue ;;
-    esac
-    if ! grep -q "^${key}=" "$DEV_VARS_FILE"; then
-      echo "    Adding missing key from template: $key"
-      grep "^${key}=" "$DEV_VARS_TEMPLATE" >> "$DEV_VARS_FILE"
-    fi
-  done < "$DEV_VARS_TEMPLATE"
-}
-
-backfill_dev_vars_from_example
-
 # ---------- Link & pull dev environment from Vercel ----------
 
 if [ ! -d "$MONOREPO_ROOT/.vercel" ] || [ ! -f "$MONOREPO_ROOT/.vercel/project.json" ]; then
@@ -468,14 +433,6 @@ compute_image_hash() {
 CURRENT_IMAGE_HASH="$(compute_image_hash)"
 STORED_IMAGE_HASH="$(grep '^FLY_IMAGE_CONTENT_HASH=' "$KILOCLAW_DIR/.dev.vars" \
   | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//' || true)"
-
-if [ -z "$STORED_IMAGE_HASH" ]; then
-  echo "==> No FLY_IMAGE_CONTENT_HASH found in .dev.vars."
-  echo "    Seeding current hash to avoid an accidental image push."
-  echo "    Pass --has-controller-changes or run ./scripts/push-dev.sh to force a rebuild."
-  set_dev_var FLY_IMAGE_CONTENT_HASH "$CURRENT_IMAGE_HASH"
-  STORED_IMAGE_HASH="$CURRENT_IMAGE_HASH"
-fi
 
 if [ "$CURRENT_IMAGE_HASH" != "$STORED_IMAGE_HASH" ]; then
   if [ "$HAS_CONTROLLER_CHANGES" = false ]; then

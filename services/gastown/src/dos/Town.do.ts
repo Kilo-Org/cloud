@@ -1414,6 +1414,45 @@ export class TownDO extends DurableObject<Env> {
     );
   }
 
+  /** Test-only: backdate a bead's updated_at timestamp. */
+  async updateBeadTimestamp(beadId: string, timestamp: string): Promise<void> {
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${beads}
+        SET ${beads.columns.updated_at} = ?
+        WHERE ${beads.bead_id} = ?
+      `,
+      [timestamp, beadId]
+    );
+  }
+
+  /** Test-only: set dispatch_attempts and last_dispatch_attempt_at on a bead. */
+  async setBeadDispatchAttempts(
+    beadId: string,
+    attempts: number,
+    lastDispatchAttemptAt?: string
+  ): Promise<void> {
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${beads}
+        SET ${beads.columns.dispatch_attempts} = ?,
+            ${beads.columns.last_dispatch_attempt_at} = COALESCE(?, ${beads.columns.last_dispatch_attempt_at})
+        WHERE ${beads.bead_id} = ?
+      `,
+      [attempts, lastDispatchAttemptAt ?? null, beadId]
+    );
+  }
+
+  /** Test-only: insert a raw event (for testing idempotency). */
+  async insertEventForTest(
+    eventType: string,
+    params?: { agent_id?: string; bead_id?: string; payload?: Record<string, unknown> }
+  ): Promise<string> {
+    return events.insertEvent(this.sql, eventType as Parameters<typeof events.insertEvent>[1], params ?? {});
+  }
+
   // ══════════════════════════════════════════════════════════════════
   // Mail
   // ══════════════════════════════════════════════════════════════════

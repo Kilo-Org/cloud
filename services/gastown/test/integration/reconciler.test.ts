@@ -446,6 +446,443 @@ describe('Reconciler', () => {
     });
   });
 
+  // ── T1: Circuit breaker ────────────────────────────────────────────
+
+  describe('T1: circuit breaker', () => {
+    it('should allow dispatch when failure count is below threshold', async () => {
+      const result = await town.slingConvoy({
+        rigId: 'rig-1',
+        convoyTitle: 'CB below threshold',
+        tasks: [{ title: 'Should dispatch' }],
+      });
+
+      await runDurableObjectAlarm(town);
+
+      const bead = await town.getBeadAsync(result.beads[0].bead.bead_id);
+      expect(bead?.assignee_agent_bead_id).toBeTruthy();
+    });
+
+    it('should block dispatch and notify mayor when threshold is reached', async () => {
+      const failures: string[] = [];
+
+      for (let i = 0; i < 20; i++) {
+        const bead = await town.createBead({
+          type: 'issue',
+          title: `Failure bead ${i}`,
+          rig_id: 'rig-1',
+        });
+
+        await town.setBeadDispatchAttempts(bead.bead_id, 1, new Date().toISOString());
+
+        failures.push(bead.bead_id);
+      }
+
+      await runDurableObjectAlarm(town);
+
+      for (const beadId of failures) {
+        const bead = await town.getBeadAsync(beadId);
+        expect(bead?.assignee_agent_bead_id).toBeNull();
+      }
+    });
+
+    it('should reset and allow dispatch after window expires', async () => {
+      const bead = await town.createBead({
+        type: 'issue',
+        title: 'Post-window bead',
+        rig_id: 'rig-1',
+      });
+
+      const pastWindow = new Date(Date.now() - 35 * 60 * 1000).toISOString();
+      await town.setBeadDispatchAttempts(bead.bead_id, 1, pastWindow);
+
+      await runDurableObjectAlarm(town);
+
+      const updated = await town.getBeadAsync(bead.bead_id);
+      expect(updated?.assignee_agent_bead_id).toBeTruthy();
+    });
+  });
+
+  // ── T2: GUPP thresholds ─────────────────────────────────────────────
+
+  describe('T2: GUPP escalation thresholds', () => {
+    it('should warn at 15min idle with no tool activity', async () => {
+      const agent = await town.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `gupp-warn-${townName}`,
+        rig_id: 'rig-1',
+      });
+      const bead = await town.createBead({
+        type: 'issue',
+        title: 'GUPP warn test',
+        rig_id: 'rig-1',
+      });
+
+      await town.hookBead(agent.id, bead.bead_id);
+      await town.updateAgentStatus(agent.id, 'working');
+
+      const warnTimestamp = new Date(Date.now() - 16 * 60_000).toISOString();
+      await town.touchAgentHeartbeat(agent.id, {
+        lastEventType: 'tool_use',
+        lastEventAt: warnTimestamp,
+        activeTools: [],
+      });
+
+      await runDurableObjectAlarm(town);
+
+      const nudges = await town.getPendingNudges(agent.id);
+      expect(nudges.some(n => n.source === 'reconciler:warn')).toBe(true);
+    });
+
+    it('should escalate at 1hr and create triage request', async () => {
+      const agent = await town.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `gupp-escalate-${townName}`,
+        rig_id: 'rig-1',
+      });
+      const bead = await town.createBead({
+        type: 'issue',
+        title: 'GUPP escalate test',
+        rig_id: 'rig-1',
+      });
+
+      await town.hookBead(agent.id, bead.bead_id);
+      await town.updateAgentStatus(agent.id, 'working');
+
+      const escalateTimestamp = new Date(Date.now() - 65 * 60_000).toISOString();
+      await town.touchAgentHeartbeat(agent.id, {
+        lastEventType: 'tool_use',
+        lastEventAt: escalateTimestamp,
+        activeTools: [],
+      });
+
+      await runDurableObjectAlarm(town);
+
+      const nudges = await town.getPendingNudges(agent.id);
+      expect(nudges.some(n => n.source === 'reconciler:escalate')).toBe(true);
+
+      const triageBeads = await town.listBeads({ type: 'issue' });
+      const triage = triageBeads.find(b => b.labels?.includes('gt:triage-request'));
+      expect(triage).toBeTruthy();
+    });
+
+    it('should force-stop at 2hr and create triage request', async () => {
+      const agent = await town.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `gupp-force-stop-${townName}`,
+        rig_id: 'rig-1',
+      });
+      const bead = await town.createBead({
+        type: 'issue',
+        title: 'GUPP force stop test',
+        rig_id: 'rig-1',
+      });
+
+      await town.hookBead(agent.id, bead.bead_id);
+      await town.updateAgentStatus(agent.id, 'working');
+
+      const forceStopTimestamp = new Date(Date.now() - 125 * 60_000).toISOString();
+      await town.touchAgentHeartbeat(agent.id, {
+        lastEventType: 'tool_use',
+        lastEventAt: forceStopTimestamp,
+        activeTools: [],
+      });
+
+      await runDurableObjectAlarm(town);
+
+      const agentAfter = await town.getAgentAsync(agent.id);
+      expect(agentAfter?.status).toBe('stalled');
+
+      const triageBeads = await town.listBeads({ type: 'issue' });
+      const triage = triageBeads.find(b => b.labels?.includes('gt:triage-request'));
+      expect(triage).toBeTruthy();
+    });
+
+    it('should skip GUPP when draining', async () => {
+      const agent = await town.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `gupp-drain-${townName}`,
+        rig_id: 'rig-1',
+      });
+      const bead = await town.createBead({
+        type: 'issue',
+        title: 'GUPP draining test',
+        rig_id: 'rig-1',
+      });
+
+      await town.hookBead(agent.id, bead.bead_id);
+      await town.updateAgentStatus(agent.id, 'working');
+
+      const staleTimestamp = new Date(Date.now() - 65 * 60_000).toISOString();
+      await town.touchAgentHeartbeat(agent.id, {
+        lastEventType: 'tool_use',
+        lastEventAt: staleTimestamp,
+        activeTools: [],
+      });
+
+      const nonce = await town.recordContainerEviction();
+
+      await runDurableObjectAlarm(town);
+
+      await town.acknowledgeContainerReady(nonce);
+
+      const agentAfter = await town.getAgentAsync(agent.id);
+      expect(agentAfter?.status).toBe('working');
+    });
+
+    it('should deduplicate GUPP escalations', async () => {
+      const agent = await town.registerAgent({
+        role: 'polecat',
+        name: 'P1',
+        identity: `gupp-dedup-${townName}`,
+        rig_id: 'rig-1',
+      });
+      const bead = await town.createBead({
+        type: 'issue',
+        title: 'GUPP dedup test',
+        rig_id: 'rig-1',
+      });
+
+      await town.hookBead(agent.id, bead.bead_id);
+      await town.updateAgentStatus(agent.id, 'working');
+
+      const staleTimestamp = new Date(Date.now() - 65 * 60_000).toISOString();
+      await town.touchAgentHeartbeat(agent.id, {
+        lastEventType: 'tool_use',
+        lastEventAt: staleTimestamp,
+        activeTools: [],
+      });
+
+      await runDurableObjectAlarm(town);
+
+      const firstNudges = await town.getPendingNudges(agent.id);
+      expect(firstNudges.filter(n => n.source === 'reconciler:escalate')).toHaveLength(1);
+
+      await runDurableObjectAlarm(town);
+
+      const secondNudges = await town.getPendingNudges(agent.id);
+      expect(secondNudges.filter(n => n.source === 'reconciler:escalate')).toHaveLength(1);
+    });
+  });
+
+  // ── T3: Event idempotency ───────────────────────────────────────────
+
+  describe('T3: event idempotency', () => {
+    it('should no-op on second agent_done for same agent', async () => {
+      const result = await town.slingConvoy({
+        rigId: 'rig-1',
+        convoyTitle: 'Double agent_done',
+        tasks: [{ title: 'Idempotency test' }],
+      });
+
+      await runDurableObjectAlarm(town);
+
+      const beadId = result.beads[0].bead.bead_id;
+      const bead = await town.getBeadAsync(beadId);
+      const agentId = bead!.assignee_agent_bead_id!;
+
+      await town.agentDone(agentId, { branch: 'gt/test', summary: 'First done' });
+      await runDurableObjectAlarm(town);
+
+      const mrBeads = await town.listBeads({ type: 'merge_request' });
+      expect(mrBeads.find(b => b.metadata?.source_bead_id === beadId)).toBeTruthy();
+
+      await town.agentDone(agentId, { branch: 'gt/test', summary: 'Second done' });
+      await runDurableObjectAlarm(town);
+
+      const mrBeadsAfter = await town.listBeads({ type: 'merge_request' });
+      expect(mrBeadsAfter.filter(b => b.metadata?.source_bead_id === beadId)).toHaveLength(1);
+    });
+
+    it('should merge double pr_status_changed merged events', async () => {
+      const result = await town.slingConvoy({
+        rigId: 'rig-1',
+        convoyTitle: 'Double pr_status_changed',
+        tasks: [{ title: 'PR status test' }],
+      });
+
+      await runDurableObjectAlarm(town);
+
+      const beadId = result.beads[0].bead.bead_id;
+      const bead = await town.getBeadAsync(beadId);
+      const agentId = bead!.assignee_agent_bead_id!;
+
+      await town.agentDone(agentId, { branch: 'gt/test', summary: 'Done' });
+      await runDurableObjectAlarm(town);
+
+      const mrBeads = await town.listBeads({ type: 'merge_request' });
+      const mrBead = mrBeads.find(b => b.metadata?.source_bead_id === beadId);
+      expect(mrBead).toBeTruthy();
+
+      await town.completeReviewWithResult({ entry_id: mrBead!.bead_id, status: 'merged', message: 'First' });
+      await town.completeReviewWithResult({ entry_id: mrBead!.bead_id, status: 'merged', message: 'Second' });
+
+      const after = await town.getBeadAsync(beadId);
+      expect(after?.status).toBe('closed');
+    });
+
+    it('should no-op bead_cancelled on already-cancelled bead', async () => {
+      const bead = await town.createBead({
+        type: 'issue',
+        title: 'Already cancelled test',
+        rig_id: 'rig-1',
+      });
+
+      await town.updateBeadStatus(bead.bead_id, 'failed', 'system');
+
+      await town.insertEventForTest('bead_cancelled', {
+        bead_id: bead.bead_id,
+        payload: { cancel_status: 'closed' },
+      });
+
+      await runDurableObjectAlarm(town);
+
+      const after = await town.getBeadAsync(bead.bead_id);
+      expect(after?.status).toBe('failed');
+    });
+  });
+
+  // ── T4: Review queue rules ───────────────────────────────────────────
+
+  describe('T4: review queue rules', () => {
+    it('Rule 2: stuck review should be returned to open after 30min', async () => {
+      const result = await town.slingConvoy({
+        rigId: 'rig-1',
+        convoyTitle: 'Rule 2 test',
+        tasks: [{ title: 'Stuck review test' }],
+      });
+
+      await runDurableObjectAlarm(town);
+
+      const beadId = result.beads[0].bead.bead_id;
+      const bead = await town.getBeadAsync(beadId);
+      const agentId = bead!.assignee_agent_bead_id!;
+
+      await town.agentDone(agentId, { branch: 'gt/test', summary: 'Done' });
+      await runDurableObjectAlarm(town);
+
+      const mrBeads = await town.listBeads({ type: 'merge_request' });
+      const mrBead = mrBeads.find(b => b.metadata?.source_bead_id === beadId);
+      expect(mrBead).toBeTruthy();
+
+      const staleTimestamp = new Date(Date.now() - 31 * 60 * 1000).toISOString();
+      await town.updateBeadTimestamp(mrBead!.bead_id, staleTimestamp);
+
+      await town.updateBeadStatus(mrBead!.bead_id, 'in_progress', 'system');
+      await town.updateBeadStatus(agentId, 'idle', 'system');
+
+      await runDurableObjectAlarm(town);
+
+      const mrAfter = await town.getBeadAsync(mrBead!.bead_id);
+      expect(mrAfter?.status).toBe('open');
+    });
+
+    it('Rule 3: abandoned MR should be returned to open after 2min', async () => {
+      const result = await town.slingConvoy({
+        rigId: 'rig-1',
+        convoyTitle: 'Rule 3 test',
+        tasks: [{ title: 'Abandoned MR test' }],
+      });
+
+      await runDurableObjectAlarm(town);
+
+      const beadId = result.beads[0].bead.bead_id;
+      const bead = await town.getBeadAsync(beadId);
+      const agentId = bead!.assignee_agent_bead_id!;
+
+      await town.agentDone(agentId, { branch: 'gt/test', summary: 'Done' });
+      await runDurableObjectAlarm(town);
+
+      const mrBeads = await town.listBeads({ type: 'merge_request' });
+      const mrBead = mrBeads.find(b => b.metadata?.source_bead_id === beadId);
+      expect(mrBead).toBeTruthy();
+
+      const staleTimestamp = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+      await town.updateBeadTimestamp(mrBead!.bead_id, staleTimestamp);
+
+      await town.updateBeadStatus(mrBead!.bead_id, 'in_progress', 'system');
+      await town.updateBeadStatus(agentId, 'idle', 'system');
+      await town.unhookBead(agentId);
+
+      await runDurableObjectAlarm(town);
+
+      const mrAfter = await town.getBeadAsync(mrBead!.bead_id);
+      expect(mrAfter?.status).toBe('open');
+    });
+
+    it('Rule 4: orphaned PR (in_progress + no working agent + 30min) should fail', async () => {
+      const result = await town.slingConvoy({
+        rigId: 'rig-1',
+        convoyTitle: 'Rule 4 test',
+        tasks: [{ title: 'Orphaned PR test' }],
+      });
+
+      await runDurableObjectAlarm(town);
+
+      const beadId = result.beads[0].bead.bead_id;
+      const bead = await town.getBeadAsync(beadId);
+      const agentId = bead!.assignee_agent_bead_id!;
+
+      await town.agentDone(agentId, { branch: 'gt/test', summary: 'Done', pr_url: 'https://github.com/test/repo/pull/1' });
+      await runDurableObjectAlarm(town);
+
+      const mrBeads = await town.listBeads({ type: 'merge_request' });
+      const mrBead = mrBeads.find(b => b.metadata?.source_bead_id === beadId);
+      expect(mrBead).toBeTruthy();
+
+      const staleTimestamp = new Date(Date.now() - 31 * 60 * 1000).toISOString();
+      await town.updateBeadTimestamp(mrBead!.bead_id, staleTimestamp);
+
+      await town.updateBeadStatus(agentId, 'idle', 'system');
+      await town.unhookBead(agentId);
+
+      await runDurableObjectAlarm(town);
+
+      const mrAfter = await town.getBeadAsync(mrBead!.bead_id);
+      expect(mrAfter?.status).toBe('failed');
+    });
+
+    it('Rule 7: refinery on terminal MR should stop_agent', async () => {
+      const result = await town.slingConvoy({
+        rigId: 'rig-1',
+        convoyTitle: 'Rule 7 test',
+        tasks: [{ title: 'Rule 7 refinery test' }],
+      });
+
+      await runDurableObjectAlarm(town);
+
+      const beadId = result.beads[0].bead.bead_id;
+      const bead = await town.getBeadAsync(beadId);
+      const agentId = bead!.assignee_agent_bead_id!;
+
+      await town.agentDone(agentId, { branch: 'gt/test', summary: 'Done' });
+      await runDurableObjectAlarm(town);
+
+      const mrBeads = await town.listBeads({ type: 'merge_request' });
+      const mrBead = mrBeads.find(b => b.metadata?.source_bead_id === beadId);
+      expect(mrBead).toBeTruthy();
+
+      await runDurableObjectAlarm(town);
+
+      const refineries = await town.listAgents({ role: 'refinery' });
+      expect(refineries.length).toBeGreaterThan(0);
+      const refinery = refineries[0];
+
+      await town.completeReviewWithResult({ entry_id: mrBead!.bead_id, status: 'merged', message: 'Done' });
+
+      await town.hookBead(refinery.id, mrBead!.bead_id);
+      await town.updateAgentStatus(refinery.id, 'working');
+
+      await runDurableObjectAlarm(town);
+
+      const refineryAfter = await town.getAgentAsync(refinery.id);
+      expect(refineryAfter?.current_hook_bead_id).toBeNull();
+    });
+  });
+
   // ── Event system: insert, drain, apply ──────────────────────────────
 
   describe('event system', () => {

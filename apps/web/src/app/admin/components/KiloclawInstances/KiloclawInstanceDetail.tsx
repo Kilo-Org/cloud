@@ -395,12 +395,14 @@ const PHASE_LABELS: Record<ReassociatePhase, string> = {
 
 function VolumeReassociationCard({
   userId,
+  instanceId,
   currentStatus,
   currentMachineId,
   previousVolumeId,
   onStatusChange,
 }: {
   userId: string;
+  instanceId: string;
   currentStatus: string | null;
   currentMachineId: string | null;
   previousVolumeId: string | null;
@@ -421,7 +423,7 @@ function VolumeReassociationCard({
     error: candidatesError,
     refetch: refetchCandidates,
   } = useQuery({
-    ...trpc.admin.kiloclawInstances.candidateVolumes.queryOptions({ userId }),
+    ...trpc.admin.kiloclawInstances.candidateVolumes.queryOptions({ userId, instanceId }),
     enabled: expanded,
   });
 
@@ -440,7 +442,7 @@ function VolumeReassociationCard({
   // Poll parent status during active phases
   const polling = phase === 'stopping' || phase === 'starting' || phase === 'waiting';
   useQuery({
-    queryKey: ['volume-reassociate-poll', userId, polling],
+    queryKey: ['volume-reassociate-poll', userId, instanceId, polling],
     queryFn: async () => {
       void queryClient.invalidateQueries({
         queryKey: trpc.admin.kiloclawInstances.get.queryKey(),
@@ -481,18 +483,18 @@ function VolumeReassociationCard({
       // Step 1: Stop if not already stopped
       if (!isStopped) {
         setPhase('stopping');
-        await machineStop({ userId });
+        await machineStop({ userId, instanceId });
         // Wait for stopped state
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
 
       // Step 2: Reassociate
       setPhase('reassociating');
-      await reassociate({ userId, newVolumeId: selectedVolumeId, reason });
+      await reassociate({ userId, instanceId, newVolumeId: selectedVolumeId, reason });
 
       // Step 3: Start
       setPhase('starting');
-      await machineStart({ userId });
+      await machineStart({ userId, instanceId });
 
       // Step 4: Wait for running
       setPhase('waiting');
@@ -2440,6 +2442,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         {isActive && data.workerStatus && data.workerStatus.status !== 'recovering' && (
           <VolumeReassociationCard
             userId={data.user_id}
+            instanceId={data.id}
             currentStatus={data.workerStatus.status}
             currentMachineId={data.workerStatus.flyMachineId}
             previousVolumeId={data.workerStatus.previousVolumeId ?? null}
@@ -2639,7 +2642,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <AdminFileEditor userId={data.user_id} />
+              <AdminFileEditor userId={data.user_id} instanceId={data.id} />
             </CardContent>
           </Card>
         )}

@@ -166,21 +166,21 @@ All tests should pass against the local PostgreSQL database.
 
 ## Common Development Commands
 
-| Command                            | Description                                                                                       |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `pnpm dev:start`                   | Start all local services in a tmux dashboard                                                      |
-| `pnpm dev:stop`                    | Stop the tmux session and all services                                                            |
-| `pnpm dev:env`                     | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
-| `pnpm test`                        | Run the Jest test suite                                                                           |
-| `pnpm typecheck`                   | Run the TypeScript type checker                                                                   |
-| `pnpm lint`                        | Lint all source files                                                                             |
-| `pnpm format`                      | Format all supported files with oxfmt                                                             |
-| `pnpm format:changed`              | Format only files changed since `main`                                                            |
-| `pnpm validate`                    | Run typecheck, lint, and tests                                                                    |
-| `pnpm drizzle migrate`             | Apply pending database migrations                                                                 |
-| `pnpm drizzle generate`            | Generate a new migration after schema changes                                                     |
-| `pnpm --filter web stripe`         | Start Stripe webhook forwarding to localhost                                                      |
-| `pnpm test:e2e`                    | Run Playwright end-to-end tests                                                                   |
+| Command                    | Description                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------- |
+| `pnpm dev:start`           | Start all local services in a tmux dashboard                                                      |
+| `pnpm dev:stop`            | Stop the tmux session and all services                                                            |
+| `pnpm dev:env`             | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
+| `pnpm test`                | Run the Jest test suite                                                                           |
+| `pnpm typecheck`           | Run the TypeScript type checker                                                                   |
+| `pnpm lint`                | Lint all source files                                                                             |
+| `pnpm format`              | Format all supported files with oxfmt                                                             |
+| `pnpm format:changed`      | Format only files changed since `main`                                                            |
+| `pnpm validate`            | Run typecheck, lint, and tests                                                                    |
+| `pnpm drizzle migrate`     | Apply pending database migrations                                                                 |
+| `pnpm drizzle generate`    | Generate a new migration after schema changes                                                     |
+| `pnpm --filter web stripe` | Start Stripe webhook forwarding to localhost                                                      |
+| `pnpm test:e2e`            | Run Playwright end-to-end tests                                                                   |
 
 ## Git Workflow
 

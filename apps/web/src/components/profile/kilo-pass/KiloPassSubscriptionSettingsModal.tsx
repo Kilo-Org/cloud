@@ -52,7 +52,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   const scheduleChange = useMutation(trpc.kiloPass.scheduleChange.mutationOptions());
   const cancelScheduledChange = useMutation(trpc.kiloPass.cancelScheduledChange.mutationOptions());
 
-  const [panel, setPanel] = useState<'main' | 'update'>('main');
+  const [panel, setPanel] = useState<'main' | 'update'>('update');
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancellationFeedbackOpen, setCancellationFeedbackOpen] = useState(false);
   const [selectedCancellationReasons, setSelectedCancellationReasons] = useState<string[]>([]);
@@ -64,28 +64,27 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
 
   const scheduledChange = scheduledChangeQuery.data?.scheduledChange ?? null;
 
+  const closeModal = () => {
+    setPanel('update');
+    onClose();
+  };
+
   const [targetTier, setTargetTier] = useState<KiloPassTier>(subscription.tier);
   const [targetCadence, setTargetCadence] = useState<KiloPassCadence>(subscription.cadence);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTargetTier(subscription.tier);
+      setTargetCadence(subscription.cadence);
+    }
+  }, [isOpen, subscription.tier, subscription.cadence]);
 
   useEffect(() => {
     if (isOpen && scheduledChange) {
       setTargetTier(scheduledChange.toTier);
       setTargetCadence(scheduledChange.toCadence);
-      return;
     }
-
-    if (isOpen) {
-      setTargetTier(subscription.tier);
-      setTargetCadence(subscription.cadence);
-    }
-  }, [
-    isOpen,
-    scheduledChange?.status,
-    scheduledChange?.toTier,
-    scheduledChange?.toCadence,
-    subscription.tier,
-    subscription.cadence,
-  ]);
+  }, [isOpen, scheduledChange]);
 
   const isCancelingPendingChange =
     cancelScheduledChange.isPending || isCancelingPendingChangeUntilRefetch;
@@ -164,7 +163,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
           };
     }
 
-    let message;
+    let message: string;
 
     if (isCadenceChange) {
       message = `Cadence changes take effect on ${effectiveAtLabel}.`;
@@ -223,11 +222,11 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
         targetCadence,
       });
       toast(`Change scheduled for ${formatIsoDateString_UsaDateOnlyFormat(result.effectiveAt)}`);
+      closeModal();
       await queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() });
       await queryClient.invalidateQueries({
         queryKey: trpc.kiloPass.getScheduledChange.queryKey(),
       });
-      setPanel('main');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to schedule change';
       toast.error(message);
@@ -259,7 +258,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   const isUpdateSubscriptionDisabled = view.status.isPendingCancellation;
 
   const pendingChange = Boolean(scheduledChange);
-  const showUpdatePanel = panel === 'update';
+  const showUpdatePanel = panel === 'update' && !pendingChange;
 
   const cancellationReasons = useMemo(() => {
     const reasons = [
@@ -363,7 +362,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
       open={isOpen}
       onOpenChange={open => {
         if (!open) {
-          setPanel('main');
+          setPanel('update');
           onClose();
         }
       }}
@@ -372,7 +371,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5 text-blue-400" />
-            Manage Kilo Pass
+            {showUpdatePanel ? 'Update Kilo Pass' : 'Manage Kilo Pass'}
           </DialogTitle>
           {showUpdatePanel ? null : (
             <DialogDescription className="text-muted-foreground">
@@ -417,7 +416,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
         <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-between">
           {showUpdatePanel ? (
             <UpdateFooter
-              onBack={() => setPanel('main')}
+              onBack={() => closeModal()}
               onCancelPendingChange={handleCancelScheduledChange}
               onScheduleChange={handleScheduleChange}
               isMutating={isMutating}
@@ -427,7 +426,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
               isSameSelection={isSameSelection}
             />
           ) : (
-            <Button variant="outline" onClick={onClose} disabled={isMutating}>
+            <Button variant="outline" onClick={closeModal} disabled={isMutating}>
               Close
             </Button>
           )}

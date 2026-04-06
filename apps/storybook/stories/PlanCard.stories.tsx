@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs';
 import { PlanCard } from '@/components/organizations/subscription/PlanCard';
-import { TEAMS_FEATURES, ENTERPRISE_FEATURES } from '@/components/organizations/UpgradeTrialDialog';
+import {
+  TEAMS_FEATURES,
+  ENTERPRISE_FEATURES,
+} from '@/components/organizations/subscription/plan-features';
 import {
   TEAM_SEAT_PRICE_MONTHLY_USD,
   ENTERPRISE_SEAT_PRICE_MONTHLY_USD,

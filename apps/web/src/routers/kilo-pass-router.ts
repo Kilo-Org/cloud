@@ -34,12 +34,47 @@ import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
+  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
   KILO_PASS_TIER_CONFIG,
 } from '@/lib/kilo-pass/constants';
 import { fromMicrodollars } from '@/lib/utils';
 import { timedUsageQuery } from '@/lib/usage-query';
+import {
+  billingHistoryResponseSchema,
+  mapStripeInvoiceToBillingHistoryEntry,
+} from '@/lib/subscriptions/subscription-center';
 import type Stripe from 'stripe';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
+
+const CursorInputSchema = z.object({
+  cursor: z.string().nullable().optional(),
+  limit: z.number().int().min(1).max(100).optional(),
+});
+
+const KiloPassCreditHistoryEntrySchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  amountUsd: z.number(),
+  kind: z.enum([
+    KiloPassIssuanceItemKind.Base,
+    KiloPassIssuanceItemKind.Bonus,
+    KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+  ]),
+  description: z.string(),
+});
+
+const KiloPassCreditHistoryResponseSchema = z.object({
+  entries: z.array(KiloPassCreditHistoryEntrySchema),
+  hasMore: z.boolean(),
+  cursor: z.string().nullable(),
+});
+
+function parseOffsetCursor(cursor: string | null | undefined): number {
+  if (!cursor) return 0;
+
+  const parsed = Number.parseInt(cursor, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
 
 const KiloPassTierSchema = z.enum(KiloPassTier);
 
@@ -92,6 +127,10 @@ const GetStateOutputSchema = z.object({
 const GetAverageMonthlyUsageLast3MonthsOutputSchema = z.object({
   averageMonthlyUsageUsd: z.number(),
 });
+
+function isTwoMonthPromoOfferActive(): boolean {
+  return dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
+}
 
 function roundToCents(usd: number): number {
   return Math.round(usd * 100) / 100;
@@ -342,7 +381,7 @@ export const kiloPassRouter = createTRPCRouter({
   getState: baseProcedure.output(GetStateOutputSchema).query(async ({ ctx }) => {
     const subscriptionBase = await getKiloPassStateForUser(db, ctx.user.id);
     if (!subscriptionBase) {
-      return { subscription: null, isEligibleForFirstMonthPromo: true };
+      return { subscription: null, isEligibleForFirstMonthPromo: isTwoMonthPromoOfferActive() };
     }
 
     const stripeCustomerId = ctx.user.stripe_customer_id;
@@ -436,7 +475,8 @@ export const kiloPassRouter = createTRPCRouter({
       currentPeriodBonusCreditsUsd = roundToCents(usd);
     } else {
       const streakMonths = Math.max(1, subscriptionBase.currentStreakMonths);
-      const shouldShowFirstMonthPromo = streakMonths === 1 && isFirstTimeSubscriberEver;
+      const shouldShowFirstMonthPromo =
+        streakMonths === 1 && isFirstTimeSubscriberEver && isTwoMonthPromoOfferActive();
 
       if (shouldShowFirstMonthPromo) {
         const cents = Math.round(baseAmountUsd * KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT * 100);
@@ -965,6 +1005,78 @@ export const kiloPassRouter = createTRPCRouter({
       });
 
       return { success: true };
+    }),
+
+  getBillingHistory: baseProcedure
+    .input(CursorInputSchema)
+    .output(billingHistoryResponseSchema)
+    .query(async ({ ctx, input }) => {
+      const subscription = await getKiloPassStateForUser(db, ctx.user.id);
+      if (!subscription) {
+        return { entries: [], hasMore: false, cursor: null };
+      }
+
+      const limit = input.limit ?? 10;
+      const invoices = await stripe.invoices.list({
+        subscription: subscription.stripeSubscriptionId,
+        limit: limit + 1,
+        starting_after: input.cursor ?? undefined,
+      });
+
+      const hasMore = invoices.data.length > limit;
+      const page = hasMore ? invoices.data.slice(0, limit) : invoices.data;
+      const entries = page.map(mapStripeInvoiceToBillingHistoryEntry);
+      const lastInvoice = page[page.length - 1];
+      const cursor = hasMore && lastInvoice ? lastInvoice.id : null;
+
+      return { entries, hasMore, cursor };
+    }),
+
+  getCreditHistory: baseProcedure
+    .input(CursorInputSchema)
+    .output(KiloPassCreditHistoryResponseSchema)
+    .query(async ({ ctx, input }) => {
+      const subscription = await getKiloPassStateForUser(db, ctx.user.id);
+      if (!subscription) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No Kilo Pass subscription found.' });
+      }
+
+      const offset = parseOffsetCursor(input.cursor);
+      const rows = await db
+        .select({
+          id: kilo_pass_issuance_items.id,
+          kind: kilo_pass_issuance_items.kind,
+          amountUsd: kilo_pass_issuance_items.amount_usd,
+          createdAt: credit_transactions.created_at,
+          description: credit_transactions.description,
+        })
+        .from(kilo_pass_issuance_items)
+        .innerJoin(
+          kilo_pass_issuances,
+          eq(kilo_pass_issuance_items.kilo_pass_issuance_id, kilo_pass_issuances.id)
+        )
+        .innerJoin(
+          credit_transactions,
+          eq(kilo_pass_issuance_items.credit_transaction_id, credit_transactions.id)
+        )
+        .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, subscription.subscriptionId))
+        .orderBy(desc(credit_transactions.created_at), desc(kilo_pass_issuance_items.id))
+        .limit(26)
+        .offset(offset);
+
+      const entries = rows.slice(0, 25).map(row => ({
+        id: row.id,
+        date: dayjs(row.createdAt).utc().toISOString(),
+        amountUsd: row.amountUsd,
+        kind: row.kind,
+        description: row.description ?? `${row.kind} credits`,
+      }));
+
+      return {
+        entries,
+        hasMore: rows.length > 25,
+        cursor: rows.length > 25 ? String(offset + 25) : null,
+      };
     }),
 
   createCheckoutSession: baseProcedure

@@ -25,6 +25,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { sandboxIdFromUserId } from '@/lib/kiloclaw/sandbox-id';
+import { createOrganization } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import type Stripe from 'stripe';
@@ -32,6 +33,8 @@ import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMock = jest.Mock<(...args: any[]) => any>;
+
+jest.setTimeout(15_000);
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -48,6 +51,7 @@ jest.mock('@/lib/stripe-client', () => {
     },
     checkout: { sessions: { create: jest.fn(), list: jest.fn(), expire: jest.fn() } },
     billingPortal: { sessions: { create: jest.fn() } },
+    invoices: { list: jest.fn() },
     errors,
   };
   return { client: stripeMock, __stripeMock: stripeMock };
@@ -106,6 +110,7 @@ type StripeMockShape = {
   billingPortal: { sessions: { create: AnyMock } };
   subscriptions: { retrieve: AnyMock; update: AnyMock; list: AnyMock };
   subscriptionSchedules: { create: AnyMock; update: AnyMock; release: AnyMock; retrieve: AnyMock };
+  invoices: { list: AnyMock };
   errors: Stripe['errors'];
 };
 
@@ -143,6 +148,8 @@ beforeEach(async () => {
   stripeMock.subscriptionSchedules.update.mockReset();
   stripeMock.subscriptionSchedules.release.mockReset();
   stripeMock.subscriptionSchedules.retrieve.mockReset();
+  stripeMock.invoices.list.mockReset();
+  stripeMock.invoices.list.mockResolvedValue({ data: [], has_more: false });
 
   // Default mock returns for live-fetch calls
   stripeMock.subscriptions.retrieve.mockResolvedValue({
@@ -258,6 +265,382 @@ describe('getBillingStatus', () => {
 
     expect(result).not.toBeNull();
     expect(result.trialEligible).toBe(false);
+  });
+});
+
+describe('subscription center procedures', () => {
+  async function createInstanceRow(params: {
+    userId: string;
+    organizationId?: string;
+    name?: string;
+    destroyedAt?: string;
+    sandboxId?: string;
+  }) {
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: params.userId,
+        organization_id: params.organizationId,
+        name: params.name,
+        destroyed_at: params.destroyedAt,
+        sandbox_id: params.sandboxId ?? `sandbox-${crypto.randomUUID()}`,
+      })
+      .returning();
+
+    if (!instance) {
+      throw new Error('Failed to insert KiloClaw instance');
+    }
+
+    return instance;
+  }
+
+  async function insertSubscriptionRow(params: {
+    userId: string;
+    instanceId: string;
+    stripeSubscriptionId?: string;
+    paymentSource?: 'credits';
+    plan: 'standard' | 'commit' | 'trial';
+    status: 'active' | 'past_due' | 'canceled' | 'unpaid' | 'trialing';
+    createdAt?: string;
+    currentPeriodStart?: string;
+    currentPeriodEnd?: string;
+    creditRenewalAt?: string;
+    cancelAtPeriodEnd?: boolean;
+  }) {
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: params.userId,
+      instance_id: params.instanceId,
+      stripe_subscription_id: params.stripeSubscriptionId,
+      payment_source: params.paymentSource,
+      plan: params.plan,
+      status: params.status,
+      created_at: params.createdAt,
+      current_period_start: params.currentPeriodStart,
+      current_period_end: params.currentPeriodEnd,
+      credit_renewal_at: params.creditRenewalAt,
+      cancel_at_period_end: params.cancelAtPeriodEnd ?? false,
+    });
+  }
+
+  it('lists only personal subscriptions for the current user', async () => {
+    const organization = await createOrganization('Subscription Center Org', user.id);
+    const olderPersonalInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Older Personal',
+    });
+    const newerPersonalInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Newer Personal',
+    });
+    const orgInstance = await createInstanceRow({
+      userId: user.id,
+      organizationId: organization.id,
+      name: 'Org Instance',
+    });
+
+    await insertSubscriptionRow({
+      userId: user.id,
+      instanceId: olderPersonalInstance.id,
+      stripeSubscriptionId: 'sub_personal_old',
+      plan: 'standard',
+      status: 'active',
+      createdAt: '2026-04-01T00:00:00.000Z',
+    });
+    await insertSubscriptionRow({
+      userId: user.id,
+      instanceId: newerPersonalInstance.id,
+      paymentSource: 'credits',
+      plan: 'commit',
+      status: 'active',
+      createdAt: '2026-04-02T00:00:00.000Z',
+      creditRenewalAt: '2026-10-02T00:00:00.000Z',
+    });
+    await insertSubscriptionRow({
+      userId: user.id,
+      instanceId: orgInstance.id,
+      stripeSubscriptionId: 'sub_org_owned',
+      plan: 'standard',
+      status: 'active',
+      createdAt: '2026-04-03T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.listPersonalSubscriptions();
+
+    expect(result.subscriptions).toHaveLength(2);
+    expect(
+      result.subscriptions.map((subscription: { instanceId: string }) => subscription.instanceId)
+    ).toEqual([newerPersonalInstance.id, olderPersonalInstance.id]);
+    expect(result.subscriptions[0]).toMatchObject({
+      instanceId: newerPersonalInstance.id,
+      plan: 'commit',
+      paymentSource: 'credits',
+      hasStripeFunding: false,
+    });
+    expect(result.subscriptions[1]).toMatchObject({
+      instanceId: olderPersonalInstance.id,
+      plan: 'standard',
+      paymentSource: null,
+      hasStripeFunding: true,
+    });
+  });
+
+  it('returns detail for the requested personal subscription', async () => {
+    const instance = await createInstanceRow({
+      userId: user.id,
+      name: 'Target Personal Instance',
+    });
+
+    await insertSubscriptionRow({
+      userId: user.id,
+      instanceId: instance.id,
+      paymentSource: 'credits',
+      plan: 'standard',
+      status: 'active',
+      currentPeriodStart: '2026-04-01T00:00:00.000Z',
+      currentPeriodEnd: '2026-05-01T00:00:00.000Z',
+      creditRenewalAt: '2026-05-01T00:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getSubscriptionDetail({ instanceId: instance.id });
+
+    expect(result).toMatchObject({
+      instanceId: instance.id,
+      instanceName: 'Target Personal Instance',
+      plan: 'standard',
+      status: 'active',
+      paymentSource: 'credits',
+      hasStripeFunding: false,
+      creditRenewalAt: '2026-05-01T00:00:00.000Z',
+    });
+  });
+
+  it('rejects detail requests for org-owned instances', async () => {
+    const organization = await createOrganization('Org Owned Detail', user.id);
+    const instance = await createInstanceRow({
+      userId: user.id,
+      organizationId: organization.id,
+      name: 'Org Detail Instance',
+    });
+
+    await insertSubscriptionRow({
+      userId: user.id,
+      instanceId: instance.id,
+      stripeSubscriptionId: 'sub_org_detail',
+      plan: 'standard',
+      status: 'active',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.kiloclaw.getSubscriptionDetail({ instanceId: instance.id })
+    ).rejects.toThrow('Subscription not found.');
+  });
+
+  it('lists Stripe billing history for the requested Stripe-funded instance', async () => {
+    stripeMock.invoices.list.mockResolvedValue({
+      data: [
+        {
+          id: 'inv_kiloclaw_1',
+          created: 1_711_965_600,
+          amount_due: 900,
+          currency: 'usd',
+          status: 'paid',
+          hosted_invoice_url: 'https://stripe.example.test/inv_kiloclaw_1',
+          invoice_pdf: 'https://stripe.example.test/inv_kiloclaw_1.pdf',
+          lines: { data: [{ description: 'KiloClaw standard plan' }] },
+        },
+      ],
+      has_more: false,
+    });
+
+    const instance = await createInstanceRow({ userId: user.id, name: 'Stripe Instance' });
+    await insertSubscriptionRow({
+      userId: user.id,
+      instanceId: instance.id,
+      stripeSubscriptionId: 'sub_kiloclaw_stripe',
+      plan: 'standard',
+      status: 'active',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getBillingHistory({ instanceId: instance.id });
+
+    expect(stripeMock.invoices.list).toHaveBeenCalledWith({
+      subscription: 'sub_kiloclaw_stripe',
+      limit: 25,
+    });
+    expect(result).toEqual({
+      entries: [
+        {
+          kind: 'stripe',
+          id: 'inv_kiloclaw_1',
+          date: new Date(1_711_965_600 * 1000).toISOString(),
+          amountCents: 900,
+          currency: 'usd',
+          status: 'paid',
+          invoiceUrl: 'https://stripe.example.test/inv_kiloclaw_1',
+          invoicePdfUrl: 'https://stripe.example.test/inv_kiloclaw_1.pdf',
+          description: 'KiloClaw standard plan',
+        },
+      ],
+      hasMore: false,
+      cursor: null,
+    });
+  });
+
+  it('lists credit-funded billing history for the requested instance', async () => {
+    const sandboxId = `sandbox-${crypto.randomUUID()}`;
+    const oldInstance = await createInstanceRow({
+      userId: user.id,
+      name: 'Old Credits Instance',
+      sandboxId,
+      destroyedAt: '2026-04-15T00:00:00.000Z',
+    });
+    const instance = await createInstanceRow({
+      userId: user.id,
+      name: 'Credits Instance',
+      sandboxId,
+    });
+    const otherInstance = await createInstanceRow({ userId: user.id, name: 'Other Instance' });
+
+    await insertSubscriptionRow({
+      userId: user.id,
+      instanceId: instance.id,
+      paymentSource: 'credits',
+      plan: 'standard',
+      status: 'active',
+      creditRenewalAt: '2026-06-01T00:00:00.000Z',
+    });
+
+    await db.insert(credit_transactions).values([
+      {
+        id: crypto.randomUUID(),
+        kilo_user_id: user.id,
+        amount_microdollars: -9_000_000,
+        is_free: false,
+        description: 'Standard renewal',
+        credit_category: `kiloclaw-subscription:${instance.id}:2026-04`,
+        created_at: '2026-04-01T12:00:00.000Z',
+      },
+      {
+        id: crypto.randomUUID(),
+        kilo_user_id: user.id,
+        amount_microdollars: -48_000_000,
+        is_free: false,
+        description: 'Commit renewal',
+        credit_category: `kiloclaw-subscription-commit:${oldInstance.id}:2026-05`,
+        created_at: '2026-05-01T12:00:00.000Z',
+      },
+      {
+        id: crypto.randomUUID(),
+        kilo_user_id: user.id,
+        amount_microdollars: -9_000_000,
+        is_free: false,
+        description: 'Other instance renewal',
+        credit_category: `kiloclaw-subscription:${otherInstance.id}:2026-06`,
+        created_at: '2026-06-01T12:00:00.000Z',
+      },
+    ]);
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getBillingHistory({ instanceId: instance.id });
+
+    expect(result).toEqual({
+      entries: [
+        {
+          kind: 'credits',
+          id: expect.any(String),
+          date: '2026-05-01T12:00:00.000Z',
+          amountMicrodollars: 48_000_000,
+          description: 'Commit renewal',
+        },
+        {
+          kind: 'credits',
+          id: expect.any(String),
+          date: '2026-04-01T12:00:00.000Z',
+          amountMicrodollars: 9_000_000,
+          description: 'Standard renewal',
+        },
+      ],
+      hasMore: false,
+      cursor: null,
+    });
+  });
+
+  it('creates a customer portal session for the requested Stripe-funded instance', async () => {
+    stripeMock.billingPortal.sessions.create.mockResolvedValue({
+      url: 'https://stripe.example.test/kiloclaw-portal',
+    });
+
+    const instance = await createInstanceRow({ userId: user.id, name: 'Portal Instance' });
+    await insertSubscriptionRow({
+      userId: user.id,
+      instanceId: instance.id,
+      stripeSubscriptionId: 'sub_kiloclaw_portal',
+      plan: 'standard',
+      status: 'active',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getCustomerPortalUrl({
+      instanceId: instance.id,
+      returnUrl: 'https://example.test/subscriptions/kiloclaw',
+    });
+
+    expect(result).toEqual({ url: 'https://stripe.example.test/kiloclaw-portal' });
+    expect(stripeMock.billingPortal.sessions.create).toHaveBeenCalledWith({
+      customer: user.stripe_customer_id,
+      return_url: 'https://example.test/subscriptions/kiloclaw',
+    });
+  });
+
+  it('cancels only the targeted instance subscription', async () => {
+    stripeMock.subscriptions.retrieve.mockResolvedValue({ schedule: null });
+    stripeMock.subscriptions.update.mockResolvedValue({});
+
+    const targetInstance = await createInstanceRow({ userId: user.id, name: 'Target Instance' });
+    const otherInstance = await createInstanceRow({ userId: user.id, name: 'Other Instance' });
+
+    await insertSubscriptionRow({
+      userId: user.id,
+      instanceId: targetInstance.id,
+      stripeSubscriptionId: 'sub_target_instance',
+      plan: 'standard',
+      status: 'active',
+    });
+    await insertSubscriptionRow({
+      userId: user.id,
+      instanceId: otherInstance.id,
+      stripeSubscriptionId: 'sub_other_instance',
+      plan: 'commit',
+      status: 'active',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.cancelSubscriptionAtInstance({
+      instanceId: targetInstance.id,
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(stripeMock.subscriptions.update).toHaveBeenCalledWith('sub_target_instance', {
+      cancel_at_period_end: true,
+    });
+
+    const [targetRow] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, targetInstance.id))
+      .limit(1);
+    const [otherRow] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, otherInstance.id))
+      .limit(1);
+
+    expect(targetRow.cancel_at_period_end).toBe(true);
+    expect(otherRow.cancel_at_period_end).toBe(false);
   });
 });
 

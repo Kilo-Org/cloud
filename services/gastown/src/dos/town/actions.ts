@@ -291,9 +291,6 @@ export type ApplyActionContext = {
 
 const LOG = '[actions]';
 
-/** Fail MR bead after this many consecutive null poll results (#1632). */
-const PR_POLL_NULL_THRESHOLD = 10;
-
 /** Minimum interval between PR polls per MR bead (ms) (#1632). */
 export const PR_POLL_INTERVAL_MS = 60_000; // 1 minute
 
@@ -750,32 +747,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 } else {
                   const elapsed = Date.now() - new Date(readySince).getTime();
                   if (elapsed >= (refineryConfig.auto_merge_delay_minutes ?? 0) * 60_000) {
-                    // Skip if auto_merge_pending is already set — a merge is already
-                    // in progress (or failed) and will clear auto_merge_ready_since
-                    // via the auto_merge_cleared event. Prevents race with concurrent
-                    // merge_pr actions from reconcileReviewQueue.
-                    const alreadyPending = z
-                      .object({ metadata: z.string().nullable() })
-                      .array()
-                      .parse([
-                        ...query(
-                          sql,
-                          /* sql */ `
-                            SELECT ${beads.columns.metadata}
-                            FROM ${beads}
-                            WHERE ${beads.bead_id} = ?
-                          `,
-                          [action.bead_id]
-                        ),
-                      ]);
-                    if (
-                      alreadyPending[0]?.metadata &&
-                      (JSON.parse(alreadyPending[0].metadata ?? '{}') as Record<string, unknown>)[
-                        'auto_merge_pending'
-                      ]
-                    ) {
-                      return;
-                    }
                     ctx.insertEvent('pr_auto_merge', {
                       bead_id: action.bead_id,
                       payload: {
@@ -798,58 +769,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               }
             }
           } else {
-            // Null result — GitHub API unreachable (token missing, expired, rate-limited, or 5xx).
-            // Increment consecutive null counter; fail the bead after PR_POLL_NULL_THRESHOLD.
-            query(
-              sql,
-              /* sql */ `
-                UPDATE ${beads}
-                SET ${beads.columns.metadata} = json_set(
-                  COALESCE(${beads.columns.metadata}, '{}'),
-                  '$.poll_null_count',
-                  COALESCE(
-                    json_extract(${beads.columns.metadata}, '$.poll_null_count'),
-                    0
-                  ) + 1
-                )
-                WHERE ${beads.bead_id} = ?
-              `,
-              [action.bead_id]
-            );
-            const rows = [
-              ...query(
-                sql,
-                /* sql */ `
-                  SELECT json_extract(${beads.columns.metadata}, '$.poll_null_count') AS null_count
-                  FROM ${beads}
-                  WHERE ${beads.bead_id} = ?
-                `,
-                [action.bead_id]
-              ),
-            ];
-            const nullCount = Number(rows[0]?.null_count ?? 0);
-            if (nullCount >= PR_POLL_NULL_THRESHOLD) {
-              console.warn(
-                `${LOG} poll_pr: ${nullCount} consecutive null results for bead=${action.bead_id}, failing`
-              );
-              beadOps.updateBeadStatus(sql, action.bead_id, 'failed', 'system');
-              query(
-                sql,
-                /* sql */ `
-                  UPDATE ${beads}
-                  SET ${beads.columns.metadata} = json_set(
-                    COALESCE(${beads.columns.metadata}, '{}'),
-                    '$.failureReason', 'pr_poll_failed',
-                    '$.failureMessage', ?
-                  )
-                  WHERE ${beads.bead_id} = ?
-                `,
-                [
-                  `Cannot poll PR status — GitHub API returned null ${nullCount} consecutive times. Check that a valid GitHub token is configured in town settings and that the GitHub API is reachable.`,
-                  action.bead_id,
-                ]
-              );
-            }
+            ctx.insertEvent('poll_pr_null', {
+              bead_id: action.bead_id,
+              payload: {},
+            });
           }
           // status === 'open' — no action needed, poll again next tick
         } catch (err) {
@@ -908,16 +831,15 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             query(
               sql,
               /* sql */ `
-                UPDATE ${beads}
-                SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.auto_merge_pending'),
-                    ${beads.columns.updated_at} = ?
-                WHERE ${beads.bead_id} = ?
+                UPDATE ${review_metadata}
+                SET ${review_metadata.columns.auto_merge_ready_since} = NULL
+                WHERE ${review_metadata.bead_id} = ?
               `,
-              [now(), action.bead_id]
+              [action.bead_id]
             );
             ctx.insertEvent('auto_merge_cleared', {
               bead_id: action.bead_id,
-              payload: { mr_bead_id: action.bead_id },
+              payload: { reason: 'fresh_feedback' },
             });
             return;
           }
@@ -929,43 +851,37 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               payload: { pr_url: action.pr_url, pr_state: 'merged' },
             });
           } else {
-            // Merge failed (405/409: branch protection, merge conflict, stale head, etc.)
-            // Clear auto_merge_pending so we resume normal polling on the next tick.
-            // auto_merge_ready_since is cleared via the auto_merge_cleared event.
-            query(
-              sql,
-              /* sql */ `
-                UPDATE ${beads}
-                SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.auto_merge_pending'),
-                    ${beads.columns.updated_at} = ?
-                WHERE ${beads.bead_id} = ?
-              `,
-              [now(), action.bead_id]
-            );
-            ctx.insertEvent('auto_merge_cleared', {
-              bead_id: action.bead_id,
-              payload: { mr_bead_id: action.bead_id },
-            });
             console.warn(
               `${LOG} merge_pr: merge failed, cleared auto_merge_pending for bead=${action.bead_id}`
             );
+            query(
+              sql,
+              /* sql */ `
+                UPDATE ${review_metadata}
+                SET ${review_metadata.columns.auto_merge_ready_since} = NULL
+                WHERE ${review_metadata.bead_id} = ?
+              `,
+              [action.bead_id]
+            );
+            ctx.insertEvent('auto_merge_cleared', {
+              bead_id: action.bead_id,
+              payload: { reason: 'merge_failed' },
+            });
           }
         } catch (err) {
           console.warn(`${LOG} merge_pr failed: bead=${action.bead_id} url=${action.pr_url}`, err);
-          // Clear pending flag on unexpected errors too
           query(
             sql,
             /* sql */ `
-              UPDATE ${beads}
-              SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.auto_merge_pending'),
-                  ${beads.columns.updated_at} = ?
-              WHERE ${beads.bead_id} = ?
+              UPDATE ${review_metadata}
+              SET ${review_metadata.columns.auto_merge_ready_since} = NULL
+              WHERE ${review_metadata.bead_id} = ?
             `,
-            [now(), action.bead_id]
+            [action.bead_id]
           );
           ctx.insertEvent('auto_merge_cleared', {
             bead_id: action.bead_id,
-            payload: { mr_bead_id: action.bead_id },
+            payload: { reason: 'error' },
           });
         }
       };

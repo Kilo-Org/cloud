@@ -43,6 +43,9 @@ const CIRCUIT_BREAKER_FAILURE_THRESHOLD = 20;
 /** Window in minutes for counting dispatch failures. */
 const CIRCUIT_BREAKER_WINDOW_MINUTES = 30;
 
+/** Fail MR bead after this many consecutive null poll results (#1632). */
+const PR_POLL_NULL_THRESHOLD = 10;
+
 /**
  * Town-level dispatch circuit breaker. Counts beads with at least one
  * dispatch attempt in the recent window that have not yet closed
@@ -453,11 +456,22 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
     }
 
     case 'auto_merge_cleared': {
-      const mrBeadId = typeof payload.mr_bead_id === 'string' ? payload.mr_bead_id : null;
-      if (!mrBeadId) {
-        console.warn(`${LOG} applyEvent: auto_merge_cleared missing mr_bead_id`);
+      const beadId = typeof payload.bead_id === 'string' ? payload.bead_id : event.bead_id;
+      if (!beadId) {
+        console.warn(`${LOG} applyEvent: auto_merge_cleared missing bead_id`);
         return;
       }
+
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.metadata} = json_remove(COALESCE(${beads.metadata}, '{}'), '$.auto_merge_pending'),
+              ${beads.columns.updated_at} = ?
+          WHERE ${beads.bead_id} = ?
+        `,
+        [new Date().toISOString(), beadId]
+      );
       query(
         sql,
         /* sql */ `
@@ -465,8 +479,68 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
           SET ${review_metadata.columns.auto_merge_ready_since} = NULL
           WHERE ${review_metadata.bead_id} = ?
         `,
-        [mrBeadId]
+        [beadId]
       );
+      return;
+    }
+
+    case 'poll_pr_null': {
+      const beadId = event.bead_id;
+      if (!beadId) {
+        console.warn(`${LOG} applyEvent: poll_pr_null missing bead_id`);
+        return;
+      }
+
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.metadata} = json_set(
+            COALESCE(${beads.columns.metadata}, '{}'),
+            '$.poll_null_count',
+            COALESCE(
+              json_extract(${beads.columns.metadata}, '$.poll_null_count'),
+              0
+            ) + 1
+          )
+          WHERE ${beads.bead_id} = ?
+        `,
+        [beadId]
+      );
+      const rows = [
+        ...query(
+          sql,
+          /* sql */ `
+            SELECT json_extract(${beads.columns.metadata}, '$.poll_null_count') AS null_count
+            FROM ${beads}
+            WHERE ${beads.bead_id} = ?
+          `,
+          [beadId]
+        ),
+      ];
+      const nullCount = Number(rows[0]?.null_count ?? 0);
+      if (nullCount >= PR_POLL_NULL_THRESHOLD) {
+        console.warn(
+          `${LOG} poll_pr: ${nullCount} consecutive null results for bead=${beadId}, failing`
+        );
+        beadOps.updateBeadStatus(sql, beadId, 'failed', 'system');
+        query(
+          sql,
+          /* sql */ `
+            UPDATE ${beads}
+            SET ${beads.columns.metadata} = json_set(
+              COALESCE(${beads.columns.metadata}, '{}'),
+              '$.failureReason', 'pr_poll_failed',
+              '$.failureMessage', ?
+            )
+            WHERE ${beads.bead_id} = ?
+          `,
+          [
+            `Cannot poll PR status — GitHub API returned null ${nullCount} consecutive times. Check that a valid GitHub token is configured in town settings and that the GitHub API is reachable.`,
+            beadId,
+          ]
+        );
+      }
       return;
     }
 

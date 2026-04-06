@@ -219,6 +219,9 @@ app.all('/i/:instanceId/*', async c => {
   if (status.status === 'restoring') {
     return c.json({ error: 'Instance is restoring from a snapshot' }, 409);
   }
+  if (status.status === 'recovering') {
+    return c.json({ error: 'Instance is recovering from an unexpected stop' }, 409);
+  }
   if (!status.flyMachineId) {
     return c.json({ error: 'Instance not provisioned' }, 404);
   }
@@ -439,6 +442,8 @@ async function resolveInstance(c: Context<AppEnv>): Promise<{
     return { machineId: null, flyAppName: null, sandboxId: null, status: 'destroying' };
   if (s.status === 'restoring')
     return { machineId: null, flyAppName: null, sandboxId: null, status: 'restoring' };
+  if (s.status === 'recovering')
+    return { machineId: null, flyAppName: null, sandboxId: null, status: 'recovering' };
 
   return {
     machineId: s.flyMachineId,
@@ -490,6 +495,15 @@ app.all('*', async c => {
             {
               error: 'Instance is restoring',
               hint: 'This instance is being restored from a snapshot. Please wait.',
+            },
+            409
+          );
+        }
+        if (instanceStatus.status === 'recovering') {
+          return c.json(
+            {
+              error: 'Instance is recovering',
+              hint: 'This instance is being recovered after an unexpected stop. Please wait.',
             },
             409
           );
@@ -596,6 +610,15 @@ app.all('*', async c => {
       {
         error: 'Instance is restoring',
         hint: 'This instance is being restored from a snapshot. Please wait.',
+      },
+      409
+    );
+  }
+  if (status === 'recovering') {
+    return c.json(
+      {
+        error: 'Instance is recovering',
+        hint: 'Your instance is being recovered after an unexpected stop. Please wait.',
       },
       409
     );

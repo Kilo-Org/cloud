@@ -130,6 +130,7 @@ export type PlatformStatusResponse = {
     | 'provisioned'
     | 'starting'
     | 'restarting'
+    | 'recovering'
     | 'running'
     | 'stopped'
     | 'destroying'
@@ -189,12 +190,23 @@ export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   lastDestroyErrorAt: number | null;
   lastRestartErrorMessage: string | null;
   lastRestartErrorAt: number | null;
+  recoveryStartedAt: number | null;
+  pendingRecoveryVolumeId: string | null;
+  recoveryPreviousVolumeId: string | null;
+  recoveryPreviousVolumeCleanupAfter: number | null;
+  lastRecoveryErrorMessage: string | null;
+  lastRecoveryErrorAt: number | null;
   previousVolumeId: string | null;
   restoreStartedAt: string | null;
   pendingRestoreVolumeId: string | null;
   instanceReadyEmailSent: boolean;
   diskUsedBytes: number | null;
   diskTotalBytes: number | null;
+};
+
+export type CleanupRecoveryPreviousVolumeResponse = {
+  ok: true;
+  deletedVolumeId: string | null;
 };
 
 /** A Fly volume snapshot. */

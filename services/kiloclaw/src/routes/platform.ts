@@ -1252,6 +1252,27 @@ platform.post('/force-retry-recovery', async c => {
   }
 });
 
+// POST /api/platform/cleanup-recovery-previous-volume
+platform.post('/cleanup-recovery-previous-volume', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withDORetry(
+      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
+      stub => stub.cleanupRecoveryPreviousVolume(),
+      'cleanupRecoveryPreviousVolume'
+    );
+    return c.json(response);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'cleanup-recovery-previous-volume');
+    return jsonError(message, status);
+  }
+});
+
 // POST /api/platform/stop
 platform.post('/stop', async c => {
   const result = await parseBody(c, UserIdRequestSchema);

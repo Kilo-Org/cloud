@@ -33,6 +33,7 @@ import type {
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
   RestoreVolumeSnapshotResponse,
+  CleanupRecoveryPreviousVolumeResponse,
   RegionsResponse,
   UpdateRegionsResponse,
 } from './types';
@@ -626,6 +627,21 @@ export class KiloClawInternalClient {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/force-retry-recovery${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async cleanupRecoveryPreviousVolume(
+    userId: string,
+    instanceId?: string
+  ): Promise<CleanupRecoveryPreviousVolumeResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/cleanup-recovery-previous-volume${params}`,
       {
         method: 'POST',
         body: JSON.stringify({ userId }),

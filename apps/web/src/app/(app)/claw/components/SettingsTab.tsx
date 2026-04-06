@@ -590,6 +590,7 @@ export function SettingsTab({
   const isSaving = mutations.patchConfig.isPending;
   const isStarting = status.status === 'starting';
   const isRestarting = status.status === 'restarting';
+  const isRecovering = status.status === 'recovering';
   const isDestroying = status.status === 'destroying';
   const supportsConfigRestore = calverAtLeast(
     cleanVersion(controllerVersion?.version),
@@ -978,7 +979,8 @@ export function SettingsTab({
                         !isRunning ||
                         mutations.restoreConfig.isPending ||
                         isDestroying ||
-                        isRestarting
+                        isRestarting ||
+                        isRecovering
                       }
                       onClick={() => {
                         posthog?.capture('claw_restore_config_clicked', {
@@ -1000,7 +1002,7 @@ export function SettingsTab({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={!isRunning || isDestroying || isRestarting}
+                disabled={!isRunning || isDestroying || isRestarting || isRecovering}
                 onClick={() => setEditConfigOpen(true)}
               >
                 <FileCode className="h-4 w-4" />
@@ -1015,7 +1017,8 @@ export function SettingsTab({
                   mutations.stop.isPending ||
                   isDestroying ||
                   isStarting ||
-                  isRestarting
+                  isRestarting ||
+                  isRecovering
                 }
                 onClick={() => {
                   posthog?.capture('claw_stop_instance_clicked', {

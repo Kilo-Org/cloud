@@ -734,13 +734,20 @@ export async function runKiloClawBillingLifecycleCron(
         .where(eq(kiloclaw_subscriptions.id, row.id));
       summary.sweep1_trial_expiry++;
 
-      const attribution = await getAffiliateAttribution(row.user_id, 'impact');
-      if (attribution) {
-        await trackTrialEnd({
-          clickId: attribution.tracking_id,
-          customerId: row.user_id,
-          customerEmail: row.email,
-          eventDate: new Date(now),
+      try {
+        const attribution = await getAffiliateAttribution(row.user_id, 'impact');
+        if (attribution) {
+          await trackTrialEnd({
+            clickId: attribution.tracking_id,
+            customerId: row.user_id,
+            customerEmail: row.email,
+            eventDate: new Date(now),
+          });
+        }
+      } catch (error) {
+        logWarning('Impact trial end tracking failed during sweep', {
+          user_id: row.user_id,
+          error: error instanceof Error ? error.message : String(error),
         });
       }
 

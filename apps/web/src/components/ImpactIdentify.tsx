@@ -20,15 +20,19 @@ export function ImpactIdentify() {
 
     let cancelled = false;
 
-    void sha1Hex(user.google_user_email).then(hashedEmail => {
-      if (cancelled || typeof window.ire !== 'function') return;
+    void sha1Hex(user.google_user_email)
+      .then(hashedEmail => {
+        if (cancelled || typeof window.ire !== 'function') return;
 
-      window.ire('identify', {
-        customerId: user.id,
-        customerEmail: hashedEmail,
-        customProfileId: '',
+        window.ire('identify', {
+          customerId: user.id,
+          customerEmail: hashedEmail,
+          customProfileId: '',
+        });
+      })
+      .catch(error => {
+        console.error('ImpactIdentify failed', error);
       });
-    });
 
     return () => {
       cancelled = true;

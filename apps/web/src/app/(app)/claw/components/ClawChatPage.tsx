@@ -5,7 +5,7 @@ import { MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useKiloClawStatus } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawStatus } from '@/hooks/useOrgKiloClaw';
-import { ClawContextProvider, useClawContext } from './ClawContext';
+import { ClawContextProvider } from './ClawContext';
 import { ChatTab } from './ChatTab';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { SetPageTitle } from '@/components/SetPageTitle';

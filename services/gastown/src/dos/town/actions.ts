@@ -559,12 +559,11 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
       const capturedAgentId = agentId;
       const capturedBeadId = beadId;
       return async () => {
-        // Best-effort dispatch. On rejected promise (definite failure), stop
-        // the container, unhook the agent (sets it to idle), and reset the
-        // bead to open so the reconciler can retry on the next tick.
-        // For false returns (timeout race), the container may still start —
-        // let the heartbeat catch it after 90s and handle via the normal
-        // stale-hook flow instead of risking double-dispatch.
+        // Best-effort dispatch. On failure, unhook the agent so it goes
+        // idle and stops tracking the bead. The bead stays in_progress —
+        // if the container actually started, heartbeat keeps it alive;
+        // if it didn't, reconcileAgents transitions the agent to idle
+        // after 90s and the reconciler retries on the next tick.
         let started = false;
         try {
           started = await ctx.dispatchAgent(capturedAgentId, capturedBeadId, rigId);
@@ -573,18 +572,9 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             `${LOG} dispatch_agent: container start failed for agent=${capturedAgentId} bead=${capturedBeadId}`,
             err
           );
-          ctx.stopAgent(capturedAgentId).catch(e => {
-            console.warn(`${LOG} dispatch_agent: stop_agent failed for agent=${capturedAgentId}`, e);
-          });
-          agentOps.unhookBead(sql, capturedAgentId);
-          beadOps.updateBeadStatus(sql, capturedBeadId, 'open', null);
         }
         if (!started) {
-          // False return is the timeout-race path — don't rollback here.
-          // If the container actually started, heartbeat keeps it alive.
-          // If it didn't, reconcileAgents catches it after 90s of missing
-          // heartbeats and transitions the agent to idle.
-          console.debug(`${LOG} dispatch_agent: container returned false (timeout race) for agent=${capturedAgentId} bead=${capturedBeadId}`);
+          agentOps.unhookBead(sql, capturedAgentId);
         }
       };
     }

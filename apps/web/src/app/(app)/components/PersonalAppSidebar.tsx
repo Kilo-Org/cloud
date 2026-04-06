@@ -25,6 +25,7 @@ import {
   Webhook,
   Factory,
   Settings,
+  MessageSquare,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import HeaderLogo from '@/components/HeaderLogo';
@@ -79,6 +80,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       title: 'KiloClaw',
       icon: KiloCrabIcon,
       url: '/claw',
+    },
+    {
+      title: 'Chat',
+      icon: MessageSquare,
+      url: '/claw/chat',
     },
     {
       title: 'Settings',

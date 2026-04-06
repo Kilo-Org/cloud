@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
@@ -27,6 +27,7 @@ import {
   formatPaymentSummary,
   isKiloclawTerminal,
 } from '@/components/subscriptions/helpers';
+import { useCursorPagination } from '@/components/subscriptions/useCursorPagination';
 import { capitalize } from '@/lib/utils';
 
 type SubscriptionConfirmationAction =
@@ -51,14 +52,6 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
-  const [billingEntries, setBillingEntries] = useState<
-    Array<
-      Awaited<ReturnType<typeof trpcClient.kiloclaw.getBillingHistory.query>>['entries'][number]
-    >
-  >([]);
-  const [billingCursor, setBillingCursor] = useState<string | null>(null);
-  const [billingHasMore, setBillingHasMore] = useState(false);
-  const [billingLoadingMore, setBillingLoadingMore] = useState(false);
   const [confirmationAction, setConfirmationAction] =
     useState<SubscriptionConfirmationAction | null>(null);
   const [pendingConfirmationAction, setPendingConfirmationAction] =
@@ -67,27 +60,15 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
   const detailQuery = useQuery(trpc.kiloclaw.getSubscriptionDetail.queryOptions({ instanceId }));
   const billingQuery = useQuery(trpc.kiloclaw.getBillingHistory.queryOptions({ instanceId }));
 
-  useEffect(() => {
-    if (!instanceId) {
-      setBillingEntries([]);
-      setBillingCursor(null);
-      setBillingHasMore(false);
-      setBillingLoadingMore(false);
-      return;
-    }
-
-    setBillingEntries([]);
-    setBillingCursor(null);
-    setBillingHasMore(false);
-    setBillingLoadingMore(false);
-  }, [instanceId]);
-
-  useEffect(() => {
-    if (!billingQuery.data) return;
-    setBillingEntries(billingQuery.data.entries);
-    setBillingCursor(billingQuery.data.cursor);
-    setBillingHasMore(billingQuery.data.hasMore);
-  }, [billingQuery.data]);
+  const fetchMoreBilling = useCallback(
+    (cursor: string) => trpcClient.kiloclaw.getBillingHistory.query({ instanceId, cursor }),
+    [trpcClient, instanceId]
+  );
+  const billing = useCursorPagination({
+    initialData: billingQuery.data,
+    fetchMore: fetchMoreBilling,
+    resetKey: instanceId,
+  });
 
   async function refreshData() {
     await Promise.all([
@@ -101,22 +82,6 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
         queryKey: trpc.kiloclaw.getBillingHistory.queryKey({ instanceId }),
       }),
     ]);
-  }
-
-  async function loadMoreBilling() {
-    if (!billingCursor || billingLoadingMore) return;
-    setBillingLoadingMore(true);
-    try {
-      const result = await trpcClient.kiloclaw.getBillingHistory.query({
-        instanceId,
-        cursor: billingCursor,
-      });
-      setBillingEntries(current => [...current, ...result.entries]);
-      setBillingCursor(result.cursor);
-      setBillingHasMore(result.hasMore);
-    } finally {
-      setBillingLoadingMore(false);
-    }
   }
 
   async function runAction(action: () => Promise<unknown>, successMessage: string) {
@@ -393,10 +358,10 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
         <CardContent className="pt-1">
           <BillingHistoryTable
             variant={subscription.hasStripeFunding ? 'stripe' : 'credits'}
-            entries={billingEntries}
-            hasMore={billingHasMore}
-            onLoadMore={() => void loadMoreBilling()}
-            isLoading={billingLoadingMore}
+            entries={billing.entries}
+            hasMore={billing.hasMore}
+            onLoadMore={() => void billing.loadMore()}
+            isLoading={billing.isLoadingMore}
           />
         </CardContent>
       </Card>

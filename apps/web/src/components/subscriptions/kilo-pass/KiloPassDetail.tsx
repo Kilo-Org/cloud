@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Calendar, Coins, Crown, ExternalLink } from 'lucide-react';
@@ -43,26 +43,13 @@ import {
   formatMonthCountLabel,
   isKiloPassTerminal,
 } from '@/components/subscriptions/helpers';
+import { useCursorPagination } from '@/components/subscriptions/useCursorPagination';
 
 export function KiloPassDetail() {
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [billingEntries, setBillingEntries] = useState<
-    Array<
-      Awaited<ReturnType<typeof trpcClient.kiloPass.getBillingHistory.query>>['entries'][number]
-    >
-  >([]);
-  const [billingCursor, setBillingCursor] = useState<string | null>(null);
-  const [billingHasMore, setBillingHasMore] = useState(false);
-  const [billingLoadingMore, setBillingLoadingMore] = useState(false);
-  const [creditEntries, setCreditEntries] = useState<
-    Array<Awaited<ReturnType<typeof trpcClient.kiloPass.getCreditHistory.query>>['entries'][number]>
-  >([]);
-  const [creditCursor, setCreditCursor] = useState<string | null>(null);
-  const [creditHasMore, setCreditHasMore] = useState(false);
-  const [creditLoadingMore, setCreditLoadingMore] = useState(false);
 
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
   const scheduledChangeQuery = useQuery(trpc.kiloPass.getScheduledChange.queryOptions());
@@ -71,42 +58,25 @@ export function KiloPassDetail() {
 
   const subscriptionId = stateQuery.data?.subscription?.stripeSubscriptionId ?? null;
 
-  useEffect(() => {
-    if (!subscriptionId) {
-      setBillingEntries([]);
-      setBillingCursor(null);
-      setBillingHasMore(false);
-      setBillingLoadingMore(false);
-      setCreditEntries([]);
-      setCreditCursor(null);
-      setCreditHasMore(false);
-      setCreditLoadingMore(false);
-      return;
-    }
+  const fetchMoreBilling = useCallback(
+    (cursor: string) => trpcClient.kiloPass.getBillingHistory.query({ cursor }),
+    [trpcClient]
+  );
+  const billing = useCursorPagination({
+    initialData: billingQuery.data,
+    fetchMore: fetchMoreBilling,
+    resetKey: subscriptionId,
+  });
 
-    setBillingEntries([]);
-    setBillingCursor(null);
-    setBillingHasMore(false);
-    setBillingLoadingMore(false);
-    setCreditEntries([]);
-    setCreditCursor(null);
-    setCreditHasMore(false);
-    setCreditLoadingMore(false);
-  }, [subscriptionId]);
-
-  useEffect(() => {
-    if (!billingQuery.data) return;
-    setBillingEntries(billingQuery.data.entries);
-    setBillingCursor(billingQuery.data.cursor);
-    setBillingHasMore(billingQuery.data.hasMore);
-  }, [billingQuery.data]);
-
-  useEffect(() => {
-    if (!creditHistoryQuery.data) return;
-    setCreditEntries(creditHistoryQuery.data.entries);
-    setCreditCursor(creditHistoryQuery.data.cursor);
-    setCreditHasMore(creditHistoryQuery.data.hasMore);
-  }, [creditHistoryQuery.data]);
+  const fetchMoreCredits = useCallback(
+    (cursor: string) => trpcClient.kiloPass.getCreditHistory.query({ cursor }),
+    [trpcClient]
+  );
+  const credits = useCursorPagination({
+    initialData: creditHistoryQuery.data,
+    fetchMore: fetchMoreCredits,
+    resetKey: subscriptionId,
+  });
 
   const subscription = stateQuery.data?.subscription ?? null;
   const scheduledChange = scheduledChangeQuery.data?.scheduledChange ?? null;
@@ -141,32 +111,6 @@ export function KiloPassDetail() {
     await trpcClient.kiloPass.cancelScheduledChange.mutate();
     toast.success('Scheduled change canceled');
     await refreshData();
-  }
-
-  async function loadMoreBilling() {
-    if (!billingCursor || billingLoadingMore) return;
-    setBillingLoadingMore(true);
-    try {
-      const result = await trpcClient.kiloPass.getBillingHistory.query({ cursor: billingCursor });
-      setBillingEntries(current => [...current, ...result.entries]);
-      setBillingCursor(result.cursor);
-      setBillingHasMore(result.hasMore);
-    } finally {
-      setBillingLoadingMore(false);
-    }
-  }
-
-  async function loadMoreCreditHistory() {
-    if (!creditCursor || creditLoadingMore) return;
-    setCreditLoadingMore(true);
-    try {
-      const result = await trpcClient.kiloPass.getCreditHistory.query({ cursor: creditCursor });
-      setCreditEntries(current => [...current, ...result.entries]);
-      setCreditCursor(result.cursor);
-      setCreditHasMore(result.hasMore);
-    } finally {
-      setCreditLoadingMore(false);
-    }
   }
 
   if (stateQuery.isLoading) {
@@ -282,10 +226,10 @@ export function KiloPassDetail() {
           </CardHeader>
           <CardContent className="pt-1">
             <CreditHistory
-              entries={creditEntries}
-              hasMore={creditHasMore}
-              onLoadMore={() => void loadMoreCreditHistory()}
-              isLoading={creditLoadingMore}
+              entries={credits.entries}
+              hasMore={credits.hasMore}
+              onLoadMore={() => void credits.loadMore()}
+              isLoading={credits.isLoadingMore}
             />
           </CardContent>
         </Card>
@@ -297,10 +241,10 @@ export function KiloPassDetail() {
           <CardContent className="pt-1">
             <BillingHistoryTable
               variant="stripe"
-              entries={billingEntries}
-              hasMore={billingHasMore}
-              onLoadMore={() => void loadMoreBilling()}
-              isLoading={billingLoadingMore}
+              entries={billing.entries}
+              hasMore={billing.hasMore}
+              onLoadMore={() => void billing.loadMore()}
+              isLoading={billing.isLoadingMore}
             />
           </CardContent>
         </Card>

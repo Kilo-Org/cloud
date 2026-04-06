@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ArrowRight, ExternalLink, Minus, Plus, Users } from 'lucide-react';
@@ -22,21 +22,12 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { DetailPageHeader } from '@/components/subscriptions/DetailPageHeader';
 import { BillingHistoryTable } from '@/components/subscriptions/BillingHistoryTable';
 import { formatDateLabel, isSeatsTerminal } from '@/components/subscriptions/helpers';
+import { useCursorPagination } from '@/components/subscriptions/useCursorPagination';
 
 export function SeatsDetail({ organizationId }: { organizationId: string }) {
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
-  const [billingEntries, setBillingEntries] = useState<
-    Array<
-      Awaited<
-        ReturnType<typeof trpcClient.organizations.subscription.getBillingHistory.query>
-      >['entries'][number]
-    >
-  >([]);
-  const [billingCursor, setBillingCursor] = useState<string | null>(null);
-  const [billingHasMore, setBillingHasMore] = useState(false);
-  const [billingLoadingMore, setBillingLoadingMore] = useState(false);
   const [seatDialogOpen, setSeatDialogOpen] = useState(false);
   const [billingCycleDialogOpen, setBillingCycleDialogOpen] = useState(false);
   const [seatCount, setSeatCount] = useState('1');
@@ -59,27 +50,19 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
     )
   );
 
-  useEffect(() => {
-    if (!organizationId) {
-      setBillingEntries([]);
-      setBillingCursor(null);
-      setBillingHasMore(false);
-      setBillingLoadingMore(false);
-      return;
-    }
-
-    setBillingEntries([]);
-    setBillingCursor(null);
-    setBillingHasMore(false);
-    setBillingLoadingMore(false);
-  }, [organizationId]);
-
-  useEffect(() => {
-    if (!billingQuery.data) return;
-    setBillingEntries(billingQuery.data.entries);
-    setBillingCursor(billingQuery.data.cursor);
-    setBillingHasMore(billingQuery.data.hasMore);
-  }, [billingQuery.data]);
+  const fetchMoreBilling = useCallback(
+    (cursor: string) =>
+      trpcClient.organizations.subscription.getBillingHistory.query({
+        organizationId,
+        cursor,
+      }),
+    [trpcClient, organizationId]
+  );
+  const billing = useCursorPagination({
+    initialData: billingQuery.data,
+    fetchMore: fetchMoreBilling,
+    resetKey: organizationId,
+  });
 
   useEffect(() => {
     if (!subscriptionQuery.data) return;
@@ -95,22 +78,6 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
         queryKey: trpc.organizations.subscription.getBillingHistory.queryKey({ organizationId }),
       }),
     ]);
-  }
-
-  async function loadMoreBilling() {
-    if (!billingCursor || billingLoadingMore) return;
-    setBillingLoadingMore(true);
-    try {
-      const result = await trpcClient.organizations.subscription.getBillingHistory.query({
-        organizationId,
-        cursor: billingCursor,
-      });
-      setBillingEntries(current => [...current, ...result.entries]);
-      setBillingCursor(result.cursor);
-      setBillingHasMore(result.hasMore);
-    } finally {
-      setBillingLoadingMore(false);
-    }
   }
 
   function openCustomerPortal() {
@@ -334,10 +301,10 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
         <CardContent className="pt-1">
           <BillingHistoryTable
             variant="stripe"
-            entries={billingEntries}
-            hasMore={billingHasMore}
-            onLoadMore={() => void loadMoreBilling()}
-            isLoading={billingLoadingMore}
+            entries={billing.entries}
+            hasMore={billing.hasMore}
+            onLoadMore={() => void billing.loadMore()}
+            isLoading={billing.isLoadingMore}
           />
         </CardContent>
       </Card>

@@ -89,12 +89,17 @@ import { trackTrialStart } from '@/lib/impact';
 const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed']);
 
 /**
- * Adopt a single orphaned subscription onto the given active instance.
+ * Adopt a single orphaned subscription onto the given active personal instance.
  *
- * An orphan is a subscription row with instance_id = NULL for this user.
- * This happens when the user destroys their instance between Stripe checkout
- * and webhook delivery — the webhook handler inserts with instance_id = NULL
- * because no active instance exists at that point.
+ * An orphan is an access-granting subscription that is either:
+ * 1. Detached (instance_id = NULL) — happens when the webhook handler inserts
+ *    a subscription while no active instance exists.
+ * 2. Linked to a destroyed personal instance — the normal case when a user
+ *    destroys and re-provisions.
+ *
+ * The subscription keeps its instance_id pointing at the destroyed instance
+ * (rather than being set to NULL) so it remains visible in the subscription
+ * center UI which uses INNER JOIN through kiloclaw_instances.
  *
  * Per billing spec Trial Eligibility and Creation rule 5, only subscriptions
  * that still grant access are eligible for adoption.  The access filter is
@@ -108,9 +113,8 @@ const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed
  * preserve prior-paid history for {@link hadPriorPaidSubscription} and to
  * block duplicate trial creation in ensureProvisionAccess (spec rule 2).
  *
- * This function is intentionally narrow: it only handles NULL instance_id
- * orphans and never deletes subscription rows.  The destroy flow is
- * responsible for setting instance_id = NULL when an instance is destroyed.
+ * Scoped to personal instances only (organization_id IS NULL) so org
+ * subscriptions are never touched.
  */
 async function adoptOrphanedSubscription(userId: string, activeInstanceId: string) {
   // Check whether the active instance already owns a subscription.
@@ -125,34 +129,36 @@ async function adoptOrphanedSubscription(userId: string, activeInstanceId: strin
     )
     .limit(1);
 
-  // If the active instance already has a subscription, nothing to do.
-  // The orphaned row stays detached — it will be visible in the subscription
-  // center via listKiloclawPersonalSubscriptionRows and can be examined by
-  // hadPriorPaidSubscription for pricing decisions.
   if (incumbent) return;
 
-  // Find the best access-granting orphan: unlinked rows for this user that
-  // still grant access, ordered so paid subscriptions come before trials.
-  // The access check is in SQL so a canceled paid orphan doesn't shadow an
-  // access-granting trial orphan behind LIMIT 1.
+  // Access-granting filter per billing spec Access Control rules 1-3.
+  const accessGrantingFilter = or(
+    eq(kiloclaw_subscriptions.status, 'active'),
+    and(eq(kiloclaw_subscriptions.status, 'past_due'), isNull(kiloclaw_subscriptions.suspended_at)),
+    and(
+      eq(kiloclaw_subscriptions.status, 'trialing'),
+      sql`${kiloclaw_subscriptions.trial_ends_at} > now()`
+    )
+  );
+
+  // Find the best access-granting orphan. Two sources:
+  // 1. Detached rows (instance_id IS NULL)
+  // 2. Rows on destroyed personal instances
   const [orphan] = await db
     .select({ id: kiloclaw_subscriptions.id })
     .from(kiloclaw_subscriptions)
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
     .where(
       and(
         eq(kiloclaw_subscriptions.user_id, userId),
-        isNull(kiloclaw_subscriptions.instance_id),
-        // Access-granting statuses per billing spec Access Control rules 1-3:
-        // active, unsuspended past_due, or unexpired trialing.
+        accessGrantingFilter,
         or(
-          eq(kiloclaw_subscriptions.status, 'active'),
+          // Detached (webhook inserted with no active instance)
+          isNull(kiloclaw_subscriptions.instance_id),
+          // Linked to a destroyed personal instance
           and(
-            eq(kiloclaw_subscriptions.status, 'past_due'),
-            isNull(kiloclaw_subscriptions.suspended_at)
-          ),
-          and(
-            eq(kiloclaw_subscriptions.status, 'trialing'),
-            sql`${kiloclaw_subscriptions.trial_ends_at} > now()`
+            isNotNull(kiloclaw_instances.destroyed_at),
+            isNull(kiloclaw_instances.organization_id)
           )
         )
       )
@@ -1438,12 +1444,12 @@ export const kiloclawRouter = createTRPCRouter({
     // Post-destroy cleanup: best-effort DB tidying that must not undo a
     // successful destroy. If any of these fail, log and move on.
     try {
-      // Detach subscription(s) from the destroyed instance and clear the
-      // destruction lifecycle so the billing cron doesn't send warning emails
-      // or attempt a redundant destroy.
-      //
-      // Setting instance_id to NULL makes the subscription adoptable by the
-      // next provisioned instance via adoptOrphanedSubscription().
+      // Clear the destruction lifecycle so the billing cron doesn't
+      // send warning emails or attempt a redundant destroy.
+      // The subscription keeps its instance_id pointing at the destroyed
+      // instance so it remains visible in the subscription center UI
+      // (listKiloclawPersonalSubscriptionRows uses INNER JOIN).
+      // adoptOrphanedSubscription will reassign it on next provision.
       // Only clear suspended_at for non-past_due subscriptions — nulling it
       // on a past_due row would re-enable access without fixing payment.
       if (destroyedRow) {
@@ -1457,13 +1463,7 @@ export const kiloclawRouter = createTRPCRouter({
             )
           )
           .limit(1);
-
-        const clearFields: {
-          instance_id: null;
-          destruction_deadline: null;
-          suspended_at?: null;
-        } = {
-          instance_id: null,
+        const clearFields: { destruction_deadline: null; suspended_at?: null } = {
           destruction_deadline: null,
         };
         if (sub && sub.status !== 'past_due') {
@@ -2505,19 +2505,22 @@ export const kiloclawRouter = createTRPCRouter({
   // ── Billing endpoints ────────────────────────────────────────────────
 
   getBillingStatus: baseProcedure.query(async ({ ctx }) => {
+    // Scope to personal instances only (organization_id IS NULL) so an org
+    // instance is never used for personal billing status or orphan adoption.
     const [activeInstance] = await db
       .select({
         id: kiloclaw_instances.id,
         destroyed_at: kiloclaw_instances.destroyed_at,
       })
       .from(kiloclaw_instances)
-      .where(eq(kiloclaw_instances.user_id, ctx.user.id))
+      .where(
+        and(eq(kiloclaw_instances.user_id, ctx.user.id), isNull(kiloclaw_instances.organization_id))
+      )
       .orderBy(desc(kiloclaw_instances.created_at))
       .limit(1);
 
-    // If an active instance exists, adopt any orphaned subscription before
-    // reading billing status.  This ensures the dashboard reflects the
-    // correct subscription even when it was inserted with instance_id = NULL.
+    // If an active personal instance exists, adopt any orphaned subscription
+    // before reading billing status.
     if (activeInstance && !activeInstance.destroyed_at) {
       await adoptOrphanedSubscription(ctx.user.id, activeInstance.id);
     }

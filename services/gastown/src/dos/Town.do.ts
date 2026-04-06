@@ -606,6 +606,7 @@ export class TownDO extends DurableObject<Env> {
   private _drainStartedAt: number | null = null;
   /** Instance UUID of the current container, set by the first heartbeat. */
   private _containerInstanceId: string | null = null;
+  private _poisonEventFailureCounts = new Map<string, number>();
 
   private get townId(): string {
     return this._townId ?? this.ctx.id.name ?? this.ctx.id.toString();
@@ -3472,6 +3473,8 @@ export class TownDO extends DurableObject<Env> {
     };
 
     // Phase 0: Drain events and apply state transitions
+    const poisonEventActions: Action[] = [];
+    const POISON_EVENT_THRESHOLD = 3;
     try {
       const pending = events.drainEvents(this.sql);
       metrics.eventsDrained = pending.length;
@@ -3482,16 +3485,39 @@ export class TownDO extends DurableObject<Env> {
         try {
           reconciler.applyEvent(this.sql, event);
           events.markProcessed(this.sql, event.event_id);
+          this._poisonEventFailureCounts.delete(event.event_id);
         } catch (err) {
           logger.error('reconciler: applyEvent failed', {
             eventId: event.event_id,
             eventType: event.event_type,
             error: err instanceof Error ? err.message : String(err),
           });
-          // Event stays unprocessed — will be retried on the next alarm tick.
-          // Mark it processed anyway after 3 consecutive failures to prevent
-          // a poison event from blocking the entire queue forever.
-          // For now, we skip it and let the next tick retry.
+          const failureCount = (this._poisonEventFailureCounts.get(event.event_id) ?? 0) + 1;
+          this._poisonEventFailureCounts.set(event.event_id, failureCount);
+          if (failureCount >= POISON_EVENT_THRESHOLD) {
+            logger.error('reconciler: poison event threshold exceeded, marking as processed', {
+              eventId: event.event_id,
+              eventType: event.event_type,
+              failureCount,
+            });
+            Sentry.captureMessage(
+              `Poison event detected: ${event.event_type} (${event.event_id}) failed ${failureCount} times. Event marked as processed and escalated.`,
+              {
+                level: 'error',
+                extra: {
+                  eventId: event.event_id,
+                  eventType: event.event_type,
+                  failureCount,
+                  townId,
+                },
+              }
+            );
+            events.markProcessed(this.sql, event.event_id);
+            poisonEventActions.push({
+              type: 'notify_mayor',
+              message: `Poison event detected and quarantined: ${event.event_type} event (${event.event_id}) failed ${failureCount} times. Event has been marked as processed.`,
+            });
+          }
         }
       }
     } catch (err) {
@@ -3522,10 +3548,11 @@ export class TownDO extends DurableObject<Env> {
     const sideEffects: Array<() => Promise<void>> = [];
     try {
       const townConfig = await this.getTownConfig();
-      const actions = reconciler.reconcile(this.sql, {
+      const reconcileActions = reconciler.reconcile(this.sql, {
         draining: this._draining,
         refineryCodeReview: townConfig.refinery?.code_review ?? true,
       });
+      const actions = [...reconcileActions, ...poisonEventActions];
       metrics.actionsEmitted = actions.length;
       for (const a of actions) {
         metrics.actionsByType[a.type] = (metrics.actionsByType[a.type] ?? 0) + 1;

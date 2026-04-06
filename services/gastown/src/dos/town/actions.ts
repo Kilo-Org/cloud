@@ -747,13 +747,30 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 } else {
                   const elapsed = Date.now() - new Date(readySince).getTime();
                   if (elapsed >= (refineryConfig.auto_merge_delay_minutes ?? 0) * 60_000) {
-                    ctx.insertEvent('pr_auto_merge', {
-                      bead_id: action.bead_id,
-                      payload: {
-                        mr_bead_id: action.bead_id,
-                        pr_url: action.pr_url,
-                      },
-                    });
+                    const mrRows = z
+                      .object({ metadata: z.record(z.unknown()) })
+                      .array()
+                      .parse([
+                        ...query(
+                          sql,
+                          /* sql */ `
+                            SELECT ${beads.columns.metadata}
+                            FROM ${beads}
+                            WHERE ${beads.bead_id} = ?
+                          `,
+                          [action.bead_id]
+                        ),
+                      ]);
+                    const mrMeta = mrRows[0]?.metadata ?? {};
+                    if (!mrMeta.auto_merge_pending) {
+                      ctx.insertEvent('pr_auto_merge', {
+                        bead_id: action.bead_id,
+                        payload: {
+                          mr_bead_id: action.bead_id,
+                          pr_url: action.pr_url,
+                        },
+                      });
+                    }
                   }
                 }
               } else {
@@ -828,15 +845,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             console.log(
               `${LOG} merge_pr: fresh feedback check found issues, aborting merge for bead=${action.bead_id}`
             );
-            query(
-              sql,
-              /* sql */ `
-                UPDATE ${review_metadata}
-                SET ${review_metadata.columns.auto_merge_ready_since} = NULL
-                WHERE ${review_metadata.bead_id} = ?
-              `,
-              [action.bead_id]
-            );
             ctx.insertEvent('auto_merge_cleared', {
               bead_id: action.bead_id,
               payload: { reason: 'fresh_feedback' },
@@ -854,15 +862,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             console.warn(
               `${LOG} merge_pr: merge failed, cleared auto_merge_pending for bead=${action.bead_id}`
             );
-            query(
-              sql,
-              /* sql */ `
-                UPDATE ${review_metadata}
-                SET ${review_metadata.columns.auto_merge_ready_since} = NULL
-                WHERE ${review_metadata.bead_id} = ?
-              `,
-              [action.bead_id]
-            );
             ctx.insertEvent('auto_merge_cleared', {
               bead_id: action.bead_id,
               payload: { reason: 'merge_failed' },
@@ -870,15 +869,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
           }
         } catch (err) {
           console.warn(`${LOG} merge_pr failed: bead=${action.bead_id} url=${action.pr_url}`, err);
-          query(
-            sql,
-            /* sql */ `
-              UPDATE ${review_metadata}
-              SET ${review_metadata.columns.auto_merge_ready_since} = NULL
-              WHERE ${review_metadata.bead_id} = ?
-            `,
-            [action.bead_id]
-          );
           ctx.insertEvent('auto_merge_cleared', {
             bead_id: action.bead_id,
             payload: { reason: 'error' },

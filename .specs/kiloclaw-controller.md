@@ -44,17 +44,12 @@ one succeeding, except where noted.
    reachable from the moment the machine boots, even if bootstrap
    takes seconds or fails entirely.
 
-2. **Bootstrap.** The controller MUST run all bootstrap steps
-   (decryption, directories, feature flags, GitHub config,
-   onboard/doctor with config patching, gateway args) after the HTTP
-   server is listening. Not every internal step corresponds to a
-   distinct health phase — config patching and gateway args
-   construction happen within the onboard/doctor step and at the end
-   of bootstrap respectively, without separate phase transitions.
-   Each major step updates the controller state so `/_kilo/health`
-   reflects progress. If any step fails, the controller MUST enter
-   degraded mode (see Degraded Mode) and MUST NOT proceed to
-   subsequent phases.
+2. **Critical bootstrap.** The controller MUST run the critical
+   bootstrap steps (decryption, directories, feature flags, gateway
+   args) after the HTTP server is listening. Each major step updates
+   the controller state so `/_kilo/health` reflects progress. If any
+   critical step fails, the controller MUST enter degraded mode (see
+   Degraded Mode) and MUST NOT proceed to subsequent phases.
 
 3. **Runtime config load.** The controller MUST read the decrypted
    environment variables produced by bootstrap and construct the
@@ -63,18 +58,26 @@ one succeeding, except where noted.
    happens between `bootstrapping` and `starting` states. If this
    fails, the controller MUST enter degraded mode.
 
-4. **Pre-gateway setup.** The controller SHOULD attempt best-effort
-   setup tasks (Kilo CLI config, gog credentials). Failures in this
-   phase MUST be logged but MUST NOT prevent startup from continuing.
-
-5. **Route registration.** The controller MUST register all Hono
+4. **Route registration.** The controller MUST register all Hono
    routes and activate the Hono app before attempting to start the
    gateway. This ensures that diagnostic and recovery endpoints
    (`/_kilo/version`, `/_kilo/config/*`, `/_kilo/env/*`,
-   `/_kilo/gateway/*`) are available even if the gateway fails to
-   start.
+   `/_kilo/gateway/*`) are available even if a later startup phase or
+   the gateway itself fails.
 
-6. **Gateway start.** The controller MUST start the gateway
+5. **Non-critical bootstrap.** The controller MUST then run the
+   non-critical bootstrap steps (GitHub config, Linear config,
+   onboard/doctor with config patching, TOOLS.md updates, mcporter
+   config). If one of these steps fails, the controller MUST enter
+   degraded mode but MUST keep the Hono app active so authenticated
+   recovery endpoints remain available. The controller MUST NOT
+   proceed to gateway start after a non-critical bootstrap failure.
+
+6. **Pre-gateway setup.** The controller SHOULD attempt best-effort
+   setup tasks (Kilo CLI config, gog credentials). Failures in this
+   phase MUST be logged but MUST NOT prevent startup from continuing.
+
+7. **Gateway start.** The controller MUST start the gateway
    supervisor as the final phase. If the gateway fails to start, the
    controller MUST enter degraded mode but MUST NOT tear down the
    Hono app — all `/_kilo/*` routes MUST remain functional.
@@ -147,9 +150,11 @@ The `phase` field during `bootstrapping` progresses through:
 
 | Phase                          | `/_kilo/health`                 | `/_kilo/*` routes | User traffic (proxy)    | WebSocket               |
 | ------------------------------ | ------------------------------- | ----------------- | ----------------------- | ----------------------- |
-| Bootstrap running              | Inline: `bootstrapping` + phase | 503               | 503                     | 503 reject              |
-| Bootstrap failed               | Inline: `degraded`              | 503               | 503                     | 503 reject              |
+| Critical bootstrap running     | Inline: `bootstrapping` + phase | 503               | 503                     | 503 reject              |
+| Critical bootstrap failed      | Inline: `degraded`              | 503               | 503                     | 503 reject              |
 | Runtime config failed          | Inline: `degraded`              | 503               | 503                     | 503 reject              |
+| Routes registered              | Hono: `bootstrapping` + phase   | Auth-gated        | 503 "Gateway not ready" | 503 reject              |
+| Non-critical bootstrap failed  | Hono: `degraded`                | Auth-gated        | 503 "Gateway not ready" | 503 reject              |
 | Routes registered, gw starting | Hono: `starting`                | Auth-gated        | 503 "Gateway not ready" | Auth-gated              |
 | Gateway start failed           | Hono: `degraded`                | Auth-gated        | 503 "Gateway not ready" | Auth-gated              |
 | Fully operational              | Hono: `ready`                   | Auth-gated        | Proxied to gateway      | Proxied to gateway      |
@@ -217,11 +222,15 @@ gateway supervisor handles crash recovery independently. Use
 2. The controller MUST NOT expose raw error messages on any
    unauthenticated endpoint. All degraded error strings MUST be
    generic stage labels.
-3. When bootstrap or runtime config load fails, only the inline
+3. When critical bootstrap or runtime config load fails, only the inline
    health handler is active. All non-health HTTP requests MUST
    receive 503. WebSocket upgrades MUST receive a 503 response and
    the socket MUST be destroyed.
-4. When the gateway fails to start (after routes are registered), all
+4. When non-critical bootstrap fails after routes are registered, all
+   `/_kilo/*` endpoints required for recovery MUST remain functional.
+   The catch-all proxy MUST return 503 with `"Gateway not ready"` for
+   user traffic.
+5. When the gateway fails to start (after routes are registered), all
    `/_kilo/*` endpoints MUST remain functional. The catch-all proxy
    MUST return 503 with `"Gateway not ready"` for user traffic.
 

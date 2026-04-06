@@ -14,6 +14,8 @@ import {
   OP_SECTION_CONFIG,
   LINEAR_SECTION_CONFIG,
   buildGatewayArgs,
+  bootstrapCritical,
+  bootstrapNonCritical,
   bootstrap,
 } from './bootstrap';
 import type { BootstrapDeps, ToolsMdSectionConfig } from './bootstrap';
@@ -773,6 +775,94 @@ describe('buildGatewayArgs', () => {
   });
 });
 
+// ---- bootstrapCritical ----
+
+describe('bootstrapCritical', () => {
+  it('sets critical phases and gateway args', async () => {
+    const key = generateTestKey();
+    const phases: string[] = [];
+    const harness = fakeDeps();
+    const env: Record<string, string | undefined> = {
+      KILOCLAW_ENV_KEY: key,
+      KILOCLAW_ENC_KILOCODE_API_KEY: encryptValue(key, 'api-key'),
+      KILOCLAW_ENC_OPENCLAW_GATEWAY_TOKEN: encryptValue(key, 'gw-token'),
+      AUTO_APPROVE_DEVICES: 'true',
+    };
+
+    await bootstrapCritical(env, phase => phases.push(phase), harness.deps);
+
+    expect(phases).toEqual(['decrypting', 'directories', 'feature-flags']);
+    expect(JSON.parse(env.KILOCLAW_GATEWAY_ARGS ?? '[]')).toContain('gw-token');
+  });
+
+  it('throws before later steps when decryption fails', async () => {
+    const phases: string[] = [];
+    const harness = fakeDeps();
+
+    await expect(
+      bootstrapCritical({ KILOCLAW_ENC_FOO: 'enc:v1:bogus' }, phase => phases.push(phase), harness.deps)
+    ).rejects.toThrow('KILOCLAW_ENV_KEY is not set');
+
+    expect(phases).toEqual(['decrypting']);
+    expect(harness.mkdirCalls).toHaveLength(0);
+  });
+});
+
+// ---- bootstrapNonCritical ----
+
+describe('bootstrapNonCritical', () => {
+  it('returns ok when doctor/onboard succeeds', async () => {
+    const harness = fakeDeps();
+    const phases: string[] = [];
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({ gateway: { port: 3001, mode: 'local' } })
+    );
+
+    const result = await bootstrapNonCritical(
+      {
+        KILOCODE_API_KEY: 'api-key',
+        OPENCLAW_GATEWAY_TOKEN: 'gw-token',
+        AUTO_APPROVE_DEVICES: 'true',
+      },
+      phase => phases.push(phase),
+      harness.deps
+    );
+
+    expect(result).toEqual({ ok: true });
+    expect(phases).toEqual(['github', 'linear', 'onboard', 'tools-md', 'mcporter']);
+  });
+
+  it('returns a doctor failure instead of throwing', async () => {
+    const harness = fakeDeps();
+    const phases: string[] = [];
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p.endsWith('openclaw.json')) return true;
+      return false;
+    });
+    (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (cmd: string, args: string[]) => {
+        if (cmd === 'openclaw' && args.includes('doctor')) {
+          throw new Error('doctor exited 1');
+        }
+        return '';
+      }
+    );
+
+    const result = await bootstrapNonCritical(
+      {
+        KILOCODE_API_KEY: 'api-key',
+        OPENCLAW_GATEWAY_TOKEN: 'gw-token',
+        AUTO_APPROVE_DEVICES: 'true',
+      },
+      phase => phases.push(phase),
+      harness.deps
+    );
+
+    expect(result).toEqual({ ok: false, phase: 'doctor', error: 'doctor exited 1' });
+    expect(phases).toEqual(['github', 'linear', 'doctor']);
+  });
+});
+
 // ---- bootstrap orchestrator ----
 
 describe('bootstrap', () => {
@@ -802,6 +892,8 @@ describe('bootstrap', () => {
       'github',
       'linear',
       'onboard',
+      'tools-md',
+      'mcporter',
     ]);
   });
 

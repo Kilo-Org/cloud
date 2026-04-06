@@ -1,6 +1,6 @@
 # Contributing — macOS Local Development Setup
 
-This guide walks you through setting up the Kilo Code backend for local development on macOS.
+This guide walks you through setting up the Kilo Code monorepo for local development on macOS.
 
 ## Prerequisites
 
@@ -143,10 +143,16 @@ You need to re-run this every time you pull new migrations from the repository.
 ### 6. Start the development server
 
 ```bash
-pnpm dev
+pnpm dev:start
 ```
 
-The app will be available at http://localhost:3000.
+This launches a tmux dashboard with the Next.js app and related services. The web app will be available at http://localhost:3000.
+
+To stop all services:
+
+```bash
+pnpm dev:stop
+```
 
 ## Verifying Your Setup
 
@@ -160,28 +166,26 @@ All tests should pass against the local PostgreSQL database.
 
 ## Common Development Commands
 
-| Command                 | Description                                                                                       |
-| ----------------------- | ------------------------------------------------------------------------------------------------- |
-| `pnpm dev`              | Start the Next.js dev server (Turbopack)                                                          |
-| `pnpm dev:start`        | Start all local services in a tmux dashboard                                                      |
-| `pnpm dev:stop`         | Stop the tmux session and all services                                                            |
-| `pnpm dev:env`          | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
-| `pnpm test`             | Run the Jest test suite                                                                           |
-| `pnpm typecheck`        | Run the TypeScript type checker                                                                   |
-| `pnpm lint`             | Lint all source files                                                                             |
-| `pnpm lint:changed`     | Lint only files changed since `main`                                                              |
-| `pnpm format`           | Format all supported files with oxfmt                                                             |
-| `pnpm format:changed`   | Format only files changed since `main`                                                            |
-| `pnpm validate`         | Run typecheck, lint changed, format changed, tests, and dependency cycle check                    |
-| `pnpm drizzle migrate`  | Apply pending database migrations                                                                 |
-| `pnpm drizzle generate` | Generate a new migration after schema changes                                                     |
-| `pnpm stripe`           | Start Stripe webhook forwarding to localhost                                                      |
-| `pnpm test:e2e`         | Run Playwright end-to-end tests                                                                   |
+| Command                            | Description                                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `pnpm dev:start`                   | Start all local services in a tmux dashboard                                                      |
+| `pnpm dev:stop`                    | Stop the tmux session and all services                                                            |
+| `pnpm dev:env`                     | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
+| `pnpm test`                        | Run the Jest test suite                                                                           |
+| `pnpm typecheck`                   | Run the TypeScript type checker                                                                   |
+| `pnpm lint`                        | Lint all source files                                                                             |
+| `pnpm format`                      | Format all supported files with oxfmt                                                             |
+| `pnpm format:changed`              | Format only files changed since `main`                                                            |
+| `pnpm validate`                    | Run typecheck, lint, and tests                                                                    |
+| `pnpm drizzle migrate`             | Apply pending database migrations                                                                 |
+| `pnpm drizzle generate`            | Generate a new migration after schema changes                                                     |
+| `pnpm --filter web stripe`         | Start Stripe webhook forwarding to localhost                                                      |
+| `pnpm test:e2e`                    | Run Playwright end-to-end tests                                                                   |
 
 ## Git Workflow
 
 - Direct commits to `main` are blocked by a git hook. Always work on a feature branch.
-- The pre-push hook runs `pnpm format:check`, `pnpm lint`, and `pnpm typecheck`.
+- The pre-push hook runs `pnpm format:check`, `lint`, and `typecheck --changes-only` in parallel.
 
 ## Stripe Webhook Testing
 
@@ -197,7 +201,7 @@ To test Stripe integration locally:
 
 ## Database Schema Changes
 
-1. Edit the schema in `src/db/schema.ts`
+1. Edit the schema in `packages/db/src/schema.ts`
 2. Generate a migration: `pnpm drizzle generate`
 3. Apply it: `pnpm drizzle migrate`
 
@@ -289,7 +293,7 @@ Trial status is checked at three layers:
 A script creates 6 organizations with different trial states for UI testing:
 
 ```bash
-pnpm script:run db create-trial-test-orgs yourname@admin.example.com
+pnpm --filter web script:run db create-trial-test-orgs yourname@admin.example.com
 ```
 
 ## Cloudflare Workers & AI Inference

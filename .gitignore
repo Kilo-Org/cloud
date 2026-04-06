@@ -1,14 +1,3 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# editor
-.idea/
-# so I can colorize multiple clones easily and distinctly:
-*.code-workspace
-
-# plans & prototypes (local only)
-/plans/
-/prototypes/
-
 # dependencies
 node_modules/
 /.pnpm-store/
@@ -20,96 +9,82 @@ node_modules/
 !.yarn/releases
 !.yarn/versions
 
-# local tokens / testing
-.tokens.json
-.test-token
-
-# testing
-/coverage
-.tmp/
-
-# next.js
+# build output
 .next/
 /out/
-
-# production
 /build
+packages/trpc/dist/
+*.tsbuildinfo
+next-env.d.ts
 
-# dev server port (written by scripts/dev.sh for multi-worktree support)
+# env & secrets
+.env*.local*
+!.env*.example*
+.env.keys
+.env.grafana
+.env.sentry-build-plugin
+.tokens.json
+.test-token
+*.pem
+
+# dev tooling
 .dev-port
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
 /.dev-logs/
 /dev/.dev-logs/
 /dev/*/.dev-logs/
 /dev/fixtures/
 /dev/*/fixtures/
-
-# env files (can opt-in for committing if needed)
-.env*.local*
-!.env*.example*
-.env.keys
-.env.grafana
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# kdiff3
-*.orig
 dev-debug-request-logs/*
 
-# misc
-.DS_Store
-.eslintcache
-*.pem
-TMP_CI_commit_msg.txt
-*.csv
-
-# Sentry Config File
-.env.sentry-build-plugin
-
-# Nix / Direnv
-.direnv
-
-# Playwright
+# testing
+/coverage
+.tmp/
 test-results/
 playwright-report/
 playwright/.auth/
 
-# Generated screenshot stories
+# debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# editor & OS
+.DS_Store
+.idea/
+*.code-workspace
+*.orig
+
+# local plans & prototypes
+/plans/
+/prototypes/
+.plan/
+.kilo/plans
+
+# generated assets
 /apps/storybook/stories/generated/
 /apps/storybook/public/screenshots/
-run-milvus-test.sh
 
-# Cloudflare
+# platform-specific
+.vercel
 .wrangler/
-.env*.local
 /.superset
+supabase/.temp
 
-# Git worktrees
+# git worktrees
 .worktrees/
 .gw.yml
 
-supabase/.temp
+# nix / direnv
+.direnv
 
-# Husky generated hook shims
-.husky/_/
-
-.dev-logs/
-
-.kilo/plans
-
-# ESLint cache
+# linter cache
 .eslintcache
 
-# @kilocode/trpc build output (rebuilt by: pnpm --filter @kilocode/trpc run build)
-packages/trpc/dist/
-.plan/
+# husky generated hook shims
+.husky/_/
+
+# misc
+TMP_CI_commit_msg.txt
+*.csv
+run-milvus-test.sh

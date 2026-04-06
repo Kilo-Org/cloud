@@ -846,7 +846,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // embedding requests through the Kilo Gateway instead of the default OpenAI endpoint.
     if (patch.vectorMemoryEnabled !== undefined || patch.vectorMemoryModel !== undefined) {
       if (this.s.vectorMemoryEnabled) {
-        const model = this.s.vectorMemoryModel ?? 'mistralai/mistral-embed';
+        const model = this.s.vectorMemoryModel ?? 'mistralai/mistral-embed-2312';
         const baseUrl = this.env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/gateway/';
         const headers: Record<string, string> = {};
         if (this.s.orgId) {

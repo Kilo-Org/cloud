@@ -10,11 +10,11 @@ export type EmbeddingModelOption = {
 };
 
 export const EMBEDDING_MODELS: EmbeddingModelOption[] = [
-  { id: 'mistralai/mistral-embed', name: 'Mistral Embed' },
+  { id: 'mistralai/mistral-embed-2312', name: 'Mistral Embed' },
   { id: 'openai/text-embedding-3-small', name: 'OpenAI Text Embedding 3 Small' },
   { id: 'openai/text-embedding-3-large', name: 'OpenAI Text Embedding 3 Large' },
-  { id: 'google/text-embedding-004', name: 'Google Text Embedding 004' },
+  { id: 'google/gemini-embedding-001', name: 'Google Gemini Embedding 001' },
   { id: 'mistralai/codestral-embed-2505', name: 'Codestral Embed' },
 ];
 
-export const DEFAULT_EMBEDDING_MODEL = 'mistralai/mistral-embed';
+export const DEFAULT_EMBEDDING_MODEL = 'mistralai/mistral-embed-2312';

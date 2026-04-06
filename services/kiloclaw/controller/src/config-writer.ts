@@ -501,7 +501,7 @@ export function generateBaseConfig(
   config.agents.defaults = config.agents.defaults ?? {};
   config.agents.defaults.memorySearch = config.agents.defaults.memorySearch ?? {};
   if (env.KILOCLAW_VECTOR_MEMORY_ENABLED === 'true') {
-    const model = env.KILOCLAW_VECTOR_MEMORY_MODEL || 'mistralai/mistral-embed';
+    const model = env.KILOCLAW_VECTOR_MEMORY_MODEL || 'mistralai/mistral-embed-2312';
     const baseUrl = env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/gateway/';
 
     config.agents.defaults.memorySearch.enabled = true;

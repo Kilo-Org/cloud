@@ -341,7 +341,7 @@ export const PersistedStateSchema = z.object({
   streamChatChannelId: z.string().nullable().default(null),
   // Vector memory: whether the builtin embedding-backed memory search is enabled.
   vectorMemoryEnabled: z.boolean().default(false),
-  // Vector memory: embedding model ID (e.g. "mistralai/mistral-embed").
+  // Vector memory: embedding model ID (e.g. "mistralai/mistral-embed-2312").
   vectorMemoryModel: z.string().nullable().default(null),
   // Dreaming: whether background memory consolidation is enabled.
   dreamingEnabled: z.boolean().default(false),

@@ -1,4 +1,5 @@
 const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
+  'arcee-ai/trinity-large-preview:free',
   'arcee-ai/trinity-mini:free',
   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
   'deepseek/deepseek-r1-0528:free',

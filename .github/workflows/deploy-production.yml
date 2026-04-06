@@ -35,15 +35,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Setup Vercel ENV
+      # Setup Vercel ENV — link from repo root; Vercel rootDirectory (apps/web) is set on the dashboard
       - run: pnpm install --global vercel@latest
       - run: vercel link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-        working-directory: apps/web
       - run: vercel env pull .env.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/web
-
-      # packages/db/drizzle.config.ts reads ../../.env.local (repo root) — copy it there
-      - run: cp apps/web/.env.local .env.local
 
       - name: Run Drizzle migrations
         run: NODE_ENV=production pnpm run drizzle migrate
@@ -90,21 +85,17 @@ jobs:
         run: pnpm install --global vercel@latest
 
       - run: vercel link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-        working-directory: apps/web
 
       - name: Pull Vercel Environment Information
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/web
 
       - name: Build Project Artifacts
         env:
           NODE_OPTIONS: '--max-old-space-size=8192'
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/web
 
       - name: Deploy Project Artifacts to Vercel
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/web
 
   deploy-global-app:
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
@@ -148,21 +139,17 @@ jobs:
         run: pnpm install --global vercel@latest
 
       - run: vercel link --project=kilocode-global-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-        working-directory: apps/web
 
       - name: Pull Vercel Environment Information
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/web
 
       - name: Build Project Artifacts
         env:
           NODE_OPTIONS: '--max-old-space-size=8192'
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/web
 
       - name: Deploy Project Artifacts to Vercel
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/web
 
   check-kiloclaw-changes:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}

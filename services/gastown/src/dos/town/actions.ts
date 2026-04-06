@@ -652,49 +652,61 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 feedback.hasFailingChecks ||
                 feedback.hasUncheckedRuns)
             ) {
-              const existingFeedback = hasExistingFeedbackBead(sql, action.bead_id);
-              if (!existingFeedback) {
-                const prMeta = parsePrUrl(action.pr_url);
-                const rmRows = z
-                  .object({ branch: z.string() })
-                  .array()
-                  .parse([
-                    ...query(
-                      sql,
-                      /* sql */ `
-                        SELECT ${review_metadata.columns.branch}
-                        FROM ${review_metadata}
-                        WHERE ${review_metadata.bead_id} = ?
-                      `,
-                      [action.bead_id]
-                    ),
-                  ]);
-                const branch = rmRows[0]?.branch ?? '';
+              // Re-verify the PR is still open before creating a feedback bead.
+              // The checkPRFeedback call above takes ~2s (3+ GitHub API calls).
+              // If the PR was merged externally during that window, inserting
+              // pr_feedback_detected would create a feedback bead for a merged
+              // PR — leading to a duplicate PR on an already-merged branch.
+              const freshStatus = await ctx.checkPRStatus(action.pr_url);
+              if (freshStatus !== 'open') {
+                console.log(
+                  `${LOG} poll_pr: PR status changed to '${freshStatus}' during feedback check, skipping feedback for bead=${action.bead_id}`
+                );
+              } else {
+                const existingFeedback = hasExistingFeedbackBead(sql, action.bead_id);
+                if (!existingFeedback) {
+                  const prMeta = parsePrUrl(action.pr_url);
+                  const rmRows = z
+                    .object({ branch: z.string() })
+                    .array()
+                    .parse([
+                      ...query(
+                        sql,
+                        /* sql */ `
+                          SELECT ${review_metadata.columns.branch}
+                          FROM ${review_metadata}
+                          WHERE ${review_metadata.bead_id} = ?
+                        `,
+                        [action.bead_id]
+                      ),
+                    ]);
+                  const branch = rmRows[0]?.branch ?? '';
 
-                ctx.insertEvent('pr_feedback_detected', {
-                  bead_id: action.bead_id,
-                  payload: {
-                    mr_bead_id: action.bead_id,
-                    pr_url: action.pr_url,
-                    pr_number: prMeta?.prNumber ?? 0,
-                    repo: prMeta?.repo ?? '',
-                    branch,
-                    has_unresolved_comments: feedback.hasUnresolvedComments,
-                    has_failing_checks: feedback.hasFailingChecks,
-                    has_unchecked_runs: feedback.hasUncheckedRuns,
-                  },
-                });
+                  ctx.insertEvent('pr_feedback_detected', {
+                    bead_id: action.bead_id,
+                    payload: {
+                      mr_bead_id: action.bead_id,
+                      pr_url: action.pr_url,
+                      pr_number: prMeta?.prNumber ?? 0,
+                      repo: prMeta?.repo ?? '',
+                      branch,
+                      has_unresolved_comments: feedback.hasUnresolvedComments,
+                      has_failing_checks: feedback.hasFailingChecks,
+                      has_unchecked_runs: feedback.hasUncheckedRuns,
+                    },
+                  });
+                }
+
+                query(
+                  sql,
+                  /* sql */ `
+                    UPDATE ${review_metadata}
+                    SET ${review_metadata.columns.last_feedback_check_at} = ?
+                    WHERE ${review_metadata.bead_id} = ?
+                  `,
+                  [now(), action.bead_id]
+                );
               }
-
-              query(
-                sql,
-                /* sql */ `
-                  UPDATE ${review_metadata}
-                  SET ${review_metadata.columns.last_feedback_check_at} = ?
-                  WHERE ${review_metadata.bead_id} = ?
-                `,
-                [now(), action.bead_id]
-              );
             }
 
             // Auto-merge timer: track grace period when everything is green
@@ -705,6 +717,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 !feedback.hasUnresolvedComments &&
                 !feedback.hasFailingChecks &&
                 feedback.allChecksPass;
+
+              console.log(
+                `${LOG} poll_pr: bead=${action.bead_id} allGreen=${allGreen} unresolved=${feedback.hasUnresolvedComments} failing=${feedback.hasFailingChecks} allPass=${feedback.allChecksPass} unchecked=${feedback.hasUncheckedRuns}`
+              );
 
               if (allGreen) {
                 const readySinceRows = z
@@ -724,6 +740,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
                 const readySince = readySinceRows[0]?.auto_merge_ready_since;
 
+                console.log(
+                  `${LOG} poll_pr: bead=${action.bead_id} readySince=${readySince ?? 'null'} rows=${readySinceRows.length}`
+                );
+
                 if (!readySince) {
                   query(
                     sql,
@@ -736,7 +756,14 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                   );
                 } else {
                   const elapsed = Date.now() - new Date(readySince).getTime();
-                  if (elapsed >= (refineryConfig.auto_merge_delay_minutes ?? 0) * 60_000) {
+                  const delayMs = (refineryConfig.auto_merge_delay_minutes ?? 0) * 60_000;
+                  console.log(
+                    `${LOG} poll_pr: bead=${action.bead_id} elapsed=${elapsed}ms delay=${delayMs}ms shouldMerge=${elapsed >= delayMs}`
+                  );
+                  if (elapsed >= delayMs) {
+                    console.log(
+                      `${LOG} poll_pr: inserting pr_auto_merge event for bead=${action.bead_id}`
+                    );
                     ctx.insertEvent('pr_auto_merge', {
                       bead_id: action.bead_id,
                       payload: {

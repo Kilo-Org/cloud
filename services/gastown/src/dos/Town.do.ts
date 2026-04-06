@@ -607,6 +607,16 @@ export class TownDO extends DurableObject<Env> {
   /** Instance UUID of the current container, set by the first heartbeat. */
   private _containerInstanceId: string | null = null;
   private _poisonEventFailureCounts = new Map<string, number>();
+  private async _loadPoisonEventFailureCounts(): Promise<void> {
+    const stored = await this.ctx.storage.get<Record<string, number>>('town:poisonEventFailureCounts');
+    if (stored) {
+      this._poisonEventFailureCounts = new Map(Object.entries(stored));
+    }
+  }
+  private async _savePoisonEventFailureCounts(): Promise<void> {
+    const obj = Object.fromEntries(this._poisonEventFailureCounts);
+    await this.ctx.storage.put('town:poisonEventFailureCounts', obj);
+  }
 
   private get townId(): string {
     return this._townId ?? this.ctx.id.name ?? this.ctx.id.toString();
@@ -3475,6 +3485,7 @@ export class TownDO extends DurableObject<Env> {
     // Phase 0: Drain events and apply state transitions
     const poisonEventActions: Action[] = [];
     const POISON_EVENT_THRESHOLD = 3;
+    await this._loadPoisonEventFailureCounts();
     try {
       const pending = events.drainEvents(this.sql);
       metrics.eventsDrained = pending.length;
@@ -3513,6 +3524,7 @@ export class TownDO extends DurableObject<Env> {
               }
             );
             events.markProcessed(this.sql, event.event_id);
+            this._poisonEventFailureCounts.delete(event.event_id);
             poisonEventActions.push({
               type: 'notify_mayor',
               message: `Poison event detected and quarantined: ${event.event_type} event (${event.event_id}) failed ${failureCount} times. Event has been marked as processed.`,
@@ -3520,6 +3532,7 @@ export class TownDO extends DurableObject<Env> {
           }
         }
       }
+      await this._savePoisonEventFailureCounts();
     } catch (err) {
       logger.error('reconciler: event drain failed', {
         error: err instanceof Error ? err.message : String(err),

@@ -557,21 +557,34 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
       beadOps.updateBeadStatus(sql, beadId, 'in_progress', agentId);
 
       const capturedAgentId = agentId;
+      const capturedBeadId = beadId;
       return async () => {
-        // Best-effort dispatch. If it fails (rejects or returns false),
-        // unhook the agent (sets it to idle) and reset the bead to open
-        // so scheduling can retry it on the next tick instead of waiting
-        // for stale-bead recovery.
-        const started = await ctx.dispatchAgent(capturedAgentId, beadId, rigId).catch(err => {
+        // Best-effort dispatch. On rejected promise (definite failure), stop
+        // the container, unhook the agent (sets it to idle), and reset the
+        // bead to open so the reconciler can retry on the next tick.
+        // For false returns (timeout race), the container may still start —
+        // let the heartbeat catch it after 90s and handle via the normal
+        // stale-hook flow instead of risking double-dispatch.
+        let started = false;
+        try {
+          started = await ctx.dispatchAgent(capturedAgentId, capturedBeadId, rigId);
+        } catch (err) {
           console.warn(
-            `${LOG} dispatch_agent: container start failed for agent=${capturedAgentId} bead=${beadId}`,
+            `${LOG} dispatch_agent: container start failed for agent=${capturedAgentId} bead=${capturedBeadId}`,
             err
           );
-          return false;
-        });
-        if (!started) {
+          ctx.stopAgent(capturedAgentId).catch(e => {
+            console.warn(`${LOG} dispatch_agent: stop_agent failed for agent=${capturedAgentId}`, e);
+          });
           agentOps.unhookBead(sql, capturedAgentId);
-          beadOps.updateBeadStatus(sql, beadId, 'open', null);
+          beadOps.updateBeadStatus(sql, capturedBeadId, 'open', null);
+        }
+        if (!started) {
+          // False return is the timeout-race path — don't rollback here.
+          // If the container actually started, heartbeat keeps it alive.
+          // If it didn't, reconcileAgents catches it after 90s of missing
+          // heartbeats and transitions the agent to idle.
+          console.debug(`${LOG} dispatch_agent: container returned false (timeout race) for agent=${capturedAgentId} bead=${capturedBeadId}`);
         }
       };
     }

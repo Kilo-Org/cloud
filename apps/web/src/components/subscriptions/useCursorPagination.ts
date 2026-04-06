@@ -31,6 +31,7 @@ export function useCursorPagination<TEntry>({
   const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const prevResetKey = useRef(resetKey);
+  const needsResync = useRef(false);
 
   // Reset all pagination state when the key changes (synchronous during render).
   if (prevResetKey.current !== resetKey) {
@@ -39,14 +40,27 @@ export function useCursorPagination<TEntry>({
     setCursor(null);
     setHasMore(false);
     setIsLoadingMore(false);
+    needsResync.current = true;
   }
 
+  // Sync from initialData whenever it changes, or after a resetKey change
+  // that cleared state while initialData was already loaded (same reference).
   useEffect(() => {
     if (!initialData) return;
     setEntries(initialData.entries);
     setCursor(initialData.cursor);
     setHasMore(initialData.hasMore);
+    needsResync.current = false;
   }, [initialData]);
+
+  // Handle the race: resetKey changed but initialData ref is unchanged,
+  // so the effect above did not re-run. Re-apply initialData here.
+  if (needsResync.current && initialData) {
+    setEntries(initialData.entries);
+    setCursor(initialData.cursor);
+    setHasMore(initialData.hasMore);
+    needsResync.current = false;
+  }
 
   const loadMore = useCallback(async () => {
     if (!cursor || isLoadingMore) return;

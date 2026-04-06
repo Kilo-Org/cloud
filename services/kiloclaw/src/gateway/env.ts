@@ -30,6 +30,10 @@ export type UserConfig = {
   instanceFeatures?: string[];
   execSecurity?: string | null;
   execAsk?: string | null;
+  botName?: string | null;
+  botNature?: string | null;
+  botVibe?: string | null;
+  botEmoji?: string | null;
   /** Organization ID — injected as KILOCODE_ORGANIZATION_ID for org instances. */
   orgId?: string | null;
   customSecretMeta?: Record<string, { configPath?: string }> | null;
@@ -211,6 +215,11 @@ export async function buildEnvVars(
   // User-selected exec permissions preset (non-sensitive, survives restarts).
   if (userConfig?.execSecurity) plainEnv.KILOCLAW_EXEC_SECURITY = userConfig.execSecurity;
   if (userConfig?.execAsk) plainEnv.KILOCLAW_EXEC_ASK = userConfig.execAsk;
+
+  if (userConfig?.botName) plainEnv.KILOCLAW_BOT_NAME = userConfig.botName;
+  if (userConfig?.botNature) plainEnv.KILOCLAW_BOT_NATURE = userConfig.botNature;
+  if (userConfig?.botVibe) plainEnv.KILOCLAW_BOT_VIBE = userConfig.botVibe;
+  if (userConfig?.botEmoji) plainEnv.KILOCLAW_BOT_EMOJI = userConfig.botEmoji;
 
   // Instance feature flags → env vars (non-sensitive, not user-overridable).
   // Applied after user env vars so users cannot suppress features via envVars config.

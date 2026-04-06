@@ -6596,6 +6596,65 @@ describe('updateExecPreset', () => {
   });
 });
 
+describe('updateBotIdentity', () => {
+  it('persists bot identity fields to DO storage', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage);
+
+    const result = await instance.updateBotIdentity({
+      botName: 'Milo',
+      botNature: 'Operations copilot',
+      botVibe: 'Dry wit',
+      botEmoji: '🤖',
+    });
+
+    expect(result).toEqual({
+      botName: 'Milo',
+      botNature: 'Operations copilot',
+      botVibe: 'Dry wit',
+      botEmoji: '🤖',
+    });
+    expect(storage._store.get('botName')).toBe('Milo');
+    expect(storage._store.get('botNature')).toBe('Operations copilot');
+    expect(storage._store.get('botVibe')).toBe('Dry wit');
+    expect(storage._store.get('botEmoji')).toBe('🤖');
+  });
+
+  it('writes IDENTITY.md on running instances', async () => {
+    const env = createFakeEnv();
+    env.FLY_APP_NAME = 'bot-app';
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, path: 'workspace/IDENTITY.md' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { instance, storage } = createInstance(undefined, env);
+    await seedProvisioned(storage, {
+      status: 'running',
+      flyMachineId: 'machine-1',
+      sandboxId: 'sandbox-1',
+    });
+
+    await instance.updateBotIdentity({ botName: 'Milo' });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://bot-app.fly.dev/_kilo/bot-identity',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          botName: 'Milo',
+          botNature: null,
+          botVibe: null,
+          botEmoji: null,
+        }),
+      })
+    );
+    vi.unstubAllGlobals();
+  });
+});
+
 describe('tryMarkInstanceReady', () => {
   it('returns shouldNotify: true on first call and persists the flag', async () => {
     const { instance, storage } = createInstance();

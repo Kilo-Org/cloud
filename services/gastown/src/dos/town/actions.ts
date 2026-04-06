@@ -571,8 +571,14 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
         if (!started) {
           console.warn(
             `${LOG} dispatch_agent: container did not start within timeout for agent=${capturedAgentId} bead=${capturedBeadId}. ` +
-              'Leaving bead in current state; stale-bead recovery will handle if container fails to start.'
+              'Reopening bead and unhooking agent; stale-bead recovery will retry.'
           );
+          // Reopen bead and unhook agent so the next tick can retry from a clean
+          // state. The stale-bead path would take ~90s; this is immediate.
+          // If the original container races in after rollback, it finds no bead
+          // and exits cleanly — safe failure mode.
+          beadOps.updateBeadStatus(ctx.sql, capturedBeadId, 'open', null);
+          agentOps.unhookBead(ctx.sql, capturedAgentId);
         }
       };
     }

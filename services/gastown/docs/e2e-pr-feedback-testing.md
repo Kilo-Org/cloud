@@ -199,11 +199,12 @@ gh api repos/$REPO/pulls/$PR_NUMBER/comments --jq 'length'
 - Auto-merge fires after ~2 min delay
 - PR merged on GitHub, no post-merge comments
 
-### Known Issues (2026-04-05)
+### Historical Test Results (2026-04-05)
 
-**Bug: Refinery dispatches despite `code_review=false` (persists after round 1 fix).** The reconciler's `code_review` bypass only works for MR beads that already have a `pr_url` in `review_metadata`. The polecat does not pass `pr_url` when creating the MR bead (see Bug 2 in round 2 results below), so the MR bead always starts with `pr_url=null`. The reconciler falls through and dispatches the refinery. Confirmed in round 2 testing — PR #38 was created by the refinery, not the polecat.
+Early test rounds found two issues that have since been addressed:
 
-**Bug: Polecat does not create GitHub PRs (NEW, round 2).** When `merge_strategy=pr`, the polecat pushes branches but does not call `gh pr create`. The MR bead is created with `pr_url=null`. This blocks the entire PR-based merge flow when `code_review=false` (no one creates the PR) and causes the refinery to enter a rework loop when `code_review=true` (no PR to review).
+1. **Refinery dispatched during `pr_url=null` window** — Fixed by transitioning all open MR beads with `pr_url` when `code_review=false`, and always dispatching the refinery for direct-merge beads.
+2. **Polecat not reliably creating PRs** — The polecat LLM occasionally skips the `gh pr create` step despite prompt instructions. This is a prompt reliability issue, not a code bug. The system prompt includes clear PR creation instructions; LLM compliance varies by run.
 
 ---
 

@@ -4,7 +4,7 @@ FROM --platform=linux/arm64 oven/bun:1-slim
 # Package categories:
 #   version control: git, git-lfs
 #   network/download: curl, wget, ca-certificates, gnupg, unzip
-#   build toolchain: build-essential, autoconf
+#   build toolchain: build-essential, autoconf, cmake, pkg-config
 #   search tools: ripgrep, jq
 #   compression: bzip2, zstd
 #   SSL/crypto: libssl-dev, libffi-dev
@@ -27,6 +27,8 @@ RUN apt-get update && \
       unzip \
       build-essential \
       autoconf \
+      cmake \
+      pkg-config \
       ripgrep \
       jq \
       bzip2 \

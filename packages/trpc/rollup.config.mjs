@@ -16,7 +16,7 @@ function resolveDts(base) {
 }
 
 export default {
-  external: ['pg'],
+  external: ['pg', '@tanstack/react-query', '@trpc/client', 'next/server'],
   input: './dist/tsc/packages/trpc/src/index.d.ts',
   output: {
     file: './dist/index.d.ts',

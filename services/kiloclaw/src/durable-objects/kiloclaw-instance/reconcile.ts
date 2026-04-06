@@ -834,7 +834,7 @@ export async function syncStatusWithFly(
   }
 
   if (flyState === 'stopped') {
-    return detectUnexpectedStop(ctx, state, flyState, rctx);
+    return await detectUnexpectedStop(ctx, state, flyState, rctx);
   }
 
   return {};

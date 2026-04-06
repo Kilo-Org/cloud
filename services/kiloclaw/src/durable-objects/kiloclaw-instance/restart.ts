@@ -36,19 +36,11 @@ export type RestartRuntime = {
 export async function runRestartMachine(
   runtime: RestartRuntime
 ): Promise<{ success: boolean; error?: string }> {
-  const { state, env, ctx, persist, scheduleAlarm, emitEvent } = runtime;
+  const { state, env, ctx, persist, scheduleAlarm } = runtime;
 
   if (!state.flyMachineId) {
     return { success: false, error: 'No machine exists' };
   }
-
-  const action = 'redeploy-same-image';
-  doLog(state, 'restartMachine: initiating async restart', {
-    action,
-    currentStatus: state.status,
-    trackedImageTag: state.trackedImageTag,
-    flyMachineId: state.flyMachineId,
-  });
 
   const flyConfig = getFlyConfig(env, state);
 
@@ -76,8 +68,6 @@ export async function runRestartMachine(
     })
   );
   await scheduleAlarm();
-
-  emitEvent({ event: 'instance.restarting', status: 'restarting', label: action });
 
   return { success: true };
 }

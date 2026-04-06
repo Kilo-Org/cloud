@@ -58,18 +58,18 @@ export type RecoverySignal =
  * Increments healthCheckFailCount and returns a recovery trigger signal when
  * SELF_HEAL_THRESHOLD is reached.
  */
-export function detectUnexpectedStop(
+export async function detectUnexpectedStop(
   ctx: DurableObjectState,
   state: InstanceMutableState,
   flyState: string,
   rctx: ReconcileContext
-): RecoverySignal {
+): Promise<RecoverySignal> {
   if (flyState !== 'stopped' || state.status !== 'running') {
     return {};
   }
 
   state.healthCheckFailCount++;
-  void ctx.storage.put(storageUpdate({ healthCheckFailCount: state.healthCheckFailCount }));
+  await ctx.storage.put(storageUpdate({ healthCheckFailCount: state.healthCheckFailCount }));
 
   if (state.healthCheckFailCount >= SELF_HEAL_THRESHOLD) {
     rctx.log('unexpected_stop_recovery_trigger', {

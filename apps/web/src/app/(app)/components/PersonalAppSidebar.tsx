@@ -27,7 +27,7 @@ import {
   Factory,
   Settings,
   CreditCard,
-  MessageSquare
+  MessageSquare,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';

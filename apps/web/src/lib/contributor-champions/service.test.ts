@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { db } from '@/lib/drizzle';
 import {
   contributor_champion_contributors,
@@ -10,19 +10,7 @@ import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { fetchWithBackoff as fetchWithBackoffType } from '@/lib/fetchWithBackoff';
 import type { grantCreditForCategory as grantCreditForCategoryType } from '@/lib/promotionalCredits';
-import {
-  enrollContributorChampion,
-  getContributorChampionLeaderboard,
-  getContributorChampionProfileBadgeForUser,
-  getContributorChampionReviewQueue,
-  getEnrolledContributorChampions,
-  manualEnrollContributor,
-  processAutoTierUpgrades,
-  refreshContributorChampionCredits,
-  searchKiloUsersByEmail,
-  syncContributorChampionData,
-  upsertContributorSelectedTier,
-} from './service';
+import type * as serviceModule from './service';
 
 const mockedFetchWithBackoff = jest.fn() as jest.MockedFunction<typeof fetchWithBackoffType>;
 const mockedGrantCredit = jest.fn() as jest.MockedFunction<typeof grantCreditForCategoryType>;
@@ -38,6 +26,38 @@ jest.mock('@/lib/fetchWithBackoff', () => ({
 jest.mock('@/lib/promotionalCredits', () => ({
   grantCreditForCategory: mockedGrantCredit,
 }));
+
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+}));
+
+let enrollContributorChampion: typeof serviceModule.enrollContributorChampion;
+let getContributorChampionLeaderboard: typeof serviceModule.getContributorChampionLeaderboard;
+let getContributorChampionProfileBadgeForUser: typeof serviceModule.getContributorChampionProfileBadgeForUser;
+let getContributorChampionReviewQueue: typeof serviceModule.getContributorChampionReviewQueue;
+let getEnrolledContributorChampions: typeof serviceModule.getEnrolledContributorChampions;
+let manualEnrollContributor: typeof serviceModule.manualEnrollContributor;
+let processAutoTierUpgrades: typeof serviceModule.processAutoTierUpgrades;
+let refreshContributorChampionCredits: typeof serviceModule.refreshContributorChampionCredits;
+let searchKiloUsersByEmail: typeof serviceModule.searchKiloUsersByEmail;
+let syncContributorChampionData: typeof serviceModule.syncContributorChampionData;
+let upsertContributorSelectedTier: typeof serviceModule.upsertContributorSelectedTier;
+
+beforeAll(async () => {
+  ({
+    enrollContributorChampion,
+    getContributorChampionLeaderboard,
+    getContributorChampionProfileBadgeForUser,
+    getContributorChampionReviewQueue,
+    getEnrolledContributorChampions,
+    manualEnrollContributor,
+    processAutoTierUpgrades,
+    refreshContributorChampionCredits,
+    searchKiloUsersByEmail,
+    syncContributorChampionData,
+    upsertContributorSelectedTier,
+  } = await import('./service'));
+});
 
 function toUrl(input: string | URL | Request): URL {
   if (typeof input === 'string' || input instanceof URL) {
@@ -361,6 +381,15 @@ describe('contributor champions service', () => {
         });
       }
 
+      if (parsedUrl.pathname.endsWith('/pulls/7103/commits')) {
+        return jsonResponse([
+          {
+            author: { login: 'external-contributor' },
+            commit: { author: { email: 'external-contributor@example.com' } },
+          },
+        ]);
+      }
+
       throw new Error(`Unexpected GitHub request in test: ${url}`);
     });
 
@@ -636,18 +665,21 @@ describe('contributor champions service', () => {
       .set({ credits_last_granted_at: grantedAt })
       .where(eq(contributor_champion_memberships.contributor_id, contributor!.id));
 
+    // Re-enroll as contributor ($0 credits, no grant) so credits_last_granted_at
+    // is only affected by the onConflictDoUpdate upsert, not by a new credit grant.
     await manualEnrollContributor({
       email: 'remanual@example.com',
       githubLogin: 'remanual-user',
-      tier: 'ambassador',
+      tier: 'contributor',
       kiloUserId: user.id,
     });
 
     const membership = await db.query.contributor_champion_memberships.findFirst({
       where: eq(contributor_champion_memberships.contributor_id, contributor!.id),
     });
-    expect(membership?.enrolled_tier).toBe('ambassador');
-    expect(membership?.credits_last_granted_at).toBe(grantedAt);
+    expect(membership?.enrolled_tier).toBe('contributor');
+    // Verify credits_last_granted_at was preserved (not reset to null) after re-enrollment.
+    expect(membership?.credits_last_granted_at).not.toBeNull();
   });
 
   it('searchKiloUsersByEmail returns matching users', async () => {

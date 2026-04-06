@@ -97,12 +97,16 @@ const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed
  * because no active instance exists at that point.
  *
  * Per billing spec Trial Eligibility and Creation rule 5, only subscriptions
- * that still grant access are eligible for adoption.  The function picks the
- * best candidate (paid over trial), and only adopts if the active instance
- * does not already have a subscription.
+ * that still grant access are eligible for adoption.  The access filter is
+ * applied in SQL so that a non-access-granting orphan (e.g. a canceled paid
+ * row) cannot shadow an access-granting one behind LIMIT 1.
+ *
+ * The function picks the best access-granting candidate (paid over trial),
+ * and only adopts if the active instance does not already have a subscription.
  *
  * Non-access-granting orphans (canceled, unpaid, etc.) are left untouched to
- * preserve prior-paid history for {@link hadPriorPaidSubscription}.
+ * preserve prior-paid history for {@link hadPriorPaidSubscription} and to
+ * block duplicate trial creation in ensureProvisionAccess (spec rule 2).
  *
  * This function is intentionally narrow: it only handles NULL instance_id
  * orphans and never deletes subscription rows.  The destroy flow is
@@ -127,34 +131,36 @@ async function adoptOrphanedSubscription(userId: string, activeInstanceId: strin
   // hadPriorPaidSubscription for pricing decisions.
   if (incumbent) return;
 
-  // Find the best orphan: unlinked rows for this user, ordered so paid
-  // subscriptions come before trials.
+  // Find the best access-granting orphan: unlinked rows for this user that
+  // still grant access, ordered so paid subscriptions come before trials.
+  // The access check is in SQL so a canceled paid orphan doesn't shadow an
+  // access-granting trial orphan behind LIMIT 1.
   const [orphan] = await db
-    .select({
-      id: kiloclaw_subscriptions.id,
-      status: kiloclaw_subscriptions.status,
-      suspended_at: kiloclaw_subscriptions.suspended_at,
-      trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
-    })
+    .select({ id: kiloclaw_subscriptions.id })
     .from(kiloclaw_subscriptions)
     .where(
-      and(eq(kiloclaw_subscriptions.user_id, userId), isNull(kiloclaw_subscriptions.instance_id))
+      and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        isNull(kiloclaw_subscriptions.instance_id),
+        // Access-granting statuses per billing spec Access Control rules 1-3:
+        // active, unsuspended past_due, or unexpired trialing.
+        or(
+          eq(kiloclaw_subscriptions.status, 'active'),
+          and(
+            eq(kiloclaw_subscriptions.status, 'past_due'),
+            isNull(kiloclaw_subscriptions.suspended_at)
+          ),
+          and(
+            eq(kiloclaw_subscriptions.status, 'trialing'),
+            sql`${kiloclaw_subscriptions.trial_ends_at} > now()`
+          )
+        )
+      )
     )
     .orderBy(sql`CASE WHEN ${kiloclaw_subscriptions.plan} != 'trial' THEN 0 ELSE 1 END`)
     .limit(1);
 
   if (!orphan) return;
-
-  // Only adopt if the orphan still grants access (billing spec rule 5).
-  const now = new Date();
-  const hasAccess =
-    orphan.status === 'active' ||
-    (orphan.status === 'past_due' && !orphan.suspended_at) ||
-    (orphan.status === 'trialing' &&
-      !!orphan.trial_ends_at &&
-      new Date(orphan.trial_ends_at) > now);
-
-  if (!hasAccess) return;
 
   await db
     .update(kiloclaw_subscriptions)
@@ -535,24 +541,18 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
   // instance_id = NULL.  See billing spec: Trial Eligibility rule 5.
   await adoptOrphanedSubscription(userId, instance.id);
 
-  // Now check the subscription on this specific instance.
-  const [existing] = await db
-    .select({
-      status: kiloclaw_subscriptions.status,
-      trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
-      suspended_at: kiloclaw_subscriptions.suspended_at,
-    })
+  // Trial eligibility: check ANY subscription for the user (not just on this
+  // instance).  Spec rule 2 says a trial is only created when the user has no
+  // existing subscription record at all — detached orphans (expired trials,
+  // canceled subscriptions) still count.
+  const [anySub] = await db
+    .select({ id: kiloclaw_subscriptions.id })
     .from(kiloclaw_subscriptions)
-    .where(
-      and(
-        eq(kiloclaw_subscriptions.user_id, userId),
-        eq(kiloclaw_subscriptions.instance_id, instance.id)
-      )
-    )
+    .where(eq(kiloclaw_subscriptions.user_id, userId))
     .limit(1);
 
-  if (!existing && !earlybird) {
-    // New user with no earlybird purchase — start trial.
+  if (!anySub && !earlybird) {
+    // New user with no subscription record and no earlybird purchase — start trial.
     const now = new Date();
     const trialEndsAt = new Date(now.getTime() + KILOCLAW_TRIAL_DURATION_DAYS * 86_400_000);
     // Use onConflictDoNothing so concurrent requests (e.g. double-submit)
@@ -604,15 +604,33 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
     return;
   }
 
-  if (existing) {
+  // Access check: check the subscription on this specific instance.
+  // After adoption, this will include any previously-orphaned subscription
+  // that was linked to this instance above.
+  const [instanceSub] = await db
+    .select({
+      status: kiloclaw_subscriptions.status,
+      trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
+      suspended_at: kiloclaw_subscriptions.suspended_at,
+    })
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        eq(kiloclaw_subscriptions.instance_id, instance.id)
+      )
+    )
+    .limit(1);
+
+  if (instanceSub) {
     // Mirror requireKiloClawAccess: active always passes; past_due passes only
     // until the billing lifecycle cron sets suspended_at.
     const hasAccess =
-      existing.status === 'active' ||
-      (existing.status === 'past_due' && !existing.suspended_at) ||
-      (existing.status === 'trialing' &&
-        !!existing.trial_ends_at &&
-        new Date(existing.trial_ends_at) > new Date());
+      instanceSub.status === 'active' ||
+      (instanceSub.status === 'past_due' && !instanceSub.suspended_at) ||
+      (instanceSub.status === 'trialing' &&
+        !!instanceSub.trial_ends_at &&
+        new Date(instanceSub.trial_ends_at) > new Date());
 
     if (hasAccess) return;
   }

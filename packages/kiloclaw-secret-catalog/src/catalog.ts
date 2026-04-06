@@ -142,17 +142,17 @@ const SECRET_CATALOG_RAW = [
     fields: [
       {
         key: 'agentcardApiKey',
-        label: 'API Key (JWT)',
-        placeholder: 'eyJ...',
-        placeholderConfigured: 'Enter new JWT to replace',
+        label: 'API Key',
+        placeholder: 'sk_test_...',
+        placeholderConfigured: 'Enter new API key to replace',
         envVar: 'AGENTCARD_API_KEY',
-        validationPattern: '^eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$',
-        validationMessage: 'Enter the JWT from ~/.agent-cards/config.json (starts with eyJ).',
-        maxLength: 2000,
+        validationPattern: '^sk_(test|live)_[A-Za-z0-9_-]+$',
+        validationMessage: 'Enter an AgentCard API key (starts with sk_test_ or sk_live_). Create one with agent-cards-admin CLI.',
+        maxLength: 200,
       },
     ],
     helpText: 'Virtual debit cards for autonomous agent spending. See setup guide for details.',
-    helpUrl: 'https://agentcard.sh',
+    helpUrl: 'https://docs.agentcard.sh/integration-guide',
   },
   {
     id: 'onepassword',
@@ -170,7 +170,7 @@ const SECRET_CATALOG_RAW = [
         validationPattern: '^ops_[A-Za-z0-9_\\-]{50,1500}$',
         validationMessage:
           '1Password service account tokens start with ops_ followed by a long base64-encoded string.',
-        maxLength: 2000,
+        maxLength: 200,
       },
     ],
     helpText: 'Create a service account at 1password.com with access to a dedicated vault.',

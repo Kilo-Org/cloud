@@ -155,14 +155,15 @@ function AgentCardSetupGuide() {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Info className="h-3.5 w-3.5" />
-          Advanced Setup Required
+          Setup Guide
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>AgentCard Setup</DialogTitle>
           <DialogDescription>
-            Give your agent the ability to create and spend virtual debit cards.
+            Give your agent the ability to create and spend virtual debit cards on behalf of your
+            users.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 text-sm">
@@ -171,55 +172,74 @@ function AgentCardSetupGuide() {
               Warning: this can permit your agent to spend real money. Use caution.
             </p>
             <p className="text-amber-400/70 mt-1 text-xs">
-              AgentCard is currently in beta. Card issuance may be limited or waitlisted.
+              Use <code className="bg-muted rounded px-1">sk_test_</code> keys during development
+              (sandbox mode, no real charges). Switch to{' '}
+              <code className="bg-muted rounded px-1">sk_live_</code> for production.
             </p>
           </div>
 
           <div>
-            <p className="mb-2 font-medium">1. Create an AgentCard account</p>
-            <p className="text-muted-foreground text-xs">Run these commands:</p>
+            <p className="mb-2 font-medium">1. Install the admin CLI</p>
             <pre className="bg-muted mt-1 rounded-md p-2 text-xs">
-              <code>npm install -g agent-cards{'\n'}agent-cards signup</code>
+              <code>npm install -g agent-cards-admin</code>
             </pre>
           </div>
 
           <div>
-            <p className="mb-2 font-medium">2. Add a payment method</p>
-            <p className="text-muted-foreground text-xs">
-              Run <code className="bg-muted rounded px-1">agent-cards payment-method</code> to link
-              a card via Stripe. This funds any virtual cards your agent creates.
+            <p className="mb-2 font-medium">2. Login</p>
+            <pre className="bg-muted mt-1 rounded-md p-2 text-xs">
+              <code>agent-cards-admin login</code>
+            </pre>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Opens your browser for magic-link email authentication.
             </p>
           </div>
 
           <div>
-            <p className="mb-2 font-medium">3. Copy your API key</p>
-            <p className="text-muted-foreground text-xs">
-              Open <code className="bg-muted rounded px-1">~/.agent-cards/config.json</code> and
-              copy the <strong>jwt</strong> value into the field above.
+            <p className="mb-2 font-medium">3. Create an organization</p>
+            <pre className="bg-muted mt-1 rounded-md p-2 text-xs">
+              <code>
+                agent-cards-admin orgs create \{'\n'}  --name &quot;Your Company&quot; \{'\n'}  --email
+                billing@yourcompany.com
+              </code>
+            </pre>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Save the org ID from the output (e.g.{' '}
+              <code className="bg-muted rounded px-1">org_abc123</code>).
             </p>
           </div>
 
           <div>
-            <p className="mb-2 font-medium">4. Upgrade your instance</p>
+            <p className="mb-2 font-medium">4. Create an API key</p>
+            <pre className="bg-muted mt-1 rounded-md p-2 text-xs">
+              <code>
+                agent-cards-admin keys create \{'\n'}  --org &lt;org-id&gt; \{'\n'}  --name
+                &quot;kiloclaw&quot;
+              </code>
+            </pre>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Save the API key (<code className="bg-muted rounded px-1">sk_test_...</code>). It
+              won&apos;t be shown again.
+            </p>
+          </div>
+
+          <div>
+            <p className="mb-2 font-medium">5. Paste the API key</p>
             <p className="text-muted-foreground text-xs">
-              This feature requires the most recent version of OpenClaw. After saving your
-              credentials, use <strong>Upgrade</strong> (not Redeploy) to install the latest image
-              and activate AgentCard. Your agent will then have access to tools like{' '}
-              <code className="bg-muted rounded px-1">create_card</code>,{' '}
-              <code className="bg-muted rounded px-1">list_cards</code>, and{' '}
-              <code className="bg-muted rounded px-1">check_balance</code>.
+              Enter the <code className="bg-muted rounded px-1">sk_test_...</code> key into the
+              field above, then save and redeploy.
             </p>
           </div>
 
           <p className="text-muted-foreground border-t pt-3 text-xs">
-            Learn more at{' '}
+            Full integration guide:{' '}
             <a
-              href="https://agentcard.sh"
+              href="https://docs.agentcard.sh/integration-guide"
               target="_blank"
               rel="noopener noreferrer"
               className="underline"
             >
-              agentcard.sh
+              docs.agentcard.sh/integration-guide
             </a>
           </p>
         </div>
@@ -227,6 +247,7 @@ function AgentCardSetupGuide() {
     </Dialog>
   );
 }
+
 
 // ---------------------------------------------------------------------------
 // Google Account (collapsible card, matches SecretEntrySection card style)

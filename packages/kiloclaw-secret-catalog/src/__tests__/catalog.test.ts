@@ -480,7 +480,7 @@ describe('Secret Catalog', () => {
     it('all maxLength values are within the global ceiling', () => {
       for (const entry of SECRET_CATALOG) {
         for (const field of entry.fields) {
-          // JWT-based secrets (e.g. AgentCard) need up to 2000 chars
+          // Longest secrets (e.g. Google credentials) can need up to 2000 chars
           expect(field.maxLength).toBeLessThanOrEqual(2000);
         }
       }

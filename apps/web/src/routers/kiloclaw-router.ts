@@ -100,7 +100,10 @@ const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed
  * Per billing spec Trial Eligibility and Creation rule 5, only orphans that
  * still grant access (active, unsuspended past_due, or unexpired trialing) are
  * eligible for reassignment.  Non-access-granting orphans (canceled, unpaid,
- * suspended past_due, expired trialing) are deleted.
+ * suspended past_due, expired trialing) are left in place — they are not
+ * reassigned but are preserved so that {@link hadPriorPaidSubscription} can
+ * still detect prior paid history for intro-pricing eligibility (Credit
+ * Enrollment rule 3).
  *
  * When the active instance already owns a subscription, the conflict is
  * resolved by keeping whichever row is the paid subscription (non-trial).
@@ -151,25 +154,17 @@ async function reassignOrphanedSubscriptions(userId: string, activeInstanceId: s
 
   if (orphans.length === 0) return;
 
-  // Partition orphans into access-granting and non-access-granting per billing
-  // spec Access Control rules 1-3.
+  // Only orphans that still grant access are eligible for reassignment per
+  // billing spec Access Control rules 1-3 and Trial Eligibility rule 5.
+  // Non-access-granting orphans (canceled, unpaid, etc.) are left in place to
+  // preserve prior-paid history for hadPriorPaidSubscription().
   const now = new Date();
-  type OrphanRow = (typeof orphans)[number];
-  const grantsAccess = (row: OrphanRow): boolean =>
-    row.status === 'active' ||
-    (row.status === 'past_due' && !row.suspended_at) ||
-    (row.status === 'trialing' && !!row.trial_ends_at && new Date(row.trial_ends_at) > now);
-
-  const eligible: OrphanRow[] = [];
-  const dead: OrphanRow[] = [];
-  for (const o of orphans) {
-    (grantsAccess(o) ? eligible : dead).push(o);
-  }
-
-  // Delete non-access-granting orphans — they are dead weight.
-  for (const d of dead) {
-    await db.delete(kiloclaw_subscriptions).where(eq(kiloclaw_subscriptions.id, d.id));
-  }
+  const eligible = orphans.filter(
+    o =>
+      o.status === 'active' ||
+      (o.status === 'past_due' && !o.suspended_at) ||
+      (o.status === 'trialing' && !!o.trial_ends_at && new Date(o.trial_ends_at) > now)
+  );
 
   if (eligible.length === 0) return;
 
@@ -203,7 +198,8 @@ async function reassignOrphanedSubscriptions(userId: string, activeInstanceId: s
   const winner = candidates[0];
   const losers = candidates.slice(1);
 
-  // Delete all losing subscription rows.
+  // Delete losing candidate rows — these are duplicate active subscriptions
+  // that would violate the per-instance unique constraint.
   for (const loser of losers) {
     await db.delete(kiloclaw_subscriptions).where(eq(kiloclaw_subscriptions.id, loser.id));
   }

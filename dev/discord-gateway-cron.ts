@@ -10,7 +10,7 @@
  *
  * Usage: npx tsx dev/discord-gateway-cron.ts
  */
-import '../src/lib/load-env';
+import '../apps/web/src/lib/load-env';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 if (!CRON_SECRET) {

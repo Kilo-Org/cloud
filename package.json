@@ -19,7 +19,10 @@
     "drizzle": "pnpm --filter @kilocode/db exec drizzle-kit",
     "test:e2e": "pnpm --filter web run test:e2e",
     "dependency-cycle-check": "pnpm --filter web run dependency-cycle-check",
-    "worktree:prepare": "bash scripts/worktree-prepare.sh"
+    "worktree:prepare": "bash scripts/worktree-prepare.sh",
+    "dev:start": "tsx dev/local/cli.ts up",
+    "dev:stop": "tsx dev/local/cli.ts stop",
+    "dev:env": "tsx dev/local/cli.ts env"
   },
   "packageManager": "pnpm@10.27.0+sha512.72d699da16b1179c14ba9e64dc71c9a40988cbdc65c264cb0e489db7de917f20dcf4d64d8723625f2969ba52d4b7e2a1170682d9ac2a5dcaeaab732b7e16f04a",
   "devDependencies": {
@@ -29,6 +32,7 @@
     "oxlint": "^1.55.0",
     "oxlint-plugin-react-native": "^0.2.8",
     "oxlint-tsgolint": "^0.17.1",
+    "tsx": "^4.21.0",
     "typescript": "catalog:"
   },
   "pnpm": {

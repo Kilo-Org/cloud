@@ -2,26 +2,26 @@
 set -uo pipefail
 
 # ──────────────────────────────────────────────────────────────
-# dev-review.sh — Start all dev services in parallel with colored logs
+# dev-auto-fix.sh — Start all dev services in parallel with colored logs
 # ──────────────────────────────────────────────────────────────
 #
 # Services:
 #   1. Root (Next.js)           — port 3000
 #   2. Session Worker           — port 8800  (inspector 9230)
-#   3. Review Worker            — port 8789  (inspector 9231)
+#   3. Auto Fix Worker          — port 8792  (inspector 9231)
 #   4. Agent Next Worker        — port 8794  (inspector 9232)
 #
-# Log files are written to dev/.dev-logs/review/<service>.log (ANSI stripped)
+# Log files are written to dev/.dev-logs/auto-fix/<service>.log (ANSI stripped)
 # so AI agents and other tools can read them easily.
 #
 # Usage:
-#   ./dev/review/dev-review.sh            # start all services
-#   ./dev/review/dev-review.sh --no-root  # skip the Next.js root app
+#   ./dev/auto-fix/dev-auto-fix.sh            # start all services
+#   ./dev/auto-fix/dev-auto-fix.sh --no-root  # skip the Next.js root app
 # ──────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CLOUD_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-LOG_DIR="$CLOUD_DIR/dev/.dev-logs/review"
+CLOUD_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+LOG_DIR="$CLOUD_DIR/dev/.dev-logs/auto-fix"
 
 # ANSI colors
 RED='\033[0;31m'
@@ -53,7 +53,7 @@ prefix_log() {
 cleanup() {
   printf "\n${BOLD}${RED}Shutting down all services...${RESET}\n"
   trap - INT TERM EXIT  # prevent re-entry
-  kill 0 2>/dev/null     # send TERM to every process in this process group
+  kill 0 2>/dev/null    # send TERM to every process in this process group
 }
 trap cleanup INT TERM EXIT
 
@@ -95,7 +95,7 @@ mkdir -p "$LOG_DIR"
 # ── Banner ───────────────────────────────────────────────────
 printf "${BOLD}${CYAN}"
 echo "╔══════════════════════════════════════════╗"
-echo "║         Kilo Cloud Dev Services          ║"
+echo "║      Kilo Cloud Auto Fix Services        ║"
 echo "╚══════════════════════════════════════════╝"
 printf "${RESET}\n"
 printf "${CYAN}Logs → %s/${RESET}\n\n" "$LOG_DIR"
@@ -112,7 +112,7 @@ fi
 start_service "$CLOUD_DIR/cloudflare-session-ingest" "session" "$YELLOW" \
   pnpm exec wrangler dev --inspector-port 9230
 
-start_service "$CLOUD_DIR/cloudflare-code-review-infra" "review" "$BLUE" \
+start_service "$CLOUD_DIR/cloudflare-auto-fix-infra" "auto-fix" "$BLUE" \
   pnpm exec wrangler dev --inspector-port 9231
 
 # agent-next needs its predev (build:wrapper) step before starting wrangler

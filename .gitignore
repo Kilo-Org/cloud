@@ -5,6 +5,10 @@
 # so I can colorize multiple clones easily and distinctly:
 *.code-workspace
 
+# plans & prototypes (local only)
+/plans/
+/prototypes/
+
 # dependencies
 node_modules/
 /.pnpm-store/
@@ -40,10 +44,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 /.dev-logs/
-/apps/web/dev/.dev-logs/
-/apps/web/dev/*/.dev-logs/
-/apps/web/dev/fixtures/
-/apps/web/dev/*/fixtures/
+/dev/.dev-logs/
+/dev/*/.dev-logs/
+/dev/fixtures/
+/dev/*/fixtures/
 
 # env files (can opt-in for committing if needed)
 .env*.local*

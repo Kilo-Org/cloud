@@ -13,6 +13,7 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/providers/anthropic';
+import { trinity_large_thinking_free_model } from '@/lib/providers/arcee';
 import { seed_20_pro_free_model } from '@/lib/providers/bytedance';
 import { corethink_free_model } from '@/lib/providers/corethink';
 import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
@@ -87,6 +88,7 @@ export const kiloFreeModels = [
   grok_code_fast_1_optimized_free_model,
   seed_20_pro_free_model,
   qwen35_plus_free_model,
+  trinity_large_thinking_free_model,
 ] as KiloFreeModel[];
 
 export function isKiloStealthModel(model: string): boolean {

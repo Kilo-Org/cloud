@@ -8,7 +8,8 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { fetchWithBackoff } from '@/lib/fetchWithBackoff';
+import type { fetchWithBackoff as fetchWithBackoffType } from '@/lib/fetchWithBackoff';
+import type { grantCreditForCategory as grantCreditForCategoryType } from '@/lib/promotionalCredits';
 import {
   enrollContributorChampion,
   getContributorChampionLeaderboard,
@@ -22,23 +23,21 @@ import {
   syncContributorChampionData,
   upsertContributorSelectedTier,
 } from './service';
-import { grantCreditForCategory } from '@/lib/promotionalCredits';
+
+const mockedFetchWithBackoff = jest.fn() as jest.MockedFunction<typeof fetchWithBackoffType>;
+const mockedGrantCredit = jest.fn() as jest.MockedFunction<typeof grantCreditForCategoryType>;
 
 jest.mock('@/lib/config.server', () => ({
   GITHUB_ADMIN_STATS_TOKEN: 'test-github-token',
 }));
 
 jest.mock('@/lib/fetchWithBackoff', () => ({
-  fetchWithBackoff: jest.fn(),
+  fetchWithBackoff: mockedFetchWithBackoff,
 }));
-
-const mockedFetchWithBackoff = jest.mocked(fetchWithBackoff);
 
 jest.mock('@/lib/promotionalCredits', () => ({
-  grantCreditForCategory: jest.fn(),
+  grantCreditForCategory: mockedGrantCredit,
 }));
-
-const mockedGrantCredit = jest.mocked(grantCreditForCategory);
 
 function toUrl(input: string | URL | Request): URL {
   if (typeof input === 'string' || input instanceof URL) {

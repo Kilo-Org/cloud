@@ -97,6 +97,11 @@ const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed
  * 2. Detached subscriptions with instance_id = NULL (set during instance
  *    destruction cleanup).
  *
+ * Per billing spec Trial Eligibility and Creation rule 5, only orphans that
+ * still grant access (active, unsuspended past_due, or unexpired trialing) are
+ * eligible for reassignment.  Non-access-granting orphans (canceled, unpaid,
+ * suspended past_due, expired trialing) are deleted.
+ *
  * When the active instance already owns a subscription, the conflict is
  * resolved by keeping whichever row is the paid subscription (non-trial).
  * If an orphan is paid and the incumbent is a trial, the trial is deleted
@@ -127,6 +132,9 @@ async function reassignOrphanedSubscriptions(userId: string, activeInstanceId: s
     .select({
       id: kiloclaw_subscriptions.id,
       plan: kiloclaw_subscriptions.plan,
+      status: kiloclaw_subscriptions.status,
+      suspended_at: kiloclaw_subscriptions.suspended_at,
+      trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
     })
     .from(kiloclaw_subscriptions)
     .where(
@@ -143,6 +151,28 @@ async function reassignOrphanedSubscriptions(userId: string, activeInstanceId: s
 
   if (orphans.length === 0) return;
 
+  // Partition orphans into access-granting and non-access-granting per billing
+  // spec Access Control rules 1-3.
+  const now = new Date();
+  type OrphanRow = (typeof orphans)[number];
+  const grantsAccess = (row: OrphanRow): boolean =>
+    row.status === 'active' ||
+    (row.status === 'past_due' && !row.suspended_at) ||
+    (row.status === 'trialing' && !!row.trial_ends_at && new Date(row.trial_ends_at) > now);
+
+  const eligible: OrphanRow[] = [];
+  const dead: OrphanRow[] = [];
+  for (const o of orphans) {
+    (grantsAccess(o) ? eligible : dead).push(o);
+  }
+
+  // Delete non-access-granting orphans — they are dead weight.
+  for (const d of dead) {
+    await db.delete(kiloclaw_subscriptions).where(eq(kiloclaw_subscriptions.id, d.id));
+  }
+
+  if (eligible.length === 0) return;
+
   // Check whether the active instance already has a subscription.
   const [incumbent] = await db
     .select({
@@ -158,9 +188,12 @@ async function reassignOrphanedSubscriptions(userId: string, activeInstanceId: s
     )
     .limit(1);
 
-  // Gather all candidates (incumbent + orphans) and pick the winner: prefer
-  // paid subscriptions over trials.
-  const candidates = [...orphans, ...(incumbent ? [incumbent] : [])];
+  // Gather all candidates (incumbent + eligible orphans) and pick the winner:
+  // prefer paid subscriptions over trials.
+  const candidates = [
+    ...eligible.map(o => ({ id: o.id, plan: o.plan })),
+    ...(incumbent ? [incumbent] : []),
+  ];
   candidates.sort((a, b) => {
     const aPaid = a.plan !== 'trial' ? 0 : 1;
     const bPaid = b.plan !== 'trial' ? 0 : 1;

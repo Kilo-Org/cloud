@@ -2040,15 +2040,21 @@ export type Violation = {
 };
 
 /**
- * Check all system invariants. Returns violations found.
+ * Check all system invariants. Returns violations found and auto-corrective
+ * actions for violations that can be self-healed.
  * Should run at the end of each alarm tick after actions are applied.
  * See reconciliation-spec.md §6.
  */
-export function checkInvariants(sql: SqlStorage): Violation[] {
+export function checkInvariants(sql: SqlStorage): {
+  violations: Violation[];
+  autoActions: Action[];
+} {
   const violations: Violation[] = [];
+  const autoActions: Action[] = [];
 
   // Invariant 7: Working agents must have hooks
   // Mayors are always 'working' and intentionally have no hook — exclude them.
+  // Auto-correct: transition the working agent to idle so it can be re-dispatched.
   const unhookedWorkers = z
     .object({ bead_id: z.string() })
     .array()
@@ -2069,6 +2075,13 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
     violations.push({
       invariant: 7,
       message: `Working agent ${a.bead_id} has no hook`,
+    });
+    autoActions.push({
+      type: 'transition_agent',
+      agent_id: a.bead_id,
+      from: 'working',
+      to: 'idle',
+      reason: 'invariant 7: working agent has no hook',
     });
   }
 
@@ -2097,6 +2110,7 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
   }
 
   // Invariant 3: Only one MR bead in_progress per rig (refinery is serial)
+  // Auto-correct: fail all but the oldest in_progress MR per rig.
   const duplicateMrPerRig = z
     .object({ rig_id: z.string(), cnt: z.number() })
     .array()
@@ -2120,9 +2134,44 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
       invariant: 3,
       message: `Rig ${r.rig_id} has ${r.cnt} in_progress MR beads (should be at most 1)`,
     });
+    const mrRows = z
+      .object({ bead_id: z.string(), created_at: z.string() })
+      .array()
+      .parse([
+        ...query(
+          sql,
+          /* sql */ `
+          SELECT ${beads.bead_id}, ${beads.created_at}
+          FROM ${beads}
+          WHERE ${beads.type} = 'merge_request'
+            AND ${beads.status} = 'in_progress'
+            AND ${beads.rig_id} = ?
+          ORDER BY ${beads.created_at} ASC
+        `,
+          [r.rig_id]
+        ),
+      ]);
+    if (mrRows.length > 1) {
+      const [oldest, ...toFail] = mrRows;
+      for (const mr of toFail) {
+        autoActions.push({
+          type: 'transition_bead',
+          bead_id: mr.bead_id,
+          from: 'in_progress',
+          to: 'failed',
+          reason: 'invariant 3: multiple in_progress MRs per rig',
+          actor: 'system',
+        });
+      }
+      violations.push({
+        invariant: 3,
+        message: `Rig ${r.rig_id}: keeping oldest MR ${oldest.bead_id}, failing ${toFail.length} duplicate(s)`,
+      });
+    }
   }
 
   // Invariant 6: At most one agent hooked per bead
+  // Auto-correct: unhook all but the most recent agent (by last_activity_at DESC).
   const multiHooked = z
     .object({ hook: z.string(), cnt: z.number() })
     .array()
@@ -2144,6 +2193,31 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
       invariant: 6,
       message: `Bead ${m.hook} has ${m.cnt} agents hooked (should be at most 1)`,
     });
+    const agentsToUnhook = z
+      .object({ bead_id: z.string(), last_activity_at: z.string().nullable() })
+      .array()
+      .parse([
+        ...query(
+          sql,
+          /* sql */ `
+          SELECT ${agent_metadata.bead_id}, ${agent_metadata.last_activity_at}
+          FROM ${agent_metadata}
+          WHERE ${agent_metadata.current_hook_bead_id} = ?
+          ORDER BY ${agent_metadata.last_activity_at} DESC
+        `,
+          [m.hook]
+        ),
+      ]);
+    if (agentsToUnhook.length > 1) {
+      const [keep, ...toUnhook] = agentsToUnhook;
+      for (const ag of toUnhook) {
+        autoActions.push({
+          type: 'unhook_agent',
+          agent_id: ag.bead_id,
+          reason: `invariant 6: multiple agents hooked to bead ${m.hook}, keeping ${keep.bead_id}`,
+        });
+      }
+    }
   }
 
   // Invariant 4: in_review beads must have at least one open/in_progress MR
@@ -2178,7 +2252,7 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
     });
   }
 
-  return violations;
+  return { violations, autoActions };
 }
 
 // ════════════════════════════════════════════════════════════════════

@@ -3609,8 +3609,9 @@ export class TownDO extends DurableObject<Env> {
 
     // Post-reconcile: Invariant checker
     try {
-      const violations = reconciler.checkInvariants(this.sql);
+      const { violations, autoActions } = reconciler.checkInvariants(this.sql);
       metrics.invariantViolations = violations.length;
+
       if (violations.length > 0) {
         // Emit as an analytics event for observability dashboards instead
         // of console.error (which spams Workers logs every 5s per town).
@@ -3637,11 +3638,23 @@ export class TownDO extends DurableObject<Env> {
               },
             }
           );
+        }
+      }
 
-          // TODO: auto-recovery for invariant #7 (working agent with no hook).
-          // Transitioning to idle requires unhooking side-effects (container stop,
-          // bead status rollback) that live in agents.ts — needs a dedicated
-          // recovery action in the reconciler rather than a raw SQL update here.
+      if (autoActions.length > 0) {
+        const ctx = this.applyActionCtx;
+        const invariantEffects: Promise<void>[] = [];
+        for (const action of autoActions) {
+          const effect = applyAction(ctx, action);
+          if (effect) invariantEffects.push(effect());
+        }
+        metrics.sideEffectsAttempted += invariantEffects.length;
+        if (invariantEffects.length > 0) {
+          const results = await Promise.allSettled(invariantEffects);
+          for (const r of results) {
+            if (r.status === 'fulfilled') metrics.sideEffectsSucceeded++;
+            else metrics.sideEffectsFailed++;
+          }
         }
       }
     } catch (err) {

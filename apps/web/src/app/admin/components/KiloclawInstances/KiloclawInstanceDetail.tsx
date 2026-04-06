@@ -58,6 +58,7 @@ import {
   XCircle,
   ShieldAlert,
   Activity,
+  Terminal,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -368,6 +369,198 @@ function VersionPinCard({ userId, instanceId }: { userId: string; instanceId: st
                 Reason is visible to the end user.
               </p>
             </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: string }) {
+  const trpc = useTRPC();
+  const [prompt, setPrompt] = useState('');
+  const [showOutput, setShowOutput] = useState(false);
+
+  const {
+    data: runStatus,
+    isLoading: statusLoading,
+    refetch: refetchStatus,
+  } = useQuery({
+    ...trpc.admin.kiloclawInstances.getKiloCliRunStatus.queryOptions({ userId, instanceId }),
+    refetchInterval: query => (query?.state?.data?.status === 'running' ? 3000 : false),
+  });
+
+  const isRunning = runStatus?.status === 'running';
+
+  const { mutateAsync: startRun, isPending: isStarting } = useMutation(
+    trpc.admin.kiloclawInstances.startKiloCliRun.mutationOptions({
+      onSuccess: () => {
+        toast.success('CLI run started');
+        setShowOutput(true);
+        void refetchStatus();
+      },
+      onError: err => {
+        toast.error(`Failed to start CLI run: ${err.message}`);
+      },
+    })
+  );
+
+  const { mutateAsync: cancelRun, isPending: isCancelling } = useMutation(
+    trpc.admin.kiloclawInstances.cancelKiloCliRun.mutationOptions({
+      onSuccess: () => {
+        toast.success('CLI run cancelled');
+        void refetchStatus();
+      },
+      onError: err => {
+        toast.error(`Failed to cancel CLI run: ${err.message}`);
+      },
+    })
+  );
+
+  const handleStart = () => {
+    if (!prompt.trim()) return;
+    void startRun({ userId, instanceId, prompt: prompt.trim() });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Terminal className="h-5 w-5" />
+          <div>
+            <CardTitle>Kilo CLI Run</CardTitle>
+            <CardDescription>
+              Run an autonomous agent task on this instance via <code>kilo run --auto</code>
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Prompt input */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Prompt</label>
+          <Textarea
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            placeholder="e.g., Fix the baseUrl in openclaw.json to use the correct gateway endpoint..."
+            maxLength={10_000}
+            className="min-h-[80px] resize-y font-mono text-sm"
+            rows={3}
+            disabled={isRunning || isStarting}
+          />
+          <p className="text-muted-foreground text-xs">
+            {prompt.length.toLocaleString()} / 10,000 characters
+          </p>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={handleStart}
+            disabled={!prompt.trim() || isRunning || isStarting}
+          >
+            {isStarting ? (
+              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="mr-1 h-4 w-4" />
+            )}
+            {isStarting ? 'Starting...' : 'Start CLI Run'}
+          </Button>
+
+          {isRunning && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => void cancelRun({ userId, instanceId })}
+              disabled={isCancelling}
+            >
+              {isCancelling ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Square className="mr-1 h-4 w-4" />
+              )}
+              Cancel
+            </Button>
+          )}
+
+          <Button size="sm" variant="outline" onClick={() => void refetchStatus()}>
+            <RefreshCw className="mr-1 h-4 w-4" />
+            Refresh Status
+          </Button>
+        </div>
+
+        {/* Status display */}
+        {statusLoading && (
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-muted-foreground text-sm">Loading run status...</span>
+          </div>
+        )}
+
+        {runStatus?.hasRun && (
+          <div className="space-y-3 rounded border p-3">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              <DetailField label="Status">
+                <Badge
+                  className={
+                    runStatus.status === 'running'
+                      ? 'bg-blue-500'
+                      : runStatus.status === 'completed'
+                        ? 'bg-green-600'
+                        : runStatus.status === 'failed'
+                          ? 'bg-red-600'
+                          : runStatus.status === 'cancelled'
+                            ? 'bg-amber-600'
+                            : ''
+                  }
+                >
+                  {runStatus.status ?? 'unknown'}
+                </Badge>
+              </DetailField>
+              <DetailField label="Exit Code">
+                {runStatus.exitCode !== null && runStatus.exitCode !== undefined
+                  ? String(runStatus.exitCode)
+                  : '—'}
+              </DetailField>
+              <DetailField label="Started">
+                {runStatus.startedAt ? formatRelativeTime(runStatus.startedAt) : '—'}
+              </DetailField>
+              <DetailField label="Completed">
+                {runStatus.completedAt ? formatRelativeTime(runStatus.completedAt) : '—'}
+              </DetailField>
+            </div>
+
+            {runStatus.prompt && (
+              <DetailField label="Prompt">
+                <p className="text-muted-foreground max-h-[60px] overflow-y-auto text-xs">
+                  {runStatus.prompt}
+                </p>
+              </DetailField>
+            )}
+
+            {runStatus.output && (
+              <div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowOutput(prev => !prev)}
+                  className="mb-1 h-auto px-0 py-1 text-xs"
+                >
+                  {showOutput ? 'Hide output' : 'Show output'}
+                </Button>
+                {showOutput && (
+                  <div className="border-border bg-background max-h-[300px] overflow-auto rounded-md border">
+                    <pre
+                      className="p-3 text-xs leading-relaxed whitespace-pre-wrap"
+                      style={{ fontFamily: "'Courier New', Courier, monospace" }}
+                    >
+                      {stripAnsi(runStatus.output)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </CardContent>
@@ -2754,6 +2947,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {/* Kilo CLI Run */}
+        {isActive && gatewayControlsEnabled && (
+          <KiloCliRunCard userId={data.user_id} instanceId={data.id} />
         )}
 
         {/* Volume Reassociation (danger zone) */}

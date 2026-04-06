@@ -300,10 +300,12 @@ function BannerButton({
     className
   );
 
+  const rel = target === '_blank' ? 'noopener noreferrer' : undefined;
+
   if (href) {
     return (
       <Button asChild className={btnClass}>
-        <Link href={href} target={target}>
+        <Link href={href} target={target} rel={rel}>
           {children}
         </Link>
       </Button>

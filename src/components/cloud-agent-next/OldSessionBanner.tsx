@@ -9,7 +9,7 @@ type OldSessionBannerProps = {
 
 export function OldSessionBanner({ onStartNewSession }: OldSessionBannerProps) {
   return (
-    <Banner color="amber" className="mb-4">
+    <Banner color="amber" role="alert" className="mb-4">
       <Banner.Icon>
         <Info />
       </Banner.Icon>

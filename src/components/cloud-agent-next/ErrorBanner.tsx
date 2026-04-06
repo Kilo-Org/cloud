@@ -12,7 +12,7 @@ type ErrorBannerProps = {
 
 export function ErrorBanner({ title = 'Error', message, onRetry, onDismiss }: ErrorBannerProps) {
   return (
-    <Banner color="red">
+    <Banner color="red" role="alert">
       <Banner.Icon>
         <AlertCircle />
       </Banner.Icon>

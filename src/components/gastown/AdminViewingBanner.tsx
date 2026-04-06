@@ -17,7 +17,7 @@ export function AdminViewingBanner({ townId }: { townId: string }) {
   if (!data?.isAdminViewing) return null;
 
   return (
-    <Banner color="amber" className="mb-4">
+    <Banner color="amber" role="alert" className="mb-4">
       <Banner.Icon>
         <ShieldAlert />
       </Banner.Icon>

@@ -559,15 +559,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
       const capturedAgentId = agentId;
       const capturedBeadId = beadId;
       return async () => {
-        // Best-effort dispatch. On failure (rejects or returns false), unhook
-        // the agent and reset the bead to 'open' so scheduling can retry it
-        // on the next tick instead of waiting for stale-bead recovery (~5 min).
-        //
-        // The double-dispatch risk from false returns (timeout race) is
-        // acceptable here: if the container DID start, the original agent
-        // finds no hooked bead and exits cleanly. If it DIDN'T start, we
-        // correctly rollback and retry. Either way we avoid the ~90s+ delay
-        // from the stale-bead recovery path.
         let started = false;
         try {
           started = await ctx.dispatchAgent(capturedAgentId, capturedBeadId, rigId);
@@ -578,8 +569,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
           );
         }
         if (!started) {
-          agentOps.unhookBead(sql, capturedAgentId);
-          beadOps.updateBeadStatus(sql, capturedBeadId, 'open', null);
+          console.warn(
+            `${LOG} dispatch_agent: container did not start within timeout for agent=${capturedAgentId} bead=${capturedBeadId}. ` +
+              'Leaving bead in current state; stale-bead recovery will handle if container fails to start.'
+          );
         }
       };
     }

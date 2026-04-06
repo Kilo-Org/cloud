@@ -464,6 +464,70 @@ export class MayorGastownClient {
       body: JSON.stringify({ action }),
     });
   }
+
+  // -- Wasteland tool endpoints --
+
+  async wastelandBrowse(input: {
+    wasteland_id: string;
+    status?: 'open' | 'claimed' | 'done';
+    limit?: number;
+  }): Promise<Array<Record<string, unknown>>> {
+    const params = new URLSearchParams();
+    if (input.status) params.set('status', input.status);
+    if (input.limit !== undefined) params.set('limit', String(input.limit));
+    const qs = params.toString();
+    return this.request<Array<Record<string, unknown>>>(
+      this.mayorPath(`/wasteland/${input.wasteland_id}/browse${qs ? `?${qs}` : ''}`)
+    );
+  }
+
+  async wastelandClaim(input: {
+    wasteland_id: string;
+    item_id: string;
+  }): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(
+      this.mayorPath(`/wasteland/${input.wasteland_id}/claim`),
+      {
+        method: 'POST',
+        body: JSON.stringify({ item_id: input.item_id }),
+      }
+    );
+  }
+
+  async wastelandPost(input: {
+    wasteland_id: string;
+    title: string;
+    description: string;
+    priority?: string;
+    type?: string;
+  }): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(
+      this.mayorPath(`/wasteland/${input.wasteland_id}/post`),
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          title: input.title,
+          description: input.description,
+          priority: input.priority,
+          type: input.type,
+        }),
+      }
+    );
+  }
+
+  async wastelandDone(input: {
+    wasteland_id: string;
+    item_id: string;
+    evidence: string;
+  }): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(
+      this.mayorPath(`/wasteland/${input.wasteland_id}/done`),
+      {
+        method: 'POST',
+        body: JSON.stringify({ item_id: input.item_id, evidence: input.evidence }),
+      }
+    );
+  }
 }
 
 export class GastownApiError extends Error {

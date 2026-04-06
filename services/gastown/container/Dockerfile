@@ -16,6 +16,7 @@ FROM oven/bun:1-slim
 #   C++ stdlib: libc++1
 #   math: libgmp-dev
 #   timezone data: tzdata
+#   Java: default-jdk
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       git \
@@ -47,6 +48,7 @@ RUN apt-get update && \
       libc++1 \
       libgmp-dev \
       tzdata \
+      default-jdk \
     && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \

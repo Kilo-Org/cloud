@@ -756,6 +756,16 @@ if (serviceNames.length === 0) {
   };
 }
 
+// When tmux destroys the session (e.g. terminal window closed with
+// destroy-unattached), it sends SIGHUP to all pane processes. Catch it
+// so we can run docker compose down before exiting.
+for (const signal of ['SIGHUP', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    doCleanup();
+    process.exit(0);
+  });
+}
+
 // Clear screen so ink starts with a clean canvas
 process.stdout.write('\x1b[2J\x1b[H');
 

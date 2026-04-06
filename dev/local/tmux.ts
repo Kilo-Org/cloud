@@ -62,6 +62,8 @@ function createSession(sessionName: string): void {
   execSync(`tmux new-session -d -s ${sessionName} -n dashboard -c ${repoRoot}`, {
     stdio: 'ignore',
   });
+  // Destroy the session when no clients are attached (e.g. terminal window closed)
+  execSync(`tmux set-option -t ${sessionName} destroy-unattached on`, { stdio: 'ignore' });
   // Enable mouse so clicking the status-bar window tabs works
   execSync(`tmux set-option -t ${sessionName} mouse on`, { stdio: 'ignore' });
   // Enable focus events so tmux detects terminal tab switches (needed for client-focus-in hook)

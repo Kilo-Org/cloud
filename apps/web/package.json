@@ -24,8 +24,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
-    "promo": "pnpm -s script src/scripts/encrypt-promo-codes.ts",
-    "dev:discord-gateway-cron": "tsx ../../dev/discord-gateway-cron.ts"
+    "promo": "pnpm -s script src/scripts/encrypt-promo-codes.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",

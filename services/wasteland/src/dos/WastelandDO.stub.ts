@@ -78,6 +78,12 @@ export type WantedItemResult = {
  * Provides the class export that wrangler.jsonc requires for the
  * WASTELAND durable_objects binding, plus RPC method signatures that
  * downstream tRPC code depends on.
+ *
+ * @stub All RPC methods throw "WastelandDO not yet implemented". This is
+ * intentional — the stub defines the contract (types + method signatures)
+ * so the tRPC router, schemas, and UI can be built and type-checked in
+ * parallel. The real implementation will land in a follow-up phase and
+ * will back each method with SqlStorage queries.
  */
 export class WastelandDO extends DurableObject<Env> {
   async fetch(): Promise<Response> {

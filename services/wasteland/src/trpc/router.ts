@@ -484,8 +484,12 @@ export const wastelandRouter = router({
     .input(z.object({ wastelandId: z.string().uuid() }))
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      // Users can only delete their own credentials — no ownership
-      // check needed beyond auth (userId comes from the JWT).
+      // Verify the caller is a member/owner of this wasteland before
+      // allowing credential deletion. The userId itself comes from the
+      // JWT (so users can only delete their own credential), but without
+      // this check any authenticated user could target arbitrary DOs.
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
       await stub.deleteCredential(ctx.userId);
 
@@ -512,10 +516,13 @@ export const wastelandRouter = router({
       // Verify user has access to this wasteland (owner, org member, or admin)
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
 
-      // Town ownership is verified implicitly: the user is authenticated via
-      // their Kilo JWT, and the frontend only shows towns they own. We don't
-      // have a service binding to Gastown, so we trust the authenticated user's
-      // claim. The connected_by field records who established the connection.
+      // TODO: Add server-side town ownership validation once a Gastown service
+      // binding is available. Currently, the Wasteland worker has no binding to
+      // Gastown (see wrangler.jsonc), so we cannot verify that `townId` belongs
+      // to the caller. The risk is limited — connecting an unowned town here
+      // does not grant the caller access to it — but a malicious user could
+      // associate someone else's town with this wasteland. The `connected_by`
+      // field records who made the connection for auditing.
 
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
 
@@ -673,7 +680,7 @@ export const wastelandRouter = router({
         wastelandId: z.string().uuid(),
         title: z.string().min(1).max(256),
         description: z.string().min(1).max(4096),
-        priority: z.enum(['low', 'medium', 'high']).optional(),
+        priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
         type: z.enum(['feature', 'bug', 'docs', 'other']).optional(),
       })
     )

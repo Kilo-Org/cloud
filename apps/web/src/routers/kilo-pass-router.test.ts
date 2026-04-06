@@ -1529,10 +1529,9 @@ describe('kiloPassRouter', () => {
   });
 
   describe('getBillingHistory', () => {
-    it('returns empty entries when user has no stripe customer', async () => {
+    it('returns empty entries when user has no kilo pass subscription', async () => {
       const user = await insertTestUser({
-        google_user_email: 'kilo-pass-billing-history-no-stripe@example.com',
-        stripe_customer_id: '',
+        google_user_email: 'kilo-pass-billing-history-no-sub@example.com',
       });
 
       const caller = await createCallerForUser(user.id);
@@ -1541,7 +1540,7 @@ describe('kiloPassRouter', () => {
       expect(result).toEqual({ entries: [], hasMore: false, cursor: null });
     });
 
-    it('returns mapped invoices from Stripe', async () => {
+    it('returns mapped invoices scoped to the kilo pass subscription', async () => {
       const stripeMock = getStripeMock();
       const invoiceCreatedTs = Math.floor(Date.now() / 1000) - 86400;
       stripeMock.invoices.list.mockResolvedValue({
@@ -1562,10 +1561,20 @@ describe('kiloPassRouter', () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-billing-history-ok@example.com',
       });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_billing_history_test',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
 
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getBillingHistory({});
 
+      expect(stripeMock.invoices.list).toHaveBeenCalledWith(
+        expect.objectContaining({ subscription: 'sub_billing_history_test' })
+      );
       expect(result.entries).toHaveLength(1);
       const entry = result.entries[0];
       if (!entry) throw new Error('Expected at least one billing history entry');

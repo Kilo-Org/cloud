@@ -8,15 +8,16 @@ import { SubscriptionCard } from '@/components/subscriptions/SubscriptionCard';
 import { SubscriptionGroup } from '@/components/subscriptions/SubscriptionGroup';
 import {
   formatDateLabel,
-  getPaidSeatSubscriptionItem,
   isSeatsTerminal,
   isWarningStatus,
 } from '@/components/subscriptions/helpers';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';
 import { SeatsSubscribeCard } from './SeatsSubscribeCard';
 
-function getSeatPrice(subscription: Stripe.Subscription) {
-  const paidSeatItem = getPaidSeatSubscriptionItem(subscription);
+function getSeatPrice(
+  subscription: Stripe.Subscription,
+  paidSeatItem: Stripe.SubscriptionItem | null
+) {
   const totalAmount = subscription.items.data.reduce(
     (sum: number, item: Stripe.SubscriptionItem) =>
       sum + (item.price?.unit_amount ?? 0) * (item.quantity ?? 0),
@@ -46,7 +47,8 @@ export function SeatsGroup({
   const subscription = query.data?.subscription ?? null;
   const status = subscription?.status ?? 'ended';
   const isVisible = subscription && (!isSeatsTerminal(status) || showTerminal);
-  const paidSeatItem = subscription ? getPaidSeatSubscriptionItem(subscription) : null;
+  const paidSeatItemId = query.data?.paidSeatItemId ?? null;
+  const paidSeatItem = subscription?.items.data.find(item => item.id === paidSeatItemId) ?? null;
 
   return (
     <SubscriptionGroup
@@ -64,7 +66,7 @@ export function SeatsGroup({
           title="Teams / Enterprise Seats"
           subtitle={`${query.data?.seatsUsed ?? 0} of ${query.data?.totalSeats ?? 0} seats in use`}
           status={subscription.status}
-          price={getSeatPrice(subscription)}
+          price={getSeatPrice(subscription, paidSeatItem)}
           billingDate={formatDateLabel(
             paidSeatItem?.current_period_end
               ? new Date(paidSeatItem.current_period_end * 1000).toISOString()

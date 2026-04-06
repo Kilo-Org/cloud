@@ -1011,14 +1011,14 @@ export const kiloPassRouter = createTRPCRouter({
     .input(CursorInputSchema)
     .output(billingHistoryResponseSchema)
     .query(async ({ ctx, input }) => {
-      const stripeCustomerId = ctx.user.stripe_customer_id;
-      if (!stripeCustomerId) {
+      const subscription = await getKiloPassStateForUser(db, ctx.user.id);
+      if (!subscription) {
         return { entries: [], hasMore: false, cursor: null };
       }
 
       const limit = input.limit ?? 10;
       const invoices = await stripe.invoices.list({
-        customer: stripeCustomerId,
+        subscription: subscription.stripeSubscriptionId,
         limit: limit + 1,
         starting_after: input.cursor ?? undefined,
       });

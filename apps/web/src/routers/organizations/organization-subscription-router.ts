@@ -52,6 +52,7 @@ const OrganizationSubscriptionResponseSchema = z.object({
   subscription: z.custom<Stripe.Subscription>().nullable(),
   seatsUsed: z.number(),
   totalSeats: z.number(),
+  paidSeatItemId: z.string().nullable(),
 });
 
 type OrganizationSubscriptionResponse = z.infer<typeof OrganizationSubscriptionResponseSchema>;
@@ -103,12 +104,13 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
           subscription: null,
           seatsUsed: usages.used,
           totalSeats: usages.total,
+          paidSeatItemId: null,
         };
       }
 
       // Fetch the subscription information from Stripe — including ended
       // subscriptions so the overview card can show the resubscribe UI.
-      let subscription = null;
+      let subscription: Stripe.Subscription | null = null;
       try {
         subscription = await retrieveSubscription(latestPurchase.subscription_stripe_id);
       } catch (error) {
@@ -119,7 +121,10 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         // Continue without Stripe data - we still have the purchase record
       }
 
-      return { subscription, seatsUsed: usages.used, totalSeats: usages.total };
+      const paidSeatItemId =
+        subscription?.items.data.find(item => KNOWN_SEAT_PRICE_IDS.has(item.price.id))?.id ?? null;
+
+      return { subscription, seatsUsed: usages.used, totalSeats: usages.total, paidSeatItemId };
     }),
 
   getResubscribeDefaults: organizationMemberProcedure

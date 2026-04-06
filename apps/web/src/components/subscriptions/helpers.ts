@@ -1,4 +1,3 @@
-import type Stripe from 'stripe';
 import { formatDollars, formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
 import { KiloPassCadence, type KiloPassTier } from '@/lib/kilo-pass/enums';
@@ -42,19 +41,6 @@ export function formatKiloPassCadenceLabel(cadence: KiloPassCadence): string {
 
 export function formatMonthCountLabel(months: number): string {
   return `${months} month${months === 1 ? '' : 's'}`;
-}
-
-export function getPaidSeatSubscriptionItem(
-  subscription: Pick<Stripe.Subscription, 'items'>
-): Stripe.SubscriptionItem | null {
-  return (
-    subscription.items.data.find(
-      item => (item.price?.unit_amount ?? 0) > 0 && (item.quantity ?? 0) > 0
-    ) ??
-    subscription.items.data.find(item => (item.price?.unit_amount ?? 0) > 0) ??
-    subscription.items.data.find(item => item.price?.recurring?.interval) ??
-    null
-  );
 }
 
 export function formatKiloclawPrice(plan: string): string {

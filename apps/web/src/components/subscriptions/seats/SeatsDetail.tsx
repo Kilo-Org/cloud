@@ -21,11 +21,7 @@ import { SEAT_PRICING } from '@/lib/organizations/constants';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { DetailPageHeader } from '@/components/subscriptions/DetailPageHeader';
 import { BillingHistoryTable } from '@/components/subscriptions/BillingHistoryTable';
-import {
-  formatDateLabel,
-  getPaidSeatSubscriptionItem,
-  isSeatsTerminal,
-} from '@/components/subscriptions/helpers';
+import { formatDateLabel, isSeatsTerminal } from '@/components/subscriptions/helpers';
 
 export function SeatsDetail({ organizationId }: { organizationId: string }) {
   const trpc = useTRPC();
@@ -160,7 +156,8 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
     );
   }
 
-  const paidSeatItem = getPaidSeatSubscriptionItem(subscription);
+  const paidSeatItemId = subscriptionQuery.data?.paidSeatItemId ?? null;
+  const paidSeatItem = subscription.items.data.find(item => item.id === paidSeatItemId) ?? null;
   const currentInterval =
     paidSeatItem?.price?.recurring?.interval === 'year' ? 'annual' : 'monthly';
   const totalAmount = subscription.items.data.reduce(
@@ -285,11 +282,17 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
               variant="outline"
               onClick={() =>
                 void (async () => {
-                  await trpcClient.organizations.subscription.stopCancellation.mutate({
-                    organizationId,
-                  });
-                  toast.success('Subscription resumed');
-                  await refreshData();
+                  try {
+                    await trpcClient.organizations.subscription.stopCancellation.mutate({
+                      organizationId,
+                    });
+                    toast.success('Subscription resumed');
+                    await refreshData();
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error ? error.message : 'Failed to resume subscription'
+                    );
+                  }
                 })()
               }
             >
@@ -302,9 +305,15 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
               onClick={() => {
                 if (!window.confirm('Cancel this seats subscription at period end?')) return;
                 void (async () => {
-                  await trpcClient.organizations.subscription.cancel.mutate({ organizationId });
-                  toast.success('Subscription will cancel at period end');
-                  await refreshData();
+                  try {
+                    await trpcClient.organizations.subscription.cancel.mutate({ organizationId });
+                    toast.success('Subscription will cancel at period end');
+                    await refreshData();
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error ? error.message : 'Failed to cancel subscription'
+                    );
+                  }
                 })();
               }}
             >
@@ -372,13 +381,19 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
             <Button
               onClick={() =>
                 void (async () => {
-                  await trpcClient.organizations.subscription.updateSeatCount.mutate({
-                    organizationId,
-                    newSeatCount: Number(seatCount),
-                  });
-                  toast.success('Seat count updated');
-                  setSeatDialogOpen(false);
-                  await refreshData();
+                  try {
+                    await trpcClient.organizations.subscription.updateSeatCount.mutate({
+                      organizationId,
+                      newSeatCount: Number(seatCount),
+                    });
+                    toast.success('Seat count updated');
+                    setSeatDialogOpen(false);
+                    await refreshData();
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error ? error.message : 'Failed to update seat count'
+                    );
+                  }
                 })()
               }
             >
@@ -406,13 +421,19 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
             <Button
               onClick={() =>
                 void (async () => {
-                  await trpcClient.organizations.subscription.changeBillingCycle.mutate({
-                    organizationId,
-                    targetCycle: currentInterval === 'annual' ? 'monthly' : 'annual',
-                  });
-                  toast.success('Billing cycle change scheduled');
-                  setBillingCycleDialogOpen(false);
-                  await refreshData();
+                  try {
+                    await trpcClient.organizations.subscription.changeBillingCycle.mutate({
+                      organizationId,
+                      targetCycle: currentInterval === 'annual' ? 'monthly' : 'annual',
+                    });
+                    toast.success('Billing cycle change scheduled');
+                    setBillingCycleDialogOpen(false);
+                    await refreshData();
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error ? error.message : 'Failed to change billing cycle'
+                    );
+                  }
                 })()
               }
             >

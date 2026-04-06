@@ -58,6 +58,7 @@ export default function OrganizationAppSidebar({
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
+  const isWastelandEnabled = useFeatureFlagEnabled('wasteland-access');
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Get current organization role and data
@@ -190,8 +191,8 @@ export default function OrganizationAppSidebar({
           },
         ]
       : []),
-    // Wasteland requires non-billing_manager role; hide for billing-only users
-    ...(currentRole !== 'billing_manager'
+    // Wasteland requires feature flag + non-billing_manager role
+    ...((isWastelandEnabled || isDevelopment) && currentRole !== 'billing_manager'
       ? [
           {
             title: 'Wastelands',

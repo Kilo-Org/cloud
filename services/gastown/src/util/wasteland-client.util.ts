@@ -198,10 +198,13 @@ async function trpcMutation<T>(
  *
  * @example
  * ```ts
+ * const header = c.req.header('Authorization') ?? '';
+ * const authToken = header.startsWith('Bearer ') ? header.slice(7) : '';
+ *
  * const client = createWastelandClient({
  *   wastelandService: env.WASTELAND_SERVICE,
  *   wastelandApiUrl: env.WASTELAND_API_URL,
- *   authToken: c.req.header('Authorization')!.slice(7),
+ *   authToken,
  * });
  * const items = await client.browseWantedBoard({ wastelandId });
  * ```

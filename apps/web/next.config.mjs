@@ -26,8 +26,11 @@ const monorepoRoot = resolve(import.meta.dirname, '../..');
 const nextConfig = {
   reactStrictMode: true,
 
-  // In a monorepo, file tracing and Turbopack both need to know the workspace root
-  // so they can resolve hoisted dependencies (e.g. `next/package.json`).
+  // Both values MUST be set to the monorepo root and kept in sync.
+  // `vercel build` sets NEXT_PRIVATE_OUTPUT_TRACE_ROOT to the project dir (apps/web)
+  // as the default outputFileTracingRoot; if only turbopack.root is set, the two
+  // values diverge and Next.js overrides turbopack.root with the wrong value,
+  // causing "can't find next/package.json" errors.
   outputFileTracingRoot: monorepoRoot,
   turbopack: {
     root: monorepoRoot,

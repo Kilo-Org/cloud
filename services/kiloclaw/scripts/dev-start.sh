@@ -374,7 +374,7 @@ if ! docker info &>/dev/null; then
   echo "Start Docker Desktop (or 'dockerd') and retry."
   exit 1
 fi
-if ! (cd "$MONOREPO_ROOT" && docker compose -f apps/web/dev/docker-compose.yml up -d --wait); then
+if ! (cd "$MONOREPO_ROOT" && docker compose -f dev/docker-compose.yml up -d --wait); then
   echo ""
   echo "ERROR: 'docker compose up' failed."
   echo "Check 'docker compose -f dev/docker-compose.yml logs' for details."
@@ -384,13 +384,13 @@ fi
 # Extra safety: wait for Postgres to accept connections (handles first-run init)
 echo "==> Waiting for Postgres to accept connections..."
 for i in $(seq 1 30); do
-  if docker exec "$(docker compose -f "$MONOREPO_ROOT/apps/web/dev/docker-compose.yml" ps -q postgres)" \
+  if docker exec "$(docker compose -f "$MONOREPO_ROOT/dev/docker-compose.yml" ps -q postgres)" \
     pg_isready -U postgres -q 2>/dev/null; then
     break
   fi
   if [ "$i" -eq 30 ]; then
     echo "ERROR: Postgres did not become ready within 30 seconds."
-    echo "Check: docker compose -f apps/web/dev/docker-compose.yml logs postgres"
+    echo "Check: docker compose -f dev/docker-compose.yml logs postgres"
     exit 1
   fi
   sleep 1
@@ -402,8 +402,8 @@ if ! (cd "$MONOREPO_ROOT" && pnpm drizzle migrate); then
   echo ""
   echo "ERROR: Database migrations failed."
   echo "The database container may not be ready yet. Check:"
-  echo "  docker compose -f apps/web/dev/docker-compose.yml ps"
-  echo "  docker compose -f apps/web/dev/docker-compose.yml logs"
+  echo "  docker compose -f dev/docker-compose.yml ps"
+  echo "  docker compose -f dev/docker-compose.yml logs"
   exit 1
 fi
 

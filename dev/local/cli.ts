@@ -270,7 +270,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     initialViewedService,
     JSON.stringify(enabledGroupIds),
   ];
-  const dashboardCmd = `tsx dev/local/dashboard.tsx ${dashboardArgs.map(a => JSON.stringify(a)).join(' ')}`;
+  const dashboardCmd = `pnpm exec tsx dev/local/dashboard.tsx ${dashboardArgs.map(a => JSON.stringify(a)).join(' ')}`;
   sendKeys(sessionName, 0, dashboardCmd, 0);
 
   // --- Focus sidebar pane and attach ---

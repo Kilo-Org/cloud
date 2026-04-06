@@ -278,7 +278,7 @@ function buildServiceDefs(): ServiceDef[] {
         dir: '.',
         port: 0,
         dependsOn: meta.dependsOn,
-        command: ['tsx', 'dev/local/scripts/start-tunnel.ts', String(nextjsPort)],
+        command: ['pnpm', 'exec', 'tsx', 'dev/local/scripts/start-tunnel.ts', String(nextjsPort)],
         group: meta.group,
       });
       continue;
@@ -291,7 +291,7 @@ function buildServiceDefs(): ServiceDef[] {
         dir: '.',
         port: 0,
         dependsOn: meta.dependsOn,
-        command: ['tsx', 'dev/local/scripts/start-stripe.ts'],
+        command: ['pnpm', 'exec', 'tsx', 'dev/local/scripts/start-stripe.ts'],
         group: meta.group,
       });
       continue;
@@ -306,7 +306,13 @@ function buildServiceDefs(): ServiceDef[] {
         dir: '.',
         port: 0,
         dependsOn: meta.dependsOn,
-        command: ['tsx', 'dev/local/scripts/start-app-builder-tunnel.ts', String(appBuilderPort)],
+        command: [
+          'pnpm',
+          'exec',
+          'tsx',
+          'dev/local/scripts/start-app-builder-tunnel.ts',
+          String(appBuilderPort),
+        ],
         group: meta.group,
       });
       continue;

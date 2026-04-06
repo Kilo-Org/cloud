@@ -452,6 +452,24 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
       return;
     }
 
+    case 'auto_merge_cleared': {
+      const mrBeadId = typeof payload.mr_bead_id === 'string' ? payload.mr_bead_id : null;
+      if (!mrBeadId) {
+        console.warn(`${LOG} applyEvent: auto_merge_cleared missing mr_bead_id`);
+        return;
+      }
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${review_metadata}
+          SET ${review_metadata.columns.auto_merge_ready_since} = NULL
+          WHERE ${review_metadata.bead_id} = ?
+        `,
+        [mrBeadId]
+      );
+      return;
+    }
+
     default: {
       console.warn(`${LOG} applyEvent: unknown event type: ${event.event_type}`);
     }

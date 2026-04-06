@@ -750,6 +750,32 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 } else {
                   const elapsed = Date.now() - new Date(readySince).getTime();
                   if (elapsed >= (refineryConfig.auto_merge_delay_minutes ?? 0) * 60_000) {
+                    // Skip if auto_merge_pending is already set — a merge is already
+                    // in progress (or failed) and will clear auto_merge_ready_since
+                    // via the auto_merge_cleared event. Prevents race with concurrent
+                    // merge_pr actions from reconcileReviewQueue.
+                    const alreadyPending = z
+                      .object({ metadata: z.string().nullable() })
+                      .array()
+                      .parse([
+                        ...query(
+                          sql,
+                          /* sql */ `
+                            SELECT ${beads.columns.metadata}
+                            FROM ${beads}
+                            WHERE ${beads.bead_id} = ?
+                          `,
+                          [action.bead_id]
+                        ),
+                      ]);
+                    if (
+                      alreadyPending[0]?.metadata &&
+                      (JSON.parse(alreadyPending[0].metadata ?? '{}') as Record<string, unknown>)[
+                        'auto_merge_pending'
+                      ]
+                    ) {
+                      return;
+                    }
                     ctx.insertEvent('pr_auto_merge', {
                       bead_id: action.bead_id,
                       payload: {
@@ -889,15 +915,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               `,
               [now(), action.bead_id]
             );
-            query(
-              sql,
-              /* sql */ `
-                UPDATE ${review_metadata}
-                SET ${review_metadata.columns.auto_merge_ready_since} = NULL
-                WHERE ${review_metadata.bead_id} = ?
-              `,
-              [action.bead_id]
-            );
+            ctx.insertEvent('auto_merge_cleared', {
+              bead_id: action.bead_id,
+              payload: { mr_bead_id: action.bead_id },
+            });
             return;
           }
 
@@ -910,7 +931,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
           } else {
             // Merge failed (405/409: branch protection, merge conflict, stale head, etc.)
             // Clear auto_merge_pending so we resume normal polling on the next tick.
-            // Also reset the auto_merge_ready_since timer so it re-evaluates freshness.
+            // auto_merge_ready_since is cleared via the auto_merge_cleared event.
             query(
               sql,
               /* sql */ `
@@ -921,15 +942,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               `,
               [now(), action.bead_id]
             );
-            query(
-              sql,
-              /* sql */ `
-                UPDATE ${review_metadata}
-                SET ${review_metadata.columns.auto_merge_ready_since} = NULL
-                WHERE ${review_metadata.bead_id} = ?
-              `,
-              [action.bead_id]
-            );
+            ctx.insertEvent('auto_merge_cleared', {
+              bead_id: action.bead_id,
+              payload: { mr_bead_id: action.bead_id },
+            });
             console.warn(
               `${LOG} merge_pr: merge failed, cleared auto_merge_pending for bead=${action.bead_id}`
             );
@@ -947,15 +963,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             `,
             [now(), action.bead_id]
           );
-          query(
-            sql,
-            /* sql */ `
-              UPDATE ${review_metadata}
-              SET ${review_metadata.columns.auto_merge_ready_since} = NULL
-              WHERE ${review_metadata.bead_id} = ?
-            `,
-            [action.bead_id]
-          );
+          ctx.insertEvent('auto_merge_cleared', {
+            bead_id: action.bead_id,
+            payload: { mr_bead_id: action.bead_id },
+          });
         }
       };
     }

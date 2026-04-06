@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const gastownRoot = resolve(__dirname, '..');
-const repoRoot = resolve(gastownRoot, '..');
+const repoRoot = resolve(gastownRoot, '..', '..');
 const containerDir = resolve(gastownRoot, 'container');
 
 // Read root workspace yaml and extract only the catalog: section.

@@ -3,7 +3,13 @@ import type { KiloClawEnv } from '../../types';
 import * as fly from '../../fly/client';
 import { STARTUP_TIMEOUT_SECONDS } from '../../config';
 import { buildMachineConfig, guestFromSize } from '../machine-config';
-import { getRegistryApp, ensureStreamChatChannel, resolveImageTag, buildUserEnvVars, resolveAndPersistImageVersion } from './config';
+import {
+  getRegistryApp,
+  ensureStreamChatChannel,
+  resolveImageTag,
+  buildUserEnvVars,
+  resolveAndPersistImageVersion,
+} from './config';
 import type { InstanceMutableState } from './types';
 import { getFlyConfig } from './types';
 import { storageUpdate } from './state';
@@ -27,7 +33,9 @@ export type RestartRuntime = {
   }) => void;
 };
 
-export async function runRestartMachine(runtime: RestartRuntime): Promise<{ success: boolean; error?: string }> {
+export async function runRestartMachine(
+  runtime: RestartRuntime
+): Promise<{ success: boolean; error?: string }> {
   const { state, env, ctx, persist, scheduleAlarm, emitEvent } = runtime;
 
   if (!state.flyMachineId) {
@@ -74,9 +82,7 @@ export async function runRestartMachine(runtime: RestartRuntime): Promise<{ succ
   return { success: true };
 }
 
-export async function runRestartMachineInBackground(
-  runtime: RestartRuntime
-): Promise<void> {
+export async function runRestartMachineInBackground(runtime: RestartRuntime): Promise<void> {
   const { state, env, ctx, loadState, persist, scheduleAlarm } = runtime;
 
   try {
@@ -84,10 +90,7 @@ export async function runRestartMachineInBackground(
 
     const currentStatus = await ctx.storage.get('status');
     if (currentStatus !== 'restarting') {
-      console.log(
-        '[DO] restartMachine: aborting background restart, status is now',
-        currentStatus
-      );
+      console.log('[DO] restartMachine: aborting background restart, status is now', currentStatus);
       return;
     }
 
@@ -162,11 +165,7 @@ export async function runRestartMachineInBackground(
     const preSuccessStatus = await ctx.storage.get('status');
     if (preSuccessStatus !== 'restarting') return;
 
-    await markRestartSuccessful(
-      ctx,
-      state,
-      createReconcileContext(state, env, 'restart')
-    );
+    await markRestartSuccessful(ctx, state, createReconcileContext(state, env, 'restart'));
     doLog(state, 'restartMachine: background restart completed successfully');
     await scheduleAlarm();
   } catch (err) {

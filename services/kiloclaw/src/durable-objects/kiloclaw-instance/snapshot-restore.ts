@@ -33,7 +33,10 @@ export type SnapshotRestoreRuntime = {
   ) => void;
 };
 
-function emitEvent(runtime: SnapshotRestoreRuntime, data: Parameters<SnapshotRestoreRuntime['emitEvent']>[0]): void {
+function emitEvent(
+  runtime: SnapshotRestoreRuntime,
+  data: Parameters<SnapshotRestoreRuntime['emitEvent']>[0]
+): void {
   const { state } = runtime;
   doLog(state, data.event, {
     ...(data.status ? { status: data.status } : undefined),

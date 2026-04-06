@@ -46,7 +46,13 @@ import { getAppKey, getFlyConfig } from './types';
 import { createMutableState, loadState, storageUpdate } from './state';
 import { nextAlarmTime, doLog, doError, doWarn, toLoggable, createReconcileContext } from './log';
 import { attemptMetadataRecovery } from './reconcile';
-import { resolveImageTag, getRegistryApp, buildUserEnvVars, ensureStreamChatChannel, resolveAndPersistImageVersion } from './config';
+import {
+  resolveImageTag,
+  getRegistryApp,
+  buildUserEnvVars,
+  ensureStreamChatChannel,
+  resolveAndPersistImageVersion,
+} from './config';
 import * as gateway from './gateway';
 import * as pairing from './pairing';
 import * as kiloCliRun from './kilo-cli-run';
@@ -84,10 +90,7 @@ import {
   runRestartMachineWithImageTag,
   type RestartRuntime,
 } from './restart';
-import {
-  createShortLivedUserToken,
-  deactivateStreamChatUsers,
-} from '../../stream-chat/client';
+import { createShortLivedUserToken, deactivateStreamChatUsers } from '../../stream-chat/client';
 import { writeEvent } from '../../utils/analytics';
 import type { KiloClawEventData, KiloClawEventName } from '../../utils/analytics';
 
@@ -332,7 +335,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         patch => this.persist(patch)
       );
       if (resolved) {
-        console.debug('[DO] Using pinned version:', resolved.openclawVersion, '→', resolved.imageTag);
+        console.debug(
+          '[DO] Using pinned version:',
+          resolved.openclawVersion,
+          '→',
+          resolved.imageTag
+        );
       } else {
         doWarn(this.s, 'Pinned tag not found in KV or Postgres, using tag directly', {
           pinnedImageTag: config.pinnedImageTag,

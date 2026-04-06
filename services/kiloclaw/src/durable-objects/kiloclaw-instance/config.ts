@@ -37,10 +37,7 @@ export type ResolvedImageVersion = {
 export async function resolveAndPersistImageVersion(
   env: KiloClawEnv,
   state: InstanceMutableState,
-  opts:
-    | { pinnedImageTag: string }
-    | { latest: true; clearOnMiss?: boolean }
-    | { imageTag: string },
+  opts: { pinnedImageTag: string } | { latest: true; clearOnMiss?: boolean } | { imageTag: string },
   persist: (patch: Partial<PersistedState>) => Promise<void>
 ): Promise<ResolvedImageVersion | null> {
   if ('pinnedImageTag' in opts) {
@@ -343,11 +340,7 @@ export async function ensureStreamChatChannel(
 ): Promise<void> {
   const { env, state, persist, logLabel } = runtime;
 
-  if (
-    state.streamChatApiKey ||
-    !env.STREAM_CHAT_API_KEY ||
-    !env.STREAM_CHAT_API_SECRET
-  ) {
+  if (state.streamChatApiKey || !env.STREAM_CHAT_API_KEY || !env.STREAM_CHAT_API_SECRET) {
     return;
   }
 

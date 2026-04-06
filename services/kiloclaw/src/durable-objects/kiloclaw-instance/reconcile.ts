@@ -26,11 +26,7 @@ import type { ReconcileContext } from './log';
 import { ensureVolume, staleProvisionAgeMs } from './fly-machines';
 import { mintFreshApiKey } from './config';
 import * as gateway from './gateway';
-import {
-  detectUnexpectedStop,
-  reconcileRecovering,
-  type RecoverySignal,
-} from './recovery';
+import { detectUnexpectedStop, reconcileRecovering, type RecoverySignal } from './recovery';
 import { writeEvent, eventContextFromState } from '../../utils/analytics';
 
 function emitStartFailedEvent(

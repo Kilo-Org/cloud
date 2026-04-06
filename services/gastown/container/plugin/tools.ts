@@ -233,23 +233,6 @@ export function createTools(client: GastownClient) {
       },
     }),
 
-    gt_status: tool({
-      description:
-        'Emit a plain-language status update visible on the dashboard. ' +
-        'Call this when starting a new phase of work (e.g. "Installing dependencies", ' +
-        '"Writing tests", "Fixing lint errors"). Write it as a brief sentence for a teammate, ' +
-        'not a log line. Do NOT call this on every tool use â only at meaningful phase transitions.',
-      args: {
-        message: tool.schema
-          .string()
-          .describe('A 1-2 sentence plain-language description of what you are currently doing.'),
-      },
-      async execute(args) {
-        await client.updateAgentStatusMessage(args.message);
-        return 'Status updated.';
-      },
-    }),
-
     gt_nudge: tool({
       description:
         'Send a real-time nudge to another agent. Unlike gt_mail_send (which queues a formal ' +

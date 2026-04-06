@@ -1,13 +1,18 @@
 import { signKiloToken, withTimeout } from '@kilocode/worker-utils';
+import type { PersistedState } from '../../schemas/instance-config';
 import type { KiloClawEnv } from '../../types';
 import { buildEnvVars } from '../../gateway/env';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../../utils/env-encryption';
 import { findPepperByUserId, getWorkerDb } from '../../db';
 import { KILOCODE_API_KEY_EXPIRY_SECONDS } from '../../config';
+import { resolveLatestVersion, resolveVersionByTag } from '../../lib/image-version';
+import { lookupCatalogVersion } from '../../lib/catalog-registration';
+import { ImageVariantSchema } from '../../schemas/image-version';
+import { setupDefaultStreamChatChannel } from '../../stream-chat/client';
 import type { InstanceMutableState } from './types';
 import { getAppKey } from './types';
 import { storageUpdate } from './state';
-import { doWarn, toLoggable } from './log';
+import { doWarn, doLog, doError, toLoggable } from './log';
 
 const MINT_TIMEOUT_MS = 5_000;
 
@@ -20,6 +25,143 @@ export function resolveImageTag(state: InstanceMutableState, env: KiloClawEnv): 
     return state.trackedImageTag;
   }
   return env.FLY_IMAGE_TAG ?? 'latest';
+}
+
+export type ResolvedImageVersion = {
+  openclawVersion: string;
+  variant: string;
+  imageTag: string;
+  imageDigest: string | null;
+};
+
+export async function resolveAndPersistImageVersion(
+  env: KiloClawEnv,
+  state: InstanceMutableState,
+  opts:
+    | { pinnedImageTag: string }
+    | { latest: true; clearOnMiss?: boolean }
+    | { imageTag: string },
+  persist: (patch: Partial<PersistedState>) => Promise<void>
+): Promise<ResolvedImageVersion | null> {
+  if ('pinnedImageTag' in opts) {
+    let pinned = await resolveVersionByTag(env.KV_CLAW_CACHE, opts.pinnedImageTag);
+
+    if (!pinned && !env.HYPERDRIVE?.connectionString) {
+      doError(state, 'HYPERDRIVE not configured — cannot look up pinned tag in Postgres', {
+        pinnedImageTag: opts.pinnedImageTag,
+      });
+    }
+    if (!pinned && env.HYPERDRIVE?.connectionString) {
+      try {
+        const catalogEntry = await lookupCatalogVersion(
+          env.HYPERDRIVE.connectionString,
+          opts.pinnedImageTag
+        );
+        if (catalogEntry) {
+          const variantParse = ImageVariantSchema.safeParse(catalogEntry.variant);
+          if (!variantParse.success) {
+            doError(state, 'Invalid variant from Postgres catalog, skipping', {
+              variant: catalogEntry.variant,
+              pinnedImageTag: opts.pinnedImageTag,
+              validationErrors: variantParse.error.flatten(),
+            });
+          } else {
+            pinned = {
+              openclawVersion: catalogEntry.openclawVersion,
+              variant: variantParse.data,
+              imageTag: catalogEntry.imageTag,
+              imageDigest: catalogEntry.imageDigest,
+              publishedAt: catalogEntry.publishedAt,
+            };
+          }
+        }
+      } catch (err) {
+        doWarn(state, 'Failed to look up pinned tag in Postgres', {
+          error: toLoggable(err),
+        });
+      }
+    }
+
+    if (pinned) {
+      state.openclawVersion = pinned.openclawVersion;
+      state.imageVariant = pinned.variant;
+      state.trackedImageTag = pinned.imageTag;
+      state.trackedImageDigest = pinned.imageDigest;
+      await persist({
+        openclawVersion: pinned.openclawVersion,
+        imageVariant: pinned.variant,
+        trackedImageTag: pinned.imageTag,
+        trackedImageDigest: pinned.imageDigest,
+      });
+      return {
+        openclawVersion: pinned.openclawVersion,
+        variant: pinned.variant,
+        imageTag: pinned.imageTag,
+        imageDigest: pinned.imageDigest,
+      };
+    }
+
+    state.openclawVersion = null;
+    state.imageVariant = null;
+    state.trackedImageTag = opts.pinnedImageTag;
+    state.trackedImageDigest = null;
+    await persist({
+      openclawVersion: null,
+      imageVariant: null,
+      trackedImageTag: opts.pinnedImageTag,
+      trackedImageDigest: null,
+    });
+    return null;
+  }
+
+  if ('latest' in opts) {
+    const latest = await resolveLatestVersion(env.KV_CLAW_CACHE, 'default');
+    if (latest) {
+      state.openclawVersion = latest.openclawVersion;
+      state.imageVariant = latest.variant;
+      state.trackedImageTag = latest.imageTag;
+      state.trackedImageDigest = latest.imageDigest;
+      await persist({
+        openclawVersion: latest.openclawVersion,
+        imageVariant: latest.variant,
+        trackedImageTag: latest.imageTag,
+        trackedImageDigest: latest.imageDigest,
+      });
+      return {
+        openclawVersion: latest.openclawVersion,
+        variant: latest.variant,
+        imageTag: latest.imageTag,
+        imageDigest: latest.imageDigest,
+      };
+    }
+
+    if (opts.clearOnMiss) {
+      state.openclawVersion = null;
+      state.imageVariant = null;
+      state.trackedImageTag = null;
+      state.trackedImageDigest = null;
+      await persist({
+        openclawVersion: null,
+        imageVariant: null,
+        trackedImageTag: null,
+        trackedImageDigest: null,
+      });
+    }
+
+    return null;
+  }
+
+  state.openclawVersion = null;
+  state.imageVariant = null;
+  state.trackedImageTag = opts.imageTag;
+  state.trackedImageDigest = null;
+  await persist({
+    openclawVersion: null,
+    imageVariant: null,
+    trackedImageTag: opts.imageTag,
+    trackedImageDigest: null,
+  });
+  return null;
 }
 
 /**
@@ -181,4 +323,56 @@ export async function buildUserEnvVars(
   }
 
   return { envVars: result, minSecretsVersion: secretsVersion };
+}
+
+export type StreamChatRuntime = {
+  env: KiloClawEnv;
+  state: InstanceMutableState;
+  persist: (patch: Partial<PersistedState>) => Promise<void>;
+  logLabel: string;
+};
+
+/**
+ * Backfill Stream Chat channel for instances created before the feature was added.
+ * setupDefaultStreamChatChannel is idempotent (upsert users, getOrCreate channel).
+ * Failure is non-fatal.
+ */
+export async function ensureStreamChatChannel(
+  runtime: StreamChatRuntime,
+  sandboxId: string
+): Promise<void> {
+  const { env, state, persist, logLabel } = runtime;
+
+  if (
+    state.streamChatApiKey ||
+    !env.STREAM_CHAT_API_KEY ||
+    !env.STREAM_CHAT_API_SECRET
+  ) {
+    return;
+  }
+
+  try {
+    const streamChat = await setupDefaultStreamChatChannel(
+      env.STREAM_CHAT_API_KEY,
+      env.STREAM_CHAT_API_SECRET,
+      sandboxId
+    );
+    state.streamChatApiKey = streamChat.apiKey;
+    state.streamChatBotUserId = streamChat.botUserId;
+    state.streamChatBotUserToken = streamChat.botUserToken;
+    state.streamChatChannelId = streamChat.channelId;
+    await persist({
+      streamChatApiKey: streamChat.apiKey,
+      streamChatBotUserId: streamChat.botUserId,
+      streamChatBotUserToken: streamChat.botUserToken,
+      streamChatChannelId: streamChat.channelId,
+    });
+    doLog(state, `${logLabel} Stream Chat channel backfilled`, {
+      channelId: streamChat.channelId,
+    });
+  } catch (err) {
+    doWarn(state, `${logLabel} Stream Chat channel backfill failed (non-fatal)`, {
+      error: toLoggable(err),
+    });
+  }
 }

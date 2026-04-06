@@ -1,15 +1,22 @@
 import type { PersistedState } from '../../schemas/instance-config';
 import type { KiloClawEnv } from '../../types';
 import * as fly from '../../fly/client';
-import { PREVIOUS_VOLUME_RETENTION_MS } from '../../config';
+import type { FlyClientConfig } from '../../fly/client';
+import {
+  PREVIOUS_VOLUME_RETENTION_MS,
+  SELF_HEAL_THRESHOLD,
+  RECOVERING_TIMEOUT_MS,
+} from '../../config';
 import * as regionHelpers from '../regions';
 import { buildMachineConfig, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
 import type { InstanceMutableState } from './types';
 import { getFlyConfig } from './types';
 import { resolveImageTag, getRegistryApp, buildUserEnvVars } from './config';
+import { storageUpdate } from './state';
 import * as gateway from './gateway';
 import * as flyMachines from './fly-machines';
 import { doError, doWarn, toLoggable } from './log';
+import type { ReconcileContext } from './log';
 import type { KiloClawEventData, KiloClawEventName } from '../../utils/analytics';
 
 export type InstanceEventInput = Omit<
@@ -33,6 +40,151 @@ export type RecoveryRuntime = {
   scheduleAlarm: () => Promise<void>;
   emitEvent: (data: InstanceEventInput) => void;
 };
+
+/**
+ * Signal returned by recovery detection and monitoring helpers.
+ * These are consumed by the reconcile dispatcher in index.ts.
+ */
+export type RecoverySignal =
+  | { beginUnexpectedStopRecovery: { flyState: 'stopped'; failCount: number } }
+  | { completeUnexpectedStopRecovery: true }
+  | { failedUnexpectedStopRecovery: { errorMessage: string; label: string } }
+  | { timedOutUnexpectedStopRecovery: { errorMessage: string; durationMs?: number } }
+  | Record<string, never>;
+
+/**
+ * Detect whether an unexpected stop has occurred based on Fly machine state.
+ * Called from syncStatusWithFly when flyState is 'stopped' and DO status is 'running'.
+ * Increments healthCheckFailCount and returns a recovery trigger signal when
+ * SELF_HEAL_THRESHOLD is reached.
+ */
+export function detectUnexpectedStop(
+  ctx: DurableObjectState,
+  state: InstanceMutableState,
+  flyState: string,
+  rctx: ReconcileContext
+): RecoverySignal {
+  if (flyState !== 'stopped' || state.status !== 'running') {
+    return {};
+  }
+
+  state.healthCheckFailCount++;
+  void ctx.storage.put(storageUpdate({ healthCheckFailCount: state.healthCheckFailCount }));
+
+  if (state.healthCheckFailCount >= SELF_HEAL_THRESHOLD) {
+    rctx.log('unexpected_stop_recovery_trigger', {
+      old_state: 'running',
+      new_state: 'recovering',
+      fly_state: flyState,
+      fail_count: state.healthCheckFailCount,
+      value: SELF_HEAL_THRESHOLD,
+    });
+    return {
+      beginUnexpectedStopRecovery: {
+        flyState,
+        failCount: state.healthCheckFailCount,
+      },
+    };
+  }
+
+  return {};
+}
+
+/**
+ * Reconcile a 'recovering' instance.
+ *
+ * Called from reconcileWithFly() when status === 'recovering'.
+ * Checks the replacement machine state and returns signals to complete,
+ * fail, or continue waiting.
+ */
+export async function reconcileRecovering(
+  flyConfig: FlyClientConfig,
+  state: InstanceMutableState,
+  rctx: ReconcileContext
+): Promise<RecoverySignal> {
+  const recoveryStartedAt = state.recoveryStartedAt;
+  const isTimedOut =
+    recoveryStartedAt !== null && Date.now() - recoveryStartedAt > RECOVERING_TIMEOUT_MS;
+
+  if (state.flyMachineId) {
+    try {
+      const machine = await fly.getMachine(flyConfig, state.flyMachineId);
+
+      if (machine.state === 'started') {
+        rctx.log('unexpected_stop_recovery_machine_started', {
+          machine_id: state.flyMachineId,
+          old_state: 'recovering',
+          new_state: 'running',
+        });
+        return { completeUnexpectedStopRecovery: true };
+      }
+
+      if (
+        machine.state === 'stopped' ||
+        machine.state === 'failed' ||
+        machine.state === 'destroyed'
+      ) {
+        const errorMessage = `unexpected stop recovery replacement machine entered ${machine.state}`;
+        rctx.log('unexpected_stop_recovery_terminal_machine_state', {
+          machine_id: state.flyMachineId,
+          fly_state: machine.state,
+          error: errorMessage,
+          old_state: 'recovering',
+          new_state: 'stopped',
+        });
+        return {
+          failedUnexpectedStopRecovery: {
+            errorMessage,
+            label: `alarm_${machine.state}`,
+          },
+        };
+      }
+
+      rctx.log('unexpected_stop_recovery_waiting_for_start', {
+        machine_id: state.flyMachineId,
+        fly_state: machine.state,
+      });
+    } catch (err) {
+      if (fly.isFlyNotFound(err)) {
+        const errorMessage = 'unexpected stop recovery replacement machine disappeared';
+        rctx.log('unexpected_stop_recovery_machine_gone', {
+          machine_id: state.flyMachineId,
+          error: errorMessage,
+          old_state: 'recovering',
+          new_state: 'stopped',
+        });
+        return {
+          failedUnexpectedStopRecovery: {
+            errorMessage,
+            label: 'alarm_machine_gone',
+          },
+        };
+      }
+
+      doError(state, 'reconcileRecovering: transient error checking replacement machine', {
+        error: toLoggable(err),
+      });
+    }
+  }
+
+  if (!isTimedOut) return {};
+
+  const errorMessage = 'unexpected stop recovery timed out';
+  const durationMs = recoveryStartedAt ? Date.now() - recoveryStartedAt : undefined;
+  rctx.log('unexpected_stop_recovery_timeout', {
+    old_state: 'recovering',
+    new_state: 'stopped',
+    durationMs,
+    error: errorMessage,
+  });
+
+  return {
+    timedOutUnexpectedStopRecovery: {
+      errorMessage,
+      durationMs,
+    },
+  };
+}
 
 export async function cleanupRecoveryPreviousVolume(
   runtime: RecoveryRuntime

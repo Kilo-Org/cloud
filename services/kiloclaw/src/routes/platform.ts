@@ -79,6 +79,7 @@ const KiloCodeConfigPatchSchema = z.object({
     .optional(),
   vectorMemoryEnabled: z.boolean().optional(),
   vectorMemoryModel: z.string().nullable().optional(),
+  dreamingEnabled: z.boolean().optional(),
 });
 
 const WebSearchConfigPatchSchema = z.object({
@@ -1115,6 +1116,7 @@ platform.patch('/kilocode-config', async c => {
     kilocodeDefaultModel,
     vectorMemoryEnabled,
     vectorMemoryModel,
+    dreamingEnabled,
   } = result.data;
 
   try {
@@ -1129,6 +1131,7 @@ platform.patch('/kilocode-config', async c => {
           kilocodeDefaultModel,
           vectorMemoryEnabled,
           vectorMemoryModel,
+          dreamingEnabled,
         }),
       'updateKiloCodeConfig'
     );

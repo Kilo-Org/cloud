@@ -33,6 +33,7 @@ export type KiloCodeConfigPatchInput = {
   kilocodeDefaultModel?: string | null;
   vectorMemoryEnabled?: boolean;
   vectorMemoryModel?: string | null;
+  dreamingEnabled?: boolean;
 };
 
 export type KiloCodeConfigResponse = {
@@ -41,6 +42,7 @@ export type KiloCodeConfigResponse = {
   kilocodeDefaultModel: string | null;
   vectorMemoryEnabled: boolean;
   vectorMemoryModel: string | null;
+  dreamingEnabled: boolean;
 };
 
 export type WebSearchConfigPatchInput = {
@@ -298,6 +300,8 @@ export type UserConfigResponse = {
   vectorMemoryEnabled: boolean;
   /** Embedding model ID for vector memory (e.g. "mistralai/mistral-embed"). */
   vectorMemoryModel: string | null;
+  /** Whether background dreaming (memory consolidation) is enabled. */
+  dreamingEnabled: boolean;
 };
 
 /** Response from POST /api/platform/doctor */

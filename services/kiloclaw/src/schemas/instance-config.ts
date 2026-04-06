@@ -343,6 +343,8 @@ export const PersistedStateSchema = z.object({
   vectorMemoryEnabled: z.boolean().default(false),
   // Vector memory: embedding model ID (e.g. "mistralai/mistral-embed").
   vectorMemoryModel: z.string().nullable().default(null),
+  // Dreaming: whether background memory consolidation is enabled.
+  dreamingEnabled: z.boolean().default(false),
 });
 
 export type PersistedState = z.infer<typeof PersistedStateSchema>;

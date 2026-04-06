@@ -525,6 +525,21 @@ export function generateBaseConfig(
     delete config.agents.defaults.memorySearch.remote;
   }
 
+  // Dreaming configuration — enables OpenClaw's background memory consolidation
+  // (moves strong short-term signals into durable long-term memory automatically).
+  config.plugins = config.plugins ?? {};
+  config.plugins.entries = config.plugins.entries ?? {};
+  config.plugins.entries['memory-core'] = config.plugins.entries['memory-core'] ?? {};
+  config.plugins.entries['memory-core'].config = config.plugins.entries['memory-core'].config ?? {};
+  config.plugins.entries['memory-core'].config.dreaming =
+    config.plugins.entries['memory-core'].config.dreaming ?? {};
+  if (env.KILOCLAW_DREAMING_ENABLED === 'true') {
+    config.plugins.entries['memory-core'].config.dreaming.enabled = true;
+    console.log('Dreaming enabled');
+  } else {
+    config.plugins.entries['memory-core'].config.dreaming.enabled = false;
+  }
+
   // Custom secret config path patching — set decrypted secret values at
   // user-specified JSON dot-notation paths in openclaw.json.
   if (env.KILOCLAW_SECRET_CONFIG_PATHS) {

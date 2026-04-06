@@ -44,6 +44,8 @@ export type UserConfig = {
   vectorMemoryEnabled?: boolean;
   /** Embedding model ID for vector memory (e.g. "mistralai/mistral-embed"). */
   vectorMemoryModel?: string | null;
+  /** Whether background dreaming (memory consolidation) is enabled. */
+  dreamingEnabled?: boolean;
 };
 
 /**
@@ -249,6 +251,11 @@ export async function buildEnvVars(
   }
   if (userConfig?.vectorMemoryModel) {
     plainEnv.KILOCLAW_VECTOR_MEMORY_MODEL = userConfig.vectorMemoryModel;
+  }
+
+  // Dreaming configuration (non-sensitive, plaintext).
+  if (userConfig?.dreamingEnabled) {
+    plainEnv.KILOCLAW_DREAMING_ENABLED = 'true';
   }
 
   // Custom secret config path mapping — tells the controller which env vars

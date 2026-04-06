@@ -792,12 +792,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     kilocodeDefaultModel?: string | null;
     vectorMemoryEnabled?: boolean;
     vectorMemoryModel?: string | null;
+    dreamingEnabled?: boolean;
   }): Promise<{
     kilocodeApiKey: string | null;
     kilocodeApiKeyExpiresAt: string | null;
     kilocodeDefaultModel: string | null;
     vectorMemoryEnabled: boolean;
     vectorMemoryModel: string | null;
+    dreamingEnabled: boolean;
   }> {
     await this.loadState();
 
@@ -822,6 +824,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (patch.vectorMemoryModel !== undefined) {
       this.s.vectorMemoryModel = patch.vectorMemoryModel;
       pending.vectorMemoryModel = this.s.vectorMemoryModel;
+    }
+    if (patch.dreamingEnabled !== undefined) {
+      this.s.dreamingEnabled = patch.dreamingEnabled;
+      pending.dreamingEnabled = this.s.dreamingEnabled;
     }
 
     if (Object.keys(pending).length > 0) {
@@ -869,12 +875,28 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
     }
 
+    // Live-patch dreaming config on the running machine when toggled.
+    if (patch.dreamingEnabled !== undefined) {
+      await gateway.patchConfigOnMachine(this.s, this.env, {
+        plugins: {
+          entries: {
+            'memory-core': {
+              config: {
+                dreaming: { enabled: this.s.dreamingEnabled },
+              },
+            },
+          },
+        },
+      });
+    }
+
     return {
       kilocodeApiKey: this.s.kilocodeApiKey,
       kilocodeApiKeyExpiresAt: this.s.kilocodeApiKeyExpiresAt,
       kilocodeDefaultModel: this.s.kilocodeDefaultModel,
       vectorMemoryEnabled: this.s.vectorMemoryEnabled,
       vectorMemoryModel: this.s.vectorMemoryModel,
+      dreamingEnabled: this.s.dreamingEnabled,
     };
   }
 
@@ -2136,7 +2158,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   async getConfig(): Promise<
-    InstanceConfig & { vectorMemoryEnabled: boolean; vectorMemoryModel: string | null }
+    InstanceConfig & {
+      vectorMemoryEnabled: boolean;
+      vectorMemoryModel: string | null;
+      dreamingEnabled: boolean;
+    }
   > {
     await this.loadState();
     return {
@@ -2156,6 +2182,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       customSecretMeta: this.s.customSecretMeta ?? undefined,
       vectorMemoryEnabled: this.s.vectorMemoryEnabled,
       vectorMemoryModel: this.s.vectorMemoryModel,
+      dreamingEnabled: this.s.dreamingEnabled,
     };
   }
 

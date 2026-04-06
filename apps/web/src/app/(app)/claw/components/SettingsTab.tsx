@@ -786,59 +786,70 @@ function InboundEmailCard({
 // VectorMemorySection
 // ---------------------------------------------------------------------------
 
-function VectorMemorySection({
+function MemorySection({
   config,
   mutations,
 }: {
-  config: { vectorMemoryEnabled: boolean; vectorMemoryModel: string | null } | undefined;
+  config:
+    | {
+        vectorMemoryEnabled: boolean;
+        vectorMemoryModel: string | null;
+        dreamingEnabled: boolean;
+      }
+    | undefined;
   mutations: ClawMutations;
 }) {
-  const configEnabled = config?.vectorMemoryEnabled ?? false;
-  const configModel = config?.vectorMemoryModel ?? DEFAULT_EMBEDDING_MODEL;
+  const configVectorEnabled = config?.vectorMemoryEnabled ?? false;
+  const configVectorModel = config?.vectorMemoryModel ?? DEFAULT_EMBEDDING_MODEL;
+  const configDreamingEnabled = config?.dreamingEnabled ?? false;
 
-  const [enabled, setEnabled] = useState(configEnabled);
-  const [model, setModel] = useState(configModel);
+  const [vectorEnabled, setVectorEnabled] = useState(configVectorEnabled);
+  const [vectorModel, setVectorModel] = useState(configVectorModel);
+  const [dreamingEnabled, setDreamingEnabled] = useState(configDreamingEnabled);
   const [lastSaved, setLastSaved] = useState<{
-    enabled: boolean;
-    model: string;
+    vectorEnabled: boolean;
+    vectorModel: string;
+    dreamingEnabled: boolean;
   } | null>(null);
 
   // Sync local state when config loads/changes from server
   useEffect(() => {
     if (config) {
       if (lastSaved === null) {
-        setEnabled(config.vectorMemoryEnabled);
-        setModel(config.vectorMemoryModel ?? DEFAULT_EMBEDDING_MODEL);
+        setVectorEnabled(config.vectorMemoryEnabled);
+        setVectorModel(config.vectorMemoryModel ?? DEFAULT_EMBEDDING_MODEL);
+        setDreamingEnabled(config.dreamingEnabled);
       }
     }
   }, [config, lastSaved]);
 
-  const savedEnabled = lastSaved?.enabled ?? configEnabled;
-  const savedModel = lastSaved?.model ?? configModel;
-  const dirty = enabled !== savedEnabled || (enabled && model !== savedModel);
+  const savedVectorEnabled = lastSaved?.vectorEnabled ?? configVectorEnabled;
+  const savedVectorModel = lastSaved?.vectorModel ?? configVectorModel;
+  const savedDreamingEnabled = lastSaved?.dreamingEnabled ?? configDreamingEnabled;
+  const dirty =
+    vectorEnabled !== savedVectorEnabled ||
+    (vectorEnabled && vectorModel !== savedVectorModel) ||
+    dreamingEnabled !== savedDreamingEnabled;
   const saving = mutations.patchConfig.isPending;
 
-  function handleToggle(checked: boolean) {
-    setEnabled(checked);
-    if (checked && !model) {
-      setModel(DEFAULT_EMBEDDING_MODEL);
+  function handleVectorToggle(checked: boolean) {
+    setVectorEnabled(checked);
+    if (checked && !vectorModel) {
+      setVectorModel(DEFAULT_EMBEDDING_MODEL);
     }
   }
 
   function handleSave() {
     mutations.patchConfig.mutate(
       {
-        vectorMemoryEnabled: enabled,
-        vectorMemoryModel: enabled ? model : null,
+        vectorMemoryEnabled: vectorEnabled,
+        vectorMemoryModel: vectorEnabled ? vectorModel : null,
+        dreamingEnabled,
       },
       {
         onSuccess: () => {
-          setLastSaved({ enabled, model });
-          toast.success(
-            enabled
-              ? 'Vector memory enabled. Change applied to running instance.'
-              : 'Vector memory disabled.'
-          );
+          setLastSaved({ vectorEnabled, vectorModel, dreamingEnabled });
+          toast.success('Memory settings saved. Changes applied to running instance.');
         },
         onError: err => toast.error(`Failed to save: ${err.message}`),
       }
@@ -847,19 +858,20 @@ function VectorMemorySection({
 
   return (
     <div>
-      <h2 className="text-foreground mb-3 text-base font-semibold">Vector Memory</h2>
+      <h2 className="text-foreground mb-3 text-base font-semibold">Memory</h2>
       <div className="rounded-lg border p-4">
+        {/* Vector Memory toggle */}
         <div className="flex items-center justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-medium">Enable Vector Memory</p>
+            <p className="text-sm font-medium">Vector Search</p>
             <p className="text-muted-foreground text-xs">
               Use semantic search across memory files via embedding vectors.
             </p>
           </div>
-          <Switch checked={enabled} onCheckedChange={handleToggle} />
+          <Switch checked={vectorEnabled} onCheckedChange={handleVectorToggle} />
         </div>
 
-        {enabled && (
+        {vectorEnabled && (
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <div className="min-w-0">
               <p className="text-sm font-medium">Embedding Model</p>
@@ -867,7 +879,7 @@ function VectorMemorySection({
                 Model used for generating vector embeddings.
               </p>
             </div>
-            <Select value={model} onValueChange={setModel}>
+            <Select value={vectorModel} onValueChange={setVectorModel}>
               <SelectTrigger className="w-full sm:w-[300px]">
                 <SelectValue placeholder="Select model" />
               </SelectTrigger>
@@ -881,6 +893,20 @@ function VectorMemorySection({
             </Select>
           </div>
         )}
+
+        <Separator className="my-4" />
+
+        {/* Dreaming toggle */}
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Dreaming</p>
+            <p className="text-muted-foreground text-xs">
+              Background memory consolidation — moves strong short-term signals into durable
+              long-term memory automatically.
+            </p>
+          </div>
+          <Switch checked={dreamingEnabled} onCheckedChange={setDreamingEnabled} />
+        </div>
 
         <div className="mt-4 flex justify-end">
           <Button
@@ -1203,8 +1229,8 @@ export function SettingsTab({
         </div>
       </div>
 
-      {/* ── Vector Memory ── */}
-      <VectorMemorySection config={config} mutations={mutations} />
+      {/* ── Memory ── */}
+      <MemorySection config={config} mutations={mutations} />
 
       {/* ── Default Permissions ── */}
       <PermissionPresetSection

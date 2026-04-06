@@ -6,6 +6,7 @@ import type { Context } from 'hono';
 import { cors } from 'hono/cors';
 import { getTownContainerStub } from './dos/TownContainer.do';
 import { getTownDOStub } from './dos/Town.do';
+import { TownConfigUpdateSchema } from './types';
 import { resError } from './util/res.util';
 import {
   authMiddleware,
@@ -323,10 +324,11 @@ app.get('/debug/towns/:townId/config', async c => {
 app.patch('/debug/towns/:townId/config', async c => {
   if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
   const townId = c.req.param('townId');
-  const body = await c.req.json();
+  const parsed = TownConfigUpdateSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: 'Invalid config', issues: parsed.error.issues }, 400);
   const town = getTownDOStub(c.env, townId);
   // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
-  const result = await town.updateTownConfig(body);
+  const result = await town.updateTownConfig(parsed.data);
   return c.json(result);
 });
 

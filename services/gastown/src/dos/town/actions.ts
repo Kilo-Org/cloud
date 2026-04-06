@@ -736,7 +736,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                   );
                 } else {
                   const elapsed = Date.now() - new Date(readySince).getTime();
-                  if (elapsed >= refineryConfig.auto_merge_delay_minutes! * 60_000) {
+                  if (elapsed >= (refineryConfig.auto_merge_delay_minutes ?? 0) * 60_000) {
                     ctx.insertEvent('pr_auto_merge', {
                       bead_id: action.bead_id,
                       payload: {

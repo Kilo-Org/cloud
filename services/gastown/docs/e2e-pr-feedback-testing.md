@@ -933,11 +933,11 @@ print(f'parent_bead_id: {bead.get(\"parent_bead_id\", \"NULL\")}')
 
 ### Summary
 
-| Scenario | Config | Result | PR | Notes |
-|----------|--------|--------|----|-------|
-| 1: No review + auto-merge | `code_review=false`, `auto_merge=true` | **PASS (with bug)** | #38 MERGED | Refinery dispatched despite `code_review=false` (bug persists). PR merged after rework. |
-| 2: Refinery review (rework mode) | `code_review=true`, `review_mode=rework` | **FAIL** | None created | Polecat pushed branch but never created PR. Refinery stuck in rework-request loop 35+ min. |
-| 3: Human feedback + auto-resolve | `code_review=false`, `auto_resolve_pr_feedback=true` | **FAIL** | None created | Same as Scenario 2: polecat pushed branch but no PR. MR bead stuck at `open`. |
+| Scenario                         | Config                                               | Result              | PR           | Notes                                                                                      |
+| -------------------------------- | ---------------------------------------------------- | ------------------- | ------------ | ------------------------------------------------------------------------------------------ |
+| 1: No review + auto-merge        | `code_review=false`, `auto_merge=true`               | **PASS (with bug)** | #38 MERGED   | Refinery dispatched despite `code_review=false` (bug persists). PR merged after rework.    |
+| 2: Refinery review (rework mode) | `code_review=true`, `review_mode=rework`             | **FAIL**            | None created | Polecat pushed branch but never created PR. Refinery stuck in rework-request loop 35+ min. |
+| 3: Human feedback + auto-resolve | `code_review=false`, `auto_resolve_pr_feedback=true` | **FAIL**            | None created | Same as Scenario 2: polecat pushed branch but no PR. MR bead stuck at `open`.              |
 
 ### Bugs Found
 
@@ -952,6 +952,7 @@ When `code_review=false` and `merge_strategy=pr`, the refinery is still dispatch
 In Scenario 1, the refinery happened to create the PR and complete a rework cycle, so the PR eventually merged. But this added ~3 minutes of unnecessary work and the refinery should not have been involved at all.
 
 **Evidence:**
+
 - 19:44:59Z: MR bead created with `pr_url=null`, reconciler action `dispatch_agent: 1`
 - 19:45:12Z: refinery `working` hook=8b5d6506
 - 19:45:42Z: refinery created rework bead "Rework: Add src/utils/set-helpers.ts..."
@@ -968,11 +969,13 @@ In Scenario 1, the refinery happened to create the PR and complete a rework cycl
 The polecat pushes branches to GitHub successfully but does NOT call `gh pr create`. The MR bead is created via `review_submitted` with `pr_url=null`. In the bead body, the polecat reports the commit was pushed, but no PR creation is mentioned.
 
 **Evidence:**
+
 - Scenario 2: branch `gt/toast/fa318809` exists on GitHub, 0 PRs associated
 - Scenario 3: branch `gt/toast/4464f47b` exists on GitHub, 0 PRs associated
 - Scenario 1: branch `gt/toast/38cba536` had PR #38, but that was created by the refinery (not the polecat)
 
 **Impact:** Without a `pr_url`:
+
 - The `code_review=false` fast-track in the reconciler can't proceed to auto-merge
 - The refinery (when dispatched) has no PR to review, leading to Bug 3
 - Human feedback can't be added because there's no PR to comment on
@@ -986,6 +989,7 @@ The polecat pushes branches to GitHub successfully but does NOT call `gh pr crea
 **Status:** New
 
 When `code_review=true` and the refinery is dispatched to an MR bead with `pr_url=null`, the refinery enters a loop where it:
+
 1. Reviews the diff (via git, not via GitHub PR)
 2. Calls `gt_request_changes` to create a rework request
 3. Continues working instead of unhoking and completing
@@ -993,6 +997,7 @@ When `code_review=true` and the refinery is dispatched to an MR bead with `pr_ur
 5. Creates duplicate rework/escalation beads
 
 **Evidence:**
+
 - 19:50:03Z: MR bead created with `pr_url=null`
 - 19:51:00Z: refinery "Code review found gaps in test coverage; preparing rework request"
 - 19:51:13Z: First rework request + escalation bead created
@@ -1009,6 +1014,7 @@ When `code_review=true` and the refinery is dispatched to an MR bead with `pr_ur
 **Status:** New (related to Bug 3)
 
 The `gt_request_changes` tool call is not idempotent. Each call creates new rework and escalation beads even when the refinery is re-issuing the same request for the same MR bead. After 35 minutes, Scenario 2 accumulated:
+
 - 5 escalation beads (all "Rework requested: missing tests...")
 - 5 "Escalation (low)" issue beads
 - 3 REWORK_REQUEST message beads
@@ -1026,20 +1032,20 @@ Task:   "Add src/utils/set-helpers.ts with union, intersection, difference,
          symmetricDifference, isSubset"
 ```
 
-| Time (UTC) | Event |
-|------------|-------|
-| 19:38:42 | Task sent to mayor |
-| 19:38:47 | Issue bead created, mayor hooks it |
-| 19:43:51 | Mayor unhooks, polecat dispatched |
-| 19:43:56 | Polecat hooks bead, starts implementing |
-| 19:44:28 | Polecat: "Set helper file added; committing and pushing" |
-| 19:44:43 | Polecat: "Creating pull request" |
-| 19:44:59 | MR bead created (`pr_url=null`). **BUG: refinery dispatched** |
-| 19:45:42 | Refinery requests rework, rework bead created |
-| 19:45:57 | Polecat dispatched for rework |
-| 19:46:58 | Rework bead: refinery calls `gt_done`, `poll_pr` starts |
-| 19:48:02 | **PR #38 merged** by kiloconnect-development bot |
-| 19:48:13 | All beads closed |
+| Time (UTC) | Event                                                         |
+| ---------- | ------------------------------------------------------------- |
+| 19:38:42   | Task sent to mayor                                            |
+| 19:38:47   | Issue bead created, mayor hooks it                            |
+| 19:43:51   | Mayor unhooks, polecat dispatched                             |
+| 19:43:56   | Polecat hooks bead, starts implementing                       |
+| 19:44:28   | Polecat: "Set helper file added; committing and pushing"      |
+| 19:44:43   | Polecat: "Creating pull request"                              |
+| 19:44:59   | MR bead created (`pr_url=null`). **BUG: refinery dispatched** |
+| 19:45:42   | Refinery requests rework, rework bead created                 |
+| 19:45:57   | Polecat dispatched for rework                                 |
+| 19:46:58   | Rework bead: refinery calls `gt_done`, `poll_pr` starts       |
+| 19:48:02   | **PR #38 merged** by kiloconnect-development bot              |
+| 19:48:13   | All beads closed                                              |
 
 **Duration:** ~9.5 min (would be ~5 min without unnecessary refinery rework)
 **PR:** #38 on branch `gt/toast/38cba536` — MERGED
@@ -1054,17 +1060,17 @@ Task:   "Add src/utils/promise-helpers.ts with delay, retry, timeout,
          allSettledWithErrors, race"
 ```
 
-| Time (UTC) | Event |
-|------------|-------|
-| 19:49:20 | Task sent to mayor |
-| 19:49:35 | Issue bead created, polecat dispatched |
-| 19:49:44 | Polecat: "Implementing promise helper utilities" |
-| 19:50:03 | MR bead created (`pr_url=null`). Refinery dispatched (expected). |
-| 19:51:00 | Refinery: "Code review found gaps in test coverage" |
-| 19:51:13 | First rework request + escalation beads (2 each) |
-| 20:02:01 | **Second rework request** (duplicate) — refinery still working |
-| 20:12:35 | Third rework request (scope mismatch) |
-| 20:25+ | **Refinery still stuck** on MR bead after 35+ min |
+| Time (UTC) | Event                                                            |
+| ---------- | ---------------------------------------------------------------- |
+| 19:49:20   | Task sent to mayor                                               |
+| 19:49:35   | Issue bead created, polecat dispatched                           |
+| 19:49:44   | Polecat: "Implementing promise helper utilities"                 |
+| 19:50:03   | MR bead created (`pr_url=null`). Refinery dispatched (expected). |
+| 19:51:00   | Refinery: "Code review found gaps in test coverage"              |
+| 19:51:13   | First rework request + escalation beads (2 each)                 |
+| 20:02:01   | **Second rework request** (duplicate) — refinery still working   |
+| 20:12:35   | Third rework request (scope mismatch)                            |
+| 20:25+     | **Refinery still stuck** on MR bead after 35+ min                |
 
 **Duration:** 35+ min (never completed)
 **PR:** None created on GitHub
@@ -1080,14 +1086,14 @@ Task:   "Add src/utils/regex-helpers.ts with escapeRegex, isValidRegex,
          matchAll, replaceAll, extractGroups"
 ```
 
-| Time (UTC) | Event |
-|------------|-------|
-| 20:13:09 | Task sent to mayor |
-| 20:13:25 | Issue bead created, polecat dispatched |
-| 20:14:01 | Polecat: "Implementing regex helper utilities" |
-| 20:14:05 | MR bead created (`pr_url=null`), polecat unhooks |
-| 20:14:17 | MR bead status=`open`, no assignee, no dispatch |
-| 20:25+ | **MR bead still `open`** — no one picks it up |
+| Time (UTC) | Event                                            |
+| ---------- | ------------------------------------------------ |
+| 20:13:09   | Task sent to mayor                               |
+| 20:13:25   | Issue bead created, polecat dispatched           |
+| 20:14:01   | Polecat: "Implementing regex helper utilities"   |
+| 20:14:05   | MR bead created (`pr_url=null`), polecat unhooks |
+| 20:14:17   | MR bead status=`open`, no assignee, no dispatch  |
+| 20:25+     | **MR bead still `open`** — no one picks it up    |
 
 **Duration:** 10+ min (never completed)
 **PR:** None created on GitHub

@@ -495,6 +495,36 @@ export function generateBaseConfig(
     console.log('Hooks enabled with inbound email mapping (dedicated token)');
   }
 
+  // Vector memory configuration — configures OpenClaw's builtin memory search
+  // to use the Kilo Gateway embeddings endpoint via the OpenAI-compatible adapter.
+  config.agents = config.agents ?? {};
+  config.agents.defaults = config.agents.defaults ?? {};
+  config.agents.defaults.memorySearch = config.agents.defaults.memorySearch ?? {};
+  if (env.KILOCLAW_VECTOR_MEMORY_ENABLED === 'true') {
+    const model = env.KILOCLAW_VECTOR_MEMORY_MODEL || 'mistralai/mistral-embed';
+    const baseUrl = env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/gateway/';
+
+    config.agents.defaults.memorySearch.enabled = true;
+    config.agents.defaults.memorySearch.provider = 'openai';
+    config.agents.defaults.memorySearch.model = model;
+    config.agents.defaults.memorySearch.remote = {
+      baseUrl,
+      apiKey: env.KILOCODE_API_KEY || '',
+      headers: {
+        ...(env.KILOCODE_ORGANIZATION_ID
+          ? { 'X-KiloCode-OrganizationId': env.KILOCODE_ORGANIZATION_ID }
+          : {}),
+      },
+    };
+    console.log(`Vector memory enabled: provider=openai model=${model}`);
+  } else {
+    config.agents.defaults.memorySearch.enabled = false;
+    // Clean up stale remote config from previous boots where memory was enabled.
+    delete config.agents.defaults.memorySearch.provider;
+    delete config.agents.defaults.memorySearch.model;
+    delete config.agents.defaults.memorySearch.remote;
+  }
+
   // Custom secret config path patching — set decrypted secret values at
   // user-specified JSON dot-notation paths in openclaw.json.
   if (env.KILOCLAW_SECRET_CONFIG_PATHS) {

@@ -173,6 +173,8 @@ const updateConfigSchema = z.object({
 const updateKiloCodeConfigSchema = z.object({
   organizationId: z.uuid(),
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
+  vectorMemoryEnabled: z.boolean().optional(),
+  vectorMemoryModel: z.string().nullable().optional(),
 });
 
 const patchWebSearchConfigSchema = z.object({
@@ -229,7 +231,7 @@ function buildWorkerChannelsPatch(
 
 type KiloCodeConfigPublicResponse = Pick<
   KiloCodeConfigResponse,
-  'kilocodeApiKeyExpiresAt' | 'kilocodeDefaultModel'
+  'kilocodeApiKeyExpiresAt' | 'kilocodeDefaultModel' | 'vectorMemoryEnabled' | 'vectorMemoryModel'
 >;
 
 function sanitizeKiloCodeConfigResponse(
@@ -238,6 +240,8 @@ function sanitizeKiloCodeConfigResponse(
   return {
     kilocodeApiKeyExpiresAt: response.kilocodeApiKeyExpiresAt,
     kilocodeDefaultModel: response.kilocodeDefaultModel,
+    vectorMemoryEnabled: response.vectorMemoryEnabled,
+    vectorMemoryModel: response.vectorMemoryModel,
   };
 }
 

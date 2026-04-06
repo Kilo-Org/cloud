@@ -45,9 +45,18 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DetailTile } from './DetailTile';
+import { EMBEDDING_MODELS, DEFAULT_EMBEDDING_MODEL } from './embeddingModels';
 
 import { getEntriesByCategory } from '@kilocode/kiloclaw-secret-catalog';
 import { SecretEntrySection } from './SecretEntrySection';
@@ -774,6 +783,122 @@ function InboundEmailCard({
 }
 
 // ---------------------------------------------------------------------------
+// VectorMemorySection
+// ---------------------------------------------------------------------------
+
+function VectorMemorySection({
+  config,
+  mutations,
+}: {
+  config: { vectorMemoryEnabled: boolean; vectorMemoryModel: string | null } | undefined;
+  mutations: ClawMutations;
+}) {
+  const configEnabled = config?.vectorMemoryEnabled ?? false;
+  const configModel = config?.vectorMemoryModel ?? DEFAULT_EMBEDDING_MODEL;
+
+  const [enabled, setEnabled] = useState(configEnabled);
+  const [model, setModel] = useState(configModel);
+  const [lastSaved, setLastSaved] = useState<{
+    enabled: boolean;
+    model: string;
+  } | null>(null);
+
+  // Sync local state when config loads/changes from server
+  useEffect(() => {
+    if (config) {
+      if (lastSaved === null) {
+        setEnabled(config.vectorMemoryEnabled);
+        setModel(config.vectorMemoryModel ?? DEFAULT_EMBEDDING_MODEL);
+      }
+    }
+  }, [config, lastSaved]);
+
+  const savedEnabled = lastSaved?.enabled ?? configEnabled;
+  const savedModel = lastSaved?.model ?? configModel;
+  const dirty = enabled !== savedEnabled || (enabled && model !== savedModel);
+  const saving = mutations.patchConfig.isPending;
+
+  function handleToggle(checked: boolean) {
+    setEnabled(checked);
+    if (checked && !model) {
+      setModel(DEFAULT_EMBEDDING_MODEL);
+    }
+  }
+
+  function handleSave() {
+    mutations.patchConfig.mutate(
+      {
+        vectorMemoryEnabled: enabled,
+        vectorMemoryModel: enabled ? model : null,
+      },
+      {
+        onSuccess: () => {
+          setLastSaved({ enabled, model });
+          toast.success(
+            enabled
+              ? 'Vector memory enabled. Change applied to running instance.'
+              : 'Vector memory disabled.'
+          );
+        },
+        onError: err => toast.error(`Failed to save: ${err.message}`),
+      }
+    );
+  }
+
+  return (
+    <div>
+      <h2 className="text-foreground mb-3 text-base font-semibold">Vector Memory</h2>
+      <div className="rounded-lg border p-4">
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Enable Vector Memory</p>
+            <p className="text-muted-foreground text-xs">
+              Use semantic search across memory files via embedding vectors.
+            </p>
+          </div>
+          <Switch checked={enabled} onCheckedChange={handleToggle} />
+        </div>
+
+        {enabled && (
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Embedding Model</p>
+              <p className="text-muted-foreground text-xs">
+                Model used for generating vector embeddings.
+              </p>
+            </div>
+            <Select value={model} onValueChange={setModel}>
+              <SelectTrigger className="w-full sm:w-[300px]">
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                {EMBEDDING_MODELS.map(m => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <div className="mt-4 flex justify-end">
+          <Button
+            size="sm"
+            disabled={!dirty || saving}
+            variant={dirty ? 'default' : 'outline'}
+            onClick={handleSave}
+          >
+            <Save className="h-4 w-4" />
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // SettingsTab
 // ---------------------------------------------------------------------------
 
@@ -1077,6 +1202,9 @@ export function SettingsTab({
           </div>
         </div>
       </div>
+
+      {/* ── Vector Memory ── */}
+      <VectorMemorySection config={config} mutations={mutations} />
 
       {/* ── Default Permissions ── */}
       <PermissionPresetSection

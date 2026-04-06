@@ -790,10 +790,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     kilocodeApiKey?: string | null;
     kilocodeApiKeyExpiresAt?: string | null;
     kilocodeDefaultModel?: string | null;
+    vectorMemoryEnabled?: boolean;
+    vectorMemoryModel?: string | null;
   }): Promise<{
     kilocodeApiKey: string | null;
     kilocodeApiKeyExpiresAt: string | null;
     kilocodeDefaultModel: string | null;
+    vectorMemoryEnabled: boolean;
+    vectorMemoryModel: string | null;
   }> {
     await this.loadState();
 
@@ -811,6 +815,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.kilocodeDefaultModel = patch.kilocodeDefaultModel;
       pending.kilocodeDefaultModel = this.s.kilocodeDefaultModel;
     }
+    if (patch.vectorMemoryEnabled !== undefined) {
+      this.s.vectorMemoryEnabled = patch.vectorMemoryEnabled;
+      pending.vectorMemoryEnabled = this.s.vectorMemoryEnabled;
+    }
+    if (patch.vectorMemoryModel !== undefined) {
+      this.s.vectorMemoryModel = patch.vectorMemoryModel;
+      pending.vectorMemoryModel = this.s.vectorMemoryModel;
+    }
 
     if (Object.keys(pending).length > 0) {
       await this.ctx.storage.put(pending);
@@ -823,10 +835,46 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       });
     }
 
+    // Live-patch vector memory config on the running machine when toggled or model changed.
+    // Must include the full `remote` block (baseUrl, apiKey, headers) so OpenClaw routes
+    // embedding requests through the Kilo Gateway instead of the default OpenAI endpoint.
+    if (patch.vectorMemoryEnabled !== undefined || patch.vectorMemoryModel !== undefined) {
+      if (this.s.vectorMemoryEnabled) {
+        const model = this.s.vectorMemoryModel ?? 'mistralai/mistral-embed';
+        const baseUrl = this.env.KILOCODE_API_BASE_URL || 'https://api.kilo.ai/api/gateway/';
+        const headers: Record<string, string> = {};
+        if (this.s.orgId) {
+          headers['X-KiloCode-OrganizationId'] = this.s.orgId;
+        }
+        await gateway.patchConfigOnMachine(this.s, this.env, {
+          agents: {
+            defaults: {
+              memorySearch: {
+                enabled: true,
+                provider: 'openai',
+                model,
+                remote: {
+                  baseUrl,
+                  apiKey: this.s.kilocodeApiKey ?? '',
+                  headers,
+                },
+              },
+            },
+          },
+        });
+      } else {
+        await gateway.patchConfigOnMachine(this.s, this.env, {
+          agents: { defaults: { memorySearch: { enabled: false } } },
+        });
+      }
+    }
+
     return {
       kilocodeApiKey: this.s.kilocodeApiKey,
       kilocodeApiKeyExpiresAt: this.s.kilocodeApiKeyExpiresAt,
       kilocodeDefaultModel: this.s.kilocodeDefaultModel,
+      vectorMemoryEnabled: this.s.vectorMemoryEnabled,
+      vectorMemoryModel: this.s.vectorMemoryModel,
     };
   }
 
@@ -2087,7 +2135,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     };
   }
 
-  async getConfig(): Promise<InstanceConfig> {
+  async getConfig(): Promise<
+    InstanceConfig & { vectorMemoryEnabled: boolean; vectorMemoryModel: string | null }
+  > {
     await this.loadState();
     return {
       envVars: this.s.envVars ?? undefined,
@@ -2104,6 +2154,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       channels: this.s.channels ?? undefined,
       machineSize: this.s.machineSize ?? undefined,
       customSecretMeta: this.s.customSecretMeta ?? undefined,
+      vectorMemoryEnabled: this.s.vectorMemoryEnabled,
+      vectorMemoryModel: this.s.vectorMemoryModel,
     };
   }
 

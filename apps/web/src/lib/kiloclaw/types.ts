@@ -31,12 +31,16 @@ export type KiloCodeConfigPatchInput = {
   kilocodeApiKey?: string | null;
   kilocodeApiKeyExpiresAt?: string | null;
   kilocodeDefaultModel?: string | null;
+  vectorMemoryEnabled?: boolean;
+  vectorMemoryModel?: string | null;
 };
 
 export type KiloCodeConfigResponse = {
   kilocodeApiKey: string | null;
   kilocodeApiKeyExpiresAt: string | null;
   kilocodeDefaultModel: string | null;
+  vectorMemoryEnabled: boolean;
+  vectorMemoryModel: string | null;
 };
 
 export type WebSearchConfigPatchInput = {
@@ -290,6 +294,10 @@ export type UserConfigResponse = {
   customSecretKeys: string[];
   /** Metadata for custom secrets (config paths, etc.). */
   customSecretMeta: Record<string, { configPath?: string }>;
+  /** Whether vector memory search is enabled on this instance. */
+  vectorMemoryEnabled: boolean;
+  /** Embedding model ID for vector memory (e.g. "mistralai/mistral-embed"). */
+  vectorMemoryModel: string | null;
 };
 
 /** Response from POST /api/platform/doctor */

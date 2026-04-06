@@ -339,6 +339,10 @@ export const PersistedStateSchema = z.object({
   streamChatBotUserId: z.string().nullable().default(null),
   streamChatBotUserToken: z.string().nullable().default(null),
   streamChatChannelId: z.string().nullable().default(null),
+  // Vector memory: whether the builtin embedding-backed memory search is enabled.
+  vectorMemoryEnabled: z.boolean().default(false),
+  // Vector memory: embedding model ID (e.g. "mistralai/mistral-embed").
+  vectorMemoryModel: z.string().nullable().default(null),
 });
 
 export type PersistedState = z.infer<typeof PersistedStateSchema>;

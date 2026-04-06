@@ -40,6 +40,10 @@ export type UserConfig = {
   /** Organization ID — injected as KILOCODE_ORGANIZATION_ID for org instances. */
   orgId?: string | null;
   customSecretMeta?: Record<string, { configPath?: string }> | null;
+  /** Whether the builtin vector memory search is enabled. */
+  vectorMemoryEnabled?: boolean;
+  /** Embedding model ID for vector memory (e.g. "mistralai/mistral-embed"). */
+  vectorMemoryModel?: string | null;
 };
 
 /**
@@ -237,6 +241,14 @@ export async function buildEnvVars(
       const envVar = FEATURE_TO_ENV_VAR[feature];
       if (envVar) plainEnv[envVar] = 'true';
     }
+  }
+
+  // Vector memory configuration (non-sensitive, plaintext).
+  if (userConfig?.vectorMemoryEnabled) {
+    plainEnv.KILOCLAW_VECTOR_MEMORY_ENABLED = 'true';
+  }
+  if (userConfig?.vectorMemoryModel) {
+    plainEnv.KILOCLAW_VECTOR_MEMORY_MODEL = userConfig.vectorMemoryModel;
   }
 
   // Custom secret config path mapping — tells the controller which env vars

@@ -20,14 +20,17 @@ function validateGitLfs() {
 
 validateGitLfs();
 
+const monorepoRoot = resolve(import.meta.dirname, '../..');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
 
-  // In a monorepo, Turbopack can't resolve `next/package.json` from apps/web/src/app
-  // because dependencies are hoisted to the workspace root.
+  // In a monorepo, file tracing and Turbopack both need to know the workspace root
+  // so they can resolve hoisted dependencies (e.g. `next/package.json`).
+  outputFileTracingRoot: monorepoRoot,
   turbopack: {
-    root: resolve(import.meta.dirname, '../..'),
+    root: monorepoRoot,
   },
 
   devIndicators: { position: 'bottom-right' },

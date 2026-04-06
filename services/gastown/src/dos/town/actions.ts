@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { beads } from '../../db/tables/beads.table';
+import { beads, BeadRecord } from '../../db/tables/beads.table';
 import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { convoy_metadata } from '../../db/tables/convoy-metadata.table';
 import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
@@ -28,7 +28,7 @@ import { parseGitUrl } from '../../util/platform-pr.util';
 const TransitionBead = z.object({
   type: z.literal('transition_bead'),
   bead_id: z.string(),
-  from: z.string().nullable(),
+  from: z.string(),
   to: z.string(),
   reason: z.string(),
   actor: z.string(),
@@ -314,6 +314,19 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     // ── Bead mutations ──────────────────────────────────────────
 
     case 'transition_bead': {
+      const [current] = BeadRecord.pick({ status: true }).array().parse([
+        ...query(
+          sql,
+          /* sql */ `SELECT ${beads.columns.status} FROM ${beads} WHERE ${beads.columns.bead_id} = ?`,
+          [action.bead_id]
+        ),
+      ]);
+      if (current && current.status !== action.from) {
+        console.warn(
+          `${LOG} transition_bead skipped: bead=${action.bead_id} from=${action.from} current=${current.status} to=${action.to}`
+        );
+        return null;
+      }
       try {
         const failureReason =
           action.to === 'failed'

@@ -902,15 +902,10 @@ export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): 
       actions.push({
         type: 'transition_bead',
         bead_id: agent.current_hook_bead_id,
-        from: null,
+        from: 'open',
         to: 'failed',
         reason: `max dispatch attempts exceeded (${hooked.dispatch_attempts})`,
         actor: 'system',
-      });
-      actions.push({
-        type: 'unhook_agent',
-        agent_id: agent.bead_id,
-        reason: 'max dispatch attempts',
       });
       continue;
     }
@@ -1499,20 +1494,20 @@ export function reconcileReviewQueue(
         actions.push({
           type: 'transition_bead',
           bead_id: ref.current_hook_bead_id,
-          from: null,
-          to: 'failed',
-          reason: `refinery max dispatch attempts exceeded (${mr.dispatch_attempts})`,
-          actor: 'system',
-        });
-        actions.push({
-          type: 'unhook_agent',
-          agent_id: ref.bead_id,
-          reason: 'max dispatch attempts',
-        });
-        continue;
-      }
+        from: 'in_progress',
+        to: 'failed',
+        reason: `refinery max dispatch attempts exceeded (${mr.dispatch_attempts})`,
+        actor: 'system',
+      });
+      actions.push({
+        type: 'unhook_agent',
+        agent_id: ref.bead_id,
+        reason: 'max dispatch attempts',
+      });
+      continue;
+    }
 
-      // Exponential backoff using bead's last_dispatch_attempt_at
+    // Exponential backoff using bead's last_dispatch_attempt_at
       const cooldownMs = getDispatchCooldownMs(mr.dispatch_attempts);
       if (!staleMs(mr.last_dispatch_attempt_at, cooldownMs)) continue;
 

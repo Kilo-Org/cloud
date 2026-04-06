@@ -558,15 +558,16 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
       const capturedAgentId = agentId;
       return async () => {
-        // Best-effort dispatch. If it fails, the agent stays 'working'
-        // and the bead stays 'in_progress'. The reconciler detects the
-        // mismatch on the next tick (idle agent hooked to in_progress
-        // bead) and retries dispatch.
+        // Best-effort dispatch. If it fails, unhook the agent (sets it
+        // to idle) and reset the bead to open so scheduling can retry it
+        // on the next tick instead of waiting for stale-bead recovery.
         await ctx.dispatchAgent(capturedAgentId, beadId, rigId).catch(err => {
           console.warn(
             `${LOG} dispatch_agent: container start failed for agent=${capturedAgentId} bead=${beadId}`,
             err
           );
+          agentOps.unhookBead(sql, capturedAgentId);
+          beadOps.updateBeadStatus(sql, beadId, 'open', null);
         });
       };
     }

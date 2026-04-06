@@ -96,12 +96,12 @@ Do not leave HTML comments from the template. Review all commits on the branch w
 
 Business-rule specs live in `.specs/`. Before making **any** changes to a domain covered by a spec — including bug fixes, new features, refactors, or reviews — you **must** first read the relevant spec.
 
-| Spec | Governs |
-| ---- | ------- |
-| `.specs/kiloclaw-billing.md` | KiloClaw billing, pricing, invoicing, usage metering, payment flows |
-| `.specs/kiloclaw-controller.md` | KiloClaw controller/machine lifecycle, bootstrap, Docker image |
-| `.specs/team-enterprise-seat-billing.md` | Team and Enterprise seat billing, subscription management |
-| `.specs/impact-affiliate-tracking.md` | Impact.com affiliate conversion tracking |
+| Spec                                     | Governs                                                             |
+| ---------------------------------------- | ------------------------------------------------------------------- |
+| `.specs/kiloclaw-billing.md`             | KiloClaw billing, pricing, invoicing, usage metering, payment flows |
+| `.specs/kiloclaw-controller.md`          | KiloClaw controller/machine lifecycle, bootstrap, Docker image      |
+| `.specs/team-enterprise-seat-billing.md` | Team and Enterprise seat billing, subscription management           |
+| `.specs/impact-affiliate-tracking.md`    | Impact.com affiliate conversion tracking                            |
 
 ## Stripe Subscription Schedules
 

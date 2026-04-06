@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { Button } from '@/components/Button';
 import type { ButtonVariant } from '@/components/Button';
 import { AlertCircle, AlertTriangle, Clock } from 'lucide-react';
@@ -127,6 +128,8 @@ export function FreeTrialWarningBanner({
   const isOwner = userRole === 'owner';
   const buttonVariant = getButtonVariantForState(state);
   const message = getTrialMessage(daysRemaining, isOwner);
+  const pathname = usePathname();
+  const shouldShowUpgradeButton = isOwner && !pathname.endsWith('/subscriptions');
 
   return (
     <div
@@ -159,7 +162,7 @@ export function FreeTrialWarningBanner({
       </div>
 
       {/* Upgrade button for owners */}
-      {isOwner && (
+      {shouldShowUpgradeButton && (
         <Button onClick={onUpgradeClick} variant={buttonVariant} className="shrink-0">
           Upgrade Now
         </Button>

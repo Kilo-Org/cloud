@@ -7,6 +7,7 @@ import {
   kiloclaw_cli_runs,
   kilocode_users,
 } from '@kilocode/db/schema';
+import type { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import {
@@ -170,6 +171,8 @@ export type AdminKiloclawInstance = {
   destroyed_at: string | null;
   suspended_at: string | null;
   user_email: string | null;
+  subscription_id: string | null;
+  subscription_status: KiloClawSubscriptionStatus | null;
 };
 
 export type AdminKiloclawInstanceDetail = AdminKiloclawInstance & {
@@ -185,12 +188,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         instance: kiloclaw_instances,
         user_email: kilocode_users.google_user_email,
         suspended_at: kiloclaw_subscriptions.suspended_at,
+        subscription_id: kiloclaw_subscriptions.id,
+        subscription_status: kiloclaw_subscriptions.status,
       })
       .from(kiloclaw_instances)
       .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
       .leftJoin(
         kiloclaw_subscriptions,
-        eq(kiloclaw_instances.user_id, kiloclaw_subscriptions.user_id)
+        eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
       )
       .where(eq(kiloclaw_instances.id, input.id))
       .limit(1);
@@ -208,6 +213,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       destroyed_at: result.instance.destroyed_at,
       suspended_at: result.suspended_at ?? null,
       user_email: result.user_email,
+      subscription_id: result.subscription_id ?? null,
+      subscription_status: result.subscription_status ?? null,
     };
 
     const derivedFlyAppName = flyAppNameFromUserId(instance.user_id);
@@ -290,12 +297,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         instance: kiloclaw_instances,
         user_email: kilocode_users.google_user_email,
         suspended_at: kiloclaw_subscriptions.suspended_at,
+        subscription_id: kiloclaw_subscriptions.id,
+        subscription_status: kiloclaw_subscriptions.status,
       })
       .from(kiloclaw_instances)
       .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
       .leftJoin(
         kiloclaw_subscriptions,
-        eq(kiloclaw_instances.user_id, kiloclaw_subscriptions.user_id)
+        eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
       )
       .where(whereCondition)
       .orderBy(orderCondition)
@@ -308,7 +317,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
       .leftJoin(
         kiloclaw_subscriptions,
-        eq(kiloclaw_instances.user_id, kiloclaw_subscriptions.user_id)
+        eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
       )
       .where(whereCondition);
 
@@ -324,6 +333,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       destroyed_at: row.instance.destroyed_at,
       suspended_at: row.suspended_at ?? null,
       user_email: row.user_email,
+      subscription_id: row.subscription_id ?? null,
+      subscription_status: row.subscription_status ?? null,
     }));
 
     return {
@@ -352,7 +363,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .from(kiloclaw_instances)
       .leftJoin(
         kiloclaw_subscriptions,
-        eq(kiloclaw_instances.user_id, kiloclaw_subscriptions.user_id)
+        eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
       );
 
     // Time-windowed counts

@@ -800,7 +800,11 @@ describe('bootstrapCritical', () => {
     const harness = fakeDeps();
 
     await expect(
-      bootstrapCritical({ KILOCLAW_ENC_FOO: 'enc:v1:bogus' }, phase => phases.push(phase), harness.deps)
+      bootstrapCritical(
+        { KILOCLAW_ENC_FOO: 'enc:v1:bogus' },
+        phase => phases.push(phase),
+        harness.deps
+      )
     ).rejects.toThrow('KILOCLAW_ENV_KEY is not set');
 
     expect(phases).toEqual(['decrypting']);

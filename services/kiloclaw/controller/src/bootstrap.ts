@@ -580,9 +580,7 @@ export async function bootstrapCritical(
   await yieldToEventLoop();
 }
 
-export type BootstrapNonCriticalResult =
-  | { ok: true }
-  | { ok: false; phase: string; error: string };
+export type BootstrapNonCriticalResult = { ok: true } | { ok: false; phase: string; error: string };
 
 type BootstrapStep = { phase: string; run: () => void | Promise<void> };
 

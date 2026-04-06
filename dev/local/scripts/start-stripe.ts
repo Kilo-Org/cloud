@@ -34,7 +34,7 @@ console.log('Starting Stripe webhook listener...');
 
 let secretPattern: RegExp | null = /whsec_[a-zA-Z0-9]+/;
 
-const child = spawn('pnpm', ['run', 'stripe'], {
+const child = spawn('pnpm', ['--filter', 'web', 'run', 'stripe'], {
   stdio: ['ignore', 'pipe', 'pipe'],
   cwd: repoRoot,
 });

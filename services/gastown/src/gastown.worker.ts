@@ -6,6 +6,7 @@ import type { Context } from 'hono';
 import { cors } from 'hono/cors';
 import { getTownContainerStub } from './dos/TownContainer.do';
 import { getTownDOStub } from './dos/Town.do';
+import { TownConfigUpdateSchema } from './types';
 import { resError } from './util/res.util';
 import {
   authMiddleware,
@@ -295,7 +296,6 @@ app.post('/debug/towns/:townId/send-message', async c => {
 });
 
 app.get('/debug/towns/:townId/beads/:beadId', async c => {
-  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
   const townId = c.req.param('townId');
   const beadId = c.req.param('beadId');
   const town = getTownDOStub(c.env, townId);
@@ -310,6 +310,26 @@ app.post('/debug/towns/:townId/graceful-stop', async c => {
   const containerStub = getTownContainerStub(c.env, townId);
   await containerStub.stop();
   return c.json({ stopped: true });
+});
+
+app.get('/debug/towns/:townId/config', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const cfg = await town.getTownConfig();
+  return c.json(cfg);
+});
+
+app.patch('/debug/towns/:townId/config', async c => {
+  if (c.env.ENVIRONMENT !== 'development') return c.json({ error: 'dev only' }, 403);
+  const townId = c.req.param('townId');
+  const parsed = TownConfigUpdateSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: 'Invalid config', issues: parsed.error.issues }, 400);
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const result = await town.updateTownConfig(parsed.data);
+  return c.json(result);
 });
 
 // ── Town ID + Auth ──────────────────────────────────────────────────────

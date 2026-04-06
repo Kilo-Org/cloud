@@ -1049,8 +1049,7 @@ export function reconcileReviewQueue(
                b.${beads.columns.rig_id}, b.${beads.columns.updated_at},
                b.${beads.columns.metadata},
                rm.${review_metadata.columns.pr_url},
-               b.${beads.columns.assignee_agent_bead_id},
-               b.${beads.columns.metadata}
+               b.${beads.columns.assignee_agent_bead_id}
         FROM ${beads} b
         INNER JOIN ${review_metadata} rm ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
         WHERE b.${beads.columns.type} = 'merge_request'
@@ -1161,10 +1160,10 @@ export function reconcileReviewQueue(
     }
   }
 
-  // When refinery code review is disabled, skip refinery dispatch (Rules 5–6)
-  // for MR beads that already have a pr_url (polecat created the PR).
-  // Transition them straight to in_progress so poll_pr can handle auto-merge.
-  // MR beads without a pr_url (direct merge strategy) still need the refinery.
+  // When refinery code review is disabled, fast-track open MR beads that
+  // have a pr_url to in_progress so poll_pr handles them. MR beads without
+  // pr_url (direct merge strategy) still need the refinery for the merge
+  // operation itself — Rules 5-6 handle those.
   if (!refineryCodeReview) {
     const openMrsWithPr = z
       .object({ bead_id: z.string() })
@@ -1196,11 +1195,12 @@ export function reconcileReviewQueue(
     }
   }
 
-  // Rules 5–6 only apply when refinery code review is enabled.
-  // When disabled, open MR beads with pr_url are fast-tracked above.
-  if (!refineryCodeReview) {
-    // Skip refinery dispatch — jump to Rule 7
-  } else {
+  // Rules 5-6: Refinery dispatch for open MR beads.
+  // Always runs for direct-merge MR beads (refinery performs the merge).
+  // When code_review=false AND merge_strategy=pr, MR beads with pr_url
+  // were fast-tracked above, so only direct-merge MR beads remain for
+  // Rules 5-6.
+  {
     // Rule 5: Pop open MR bead for idle refinery
     // Get all rigs that have open MR beads
     const rigsWithOpenMrs = z
@@ -1470,6 +1470,15 @@ export function reconcileReviewQueue(
     actions.push({
       type: 'unhook_agent',
       agent_id: ref.bead_id,
+      reason: `MR bead ${mr.status} — cleanup`,
+    });
+    // Transition to idle immediately so the agent doesn't spend a tick
+    // in an inconsistent working+unhooked state.
+    actions.push({
+      type: 'transition_agent',
+      agent_id: ref.bead_id,
+      from: ref.status,
+      to: 'idle',
       reason: `MR bead ${mr.status} — cleanup`,
     });
   }

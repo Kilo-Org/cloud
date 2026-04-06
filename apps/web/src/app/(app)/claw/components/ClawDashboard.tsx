@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
-import { Check, MessageSquare, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
+import { Check, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
@@ -39,16 +38,6 @@ function MaybeBillingWrapper({
   if (skip) return <>{children}</>;
   return <BillingWrapper hideBanners={hideBanners}>{children}</BillingWrapper>;
 }
-
-// Lazy-load the Chat tab so the stream-chat-react bundle (~200KB) only loads
-// when the user opens that tab, not on every /claw page visit.
-const ChatTab = dynamic(() => import('./ChatTab').then(m => ({ default: m.ChatTab })), {
-  loading: () => (
-    <div className="flex h-96 items-center justify-center text-sm text-muted-foreground">
-      Loading chat…
-    </div>
-  ),
-});
 
 type PopulatedClawStatus = KiloClawDashboardStatus & {
   status: NonNullable<KiloClawDashboardStatus['status']>;
@@ -125,7 +114,7 @@ function ClawDashboardInner({
     Date.now() - instanceStatus.provisionedAt < SEVEN_DAYS_MS;
   const configServiceNudgeVisible = !instanceStatus || instanceYoung;
 
-  const VALID_TABS = ['instance', 'chat', 'subscription', 'changelog'] as const;
+  const VALID_TABS = ['instance', 'subscription', 'changelog'] as const;
   type TabValue = (typeof VALID_TABS)[number];
 
   function tabFromHash(): TabValue {
@@ -360,10 +349,6 @@ function ClawDashboardInner({
                   <TabsTrigger value="instance" className={tabTriggerClass}>
                     Gateway Process
                   </TabsTrigger>
-                  <TabsTrigger value="chat" className={tabTriggerClass}>
-                    <MessageSquare className="mr-1.5 inline h-3.5 w-3.5" />
-                    Chat
-                  </TabsTrigger>
                   {!organizationId && (
                     <TabsTrigger value="subscription" className={tabTriggerClass}>
                       Subscription
@@ -383,10 +368,6 @@ function ClawDashboardInner({
                     gatewayError={gatewayError}
                   />
                 </TabsContent>
-                <TabsContent value="chat" className="mt-0">
-                  <ChatTab enabled={activeTab === 'chat' && isRunning} />
-                </TabsContent>
-
                 <TabsContent value="subscription" className="mt-0">
                   <SubscriptionTab />
                 </TabsContent>

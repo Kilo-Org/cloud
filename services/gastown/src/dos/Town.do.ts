@@ -288,6 +288,10 @@ export class TownDO extends DurableObject<Env> {
         // instead of creating a new PR.
         if (agent.role === 'refinery' && bead.type === 'merge_request') {
           const reviewMeta = reviewQueue.getReviewMetadata(this.sql, beadId);
+          // Always pass existingPrUrl so the refinery knows the PR exists
+          // and doesn't create a duplicate. The review_mode controls HOW
+          // the refinery communicates findings (comments vs rework), not
+          // whether it knows the PR exists.
           const existingPrUrl =
             typeof reviewMeta?.pr_url === 'string' ? reviewMeta.pr_url : undefined;
           systemPromptOverride = buildRefinerySystemPrompt({
@@ -303,30 +307,34 @@ export class TownDO extends DurableObject<Env> {
                 : 'unknown',
             mergeStrategy: townConfig.merge_strategy ?? 'direct',
             existingPrUrl,
+            reviewMode: townConfig.refinery?.review_mode ?? 'rework',
           });
         }
 
-        // When merge_strategy is 'pr', polecats create the PR themselves.
-        // Exception: review-then-land convoy intermediate beads merge directly
-        // into the convoy feature branch (the refinery handles that).
+        // When merge_strategy is 'pr', polecats always create the PR themselves
+        // and pass pr_url to gt_done. For review-then-land convoy intermediate
+        // beads, the PR targets the convoy feature branch (not main).
         if (agent.role === 'polecat' && townConfig.merge_strategy === 'pr') {
+          const rig = rigs.getRig(this.sql, rigId);
           const convoyId = beadOps.getConvoyForBead(this.sql, beadId);
+          const convoyFeatureBranch = convoyId
+            ? beadOps.getConvoyFeatureBranch(this.sql, convoyId)
+            : null;
           const convoyMergeMode = convoyId ? beadOps.getConvoyMergeMode(this.sql, convoyId) : null;
-          const isReviewThenLandIntermediate =
-            convoyMergeMode === 'review-then-land' && convoyId !== beadId;
+          const targetBranch =
+            convoyMergeMode === 'review-then-land' && convoyFeatureBranch
+              ? convoyFeatureBranch
+              : (rig?.default_branch ?? 'main');
 
-          if (!isReviewThenLandIntermediate) {
-            const rig = rigs.getRig(this.sql, rigId);
-            systemPromptOverride = buildPolecatSystemPrompt({
-              agentName: agent.name,
-              rigId,
-              townId: this.townId,
-              identity: agent.identity,
-              gates: townConfig.refinery?.gates ?? [],
-              mergeStrategy: 'pr',
-              targetBranch: rig?.default_branch ?? 'main',
-            });
-          }
+          systemPromptOverride = buildPolecatSystemPrompt({
+            agentName: agent.name,
+            rigId,
+            townId: this.townId,
+            identity: agent.identity,
+            gates: townConfig.refinery?.gates ?? [],
+            mergeStrategy: 'pr',
+            targetBranch,
+          });
         }
 
         return scheduling.dispatchAgent(schedulingCtx, agent, bead, {
@@ -2563,16 +2571,19 @@ export class TownDO extends DurableObject<Env> {
       ]
     );
 
-    // Create convoy_metadata
+    // Create convoy_metadata with merge_mode from the town config default
+    const townConfig = await this.getTownConfig();
+    const convoyMergeMode = townConfig.convoy_merge_mode ?? 'review-then-land';
     query(
       this.sql,
       /* sql */ `
         INSERT INTO ${convoy_metadata} (
           ${convoy_metadata.columns.bead_id}, ${convoy_metadata.columns.total_beads},
-          ${convoy_metadata.columns.closed_beads}, ${convoy_metadata.columns.landed_at}
-        ) VALUES (?, ?, ?, ?)
+          ${convoy_metadata.columns.closed_beads}, ${convoy_metadata.columns.landed_at},
+          ${convoy_metadata.columns.merge_mode}
+        ) VALUES (?, ?, ?, ?, ?)
       `,
-      [convoyId, parsed.beads.length, 0, null]
+      [convoyId, parsed.beads.length, 0, null, convoyMergeMode]
     );
 
     // Track beads via bead_dependencies
@@ -2847,7 +2858,8 @@ export class TownDO extends DurableObject<Env> {
       ]
     );
 
-    const mergeMode = input.merge_mode ?? 'review-then-land';
+    const tc = await this.getTownConfig();
+    const mergeMode = input.merge_mode ?? tc.convoy_merge_mode ?? 'review-then-land';
 
     const stagedValue = isStaged ? 1 : 0;
 

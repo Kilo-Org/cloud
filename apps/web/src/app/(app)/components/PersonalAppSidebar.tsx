@@ -27,6 +27,7 @@ import {
   Factory,
   Settings,
   CreditCard,
+  MessageSquare
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
@@ -80,6 +81,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       title: 'KiloClaw',
       icon: KiloCrabIcon,
       url: '/claw',
+    },
+    {
+      title: 'Chat',
+      icon: MessageSquare,
+      url: '/claw/chat',
     },
     {
       title: 'Settings',

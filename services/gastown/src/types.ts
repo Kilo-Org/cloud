@@ -264,9 +264,14 @@ export const TownConfigSchema = z.object({
       gates: z.array(z.string()).default([]),
       auto_merge: z.boolean().default(true),
       require_clean_merge: z.boolean().default(true),
-      /** When enabled, the refinery agent reviews PRs and adds GitHub review
-       *  comments. Disable if you use an external code-review bot. */
+      /** When enabled, the refinery agent reviews code (runs gates, checks
+       *  the diff). When disabled, the refinery is completely skipped —
+       *  MR beads go straight to poll_pr for auto-merge/auto-resolve. */
       code_review: z.boolean().default(true),
+      /** Controls how the refinery communicates review findings:
+       *  - 'rework': creates internal rework beads via gt_request_changes (default)
+       *  - 'comments': posts GitHub review comments on the PR (requires merge_strategy: 'pr') */
+      review_mode: z.enum(['rework', 'comments']).default('rework'),
       /** When enabled, a polecat is automatically dispatched to address
        *  unresolved review comments and failing CI checks on open PRs. */
       auto_resolve_pr_feedback: z.boolean().default(false),
@@ -292,6 +297,11 @@ export const TownConfigSchema = z.object({
 
   /** When true, all convoys are created as staged by default (agents not dispatched until started). */
   staged_convoys_default: z.boolean().default(false),
+
+  /** Default merge mode for new convoys.
+   *  - 'review-then-land': beads merge into a convoy feature branch, then a single landing PR is created (default)
+   *  - 'review-and-merge': each bead gets its own PR directly to the target branch */
+  convoy_merge_mode: z.enum(['review-then-land', 'review-and-merge']).default('review-then-land'),
 
   /** GitHub PAT used exclusively for `gh` CLI operations (PRs, issues, etc.).
    *  Git clone/push still uses the integration token from git_auth. */
@@ -350,6 +360,7 @@ export const TownConfigUpdateSchema = z.object({
       auto_merge: z.boolean().optional(),
       require_clean_merge: z.boolean().optional(),
       code_review: z.boolean().optional(),
+      review_mode: z.enum(['rework', 'comments']).optional(),
       auto_resolve_pr_feedback: z.boolean().optional(),
       auto_merge_delay_minutes: z.number().int().min(0).nullable().optional(),
     })
@@ -362,6 +373,7 @@ export const TownConfigUpdateSchema = z.object({
     })
     .optional(),
   staged_convoys_default: z.boolean().optional(),
+  convoy_merge_mode: z.enum(['review-then-land', 'review-and-merge']).optional(),
   github_cli_pat: z.string().optional(),
   git_author_name: z.string().optional(),
   git_author_email: z.string().optional(),

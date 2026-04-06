@@ -15,8 +15,10 @@ export function buildRefinerySystemPrompt(params: {
   targetBranch: string;
   polecatAgentId: string;
   mergeStrategy: MergeStrategy;
-  /** When set, the polecat already created a PR — the refinery reviews it via GitHub. */
+  /** When set, the polecat already created a PR — the refinery reviews it. */
   existingPrUrl?: string;
+  /** Controls how the refinery communicates findings: 'rework' (gt_request_changes) or 'comments' (GitHub PR comments). */
+  reviewMode?: 'rework' | 'comments';
   /** Present when this review is for a bead inside a convoy. */
   convoyContext?: {
     mergeMode: 'review-then-land' | 'review-and-merge';
@@ -31,10 +33,17 @@ export function buildRefinerySystemPrompt(params: {
 
   const convoySection = params.convoyContext ? buildConvoySection(params.convoyContext) : '';
 
-  // When the polecat already created a PR, the refinery reviews it via
-  // GitHub and adds review comments instead of creating a new PR.
+  // When the polecat already created a PR, the refinery reviews it.
+  // The review_mode controls whether findings are posted as GitHub comments
+  // or communicated via internal rework requests.
   if (params.existingPrUrl) {
-    return buildPRReviewPrompt({ ...params, prUrl: params.existingPrUrl, gateList, convoySection });
+    return buildPRReviewPrompt({
+      ...params,
+      prUrl: params.existingPrUrl,
+      reviewMode: params.reviewMode ?? 'rework',
+      gateList,
+      convoySection,
+    });
   }
 
   const mergeInstructions =
@@ -119,14 +128,58 @@ function buildPRReviewPrompt(params: {
   targetBranch: string;
   polecatAgentId: string;
   prUrl: string;
+  reviewMode: 'rework' | 'comments';
   gateList: string;
   convoySection: string;
 }): string {
+  const isCommentMode = params.reviewMode === 'comments';
+
+  const step3Pass = isCommentMode
+    ? `1. Leave a comment on the PR noting that the review passed:
+   \`gh pr comment ${params.prUrl} --body "Refinery code review passed. All quality gates pass."\`
+   Do NOT use \`gh pr review --approve\` — GitHub prevents bot accounts from approving their own PRs, so this command will fail.
+2. Call \`gt_done\` with branch="${params.branch}" and pr_url="${params.prUrl}".`
+    : `1. Call \`gt_done\` with branch="${params.branch}" and pr_url="${params.prUrl}".`;
+
+  const step3Fail = isCommentMode
+    ? `1. Submit a review requesting changes with **specific, actionable inline comments** using the GitHub API:
+   \`\`\`
+   gh api repos/{owner}/{repo}/pulls/{number}/reviews --method POST --input - <<'EOF'
+   {
+     "event": "REQUEST_CHANGES",
+     "body": "<summary of issues>",
+     "comments": [
+       {"path": "src/file.ts", "position": 10, "body": "<specific issue and how to fix it>"}
+     ]
+   }
+   EOF
+   \`\`\`
+   Each entry in \`comments\` creates an inline review thread at the specified file and diff position.
+2. Call \`gt_done\` with branch="${params.branch}" and pr_url="${params.prUrl}".
+   The system will detect your unresolved review comments and automatically dispatch a polecat to address them.`
+    : `1. Call \`gt_request_changes\` with a detailed description of the issues:
+   - Which gate failed and the exact error output
+   - Specific files and line numbers that need changes
+   - Clear instructions on what to fix
+   This creates a rework bead that dispatches a polecat to fix the issues.
+2. Call \`gt_done\` with branch="${params.branch}" and pr_url="${params.prUrl}".`;
+
+  const tools = isCommentMode
+    ? `- \`gt_prime\` — Get your role context and current assignment
+- \`gt_done\` — Signal your review is complete (pass pr_url="${params.prUrl}")
+- \`gt_escalate\` — Record issues for visibility
+- \`gt_checkpoint\` — Save progress for crash recovery`
+    : `- \`gt_prime\` — Get your role context and current assignment
+- \`gt_done\` — Signal your review is complete (pass pr_url="${params.prUrl}")
+- \`gt_request_changes\` — Request rework from the polecat (creates a rework bead)
+- \`gt_escalate\` — Record issues for visibility
+- \`gt_checkpoint\` — Save progress for crash recovery`;
+
   return `You are the Refinery agent for rig "${params.rigId}" (town "${params.townId}").
 Your identity: ${params.identity}
 
 ## Your Role
-You review pull requests created by polecat agents. You add review comments on the PR via the GitHub/GitLab CLI. You do NOT create PRs — the polecat already created one.
+You review pull requests created by polecat agents.${isCommentMode ? ' You add review comments on the PR via the GitHub API.' : ' You use internal rework requests to communicate issues to the polecat.'} You do NOT create PRs — the polecat already created one.
 
 ## Current Review
 - **Pull Request:** ${params.prUrl}
@@ -155,40 +208,20 @@ Review the diff on the PR:
 ### Step 3: Submit Your Review
 
 **If everything passes (gates + code review):**
-1. Leave a comment on the PR noting that the review passed:
-   \`gh pr comment ${params.prUrl} --body "Refinery code review passed. All quality gates pass."\`
-   Do NOT use \`gh pr review --approve\` — the bot account cannot approve its own PRs.
-2. Call \`gt_done\` with branch="${params.branch}" and pr_url="${params.prUrl}".
+${step3Pass}
 
 **If quality gates fail or code review finds issues:**
-1. Submit a review requesting changes with **specific, actionable inline comments** using the GitHub API:
-   \`\`\`
-   gh api repos/{owner}/{repo}/pulls/{number}/reviews --method POST --input - <<'EOF'
-   {
-     "event": "REQUEST_CHANGES",
-     "body": "<summary of issues>",
-     "comments": [
-       {"path": "src/file.ts", "position": 10, "body": "<specific issue and how to fix it>"}
-     ]
-   }
-   EOF
-   \`\`\`
-   Each entry in \`comments\` creates an inline review thread at the specified file and diff position. Prefer inline comments over general body text — they create review threads the system can track and auto-resolve.
-2. Call \`gt_done\` with branch="${params.branch}" and pr_url="${params.prUrl}".
-   The system will detect your unresolved review comments and automatically dispatch a polecat to address them.
+${step3Fail}
 
 ## Available Gastown Tools
-- \`gt_prime\` — Get your role context and current assignment
-- \`gt_done\` — Signal your review is complete (pass pr_url="${params.prUrl}")
-- \`gt_escalate\` — Record issues for visibility
-- \`gt_checkpoint\` — Save progress for crash recovery
+${tools}
 
 ## Important
-- ALWAYS call \`gt_done\` with pr_url="${params.prUrl}" when you finish — whether you approved or requested changes.
+- ALWAYS call \`gt_done\` with pr_url="${params.prUrl}" when you finish${isCommentMode ? ' — whether you approved or requested changes' : ' if the review passed'}.
 - Before any git operation, run \`git status\` first to understand the working tree state.
-- Be specific in review comments. "Fix the tests" is not actionable. "Test \`calculateTotal\` in \`tests/cart.test.ts\` fails because the discount logic in \`src/cart.ts:47\` doesn't handle the zero-quantity case" is actionable.
-- Prefer inline PR comments (with file path and line number) over general review body comments. Inline comments create review threads that the system can track and auto-resolve.
-- Do NOT modify the code yourself. Your job is to review and comment — not to fix code.
+- Be specific in review feedback. "Fix the tests" is not actionable. "Test \`calculateTotal\` in \`tests/cart.test.ts\` fails because the discount logic in \`src/cart.ts:47\` doesn't handle the zero-quantity case" is actionable.
+- Do NOT modify the code yourself. Your job is to review — not to fix code.
+- Do NOT create a new PR. The polecat already created one at ${params.prUrl}.
 - Do NOT merge the PR. The auto-merge system handles merging after all review comments are resolved.
 - If you cannot determine whether the code is correct, escalate with severity "medium" instead of guessing.
 `;

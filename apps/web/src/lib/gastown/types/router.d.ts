@@ -486,6 +486,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
               auto_merge: boolean;
               require_clean_merge: boolean;
               code_review: boolean;
+              review_mode: 'comments' | 'rework';
               auto_resolve_pr_feedback: boolean;
               auto_merge_delay_minutes: number | null;
             }
@@ -498,6 +499,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
             }
           | undefined;
         staged_convoys_default: boolean;
+        convoy_merge_mode: 'review-and-merge' | 'review-then-land';
         github_cli_pat?: string | undefined;
         git_author_name?: string | undefined;
         git_author_email?: string | undefined;
@@ -541,6 +543,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
                 auto_merge?: boolean | undefined;
                 require_clean_merge?: boolean | undefined;
                 code_review?: boolean | undefined;
+                review_mode?: 'comments' | 'rework' | undefined;
                 auto_resolve_pr_feedback?: boolean | undefined;
                 auto_merge_delay_minutes?: number | null | undefined;
               }
@@ -553,6 +556,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
               }
             | undefined;
           staged_convoys_default?: boolean | undefined;
+          convoy_merge_mode?: 'review-and-merge' | 'review-then-land' | undefined;
           github_cli_pat?: string | undefined;
           git_author_name?: string | undefined;
           git_author_email?: string | undefined;
@@ -590,6 +594,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
               auto_merge: boolean;
               require_clean_merge: boolean;
               code_review: boolean;
+              review_mode: 'comments' | 'rework';
               auto_resolve_pr_feedback: boolean;
               auto_merge_delay_minutes: number | null;
             }
@@ -602,6 +607,7 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
             }
           | undefined;
         staged_convoys_default: boolean;
+        convoy_merge_mode: 'review-and-merge' | 'review-then-land';
         github_cli_pat?: string | undefined;
         git_author_name?: string | undefined;
         git_author_email?: string | undefined;
@@ -1791,6 +1797,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                   auto_merge: boolean;
                   require_clean_merge: boolean;
                   code_review: boolean;
+                  review_mode: 'comments' | 'rework';
                   auto_resolve_pr_feedback: boolean;
                   auto_merge_delay_minutes: number | null;
                 }
@@ -1803,6 +1810,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                 }
               | undefined;
             staged_convoys_default: boolean;
+            convoy_merge_mode: 'review-and-merge' | 'review-then-land';
             github_cli_pat?: string | undefined;
             git_author_name?: string | undefined;
             git_author_email?: string | undefined;
@@ -1846,6 +1854,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                     auto_merge?: boolean | undefined;
                     require_clean_merge?: boolean | undefined;
                     code_review?: boolean | undefined;
+                    review_mode?: 'comments' | 'rework' | undefined;
                     auto_resolve_pr_feedback?: boolean | undefined;
                     auto_merge_delay_minutes?: number | null | undefined;
                   }
@@ -1858,6 +1867,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                   }
                 | undefined;
               staged_convoys_default?: boolean | undefined;
+              convoy_merge_mode?: 'review-and-merge' | 'review-then-land' | undefined;
               github_cli_pat?: string | undefined;
               git_author_name?: string | undefined;
               git_author_email?: string | undefined;
@@ -1895,6 +1905,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                   auto_merge: boolean;
                   require_clean_merge: boolean;
                   code_review: boolean;
+                  review_mode: 'comments' | 'rework';
                   auto_resolve_pr_feedback: boolean;
                   auto_merge_delay_minutes: number | null;
                 }
@@ -1907,6 +1918,7 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
                 }
               | undefined;
             staged_convoys_default: boolean;
+            convoy_merge_mode: 'review-and-merge' | 'review-then-land';
             github_cli_pat?: string | undefined;
             git_author_name?: string | undefined;
             git_author_email?: string | undefined;

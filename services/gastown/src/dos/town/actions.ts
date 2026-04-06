@@ -632,69 +632,73 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
             const refineryConfig = townConfig.refinery;
             if (!refineryConfig) return;
 
-            // Auto-resolve PR feedback: detect unresolved comments and failing CI
-            if (refineryConfig.auto_resolve_pr_feedback) {
-              const feedback = await ctx.checkPRFeedback(action.pr_url);
-              if (
-                feedback &&
-                (feedback.hasUnresolvedComments ||
-                  feedback.hasFailingChecks ||
-                  feedback.hasUncheckedRuns)
-              ) {
-                const existingFeedback = hasExistingFeedbackBead(sql, action.bead_id);
-                if (!existingFeedback) {
-                  const prMeta = parsePrUrl(action.pr_url);
-                  const rmRows = z
-                    .object({ branch: z.string() })
-                    .array()
-                    .parse([
-                      ...query(
-                        sql,
-                        /* sql */ `
-                          SELECT ${review_metadata.columns.branch}
-                          FROM ${review_metadata}
-                          WHERE ${review_metadata.bead_id} = ?
-                        `,
-                        [action.bead_id]
-                      ),
-                    ]);
-                  const branch = rmRows[0]?.branch ?? '';
-
-                  ctx.insertEvent('pr_feedback_detected', {
-                    bead_id: action.bead_id,
-                    payload: {
-                      mr_bead_id: action.bead_id,
-                      pr_url: action.pr_url,
-                      pr_number: prMeta?.prNumber ?? 0,
-                      repo: prMeta?.repo ?? '',
-                      branch,
-                      has_unresolved_comments: feedback.hasUnresolvedComments,
-                      has_failing_checks: feedback.hasFailingChecks,
-                      has_unchecked_runs: feedback.hasUncheckedRuns,
-                    },
-                  });
-                }
-
-                query(
-                  sql,
-                  /* sql */ `
-                    UPDATE ${review_metadata}
-                    SET ${review_metadata.columns.last_feedback_check_at} = ?
-                    WHERE ${review_metadata.bead_id} = ?
-                  `,
-                  [now(), action.bead_id]
-                );
-              }
-            }
-
-            // Auto-merge timer: track grace period when everything is green.
-            // Requires both auto_merge enabled AND a delay configured.
-            if (
+            const wantsAutoResolve = refineryConfig.auto_resolve_pr_feedback === true;
+            const wantsAutoMerge =
               refineryConfig.auto_merge !== false &&
               refineryConfig.auto_merge_delay_minutes !== null &&
-              refineryConfig.auto_merge_delay_minutes !== undefined
+              refineryConfig.auto_merge_delay_minutes !== undefined;
+
+            // Fetch feedback once and reuse for both auto-resolve and auto-merge.
+            // Each checkPRFeedback call makes 3+ GitHub API requests (GraphQL +
+            // check-runs + commit status), so deduplicating halves our API usage.
+            const feedback =
+              wantsAutoResolve || wantsAutoMerge ? await ctx.checkPRFeedback(action.pr_url) : null;
+
+            // Auto-resolve PR feedback: detect unresolved comments and failing CI
+            if (
+              wantsAutoResolve &&
+              feedback &&
+              (feedback.hasUnresolvedComments ||
+                feedback.hasFailingChecks ||
+                feedback.hasUncheckedRuns)
             ) {
-              const feedback = await ctx.checkPRFeedback(action.pr_url);
+              const existingFeedback = hasExistingFeedbackBead(sql, action.bead_id);
+              if (!existingFeedback) {
+                const prMeta = parsePrUrl(action.pr_url);
+                const rmRows = z
+                  .object({ branch: z.string() })
+                  .array()
+                  .parse([
+                    ...query(
+                      sql,
+                      /* sql */ `
+                        SELECT ${review_metadata.columns.branch}
+                        FROM ${review_metadata}
+                        WHERE ${review_metadata.bead_id} = ?
+                      `,
+                      [action.bead_id]
+                    ),
+                  ]);
+                const branch = rmRows[0]?.branch ?? '';
+
+                ctx.insertEvent('pr_feedback_detected', {
+                  bead_id: action.bead_id,
+                  payload: {
+                    mr_bead_id: action.bead_id,
+                    pr_url: action.pr_url,
+                    pr_number: prMeta?.prNumber ?? 0,
+                    repo: prMeta?.repo ?? '',
+                    branch,
+                    has_unresolved_comments: feedback.hasUnresolvedComments,
+                    has_failing_checks: feedback.hasFailingChecks,
+                    has_unchecked_runs: feedback.hasUncheckedRuns,
+                  },
+                });
+              }
+
+              query(
+                sql,
+                /* sql */ `
+                  UPDATE ${review_metadata}
+                  SET ${review_metadata.columns.last_feedback_check_at} = ?
+                  WHERE ${review_metadata.bead_id} = ?
+                `,
+                [now(), action.bead_id]
+              );
+            }
+
+            // Auto-merge timer: track grace period when everything is green
+            if (wantsAutoMerge) {
               if (!feedback) return;
 
               const allGreen =
@@ -732,7 +736,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                   );
                 } else {
                   const elapsed = Date.now() - new Date(readySince).getTime();
-                  if (elapsed >= refineryConfig.auto_merge_delay_minutes * 60_000) {
+                  if (elapsed >= (refineryConfig.auto_merge_delay_minutes ?? 0) * 60_000) {
                     ctx.insertEvent('pr_auto_merge', {
                       bead_id: action.bead_id,
                       payload: {

@@ -193,14 +193,28 @@ describe('buildRefinerySystemPrompt with existingPrUrl', () => {
     expect(prompt).not.toContain('Pull Request:');
   });
 
-  it('produces PR-review prompt when existingPrUrl is set', () => {
+  it('produces PR-review prompt in rework mode (default) when existingPrUrl is set', () => {
     const prompt = buildRefinerySystemPrompt({
       ...baseParams,
       existingPrUrl: 'https://github.com/org/repo/pull/42',
     });
     expect(prompt).toContain('https://github.com/org/repo/pull/42');
-    expect(prompt).toContain('gh pr review');
     expect(prompt).toContain('gh pr diff');
+    expect(prompt).toContain('gt_request_changes');
+    expect(prompt).toContain('Do NOT merge the PR');
+    expect(prompt).not.toContain('gh pr create');
+    expect(prompt).toContain('Do NOT create a new PR');
+  });
+
+  it('produces PR-review prompt in comments mode when existingPrUrl is set', () => {
+    const prompt = buildRefinerySystemPrompt({
+      ...baseParams,
+      existingPrUrl: 'https://github.com/org/repo/pull/42',
+      reviewMode: 'comments',
+    });
+    expect(prompt).toContain('https://github.com/org/repo/pull/42');
+    expect(prompt).toContain('gh pr diff');
+    expect(prompt).toContain('gh api repos/');
     expect(prompt).toContain('gh pr comment');
     expect(prompt).toContain('Do NOT merge the PR');
     expect(prompt).not.toContain('gh pr create');

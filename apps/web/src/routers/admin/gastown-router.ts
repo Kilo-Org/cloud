@@ -142,6 +142,7 @@ const TownConfigRecord = z.object({
       auto_merge: z.boolean(),
       require_clean_merge: z.boolean(),
       code_review: z.boolean(),
+      review_mode: z.enum(['rework', 'comments']),
       auto_resolve_pr_feedback: z.boolean(),
       auto_merge_delay_minutes: z.number().nullable(),
     })

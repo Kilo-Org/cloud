@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '../../..');
-const devVarsPath = path.join(repoRoot, 'kiloclaw/.dev.vars');
+const devVarsPath = path.join(repoRoot, 'services/kiloclaw/.dev.vars');
 
 type TunnelConfig = {
   tunnelName: string;
@@ -27,7 +27,7 @@ function parseConfFile(filePath: string): Record<string, string> {
 
 function loadTunnelConfig(): TunnelConfig {
   const globalPath = path.join(os.homedir(), '.config/kiloclaw/dev-start.conf');
-  const localPath = path.join(repoRoot, 'kiloclaw/scripts/.dev-start.conf');
+  const localPath = path.join(repoRoot, 'services/kiloclaw/scripts/.dev-start.conf');
 
   const merged = {
     ...parseConfFile(globalPath),

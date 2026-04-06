@@ -20,7 +20,7 @@ set -uo pipefail
 # ──────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CLOUD_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+CLOUD_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 LOG_DIR="$CLOUD_DIR/dev/.dev-logs/review"
 
 # ANSI colors
@@ -105,18 +105,18 @@ printf "${CYAN}Logs → %s/${RESET}\n\n" "$LOG_DIR"
 # fighting over the default 9229.
 
 if [ "$SKIP_ROOT" = false ]; then
-  start_service "$CLOUD_DIR" "root" "$GREEN" \
-    pnpm dev
+  start_service "$CLOUD_DIR/apps/web" "root" "$GREEN" \
+    pnpm run dev
 fi
 
-start_service "$CLOUD_DIR/cloudflare-session-ingest" "session" "$YELLOW" \
+start_service "$CLOUD_DIR/services/session-ingest" "session" "$YELLOW" \
   pnpm exec wrangler dev --inspector-port 9230
 
-start_service "$CLOUD_DIR/cloudflare-code-review-infra" "review" "$BLUE" \
+start_service "$CLOUD_DIR/services/code-review-infra" "review" "$BLUE" \
   pnpm exec wrangler dev --inspector-port 9231
 
 # agent-next needs its predev (build:wrapper) step before starting wrangler
-start_service_sh "$CLOUD_DIR/cloud-agent-next" "agent-next" "$RED" \
+start_service_sh "$CLOUD_DIR/services/cloud-agent-next" "agent-next" "$RED" \
   "pnpm run build:wrapper && exec pnpm exec wrangler dev --env dev --inspector-port 9232"
 
 printf "\n${BOLD}${CYAN}All services launched. Press Ctrl+C to stop.${RESET}\n\n"

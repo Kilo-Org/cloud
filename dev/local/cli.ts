@@ -151,7 +151,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     if (captureServices.includes('kiloclaw-tunnel')) {
       oldValues.set(
         'tunnel',
-        readEnvValue(path.join(repoRoot, 'kiloclaw/.dev.vars'), 'KILOCODE_API_BASE_URL')
+        readEnvValue(path.join(repoRoot, 'services/kiloclaw/.dev.vars'), 'KILOCODE_API_BASE_URL')
       );
     }
     if (captureServices.includes('kiloclaw-stripe')) {
@@ -163,7 +163,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     if (captureServices.includes('app-builder-tunnel')) {
       oldValues.set(
         'app-builder-tunnel',
-        readEnvValue(path.join(repoRoot, 'cloudflare-app-builder/.dev.vars'), 'BUILDER_HOSTNAME')
+        readEnvValue(path.join(repoRoot, 'services/app-builder/.dev.vars'), 'BUILDER_HOSTNAME')
       );
     }
 
@@ -178,7 +178,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     if (captureServices.includes('kiloclaw-tunnel')) {
       waits.push(
         waitForEnvValueChange(
-          path.join(repoRoot, 'kiloclaw/.dev.vars'),
+          path.join(repoRoot, 'services/kiloclaw/.dev.vars'),
           'KILOCODE_API_BASE_URL',
           oldValues.get('tunnel'),
           30_000
@@ -212,7 +212,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     if (captureServices.includes('app-builder-tunnel')) {
       waits.push(
         waitForEnvValueChange(
-          path.join(repoRoot, 'cloudflare-app-builder/.dev.vars'),
+          path.join(repoRoot, 'services/app-builder/.dev.vars'),
           'BUILDER_HOSTNAME',
           oldValues.get('app-builder-tunnel'),
           30_000

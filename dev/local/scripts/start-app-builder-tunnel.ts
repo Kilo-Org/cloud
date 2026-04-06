@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '../../..');
-const devVarsPath = path.join(repoRoot, 'cloudflare-app-builder/.dev.vars');
+const devVarsPath = path.join(repoRoot, 'services/app-builder/.dev.vars');
 const envDevLocalPath = path.join(repoRoot, '.env.development.local');
 
 function updateEnvValue(filePath: string, key: string, value: string): void {

@@ -183,6 +183,37 @@ if [ ! -f "$KILOCLAW_DIR/.dev.vars" ]; then
   cp "$KILOCLAW_DIR/.dev.vars.example" "$KILOCLAW_DIR/.dev.vars"
 fi
 
+# ---------- Backfill missing .dev.vars keys from template ----------
+
+set_dev_var() {
+  local key="$1" value="$2"
+  local file="$KILOCLAW_DIR/.dev.vars"
+  if grep -q "^${key}=" "$file" 2>/dev/null; then
+    sed -i '' "s|^${key}=.*|${key}=${value}|" "$file"
+  else
+    echo "${key}=${value}" >> "$file"
+  fi
+}
+
+backfill_dev_vars_from_example() {
+  local example="$KILOCLAW_DIR/.dev.vars.example"
+  local target="$KILOCLAW_DIR/.dev.vars"
+  [ -f "$example" ] || return 0
+  while IFS= read -r line; do
+    # Skip blank lines and comments
+    case "$line" in
+      ''|'#'*) continue ;;
+    esac
+    local key="${line%%=*}"
+    if ! grep -q "^${key}=" "$target" 2>/dev/null; then
+      echo "$line" >> "$target"
+      echo "    Added missing key: $key"
+    fi
+  done < "$example"
+}
+
+backfill_dev_vars_from_example
+
 # ---------- Link & pull dev environment from Vercel ----------
 
 if [ ! -d "$MONOREPO_ROOT/.vercel" ] || [ ! -f "$MONOREPO_ROOT/.vercel/project.json" ]; then
@@ -433,6 +464,13 @@ compute_image_hash() {
 CURRENT_IMAGE_HASH="$(compute_image_hash)"
 STORED_IMAGE_HASH="$(grep '^FLY_IMAGE_CONTENT_HASH=' "$KILOCLAW_DIR/.dev.vars" \
   | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//' || true)"
+
+if [ -z "$STORED_IMAGE_HASH" ]; then
+  echo "==> No FLY_IMAGE_CONTENT_HASH in .dev.vars — seeding with current hash"
+  echo "    to avoid an accidental image push on first run."
+  set_dev_var FLY_IMAGE_CONTENT_HASH "$CURRENT_IMAGE_HASH"
+  STORED_IMAGE_HASH="$CURRENT_IMAGE_HASH"
+fi
 
 if [ "$CURRENT_IMAGE_HASH" != "$STORED_IMAGE_HASH" ]; then
   if [ "$HAS_CONTROLLER_CHANGES" = false ]; then

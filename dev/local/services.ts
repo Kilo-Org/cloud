@@ -59,56 +59,90 @@ const serviceMeta: Record<string, ServiceMeta> = {
   'cloud-agent-next': {
     group: 'cloud-agent',
     dependsOn: ['postgres', 'nextjs', 'cloudflare-session-ingest'],
+    dir: 'services/cloud-agent-next',
     useLanIp: true,
   },
   'cloudflare-webhook-agent-ingest': {
     group: 'cloud-agent',
     dependsOn: ['cloud-agent-next', 'nextjs', 'postgres'],
+    dir: 'services/webhook-agent-ingest',
   },
-  'cloudflare-session-ingest': { group: 'cloud-agent', dependsOn: ['postgres'] },
+  'cloudflare-session-ingest': {
+    group: 'cloud-agent',
+    dependsOn: ['postgres'],
+    dir: 'services/session-ingest',
+  },
   // app-builder
   'app-builder-tunnel': { group: 'app-builder', dependsOn: [] },
   'cloudflare-app-builder': {
     group: 'app-builder',
     dependsOn: ['cloudflare-db-proxy', 'cloudflare-git-token-service', 'app-builder-tunnel'],
+    dir: 'services/app-builder',
     useLanIp: true,
   },
-  'cloudflare-db-proxy': { group: 'app-builder', dependsOn: ['postgres'] },
-  'cloudflare-git-token-service': { group: 'app-builder', dependsOn: ['postgres'] },
+  'cloudflare-db-proxy': {
+    group: 'app-builder',
+    dependsOn: ['postgres'],
+    dir: 'services/db-proxy',
+  },
+  'cloudflare-git-token-service': {
+    group: 'app-builder',
+    dependsOn: ['postgres'],
+    dir: 'services/git-token-service',
+  },
   // code-review
   'cloudflare-code-review-infra': {
     group: 'code-review',
     dependsOn: ['cloud-agent-next', 'nextjs'],
+    dir: 'services/code-review-infra',
   },
   // auto-triage
   'cloudflare-auto-triage-infra': {
     group: 'auto-triage',
     dependsOn: ['cloud-agent-next', 'nextjs'],
+    dir: 'services/auto-triage-infra',
   },
   // auto-fix
-  'cloudflare-auto-fix-infra': { group: 'auto-fix', dependsOn: ['cloud-agent-next', 'nextjs'] },
+  'cloudflare-auto-fix-infra': {
+    group: 'auto-fix',
+    dependsOn: ['cloud-agent-next', 'nextjs'],
+    dir: 'services/auto-fix-infra',
+  },
   // deploy
   'cloudflare-deploy-builder': {
     group: 'deploy',
     dependsOn: ['nextjs'],
-    dir: 'cloudflare-deploy-infra/builder',
+    dir: 'services/deploy-infra/builder',
   },
   'cloudflare-deploy-dispatcher': {
     group: 'deploy',
     dependsOn: [],
-    dir: 'cloudflare-deploy-infra/dispatcher',
+    dir: 'services/deploy-infra/dispatcher',
   },
   // kiloclaw
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-stripe': { group: 'kiloclaw', dependsOn: [] },
-  kiloclaw: { group: 'kiloclaw', dependsOn: ['postgres', 'kiloclaw-tunnel'] },
+  kiloclaw: {
+    group: 'kiloclaw',
+    dependsOn: ['postgres', 'kiloclaw-tunnel'],
+    dir: 'services/kiloclaw',
+  },
   // observability
-  'cloudflare-o11y': { group: 'observability', dependsOn: ['nextjs'] },
-  'cloudflare-ai-attribution': { group: 'observability', dependsOn: [] },
+  'cloudflare-o11y': {
+    group: 'observability',
+    dependsOn: ['nextjs'],
+    dir: 'services/o11y',
+  },
+  'cloudflare-ai-attribution': {
+    group: 'observability',
+    dependsOn: [],
+    dir: 'services/ai-attribution',
+  },
   // gastown
   'cloudflare-gastown': {
     group: 'gastown',
     dependsOn: ['postgres', 'cloudflare-git-token-service', 'nextjs'],
+    dir: 'services/gastown',
   },
 };
 
@@ -214,10 +248,10 @@ function buildServiceDefs(): ServiceDef[] {
       defs.push({
         name,
         type: 'nextjs',
-        dir: '.',
+        dir: 'apps/web',
         port: 3000 + portOffset,
         dependsOn: meta.dependsOn,
-        command: ['pnpm', 'next', 'dev'],
+        command: ['pnpm', 'run', 'dev'],
         group: meta.group,
       });
       continue;
@@ -265,7 +299,7 @@ function buildServiceDefs(): ServiceDef[] {
 
     if (name === 'app-builder-tunnel') {
       const appBuilderPort =
-        readWranglerPort(path.join(repoRoot, 'cloudflare-app-builder')) + portOffset;
+        readWranglerPort(path.join(repoRoot, 'services/app-builder')) + portOffset;
       defs.push({
         name,
         type: 'process',

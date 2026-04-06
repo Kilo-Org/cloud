@@ -28,10 +28,12 @@
   "devDependencies": {
     "@typescript/native-preview": "catalog:",
     "husky": "^9.1.7",
+    "ink": "^6.8.0",
     "oxfmt": "^0.40.0",
     "oxlint": "^1.55.0",
     "oxlint-plugin-react-native": "^0.2.8",
     "oxlint-tsgolint": "^0.17.1",
+    "react": "^19.2.4",
     "tsx": "^4.21.0",
     "typescript": "catalog:"
   },

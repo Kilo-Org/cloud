@@ -902,7 +902,7 @@ export function reconcileBeads(sql: SqlStorage, opts?: { draining?: boolean }): 
       actions.push({
         type: 'transition_bead',
         bead_id: agent.current_hook_bead_id,
-        from: null,
+        from: 'open',
         to: 'failed',
         reason: `max dispatch attempts exceeded (${hooked.dispatch_attempts})`,
         actor: 'system',
@@ -1499,7 +1499,7 @@ export function reconcileReviewQueue(
         actions.push({
           type: 'transition_bead',
           bead_id: ref.current_hook_bead_id,
-          from: null,
+          from: 'in_progress',
           to: 'failed',
           reason: `refinery max dispatch attempts exceeded (${mr.dispatch_attempts})`,
           actor: 'system',

@@ -28,7 +28,7 @@ import { parseGitUrl } from '../../util/platform-pr.util';
 const TransitionBead = z.object({
   type: z.literal('transition_bead'),
   bead_id: z.string(),
-  from: z.string().nullable(),
+  from: z.string(),
   to: z.string(),
   reason: z.string(),
   actor: z.string(),
@@ -314,6 +314,13 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     // ── Bead mutations ──────────────────────────────────────────
 
     case 'transition_bead': {
+      const current = beadOps.getBead(sql, action.bead_id);
+      if (current && current.status !== action.from) {
+        console.warn(
+          `${LOG} transition_bead skipped: bead=${action.bead_id} expected from=${action.from} but is ${current.status}`
+        );
+        return null;
+      }
       try {
         const failureReason =
           action.to === 'failed'

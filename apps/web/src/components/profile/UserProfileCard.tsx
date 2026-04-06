@@ -6,8 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { getInitialsFromName } from '@/lib/utils';
 import { Mail, Linkedin, Github, Edit } from 'lucide-react';
 import { EditProfileDialog } from './EditProfileDialog';
-
-type ContributorChampionTier = 'contributor' | 'ambassador' | 'champion';
+import type { ContributorChampionTier } from '@kilocode/db/schema-types';
 
 type UserProfileCardProps = {
   name: string;
@@ -20,9 +19,9 @@ type UserProfileCardProps = {
 };
 
 function formatContributorChampionTier(tier: ContributorChampionTier): string {
-  if (tier === 'contributor') return 'Contributor';
+  if (tier === 'champion') return 'Champion';
   if (tier === 'ambassador') return 'Ambassador';
-  return 'Champion';
+  return 'Contributor';
 }
 
 export function UserProfileCard({

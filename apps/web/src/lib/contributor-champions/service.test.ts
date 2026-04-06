@@ -15,9 +15,14 @@ import {
   getContributorChampionProfileBadgeForUser,
   getContributorChampionReviewQueue,
   getEnrolledContributorChampions,
+  manualEnrollContributor,
+  processAutoTierUpgrades,
+  refreshContributorChampionCredits,
+  searchKiloUsersByEmail,
   syncContributorChampionData,
   upsertContributorSelectedTier,
 } from './service';
+import { grantCreditForCategory } from '@/lib/promotionalCredits';
 
 jest.mock('@/lib/config.server', () => ({
   GITHUB_ADMIN_STATS_TOKEN: 'test-github-token',
@@ -28,6 +33,12 @@ jest.mock('@/lib/fetchWithBackoff', () => ({
 }));
 
 const mockedFetchWithBackoff = jest.mocked(fetchWithBackoff);
+
+jest.mock('@/lib/promotionalCredits', () => ({
+  grantCreditForCategory: jest.fn(),
+}));
+
+const mockedGrantCredit = jest.mocked(grantCreditForCategory);
 
 function toUrl(input: string | URL | Request): URL {
   if (typeof input === 'string' || input instanceof URL) {
@@ -397,5 +408,263 @@ describe('contributor champions service', () => {
     const afterEnrollment = await getContributorChampionProfileBadgeForUser({ userId: user.id });
     expect(afterEnrollment?.tier).toBe('ambassador');
     expect(afterEnrollment?.enrolledAt).toBeTruthy();
+  });
+
+  it('processAutoTierUpgrades upgrades contributor to ambassador at 5 PRs and ambassador to champion at 15 PRs', async () => {
+    const contributorId = await insertContributor({
+      login: 'upgrade-candidate',
+      allTimeContributions: 5,
+    });
+    const alreadyChampionId = await insertContributor({
+      login: 'already-champion',
+      allTimeContributions: 20,
+    });
+    const staysContributorId = await insertContributor({
+      login: 'stays-contributor',
+      allTimeContributions: 3,
+    });
+
+    await insertEvent({
+      contributorId,
+      prNumber: 9_000,
+      mergedAt: daysAgo(10),
+      login: 'upgrade-candidate',
+    });
+    await insertEvent({
+      contributorId: alreadyChampionId,
+      prNumber: 9_001,
+      mergedAt: daysAgo(10),
+      login: 'already-champion',
+    });
+    await insertEvent({
+      contributorId: staysContributorId,
+      prNumber: 9_002,
+      mergedAt: daysAgo(10),
+      login: 'stays-contributor',
+    });
+
+    await db.insert(contributor_champion_memberships).values([
+      {
+        contributor_id: contributorId,
+        enrolled_tier: 'contributor',
+        enrolled_at: daysAgo(60),
+        credit_amount_microdollars: 0,
+      },
+      {
+        contributor_id: alreadyChampionId,
+        enrolled_tier: 'champion',
+        enrolled_at: daysAgo(60),
+        credit_amount_microdollars: 150_000_000,
+      },
+      {
+        contributor_id: staysContributorId,
+        enrolled_tier: 'contributor',
+        enrolled_at: daysAgo(60),
+        credit_amount_microdollars: 0,
+      },
+    ]);
+
+    const result = await processAutoTierUpgrades();
+
+    expect(result.upgraded).toBe(1);
+    expect(result.upgrades).toHaveLength(1);
+    expect(result.upgrades[0]?.fromTier).toBe('contributor');
+    expect(result.upgrades[0]?.toTier).toBe('ambassador');
+
+    const membership = await db.query.contributor_champion_memberships.findFirst({
+      where: eq(contributor_champion_memberships.contributor_id, contributorId),
+    });
+    expect(membership?.enrolled_tier).toBe('ambassador');
+
+    const championMembership = await db.query.contributor_champion_memberships.findFirst({
+      where: eq(contributor_champion_memberships.contributor_id, alreadyChampionId),
+    });
+    expect(championMembership?.enrolled_tier).toBe('champion');
+
+    const staysMembership = await db.query.contributor_champion_memberships.findFirst({
+      where: eq(contributor_champion_memberships.contributor_id, staysContributorId),
+    });
+    expect(staysMembership?.enrolled_tier).toBe('contributor');
+  });
+
+  it('refreshContributorChampionCredits grants credits for enrolled members with linked users', async () => {
+    const user = await insertTestUser({ google_user_email: 'credit-user@example.com' });
+    const contributorId = await insertContributor({
+      login: 'credit-contributor',
+      allTimeContributions: 10,
+    });
+    await insertEvent({
+      contributorId,
+      prNumber: 10_000,
+      mergedAt: daysAgo(10),
+      login: 'credit-contributor',
+      email: 'credit-user@example.com',
+    });
+
+    await db.insert(contributor_champion_memberships).values({
+      contributor_id: contributorId,
+      enrolled_tier: 'ambassador',
+      enrolled_at: daysAgo(60),
+      credit_amount_microdollars: 50_000_000,
+      linked_kilo_user_id: user.id,
+      credits_last_granted_at: null,
+    });
+
+    mockedGrantCredit.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      amount_usd: 50,
+      credit_transaction_id: 'test-tx',
+    });
+
+    const result = await refreshContributorChampionCredits();
+
+    expect(result.processed).toBe(1);
+    expect(result.granted).toBe(1);
+    expect(result.skippedNoUser).toBe(0);
+    expect(result.errored).toBe(0);
+
+    expect(mockedGrantCredit).toHaveBeenCalledWith(
+      expect.objectContaining({ id: user.id }),
+      expect.objectContaining({
+        credit_category: 'contributor-champion-credits',
+        amount_usd: 50,
+      })
+    );
+
+    const membership = await db.query.contributor_champion_memberships.findFirst({
+      where: eq(contributor_champion_memberships.contributor_id, contributorId),
+    });
+    expect(membership?.credits_last_granted_at).not.toBeNull();
+  });
+
+  it('refreshContributorChampionCredits skips members whose credits were granted less than 30 days ago', async () => {
+    const user = await insertTestUser({ google_user_email: 'recent-credit@example.com' });
+    const contributorId = await insertContributor({
+      login: 'recent-credit-contributor',
+      allTimeContributions: 10,
+    });
+    await insertEvent({
+      contributorId,
+      prNumber: 10_100,
+      mergedAt: daysAgo(10),
+      login: 'recent-credit-contributor',
+      email: 'recent-credit@example.com',
+    });
+
+    await db.insert(contributor_champion_memberships).values({
+      contributor_id: contributorId,
+      enrolled_tier: 'ambassador',
+      enrolled_at: daysAgo(60),
+      credit_amount_microdollars: 50_000_000,
+      linked_kilo_user_id: user.id,
+      credits_last_granted_at: daysAgo(15),
+    });
+
+    mockedGrantCredit.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      amount_usd: 50,
+      credit_transaction_id: 'test-tx',
+    });
+
+    const result = await refreshContributorChampionCredits();
+
+    expect(result.processed).toBe(0);
+    expect(result.granted).toBe(0);
+    expect(mockedGrantCredit).not.toHaveBeenCalled();
+  });
+
+  it('manualEnrollContributor creates contributor and membership, grants credits when linked', async () => {
+    const user = await insertTestUser({ google_user_email: 'manual@example.com' });
+
+    mockedGrantCredit.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      amount_usd: 50,
+      credit_transaction_id: 'test-tx',
+    });
+
+    const result = await manualEnrollContributor({
+      email: 'manual@example.com',
+      githubLogin: 'manual-user',
+      tier: 'ambassador',
+      kiloUserId: user.id,
+    });
+
+    expect(result.enrolledTier).toBe('ambassador');
+    expect(result.creditAmountUsd).toBe(50);
+    expect(result.creditGranted).toBe(true);
+
+    expect(mockedGrantCredit).toHaveBeenCalledWith(
+      expect.objectContaining({ id: user.id }),
+      expect.objectContaining({
+        credit_category: 'contributor-champion-credits',
+        amount_usd: 50,
+      })
+    );
+
+    const contributor = await db.query.contributor_champion_contributors.findFirst({
+      where: eq(contributor_champion_contributors.github_login, 'manual-user'),
+    });
+    expect(contributor).toBeTruthy();
+    expect(contributor?.manual_email).toBe('manual@example.com');
+  });
+
+  it('manualEnrollContributor preserves credits_last_granted_at on re-enrollment', async () => {
+    const user = await insertTestUser({ google_user_email: 'remanual@example.com' });
+
+    mockedGrantCredit.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      amount_usd: 50,
+      credit_transaction_id: 'test-tx',
+    });
+
+    await manualEnrollContributor({
+      email: 'remanual@example.com',
+      githubLogin: 'remanual-user',
+      tier: 'contributor',
+      kiloUserId: user.id,
+    });
+
+    const contributor = await db.query.contributor_champion_contributors.findFirst({
+      where: eq(contributor_champion_contributors.github_login, 'remanual-user'),
+    });
+    const grantedAt = daysAgo(10);
+    await db
+      .update(contributor_champion_memberships)
+      .set({ credits_last_granted_at: grantedAt })
+      .where(eq(contributor_champion_memberships.contributor_id, contributor!.id));
+
+    await manualEnrollContributor({
+      email: 'remanual@example.com',
+      githubLogin: 'remanual-user',
+      tier: 'ambassador',
+      kiloUserId: user.id,
+    });
+
+    const membership = await db.query.contributor_champion_memberships.findFirst({
+      where: eq(contributor_champion_memberships.contributor_id, contributor!.id),
+    });
+    expect(membership?.enrolled_tier).toBe('ambassador');
+    expect(membership?.credits_last_granted_at).toBe(grantedAt);
+  });
+
+  it('searchKiloUsersByEmail returns matching users', async () => {
+    await insertTestUser({ google_user_email: 'findme@example.com', google_user_name: 'Find Me' });
+    await insertTestUser({
+      google_user_email: 'other@example.com',
+      google_user_name: 'Other User',
+    });
+
+    const results = await searchKiloUsersByEmail('findme');
+    expect(results).toHaveLength(1);
+    expect(results[0]?.email).toBe('findme@example.com');
+  });
+
+  it('searchKiloUsersByEmail returns empty for short queries', async () => {
+    const results = await searchKiloUsersByEmail('a');
+    expect(results).toHaveLength(0);
   });
 });

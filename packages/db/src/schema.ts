@@ -2310,6 +2310,7 @@ export const contributor_champion_memberships = pgTable(
     index('IDX_contributor_champion_memberships_credits_due')
       .on(table.credits_last_granted_at)
       .where(sql`${table.enrolled_tier} IS NOT NULL AND ${table.credit_amount_microdollars} > 0`),
+    index('IDX_contributor_champion_memberships_linked_kilo_user_id').on(table.linked_kilo_user_id),
   ]
 );
 

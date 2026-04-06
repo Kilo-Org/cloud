@@ -739,7 +739,7 @@ export async function softDeleteUser(userId: string) {
       .set({ manual_email: null })
       .where(
         or(
-          eq(contributor_champion_contributors.manual_email, originalEmail),
+          sql`lower(${contributor_champion_contributors.manual_email}) = lower(${originalEmail})`,
           sql`${contributor_champion_contributors.id} IN (
             SELECT m.contributor_id FROM contributor_champion_memberships m
             WHERE m.linked_kilo_user_id = ${userId}

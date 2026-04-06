@@ -58,12 +58,7 @@ const CONTRIBUTOR_TIER_SCHEMA = z.enum([
 
 type ContributorTier = (typeof CONTRIBUTOR_TIERS)[keyof typeof CONTRIBUTOR_TIERS];
 
-/** Monthly credit amount in USD for each contributor tier. */
-const TIER_CREDIT_USD: Record<ContributorTier, number> = {
-  contributor: 0,
-  ambassador: 50,
-  champion: 150,
-};
+import { TIER_CREDIT_USD } from './constants';
 
 const CREDIT_EXPIRY_HOURS = 30 * 24; // 30 days
 
@@ -683,7 +678,7 @@ export async function upsertContributorSelectedTier(input: {
 export async function getContributorChampionReviewQueue(): Promise<LeaderboardRow[]> {
   const leaderboard = await getContributorChampionLeaderboard();
   return leaderboard.filter(
-    row => row.enrolledTier === null && row.enrolledAt === null && row.contributionsAllTime > 0
+    row => row.enrolledTier === null && row.enrolledAt === null && row.contributions90d > 0
   );
 }
 
@@ -911,43 +906,45 @@ export async function processAutoTierUpgrades(): Promise<AutoUpgradeSummary> {
     )
     .where(isNotNull(contributor_champion_memberships.enrolled_tier));
 
-  for (const row of enrolledRows) {
-    summary.processed += 1;
+  await db.transaction(async tx => {
+    for (const row of enrolledRows) {
+      summary.processed += 1;
 
-    const currentTier = parseContributorTier(row.enrolledTier);
-    if (!currentTier) continue;
+      const currentTier = parseContributorTier(row.enrolledTier);
+      if (!currentTier) continue;
 
-    let newTier: ContributorTier | null = null;
+      let newTier: ContributorTier | null = null;
 
-    // Auto-upgrade uses all-time PR count (not 90-day rolling window).
-    // This intentionally differs from getContributorTierSuggestion() which uses 90d.
-    if (row.allTimeContributions >= 15 && currentTier !== 'champion') {
-      newTier = 'champion';
-    } else if (row.allTimeContributions >= 5 && currentTier === 'contributor') {
-      newTier = 'ambassador';
+      // Auto-upgrade uses all-time PR count (not 90-day rolling window).
+      // This intentionally differs from getContributorTierSuggestion() which uses 90d.
+      if (row.allTimeContributions >= 15 && currentTier !== 'champion') {
+        newTier = 'champion';
+      } else if (row.allTimeContributions >= 5 && currentTier === 'contributor') {
+        newTier = 'ambassador';
+      }
+
+      if (!newTier) continue;
+
+      const newCreditAmountMicrodollars = toMicrodollars(TIER_CREDIT_USD[newTier]);
+
+      await tx
+        .update(contributor_champion_memberships)
+        .set({
+          enrolled_tier: newTier,
+          credit_amount_microdollars: newCreditAmountMicrodollars,
+          updated_at: sql`now()`,
+        })
+        .where(eq(contributor_champion_memberships.id, row.membershipId));
+
+      summary.upgraded += 1;
+      summary.upgrades.push({
+        contributorId: row.contributorId,
+        githubLogin: row.githubLogin,
+        fromTier: currentTier,
+        toTier: newTier,
+      });
     }
-
-    if (!newTier) continue;
-
-    const newCreditAmountMicrodollars = toMicrodollars(TIER_CREDIT_USD[newTier]);
-
-    await db
-      .update(contributor_champion_memberships)
-      .set({
-        enrolled_tier: newTier,
-        credit_amount_microdollars: newCreditAmountMicrodollars,
-        updated_at: sql`now()`,
-      })
-      .where(eq(contributor_champion_memberships.id, row.membershipId));
-
-    summary.upgraded += 1;
-    summary.upgrades.push({
-      contributorId: row.contributorId,
-      githubLogin: row.githubLogin,
-      fromTier: currentTier,
-      toTier: newTier,
-    });
-  }
+  });
 
   return summary;
 }
@@ -988,8 +985,6 @@ export async function getContributorChampionProfileBadgeForUser(input: {
     enrolledAt: row.enrolled_at,
   };
 }
-
-export { TIER_CREDIT_USD };
 
 type KiloUserSearchResult = {
   userId: string;
@@ -1083,6 +1078,7 @@ export async function manualEnrollContributor(input: {
           enrolled_at: now,
           credit_amount_microdollars: creditAmountMicrodollars,
           linked_kilo_user_id: input.kiloUserId,
+          credits_last_granted_at: sql`contributor_champion_memberships.credits_last_granted_at`,
           updated_at: sql`now()`,
         },
       });

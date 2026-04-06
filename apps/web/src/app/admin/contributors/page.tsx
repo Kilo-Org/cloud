@@ -48,9 +48,11 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ContributorChampionTier } from '@kilocode/db/schema-types';
+import { TIER_CREDIT_USD } from '@/lib/contributor-champions/constants';
 
-const contributorTiers = ['contributor', 'ambassador', 'champion'] as const;
-type ContributorTier = (typeof contributorTiers)[number];
+const contributorTiers = Object.values(ContributorChampionTier);
+type ContributorTier = ContributorChampionTier;
 type DrillInWindow = 'all_time' | 'rolling_30_days';
 
 const PAGE_SIZE = 10;
@@ -135,11 +137,10 @@ type LeaderboardRow = {
   linkedKiloUserId: string | null;
 };
 
-const TIER_CREDIT_DISPLAY: Record<ContributorTier, string> = {
-  contributor: 'No monthly credits',
-  ambassador: '$50/month in Kilo Credits',
-  champion: '$150/month in Kilo Credits',
-};
+function tierCreditDisplay(tier: ContributorTier): string {
+  const usd = TIER_CREDIT_USD[tier];
+  return usd > 0 ? `$${usd}/month in Kilo Credits` : 'No monthly credits';
+}
 
 function normalizeTier(value: string): ContributorTier | null {
   if (value === 'contributor' || value === 'ambassador' || value === 'champion') {
@@ -322,8 +323,6 @@ export default function ContributorChampionsAdminPage() {
 
   const [drillInState, setDrillInState] = useState<DrillInState | null>(null);
   const [enrollmentState, setEnrollmentState] = useState<EnrollmentState | null>(null);
-  const [hasAutoSynced, setHasAutoSynced] = useState(false);
-
   // Enrolled table state
   const [enrolledPage, setEnrolledPage] = useState(1);
   const [enrolledFilters, setEnrolledFilters] = useState<EnrolledFilters>({
@@ -434,16 +433,6 @@ export default function ContributorChampionsAdminPage() {
       },
     })
   );
-
-  useEffect(() => {
-    if (hasAutoSynced || syncMutation.isPending) {
-      return;
-    }
-
-    setHasAutoSynced(true);
-    void syncMutation.mutateAsync();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- syncMutation is a stable object from useMutation; listing it causes infinite re-renders
-  }, [hasAutoSynced]);
 
   const isLoadingTables = reviewQuery.isLoading || enrolledQuery.isLoading;
 
@@ -1139,7 +1128,7 @@ export default function ContributorChampionsAdminPage() {
             <div className="space-y-2 text-sm">
               <p>
                 <b className="capitalize">{enrollmentState.tier}</b> tier:{' '}
-                {TIER_CREDIT_DISPLAY[enrollmentState.tier]}
+                {tierCreditDisplay(enrollmentState.tier)}
                 {enrollmentState.tier !== 'contributor' ? ', renewing every 30 days' : ''}
               </p>
               {(() => {
@@ -1287,11 +1276,9 @@ export default function ContributorChampionsAdminPage() {
                   {contributorTiers.map(tier => (
                     <SelectItem key={tier} value={tier}>
                       {tier}
-                      {tier === 'ambassador'
-                        ? ' — $50/mo credits'
-                        : tier === 'champion'
-                          ? ' — $150/mo credits'
-                          : ' — no credits'}
+                      {TIER_CREDIT_USD[tier] > 0
+                        ? ` — $${TIER_CREDIT_USD[tier]}/mo credits`
+                        : ' — no credits'}
                     </SelectItem>
                   ))}
                 </SelectContent>

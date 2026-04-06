@@ -89,55 +89,124 @@ import { trackTrialStart } from '@/lib/impact';
 const UNSAFE_ERROR_CODES = new Set(['config_read_failed', 'config_replace_failed']);
 
 /**
+ * Reassign orphaned subscription rows to the given active instance. Handles two
+ * categories of orphans:
+ *
+ * 1. Subscriptions still pointing at a destroyed personal instance (instance_id
+ *    references an instance with destroyed_at set).
+ * 2. Detached subscriptions with instance_id = NULL (set during instance
+ *    destruction cleanup).
+ *
+ * When the active instance already owns a subscription, the conflict is
+ * resolved by keeping whichever row is the paid subscription (non-trial).
+ * If an orphan is paid and the incumbent is a trial, the trial is deleted
+ * and the paid subscription takes over.  If the orphan is a trial and a paid
+ * subscription already covers the instance, the orphan trial is deleted.
+ *
+ * Scoped to the user's personal subscriptions only — org and multi-instance
+ * subscriptions are never touched.
+ */
+async function reassignOrphanedSubscriptions(userId: string, activeInstanceId: string) {
+  // Collect IDs of destroyed personal instances (excluding the active one).
+  const destroyedPersonalInstanceIds = (
+    await db
+      .select({ id: kiloclaw_instances.id })
+      .from(kiloclaw_instances)
+      .where(
+        and(
+          eq(kiloclaw_instances.user_id, userId),
+          isNull(kiloclaw_instances.organization_id),
+          isNotNull(kiloclaw_instances.destroyed_at),
+          ne(kiloclaw_instances.id, activeInstanceId)
+        )
+      )
+  ).map(r => r.id);
+
+  // Find orphaned subscriptions: linked to destroyed instances or detached.
+  const orphans = await db
+    .select({
+      id: kiloclaw_subscriptions.id,
+      plan: kiloclaw_subscriptions.plan,
+    })
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        or(
+          destroyedPersonalInstanceIds.length > 0
+            ? inArray(kiloclaw_subscriptions.instance_id, destroyedPersonalInstanceIds)
+            : sql`false`,
+          isNull(kiloclaw_subscriptions.instance_id)
+        )
+      )
+    );
+
+  if (orphans.length === 0) return;
+
+  // Check whether the active instance already has a subscription.
+  const [incumbent] = await db
+    .select({
+      id: kiloclaw_subscriptions.id,
+      plan: kiloclaw_subscriptions.plan,
+    })
+    .from(kiloclaw_subscriptions)
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        eq(kiloclaw_subscriptions.instance_id, activeInstanceId)
+      )
+    )
+    .limit(1);
+
+  // Gather all candidates (incumbent + orphans) and pick the winner: prefer
+  // paid subscriptions over trials.
+  const candidates = [...orphans, ...(incumbent ? [incumbent] : [])];
+  candidates.sort((a, b) => {
+    const aPaid = a.plan !== 'trial' ? 0 : 1;
+    const bPaid = b.plan !== 'trial' ? 0 : 1;
+    return aPaid - bPaid;
+  });
+
+  const winner = candidates[0];
+  const losers = candidates.slice(1);
+
+  // Delete all losing subscription rows.
+  for (const loser of losers) {
+    await db.delete(kiloclaw_subscriptions).where(eq(kiloclaw_subscriptions.id, loser.id));
+  }
+
+  // Ensure the winner is assigned to the active instance.
+  if (winner.id !== incumbent?.id) {
+    await db
+      .update(kiloclaw_subscriptions)
+      .set({ instance_id: activeInstanceId })
+      .where(eq(kiloclaw_subscriptions.id, winner.id));
+  }
+}
+
+/**
  * Return the user's active instance, creating a new registry row if none
  * exists (e.g. trial expired and personal instance was destroyed).
  *
- * When a new row is created, the subscription row linked to the user's
- * most recently destroyed personal instance is reassigned to the new
- * instance_id. The update is scoped to that exact
- * destroyed instance row so that subscriptions on other (org or multi-)
- * instances are never touched and UQ_kiloclaw_subscriptions_instance is not
- * violated.
- *
- * This mirrors the reassignment already performed in ensureProvisionAccess
- * (lines 485–497) for the Stripe hosting-only checkout path.
+ * In both cases (existing active instance or newly created), any orphaned
+ * subscription rows pointing at destroyed personal instances are reassigned
+ * to the active instance via {@link reassignOrphanedSubscriptions}.
  */
 async function getOrCreateInstanceForBilling(userId: string): Promise<ActiveKiloClawInstance> {
   const active = await getActiveInstance(userId);
-  if (active) return active;
-
-  // Find the most recently destroyed personal instance. We don't filter by
-  // sandboxId format because both legacy (base64url) and instance-keyed (ki_)
-  // rows may exist.
-  const [destroyedInstance] = await db
-    .select({ id: kiloclaw_instances.id })
-    .from(kiloclaw_instances)
-    .where(
-      and(
-        eq(kiloclaw_instances.user_id, userId),
-        isNull(kiloclaw_instances.organization_id),
-        isNotNull(kiloclaw_instances.destroyed_at)
-      )
-    )
-    .orderBy(desc(kiloclaw_instances.destroyed_at))
-    .limit(1);
+  if (active) {
+    // Even when an active instance already exists, there may be orphaned
+    // subscriptions still pointing at a destroyed instance (e.g. the user
+    // destroyed and re-provisioned before any billing endpoint ran).
+    await reassignOrphanedSubscriptions(userId, active.id);
+    return active;
+  }
 
   const newInstance = await ensureActiveInstance(userId);
 
-  // Reassign the subscription row that was linked to the destroyed personal
-  // instance onto the new instance. Scoped to that specific instance_id so
-  // subscriptions on other instances (org, multi-instance) are not disturbed.
-  if (destroyedInstance) {
-    await db
-      .update(kiloclaw_subscriptions)
-      .set({ instance_id: newInstance.id })
-      .where(
-        and(
-          eq(kiloclaw_subscriptions.user_id, userId),
-          eq(kiloclaw_subscriptions.instance_id, destroyedInstance.id)
-        )
-      );
-  }
+  // Reassign any subscription rows that were linked to destroyed personal
+  // instances onto the new instance.
+  await reassignOrphanedSubscriptions(userId, newInstance.id);
 
   return newInstance;
 }
@@ -485,6 +554,9 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
     // auto-create a trial (spec: user must manually subscribe).
   }
 
+  // Order so paid subscriptions are examined before trial rows. Without
+  // explicit ordering, the LIMIT 1 pick is nondeterministic and may
+  // return a trial row, leaving an orphaned paid subscription unchecked.
   const [existing] = await db
     .select({
       status: kiloclaw_subscriptions.status,
@@ -494,6 +566,7 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
     })
     .from(kiloclaw_subscriptions)
     .where(eq(kiloclaw_subscriptions.user_id, userId))
+    .orderBy(sql`CASE WHEN ${kiloclaw_subscriptions.plan} != 'trial' THEN 0 ELSE 1 END`)
     .limit(1);
 
   if (!existing && !earlybird) {
@@ -564,33 +637,15 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
         new Date(existing.trial_ends_at) > new Date());
 
     if (hasAccess) {
-      // If the subscription references a destroyed instance, reassign it to
-      // the new instance being provisioned. This covers the case where a user
-      // destroyed their instance and re-provisioned while the subscription
-      // (e.g. a trial) is still valid.  See billing spec: Trial Eligibility
+      // Reassign ALL subscriptions still pointing at destroyed personal
+      // instances to the (about to be) provisioned instance. This covers the
+      // case where a user destroyed their instance and re-provisioned while
+      // holding a paid subscription.  See billing spec: Trial Eligibility
       // and Creation rule 5.
-      if (existing.instance_id) {
-        const [linkedInstance] = await db
-          .select({ destroyed_at: kiloclaw_instances.destroyed_at })
-          .from(kiloclaw_instances)
-          .where(eq(kiloclaw_instances.id, existing.instance_id))
-          .limit(1);
-
-        if (linkedInstance?.destroyed_at) {
-          // ensureActiveInstance is idempotent; the subsequent call in
-          // provisionInstance will be a no-op.
-          const newInstance = await ensureActiveInstance(userId);
-          await db
-            .update(kiloclaw_subscriptions)
-            .set({ instance_id: newInstance.id })
-            .where(
-              and(
-                eq(kiloclaw_subscriptions.user_id, userId),
-                eq(kiloclaw_subscriptions.instance_id, existing.instance_id)
-              )
-            );
-        }
-      }
+      // ensureActiveInstance is idempotent; the subsequent call in
+      // provisionInstance will be a no-op.
+      const newInstance = await ensureActiveInstance(userId);
+      await reassignOrphanedSubscriptions(userId, newInstance.id);
       return;
     }
   }
@@ -1406,6 +1461,7 @@ export const kiloclawRouter = createTRPCRouter({
         .select({ status: kiloclaw_subscriptions.status })
         .from(kiloclaw_subscriptions)
         .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
+        .orderBy(sql`CASE WHEN ${kiloclaw_subscriptions.plan} != 'trial' THEN 0 ELSE 1 END`)
         .limit(1);
       const clearFields: { suspended_at?: null; destruction_deadline: null } = {
         destruction_deadline: null,
@@ -1417,6 +1473,21 @@ export const kiloclawRouter = createTRPCRouter({
         .update(kiloclaw_subscriptions)
         .set(clearFields)
         .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id));
+
+      // Detach subscription(s) from the destroyed instance so they can be
+      // reassigned when the user re-provisions. Setting instance_id to NULL
+      // prevents the subscription from being silently orphaned.
+      if (destroyedRow) {
+        await db
+          .update(kiloclaw_subscriptions)
+          .set({ instance_id: null })
+          .where(
+            and(
+              eq(kiloclaw_subscriptions.user_id, ctx.user.id),
+              eq(kiloclaw_subscriptions.instance_id, destroyedRow.id)
+            )
+          );
+      }
 
       // Clear lifecycle emails so they can fire again if the user re-provisions.
       const resettableEmailTypes = [
@@ -2443,10 +2514,14 @@ export const kiloclawRouter = createTRPCRouter({
   // ── Billing endpoints ────────────────────────────────────────────────
 
   getBillingStatus: baseProcedure.query(async ({ ctx }) => {
+    // Order so paid subscriptions are returned before trial rows. Without
+    // explicit ordering the LIMIT 1 pick is nondeterministic and may
+    // return a stale trial when a paid subscription also exists.
     const [sub] = await db
       .select()
       .from(kiloclaw_subscriptions)
       .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
+      .orderBy(sql`CASE WHEN ${kiloclaw_subscriptions.plan} != 'trial' THEN 0 ELSE 1 END`)
       .limit(1);
 
     const [earlybird] = await db

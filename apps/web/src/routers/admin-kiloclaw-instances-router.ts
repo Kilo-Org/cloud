@@ -991,6 +991,20 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             sql`${kiloclaw_email_log.email_type} LIKE 'claw_instance_ready:%'`
           )
         );
+
+      // Detach subscription(s) from the destroyed instance so they can be
+      // reassigned when the user re-provisions.
+      if (destroyedRow) {
+        await db
+          .update(kiloclaw_subscriptions)
+          .set({ instance_id: null })
+          .where(
+            and(
+              eq(kiloclaw_subscriptions.user_id, instance.user_id),
+              eq(kiloclaw_subscriptions.instance_id, destroyedRow.id)
+            )
+          );
+      }
     } catch (cleanupError) {
       console.error('[admin-kiloclaw] Post-destroy cleanup failed:', cleanupError);
     }

@@ -608,7 +608,9 @@ export class TownDO extends DurableObject<Env> {
   private _containerInstanceId: string | null = null;
   private _poisonEventFailureCounts = new Map<string, number>();
   private async _loadPoisonEventFailureCounts(): Promise<void> {
-    const stored = await this.ctx.storage.get<Record<string, number>>('town:poisonEventFailureCounts');
+    const stored = await this.ctx.storage.get<Record<string, number>>(
+      'town:poisonEventFailureCounts'
+    );
     if (stored) {
       this._poisonEventFailureCounts = new Map(Object.entries(stored));
     }

@@ -585,6 +585,54 @@ app.get('/api/towns/:townId/drain-status', c =>
   instrumented(c, 'GET /api/towns/:townId/drain-status', () => handleDrainStatus(c, c.req.param()))
 );
 
+// ── Container Registry ─────────────────────────────────────────────────
+// Simple pass-through to TownContainerDO registry.
+// Protected by authMiddleware (accepts container JWTs), not kiloAuthMiddleware.
+
+app.use(
+  '/api/towns/:townId/container-registry',
+  async (c: Context<GastownEnv, string>, next) =>
+    c.env.ENVIRONMENT === 'development' ? next() : authMiddleware(c, next)
+);
+
+app.get('/api/towns/:townId/container-registry', async c => {
+  const townId = c.req.param('townId');
+  const tc = getTownContainerStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const registry = await tc.getRegistry();
+  return c.json({ success: true, data: registry });
+});
+
+app.post('/api/towns/:townId/container-registry', async c => {
+  const townId = c.req.param('townId');
+  const body = await c.req.json();
+  const tc = getTownContainerStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  await tc.updateRegistry(body);
+  return c.json({ success: true });
+});
+
+// ── Agent DB Snapshot ───────────────────────────────────────────────────
+// Stored in the AGENT_DB_SNAPSHOTS_KV namespace keyed by agentId.
+// Protected by authMiddleware (accepts container JWTs), not kiloAuthMiddleware.
+// Registered after authMiddleware but before kiloAuthMiddleware wildcard.
+
+app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c => {
+  const { agentId } = c.req.param();
+  const snapshot = await c.env.AGENT_DB_SNAPSHOTS_KV.get(agentId, 'arrayBuffer');
+  if (!snapshot) return c.json({ success: false, error: 'Snapshot not found' }, 404);
+  return new Response(snapshot, {
+    headers: { 'Content-Type': 'application/octet-stream' },
+  });
+});
+
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c => {
+  const { agentId } = c.req.param();
+  const body = await c.req.arrayBuffer();
+  await c.env.AGENT_DB_SNAPSHOTS_KV.put(agentId, body);
+  return c.json({ success: true });
+});
+
 // ── Kilo User Auth ──────────────────────────────────────────────────────
 // Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for dashboard/user
 // routes. Container→worker routes use the agent JWT middleware instead
@@ -748,44 +796,7 @@ app.get('/api/users/:userId/towns/:townId/events', c =>
   )
 );
 
-// ── Container Registry ─────────────────────────────────────────────────
-// Simple pass-through to TownContainerDO registry.
 
-app.get('/api/towns/:townId/container-registry', async c => {
-  const townId = c.req.param('townId');
-  const tc = getTownContainerStub(c.env, townId);
-  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
-  const registry = await tc.getRegistry();
-  return c.json({ success: true, data: registry });
-});
-
-app.post('/api/towns/:townId/container-registry', async c => {
-  const townId = c.req.param('townId');
-  const body = await c.req.json();
-  const tc = getTownContainerStub(c.env, townId);
-  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
-  await tc.updateRegistry(body);
-  return c.json({ success: true });
-});
-
-// ── Agent DB Snapshot ───────────────────────────────────────────────────
-// Stored in the AGENT_DB_SNAPSHOTS_KV namespace keyed by agentId.
-
-app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c => {
-  const { agentId } = c.req.param();
-  const snapshot = await c.env.AGENT_DB_SNAPSHOTS_KV.get(agentId, 'arrayBuffer');
-  if (!snapshot) return c.json({ success: false, error: 'Snapshot not found' }, 404);
-  return new Response(snapshot, {
-    headers: { 'Content-Type': 'application/octet-stream' },
-  });
-});
-
-app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c => {
-  const { agentId } = c.req.param();
-  const body = await c.req.arrayBuffer();
-  await c.env.AGENT_DB_SNAPSHOTS_KV.put(agentId, body);
-  return c.json({ success: true });
-});
 
 // ── Town Container ──────────────────────────────────────────────────────
 // These routes proxy commands to the container's control server via DO.fetch().

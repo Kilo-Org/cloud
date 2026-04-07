@@ -8,6 +8,7 @@
 
 import { createKilo, type KiloClient } from '@kilocode/sdk';
 import { z } from 'zod';
+import * as fs from 'node:fs/promises';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
 import { buildKiloConfigContent } from './agent-runner';
@@ -64,6 +65,80 @@ let sdkServerLock: Promise<void> = Promise.resolve();
 
 export function getUptime(): number {
   return Date.now() - startTime;
+}
+
+async function hydrateDbFromSnapshot(
+  agentId: string,
+  apiUrl: string,
+  token: string,
+  rigId: string,
+  townId: string
+): Promise<void> {
+  const MANAGER_LOG = '[process-manager]';
+  try {
+    const resp = await fetch(
+      `${apiUrl}/api/towns/${townId}/rigs/${rigId}/agents/${agentId}/db-snapshot`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (!resp.ok) {
+      if (resp.status === 404) {
+        console.log(`${MANAGER_LOG} No DB snapshot found for agent ${agentId}, starting fresh`);
+        return;
+      }
+      console.warn(`${MANAGER_LOG} Failed to fetch DB snapshot for ${agentId}: ${resp.status}`);
+      return;
+    }
+    const buffer = await resp.arrayBuffer();
+    if (buffer.byteLength === 0) {
+      console.log(`${MANAGER_LOG} DB snapshot for ${agentId} is empty, skipping hydration`);
+      return;
+    }
+    const dir = `/tmp/agent-home-${agentId}/.local/share/kilo`;
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(`${dir}/kilo.db`, Buffer.from(buffer));
+    console.log(`${MANAGER_LOG} Hydrated DB snapshot for agent ${agentId} (${buffer.byteLength} bytes)`);
+  } catch (err) {
+    console.warn(`${MANAGER_LOG} DB hydration failed for agent ${agentId}:`, err);
+  }
+}
+
+async function saveDbSnapshot(
+  agentId: string,
+  apiUrl: string,
+  token: string,
+  rigId: string,
+  townId: string
+): Promise<void> {
+  const MANAGER_LOG = '[process-manager]';
+  try {
+    const dbPath = `/tmp/agent-home-${agentId}/.local/share/kilo/kilo.db`;
+    await fs.access(dbPath);
+    const buffer = await fs.readFile(dbPath);
+    const resp = await fetch(
+      `${apiUrl}/api/towns/${townId}/rigs/${rigId}/agents/${agentId}/db-snapshot`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/octet-stream',
+        },
+        body: buffer,
+      }
+    );
+    if (!resp.ok) {
+      console.warn(`${MANAGER_LOG} Failed to save DB snapshot for ${agentId}: ${resp.status}`);
+      return;
+    }
+    console.log(`${MANAGER_LOG} Saved DB snapshot for agent ${agentId} (${buffer.byteLength} bytes)`);
+  } catch (err) {
+    if ((err as { code?: string }).code === 'ENOENT') {
+      console.log(`${MANAGER_LOG} No kilo.db found for agent ${agentId}, skipping snapshot save`);
+      return;
+    }
+    console.warn(`${MANAGER_LOG} DB snapshot save failed for agent ${agentId}:`, err);
+  }
 }
 
 export function registerEventSink(
@@ -503,6 +578,14 @@ async function subscribeToEvents(
         sdkInstances.delete(agent.workdir);
       }
     }
+
+    // Save DB snapshot before completing exit
+    const apiUrl = agent.gastownApiUrl;
+    const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+    if (apiUrl && token) {
+      void saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId);
+    }
+
     controller.abort();
   };
 
@@ -669,6 +752,13 @@ export async function startAgent(
   const { signal } = startupAbortController;
   let sessionCounted = false;
   try {
+    // 0. Hydrate agent DB from KV snapshot before starting the SDK server
+    const apiUrl = agent.gastownApiUrl;
+    const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+    if (apiUrl && token) {
+      await hydrateDbFromSnapshot(request.agentId, apiUrl, token, request.rigId, request.townId);
+    }
+
     // 1. Ensure SDK server is running for this workdir
     const { client, port } = await ensureSDKServer(workdir, env);
     agent.serverPort = port;
@@ -868,6 +958,13 @@ export async function stopAgent(agentId: string): Promise<void> {
   agent.exitReason = 'stopped';
   log.info('agent.exit', { agentId, reason: 'stopped', exitReason: 'stopped' });
   broadcastEvent(agentId, 'agent.exited', { reason: 'stopped' });
+
+  // Save DB snapshot before completing stop
+  const apiUrl = agent.gastownApiUrl;
+  const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+  if (apiUrl && token) {
+    void saveDbSnapshot(agentId, apiUrl, token, agent.rigId, agent.townId);
+  }
 }
 
 /**
@@ -1375,7 +1472,14 @@ export async function drainAll(): Promise<void> {
         });
       }
 
-      // 4d: Report the agent as completed so the TownDO can unhook it
+      // 4d: Save DB snapshot
+      const apiUrl = agent.gastownApiUrl;
+      const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+      if (apiUrl && token) {
+        await saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId);
+      }
+
+      // 4e: Report the agent as completed so the TownDO can unhook it
       // and transition the bead. Without this, the bead stays in_progress
       // and the agent stays working until stale-bead recovery kicks in.
       if (agent.role !== 'mayor' && agent.role !== 'triage') {
@@ -1402,7 +1506,7 @@ export async function stopAll(): Promise<void> {
   }
   eventAbortControllers.clear();
 
-  // Abort all running sessions
+  // Abort all running sessions and save DB snapshots
   for (const agent of agents.values()) {
     if (agent.status === 'running' || agent.status === 'starting') {
       try {
@@ -1417,6 +1521,13 @@ export async function stopAll(): Promise<void> {
       }
       agent.status = 'exited';
       agent.exitReason = 'container shutdown';
+
+      // Save DB snapshot before completing shutdown
+      const apiUrl = agent.gastownApiUrl;
+      const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+      if (apiUrl && token) {
+        void saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId);
+      }
     }
   }
 
@@ -1425,4 +1536,67 @@ export async function stopAll(): Promise<void> {
     instance.server.close();
   }
   sdkInstances.clear();
+}
+
+/**
+ * Boot-time agent hydration — fetches the container registry from the
+ * Gastown worker and resumes all registered agents.
+ *
+ * Called from main.ts when GASTOWN_TOWN_ID and GASTOWN_API_URL are set.
+ */
+export async function bootHydration(): Promise<void> {
+  const LOG = '[boot-hydration]';
+  const apiUrl = process.env.GASTOWN_API_URL;
+  const townId = process.env.GASTOWN_TOWN_ID;
+  const token = process.env.GASTOWN_CONTAINER_TOKEN;
+
+  if (!apiUrl || !townId || !token) {
+    console.log(`${LOG} Missing GASTOWN_API_URL, GASTOWN_TOWN_ID, or GASTOWN_CONTAINER_TOKEN — skipping boot hydration`);
+    return;
+  }
+
+  console.log(`${LOG} Fetching container registry for town=${townId}`);
+  let registry: unknown;
+  try {
+    const resp = await fetch(`${apiUrl}/api/towns/${townId}/container-registry`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) {
+      console.warn(`${LOG} Failed to fetch registry: ${resp.status}`);
+      return;
+    }
+    const json = (await resp.json()) as { data: unknown };
+    registry = json.data;
+  } catch (err) {
+    console.warn(`${LOG} Registry fetch failed:`, err);
+    return;
+  }
+
+  if (!Array.isArray(registry) || registry.length === 0) {
+    console.log(`${LOG} No agents in registry — nothing to hydrate`);
+    return;
+  }
+
+  console.log(`${LOG} Resuming ${registry.length} agent(s) from registry`);
+
+  for (const entry of registry as Record<string, unknown>[]) {
+    const agentId = entry.agentId as string | undefined;
+    const agentRequest = entry.request as StartAgentRequest | undefined;
+    const workdir = entry.workdir as string | undefined;
+    const env = entry.env as Record<string, string> | undefined;
+
+    if (!agentId || !agentRequest || !workdir || !env) {
+      console.warn(`${LOG} Skipping malformed registry entry:`, entry);
+      continue;
+    }
+
+    console.log(`${LOG} Resuming agent ${agentId} in ${workdir}`);
+    try {
+      await startAgent(agentRequest, workdir, env);
+      console.log(`${LOG} Agent ${agentId} resumed`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`${LOG} Failed to resume agent ${agentId}:`, msg);
+    }
+  }
 }

@@ -4381,7 +4381,13 @@ export class TownDO extends DurableObject<Env> {
       const threadSummaries = threads.map((t, i) => {
         const comments = t.comments?.nodes ?? [];
         const commentText = comments
-          .map(c => `  [${c.author?.login ?? 'unknown'}]: ${c.body}`)
+          .map(c => {
+            const sanitized = c.body
+              .replace(/<!--[\s\S]*?-->/g, '')
+              .replace(/<[^>]+>/g, '')
+              .trim();
+            return `  [${c.author?.login ?? 'unknown'}]: ${sanitized}`;
+          })
           .join('\n');
         return `Thread ${i + 1}:\n${commentText}`;
       });

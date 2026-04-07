@@ -1565,6 +1565,10 @@ export async function drainAll(): Promise<void> {
     }
   }
 
+  // Clear the container registry so bootHydration on the next container
+  // doesn't resurrect agents that were already force-saved during eviction.
+  syncRegistry();
+
   console.log(`${DRAIN_LOG} Drain complete`);
 }
 

@@ -1125,10 +1125,22 @@ export class TownDO extends DurableObject<Env> {
     const hookedBeadId = agent.current_hook_bead_id;
 
     if (hookedBeadId) {
-      // Return the bead to 'open' so the scheduler can re-assign it
+      // Return the bead to 'open' so the scheduler can re-assign it.
+      // Also reset bead dispatch_attempts so the reconciler doesn't
+      // skip it due to accumulated cooldown from prior failed dispatches.
       const bead = beadOps.getBead(this.sql, hookedBeadId);
       if (bead && bead.status !== 'closed' && bead.status !== 'failed') {
         beadOps.updateBeadStatus(this.sql, hookedBeadId, 'open', agentId);
+        query(
+          this.sql,
+          /* sql */ `
+            UPDATE ${beads}
+            SET ${beads.columns.dispatch_attempts} = 0,
+                ${beads.columns.last_dispatch_attempt_at} = NULL
+            WHERE ${beads.bead_id} = ?
+          `,
+          [hookedBeadId]
+        );
       }
 
       beadOps.logBeadEvent(this.sql, {
@@ -2313,7 +2325,9 @@ export class TownDO extends DurableObject<Env> {
         beadTitle: combinedMessage,
         beadBody: '',
         checkpoint: agents.readCheckpoint(this.sql, mayor.id),
-        conversationHistory: await this.reconstructConversation(mayor.id),
+        // conversationHistory is no longer needed — the mayor's kilo.db
+        // is persisted to KV and hydrated on boot, preserving the full
+        // session state across container evictions.
         gitUrl: rigConfig?.gitUrl ?? '',
         defaultBranch: rigConfig?.defaultBranch ?? 'main',
         kilocodeToken,
@@ -2416,7 +2430,8 @@ export class TownDO extends DurableObject<Env> {
       beadTitle: 'Mayor ready. Waiting for instructions.',
       beadBody: '',
       checkpoint: agents.readCheckpoint(this.sql, mayor.id),
-      conversationHistory: await this.reconstructConversation(mayor.id),
+      // conversationHistory is no longer needed — kilo.db persistence
+      // handles session continuity across container evictions.
       gitUrl: rigConfig?.gitUrl ?? '',
       defaultBranch: rigConfig?.defaultBranch ?? 'main',
       kilocodeToken,
@@ -2447,10 +2462,6 @@ export class TownDO extends DurableObject<Env> {
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
 
     if (isAlive) {
-      // Reconstruct conversation history so the new session retains context
-      // (same mechanism used for container restarts — see PR #1494).
-      const conversationHistory = await this.reconstructConversation(mayor.id);
-
       // Attach fresh town config so the container can update process.env
       // before restarting the SDK server (tokens, git identity, etc.).
       const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
@@ -2460,13 +2471,15 @@ export class TownDO extends DurableObject<Env> {
       // header parsing fails on the container side).
       const townConfig = await config.getTownConfig(this.ctx.storage);
 
+      // conversationHistory is no longer needed for model updates —
+      // kilo.db persistence handles session continuity.
       const updated = await dispatch.updateAgentModelInContainer(
         this.env,
         townId,
         mayor.id,
         model,
         smallModel,
-        conversationHistory || undefined,
+        undefined,
         containerConfig,
         townConfig.organization_id
       );

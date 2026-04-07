@@ -1,7 +1,12 @@
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { EnvSyncPlan, SecretStoreAutoCreate } from './types';
+import type {
+  DevVarsFileChange,
+  EnvSyncPlan,
+  SecretStoreAutoCreate,
+  SecretStoreWarning,
+} from './types';
 import { formatValue } from './parse';
 
 // ---------------------------------------------------------------------------

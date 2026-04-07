@@ -1,8 +1,9 @@
 import expoConstants from 'expo-constants';
+import { type ENV_KEYS } from './env-keys';
 
 const extra = expoConstants.expoConfig?.extra;
 
-function required(key: string): string {
+function required(key: keyof typeof ENV_KEYS): string {
   const value = extra?.[key] as string | undefined;
   if (!value) {
     throw new Error(`Missing required config: ${key}`);

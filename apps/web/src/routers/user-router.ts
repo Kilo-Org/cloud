@@ -37,6 +37,8 @@ import { getCreditBlocks } from '@/lib/getCreditBlocks';
 import { getBalanceForUser } from '@/lib/user.balance';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 
+const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+
 const ViewTypeSchema = z.union([z.literal('personal'), z.literal('all'), z.uuid()]);
 
 export const PeriodSchema = z.enum(['week', 'month', 'year', 'all']);
@@ -638,6 +640,22 @@ export const userRouter = createTRPCRouter({
   requestAccountDeletion: baseProcedure.mutation(async ({ ctx }) => {
     const userEmail = ctx.user.google_user_email;
     const userId = ctx.user.id;
+
+    const lastRequested = ctx.user.account_deletion_requested_at;
+    if (
+      lastRequested &&
+      Date.now() - new Date(lastRequested).getTime() < ACCOUNT_DELETION_COOLDOWN_MS
+    ) {
+      throw new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Account deletion already requested. Please wait before trying again.',
+      });
+    }
+
+    await db
+      .update(kilocode_users)
+      .set({ account_deletion_requested_at: new Date().toISOString() })
+      .where(eq(kilocode_users.id, userId));
 
     await Promise.all([
       sendAccountDeletionConfirmationEmail(userEmail),

@@ -1,5 +1,5 @@
 import type { ExpoConfig } from 'expo/config';
-import { ENV_KEYS } from './src/lib/env-keys.ts';
+import { ENV_KEYS } from './src/lib/env-keys';
 
 const missing = Object.values(ENV_KEYS).filter(key => !process.env[key]);
 if (missing.length > 0) {

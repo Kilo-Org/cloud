@@ -1,0 +1,1 @@
+ALTER TABLE "kilocode_users" ADD COLUMN "account_deletion_requested_at" timestamp with time zone;

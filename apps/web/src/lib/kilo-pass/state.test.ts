@@ -1,7 +1,11 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 
 import { db } from '@/lib/drizzle';
-import { kilo_pass_subscriptions, kilocode_users } from '@kilocode/db/schema';
+import {
+  kilo_pass_subscriptions,
+  kilo_pass_pause_events,
+  kilocode_users,
+} from '@kilocode/db/schema';
 import { KiloPassCadence } from './enums';
 import { KiloPassTier } from '@/lib/kilo-pass/enums';
 
@@ -11,6 +15,8 @@ import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 
 describe('getKiloPassStateForUser', () => {
   afterEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(kilo_pass_pause_events);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(kilo_pass_subscriptions);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -147,5 +153,77 @@ describe('getKiloPassStateForUser', () => {
     const user = await insertTestUser();
     const state = await getKiloPassStateForUser(db, user.id);
     expect(state).toBeNull();
+  });
+
+  test('returns paused status when DB status is active but an open pause event exists', async () => {
+    const user = await insertTestUser();
+    const stripeSubId = `test-stripe-sub-paused-${crypto.randomUUID()}`;
+
+    const [sub] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active', // Stripe reports active when pause_collection is first set
+        cancel_at_period_end: false,
+        started_at: '2025-06-01T00:00:00.000Z',
+        ended_at: null,
+        current_streak_months: 3,
+        next_yearly_issue_at: null,
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+
+    await db.insert(kilo_pass_pause_events).values({
+      kilo_pass_subscription_id: sub!.id,
+      paused_at: '2025-09-01T00:00:00.000Z',
+      resumes_at: '2025-10-01T00:00:00.000Z',
+    });
+
+    const state = await getKiloPassStateForUser(db, user.id);
+    expect(state).toEqual(
+      expect.objectContaining({
+        status: 'paused',
+        resumesAt: '2025-10-01T00:00:00.000Z',
+      })
+    );
+  });
+
+  test('returns active status when pause event is closed (resumed)', async () => {
+    const user = await insertTestUser();
+    const stripeSubId = `test-stripe-sub-resumed-${crypto.randomUUID()}`;
+
+    const [sub] = await db
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        stripe_subscription_id: stripeSubId,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+        cancel_at_period_end: false,
+        started_at: '2025-06-01T00:00:00.000Z',
+        ended_at: null,
+        current_streak_months: 3,
+        next_yearly_issue_at: null,
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+
+    // Closed pause event (has resumed_at)
+    await db.insert(kilo_pass_pause_events).values({
+      kilo_pass_subscription_id: sub!.id,
+      paused_at: '2025-09-01T00:00:00.000Z',
+      resumes_at: '2025-10-01T00:00:00.000Z',
+      resumed_at: '2025-09-15T00:00:00.000Z',
+    });
+
+    const state = await getKiloPassStateForUser(db, user.id);
+    expect(state).toEqual(
+      expect.objectContaining({
+        status: 'active',
+        resumesAt: null,
+      })
+    );
   });
 });

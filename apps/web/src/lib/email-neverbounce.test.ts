@@ -43,6 +43,27 @@ describe('verifyEmail', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  it('skips NeverBounce and returns true for icloud.com emails', async () => {
+    expect(await verifyEmail('user@icloud.com')).toBe(true);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('skips NeverBounce and returns true for me.com emails', async () => {
+    expect(await verifyEmail('user@me.com')).toBe(true);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('skips NeverBounce for bypass domains regardless of case', async () => {
+    expect(await verifyEmail('user@ICLOUD.COM')).toBe(true);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('does not skip NeverBounce for non-bypass domains', async () => {
+    mockNeverBounceResponse('valid');
+    expect(await verifyEmail('user@gmail.com')).toBe(true);
+    expect(mockFetch).toHaveBeenCalled();
+  });
+
   it('returns true for valid emails', async () => {
     mockNeverBounceResponse('valid');
     expect(await verifyEmail('good@example.com')).toBe(true);

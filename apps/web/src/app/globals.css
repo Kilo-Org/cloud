@@ -233,3 +233,11 @@
     }
   }
 }
+
+/* Ghost text for chat autocomplete */
+.chat-ghost-text {
+  color: var(--muted-foreground);
+  opacity: 0.6;
+  pointer-events: none;
+  user-select: none;
+}

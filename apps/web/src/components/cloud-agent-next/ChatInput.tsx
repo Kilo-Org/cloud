@@ -14,6 +14,7 @@ import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombob
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
 import type { AgentMode } from './types';
+import { useChatGhostText } from './hooks/useChatGhostText';
 
 type ChatInputProps = {
   onSend: (message: string) => void;
@@ -44,6 +45,7 @@ type ChatInputProps = {
   showToolbar?: boolean;
   /** Pre-populate the textarea (e.g. to restore text after a failed send) */
   initialValue?: string;
+  enableChatAutocomplete?: boolean;
 };
 
 export function ChatInput({
@@ -64,11 +66,21 @@ export function ChatInput({
   availableVariants = [],
   showToolbar = false,
   initialValue,
+  enableChatAutocomplete = true,
 }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const {
+    ghostText,
+    handleKeyDown: handleGhostTextKeyDown,
+    handleInputChange: handleGhostTextInputChange,
+  } = useChatGhostText({
+    textAreaRef: textareaRef,
+    enableChatAutocomplete: enableChatAutocomplete && !disabled && !isStreaming,
+  });
 
   // Restore text into the textarea when initialValue changes (e.g. after a failed send).
   // Treats undefined as "no opinion" (skip), but empty string actively clears the field.
@@ -121,6 +133,7 @@ export function ChatInput({
 
     onSend(trimmed);
     setValue('');
+    handleGhostTextInputChange('');
     setShowAutocomplete(false);
 
     if (textareaRef.current) {
@@ -143,12 +156,14 @@ export function ChatInput({
       // Send immediately
       onSend(expansion);
       setValue('');
+      handleGhostTextInputChange('');
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
     } else {
       // Just fill the input for editing
       setValue(expansion);
+      handleGhostTextInputChange(expansion);
       // Force height recalculation for expanded text
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
@@ -163,6 +178,10 @@ export function ChatInput({
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Ignore keyboard events during IME composition (Chinese, Japanese, Korean input)
     if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+
+    if (handleGhostTextKeyDown(e)) {
+      return;
+    }
 
     if (showAutocomplete && filteredCommands.length > 0) {
       switch (e.key) {
@@ -224,20 +243,37 @@ export function ChatInput({
         {/* Textarea with slash command autocomplete */}
         <Popover open={showAutocomplete} onOpenChange={handleOpenChange}>
           <PopoverAnchor asChild>
-            <textarea
-              ref={textareaRef}
-              value={value}
-              onChange={e => setValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={placeholder}
-              disabled={disabled}
-              className="max-h-[200px] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-sm focus:ring-0 focus:outline-none"
-              rows={1}
-              role="combobox"
-              aria-expanded={showAutocomplete}
-              aria-autocomplete="list"
-              aria-controls="slash-command-list"
-            />
+            <div className="relative w-full">
+              <textarea
+                ref={textareaRef}
+                value={value}
+                onChange={e => {
+                  setValue(e.target.value);
+                  handleGhostTextInputChange(e.target.value);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder={placeholder}
+                disabled={disabled}
+                className="max-h-[200px] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-sm focus:ring-0 focus:outline-none"
+                rows={1}
+                role="combobox"
+                aria-expanded={showAutocomplete}
+                aria-autocomplete="list"
+                aria-controls="slash-command-list"
+              />
+              {/* Ghost text overlay */}
+              {ghostText && (
+                <div
+                  className="pointer-events-none absolute left-0 top-0 flex h-full w-full select-none items-start overflow-hidden p-4 pb-2"
+                  aria-hidden="true"
+                >
+                  <span className="invisible whitespace-pre-wrap break-words text-sm">{value}</span>
+                  <span className="chat-ghost-text whitespace-pre-wrap break-words text-sm">
+                    {ghostText}
+                  </span>
+                </div>
+              )}
+            </div>
           </PopoverAnchor>
           <PopoverContent
             className="w-[var(--radix-popover-trigger-width)] min-w-[min(300px,calc(100vw-2rem))] p-0"

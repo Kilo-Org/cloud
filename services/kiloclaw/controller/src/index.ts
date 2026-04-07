@@ -436,21 +436,34 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     // The Docker image bakes in a pinned version; this upgrades to the
     // latest release in the background so the instance always has the
     // newest CLI without requiring an image rebuild.
+    //
+    // The upgrade is deferred so it doesn't compete with the gateway for
+    // CPU during startup. On shared-cpu-2x (~6% of 2 cores), npm's
+    // dependency resolution and decompression would otherwise starve the
+    // gateway's lazy initialization, adding ~30-100s to the user's first
+    // request. Once the gateway is warm and CPU has settled, the upgrade
+    // runs safely in the background.
+    //
+    // TODO: Replace this timeout with a warm-up callback that fires after
+    // the gateway is confirmed ready (see gateway-warmup.ts).
     if (env.KILOCLAW_KILO_CLI === 'true') {
-      // Strip NPM_CONFIG_PREFIX so the install overwrites the system-wide
-      // binary in /usr/local/bin instead of writing to the per-user prefix.
-      const upgradeEnv = { ...process.env };
-      delete upgradeEnv.NPM_CONFIG_PREFIX;
-      execFile('npm', ['install', '-g', '@kilocode/cli@latest'], { env: upgradeEnv }, err => {
-        if (err) {
-          console.warn(
-            '[kilo-cli] Background upgrade failed (using baked-in version):',
-            err.message
-          );
-        } else {
-          console.log('[kilo-cli] Upgraded to latest version');
-        }
-      });
+      const KILO_CLI_UPGRADE_DELAY_MS = 5 * 60 * 1000; // 5 minutes
+      setTimeout(() => {
+        // Strip NPM_CONFIG_PREFIX so the install overwrites the system-wide
+        // binary in /usr/local/bin instead of writing to the per-user prefix.
+        const upgradeEnv = { ...process.env };
+        delete upgradeEnv.NPM_CONFIG_PREFIX;
+        execFile('npm', ['install', '-g', '@kilocode/cli@latest'], { env: upgradeEnv }, err => {
+          if (err) {
+            console.warn(
+              '[kilo-cli] Background upgrade failed (using baked-in version):',
+              err.message
+            );
+          } else {
+            console.log('[kilo-cli] Upgraded to latest version');
+          }
+        });
+      }, KILO_CLI_UPGRADE_DELAY_MS);
     }
   } catch (err) {
     const fullError = err instanceof Error ? err.message : String(err);

@@ -23,6 +23,7 @@ const config: ExpoConfig = {
   ios: {
     icon: './assets/images/logo.png',
     bundleIdentifier: 'com.kilocode.kiloapp',
+    usesAppleSignIn: true,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       NSMicrophoneUsageDescription:

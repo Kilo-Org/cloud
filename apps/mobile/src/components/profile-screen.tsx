@@ -2,7 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { useRouter } from 'expo-router';
 import { ArrowLeftRight, Building2, KeyRound, LogOut, Trash2, User } from 'lucide-react-native';
-import { Alert, Pressable, View } from 'react-native';
+import { Alert, Platform, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -218,7 +218,10 @@ export function ProfileScreen() {
         </Animated.View>
 
         {/* Actions */}
-        <View className="mt-auto gap-3" style={{ paddingBottom: Math.max(bottom, 16) }}>
+        <View
+          className="mt-auto gap-3"
+          style={{ paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0) }}
+        >
           <Button
             variant="outline"
             className="flex-row gap-2"

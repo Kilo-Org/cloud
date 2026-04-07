@@ -1,5 +1,9 @@
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { getUserAuthProviders, unlinkAuthProviderFromUser } from '@/lib/user';
+import {
+  sendAccountDeletionConfirmationEmail,
+  sendAccountDeletionSupportNotification,
+} from '@/lib/email';
 import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
@@ -629,5 +633,17 @@ export const userRouter = createTRPCRouter({
       .where(eq(kilocode_users.id, ctx.user.id));
 
     return successResult({ is_member: isMember });
+  }),
+
+  requestAccountDeletion: baseProcedure.mutation(async ({ ctx }) => {
+    const userEmail = ctx.user.google_user_email;
+    const userId = ctx.user.id;
+
+    await Promise.all([
+      sendAccountDeletionConfirmationEmail(userEmail),
+      sendAccountDeletionSupportNotification(userEmail, userId),
+    ]);
+
+    return successResult();
   }),
 });

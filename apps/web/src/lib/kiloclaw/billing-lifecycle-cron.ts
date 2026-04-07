@@ -937,6 +937,9 @@ export async function runKiloClawBillingLifecycleCron(
   }
 
   // ── Advisory email sweeps (safe to skip on timeout) ─────────────────
+  // Refresh timestamp so advisory queries use wall-clock time, not the
+  // potentially-stale `now` captured before enforcement sweeps ran.
+  const advisoryNow = new Date().toISOString();
 
   // ── Sweep 2.5: Destruction 2-day Warning ───────────────────────────
   const twoDaysFromNow = new Date(Date.now() + DESTRUCTION_WARNING_DAYS * MS_PER_DAY).toISOString();
@@ -950,7 +953,7 @@ export async function runKiloClawBillingLifecycleCron(
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
     .where(
       and(
-        gte(kiloclaw_subscriptions.destruction_deadline, now),
+        gte(kiloclaw_subscriptions.destruction_deadline, advisoryNow),
         lte(kiloclaw_subscriptions.destruction_deadline, twoDaysFromNow),
         isNotNull(kiloclaw_subscriptions.suspended_at)
       )
@@ -995,7 +998,7 @@ export async function runKiloClawBillingLifecycleCron(
     .where(
       and(
         eq(kiloclaw_subscriptions.status, 'trialing'),
-        gte(kiloclaw_subscriptions.trial_ends_at, now),
+        gte(kiloclaw_subscriptions.trial_ends_at, advisoryNow),
         lte(kiloclaw_subscriptions.trial_ends_at, trialWarningCutoff),
         isNull(kiloclaw_subscriptions.suspended_at)
       )

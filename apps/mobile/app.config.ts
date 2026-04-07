@@ -4,10 +4,11 @@ import { ENV_KEYS } from './src/lib/env-keys';
 const missing = Object.values(ENV_KEYS).filter(key => !process.env[key]);
 if (missing.length > 0) {
   const message = `Missing required environment variables: ${missing.join(', ')}`;
-  if (process.env.CI) {
+  if (process.env.GITHUB_ACTIONS) {
+    console.warn(`⚠️  ${message}`);
+  } else {
     throw new Error(message);
   }
-  console.warn(`⚠️  ${message}`);
 }
 
 const config: ExpoConfig = {

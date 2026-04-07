@@ -4385,8 +4385,11 @@ export class TownDO extends DurableObject<Env> {
             const sanitized = c.body
               .replace(/<!--[\s\S]*?-->/g, '')
               .replace(/<[^>]+>/g, '')
+              .replace(/\\/g, '\\\\')
+              .replace(/`/g, '\\`')
+              .replace(/\n/g, '\\n')
               .trim();
-            return `  [${c.author?.login ?? 'unknown'}]: ${sanitized}`;
+            return `  [${c.author?.login ?? 'unknown'}]: \`${sanitized}\``;
           })
           .join('\n');
         return `Thread ${i + 1}:\n${commentText}`;

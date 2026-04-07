@@ -97,6 +97,7 @@ const config: ExpoConfig = {
         iCloudContainerEnvironment: 'Production',
       },
     ],
+    'expo-apple-authentication',
     'expo-audio',
     'expo-sharing',
     'expo-video',

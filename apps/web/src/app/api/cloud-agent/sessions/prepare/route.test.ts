@@ -600,6 +600,9 @@ describe('POST /api/cloud-agent/sessions/prepare', () => {
       expect(mockedMergeProfileConfiguration).toHaveBeenCalledWith({
         profileName: 'My Default',
         owner: { type: 'user', id: user.id },
+        userId: undefined,
+        repoFullName: 'owner/repo',
+        platform: 'github',
         envVars: { INLINE: 'value' },
         setupCommands: ['echo inline'],
       });

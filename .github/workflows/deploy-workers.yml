@@ -24,6 +24,7 @@ on:
           - services/git-token-service
           - services/gmail-push
           - services/images-mcp
+          - services/kiloclaw-billing
           - services/o11y
           - services/security-auto-analysis
           - services/security-sync
@@ -107,6 +108,7 @@ jobs:
             services/git-token-service
             services/gmail-push
             services/images-mcp
+            services/kiloclaw-billing
             services/o11y
             services/security-auto-analysis
             services/security-sync

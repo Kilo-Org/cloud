@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./instance-id": "./src/instance-id.ts",
-    "./redact-headers": "./src/redact-headers.ts"
+    "./redact-headers": "./src/redact-headers.ts",
+    "./kiloclaw-billing-observability": "./src/kiloclaw-billing-observability.ts"
   },
   "scripts": {
     "test": "vitest run",

@@ -48,10 +48,23 @@ function postJson(path: string, body: Record<string, unknown>) {
   };
 }
 
+let loggedValues: unknown[] = [];
+
+function findJsonLog(message: string): Record<string, unknown> | undefined {
+  return loggedValues
+    .filter((value: unknown): value is string => typeof value === 'string' && value.startsWith('{'))
+    .map((value: string) => JSON.parse(value) as Record<string, unknown>)
+    .find((record: Record<string, unknown>) => record.message === message);
+}
+
 describe('POST /destroy-fly-machine', () => {
   let fetchSpy: ReturnType<typeof vi.fn<() => Promise<Response>>>;
 
   beforeEach(() => {
+    loggedValues = [];
+    vi.spyOn(console, 'log').mockImplementation((value?: unknown) => {
+      loggedValues.push(value);
+    });
     fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response(null, { status: 200 })) as ReturnType<
@@ -82,6 +95,61 @@ describe('POST /destroy-fly-machine', () => {
         method: 'DELETE',
         headers: { Authorization: 'Bearer fly-test-token' },
       }
+    );
+  });
+
+  it('logs billing-correlated platform requests with propagated context', async () => {
+    const { env } = makeEnv();
+    const { path, init } = postJson('/destroy-fly-machine', {
+      userId: testUserId,
+      appName: testAppName,
+      machineId: testMachineId,
+    });
+    const headers = new Headers(init.headers as Record<string, string>);
+    headers.set('x-kiloclaw-billing-run-id', '11111111-1111-4111-8111-111111111111');
+    headers.set('x-kiloclaw-billing-sweep', 'instance_destruction');
+    headers.set('x-kiloclaw-billing-call-id', '22222222-2222-4222-8222-222222222222');
+    headers.set('x-kiloclaw-billing-attempt', '2');
+
+    const resp = await platform.request(
+      path,
+      {
+        ...init,
+        headers,
+      },
+      env
+    );
+
+    expect(resp.status).toBe(200);
+    expect(findJsonLog('Starting billing-correlated kiloclaw platform request')).toEqual(
+      expect.objectContaining({
+        billingFlow: 'kiloclaw_lifecycle',
+        billingRunId: '11111111-1111-4111-8111-111111111111',
+        billingSweep: 'instance_destruction',
+        billingCallId: '22222222-2222-4222-8222-222222222222',
+        billingAttempt: 2,
+        billingComponent: 'kiloclaw_platform',
+        event: 'downstream_action',
+        outcome: 'started',
+        method: 'POST',
+        path: '/destroy-fly-machine',
+      })
+    );
+    expect(findJsonLog('Finished billing-correlated kiloclaw platform request')).toEqual(
+      expect.objectContaining({
+        billingFlow: 'kiloclaw_lifecycle',
+        billingRunId: '11111111-1111-4111-8111-111111111111',
+        billingSweep: 'instance_destruction',
+        billingCallId: '22222222-2222-4222-8222-222222222222',
+        billingAttempt: 2,
+        billingComponent: 'kiloclaw_platform',
+        event: 'downstream_action',
+        outcome: 'completed',
+        method: 'POST',
+        path: '/destroy-fly-machine',
+        statusCode: 200,
+        userId: testUserId,
+      })
     );
   });
 

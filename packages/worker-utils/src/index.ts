@@ -54,3 +54,12 @@ export type { SessionMetricsParams, SessionMetricsParamsInput } from './session-
 export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id.js';
 
 export { redactSensitiveHeaders } from './redact-headers.js';
+
+export {
+  BILLING_FLOW,
+  BILLING_HEADER_NAMES,
+  createBillingCorrelationHeaders,
+  normalizeBillingCorrelation,
+  readBillingCorrelationHeaders,
+} from './kiloclaw-billing-observability.js';
+export type { BillingCorrelationContext } from './kiloclaw-billing-observability.js';

@@ -27,7 +27,7 @@ function convertModel(
     canonical_slug: id,
     hugging_face_id: '',
     name,
-    created: 631148400,
+    created: 631148400, // our clients do not care about this field, we can fix it later if that changes
     description: model.description,
     context_length: model.context_length,
     architecture: {

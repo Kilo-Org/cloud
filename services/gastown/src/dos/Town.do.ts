@@ -4383,7 +4383,7 @@ export class TownDO extends DurableObject<Env> {
         const commentText = comments
           .map(c => `  [${c.author?.login ?? 'unknown'}]: ${c.body}`)
           .join('\n');
-        return `Thread ${i + 1}:\n${commentText}`;
+        return `Thread ${i + 1}:\n\`\`\`\n${commentText}\n\`\`\``;
       });
 
       const prompt = `You are evaluating unresolved PR review comment threads to decide if a pull request is safe to auto-merge.

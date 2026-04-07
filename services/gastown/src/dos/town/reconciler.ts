@@ -1062,7 +1062,8 @@ export function reconcileReviewQueue(
   for (const mr of mrBeads) {
     // Rule 1: PR-strategy MR beads in_progress need polling.
     // Rate-limit: skip if polled less than PR_POLL_INTERVAL_MS ago (#1632).
-    if (mr.status === 'in_progress' && mr.pr_url) {
+    // Exclude empty-string pr_url (misclassified as PR-strategy beads).
+    if (mr.status === 'in_progress' && mr.pr_url && mr.pr_url !== '') {
       const lastPollAt: unknown = mr.metadata?.last_poll_at;
       const msSinceLastPoll =
         typeof lastPollAt === 'string' ? Date.now() - new Date(lastPollAt).getTime() : Infinity;
@@ -1140,10 +1141,12 @@ export function reconcileReviewQueue(
     // Only in_progress — open beads are just waiting for the refinery to pop them.
     // Skip when refinery code review is disabled: poll_pr keeps the bead alive via
     // updated_at touches, and no refinery is expected to be working on it.
+    // Exclude empty-string pr_url (misclassified as PR-strategy beads).
     if (
       refineryCodeReview &&
       mr.status === 'in_progress' &&
       mr.pr_url &&
+      mr.pr_url !== '' &&
       staleMs(mr.updated_at, ORPHANED_PR_REVIEW_TIMEOUT_MS)
     ) {
       const workingAgent = hasWorkingAgentHooked(sql, mr.bead_id);

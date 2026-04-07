@@ -77,7 +77,9 @@ export async function GET(
       authenticated_requests: sql<number>`COUNT(*) FILTER (WHERE ${free_model_usage.kilo_user_id} IS NOT NULL)`,
     })
     .from(free_model_usage)
-    .where(sql`${free_model_usage.created_at} >= NOW() - INTERVAL '24 hours' AND ${TEST_ROW_FILTER}`);
+    .where(
+      sql`${free_model_usage.created_at} >= NOW() - INTERVAL '24 hours' AND ${TEST_ROW_FILTER}`
+    );
 
   const bigIntToNumber = (value: unknown): number => {
     if (value === null || value === undefined) return 0;

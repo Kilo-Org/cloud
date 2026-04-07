@@ -1,11 +1,20 @@
 import { describe, expect, it } from '@jest/globals';
 
 import {
+  IMPACT_CLICK_ID_COOKIE,
   IMPACT_SIGNUP_FALLBACK_MAX_ACCOUNT_AGE_MS,
+  IMPACT_TRACKED_CLICK_ID_COOKIE,
   shouldTrackImpactSignupFallback,
 } from '@/lib/impact-affiliate-utils';
 
 describe('impact affiliate utils', () => {
+  describe('cookie contract', () => {
+    it('uses the shared kilo.ai parent-domain cookie names for auth recovery', () => {
+      expect(IMPACT_CLICK_ID_COOKIE).toBe('impact_click_id');
+      expect(IMPACT_TRACKED_CLICK_ID_COOKIE).toBe('impact_tracked_click_id');
+    });
+  });
+
   describe('shouldTrackImpactSignupFallback', () => {
     it('tracks explicit new users even when auth state is otherwise incomplete', () => {
       expect(

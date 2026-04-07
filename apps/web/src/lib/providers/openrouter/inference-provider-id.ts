@@ -47,6 +47,7 @@ export const DirectUserByokInferenceProviderIdSchema = z.enum([
   'byteplus-coding',
   'codestral',
   'kimi-coding',
+  'neuralwatt',
   'zai-coding',
 ]);
 
@@ -73,6 +74,7 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum['byteplus-coding']]: 'bytedance-seed-code',
   [DirectUserByokInferenceProviderIdSchema.enum.codestral]: 'mistral/codestral',
   [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'kimi-for-coding',
+  [DirectUserByokInferenceProviderIdSchema.enum.neuralwatt]: 'Qwen/Qwen3.5-35B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum['zai-coding']]: 'glm-4.7',
 } satisfies Record<UserByokProviderId, string>;
 

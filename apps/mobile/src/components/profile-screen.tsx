@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { useRouter } from 'expo-router';
-import { ArrowLeftRight, Building2, KeyRound, LogOut, User } from 'lucide-react-native';
-import { Alert, Pressable, View } from 'react-native';
+import { ArrowLeftRight, Building2, KeyRound, LogOut, Trash2, User } from 'lucide-react-native';
+import { Alert, Platform, Pressable, View } from 'react-native';
+import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -105,6 +106,34 @@ export function ProfileScreen() {
       : (orgs?.find(o => o.organizationId === context?.organizationId)?.organizationName ??
         'Organization');
 
+  const deleteAccount = useMutation(
+    trpc.user.requestAccountDeletion.mutationOptions({
+      onSuccess: () => {
+        toast.success('Account deletion request sent. Check your email for confirmation.');
+      },
+      onError: error => {
+        toast.error(error.message);
+      },
+    })
+  );
+
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account?',
+      'This will send a request to permanently delete your account and all associated data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: () => {
+            deleteAccount.mutate();
+          },
+        },
+      ]
+    );
+  };
+
   const confirmSignOut = () => {
     Alert.alert('Sign out?', 'You will need to sign in again to access your workspace.', [
       { text: 'Cancel', style: 'cancel' },
@@ -189,7 +218,10 @@ export function ProfileScreen() {
         </Animated.View>
 
         {/* Actions */}
-        <View className="mt-auto gap-3" style={{ paddingBottom: Math.max(bottom, 16) }}>
+        <View
+          className="mt-auto gap-3"
+          style={{ paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0) }}
+        >
           <Button
             variant="outline"
             className="flex-row gap-2"
@@ -211,6 +243,17 @@ export function ProfileScreen() {
           >
             <LogOut size={16} color={colors.mutedForeground} />
             <Text className="text-muted-foreground">Sign Out</Text>
+          </Button>
+
+          <Button
+            variant="ghost"
+            className="flex-row gap-2"
+            onPress={confirmDeleteAccount}
+            disabled={deleteAccount.isPending}
+            accessibilityLabel="Delete account"
+          >
+            <Trash2 size={16} color={colors.destructive} />
+            <Text className="text-destructive">Delete Account</Text>
           </Button>
 
           <Text className="text-center text-xs text-muted-foreground">

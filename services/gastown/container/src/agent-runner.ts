@@ -416,7 +416,7 @@ async function createMayorWorkspace(rigId: string): Promise<string> {
  * user customization), the TownDO sends the updated prompt and we
  * rewrite this file.
  */
-async function writeMayorSystemPromptToAgentsMd(
+export async function writeMayorSystemPromptToAgentsMd(
   workspaceDir: string,
   systemPrompt: string
 ): Promise<void> {

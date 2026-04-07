@@ -241,6 +241,21 @@ export function systemPromptForRole(params: {
   }
 }
 
+/**
+ * Append per-role custom instructions from town config to a system prompt.
+ * Returns the prompt unchanged when no custom instructions exist for the role.
+ */
+export function appendCustomInstructions(
+  systemPrompt: string,
+  role: string,
+  townConfig: TownConfig
+): string {
+  const roleKey = role as keyof NonNullable<TownConfig['custom_instructions']>;
+  const instructions = townConfig.custom_instructions?.[roleKey]?.trim();
+  if (!instructions) return systemPrompt;
+  return `${systemPrompt}\n\n## Custom Instructions (from town settings)\n\n${instructions}`;
+}
+
 /** Generate a branch name for an agent working on a specific bead. */
 export function branchForAgent(name: string, beadId?: string): string {
   const slug = name
@@ -412,16 +427,19 @@ export async function startAgentInContainer(
         }),
         model: resolveModel(params.townConfig, params.rigId, params.role),
         smallModel: resolveSmallModel(params.townConfig),
-        systemPrompt:
+        systemPrompt: appendCustomInstructions(
           params.systemPromptOverride ??
-          systemPromptForRole({
-            role: params.role,
-            identity: params.identity,
-            agentName: params.agentName,
-            rigId: params.rigId,
-            townId: params.townId,
-            gates: params.townConfig.refinery?.gates ?? [],
-          }),
+            systemPromptForRole({
+              role: params.role,
+              identity: params.identity,
+              agentName: params.agentName,
+              rigId: params.rigId,
+              townId: params.townId,
+              gates: params.townConfig.refinery?.gates ?? [],
+            }),
+          params.role,
+          params.townConfig
+        ),
         gitUrl: params.gitUrl,
         branch: params.convoyFeatureBranch
           ? branchForConvoyAgent(params.convoyFeatureBranch, params.agentName, params.beadId)
@@ -658,6 +676,29 @@ export async function sendMessageToAgent(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt: message }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Rewrite the mayor's AGENTS.md with an updated system prompt.
+ * Called when custom instructions change so the running mayor picks them up.
+ */
+export async function updateMayorSystemPromptInContainer(
+  env: Env,
+  townId: string,
+  agentId: string,
+  systemPrompt: string
+): Promise<boolean> {
+  try {
+    const container = getTownContainerStub(env, townId);
+    const response = await container.fetch(`http://container/agents/${agentId}/system-prompt`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ systemPrompt }),
     });
     return response.ok;
   } catch {

@@ -294,6 +294,7 @@ export type EncryptedData = {
 // --- AuthProviderId ---
 
 export type AuthProviderId =
+  | 'apple'
   | 'email'
   | 'google'
   | 'github'

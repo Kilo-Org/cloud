@@ -317,6 +317,15 @@ export const TownConfigSchema = z.object({
   /** When true, AI agent co-authorship trailer is omitted from commits.
    *  Only takes effect when git_author_name is set. */
   disable_ai_coauthor: z.boolean().default(false),
+
+  /** Per-role custom instructions appended to the agent's system prompt. */
+  custom_instructions: z
+    .object({
+      polecat: z.string().max(2000).optional(),
+      refinery: z.string().max(2000).optional(),
+      mayor: z.string().max(2000).optional(),
+    })
+    .optional(),
 });
 
 export type TownConfig = z.infer<typeof TownConfigSchema>;
@@ -378,6 +387,13 @@ export const TownConfigUpdateSchema = z.object({
   git_author_name: z.string().optional(),
   git_author_email: z.string().optional(),
   disable_ai_coauthor: z.boolean().optional(),
+  custom_instructions: z
+    .object({
+      polecat: z.string().max(2000).optional(),
+      refinery: z.string().max(2000).optional(),
+      mayor: z.string().max(2000).optional(),
+    })
+    .optional(),
 });
 export type TownConfigUpdate = z.infer<typeof TownConfigUpdateSchema>;
 

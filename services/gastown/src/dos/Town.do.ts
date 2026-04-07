@@ -326,6 +326,10 @@ export class TownDO extends DurableObject<Env> {
               ? convoyFeatureBranch
               : (rig?.default_branch ?? 'main');
 
+          console.log(
+            `${TOWN_LOG} dispatch polecat: bead=${beadId} convoyId=${convoyId ?? 'none'} mergeMode=${convoyMergeMode ?? 'none'} featureBranch=${convoyFeatureBranch ?? 'none'} targetBranch=${targetBranch}`
+          );
+
           systemPromptOverride = buildPolecatSystemPrompt({
             agentName: agent.name,
             rigId,
@@ -1133,6 +1137,18 @@ export class TownDO extends DurableObject<Env> {
     }
 
     agents.updateAgentStatus(this.sql, agentId, 'idle');
+
+    // Reset dispatch_attempts so the reconciler will dispatch this agent
+    // immediately on the next tick instead of waiting for cooldown/backoff.
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agent_metadata}
+        SET ${agent_metadata.columns.dispatch_attempts} = 0
+        WHERE ${agent_metadata.bead_id} = ?
+      `,
+      [agentId]
+    );
 
     console.log(
       `${TOWN_LOG} resetAgent: reset agent=${agentId} hookedBead=${hookedBeadId ?? 'none'}`
@@ -2458,6 +2474,49 @@ export class TownDO extends DurableObject<Env> {
     }
     // If the mayor is not alive, the next dispatch will pick up the new
     // model from the updated town config automatically.
+  }
+
+  /**
+   * Rewrite the running mayor's AGENTS.md with the current system prompt
+   * (including custom instructions). Called when custom instructions change
+   * so the mayor picks them up on its next session restart.
+   */
+  async updateMayorSystemPrompt(): Promise<void> {
+    const townId = this.townId;
+    const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0];
+    if (!mayor) return;
+
+    const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
+    const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
+    if (!isAlive) return;
+
+    const townConfig = await this.getTownConfig();
+    const systemPrompt = dispatch.appendCustomInstructions(
+      dispatch.systemPromptForRole({
+        role: 'mayor',
+        identity: mayor.identity,
+        agentName: 'mayor',
+        rigId: `mayor-${townId}`,
+        townId,
+        gates: townConfig.refinery?.gates ?? [],
+      }),
+      'mayor',
+      townConfig
+    );
+
+    const updated = await dispatch.updateMayorSystemPromptInContainer(
+      this.env,
+      townId,
+      mayor.id,
+      systemPrompt
+    );
+    if (updated) {
+      console.log(`${TOWN_LOG} updateMayorSystemPrompt: rewrote AGENTS.md for mayor ${mayor.id}`);
+    } else {
+      console.warn(
+        `${TOWN_LOG} updateMayorSystemPrompt: failed to rewrite AGENTS.md for mayor ${mayor.id}`
+      );
+    }
   }
 
   async getMayorStatus(): Promise<{
@@ -4156,9 +4215,11 @@ export class TownDO extends DurableObject<Env> {
     };
 
     // Check for unresolved review threads via GraphQL.
-    // Fetches the first 100 threads; if there are more (hasNextPage),
-    // conservatively treat the PR as having unresolved comments to avoid
-    // auto-merging with un-checked reviewer feedback.
+    // Fetches the first 100 threads with comment bodies; if there are more
+    // (hasNextPage), conservatively treat the PR as having unresolved comments.
+    // When unresolved threads exist, uses Workers AI to classify whether they
+    // are truly blocking (requesting code changes, identifying bugs) vs
+    // informational (status reports, nits, praise, warnings about future work).
     let hasUnresolvedComments = false;
     try {
       const graphqlRes = await fetch('https://api.github.com/graphql', {
@@ -4170,7 +4231,15 @@ export class TownDO extends DurableObject<Env> {
               pullRequest(number: $number) {
                 reviewThreads(first: 100) {
                   pageInfo { hasNextPage }
-                  nodes { isResolved }
+                  nodes {
+                    isResolved
+                    comments(first: 5) {
+                      nodes {
+                        body
+                        author { login }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -4191,7 +4260,21 @@ export class TownDO extends DurableObject<Env> {
                         reviewThreads: z
                           .object({
                             pageInfo: z.object({ hasNextPage: z.boolean() }).optional(),
-                            nodes: z.array(z.object({ isResolved: z.boolean() })),
+                            nodes: z.array(
+                              z.object({
+                                isResolved: z.boolean(),
+                                comments: z
+                                  .object({
+                                    nodes: z.array(
+                                      z.object({
+                                        body: z.string(),
+                                        author: z.object({ login: z.string() }).nullable(),
+                                      })
+                                    ),
+                                  })
+                                  .optional(),
+                              })
+                            ),
                           })
                           .optional(),
                       })
@@ -4207,7 +4290,16 @@ export class TownDO extends DurableObject<Env> {
           : undefined;
         const threads = reviewThreads?.nodes ?? [];
         const hasMorePages = reviewThreads?.pageInfo?.hasNextPage === true;
-        hasUnresolvedComments = threads.some(t => !t.isResolved) || hasMorePages;
+
+        if (hasMorePages) {
+          // Too many threads to inspect — conservatively block auto-merge
+          hasUnresolvedComments = true;
+        } else {
+          const unresolvedThreads = threads.filter(t => !t.isResolved);
+          if (unresolvedThreads.length > 0) {
+            hasUnresolvedComments = await this.areThreadsBlocking(unresolvedThreads);
+          }
+        }
       }
     } catch (err) {
       console.warn(`${TOWN_LOG} checkPRFeedback: GraphQL failed for ${prUrl}`, err);
@@ -4313,6 +4405,112 @@ export class TownDO extends DurableObject<Env> {
   }
 
   /**
+   * Use Workers AI to determine if unresolved PR review threads contain
+   * blocking feedback that should prevent auto-merge.
+   *
+   * Returns true if any thread is blocking (requires code changes, identifies
+   * bugs/security issues). Returns false if all threads are informational
+   * (status reports, nits, praise, warnings about future considerations).
+   *
+   * Falls back to true (conservatively blocking) if the AI call fails.
+   */
+  private async areThreadsBlocking(
+    threads: Array<{
+      isResolved: boolean;
+      comments?: { nodes: Array<{ body: string; author: { login: string } | null }> };
+    }>
+  ): Promise<boolean> {
+    try {
+      const threadSummaries = threads.map((t, i) => {
+        const comments = t.comments?.nodes ?? [];
+        const commentText = comments
+          .map(c => `  [${c.author?.login ?? 'unknown'}]: ${c.body}`)
+          .join('\n');
+        return `Thread ${i + 1}:\n${commentText}`;
+      });
+
+      const prompt = `You are evaluating unresolved PR review comment threads to decide if a pull request is safe to auto-merge.
+
+Here are the unresolved review threads:
+
+${threadSummaries.join('\n\n')}
+
+For each thread, classify it as BLOCKING or NON-BLOCKING:
+- BLOCKING: Requests a code change, identifies a bug, security vulnerability, correctness problem, or raises a warning about the code that should be addressed before merge.
+- NON-BLOCKING: Approvals, praise, "LGTM", status summaries (e.g. "Code review passed", "No issues found"), acknowledgements, or comments that express approval of the code without requesting changes.
+
+Important: A comment is only NON-BLOCKING if it expresses approval or is purely a status report. If a comment raises any concern, warning, suggestion, or question about the code — even if phrased softly — it is BLOCKING.
+
+Respond with ONLY a JSON object (no markdown, no explanation): { "blocking": true/false, "reason": "brief one-sentence explanation" }`;
+
+      const response: unknown = await this.env.AI.run(
+        // Model may not be in the AiModels type map yet — cast to access it.
+        '@cf/google/gemma-4-26b-a4b-it' as keyof AiModels,
+        {
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 256,
+          temperature: 0,
+          // Disable Gemma 4's thinking/reasoning mode — we only need the
+          // final JSON answer, not a chain-of-thought. Without this, the
+          // model burns all tokens on reasoning and returns content: null.
+          chat_template_kwargs: { enable_thinking: false },
+        } as AiTextGenerationInput
+      );
+
+      // Gemma 4 returns OpenAI-compatible chat completion format:
+      //   { choices: [{ message: { content: "..." } }] }
+      // Older Workers AI models return { response: "..." }.
+      // Parse both shapes defensively.
+      const openAiResult = z
+        .object({
+          choices: z.array(z.object({ message: z.object({ content: z.string() }) })),
+        })
+        .safeParse(response);
+      const legacyResult = z.object({ response: z.string() }).safeParse(response);
+
+      const text = openAiResult.success
+        ? openAiResult.data.choices[0]?.message.content
+        : legacyResult.success
+          ? legacyResult.data.response
+          : null;
+      if (!text) {
+        console.warn(
+          `${TOWN_LOG} areThreadsBlocking: could not extract text from AI response, defaulting to blocking. Raw: ${JSON.stringify(response)?.slice(0, 500)}`
+        );
+        return true;
+      }
+
+      // Extract JSON from response (model may wrap in markdown code fences)
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.warn(
+          `${TOWN_LOG} areThreadsBlocking: no JSON in AI response, defaulting to blocking: ${text}`
+        );
+        return true;
+      }
+
+      const parsed = z
+        .object({ blocking: z.boolean(), reason: z.string().optional() })
+        .safeParse(JSON.parse(jsonMatch[0]));
+
+      if (!parsed.success) {
+        console.warn(
+          `${TOWN_LOG} areThreadsBlocking: failed to parse AI response, defaulting to blocking: ${text}`
+        );
+        return true;
+      }
+
+      console.log(
+        `${TOWN_LOG} areThreadsBlocking: blocking=${parsed.data.blocking} reason=${parsed.data.reason ?? 'none'} threads=${threads.length}`
+      );
+      return parsed.data.blocking;
+    } catch (err) {
+      console.warn(`${TOWN_LOG} areThreadsBlocking: AI call failed, defaulting to blocking`, err);
+      return true;
+    }
+  }
+
+  /**
    * Merge a PR via GitHub API. Used by the auto-merge feature.
    * Returns true if the merge succeeded.
    */
@@ -4330,29 +4528,42 @@ export class TownDO extends DurableObject<Env> {
       return false;
     }
 
-    const response = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/pulls/${numberStr}/merge`,
-      {
-        method: 'PUT',
-        headers: {
-          Authorization: `token ${token}`,
-          Accept: 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json',
-          'User-Agent': 'Gastown-Refinery/1.0',
-        },
-        body: JSON.stringify({ merge_method: 'merge' }),
-      }
-    );
+    const mergeUrl = `https://api.github.com/repos/${owner}/${repo}/pulls/${numberStr}/merge`;
+    const mergeHeaders = {
+      Authorization: `token ${token}`,
+      Accept: 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'Gastown-Refinery/1.0',
+    };
 
-    if (!response.ok) {
+    // Try merge methods in order of preference. Repos may only allow a subset
+    // (e.g. squash-only). A 405 "not allowed" response means that method is
+    // disabled — try the next one.
+    const methods = ['squash', 'merge', 'rebase'] as const;
+    for (const method of methods) {
+      const response = await fetch(mergeUrl, {
+        method: 'PUT',
+        headers: mergeHeaders,
+        body: JSON.stringify({ merge_method: method }),
+      });
+
+      if (response.ok) return true;
+
       const text = await response.text().catch(() => '(unreadable)');
+      if (response.status === 405 && text.includes('not allowed')) {
+        // This merge method is disabled on the repo — try the next one
+        continue;
+      }
+
+      // Any other error (409 conflict, 422 validation, etc.) is a real failure
       console.warn(
-        `${TOWN_LOG} mergePR: GitHub API returned ${response.status} for ${prUrl}: ${text.slice(0, 500)}`
+        `${TOWN_LOG} mergePR: GitHub API returned ${response.status} for ${prUrl} (method=${method}): ${text.slice(0, 500)}`
       );
       return false;
     }
 
-    return true;
+    console.warn(`${TOWN_LOG} mergePR: all merge methods rejected for ${prUrl}`);
+    return false;
   }
 
   /**

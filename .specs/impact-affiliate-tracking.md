@@ -12,6 +12,7 @@ retry strategies, and other implementation choices belong in plan documents and 
 
 Draft -- created 2026-03-31.
 Updated 2026-04-01 -- aligned with revised Impact integration document and implementation review.
+Updated 2026-04-06 -- clarify that conversion events require an affiliate attribution record.
 
 ## Conventions
 
@@ -175,9 +176,10 @@ This integration applies only to KiloClaw subscriptions.
 3. When a conversion API call fails for any reason, the primary operation (user creation, invoice settlement, etc.) MUST
    NOT be affected.
 
-4. When the affiliate tracking identifier is not available for a user (no attribution record exists), conversion events
-   MUST still be sent with an empty or null click ID. Impact.com will not attribute these but may use them for
-   reporting.
+4. Conversion events (SIGNUP, TRIAL_START, TRIAL_END, SALE) MUST only be sent for users who have an affiliate
+   attribution record. Users who did not arrive via an affiliate link MUST NOT generate conversion events. When an
+   attribution record exists but the click ID stored in it is empty or null, the event MUST still be sent with an
+   empty or null click ID.
 
 ## Changelog
 
@@ -200,3 +202,11 @@ guide.
 The RE_SUBSCRIPTION action tracker (71660) no longer exists in Impact.com. Removed the RE_SUBSCRIPTION event and
 consolidated all paid KiloClaw invoice tracking under the SALE event (71659). The `Numeric1` month number field is no
 longer sent. Both initial and renewal invoices now fire the same SALE conversion.
+
+### 2026-04-06 -- Clarify attribution-gated conversion events
+
+Error-handling rule 4 previously required sending conversion events for all users, even those without an affiliate
+attribution record. Updated to clarify that conversion events MUST only be sent for users with an attribution record
+(i.e., users who arrived via an affiliate link). Sending events for non-affiliate users inflates Impact conversion
+volume with unattributable data. The click ID within the attribution record may still be empty/null — the attribution
+record itself is the gate, not the click ID value.

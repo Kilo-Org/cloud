@@ -11,11 +11,13 @@ import { validateOpenclawJsonForSave } from '@/app/(app)/claw/components/validat
 
 function AdminFileEditorPaneInner({
   userId,
+  instanceId,
   filePath,
   writeFileMutation,
   onDirtyChange,
 }: {
   userId: string;
+  instanceId: string;
   filePath: string;
   writeFileMutation: ReturnType<typeof useMutation<{ etag: string }, any, any>>; // eslint-disable-line @typescript-eslint/no-explicit-any
   onDirtyChange: (dirty: boolean) => void;
@@ -23,7 +25,7 @@ function AdminFileEditorPaneInner({
   const trpc = useTRPC();
   const { data, isLoading, error, refetch } = useQuery(
     trpc.admin.kiloclawInstances.readFile.queryOptions(
-      { userId, path: filePath },
+      { userId, instanceId, path: filePath },
       { refetchOnWindowFocus: false, refetchOnMount: 'always' }
     )
   );
@@ -37,11 +39,11 @@ function AdminFileEditorPaneInner({
       }
     ) => {
       writeFileMutation.mutate(
-        { userId, path: args.path, content: args.content, etag: args.etag },
+        { userId, instanceId, path: args.path, content: args.content, etag: args.etag },
         callbacks
       );
     },
-    [writeFileMutation, userId]
+    [writeFileMutation, userId, instanceId]
   );
 
   const validateBeforeSave = useCallback(validateOpenclawJsonForSave, []);
@@ -61,7 +63,7 @@ function AdminFileEditorPaneInner({
   );
 }
 
-export function AdminFileEditor({ userId }: { userId: string }) {
+export function AdminFileEditor({ userId, instanceId }: { userId: string; instanceId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [enabled, setEnabled] = useState(false);
@@ -73,7 +75,7 @@ export function AdminFileEditor({ userId }: { userId: string }) {
     refetch,
   } = useQuery(
     trpc.admin.kiloclawInstances.fileTree.queryOptions(
-      { userId },
+      { userId, instanceId },
       { refetchOnWindowFocus: false, enabled }
     )
   );
@@ -82,10 +84,10 @@ export function AdminFileEditor({ userId }: { userId: string }) {
     trpc.admin.kiloclawInstances.writeFile.mutationOptions({
       onSuccess: async () => {
         await queryClient.invalidateQueries({
-          queryKey: trpc.admin.kiloclawInstances.fileTree.queryKey({ userId }),
+          queryKey: trpc.admin.kiloclawInstances.fileTree.queryKey({ userId, instanceId }),
         });
         await queryClient.invalidateQueries({
-          queryKey: trpc.admin.kiloclawInstances.readFile.queryKey(),
+          queryKey: trpc.admin.kiloclawInstances.readFile.queryKey({ userId, instanceId }),
         });
       },
     })
@@ -111,6 +113,7 @@ export function AdminFileEditor({ userId }: { userId: string }) {
         <AdminFileEditorPaneInner
           key={selectedPath}
           userId={userId}
+          instanceId={instanceId}
           filePath={selectedPath}
           writeFileMutation={writeFileMutation}
           onDirtyChange={onDirtyChange}

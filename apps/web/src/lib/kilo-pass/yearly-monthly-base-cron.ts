@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { kilo_pass_subscriptions, kilocode_users } from '@kilocode/db/schema';
+import { kilo_pass_issuances, kilo_pass_subscriptions, kilocode_users } from '@kilocode/db/schema';
 import {
   KiloPassAuditLogResult,
   KiloPassCadence,
@@ -9,7 +9,7 @@ import {
   type KiloPassTier,
 } from '@/lib/kilo-pass/enums';
 import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
-import { and, desc, eq, isNotNull, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
 import {
   appendKiloPassAuditLog,
@@ -60,7 +60,7 @@ async function issueYearlyCadenceMonthlyBaseOnce(
 ): Promise<{
   issueMonth: string;
   nextYearlyIssueAtNewIso: string;
-  issuanceId: string;
+  issuanceId: string | null;
   issuanceHeaderWasCreated: boolean;
   baseWasIssued: boolean;
   baseCreditTransactionId: string | null;
@@ -69,6 +69,45 @@ async function issueYearlyCadenceMonthlyBaseOnce(
 
   const issueMonth = computeIssueMonth(dayjs(nextYearlyIssueAt).utc());
   const nextYearlyIssueAtNewIso = dayjs(nextYearlyIssueAt).utc().add(1, 'month').toISOString();
+
+  // Count total issuances since the last invoice-sourced issuance (start of yearly period)
+  const lastInvoiceIssuance = await tx
+    .select({ issueMonth: kilo_pass_issuances.issue_month })
+    .from(kilo_pass_issuances)
+    .where(
+      and(
+        eq(kilo_pass_issuances.kilo_pass_subscription_id, subscriptionId),
+        eq(kilo_pass_issuances.source, KiloPassIssuanceSource.StripeInvoice)
+      )
+    )
+    .orderBy(desc(kilo_pass_issuances.issue_month))
+    .limit(1);
+
+  const periodStartMonth = lastInvoiceIssuance[0]?.issueMonth;
+  if (periodStartMonth) {
+    const totalIssuances = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(kilo_pass_issuances)
+      .where(
+        and(
+          eq(kilo_pass_issuances.kilo_pass_subscription_id, subscriptionId),
+          sql`${kilo_pass_issuances.issue_month} >= ${periodStartMonth}`
+        )
+      );
+
+    const count = totalIssuances[0]?.count ?? 0;
+    if (count >= 12) {
+      // All 12 months issued for this yearly period — skip but still advance cursor
+      return {
+        issueMonth,
+        nextYearlyIssueAtNewIso: dayjs(nextYearlyIssueAt).utc().add(1, 'month').toISOString(),
+        issuanceId: null,
+        issuanceHeaderWasCreated: false,
+        baseWasIssued: false,
+        baseCreditTransactionId: null,
+      };
+    }
+  }
 
   const issuanceHeader = await createOrGetIssuanceHeader(tx, {
     subscriptionId,
@@ -150,7 +189,7 @@ export async function runKiloPassYearlyMonthlyBaseCron(
     .where(
       and(
         eq(kilo_pass_subscriptions.cadence, KiloPassCadence.Yearly),
-        eq(kilo_pass_subscriptions.status, 'active'),
+        inArray(kilo_pass_subscriptions.status, ['active', 'paused']),
         isNotNull(kilo_pass_subscriptions.next_yearly_issue_at),
         lte(kilo_pass_subscriptions.next_yearly_issue_at, nowIso)
       )

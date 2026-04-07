@@ -4,27 +4,27 @@ import { captureException } from '@sentry/nextjs';
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
 import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
 import { getUserFromAuth } from '@/lib/user.server';
-import { getCodingPlanModelsForUser } from '@/lib/providers/coding-plans';
+import { getDirectByokModelsForUser } from '@/lib/providers/direct-byok';
 import { unstable_cache } from 'next/cache';
 
-const getCodingPlanModelsForUser_cached = unstable_cache(
-  (userId: string) => getCodingPlanModelsForUser(userId),
+const getDirectByokModelsForUser_cached = unstable_cache(
+  (userId: string) => getDirectByokModelsForUser(userId),
   undefined,
   { revalidate: 60 }
 );
 
-async function getCodingPlanModels() {
+async function getDirectByokModels() {
   try {
     const { user } = await getUserFromAuth({ adminOnly: false });
     if (user) {
-      console.debug('[getCodingPlanModels] authenticated request, fetching coding plan models');
-      return await getCodingPlanModelsForUser_cached(user.id);
+      console.debug('[getDirectByokModels] authenticated request, fetching direct byok models');
+      return await getDirectByokModelsForUser_cached(user.id);
     } else {
-      console.debug('[getCodingPlanModels] anonymous request, no coding plan models');
+      console.debug('[getDirectByokModels] anonymous request, no direct byok models');
       return [];
     }
   } catch (e) {
-    console.debug('[getCodingPlanModels] error, database unavailable?', e);
+    console.debug('[getDirectByokModels] error, database unavailable?', e);
     return [];
   }
 }
@@ -39,7 +39,7 @@ export async function GET(
   try {
     const data = await getEnhancedOpenRouterModels();
     return NextResponse.json(
-      Array.isArray(data.data) ? { data: data.data.concat(await getCodingPlanModels()) } : data
+      Array.isArray(data.data) ? { data: data.data.concat(await getDirectByokModels()) } : data
     );
   } catch (error) {
     captureException(error, {

@@ -1,5 +1,17 @@
-/** @type {import('expo/config').ExpoConfig} */
-const config = {
+import type { ExpoConfig } from 'expo/config';
+import { ENV_KEYS } from './src/lib/env-keys';
+
+const missing = Object.values(ENV_KEYS).filter(key => !process.env[key]);
+if (missing.length > 0) {
+  const message = `Missing required environment variables: ${missing.join(', ')}`;
+  if (process.env.GITHUB_ACTIONS) {
+    console.warn(`⚠️  ${message}`);
+  } else {
+    throw new Error(message);
+  }
+}
+
+const config: ExpoConfig = {
   name: 'KiloClaw',
   owner: 'kilocode',
   slug: 'kilo-app',
@@ -11,6 +23,7 @@ const config = {
   ios: {
     icon: './assets/images/logo.png',
     bundleIdentifier: 'com.kilocode.kiloapp',
+    usesAppleSignIn: true,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       NSMicrophoneUsageDescription:
@@ -36,6 +49,11 @@ const config = {
       monochromeImage: './assets/images/android-icon-foreground.png',
     },
     predictiveBackGestureEnabled: false,
+    blockedPermissions: [
+      'android.permission.READ_MEDIA_IMAGES',
+      'android.permission.READ_MEDIA_VIDEO',
+      'android.permission.READ_MEDIA_AUDIO',
+    ],
   },
   plugins: [
     [
@@ -74,18 +92,12 @@ const config = {
       },
     ],
     [
-      'expo-media-library',
-      {
-        photosPermission: 'Allow $(PRODUCT_NAME) to access your photos to save and share media.',
-        savePhotosPermission: 'Allow $(PRODUCT_NAME) to save photos to your library.',
-      },
-    ],
-    [
       'expo-document-picker',
       {
         iCloudContainerEnvironment: 'Production',
       },
     ],
+    'expo-apple-authentication',
     'expo-audio',
     'expo-sharing',
     'expo-video',
@@ -105,10 +117,7 @@ const config = {
     reactCompiler: true,
   },
   extra: {
-    apiBaseUrl: process.env.API_BASE_URL,
-    webBaseUrl: process.env.WEB_BASE_URL,
-    appsFlyerDevKey: process.env.APPSFLYER_DEV_KEY,
-    appsFlyerAppId: process.env.APPSFLYER_APP_ID,
+    ...Object.fromEntries(Object.entries(ENV_KEYS).map(([key, env]) => [key, process.env[env]])),
     router: {},
     eas: {
       projectId: '2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4',
@@ -116,4 +125,4 @@ const config = {
   },
 };
 
-module.exports = config;
+export default config;

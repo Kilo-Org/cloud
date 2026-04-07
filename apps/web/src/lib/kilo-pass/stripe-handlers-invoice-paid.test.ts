@@ -7,6 +7,7 @@ import {
   kilo_pass_audit_log,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
+  kilo_pass_pause_events,
   kilo_pass_scheduled_changes,
   kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
@@ -1863,5 +1864,328 @@ describe('handleKiloPassInvoicePaid', () => {
     expect(subRow).toBeTruthy();
     expect(subRow?.status).toBe('canceled');
     expect(subRow?.ended_at).not.toBeNull();
+  });
+
+  describe('streak across pauses', () => {
+    async function insertPauseEvent(params: {
+      kiloPassSubscriptionId: string;
+      pausedAt: string;
+      resumesAt: string | null;
+      resumedAt: string | null;
+    }): Promise<void> {
+      await db.insert(kilo_pass_pause_events).values({
+        kilo_pass_subscription_id: params.kiloPassSubscriptionId,
+        paused_at: params.pausedAt,
+        resumes_at: params.resumesAt,
+        resumed_at: params.resumedAt,
+      });
+    }
+
+    async function getKiloPassSubscriptionId(stripeSubId: string): Promise<string> {
+      const rows = await db
+        .select({ id: kilo_pass_subscriptions.id })
+        .from(kilo_pass_subscriptions)
+        .where(eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId));
+      const id = rows[0]?.id;
+      if (!id) throw new Error(`No kilo_pass_subscriptions row for ${stripeSubId}`);
+      return id;
+    }
+
+    async function seedMonths(params: {
+      stripeSubId: string;
+      kiloUserId: string;
+      months: string[];
+      priceId: string;
+      subscription: ReturnType<typeof makeStripeSubscription>;
+    }): Promise<void> {
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+      const retrieve = jest.fn(async () => params.subscription);
+      const stripe = { subscriptions: { retrieve } };
+
+      for (const month of params.months) {
+        const periodStartSeconds = new Date(`${month}T00:00:00Z`).getTime() / 1000;
+        const invoice = makeStripeInvoice({
+          id: `inv_seed_${month}_${Math.random()}`,
+          amount_paid_cents: 1900,
+          period_start_seconds: periodStartSeconds,
+          created_seconds: periodStartSeconds,
+          priceId: params.priceId,
+          subscriptionIdOrExpanded: params.stripeSubId,
+          metadata: params.subscription.metadata,
+        });
+        await handleKiloPassInvoicePaid({
+          eventId: `evt_seed_${month}_${Math.random()}`,
+          invoice,
+          stripe: stripe as unknown as Stripe,
+        });
+      }
+    }
+
+    test('single pause preserves streak', async () => {
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const stripeSubId = `sub_pause_1_${Math.random()}`;
+
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: new Date('2026-01-01T00:00:00Z').getTime() / 1000,
+        metadata: meta,
+      });
+
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+
+      // Seed months 1-3 (Jan, Feb, Mar)
+      await seedMonths({
+        stripeSubId,
+        kiloUserId: user.id,
+        months: ['2026-01-01', '2026-02-01', '2026-03-01'],
+        priceId,
+        subscription,
+      });
+
+      // Get the subscription ID
+      const kiloPassSubscriptionId = await getKiloPassSubscriptionId(stripeSubId);
+
+      // Pause covering months 4-5 (paused Apr 1, resumed Jun 1)
+      await insertPauseEvent({
+        kiloPassSubscriptionId,
+        pausedAt: '2026-04-01T00:00:00.000Z',
+        resumesAt: '2026-06-01T00:00:00.000Z',
+        resumedAt: '2026-06-01T00:00:00.000Z',
+      });
+
+      // Call handler for month 6
+      const retrieve = jest.fn(async () => subscription);
+      const stripe = { subscriptions: { retrieve } };
+      const month6Start = new Date('2026-06-01T00:00:00Z').getTime() / 1000;
+      const invoice6 = makeStripeInvoice({
+        id: `inv_month6_${Math.random()}`,
+        amount_paid_cents: 1900,
+        period_start_seconds: month6Start,
+        created_seconds: month6Start,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubId,
+        metadata: meta,
+      });
+
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_month6_${Math.random()}`,
+        invoice: invoice6,
+        stripe: stripe as unknown as Stripe,
+      });
+
+      const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
+      });
+      // months 1, 2, 3 (issuances) + month 6 (current) = 4
+      // months 4, 5 are paused (skipped in walk)
+      expect(subRow?.current_streak_months).toBe(4);
+    });
+
+    test('multiple pause/resume cycles preserve streak', async () => {
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const stripeSubId = `sub_pause_2_${Math.random()}`;
+
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: new Date('2026-01-01T00:00:00Z').getTime() / 1000,
+        metadata: meta,
+      });
+
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+
+      // Seed 5 months of issuances (Jan-May)
+      await seedMonths({
+        stripeSubId,
+        kiloUserId: user.id,
+        months: ['2026-01-01', '2026-02-01', '2026-03-01', '2026-04-01', '2026-05-01'],
+        priceId,
+        subscription,
+      });
+
+      const kiloPassSubscriptionId = await getKiloPassSubscriptionId(stripeSubId);
+
+      // Pause event 1: month 6 (Jun), resumed mid-Jul
+      await insertPauseEvent({
+        kiloPassSubscriptionId,
+        pausedAt: '2026-06-01T00:00:00.000Z',
+        resumesAt: '2026-07-15T00:00:00.000Z',
+        resumedAt: '2026-07-15T00:00:00.000Z',
+      });
+
+      // Pause event 2: month 7 pause (Jul), resumed month 9 (Sep)
+      await insertPauseEvent({
+        kiloPassSubscriptionId,
+        pausedAt: '2026-07-15T00:00:00.000Z',
+        resumesAt: '2026-09-01T00:00:00.000Z',
+        resumedAt: '2026-09-01T00:00:00.000Z',
+      });
+
+      // Call handler for month 9 (Sep)
+      const retrieve = jest.fn(async () => subscription);
+      const stripe = { subscriptions: { retrieve } };
+      const month9Start = new Date('2026-09-01T00:00:00Z').getTime() / 1000;
+      const invoice9 = makeStripeInvoice({
+        id: `inv_month9_${Math.random()}`,
+        amount_paid_cents: 1900,
+        period_start_seconds: month9Start,
+        created_seconds: month9Start,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubId,
+        metadata: meta,
+      });
+
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_month9_${Math.random()}`,
+        invoice: invoice9,
+        stripe: stripe as unknown as Stripe,
+      });
+
+      const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
+      });
+      // months 1-5 (issuances) + month 9 (current) = 6; months 6, 7, 8 paused (skipped)
+      expect(subRow?.current_streak_months).toBe(6);
+    });
+
+    test('no pause — gap breaks streak (regression)', async () => {
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const stripeSubId = `sub_gap_break_${Math.random()}`;
+
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: new Date('2026-01-01T00:00:00Z').getTime() / 1000,
+        metadata: meta,
+      });
+
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+
+      // Seed months 1-3 (Jan, Feb, Mar) — no pause, no month 4
+      await seedMonths({
+        stripeSubId,
+        kiloUserId: user.id,
+        months: ['2026-01-01', '2026-02-01', '2026-03-01'],
+        priceId,
+        subscription,
+      });
+
+      // Call handler for month 5 (May) — gap at month 4 with no pause event
+      const retrieve = jest.fn(async () => subscription);
+      const stripe = { subscriptions: { retrieve } };
+      const month5Start = new Date('2026-05-01T00:00:00Z').getTime() / 1000;
+      const invoice5 = makeStripeInvoice({
+        id: `inv_gap_break_${Math.random()}`,
+        amount_paid_cents: 1900,
+        period_start_seconds: month5Start,
+        created_seconds: month5Start,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubId,
+        metadata: meta,
+      });
+
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_gap_break_${Math.random()}`,
+        invoice: invoice5,
+        stripe: stripe as unknown as Stripe,
+      });
+
+      const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
+      });
+      // month 4 has no issuance and no pause → streak resets to 1
+      expect(subRow?.current_streak_months).toBe(1);
+    });
+
+    test('no pause — existing behavior unchanged (regression)', async () => {
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const stripeSubId = `sub_no_gap_${Math.random()}`;
+
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: new Date('2026-01-01T00:00:00Z').getTime() / 1000,
+        metadata: meta,
+      });
+
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+
+      // Seed months 1-3 (Jan, Feb, Mar) consecutively
+      await seedMonths({
+        stripeSubId,
+        kiloUserId: user.id,
+        months: ['2026-01-01', '2026-02-01', '2026-03-01'],
+        priceId,
+        subscription,
+      });
+
+      // Call handler for month 4 (Apr) — no gap, no pause
+      const retrieve = jest.fn(async () => subscription);
+      const stripe = { subscriptions: { retrieve } };
+      const month4Start = new Date('2026-04-01T00:00:00Z').getTime() / 1000;
+      const invoice4 = makeStripeInvoice({
+        id: `inv_no_gap_${Math.random()}`,
+        amount_paid_cents: 1900,
+        period_start_seconds: month4Start,
+        created_seconds: month4Start,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubId,
+        metadata: meta,
+      });
+
+      await handleKiloPassInvoicePaid({
+        eventId: `evt_no_gap_${Math.random()}`,
+        invoice: invoice4,
+        stripe: stripe as unknown as Stripe,
+      });
+
+      const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
+      });
+      // months 1, 2, 3, 4 = streak of 4
+      expect(subRow?.current_streak_months).toBe(4);
+    });
   });
 });

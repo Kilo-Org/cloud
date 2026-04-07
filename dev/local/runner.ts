@@ -85,8 +85,16 @@ export async function waitForPort(port: number, name: string, maxWaitMs: number)
 
 export function buildStartCommand(serviceName: string): string {
   const svc = getService(serviceName);
-  const parts: string[] = [];
 
+  // Use pnpm --filter instead of cd to avoid cwd issues on restart —
+  // after ctrl-c the shell stays in the service dir, so a relative cd
+  // would try to descend into <dir>/<dir> which doesn't exist.
+  if (svc.dir !== '.' && svc.command[0] === 'pnpm') {
+    const [, ...rest] = svc.command;
+    return `pnpm --filter {./${svc.dir}} ${rest.join(' ')}`;
+  }
+
+  const parts: string[] = [];
   if (svc.dir !== '.') parts.push(`cd ${svc.dir}`);
   parts.push(svc.command.join(' '));
 

@@ -1,0 +1,130 @@
+name: Push Dev KiloClaw Image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  push-dev:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    name: Build & Push Dev Image
+
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          dissociate: true
+
+      - name: Setup Docker Buildx
+        uses: useblacksmith/setup-docker-builder@5241b2e9423e8b1fa37ed6050ecb62d0fb9a4e38 # v1.6.0
+
+      - name: Login to Fly Registry
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: registry.fly.io
+          username: x
+          password: ${{ secrets.FLY_DEV_API_TOKEN }}
+
+      - name: Generate image tag and cache bust value
+        id: tag
+        run: |
+          TIMESTAMP=$(date +%s)
+          echo "tag=dev-${TIMESTAMP}" >> "$GITHUB_OUTPUT"
+          echo "cache_bust=${TIMESTAMP}" >> "$GITHUB_OUTPUT"
+          echo "Tag: dev-${TIMESTAMP}"
+
+      - name: Compute source content hash
+        id: content-hash
+        working-directory: services/kiloclaw
+        run: |
+          for path in Dockerfile controller container skills \
+                      openclaw-pairing-list.js openclaw-device-pairing-list.js; do
+            if [ ! -e "$path" ]; then
+              echo "::error::Required path not found: $path"
+              exit 1
+            fi
+          done
+
+          CONTENT_HASH=$(
+            find Dockerfile controller/ container/ skills/ \
+              openclaw-pairing-list.js openclaw-device-pairing-list.js \
+              -type f \
+              | sort \
+              | xargs sha256sum \
+              | sha256sum \
+              | cut -d' ' -f1 \
+              | cut -c1-12
+          )
+
+          echo "hash=${CONTENT_HASH}" >> "$GITHUB_OUTPUT"
+          echo "Source content hash: ${CONTENT_HASH}"
+
+      - name: Build and push Docker image
+        id: docker-build
+        uses: useblacksmith/build-push-action@cbd1f60d194a98cb3be5523b15134501eaf0fbf3 # v2.1.0
+        with:
+          context: services/kiloclaw
+          file: services/kiloclaw/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            registry.fly.io/kiloclaw-registry-dev:${{ steps.tag.outputs.tag }}
+          build-args: |
+            CONTROLLER_COMMIT=${{ github.sha }}
+            CONTROLLER_CACHE_BUST=${{ steps.tag.outputs.cache_bust }}
+
+      - name: Extract image digest
+        id: digest
+        env:
+          BUILD_DIGEST: ${{ steps.docker-build.outputs.digest }}
+        run: |
+          echo "digest=${BUILD_DIGEST:-}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract OpenClaw version
+        id: openclaw-version
+        run: |
+          VERSION=$(sed -n 's/.*openclaw@\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' services/kiloclaw/Dockerfile | head -1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Failed to extract OpenClaw version from Dockerfile"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Write .dev.vars summary
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          DIGEST="${{ steps.digest.outputs.digest }}"
+          OPENCLAW="${{ steps.openclaw-version.outputs.version }}"
+          CONTENT="${{ steps.content-hash.outputs.hash }}"
+
+          {
+            echo ""
+            echo "## .dev.vars entries for KiloClaw worker"
+            echo ""
+            echo "Add or update these in \`services/kiloclaw/.dev.vars\`, then restart wrangler dev:"
+            echo ""
+            echo '```'
+            echo "FLY_IMAGE_TAG=${TAG}"
+            if [ -n "$DIGEST" ]; then
+              echo "FLY_IMAGE_DIGEST=${DIGEST}"
+            fi
+            echo "OPENCLAW_VERSION=${OPENCLAW}"
+            echo "FLY_IMAGE_CONTENT_HASH=${CONTENT}"
+            echo '```'
+            echo ""
+            echo "**Image pushed to:** \`registry.fly.io/kiloclaw-registry-dev:${TAG}\`"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo ""
+          echo "=== .dev.vars entries ==="
+          echo "FLY_IMAGE_TAG=${TAG}"
+          if [ -n "$DIGEST" ]; then
+            echo "FLY_IMAGE_DIGEST=${DIGEST}"
+          fi
+          echo "OPENCLAW_VERSION=${OPENCLAW}"
+          echo "FLY_IMAGE_CONTENT_HASH=${CONTENT}"
+          echo "=========================="

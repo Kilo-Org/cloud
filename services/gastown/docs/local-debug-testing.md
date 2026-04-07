@@ -309,3 +309,60 @@ Triage/escalation beads pile up with `rig_id=NULL`. These are by design:
 - GUPP force-stop beads are created by the patrol system for stuck agents
 
 During testing, container restarts generate many of these. Bulk-close via admin panel if needed.
+
+## 7. Auto-Merge with Workers AI Thread Classification
+
+The auto-merge flow uses Workers AI (Gemma 4 26B) to classify unresolved PR review threads as blocking vs non-blocking. This prevents informational bot comments (status reports, code review summaries) from blocking auto-merge.
+
+### How It Works
+
+1. `poll_pr` runs every ~60s for MR beads with a `pr_url`
+2. `checkPRFeedback` fetches review threads via GitHub GraphQL (including comment bodies)
+3. If unresolved threads exist, `areThreadsBlocking()` sends them to Workers AI
+4. The model classifies threads as BLOCKING (requires code changes, bugs, security) or NON-BLOCKING (informational, nits, bot status reports)
+5. Only truly blocking threads prevent auto-merge
+
+### Config Required
+
+Set these on the town config (via `PATCH /debug/towns/:townId/config`):
+
+```json
+{
+  "refinery": {
+    "auto_merge": true,
+    "auto_merge_delay_minutes": 0,
+    "auto_resolve_pr_feedback": true
+  }
+}
+```
+
+### Testing Locally
+
+The `areThreadsBlocking` AI call only triggers when:
+
+- An MR bead has a `pr_url` (external GitHub PR exists)
+- The PR has unresolved review threads on GitHub
+- `auto_merge` is enabled in the town config
+
+In local dev, PRs created by the refinery in review-and-merge mode may not create external GitHub PRs, so the AI classification branch won't fire. To test the AI path end-to-end:
+
+1. Manually create a PR with unresolved review comments on the target repo
+2. Create an MR bead that references that PR
+3. Watch the wrangler logs for `areThreadsBlocking` output
+
+### Monitoring in Production
+
+Query Analytics Engine for the `areThreadsBlocking` log output:
+
+```bash
+# Check wrangler tail for AI classification logs
+npx wrangler tail gastown --format json --search "areThreadsBlocking"
+```
+
+The `areThreadsBlocking` method logs its decision:
+
+```
+[town] areThreadsBlocking: blocking=false reason=<explanation> threads=2
+```
+
+If the AI call fails, it conservatively defaults to `blocking=true` and logs a warning.

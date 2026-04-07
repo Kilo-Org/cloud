@@ -45,10 +45,19 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import type { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
 
 type SortField = 'created_at' | 'destroyed_at';
 type SortOrder = 'asc' | 'desc';
 type StatusFilter = 'all' | 'active' | 'suspended' | 'destroyed';
+
+const subscriptionBadgeClass: Record<KiloClawSubscriptionStatus, string> = {
+  active: 'border-green-500/30 bg-green-500/15 text-green-400',
+  trialing: 'border-blue-500/30 bg-blue-500/15 text-blue-400',
+  past_due: 'border-amber-500/30 bg-amber-500/15 text-amber-400',
+  canceled: 'border-red-500/30 bg-red-500/15 text-red-400',
+  unpaid: 'border-red-500/30 bg-red-500/15 text-red-400',
+};
 
 function toSortedSearchParams(obj: Record<string, unknown>): URLSearchParams {
   const params = new URLSearchParams();
@@ -472,6 +481,7 @@ export function KiloclawInstancesPage() {
               <TableHead>User</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Sandbox ID</TableHead>
+              <TableHead>Subscription</TableHead>
               <TableHead>Status</TableHead>
               <TableHead
                 className="hover:bg-muted/50 cursor-pointer"
@@ -496,13 +506,13 @@ export function KiloclawInstancesPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={7} className="h-24 text-center">
                   Loading instances...
                 </TableCell>
               </TableRow>
             ) : instances.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={7} className="h-24 text-center">
                   No instances found.
                 </TableCell>
               </TableRow>
@@ -555,6 +565,19 @@ export function KiloclawInstancesPage() {
                     >
                       {instance.sandbox_id}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    {instance.subscription_status ? (
+                      <Badge
+                        variant="outline"
+                        className={subscriptionBadgeClass[instance.subscription_status]}
+                        title={instance.subscription_id ?? undefined}
+                      >
+                        {instance.subscription_status}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {instance.destroyed_at !== null ? (

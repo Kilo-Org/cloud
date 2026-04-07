@@ -1,26 +1,26 @@
 import { type UserByokProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import {
   COMPATIBLE_USER_AGENT,
-  type CodingPlanModel,
-  type CodingPlanProvider,
-} from '@/lib/providers/coding-plans/types';
-import CODING_PLANS from './coding-plan-definitions';
+  type DirectByokModel,
+  type DirectByokProvider,
+} from '@/lib/providers/direct-byok/types';
+import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/byok';
 import { readDb } from '@/lib/drizzle';
 import { preferredModels } from '@/lib/models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { OpenCodeSettings } from '@kilocode/db';
 
-export function formatCodingPlanModelId(provider: CodingPlanProvider, model: CodingPlanModel) {
+export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
   return (provider.id + '/' + model.id).toLowerCase();
 }
 
 function convertModel(
-  provider: CodingPlanProvider,
-  model: CodingPlanModel,
+  provider: DirectByokProvider,
+  model: DirectByokModel,
   preferredIndex: number
 ) {
-  const id = formatCodingPlanModelId(provider, model);
+  const id = formatDirectByokModelId(provider, model);
   const name = provider.name + ': ' + model.name;
   return {
     id,
@@ -62,20 +62,20 @@ function convertModel(
   };
 }
 
-function getCodingPlanModels(byokProviders: UserByokProviderId[]) {
+function getDirectByokModels(byokProviders: UserByokProviderId[]) {
   let nextPreferredId = preferredModels.length;
-  return CODING_PLANS.filter(codingPlan => byokProviders.includes(codingPlan.id)).flatMap(
+  return DIRECT_BYOK_PROVIDERS.filter(provider => byokProviders.includes(provider.id)).flatMap(
     provider => provider.models.map(model => convertModel(provider, model, nextPreferredId++))
   );
 }
 
-export function getCodingPlanModel(requestedModel: string): {
-  provider: CodingPlanProvider | null;
-  model: CodingPlanModel | null;
+export function getDirectByokModel(requestedModel: string): {
+  provider: DirectByokProvider | null;
+  model: DirectByokModel | null;
 } {
-  for (const provider of CODING_PLANS) {
+  for (const provider of DIRECT_BYOK_PROVIDERS) {
     const model = provider?.models.find(
-      model => formatCodingPlanModelId(provider, model) === requestedModel
+      model => formatDirectByokModelId(provider, model) === requestedModel
     );
     if (model) {
       return { provider, model };
@@ -84,28 +84,28 @@ export function getCodingPlanModel(requestedModel: string): {
   return { provider: null, model: null };
 }
 
-export async function getCodingPlanModelsForOrganization(organizationId: string) {
+export async function getDirectByokModelsForOrganization(organizationId: string) {
   const userByok = await getBYOKforOrganization(
     readDb,
     organizationId,
-    CODING_PLANS.map(provider => provider.id)
+    DIRECT_BYOK_PROVIDERS.map(provider => provider.id)
   );
-  return userByok ? getCodingPlanModels(userByok.map(ub => ub.providerId)) : [];
+  return userByok ? getDirectByokModels(userByok.map(ub => ub.providerId)) : [];
 }
 
-export async function getCodingPlanModelsForUser(userId: string) {
+export async function getDirectByokModelsForUser(userId: string) {
   const userByok = await getBYOKforUser(
     readDb,
     userId,
-    CODING_PLANS.map(provider => provider.id)
+    DIRECT_BYOK_PROVIDERS.map(provider => provider.id)
   );
-  return userByok ? getCodingPlanModels(userByok.map(ub => ub.providerId)) : [];
+  return userByok ? getDirectByokModels(userByok.map(ub => ub.providerId)) : [];
 }
 
-export function createAiSdkProvider(codingPlanProvider: CodingPlanProvider, apiKey: string) {
-  if (codingPlanProvider.ai_sdk_provider === 'openai-compatible') {
+export function createAiSdkProvider(directByokProvider: DirectByokProvider, apiKey: string) {
+  if (directByokProvider.ai_sdk_provider === 'openai-compatible') {
     return createOpenAICompatible({
-      baseURL: codingPlanProvider.base_url,
+      baseURL: directByokProvider.base_url,
       apiKey,
       name: 'openaiCompatible',
       fetch: (url, init) => {
@@ -115,6 +115,6 @@ export function createAiSdkProvider(codingPlanProvider: CodingPlanProvider, apiK
       },
     });
   } else {
-    throw new Error('Unrecognized AI SDK provider: ' + codingPlanProvider.ai_sdk_provider);
+    throw new Error('Unrecognized AI SDK provider: ' + directByokProvider.ai_sdk_provider);
   }
 }

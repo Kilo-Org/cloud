@@ -1,13 +1,14 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
-import {
-  agent_environment_profiles,
-  agent_environment_profile_repo_bindings,
-} from '@kilocode/db/schema';
-import { eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { ProfileOwner } from './types';
-import { buildOwnershipCondition, verifyProfileOwnership } from './profile-utils';
+import { verifyProfileOwnership } from './profile-utils';
+import {
+  findBinding,
+  updateBindingProfile,
+  insertBinding,
+  deleteBinding,
+  selectBindingsWithProfiles,
+} from './repo-binding-db';
 
 type RepoBinding = {
   repoFullName: string;
@@ -26,39 +27,15 @@ export async function bindProfileToRepo(
   platform: 'github' | 'gitlab',
   profileId: string
 ): Promise<void> {
-  // Verify the profile belongs to the owner
   await verifyProfileOwnership(profileId, owner);
 
   const repoLower = repoFullName.toLowerCase();
-
-  // Check for an existing binding for this repo+platform owned by the same owner
-  const [existing] = await db
-    .select({ bindingId: agent_environment_profile_repo_bindings.id })
-    .from(agent_environment_profile_repo_bindings)
-    .innerJoin(
-      agent_environment_profiles,
-      eq(agent_environment_profile_repo_bindings.profile_id, agent_environment_profiles.id)
-    )
-    .where(
-      and(
-        eq(agent_environment_profile_repo_bindings.repo_full_name, repoLower),
-        eq(agent_environment_profile_repo_bindings.platform, platform),
-        buildOwnershipCondition(owner)
-      )
-    )
-    .limit(1);
+  const existing = await findBinding(owner, repoLower, platform);
 
   if (existing) {
-    await db
-      .update(agent_environment_profile_repo_bindings)
-      .set({ profile_id: profileId })
-      .where(eq(agent_environment_profile_repo_bindings.id, existing.bindingId));
+    await updateBindingProfile(existing.bindingId, profileId);
   } else {
-    await db.insert(agent_environment_profile_repo_bindings).values({
-      repo_full_name: repoLower,
-      platform,
-      profile_id: profileId,
-    });
+    await insertBinding(repoLower, platform, profileId);
   }
 }
 
@@ -72,22 +49,7 @@ export async function unbindRepo(
   platform: 'github' | 'gitlab'
 ): Promise<void> {
   const repoLower = repoFullName.toLowerCase();
-
-  const [binding] = await db
-    .select({ bindingId: agent_environment_profile_repo_bindings.id })
-    .from(agent_environment_profile_repo_bindings)
-    .innerJoin(
-      agent_environment_profiles,
-      eq(agent_environment_profile_repo_bindings.profile_id, agent_environment_profiles.id)
-    )
-    .where(
-      and(
-        eq(agent_environment_profile_repo_bindings.repo_full_name, repoLower),
-        eq(agent_environment_profile_repo_bindings.platform, platform),
-        buildOwnershipCondition(owner)
-      )
-    )
-    .limit(1);
+  const binding = await findBinding(owner, repoLower, platform);
 
   if (!binding) {
     throw new TRPCError({
@@ -96,9 +58,7 @@ export async function unbindRepo(
     });
   }
 
-  await db
-    .delete(agent_environment_profile_repo_bindings)
-    .where(eq(agent_environment_profile_repo_bindings.id, binding.bindingId));
+  await deleteBinding(binding.bindingId);
 }
 
 /**
@@ -111,23 +71,7 @@ export async function getBindingForRepo(
   platform: 'github' | 'gitlab'
 ): Promise<string | null> {
   const repoLower = repoFullName.toLowerCase();
-
-  const [binding] = await db
-    .select({ profileId: agent_environment_profile_repo_bindings.profile_id })
-    .from(agent_environment_profile_repo_bindings)
-    .innerJoin(
-      agent_environment_profiles,
-      eq(agent_environment_profile_repo_bindings.profile_id, agent_environment_profiles.id)
-    )
-    .where(
-      and(
-        eq(agent_environment_profile_repo_bindings.repo_full_name, repoLower),
-        eq(agent_environment_profile_repo_bindings.platform, platform),
-        buildOwnershipCondition(owner)
-      )
-    )
-    .limit(1);
-
+  const binding = await findBinding(owner, repoLower, platform);
   return binding?.profileId ?? null;
 }
 
@@ -135,20 +79,5 @@ export async function getBindingForRepo(
  * List all repo-profile bindings for the given owner.
  */
 export async function listBindings(owner: ProfileOwner): Promise<RepoBinding[]> {
-  const bindings = await db
-    .select({
-      repoFullName: agent_environment_profile_repo_bindings.repo_full_name,
-      platform: agent_environment_profile_repo_bindings.platform,
-      profileId: agent_environment_profile_repo_bindings.profile_id,
-      profileName: agent_environment_profiles.name,
-    })
-    .from(agent_environment_profile_repo_bindings)
-    .innerJoin(
-      agent_environment_profiles,
-      eq(agent_environment_profile_repo_bindings.profile_id, agent_environment_profiles.id)
-    )
-    .where(buildOwnershipCondition(owner))
-    .orderBy(agent_environment_profile_repo_bindings.repo_full_name);
-
-  return bindings;
+  return selectBindingsWithProfiles(owner);
 }

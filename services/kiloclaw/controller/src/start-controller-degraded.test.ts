@@ -21,7 +21,11 @@ class MockServerResponse extends Writable {
     return this;
   }
 
-  _write(chunk: Buffer | string, _encoding: BufferEncoding, callback: (error?: Error | null) => void) {
+  _write(
+    chunk: Buffer | string,
+    _encoding: BufferEncoding,
+    callback: (error?: Error | null) => void
+  ) {
     this.body += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
     callback();
   }
@@ -40,7 +44,11 @@ function createRequest(pathname: string, headers: Record<string, string> = {}): 
   return req;
 }
 
-async function dispatch(httpState: HttpState, pathname: string, headers: Record<string, string> = {}) {
+async function dispatch(
+  httpState: HttpState,
+  pathname: string,
+  headers: Record<string, string> = {}
+) {
   if (!httpState.requestHandler) {
     throw new Error('request handler was not initialized');
   }
@@ -166,7 +174,7 @@ describe('startController degraded behavior', () => {
   });
 
   it('keeps inline-only health behavior when critical bootstrap fails', async () => {
-    const bootstrapNonCritical = vi.fn(async () => ({ ok: true } as const));
+    const bootstrapNonCritical = vi.fn(async () => ({ ok: true }) as const);
     const { startController, httpState } = await loadStartControllerWithMocks({
       bootstrapCritical: async () => {
         throw new Error('decrypt failed');

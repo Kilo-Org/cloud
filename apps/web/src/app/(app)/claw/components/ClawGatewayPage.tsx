@@ -17,7 +17,9 @@ import {
 import { ClawContextProvider, useClawContext } from './ClawContext';
 import { InstanceControls } from './InstanceControls';
 import { InstanceTab } from './InstanceTab';
+import { OpenClawButton } from './OpenClawButton';
 import { BillingWrapper } from './billing/BillingWrapper';
+import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -30,6 +32,7 @@ function ClawGatewayInner({ status }: { status: KiloClawDashboardStatus }) {
   const mutations = organizationId ? orgMutations : personalMutations;
 
   const isRunning = status.status === 'running';
+  const gatewayUrl = useGatewayUrl(status);
 
   const personalGateway = useKiloClawGatewayStatus(!organizationId && isRunning);
   const orgGateway = useOrgKiloClawGatewayStatus(
@@ -46,26 +49,33 @@ function ClawGatewayInner({ status }: { status: KiloClawDashboardStatus }) {
 
   const onRedeploySuccess = useCallback(() => {}, []);
 
+  const gatewayReady = gatewayStatus?.state === 'running';
+
   const gatewayContent = (
-    <Card>
-      <CardContent className="border-b p-5">
-        <InstanceControls
-          status={status}
-          mutations={mutations}
-          onRedeploySuccess={onRedeploySuccess}
-          upgradeRequested={upgradeRequested}
-          onUpgradeHandled={onUpgradeHandled}
-        />
-      </CardContent>
-      <CardContent className="p-5">
-        <InstanceTab
-          status={status}
-          gatewayStatus={gatewayStatus}
-          gatewayLoading={gatewayLoading}
-          gatewayError={gatewayError}
-        />
-      </CardContent>
-    </Card>
+    <>
+      <div className="flex justify-end">
+        <OpenClawButton canShow={isRunning && !!gatewayReady} gatewayUrl={gatewayUrl} />
+      </div>
+      <Card>
+        <CardContent className="border-b p-5">
+          <InstanceControls
+            status={status}
+            mutations={mutations}
+            onRedeploySuccess={onRedeploySuccess}
+            upgradeRequested={upgradeRequested}
+            onUpgradeHandled={onUpgradeHandled}
+          />
+        </CardContent>
+        <CardContent className="p-5">
+          <InstanceTab
+            status={status}
+            gatewayStatus={gatewayStatus}
+            gatewayLoading={gatewayLoading}
+            gatewayError={gatewayError}
+          />
+        </CardContent>
+      </Card>
+    </>
   );
 
   if (!organizationId) {

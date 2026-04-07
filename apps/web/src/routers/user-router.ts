@@ -652,15 +652,15 @@ export const userRouter = createTRPCRouter({
       });
     }
 
-    await db
-      .update(kilocode_users)
-      .set({ account_deletion_requested_at: new Date().toISOString() })
-      .where(eq(kilocode_users.id, userId));
-
     await Promise.all([
       sendAccountDeletionConfirmationEmail(userEmail),
       sendAccountDeletionSupportNotification(userEmail, userId),
     ]);
+
+    await db
+      .update(kilocode_users)
+      .set({ account_deletion_requested_at: new Date().toISOString() })
+      .where(eq(kilocode_users.id, userId));
 
     return successResult();
   }),

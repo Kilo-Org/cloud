@@ -4,6 +4,7 @@
  * Exposes the wrapper's HTTP API for the Worker to interact with:
  * - GET /health - Health check (includes sessionId)
  * - GET /job/status - Current job status
+ * - POST /job/init - Initialize supervisor (optional, only when onInit provided)
  * - POST /job/prompt - Send a prompt (includes execution binding)
  * - POST /job/command - Send a command (includes execution binding)
  * - POST /job/answer-permission - Answer a permission request
@@ -15,6 +16,11 @@
 import type { WrapperState, JobContext } from './state.js';
 import type { WrapperKiloClient } from './kilo-api.js';
 import type { PerTurnConfig } from './lifecycle.js';
+import type {
+  ExecutionBinding,
+  PromptPayload,
+  CommandPayload,
+} from '../../src/shared/wrapper-protocol.js';
 import { createLogUploader } from './log-uploader.js';
 import { logToFile } from './utils.js';
 
@@ -32,6 +38,10 @@ export type ServerConfig = {
   agentSessionId: string;
   /** Stable Cloud Agent user ID, passed at wrapper startup */
   userId: string;
+  /** If provided, a POST /job/init route is registered that calls this handler */
+  onInit?: (req: Request) => Promise<Response>;
+  /** Optional supervisor state getter for health endpoint */
+  getSupervisorState?: () => string;
 };
 
 export type ServerDependencies = {
@@ -48,41 +58,9 @@ export type ServerDependencies = {
   setPerTurnConfig: (config: PerTurnConfig) => void;
 };
 
-/**
- * Per-execution config, included in prompt/command bodies.
- * A new executionId triggers setup (log uploader, state reset).
- * Same executionId is idempotent. Omitted means use existing context.
- */
-type ExecutionBinding = {
-  executionId: string;
-  ingestUrl: string;
-  ingestToken: string;
-  workerAuthToken: string;
-  upstreamBranch?: string;
-};
-
-type PromptBody = {
-  prompt?: string;
-  /** Message parts - only text parts are supported */
-  parts?: Array<{ type: 'text'; text: string }>;
-  model?: { providerID?: string; modelID: string };
-  variant?: string;
-  agent?: string;
-  messageId?: string;
-  system?: string;
-  tools?: Record<string, boolean>;
-  autoCommit?: boolean;
-  condenseOnComplete?: boolean;
-  /** Per-execution config — new executionId triggers setup */
-  execution?: ExecutionBinding;
-};
-
-type CommandBody = {
-  command: string;
-  args?: string;
-  /** Per-execution config — new executionId triggers setup */
-  execution?: ExecutionBinding;
-};
+// ExecutionBinding, PromptPayload, CommandPayload imported from shared/wrapper-protocol.ts
+type PromptBody = PromptPayload;
+type CommandBody = CommandPayload;
 
 type AnswerPermissionBody = {
   permissionId: string;
@@ -121,6 +99,8 @@ function errorResponse(error: string, message: string, status: number): Response
  * - If same `executionId`: no-op (idempotent).
  * - If `execution` omitted: use existing job context (for follow-up calls
  *   like answer-question).
+ * - Supervisor mode (no `executionId`): skip idempotency/conflict checks,
+ *   just accept and run.
  *
  * Returns an error Response if binding fails, or null on success.
  */
@@ -139,22 +119,27 @@ async function bindExecutionContext(
     return null;
   }
 
-  // Idempotent: same executionId
-  const currentJob = state.currentJob;
-  if (currentJob && currentJob.executionId === execution.executionId) {
-    return null;
-  }
-
-  // Conflict: different executionId while active
-  if (currentJob && state.isActive) {
-    logToFile(
-      `execution binding conflict: active=${currentJob.executionId} requested=${execution.executionId}`
-    );
-    return errorResponse(
-      'JOB_CONFLICT',
-      `Cannot bind new execution while execution ${currentJob.executionId} is active`,
-      409
-    );
+  // When executionId is present (shared sandbox mode): idempotency + conflict detection
+  if (execution.executionId) {
+    const currentJob = state.currentJob;
+    if (currentJob?.executionId === execution.executionId) {
+      return null; // Idempotent: same executionId
+    }
+    if (currentJob && state.isActive) {
+      logToFile(
+        `execution binding conflict: active=${currentJob.executionId} requested=${execution.executionId}`
+      );
+      return errorResponse(
+        'JOB_CONFLICT',
+        `Cannot bind new execution while execution ${currentJob.executionId} is active`,
+        409
+      );
+    }
+  } else {
+    // Supervisor mode (no executionId): just check we're not already active
+    if (state.isActive) {
+      return errorResponse('JOB_CONFLICT', 'Cannot bind new execution while active', 409);
+    }
   }
 
   // Parse ingest URL to derive worker base URL for log uploads
@@ -177,11 +162,23 @@ async function bindExecutionContext(
     workerAuthToken: execution.workerAuthToken,
   };
 
-  // Close stale ingest connection from the prior execution. The prior execution's
-  // 'complete' event was already delivered before the DO allowed this new execution
-  // to start, so all A-side events have been flushed — closing now is safe.
-  // Await the close to ensure the old event subscription is fully torn down
-  // before starting the new job context.
+  // Supervisor mode (no executionId): keep the persistent connection and
+  // session-scoped log uploader alive. Only refresh the job context (for
+  // updated auth tokens) and reset lifecycle state.
+  if (!execution.executionId) {
+    deps.resetLifecycle();
+    try {
+      state.startJob(jobContext);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logToFile(`execution binding failed: ${msg}`);
+      return errorResponse('JOB_CONFLICT', msg, 409);
+    }
+    logToFile(`execution bound: executionId=(supervisor) sessionId=${config.sessionId}`);
+    return null;
+  }
+
+  // Shared sandbox mode: close stale connection from the prior execution
   if (state.isConnected) {
     await deps.closeConnection();
   }
@@ -225,7 +222,7 @@ function createHealthHandler(config: ServerConfig, state: WrapperState) {
   return (): Response => {
     return jsonResponse({
       healthy: true,
-      state: state.isActive ? 'active' : 'idle',
+      state: config.getSupervisorState?.() ?? (state.isActive ? 'active' : 'idle'),
       version: config.version,
       sessionId: config.sessionId,
     });
@@ -269,7 +266,7 @@ function createPromptHandler(config: ServerConfig, deps: ServerDependencies) {
       autoCommit: body.autoCommit ?? false,
       condenseOnComplete: body.condenseOnComplete ?? false,
       model: body.model?.modelID,
-      upstreamBranch: body.execution?.upstreamBranch,
+      upstreamBranch: body.upstreamBranch,
     });
 
     // Open connection if idle
@@ -528,6 +525,10 @@ export function createServer(
       '/job/abort': abortHandler,
     },
   };
+
+  if (config.onInit) {
+    routes.POST['/job/init'] = config.onInit;
+  }
 
   const server = Bun.serve({
     port: config.port,

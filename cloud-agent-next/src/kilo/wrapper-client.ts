@@ -23,13 +23,8 @@ export type WrapperClientOptions = {
   port: number;
 };
 
-export type ExecutionBinding = {
-  executionId: string;
-  ingestUrl: string;
-  ingestToken: string;
-  workerAuthToken: string;
-  upstreamBranch?: string;
-};
+export type { ExecutionBinding } from '../shared/wrapper-protocol.js';
+import type { ExecutionBinding } from '../shared/wrapper-protocol.js';
 
 export type EnsureRunningOptions = {
   agentSessionId: string;
@@ -47,25 +42,11 @@ export type EnsureWrapperOptions = {
   sessionId?: string;
 };
 
-export type WrapperPromptOptions = {
-  prompt?: string;
-  parts?: Array<{ type: string; text?: string; data?: string; mimeType?: string }>;
-  model?: { providerID?: string; modelID: string };
-  variant?: string;
-  agent?: string;
-  messageId?: string;
-  system?: string;
-  tools?: Record<string, boolean>;
-  autoCommit?: boolean;
-  condenseOnComplete?: boolean;
-  execution?: ExecutionBinding;
-};
+export type { PromptPayload as WrapperPromptOptions } from '../shared/wrapper-protocol.js';
+import type { PromptPayload as WrapperPromptOptions } from '../shared/wrapper-protocol.js';
 
-export type WrapperCommandOptions = {
-  command: string;
-  args?: string;
-  execution?: ExecutionBinding;
-};
+export type { CommandPayload as WrapperCommandOptions } from '../shared/wrapper-protocol.js';
+import type { CommandPayload as WrapperCommandOptions } from '../shared/wrapper-protocol.js';
 
 export type WrapperPermissionResponse = 'always' | 'once' | 'reject';
 
@@ -89,6 +70,59 @@ export type JobStatus = {
 };
 
 export type WrapperSessionCommandResponse = unknown;
+
+export type {
+  SupervisorInitPayload,
+  SupervisorInitResponse,
+} from '../shared/supervisor-protocol.js';
+import type {
+  SupervisorInitPayload,
+  SupervisorInitResponse,
+} from '../shared/supervisor-protocol.js';
+
+// ---------------------------------------------------------------------------
+// Supervisor Payload Builder
+// ---------------------------------------------------------------------------
+
+export type BuildSupervisorPayloadOpts = {
+  sessionId: string;
+  userId: string;
+  repoUrl: string;
+  branchName: string;
+  githubRepo?: string;
+  setupCommands?: string[];
+  kilocodeToken?: string;
+  kiloSessionId?: string;
+  env?: Record<string, string>;
+};
+
+/**
+ * Build the common fields of a SupervisorInitPayload.
+ * Returns everything except `ingest`, which is caller-specific.
+ * Used by both the orchestrator (DO execute path) and async-preparation.
+ */
+export function buildSupervisorPayload(
+  opts: BuildSupervisorPayloadOpts
+): Omit<SupervisorInitPayload, 'ingest'> {
+  const repoName = opts.githubRepo ?? 'repo';
+  const workspacePath = `/home/${opts.sessionId}/workspace/${repoName}`;
+  const sessionHome = `/home/${opts.sessionId}`;
+
+  return {
+    agentSessionId: opts.sessionId,
+    userId: opts.userId,
+    workspacePath,
+    sessionHome,
+    repo: {
+      url: opts.repoUrl,
+      branch: opts.branchName,
+    },
+    setupCommands: opts.setupCommands,
+    auth: opts.kilocodeToken ? { kilocodeToken: opts.kilocodeToken } : undefined,
+    sessionImport: opts.kiloSessionId ? { kiloSessionId: opts.kiloSessionId } : undefined,
+    env: opts.env,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Error Classes
@@ -544,6 +578,50 @@ export class WrapperClient {
     }
 
     throw lastError ?? new WrapperNotReadyError('Failed to start wrapper after port retries');
+  }
+
+  /**
+   * Create a WrapperClient for a supervisor-mode sandbox.
+   * The supervisor wrapper always runs on port 5000, started by the container's CMD.
+   * No process scanning or startup needed — just connect.
+   */
+  static forSupervisor(session: ExecutionSession): WrapperClient {
+    return new WrapperClient({ session, port: 5000 });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Supervisor Lifecycle Methods
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Initialize a supervisor-mode wrapper. Sends the init payload and waits
+   * for workspace setup + kilo server startup inside the container.
+   * Only used for per-session sandboxes (supervisor mode).
+   */
+  async init(payload: SupervisorInitPayload): Promise<SupervisorInitResponse> {
+    return this.request<SupervisorInitResponse>('POST', '/job/init', payload);
+  }
+
+  /**
+   * Wait for the supervisor wrapper to become healthy.
+   * Used during supervisor mode initialization — the wrapper starts with the
+   * container CMD but needs a moment to bind its HTTP server.
+   */
+  async waitForHealthy(maxWaitMs = 30_000): Promise<WrapperHealthResponse> {
+    const deadline = Date.now() + maxWaitMs;
+    const retryDelay = 500;
+
+    while (Date.now() < deadline) {
+      try {
+        return await this.health();
+      } catch {
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
+
+    throw new WrapperNotReadyError(
+      `Supervisor wrapper did not become healthy within ${maxWaitMs}ms`
+    );
   }
 
   // ---------------------------------------------------------------------------

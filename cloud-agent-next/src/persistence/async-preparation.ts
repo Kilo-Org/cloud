@@ -11,6 +11,7 @@ import {
   cloneGitHubRepo,
   cloneGitRepo,
   manageBranch,
+  buildGitCloneUrl,
 } from '../workspace.js';
 import {
   SessionService,
@@ -18,7 +19,7 @@ import {
   runSetupCommands,
   writeAuthFile,
 } from '../session-service.js';
-import { WrapperClient } from '../kilo/wrapper-client.js';
+import { WrapperClient, buildSupervisorPayload } from '../kilo/wrapper-client.js';
 import type { PreparingStep } from '../shared/protocol.js';
 import type { PreparationInput } from './schemas.js';
 import type { Env as WorkerEnv, SandboxId, SessionId as AgentSessionId } from '../types.js';
@@ -35,6 +36,106 @@ export type PreparationStepsResult = {
   resolvedInstallationId: string | undefined;
   resolvedGithubAppType: 'standard' | 'lite' | undefined;
 };
+
+/**
+ * Supervisor path: after token resolution and sandbox creation, delegate all
+ * workspace setup to the supervisor wrapper via /job/init.
+ *
+ * Throws on failure so the caller gets a clear error rather than a silent `undefined`.
+ */
+async function executeSupervisorInit(
+  sandboxId: SandboxId,
+  sandbox: ReturnType<typeof getSandbox>,
+  input: PreparationInput,
+  resolvedGithubToken: string | undefined,
+  emitProgress: EmitProgress,
+  env: WorkerEnv,
+  resolved: {
+    resolvedInstallationId: string | undefined;
+    resolvedGithubAppType: 'standard' | 'lite' | undefined;
+  }
+): Promise<PreparationStepsResult> {
+  const sessionService = new SessionService();
+  emitProgress('kilo_server', 'Initializing supervisor…');
+
+  const session = await sandbox.createSession();
+  const wrapperClient = WrapperClient.forSupervisor(session);
+
+  await wrapperClient.waitForHealthy();
+
+  const repoUrl = buildGitCloneUrl({
+    githubRepo: input.githubRepo,
+    githubToken: resolvedGithubToken,
+    gitUrl: input.gitUrl,
+    gitToken: input.gitToken,
+    platform: input.platform,
+  });
+
+  const branchName = determineBranchName(input.sessionId, input.upstreamBranch);
+  const workspacePath = `/home/${input.sessionId}/workspace/${input.githubRepo ?? 'repo'}`;
+  const sessionHome = `/home/${input.sessionId}`;
+  const effectiveEnv = sessionService.getEffectiveSessionEnv({
+    userEnvVars: input.envVars,
+    sessionHome,
+    sessionId: input.sessionId,
+    workspacePath,
+    env,
+    kilocodeToken: input.authToken,
+    kilocodeModel: input.model,
+    orgId: input.kilocodeOrganizationId ?? input.orgId,
+    githubToken: resolvedGithubToken,
+    githubRepo: input.githubRepo,
+    encryptedSecrets: input.encryptedSecrets,
+    createdOnPlatform: input.createdOnPlatform,
+    appendSystemPrompt: input.appendSystemPrompt,
+    gitUrl: input.gitUrl,
+    gitToken: input.gitToken,
+    platform: input.platform,
+    mcpServers: input.mcpServers,
+  });
+
+  const workerUrl = env.WORKER_URL || 'http://localhost:8788';
+  const ingestUrl = `${workerUrl}/sessions/${encodeURIComponent(input.userId)}/${input.sessionId}/ingest`;
+
+  const basePayload = buildSupervisorPayload({
+    sessionId: input.sessionId,
+    userId: input.userId,
+    repoUrl,
+    branchName,
+    githubRepo: input.githubRepo,
+    setupCommands: input.setupCommands,
+    kilocodeToken: input.authToken,
+    kiloSessionId: input.kiloSessionId,
+    env: effectiveEnv,
+  });
+
+  const initResponse = await wrapperClient.init({
+    ...basePayload,
+    ingest: {
+      url: ingestUrl,
+      token: input.authToken,
+      workerAuthToken: input.authToken,
+    },
+  });
+
+  if (initResponse.status !== 'ready' || !initResponse.kiloSessionId) {
+    throw new Error(
+      `Supervisor init failed at step ${initResponse.step ?? 'unknown'}: ${initResponse.message ?? 'unknown error'}`
+    );
+  }
+
+  emitProgress('ready', 'Supervisor ready');
+
+  return {
+    sandboxId,
+    workspacePath,
+    sessionHome,
+    branchName,
+    kiloSessionId: initResponse.kiloSessionId,
+    resolvedInstallationId: resolved.resolvedInstallationId,
+    resolvedGithubAppType: resolved.resolvedGithubAppType,
+  };
+}
 
 /**
  * Execute all expensive workspace preparation steps (token resolution, disk
@@ -96,6 +197,30 @@ export async function executePreparationSteps(
   });
   await checkDiskAndCleanBeforeSetup(sandbox, input.orgId, input.userId, input.sessionId);
 
+  // Supervisor path: sandbox CMD handles workspace setup + kilo startup
+  if (sandboxId.startsWith('ses-')) {
+    try {
+      return await executeSupervisorInit(
+        sandboxId,
+        sandbox,
+        input,
+        resolvedGithubToken,
+        emitProgress,
+        env,
+        {
+          resolvedInstallationId,
+          resolvedGithubAppType,
+        }
+      );
+    } catch (error) {
+      emitProgress(
+        'failed',
+        `Supervisor init failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return undefined;
+    }
+  }
+
   // 3. Workspace setup
   emitProgress('workspace_setup', 'Setting up workspace…');
   const { workspacePath, sessionHome } = await setupWorkspace(
@@ -140,14 +265,10 @@ export async function executePreparationSteps(
 
   const cloneOptions = input.shallow ? { shallow: true } : undefined;
   if (input.gitUrl) {
-    await cloneGitRepo(
-      session,
-      workspacePath,
-      input.gitUrl,
-      input.gitToken,
-      undefined,
-      cloneOptions
-    );
+    await cloneGitRepo(session, workspacePath, input.gitUrl, input.gitToken, undefined, {
+      ...cloneOptions,
+      platform: input.platform,
+    });
   } else if (input.githubRepo) {
     await cloneGitHubRepo(
       session,

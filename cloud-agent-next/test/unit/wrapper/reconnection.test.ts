@@ -208,7 +208,7 @@ describe('ingest WS reconnection', () => {
     vi.stubGlobal('WebSocket', MockWebSocket);
     stubFetch();
 
-    state = new WrapperState();
+    state = new WrapperState('test-session-id');
     state.startJob(createJobContext());
     callbacks = createCallbacks();
   });

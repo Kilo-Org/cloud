@@ -415,6 +415,41 @@ export async function createSandboxUsageEvent(
   };
 }
 
+/**
+ * Build an HTTPS git clone URL with optional embedded credentials.
+ * Handles GitHub repos (with/without token) and generic git URLs.
+ */
+export function buildGitCloneUrl(opts: {
+  githubRepo?: string;
+  githubToken?: string;
+  gitUrl?: string;
+  gitToken?: string;
+  platform?: 'github' | 'gitlab';
+}): string {
+  const { githubRepo, githubToken, gitUrl, gitToken, platform } = opts;
+
+  if (githubRepo && githubToken) {
+    return `https://x-access-token:${githubToken}@github.com/${githubRepo}.git`;
+  }
+
+  if (gitUrl) {
+    if (gitToken) {
+      const urlObj = new URL(gitUrl);
+      urlObj.username = platform === 'gitlab' ? 'oauth2' : 'x-access-token';
+      urlObj.password = gitToken;
+      return urlObj.toString();
+    }
+    return gitUrl;
+  }
+
+  if (githubRepo) {
+    // Public repo, no token needed
+    return `https://github.com/${githubRepo}.git`;
+  }
+
+  throw new Error('Missing git source: provide either githubRepo or gitUrl');
+}
+
 export async function cloneGitHubRepo(
   session: ExecutionSession,
   workspacePath: string,

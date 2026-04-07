@@ -3,6 +3,7 @@ import {
   manageBranch,
   cloneGitHubRepo,
   cloneGitRepo,
+  buildGitCloneUrl,
   updateGitRemoteToken,
   checkDiskSpace,
   checkDiskAndCleanBeforeSetup,
@@ -518,6 +519,28 @@ describe('disk space checking', () => {
         expect.stringContaining('x-access-token:test-token'),
         expect.any(Object)
       );
+    });
+  });
+
+  describe('buildGitCloneUrl', () => {
+    it('uses oauth2 for GitLab tokenized clone URLs', () => {
+      expect(
+        buildGitCloneUrl({
+          gitUrl: 'https://gitlab.com/acme/repo.git',
+          gitToken: 'token',
+          platform: 'gitlab',
+        })
+      ).toContain('https://oauth2:token@gitlab.com/acme/repo.git');
+    });
+
+    it('uses x-access-token for non-GitLab tokenized clone URLs', () => {
+      expect(
+        buildGitCloneUrl({
+          gitUrl: 'https://example.com/acme/repo.git',
+          gitToken: 'token',
+          platform: 'github',
+        })
+      ).toContain('https://x-access-token:token@example.com/acme/repo.git');
     });
   });
 

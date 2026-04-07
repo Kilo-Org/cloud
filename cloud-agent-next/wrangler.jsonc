@@ -144,7 +144,7 @@
     },
     {
       "class_name": "SandboxSmall",
-      "image": "./Dockerfile",
+      "image": "./Dockerfile.supervisor",
       "instance_type": "standard-2",
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.1.17",
@@ -295,7 +295,7 @@
         },
         {
           "class_name": "SandboxSmall",
-          "image": "./Dockerfile.dev",
+          "image": "./Dockerfile.supervisor",
           "instance_type": "standard-2",
           "image_vars": {
             "KILOCODE_CLI_VERSION": "7.1.17",

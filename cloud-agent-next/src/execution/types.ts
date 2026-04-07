@@ -12,6 +12,7 @@ import type { AgentMode } from '../schema.js';
 import type { Images, EncryptedSecrets as SchemaEncryptedSecrets } from '../router/schemas.js';
 import type { EncryptedSecrets } from '../utils/encryption.js';
 import type { MCPServerConfig } from '../persistence/types.js';
+import type { SandboxId } from '../types.js';
 
 // ---------------------------------------------------------------------------
 // Execution Modes
@@ -24,6 +25,50 @@ export type ExecutionMode = AgentMode;
 export type StreamingMode = 'sse' | 'websocket';
 
 // ---------------------------------------------------------------------------
+// Shared Composite Types
+// ---------------------------------------------------------------------------
+
+/**
+ * Git repository source — discriminated union.
+ * Replaces the flat githubRepo/githubToken/gitUrl/gitToken/platform fields
+ * that were duplicated across 8+ types.
+ */
+export type GitSource =
+  | { platform: 'github'; githubRepo: string; token?: string }
+  | { platform: 'gitlab'; url: string; token?: string };
+
+/**
+ * Kilo authentication credentials.
+ * Replaces the repeated kilocodeToken + kilocodeModel pair.
+ */
+export type KiloAuth = {
+  kilocodeToken: string;
+  kilocodeModel?: string;
+};
+
+/**
+ * Workspace identity — the stable reference for where code lives.
+ * These 4 fields always travel together.
+ */
+export type WorkspaceIdentity = {
+  workspacePath: string;
+  sessionHome: string;
+  branchName: string;
+  sandboxId: SandboxId;
+};
+
+/**
+ * Per-turn overridable execution settings.
+ * These move as a unit from DO → orchestrator → wrapper.
+ */
+export type ExecutionConfig = {
+  model?: string;
+  variant?: string;
+  autoCommit?: boolean;
+  condenseOnComplete?: boolean;
+};
+
+// ---------------------------------------------------------------------------
 // Token Resume Context (for DO token management)
 // ---------------------------------------------------------------------------
 
@@ -31,66 +76,10 @@ export type StreamingMode = 'sse' | 'websocket';
  * Resume context for follow-up executions (token management).
  * Used by CloudAgentSession DO for managing authentication tokens.
  */
-export type TokenResumeContext = {
-  kilocodeToken: string;
-  kilocodeModel: string;
+export type TokenResumeContext = KiloAuth & {
+  kilocodeModel: string; // required (overrides optional in KiloAuth)
   githubToken?: string;
   gitToken?: string;
-};
-
-// ---------------------------------------------------------------------------
-// Initialize Context (for session initialization)
-// ---------------------------------------------------------------------------
-
-/**
- * Context for initializing a new session on first execution.
- * Contains all parameters needed to set up workspace, clone repos, etc.
- * Used by CloudAgentSession DO for the initiate flow.
- */
-export type InitializeContext = {
-  /** Kilocode authentication token */
-  kilocodeToken: string;
-  /** Model to use for Kilocode CLI */
-  kilocodeModel?: string;
-  /** GitHub repository to clone (e.g., "owner/repo") */
-  githubRepo?: string;
-  /** GitHub Personal Access Token for private repos */
-  githubToken?: string;
-  /** Generic Git URL to clone */
-  gitUrl?: string;
-  /** Git token for authentication */
-  gitToken?: string;
-  /** Environment variables to set in the session (plaintext) */
-  envVars?: Record<string, string>;
-  /**
-   * Encrypted secret env vars from agent environment profiles.
-   * Stored encrypted, decrypted only at session execution time.
-   */
-  encryptedSecrets?: SchemaEncryptedSecrets;
-  /** Setup commands to run after clone (e.g., npm install) */
-  setupCommands?: string[];
-  /** MCP server configurations */
-  mcpServers?: Record<string, MCPServerConfig>;
-  /** Branch to checkout (if not session-specific) */
-  upstreamBranch?: string;
-  /** Bot ID for sandbox isolation */
-  botId?: string;
-  /**
-   * Existing Kilo session ID (for prepared sessions).
-   * When set, the CLI will resume this session instead of creating a new one.
-   */
-  kiloSessionId?: string;
-  /**
-   * Flag indicating this is a prepared session (via prepareSession flow).
-   * When true, use initiateFromKiloSession instead of initiate,
-   * and skip linking (backend already linked during prepareSession).
-   */
-  isPreparedSession?: boolean;
-  /** GitHub App type for selecting correct credentials and slug */
-  githubAppType?: 'standard' | 'lite';
-  /** Git platform type for correct token/env var handling */
-  platform?: 'github' | 'gitlab';
-  createdOnPlatform?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -212,11 +201,9 @@ export type StartExecutionV2Result =
 /**
  * Context needed to resume an existing workspace (no clone needed).
  */
-export type ResumeContext = {
+export type ResumeContext = KiloAuth & {
   kiloSessionId: string;
   workspacePath: string;
-  kilocodeToken: string;
-  kilocodeModel?: string;
   branchName: string;
   /** GitHub token for token refresh (optional) */
   githubToken?: string;
@@ -226,31 +213,30 @@ export type ResumeContext = {
 
 /**
  * Context for initializing a new workspace.
+ * Used by both the DO (initiate flow) and orchestrator (workspace plan).
  */
-export type InitContext = {
-  githubRepo?: string;
-  gitUrl?: string;
-  githubToken?: string;
-  gitToken?: string;
+export type InitContext = KiloAuth & {
+  /** Git repository source (GitHub or GitLab) */
+  gitSource?: GitSource;
+  /** Environment variables to set in the session (plaintext) */
   envVars?: Record<string, string>;
+  /** Setup commands to run after clone (e.g., npm install) */
   setupCommands?: string[];
+  /** Branch to checkout (if not session-specific) */
   upstreamBranch?: string;
+  /** Existing Kilo session ID (for prepared sessions) */
   kiloSessionId?: string;
+  /** Flag indicating this is a prepared session (via prepareSession flow) */
   isPreparedSession?: boolean;
-  /** Kilocode API token */
-  kilocodeToken: string;
-  /** Kilocode model to use */
-  kilocodeModel?: string;
   /** Encrypted secrets for agent environment profiles */
   encryptedSecrets?: EncryptedSecrets;
   /** MCP server configurations */
   mcpServers?: Record<string, MCPServerConfig>;
   /** Bot ID for bot-specific sessions */
   botId?: string;
-  /** GitHub app type for determining which app to use */
+  /** GitHub App type for selecting correct credentials and slug */
   githubAppType?: 'lite' | 'standard';
-  /** Git platform type for correct token/env var handling */
-  platform?: 'github' | 'gitlab';
+  /** Platform that created this session (e.g., "slack", "cloud-agent") */
   createdOnPlatform?: string;
 };
 
@@ -265,10 +251,8 @@ export type ExistingSessionMetadata = {
   sessionHome?: string;
   upstreamBranch?: string;
   appendSystemPrompt?: string;
-  /** GitHub repo (for token updates) */
-  githubRepo?: string;
-  /** Git URL (for token updates) */
-  gitUrl?: string;
+  /** Git source (for token updates on resume) */
+  gitSource?: GitSource;
 };
 
 /**

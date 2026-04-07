@@ -366,14 +366,10 @@ const prepareSessionHandler = internalApiProtectedProcedure
       const cloneOptions = input.shallow ? { shallow: true } : undefined;
       logger.info('Cloning repository');
       if (input.gitUrl) {
-        await cloneGitRepo(
-          session,
-          workspacePath,
-          input.gitUrl,
-          input.gitToken,
-          undefined,
-          cloneOptions
-        );
+        await cloneGitRepo(session, workspacePath, input.gitUrl, input.gitToken, undefined, {
+          ...cloneOptions,
+          platform: input.platform,
+        });
       } else if (input.githubRepo) {
         await cloneGitHubRepo(
           session,

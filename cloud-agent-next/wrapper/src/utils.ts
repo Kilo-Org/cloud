@@ -73,6 +73,42 @@ export async function hasGitUpstream(workspacePath: string, timeoutMs?: number):
   }
 }
 
+/**
+ * Install process-level crash handlers (uncaughtException, unhandledRejection).
+ * On crash: best-effort log upload (5s timeout), then process.exit(1).
+ *
+ * @param getUploader - Returns the current log uploader (may be null).
+ * @param isShuttingDown - Returns true if a graceful shutdown is already in progress.
+ * @param prefix - Log prefix for crash messages (e.g. '[supervisor]').
+ */
+export function installCrashHandlers(
+  getUploader: () => { uploadNow: () => Promise<void>; stop: () => void } | null,
+  isShuttingDown: () => boolean,
+  prefix = ''
+): void {
+  function handleCrash(label: string, error: unknown): void {
+    if (isShuttingDown()) return;
+
+    const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
+    logToFile(`${prefix}${label}: ${message}`);
+    console.error(`${prefix}${label}:`, error);
+
+    const uploader = getUploader();
+    if (uploader) {
+      const timeout = new Promise<void>(resolve => setTimeout(resolve, 5_000));
+      void Promise.race([uploader.uploadNow().catch(() => {}), timeout]).finally(() => {
+        uploader.stop();
+        process.exit(1);
+      });
+    } else {
+      process.exit(1);
+    }
+  }
+
+  process.on('uncaughtException', err => handleCrash('uncaught exception', err));
+  process.on('unhandledRejection', reason => handleCrash('unhandled rejection', reason));
+}
+
 export function logToFile(message: string): void {
   const logPath = process.env.WRAPPER_LOG_PATH || '/tmp/kilocode-wrapper.log';
   try {

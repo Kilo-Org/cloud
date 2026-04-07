@@ -733,6 +733,46 @@ export class SessionService {
     return envVars;
   }
 
+  getEffectiveSessionEnv(options: {
+    userEnvVars: Record<string, string> | undefined;
+    sessionHome: string;
+    sessionId: string;
+    workspacePath: string;
+    env: PersistenceEnv;
+    kilocodeToken: string;
+    kilocodeModel: string | undefined;
+    orgId?: string;
+    githubToken?: string;
+    githubRepo?: string;
+    encryptedSecrets?: EncryptedSecrets;
+    createdOnPlatform?: string;
+    appendSystemPrompt?: string;
+    gitUrl?: string;
+    gitToken?: string;
+    platform?: 'github' | 'gitlab';
+    mcpServers?: Record<string, MCPServerConfig>;
+  }): Record<string, string> {
+    return this.getSaferEnvVars(
+      options.userEnvVars,
+      options.sessionHome,
+      options.sessionId,
+      options.workspacePath,
+      options.env,
+      options.kilocodeToken,
+      options.kilocodeModel,
+      options.orgId,
+      options.githubToken,
+      options.githubRepo,
+      options.encryptedSecrets,
+      options.createdOnPlatform,
+      options.appendSystemPrompt,
+      options.gitUrl,
+      options.gitToken,
+      options.platform,
+      options.mcpServers
+    );
+  }
+
   /**
    * Get an existing session or create a new one.
    *
@@ -754,25 +794,25 @@ export class SessionService {
     const { sessionId, sessionHome, workspacePath, envVars } = context;
 
     // Decrypt secrets and merge with env vars (just-in-time decryption)
-    const saferEnvVars = this.getSaferEnvVars(
-      envVars,
+    const saferEnvVars = this.getEffectiveSessionEnv({
+      userEnvVars: envVars,
       sessionHome,
       sessionId,
       workspacePath,
       env,
-      originalToken,
+      kilocodeToken: originalToken,
       kilocodeModel,
-      originalOrgId,
-      context.githubToken,
-      context.githubRepo,
+      orgId: originalOrgId,
+      githubToken: context.githubToken,
+      githubRepo: context.githubRepo,
       encryptedSecrets,
       createdOnPlatform,
       appendSystemPrompt,
-      context.gitUrl,
-      context.gitToken,
-      context.platform,
-      mcpServers
-    );
+      gitUrl: context.gitUrl,
+      gitToken: context.gitToken,
+      platform: context.platform,
+      mcpServers,
+    });
 
     const session = await sandbox.createSession({
       name: sessionId,

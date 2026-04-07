@@ -30,7 +30,7 @@ describe('WrapperState', () => {
   let state: WrapperState;
 
   beforeEach(() => {
-    state = new WrapperState();
+    state = new WrapperState('test-session-id');
   });
 
   // -------------------------------------------------------------------------

@@ -6,7 +6,7 @@ import { logToFile } from './utils.js';
 type LogUploaderOpts = {
   workerBaseUrl: string;
   sessionId: string;
-  executionId: string;
+  executionId?: string;
   userId: string;
   workerAuthToken: string;
   /** Directory containing CLI log files (e.g. ~/.local/share/kilo/log/) */
@@ -95,7 +95,9 @@ export function createLogUploader(opts: LogUploaderOpts): LogUploader {
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), UPLOAD_TIMEOUT_MS);
     try {
-      const url = `${opts.workerBaseUrl}/sessions/${encodeURIComponent(opts.userId)}/${encodeURIComponent(opts.sessionId)}/logs/${encodeURIComponent(opts.executionId)}/logs.tar.gz`;
+      const url = opts.executionId
+        ? `${opts.workerBaseUrl}/sessions/${encodeURIComponent(opts.userId)}/${encodeURIComponent(opts.sessionId)}/logs/${encodeURIComponent(opts.executionId)}/logs.tar.gz`
+        : `${opts.workerBaseUrl}/sessions/${encodeURIComponent(opts.userId)}/${encodeURIComponent(opts.sessionId)}/logs/logs.tar.gz`;
       const response = await fetch(url, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${opts.workerAuthToken}` },

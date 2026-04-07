@@ -819,4 +819,112 @@ describe('Disconnect handling & reaper', () => {
     expect(result.customEvents).toHaveLength(1);
     expect(result.customEvents[0].stream_event_type).toBe('wrapper_disconnected');
   });
+
+  // ---------------------------------------------------------------------------
+  // Supervisor disconnect reaper (per-session sandbox safety net)
+  // ---------------------------------------------------------------------------
+
+  describe('supervisor disconnect reaper', () => {
+    it('alarm destroys per-session sandbox after supervisor disconnect timeout', async () => {
+      const userId = 'user_supv_1';
+      const sessionId = 'agent_supv_1';
+      const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+      const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+      const result = await runInDurableObject(stub, async (instance, state) => {
+        const now = Date.now();
+
+        await instance.updateMetadata({
+          version: now,
+          sessionId,
+          userId,
+          timestamp: now,
+          sandboxId: 'ses-abc123',
+        });
+
+        // Simulate supervisor disconnect 6 minutes ago (exceeds 5-minute default)
+        await state.storage.put('supervisor_disconnect', {
+          disconnectedAt: now - 6 * 60 * 1000,
+        });
+
+        await instance.alarm();
+
+        const supervisorDisconnectAfter = await state.storage.get('supervisor_disconnect');
+
+        return { supervisorDisconnectAfter };
+      });
+
+      // State should be cleared after processing
+      expect(result.supervisorDisconnectAfter).toBeUndefined();
+    });
+
+    it('alarm skips supervisor disconnect when timeout has not elapsed', async () => {
+      const userId = 'user_supv_2';
+      const sessionId = 'agent_supv_2';
+      const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+      const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+      const result = await runInDurableObject(stub, async (instance, state) => {
+        const now = Date.now();
+
+        await instance.updateMetadata({
+          version: now,
+          sessionId,
+          userId,
+          timestamp: now,
+          sandboxId: 'ses-abc456',
+        });
+
+        // Supervisor disconnected only 2 minutes ago — within 5-minute threshold
+        await state.storage.put('supervisor_disconnect', {
+          disconnectedAt: now - 2 * 60 * 1000,
+        });
+
+        await instance.alarm();
+
+        const supervisorDisconnectAfter = await state.storage.get('supervisor_disconnect');
+
+        return { supervisorDisconnectAfter };
+      });
+
+      // State should still be present (not yet expired)
+      expect(result.supervisorDisconnectAfter).toBeDefined();
+    });
+
+    it('alarm skips supervisor disconnect for non-ses sandbox', async () => {
+      const userId = 'user_supv_3';
+      const sessionId = 'agent_supv_3';
+      const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
+      const stub = env.CLOUD_AGENT_SESSION.get(doId);
+
+      const result = await runInDurableObject(stub, async (instance, state) => {
+        const now = Date.now();
+
+        await instance.updateMetadata({
+          version: now,
+          sessionId,
+          userId,
+          timestamp: now,
+          sandboxId: 'org-aabbcc123',
+        });
+
+        // Even with an expired supervisor disconnect, non-ses sandboxes are untouched
+        await state.storage.put('supervisor_disconnect', {
+          disconnectedAt: now - 10 * 60 * 1000,
+        });
+
+        await instance.alarm();
+
+        // State should still be cleared (the check runs and clears state)
+        // but no sandbox destruction occurs for non-ses sandboxes
+        const supervisorDisconnectAfter = await state.storage.get('supervisor_disconnect');
+
+        return { supervisorDisconnectAfter };
+      });
+
+      // State is cleared after timeout regardless (to avoid permanent cruft),
+      // but the sandbox itself is not destroyed
+      expect(result.supervisorDisconnectAfter).toBeUndefined();
+    });
+  });
 });

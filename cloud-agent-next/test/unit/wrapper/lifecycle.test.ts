@@ -80,7 +80,7 @@ describe('createLifecycleManager', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    state = new WrapperState();
+    state = new WrapperState('test-session-id');
     kiloClient = createMockKiloClient();
     connectionFns = createMockConnectionFns();
     config = createDefaultConfig();

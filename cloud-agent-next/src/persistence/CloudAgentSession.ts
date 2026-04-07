@@ -62,12 +62,14 @@ import { ExecutionOrchestrator, type OrchestratorDeps } from '../execution/orche
 import type {
   ExecutionMode,
   ExecutionPlan,
+  ExistingSessionMetadata,
   StartExecutionV2Request,
   StartExecutionV2Result,
-  InitializeContext,
+  InitContext,
   TokenResumeContext,
 } from '../execution/types.js';
 import { isExecutionError } from '../execution/errors.js';
+import { toGitSource } from '../execution/git-source.js';
 import type { Env as WorkerEnv, SandboxId } from '../types.js';
 import { generateSandboxId, getSandboxNamespace } from '../sandbox-id.js';
 
@@ -119,6 +121,19 @@ type DisconnectGraceState = {
   disconnectedAt: number;
   wsCloseCode: number;
   wsCloseReason: string;
+};
+
+/** DO storage key for persisting supervisor disconnect state across hibernation. */
+const SUPERVISOR_DISCONNECT_KEY = 'supervisor_disconnect';
+
+/** Default supervisor disconnect timeout: 5 minutes.
+ *  After the supervisor ingest WS drops, the reaper waits this long
+ *  before destroying the per-session sandbox container. */
+const SUPERVISOR_DISCONNECT_TIMEOUT_MS_DEFAULT = 5 * 60 * 1000;
+
+/** Stored in DO storage under SUPERVISOR_DISCONNECT_KEY while the supervisor is disconnected. */
+type SupervisorDisconnectState = {
+  disconnectedAt: number;
 };
 
 export class CloudAgentSession extends DurableObject {
@@ -273,6 +288,7 @@ export class CloudAgentSession extends DurableObject {
         clearActiveExecution: () => this.clearActiveExecution(),
         getActiveExecutionId: () => this.executionQueries.getActiveExecutionId(),
         cancelDisconnectGrace: () => this.cancelDisconnectGrace(),
+        cancelSupervisorDisconnect: () => this.cancelSupervisorDisconnect(),
         getExecution: async (executionId: string) => {
           const execution = await this.executionQueries.get(executionId as ExecutionId);
           if (!execution) return null;
@@ -429,12 +445,15 @@ export class CloudAgentSession extends DurableObject {
     // Clean up ingest connection tracking
     if (tags.some(tag => tag.startsWith('ingest:'))) {
       const ingestHandler = await this.getIngestHandler();
-      const disconnectedExecutionId = ingestHandler.handleIngestClose(ws);
+      const { executionId: disconnectedExecutionId, isSupervisor } =
+        ingestHandler.handleIngestClose(ws);
 
-      // If the wrapper disconnected while its execution was still active, start a
-      // grace period before failing. This gives the wrapper time to reconnect
-      // (exponential backoff: 1s, 2s, 4s …).
-      if (disconnectedExecutionId) {
+      if (isSupervisor) {
+        await this.startSupervisorDisconnect();
+      } else if (disconnectedExecutionId) {
+        // If the wrapper disconnected while its execution was still active, start a
+        // grace period before failing. This gives the wrapper time to reconnect
+        // (exponential backoff: 1s, 2s, 4s …).
         const activeExecutionId = await this.executionQueries.getActiveExecutionId();
         if (activeExecutionId === disconnectedExecutionId) {
           const execution = await this.executionQueries.get(activeExecutionId);
@@ -747,8 +766,11 @@ export class CloudAgentSession extends DurableObject {
    * @param command - The command to send (kill, ping)
    */
   sendToWrapper(executionId: ExecutionId, command: WrapperCommand): void {
-    const wrappers = this.ctx.getWebSockets(`ingest:${executionId}`);
-    for (const ws of wrappers) {
+    // Try execution-specific sockets first, then supervisor session socket
+    const executionSockets = this.ctx.getWebSockets(`ingest:${executionId}`);
+    const sockets =
+      executionSockets.length > 0 ? executionSockets : this.ctx.getWebSockets('ingest:session');
+    for (const ws of sockets) {
       ws.send(JSON.stringify(command));
     }
   }
@@ -1307,21 +1329,30 @@ export class CloudAgentSession extends DurableObject {
         .withFields({ sessionId: this.sessionId, lastActivity, elapsedMs: Date.now() - now })
         .debug('TTL check passed');
 
+      // Determine if this is a supervisor (per-session) sandbox.
+      // Supervisor sessions delegate execution timeout/watchdog logic to the
+      // wrapper process, so the DO skips redundant checks.
+      const metadata = await this.getMetadata();
+      const isSupervisor = metadata?.sandboxId?.startsWith('ses-') ?? false;
+
       // Run cleanup tasks
-      logger
-        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
-        .debug('Starting cleanupStaleExecutions');
-      await this.cleanupStaleExecutions(now);
+      if (!isSupervisor) {
+        // Shared sandbox: DO owns execution health monitoring
+        logger
+          .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
+          .debug('Starting cleanupStaleExecutions');
+        await this.cleanupStaleExecutions(now);
 
-      logger
-        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
-        .debug('Starting checkHungExecution');
-      await this.checkHungExecution(now);
+        logger
+          .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
+          .debug('Starting checkHungExecution');
+        await this.checkHungExecution(now);
 
-      logger
-        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
-        .debug('Starting checkMaxRuntime');
-      await this.checkMaxRuntime(now);
+        logger
+          .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
+          .debug('Starting checkMaxRuntime');
+        await this.checkMaxRuntime(now);
+      }
 
       logger
         .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
@@ -1338,6 +1369,12 @@ export class CloudAgentSession extends DurableObject {
         .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
         .debug('Starting cleanupIdleKiloServer');
       await this.cleanupIdleKiloServer(now);
+
+      // Check if supervisor sandbox should be destroyed due to disconnect timeout
+      logger
+        .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
+        .debug('Starting checkSupervisorDisconnect');
+      await this.checkSupervisorDisconnect(now);
 
       logger
         .withFields({ sessionId: this.sessionId, elapsedMs: Date.now() - now })
@@ -1566,6 +1603,11 @@ export class CloudAgentSession extends DurableObject {
   private getKiloServerIdleTimeoutMs(): number {
     const value = Number((this.env as unknown as WorkerEnv).KILO_SERVER_IDLE_TIMEOUT_MS);
     return Number.isFinite(value) && value > 0 ? value : KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT;
+  }
+
+  private getSupervisorDisconnectTimeoutMs(): number {
+    const value = Number((this.env as unknown as WorkerEnv).SUPERVISOR_DISCONNECT_TIMEOUT_MS);
+    return Number.isFinite(value) && value > 0 ? value : SUPERVISOR_DISCONNECT_TIMEOUT_MS_DEFAULT;
   }
 
   /**
@@ -1838,6 +1880,113 @@ export class CloudAgentSession extends DurableObject {
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Supervisor Disconnect Reaper
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Record that the supervisor ingest WS disconnected.
+   * The alarm reaper will check this and destroy the per-session sandbox
+   * if the supervisor doesn't reconnect within the timeout.
+   */
+  private async startSupervisorDisconnect(): Promise<void> {
+    // Only relevant for per-session (ses-) sandboxes
+    const metadata = await this.getMetadata();
+    if (!metadata?.sandboxId?.startsWith('ses-')) return;
+
+    // Don't overwrite an existing disconnect timestamp — preserve the
+    // original disconnect time so the timeout is measured from the first drop.
+    const existing =
+      await this.ctx.storage.get<SupervisorDisconnectState>(SUPERVISOR_DISCONNECT_KEY);
+    if (existing) return;
+
+    const state: SupervisorDisconnectState = { disconnectedAt: Date.now() };
+    await this.ctx.storage.put(SUPERVISOR_DISCONNECT_KEY, state);
+
+    logger
+      .withFields({ sessionId: this.sessionId })
+      .info('Supervisor ingest disconnected — started disconnect timer');
+  }
+
+  /**
+   * Cancel the supervisor disconnect timer.
+   * Called when a supervisor ingest socket reconnects.
+   */
+  private async cancelSupervisorDisconnect(): Promise<void> {
+    const existed = await this.ctx.storage.get(SUPERVISOR_DISCONNECT_KEY);
+    if (existed) {
+      await this.ctx.storage.delete(SUPERVISOR_DISCONNECT_KEY);
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .info('Supervisor reconnected — cancelled disconnect timer');
+    }
+  }
+
+  /**
+   * Check if the supervisor disconnect timeout has elapsed.
+   * If the supervisor ingest WS has been gone for longer than
+   * SUPERVISOR_DISCONNECT_TIMEOUT_MS and no supervisor socket is
+   * currently connected, destroy the per-session sandbox container.
+   *
+   * Called from alarm() alongside the other reaper checks.
+   */
+  private async checkSupervisorDisconnect(now: number): Promise<void> {
+    const disconnectState =
+      await this.ctx.storage.get<SupervisorDisconnectState>(SUPERVISOR_DISCONNECT_KEY);
+    if (!disconnectState) return;
+
+    const elapsed = now - disconnectState.disconnectedAt;
+    const timeoutMs = this.getSupervisorDisconnectTimeoutMs();
+    if (elapsed < timeoutMs) return;
+
+    // Clear state first to avoid re-processing on the next alarm cycle
+    await this.ctx.storage.delete(SUPERVISOR_DISCONNECT_KEY);
+
+    // Re-check: supervisor may have reconnected during the timeout window
+    const ingestHandler = await this.getIngestHandler();
+    if (ingestHandler.hasSupervisorConnection()) {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .info('Supervisor reconnected during disconnect timeout — skipping sandbox destroy');
+      return;
+    }
+
+    const metadata = await this.getMetadata();
+    if (!metadata?.sandboxId?.startsWith('ses-')) return;
+
+    logger
+      .withFields({
+        sessionId: this.sessionId,
+        sandboxId: metadata.sandboxId,
+        disconnectedAt: disconnectState.disconnectedAt,
+        elapsedMs: elapsed,
+        timeoutMs,
+      })
+      .warn('Supervisor disconnect timeout expired — destroying per-session sandbox');
+
+    try {
+      const workerEnv = this.env as unknown as WorkerEnv;
+      const sandbox = getSandbox(
+        getSandboxNamespace(workerEnv, metadata.sandboxId),
+        metadata.sandboxId
+      );
+      await sandbox.destroy();
+
+      logger
+        .withFields({ sessionId: this.sessionId, sandboxId: metadata.sandboxId })
+        .info('Per-session sandbox destroyed by reaper');
+    } catch (error) {
+      // Log but don't fail — sandbox may already be stopped or recycled
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          sandboxId: metadata.sandboxId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .warn('Failed to destroy per-session sandbox (may already be stopped)');
+    }
+  }
+
   /**
    * Fail an execution with full cleanup.
    * Idempotent — safe to call if execution is already terminal.
@@ -2075,6 +2224,28 @@ export class CloudAgentSession extends DurableObject {
   // ---------------------------------------------------------------------------
 
   /**
+   * Extract ExistingSessionMetadata from flat CloudAgentSessionState.
+   */
+  private toExistingMetadata(state: CloudAgentSessionState): ExistingSessionMetadata {
+    return {
+      workspacePath: state.workspacePath ?? '',
+      kiloSessionId: state.kiloSessionId ?? '',
+      branchName: state.branchName ?? '',
+      sandboxId: state.sandboxId,
+      sessionHome: state.sessionHome,
+      upstreamBranch: state.upstreamBranch,
+      appendSystemPrompt: state.appendSystemPrompt,
+      gitSource: toGitSource({
+        githubRepo: state.githubRepo,
+        githubToken: state.githubToken,
+        gitUrl: state.gitUrl,
+        gitToken: state.gitToken,
+        platform: state.platform,
+      }),
+    };
+  }
+
+  /**
    * Build an execution plan for the orchestrator.
    */
   private buildExecutionPlan(params: {
@@ -2089,29 +2260,21 @@ export class CloudAgentSession extends DurableObject {
     variant?: string;
     autoCommit?: boolean;
     condenseOnComplete?: boolean;
-    initContext?: InitializeContext;
+    initContext?: InitContext;
     resumeContext?: TokenResumeContext;
     existingMetadata?: CloudAgentSessionState;
     kiloSessionId?: string;
   }): ExecutionPlan {
+    const existingMeta = params.existingMetadata
+      ? this.toExistingMetadata(params.existingMetadata)
+      : undefined;
+
     const workspace = params.initContext
       ? {
           shouldPrepare: true as const,
           sandboxId: params.sandboxId,
           initContext: params.initContext,
-          existingMetadata: params.existingMetadata
-            ? {
-                workspacePath: params.existingMetadata.workspacePath ?? '',
-                kiloSessionId: params.existingMetadata.kiloSessionId ?? '',
-                branchName: params.existingMetadata.branchName ?? '',
-                sandboxId: params.existingMetadata.sandboxId,
-                sessionHome: params.existingMetadata.sessionHome,
-                upstreamBranch: params.existingMetadata.upstreamBranch,
-                appendSystemPrompt: params.existingMetadata.appendSystemPrompt,
-                githubRepo: params.existingMetadata.githubRepo,
-                gitUrl: params.existingMetadata.gitUrl,
-              }
-            : undefined,
+          existingMetadata: existingMeta,
         }
       : {
           shouldPrepare: false as const,
@@ -2125,19 +2288,7 @@ export class CloudAgentSession extends DurableObject {
             githubToken: params.resumeContext?.githubToken,
             gitToken: params.resumeContext?.gitToken,
           },
-          existingMetadata: params.existingMetadata
-            ? {
-                workspacePath: params.existingMetadata.workspacePath ?? '',
-                kiloSessionId: params.existingMetadata.kiloSessionId ?? '',
-                branchName: params.existingMetadata.branchName ?? '',
-                sandboxId: params.existingMetadata.sandboxId,
-                sessionHome: params.existingMetadata.sessionHome,
-                upstreamBranch: params.existingMetadata.upstreamBranch,
-                appendSystemPrompt: params.existingMetadata.appendSystemPrompt,
-                githubRepo: params.existingMetadata.githubRepo,
-                gitUrl: params.existingMetadata.gitUrl,
-              }
-            : undefined,
+          existingMetadata: existingMeta,
         };
 
     return {
@@ -2319,20 +2470,22 @@ export class CloudAgentSession extends DurableObject {
             initiateResult.error ?? 'Failed to initiate session'
           );
         }
-        const initContext: InitializeContext = {
+        const initContext: InitContext = {
           kilocodeToken: request.authToken,
           kilocodeModel: request.model,
-          githubRepo: request.githubRepo,
-          githubToken: request.githubToken,
-          gitUrl: request.gitUrl,
-          gitToken: request.gitToken,
+          gitSource: toGitSource({
+            githubRepo: request.githubRepo,
+            githubToken: request.githubToken,
+            gitUrl: request.gitUrl,
+            gitToken: request.gitToken,
+            platform: request.platform,
+          }),
           envVars: request.envVars,
           encryptedSecrets: request.encryptedSecrets,
           setupCommands: request.setupCommands,
           mcpServers: request.mcpServers,
           upstreamBranch: request.upstreamBranch,
           botId: request.botId,
-          platform: request.platform,
           createdOnPlatform: request.createdOnPlatform,
         };
 
@@ -2410,13 +2563,16 @@ export class CloudAgentSession extends DurableObject {
             metadata.sessionId,
             metadata.botId
           ));
-        const initContext: InitializeContext = {
+        const initContext: InitContext = {
           kilocodeToken: token,
           kilocodeModel: metadata.model,
-          githubRepo: metadata.githubRepo,
-          githubToken,
-          gitUrl: metadata.gitUrl,
-          gitToken: metadata.gitToken,
+          gitSource: toGitSource({
+            githubRepo: metadata.githubRepo,
+            githubToken: githubToken ?? metadata.githubToken,
+            gitUrl: metadata.gitUrl,
+            gitToken: metadata.gitToken,
+            platform: metadata.platform,
+          }),
           envVars: metadata.envVars,
           encryptedSecrets: metadata.encryptedSecrets,
           setupCommands: metadata.setupCommands,
@@ -2426,7 +2582,6 @@ export class CloudAgentSession extends DurableObject {
           kiloSessionId: metadata.kiloSessionId,
           isPreparedSession: true,
           githubAppType: metadata.githubAppType,
-          platform: metadata.platform,
           createdOnPlatform: metadata.createdOnPlatform,
         };
 

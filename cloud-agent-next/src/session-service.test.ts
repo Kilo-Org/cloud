@@ -1621,6 +1621,62 @@ describe('SessionService', () => {
     });
   });
 
+  describe('getEffectiveSessionEnv', () => {
+    it('includes synthesized config, reserved vars, decrypted secrets, and GitLab envs', () => {
+      const service = new SessionService();
+      const sessionId: SessionId = 'agent_effective_env';
+      const envVars = service.getEffectiveSessionEnv({
+        userEnvVars: {
+          CUSTOM: 'value',
+        },
+        sessionHome: `/home/${sessionId}`,
+        sessionId,
+        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
+        env: {
+          ...mockEnv,
+          AGENT_ENV_VARS_PRIVATE_KEY: `<SECRET>`,
+          KILOCODE_BACKEND_BASE_URL: 'https://kilo.example.com',
+          KILO_SESSION_INGEST_URL: 'https://ingest.example.com',
+        },
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        orgId: 'org',
+        gitUrl: 'https://gitlab.example.com/acme/repo.git',
+        gitToken: 'gitlab-token',
+        platform: 'gitlab',
+        encryptedSecrets: {
+          SECRET_KEY: {
+            encryptedData: '2tZX7CSn8oE2tU2gI9rJF6st0lU=',
+            encryptedDEK:
+              'aMXB4vELIu5KJzDqCO09nD5E5QPU1/Pt9alxP5wKzqj7SYngOd7is+qqe/CW5qI/0ni+Uj0Auj4lR2L0sYIYgSTK0EYcYaJY4f8QJYAn1fD/hV4sPi2uee6MgYy8D+UvXFKdTMWrn+CZ2X4P8NfWpQQ4QdM6vFQfby7uc6dgNQxHj5BDbqN0+g3mddvZZ0ScTK6uqIc/zMVmj6D3S8m35jUN5uXX+9sJwVe+NwY5Sb4LgnB8y0v69/4K4IU7mZKqKsV3SV0ypfbl8hF8qz4Mwe9b0xji7w+uQGPhx0j1uzq06ygz2Aq7cYxMuMdNsxHk3MRtMde5eK6eANPjw==',
+            algorithm: 'rsa-aes-256-gcm',
+            version: 1,
+          },
+        },
+      });
+
+      expect(envVars).toMatchObject({
+        CUSTOM: 'value',
+        SECRET_KEY: 'decrypted-secret-value',
+        HOME: `/home/${sessionId}`,
+        SESSION_ID: sessionId,
+        SESSION_HOME: `/home/${sessionId}`,
+        KILOCODE_TOKEN: 'token',
+        KILOCODE_ORGANIZATION_ID: 'org',
+        KILOCODE_BACKEND_BASE_URL: 'https://kilo.example.com',
+        KILO_API_URL: 'https://kilo.example.com',
+        KILO_SESSION_INGEST_URL: 'https://ingest.example.com',
+        GITLAB_TOKEN: 'gitlab-token',
+        GITLAB_HOST: 'gitlab.example.com',
+      });
+
+      expect(JSON.parse(envVars.KILO_CONFIG_CONTENT)).toMatchObject({
+        model: 'kilo/test-model',
+      });
+      expect(envVars.OPENCODE_CONFIG_CONTENT).toBe(envVars.KILO_CONFIG_CONTENT);
+    });
+  });
+
   describe('Setup Commands Execution', () => {
     it('should continue executing commands when one fails during resume (lenient)', async () => {
       const metadata = {

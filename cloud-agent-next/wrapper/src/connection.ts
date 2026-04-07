@@ -128,7 +128,8 @@ export function createConnectionManager(
       // Buffer events while disconnected
       if (eventBuffer.length < MAX_BUFFER_SIZE) {
         eventBuffer.push(event);
-      } else {
+      } else if (!bufferOverflowed) {
+        logToFile(`event buffer full (${MAX_BUFFER_SIZE}) — subsequent events will be dropped`);
         bufferOverflowed = true;
       }
     }
@@ -248,7 +249,9 @@ export function createConnectionManager(
     }
 
     const url = new URL(job.ingestUrl);
-    url.searchParams.set('executionId', job.executionId);
+    if (job.executionId) {
+      url.searchParams.set('executionId', job.executionId);
+    }
 
     const wsUrl = url.toString();
     logToFile(`ingest WS connecting to: ${wsUrl}`);
@@ -436,7 +439,7 @@ export function createConnectionManager(
             if (job) {
               sendToIngest({
                 streamEventType: 'heartbeat',
-                data: { executionId: job.executionId },
+                data: job.executionId ? { executionId: job.executionId } : {},
                 timestamp: new Date().toISOString(),
               });
             }

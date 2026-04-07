@@ -130,6 +130,10 @@ export type Env = {
   PENDING_START_TIMEOUT_MS?: string;
   /** Kilo server idle timeout override (ms) - defaults to 15 minutes */
   KILO_SERVER_IDLE_TIMEOUT_MS?: string;
+  /** Supervisor disconnect timeout override (ms) - defaults to 5 minutes.
+   *  After the supervisor ingest WS drops, the reaper waits this long
+   *  before destroying the per-session sandbox container. */
+  SUPERVISOR_DISCONNECT_TIMEOUT_MS?: string;
   /** Shared secret for backend-to-backend authentication (prepareSession/updateSession) */
   INTERNAL_API_SECRET?: string;
   /** Worker base URL for building WebSocket ingest endpoint */

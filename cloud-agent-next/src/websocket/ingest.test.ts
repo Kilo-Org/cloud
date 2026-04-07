@@ -64,7 +64,7 @@ function makeAttachment(overrides?: Partial<IngestAttachment>): IngestAttachment
 
 describe('createIngestHandler', () => {
   describe('handleIngestClose', () => {
-    it('returns null when WebSocket has no attachment', () => {
+    it('returns null executionId when WebSocket has no attachment', () => {
       const state = createFakeState();
       const handler = createIngestHandler(
         state,
@@ -75,7 +75,7 @@ describe('createIngestHandler', () => {
       );
       const ws = createFakeWebSocket(null);
 
-      expect(handler.handleIngestClose(ws)).toBeNull();
+      expect(handler.handleIngestClose(ws)).toEqual({ executionId: null, isSupervisor: false });
     });
 
     it('returns executionId when no other ingest sockets remain', () => {
@@ -92,11 +92,14 @@ describe('createIngestHandler', () => {
       );
       const ws = createFakeWebSocket(makeAttachment());
 
-      expect(handler.handleIngestClose(ws)).toBe(EXECUTION_ID);
+      expect(handler.handleIngestClose(ws)).toEqual({
+        executionId: EXECUTION_ID,
+        isSupervisor: false,
+      });
       expect(state.getWebSockets).toHaveBeenCalledWith(`ingest:${EXECUTION_ID}`);
     });
 
-    it('returns null when a replacement ingest socket exists', () => {
+    it('returns null executionId when a replacement ingest socket exists', () => {
       const state = createFakeState();
       const replacementWs = createFakeWebSocket();
       // A replacement socket still exists for this execution
@@ -111,7 +114,23 @@ describe('createIngestHandler', () => {
       );
       const ws = createFakeWebSocket(makeAttachment());
 
-      expect(handler.handleIngestClose(ws)).toBeNull();
+      expect(handler.handleIngestClose(ws)).toEqual({ executionId: null, isSupervisor: false });
+    });
+
+    it('returns isSupervisor true for ingest:session tagged socket', () => {
+      const state = createFakeState();
+      vi.mocked(state.getTags).mockReturnValue(['ingest:session']);
+
+      const handler = createIngestHandler(
+        state,
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        createFakeDOContext()
+      );
+      const ws = createFakeWebSocket(null);
+
+      expect(handler.handleIngestClose(ws)).toEqual({ executionId: null, isSupervisor: true });
     });
 
     // The positive case through the full handleIngestRequest → handleIngestClose
@@ -410,6 +429,193 @@ describe('createIngestHandler', () => {
       await handler.handleIngestMessage(ws, message);
 
       expect(doContext.updateLastEventAt).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleIngestMessage — supervisor session socket', () => {
+    function makeSessionAttachment(overrides?: Partial<IngestAttachment>): IngestAttachment {
+      const now = Date.now();
+      return {
+        type: 'session',
+        executionId: '' as ExecutionId,
+        connectedAt: now,
+        kiloSessionState: { captured: false },
+        lastHeartbeatUpdate: now,
+        lastEventAtUpdate: now,
+        ...overrides,
+      };
+    }
+
+    it('resolves executionId from active execution and broadcasts', async () => {
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
+      vi.mocked(doContext.getActiveExecutionId).mockResolvedValue(EXECUTION_ID);
+
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeSessionAttachment());
+
+      // Kilocode events on supervisor sockets are broadcast-only (not persisted)
+      const message = JSON.stringify({
+        streamEventType: 'kilocode',
+        data: { event: 'session.status', properties: { sessionID: 'kilo_1' } },
+        timestamp: new Date().toISOString(),
+      });
+
+      await handler.handleIngestMessage(ws, message);
+
+      expect(doContext.getActiveExecutionId).toHaveBeenCalled();
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 0,
+          execution_id: EXECUTION_ID,
+          stream_event_type: 'kilocode',
+        })
+      );
+    });
+
+    it('broadcasts without persistence when no active execution', async () => {
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
+      vi.mocked(doContext.getActiveExecutionId).mockResolvedValue(null);
+
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeSessionAttachment());
+
+      const message = JSON.stringify({
+        streamEventType: 'kilocode',
+        data: { event: 'session.status' },
+        timestamp: new Date().toISOString(),
+      });
+
+      await handler.handleIngestMessage(ws, message);
+
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 0,
+          execution_id: '',
+          stream_event_type: 'kilocode',
+        })
+      );
+    });
+
+    it('persists only terminal events for supervisor sessions', async () => {
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
+      vi.mocked(doContext.getActiveExecutionId).mockResolvedValue(EXECUTION_ID);
+
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeSessionAttachment());
+
+      // Terminal event: should be persisted
+      await handler.handleIngestMessage(
+        ws,
+        JSON.stringify({
+          streamEventType: 'complete',
+          data: { exitCode: 0 },
+          timestamp: new Date().toISOString(),
+        })
+      );
+      expect(eventQueries.insert).toHaveBeenCalled();
+      vi.mocked(eventQueries.insert).mockClear();
+
+      // Kilocode event: should NOT be persisted (broadcast-only)
+      await handler.handleIngestMessage(
+        ws,
+        JSON.stringify({
+          streamEventType: 'kilocode',
+          data: { event: 'message.updated', properties: { info: { id: 'msg_1' } } },
+          timestamp: new Date().toISOString(),
+        })
+      );
+      expect(eventQueries.insert).not.toHaveBeenCalled();
+      // But should still be broadcast
+      expect(broadcastFn).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 0, stream_event_type: 'kilocode' })
+      );
+    });
+
+    it('drops heartbeat events when no active execution', async () => {
+      const eventQueries = createFakeEventQueries();
+      const broadcastFn = vi.fn();
+      const doContext = createFakeDOContext();
+      vi.mocked(doContext.getActiveExecutionId).mockResolvedValue(null);
+
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcastFn,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeSessionAttachment());
+
+      const message = JSON.stringify({
+        streamEventType: 'heartbeat',
+        data: {},
+        timestamp: new Date().toISOString(),
+      });
+
+      await handler.handleIngestMessage(ws, message);
+
+      expect(broadcastFn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('hasSupervisorConnection', () => {
+    it('returns true when supervisor session socket exists', () => {
+      const state = createFakeState();
+      vi.mocked(state.getWebSockets).mockImplementation((tag?: string) => {
+        if (tag === 'ingest:session') return [createFakeWebSocket()];
+        return [];
+      });
+
+      const handler = createIngestHandler(
+        state,
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        createFakeDOContext()
+      );
+
+      expect(handler.hasSupervisorConnection()).toBe(true);
+    });
+
+    it('returns false when no supervisor session socket exists', () => {
+      const state = createFakeState();
+      vi.mocked(state.getWebSockets).mockReturnValue([]);
+
+      const handler = createIngestHandler(
+        state,
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        createFakeDOContext()
+      );
+
+      expect(handler.hasSupervisorConnection()).toBe(false);
     });
   });
 });

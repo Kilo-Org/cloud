@@ -121,7 +121,9 @@ const shouldIgnoreTerminalEvent = async (
  * This data persists across hibernation cycles.
  */
 export type IngestAttachment = {
-  /** Execution ID for this ingest connection */
+  /** Discriminator: 'execution' for per-execution sockets, 'session' for supervisor */
+  type?: 'execution' | 'session';
+  /** Execution ID for this ingest connection (set for execution sockets, resolved dynamically for session sockets) */
   executionId: ExecutionId;
   /** Unix timestamp when connection was established */
   connectedAt: number;
@@ -174,6 +176,8 @@ export type IngestDOContext = {
   ) => Promise<void>;
   /** Cancel the disconnect grace period when wrapper reconnects */
   cancelDisconnectGrace?: () => Promise<void>;
+  /** Cancel the supervisor disconnect timer when a supervisor ingest socket opens */
+  cancelSupervisorDisconnect?: () => Promise<void>;
 };
 
 // ---------------------------------------------------------------------------
@@ -228,8 +232,27 @@ export function createIngestHandler(
       const url = new URL(request.url);
       const executionId = url.searchParams.get('executionId') as ExecutionId | null;
 
+      // Supervisor mode: no executionId — session-level ingest connection
       if (!executionId) {
-        return new Response('Missing executionId parameter', { status: 400 });
+        const pair = new WebSocketPair();
+        state.acceptWebSocket(pair[1], ['ingest:session']);
+
+        // Serialize a session-level attachment so handleIngestMessage can
+        // identify this as a supervisor socket and resolve executionId dynamically.
+        const now = Date.now();
+        const sessionAttachment: IngestAttachment = {
+          type: 'session',
+          executionId: '' as ExecutionId, // resolved dynamically per-message
+          connectedAt: now,
+          kiloSessionState: { captured: false },
+          lastHeartbeatUpdate: now,
+          lastEventAtUpdate: 0,
+        };
+        pair[1].serializeAttachment(sessionAttachment);
+
+        await doContext.cancelDisconnectGrace?.();
+        await doContext.cancelSupervisorDisconnect?.();
+        return new Response(null, { status: 101, webSocket: pair[0] });
       }
 
       // Validate execution exists and token matches
@@ -273,6 +296,7 @@ export function createIngestHandler(
 
       // Store execution ID and capture state in attachment for hibernation-safe access
       const attachment: IngestAttachment = {
+        type: 'execution',
         executionId,
         connectedAt: now,
         kiloSessionState: { captured: false },
@@ -325,7 +349,35 @@ export function createIngestHandler(
         return;
       }
 
-      const { executionId } = attachment;
+      // Session-level sockets (supervisor mode): resolve executionId from active execution
+      let { executionId } = attachment;
+      const isSupervisorSocket = attachment.type === 'session';
+      if (isSupervisorSocket) {
+        const activeId = await doContext.getActiveExecutionId();
+        if (!activeId) {
+          // No active execution — broadcast-only (no persistence, no lifecycle)
+          // This can happen for heartbeats arriving between turns.
+          try {
+            const ingestEvent = JSON.parse(message) as IngestEvent;
+            if (ingestEvent.streamEventType && ingestEvent.streamEventType !== 'heartbeat') {
+              broadcastFn({
+                id: 0 as EventId,
+                execution_id: '' as ExecutionId,
+                session_id: sessionId,
+                stream_event_type: ingestEvent.streamEventType,
+                payload: JSON.stringify(ingestEvent.data ?? {}),
+                timestamp: ingestEvent.timestamp
+                  ? new Date(ingestEvent.timestamp).getTime()
+                  : Date.now(),
+              });
+            }
+          } catch {
+            // Ignore parse errors for events without active execution
+          }
+          return;
+        }
+        executionId = activeId as ExecutionId;
+      }
 
       try {
         // Parse the ingest event
@@ -352,7 +404,28 @@ export function createIngestHandler(
         // Route event: broadcast-only, upsert, or plain insert.
         // Only events in the allowlists are written to SQLite;
         // everything else is broadcast to /stream clients with eventId 0.
-        if (eventType === 'kilocode') {
+        //
+        // Supervisor sessions: the wrapper owns kilo state, so the DO only
+        // persists terminal lifecycle events (complete, interrupted, error).
+        // All other events are broadcast-only — the UI still gets real-time
+        // updates but the DO doesn't store kilo-internal state.
+        if (isSupervisorSocket) {
+          if (
+            PERSISTED_STREAM_EVENT_TYPES.has(eventType) &&
+            eventType !== 'autocommit_started' &&
+            eventType !== 'autocommit_completed'
+          ) {
+            eventId = eventQueries.insert({
+              executionId,
+              sessionId,
+              streamEventType: eventType,
+              payload,
+              timestamp,
+            });
+          } else {
+            eventId = 0;
+          }
+        } else if (eventType === 'kilocode') {
           const kiloEventName = (ingestEvent.data as Record<string, unknown> | undefined)?.event as
             | string
             | undefined;
@@ -589,18 +662,25 @@ export function createIngestHandler(
      *
      * @param ws - The WebSocket that closed
      */
-    handleIngestClose(ws: WebSocket): ExecutionId | null {
+    handleIngestClose(ws: WebSocket): { executionId: ExecutionId | null; isSupervisor: boolean } {
+      const tags = state.getTags(ws);
+
+      // Supervisor session socket — no executionId to return
+      if (tags.includes('ingest:session')) {
+        return { executionId: null, isSupervisor: true };
+      }
+
       const attachment = ws.deserializeAttachment() as IngestAttachment | null;
-      if (!attachment) return null;
+      if (!attachment) return { executionId: null, isSupervisor: false };
 
       const { executionId } = attachment;
 
       // If another ingest socket still exists for this execution (e.g. a
       // replacement connection), the wrapper isn't truly gone.
       const remaining = state.getWebSockets(`ingest:${executionId}`);
-      if (remaining.length > 0) return null;
+      if (remaining.length > 0) return { executionId: null, isSupervisor: false };
 
-      return executionId;
+      return { executionId, isSupervisor: false };
     },
 
     /**
@@ -613,7 +693,20 @@ export function createIngestHandler(
      * @returns True if there's an active connection for this execution
      */
     hasActiveConnection(executionId: ExecutionId): boolean {
-      return state.getWebSockets(`ingest:${executionId}`).length > 0;
+      return (
+        state.getWebSockets(`ingest:${executionId}`).length > 0 ||
+        state.getWebSockets('ingest:session').length > 0
+      );
+    },
+
+    /**
+     * Check if a supervisor-level ingest socket is currently connected.
+     *
+     * Used by the alarm reaper to decide whether the supervisor sandbox
+     * should be destroyed after a disconnect timeout.
+     */
+    hasSupervisorConnection(): boolean {
+      return state.getWebSockets('ingest:session').length > 0;
     },
   };
 }

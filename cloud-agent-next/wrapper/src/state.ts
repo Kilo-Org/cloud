@@ -19,7 +19,7 @@ export type { LogUploader } from './log-uploader.js';
 // ---------------------------------------------------------------------------
 
 export type JobContext = {
-  executionId: string;
+  executionId?: string;
   kiloSessionId: string;
   ingestUrl: string;
   ingestToken: string;
@@ -45,6 +45,9 @@ export type WrapperStatus = {
 // ---------------------------------------------------------------------------
 
 export class WrapperState {
+  /** Stable agent session ID (always present, used for message ID generation in supervisor mode) */
+  readonly agentSessionId: string;
+
   // Job context (set on the first turn-start request, cleared on reset or drain)
   private job: JobContext | null = null;
 
@@ -67,6 +70,13 @@ export class WrapperState {
 
   // Callbacks for sending events to ingest
   private _sendToIngestFn: ((event: IngestEvent) => void) | null = null;
+
+  /** Called when wrapper transitions idle → active. Set externally (e.g. by supervisor). */
+  onBecameActive: (() => void) | null = null;
+
+  constructor(agentSessionId: string) {
+    this.agentSessionId = agentSessionId;
+  }
 
   // Log uploader (set per-job, cleared on job end)
   private _logUploader: LogUploader | null = null;
@@ -96,22 +106,29 @@ export class WrapperState {
   // ---------------------------------------------------------------------------
 
   /**
-   * Start a new job. Idempotent for same executionId.
+   * Start a new job. Idempotent for same executionId (shared-sandbox mode).
+   * In supervisor mode (no executionId), always accepts unless currently active.
    * Throws if a different job is currently active (caller should return 409).
    */
   startJob(context: JobContext): void {
-    if (this.job && this.job.executionId === context.executionId) {
-      return;
+    if (context.executionId && this.job?.executionId === context.executionId) {
+      return; // Idempotent: same executionId
     }
 
-    if (this.job && this.job.executionId !== context.executionId && this.isActive) {
-      throw new Error(`Cannot start new job while active (current: ${this.job.executionId})`);
+    if (this.job && this._isActive) {
+      throw new Error(
+        context.executionId
+          ? `Cannot start new job while active (current: ${this.job.executionId})`
+          : 'Cannot start new job while active'
+      );
     }
 
-    // Start new job
     this.job = context;
     this._lastError = null;
-    this.messageCounter = 0;
+    // In supervisor mode (no executionId), keep the counter monotonic across turns
+    if (context.executionId) {
+      this.messageCounter = 0;
+    }
     this.updateActivity();
   }
 
@@ -121,9 +138,13 @@ export class WrapperState {
   clearJob(): void {
     this._logUploader?.stop();
     this._logUploader = null;
+    const hadExecutionId = !!this.job?.executionId;
     this.job = null;
     this._isActive = false;
-    this.messageCounter = 0;
+    // In supervisor mode (no executionId), keep counter monotonic
+    if (hadExecutionId) {
+      this.messageCounter = 0;
+    }
     this._lastAssistantMessageId = null;
   }
 
@@ -139,6 +160,7 @@ export class WrapperState {
     this._isActive = active;
     if (active) {
       this.updateActivity();
+      this.onBecameActive?.();
     }
   }
 
@@ -276,16 +298,19 @@ export class WrapperState {
 
   /**
    * Generate the next messageId for this job.
-   * Format: msg_<base-executionId>_<counter>
+   * Format: msg_<base-executionId>_<counter> (shared-sandbox) or msg_<sessionId>_<counter> (supervisor)
    */
   nextMessageId(): string {
     if (!this.job) {
       throw new Error('No job context - call startJob() first');
     }
     this.messageCounter++;
-    // Strip known prefixes if present
-    const base = this.job.executionId.replace(/^(exc_|exec_|execution_|msg_)/, '');
-    return `msg_${base}_${this.messageCounter}`;
+    if (this.job.executionId) {
+      const base = this.job.executionId.replace(/^(exc_|exec_|execution_|msg_)/, '');
+      return `msg_${base}_${this.messageCounter}`;
+    }
+    // Supervisor mode: session-stable, monotonic IDs
+    return `msg_${this.agentSessionId}_${this.messageCounter}`;
   }
 
   // ---------------------------------------------------------------------------

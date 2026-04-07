@@ -280,6 +280,52 @@ async function markAutoResumeRequested(
     .where(subscriptionFilter);
 }
 
+async function clearAutoResumeState(
+  database: WorkerDb,
+  params: {
+    userId: string;
+    instanceId?: string;
+  }
+): Promise<void> {
+  const subscriptionFilter = params.instanceId
+    ? and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId)
+      )
+    : eq(kiloclaw_subscriptions.user_id, params.userId);
+
+  const resettableEmailTypes = [
+    'claw_suspended_trial',
+    'claw_suspended_subscription',
+    'claw_suspended_payment',
+    'claw_destruction_warning',
+    'claw_instance_destroyed',
+    'claw_credit_renewal_failed',
+  ];
+
+  await database.transaction(async tx => {
+    await tx
+      .delete(kiloclaw_email_log)
+      .where(
+        and(
+          eq(kiloclaw_email_log.user_id, params.userId),
+          inArray(kiloclaw_email_log.email_type, resettableEmailTypes)
+        )
+      );
+
+    await tx
+      .update(kiloclaw_subscriptions)
+      .set({
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_requested_at: null,
+        auto_resume_retry_after: null,
+        auto_resume_failure_count: 0,
+      })
+      .where(subscriptionFilter);
+  });
+}
+
 function createSweepContext(message: BillingSweepMessage, attempt: number): SweepExecutionContext {
   return {
     billingFlow: BILLING_FLOW,
@@ -678,22 +724,18 @@ async function autoResumeIfSuspended(
   const resolvedInstanceId = targetInstance?.id ?? row.instance_id ?? undefined;
 
   if (!targetInstance) {
-    await markAutoResumeRequested(database, {
+    await clearAutoResumeState(database, {
       userId: row.user_id,
       instanceId: resolvedInstanceId,
-      requestedAtIso: nowIso,
-      retryAfterIso,
-      failureCount: nextFailureCount,
     });
-    log('warn', 'Skipped async auto-resume because no active instance was found', {
-      event: 'resume_request_failed',
-      outcome: 'skipped',
+    log('info', 'Cleared auto-resume state because no active instance remains', {
+      event: 'resume_completed',
+      outcome: 'completed',
       userId: row.user_id,
       instanceId: resolvedInstanceId,
-      retryAfter: retryAfterIso,
-      autoResumeFailureCount: nextFailureCount,
+      recoveryReason: 'no_active_instance',
     });
-    return false;
+    return true;
   }
 
   try {

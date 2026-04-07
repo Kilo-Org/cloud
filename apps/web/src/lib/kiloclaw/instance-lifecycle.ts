@@ -38,6 +38,56 @@ function getResettableAutoResumeEmailTypes() {
   ] as const;
 }
 
+function subscriptionFilterForUser(kiloUserId: string, instanceId?: string) {
+  return instanceId
+    ? and(
+        eq(kiloclaw_subscriptions.user_id, kiloUserId),
+        eq(kiloclaw_subscriptions.instance_id, instanceId)
+      )
+    : eq(kiloclaw_subscriptions.user_id, kiloUserId);
+}
+
+async function clearAutoResumeState(
+  kiloUserId: string,
+  options: {
+    instanceId?: string;
+    sandboxId?: string;
+    logMessage: string;
+    logFields?: Record<string, unknown>;
+  }
+): Promise<void> {
+  const subscriptionFilter = subscriptionFilterForUser(kiloUserId, options.instanceId);
+
+  await db.transaction(async tx => {
+    await tx
+      .delete(kiloclaw_email_log)
+      .where(
+        and(
+          eq(kiloclaw_email_log.user_id, kiloUserId),
+          inArray(kiloclaw_email_log.email_type, [...getResettableAutoResumeEmailTypes()])
+        )
+      );
+
+    await tx
+      .update(kiloclaw_subscriptions)
+      .set({
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_requested_at: null,
+        auto_resume_retry_after: null,
+        auto_resume_failure_count: 0,
+      })
+      .where(subscriptionFilter);
+  });
+
+  logInfo(options.logMessage, {
+    user_id: kiloUserId,
+    instance_id: options.instanceId ?? null,
+    ...(options.sandboxId ? { sandbox_id: options.sandboxId } : {}),
+    ...(options.logFields ?? {}),
+  });
+}
+
 async function resolveActiveInstance(
   kiloUserId: string,
   options: { instanceId?: string; sandboxId?: string }
@@ -78,9 +128,10 @@ export async function autoResumeIfSuspended(
 ): Promise<void> {
   const targetInstance = await resolveActiveInstance(kiloUserId, { instanceId });
   if (!targetInstance) {
-    logError('Skipped async auto-resume because no active instance was found', {
-      user_id: kiloUserId,
-      instance_id: instanceId ?? null,
+    await clearAutoResumeState(kiloUserId, {
+      instanceId,
+      logMessage: 'Cleared auto-resume state because no active instance remains',
+      logFields: { recovery_reason: 'no_active_instance' },
     });
     return;
   }
@@ -158,12 +209,13 @@ export async function completeAutoResumeIfReady(
 ): Promise<{ instanceId: string | null; resumeCompleted: boolean }> {
   const targetInstance = await resolveActiveInstance(kiloUserId, { instanceId, sandboxId });
   if (!targetInstance) {
-    logInfo('Skipped async auto-resume completion because no active instance was found', {
-      user_id: kiloUserId,
-      instance_id: instanceId ?? null,
-      sandbox_id: sandboxId,
+    await clearAutoResumeState(kiloUserId, {
+      instanceId,
+      sandboxId,
+      logMessage: 'Cleared auto-resume state because readiness callback found no active instance',
+      logFields: { recovery_reason: 'ready_without_active_instance' },
     });
-    return { instanceId: null, resumeCompleted: false };
+    return { instanceId: instanceId ?? null, resumeCompleted: true };
   }
 
   const [subscription] = await db
@@ -198,37 +250,10 @@ export async function completeAutoResumeIfReady(
     return { instanceId: targetInstance.id, resumeCompleted: false };
   }
 
-  await db.transaction(async tx => {
-    await tx
-      .delete(kiloclaw_email_log)
-      .where(
-        and(
-          eq(kiloclaw_email_log.user_id, kiloUserId),
-          inArray(kiloclaw_email_log.email_type, [...getResettableAutoResumeEmailTypes()])
-        )
-      );
-
-    await tx
-      .update(kiloclaw_subscriptions)
-      .set({
-        suspended_at: null,
-        destruction_deadline: null,
-        auto_resume_requested_at: null,
-        auto_resume_retry_after: null,
-        auto_resume_failure_count: 0,
-      })
-      .where(
-        and(
-          eq(kiloclaw_subscriptions.user_id, kiloUserId),
-          eq(kiloclaw_subscriptions.instance_id, targetInstance.id)
-        )
-      );
-  });
-
-  logInfo('Async auto-resume completed', {
-    user_id: kiloUserId,
-    instance_id: targetInstance.id,
-    sandbox_id: sandboxId,
+  await clearAutoResumeState(kiloUserId, {
+    instanceId: targetInstance.id,
+    sandboxId,
+    logMessage: 'Async auto-resume completed',
   });
   return { instanceId: targetInstance.id, resumeCompleted: true };
 }

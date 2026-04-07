@@ -210,16 +210,15 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
   // any pending async auto-resume state for this instance.
   if (data.loadAvg5m <= INSTANCE_READY_LOAD_THRESHOLD) {
     try {
-      // Validate config before marking the DO flag so a misconfigured env var
-      // doesn't permanently prevent the email with no way to retry.
       const apiOrigin = backendApiOrigin(c.env.BACKEND_API_URL);
       const { shouldNotify } = await stub.tryMarkInstanceReady();
 
-      if (shouldNotify && c.env.INTERNAL_API_SECRET) {
+      if (c.env.INTERNAL_API_SECRET) {
         console.log('[controller] instance-ready: dispatching notification', {
           userId,
           sandboxId: data.sandboxId,
           instanceId: isInstanceKeyedSandboxId(data.sandboxId) ? doKey : null,
+          shouldNotify,
         });
         waitUntil(
           notifyInstanceReady(

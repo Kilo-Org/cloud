@@ -122,6 +122,27 @@ describe('instance lifecycle async resume', () => {
     expect(updateSetCalls[0]).not.toHaveProperty('destruction_deadline');
   });
 
+  it('clears stale suspension state when no active instance remains', async () => {
+    const instanceId = '11111111-1111-4111-8111-111111111111';
+    selectResultsQueue.push([]);
+
+    await autoResumeIfSuspended('user-1', instanceId);
+
+    expect(startAsyncMock).not.toHaveBeenCalled();
+    expect(updateSetCalls).toHaveLength(0);
+    expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+    expect(deleteWhereCalls).toHaveLength(1);
+    expect(txUpdateSetCalls).toEqual([
+      {
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_requested_at: null,
+        auto_resume_retry_after: null,
+        auto_resume_failure_count: 0,
+      },
+    ]);
+  });
+
   it('completes async auto-resume for the correct instance and clears retry state', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';
@@ -150,6 +171,27 @@ describe('instance lifecycle async resume', () => {
       auto_resume_retry_after: null,
       auto_resume_failure_count: 0,
     });
+  });
+
+  it('clears auto-resume state when readiness arrives after the instance is already gone', async () => {
+    const instanceId = '11111111-1111-4111-8111-111111111111';
+    const sandboxId = 'ki_11111111111141118111111111111111';
+    selectResultsQueue.push([]);
+
+    const result = await completeAutoResumeIfReady('user-1', sandboxId, instanceId);
+
+    expect(result).toEqual({ instanceId, resumeCompleted: true });
+    expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+    expect(deleteWhereCalls).toHaveLength(1);
+    expect(txUpdateSetCalls).toEqual([
+      {
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_requested_at: null,
+        auto_resume_retry_after: null,
+        auto_resume_failure_count: 0,
+      },
+    ]);
   });
 
   it('treats repeated readiness notifications as idempotent once resume state is already clear', async () => {

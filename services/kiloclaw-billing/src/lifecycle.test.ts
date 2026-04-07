@@ -25,6 +25,8 @@ function createSelectResult<T>(rows: T[]): SelectResult<T> {
 
 function createMockDb(selectResults: unknown[][]) {
   const updates: Array<Record<string, unknown>> = [];
+  const txUpdates: Array<Record<string, unknown>> = [];
+  const txDeletes: unknown[] = [];
   const select = vi.fn(() => ({
     from: vi.fn(() => ({
       where: vi.fn(() => createSelectResult(selectResults.shift() ?? [])),
@@ -38,13 +40,37 @@ function createMockDb(selectResults: unknown[][]) {
       };
     }),
   }));
+  const transaction = vi.fn(async (callback: (tx: {
+    delete: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  }) => Promise<unknown>) =>
+    callback({
+      delete: vi.fn(() => ({
+        where: vi.fn(async whereArg => {
+          txDeletes.push(whereArg);
+          return undefined;
+        }),
+      })),
+      update: vi.fn(() => ({
+        set: vi.fn((values: Record<string, unknown>) => {
+          txUpdates.push(values);
+          return {
+            where: vi.fn(async () => undefined),
+          };
+        }),
+      })),
+    })
+  );
 
   return {
     db: {
       select,
       update,
+      transaction,
     },
     updates,
+    txUpdates,
+    txDeletes,
   };
 }
 
@@ -149,5 +175,39 @@ describe('interrupted auto-resume sweep', () => {
     expect(updates[0].auto_resume_retry_after).toEqual(expect.any(String));
     expect(updates[0]).not.toHaveProperty('suspended_at');
     expect(updates[0]).not.toHaveProperty('destruction_deadline');
+  });
+
+  it('clears stale suspension state when no active instance remains', async () => {
+    const instanceId = '11111111-1111-4111-8111-111111111111';
+    const { db, updates, txUpdates, txDeletes } = createMockDb([
+      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_failure_count: 1 }],
+      [],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn();
+
+    const summary = await runSweep(
+      createEnv(fetch),
+      {
+        runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        sweep: 'interrupted_auto_resume',
+      },
+      1
+    );
+
+    expect(summary.interrupted_auto_resume_requests).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(txDeletes).toHaveLength(1);
+    expect(txUpdates).toEqual([
+      {
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_requested_at: null,
+        auto_resume_retry_after: null,
+        auto_resume_failure_count: 0,
+      },
+    ]);
   });
 });

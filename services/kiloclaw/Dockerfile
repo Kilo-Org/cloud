@@ -1,4 +1,8 @@
-FROM debian:bookworm-slim
+# Global build args — declared before any FROM so they're available to all stages.
+ARG CONTROLLER_COMMIT=unknown
+ARG CONTROLLER_CACHE_BUST=1
+
+FROM debian:bookworm-slim AS runtime
 
 # Install Node.js 24 (required by OpenClaw)
 ENV NODE_VERSION=24.14.1
@@ -88,15 +92,22 @@ RUN GOBIN=/usr/local/bin go install github.com/steipete/gogcli/cmd/gog@v0.12.0 \
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh \
     && uv --version
 
-# Install pinned Bun (build-time only) and compile the controller bundle.
-ARG BUN_VERSION=1.2.4
-RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
+# ── Builder stage: compile the controller with Bun ────────────────────
+# Bun is only needed to bundle the controller TypeScript into a single JS
+# file. By building in a separate stage, Bun (~100MB) stays out of the
+# final image. Bun installed to /root/.bun/ which gets shadowed by the
+# Fly Volume mount at /root, so it was unreachable at runtime anyway.
+FROM debian:bookworm-slim AS controller-builder
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl unzip \
+    && curl -fsSL https://bun.sh/install | bash -s "bun-v1.2.4" \
+    && rm -rf /var/lib/apt/lists/*
 ENV PATH="/root/.bun/bin:$PATH"
 
-ARG CONTROLLER_COMMIT=unknown
-# Changing this ARG value invalidates the COPY + RUN layers below it,
-# forcing a controller rebuild even when Docker thinks the source is unchanged.
-ARG CONTROLLER_CACHE_BUST=1
+# Re-declare global ARGs to make them available in this stage
+ARG CONTROLLER_COMMIT
+ARG CONTROLLER_CACHE_BUST
 COPY controller/ /tmp/controller-build/
 RUN cd /tmp/controller-build \
     && bun install --frozen-lockfile \
@@ -105,6 +116,12 @@ RUN cd /tmp/controller-build \
        --define "KILOCLAW_CONTROLLER_VERSION=\"${CONTROLLER_VERSION}\"" \
        --define "KILOCLAW_CONTROLLER_COMMIT=\"${CONTROLLER_COMMIT}\"" \
     && rm -rf /tmp/controller-build
+
+# ── Final stage: runtime image ────────────────────────────────────────
+FROM runtime AS final
+
+# Copy the compiled controller from the builder stage
+COPY --from=controller-builder /usr/local/bin/kiloclaw-controller.js /usr/local/bin/kiloclaw-controller.js
 
 # Create OpenClaw directories
 # When a Fly Volume is mounted at /root, these dirs persist across restarts.

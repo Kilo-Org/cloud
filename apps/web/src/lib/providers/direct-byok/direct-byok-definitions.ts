@@ -1,4 +1,4 @@
-import { COMPATIBLE_USER_AGENT, type CodingPlanProvider } from '@/lib/providers/coding-plans/types';
+import { COMPATIBLE_USER_AGENT, type DirectByokProvider } from '@/lib/providers/direct-byok/types';
 import {
   REASONING_VARIANTS_BINARY,
   REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
@@ -198,7 +198,7 @@ export default [
         id: 'glm-4.5',
         name: 'GLM-4.5',
         description:
-          'GLM-4.5 is Z.ai\'s flagship foundation model purpose-built for agent-based applications. It leverages a Mixture-of-Experts (MoE) architecture and supports a context length of up to 128K tokens. GLM-4.5 delivers significantly enhanced capabilities in reasoning, code generation, and agent alignment, with a hybrid inference mode offering a "thinking mode" for complex reasoning and tool use and a "non-thinking mode" optimized for instant responses.',
+          "GLM-4.5 is Z.ai's flagship foundation model purpose-built for agent-based applications. It leverages a Mixture-of-Experts (MoE) architecture and supports a context length of up to 128K tokens. GLM-4.5 delivers significantly enhanced capabilities in reasoning, code generation, and agent alignment, with a hybrid inference mode offering a \"thinking mode\" for complex reasoning and tool use and a \"non-thinking mode\" optimized for instant responses.",
         flags: [],
         context_length: 131072,
         max_completion_tokens: 98304,
@@ -208,7 +208,7 @@ export default [
         id: 'glm-4.5-air',
         name: 'GLM-4.5-Air',
         description:
-          'GLM-4.5-Air is the lightweight variant of Z.ai\'s latest flagship model family, purpose-built for agent-centric applications. Like GLM-4.5, it adopts the Mixture-of-Experts (MoE) architecture but with a more compact parameter size. GLM-4.5-Air supports hybrid inference modes, offering a "thinking mode" for advanced reasoning and tool use and a "non-thinking mode" for real-time interaction.',
+          "GLM-4.5-Air is the lightweight variant of Z.ai's latest flagship model family, purpose-built for agent-centric applications. Like GLM-4.5, it adopts the Mixture-of-Experts (MoE) architecture but with a more compact parameter size. GLM-4.5-Air supports hybrid inference modes, offering a \"thinking mode\" for advanced reasoning and tool use and a \"non-thinking mode\" for real-time interaction.",
         flags: [],
         context_length: 131072,
         max_completion_tokens: 98304,
@@ -236,4 +236,4 @@ export default [
       },
     ],
   },
-] satisfies ReadonlyArray<CodingPlanProvider>;
+] satisfies ReadonlyArray<DirectByokProvider>;

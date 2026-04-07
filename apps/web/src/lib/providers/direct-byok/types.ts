@@ -2,23 +2,23 @@ import type { DirectUserByokInferenceProviderId } from '@/lib/providers/openrout
 import type { TransformRequestContext } from '@/lib/providers/types';
 import type { CustomLlmProvider, OpenCodeVariant } from '@kilocode/db';
 
-export type CodingPlanModelFlag = 'recommended' | 'vision';
+export type DirectByokModelFlag = 'recommended' | 'vision';
 
-export type CodingPlanModel = {
+export type DirectByokModel = {
   id: string;
   name: string;
-  flags: ReadonlyArray<CodingPlanModelFlag>;
+  flags: ReadonlyArray<DirectByokModelFlag>;
   description: string;
   context_length: number;
   max_completion_tokens: number;
   variants: Record<string, OpenCodeVariant> | null;
 };
 
-export type CodingPlanProvider = {
+export type DirectByokProvider = {
   id: DirectUserByokInferenceProviderId;
   name: string;
   base_url: string;
-  models: ReadonlyArray<CodingPlanModel>;
+  models: ReadonlyArray<DirectByokModel>;
   ai_sdk_provider: CustomLlmProvider;
   transformRequest(context: TransformRequestContext): void;
 };

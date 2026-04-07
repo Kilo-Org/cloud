@@ -11,14 +11,10 @@ import type { BillingSweepMessage, BillingWorkerEnv } from './types.js';
 let loggedValues: unknown[] = [];
 
 function findLogRecord(message: string): Record<string, unknown> | undefined {
-  return loggedValues
-    .find(
-      (value: unknown) =>
-        typeof value === 'object' &&
-        value !== null &&
-        'message' in value &&
-        value.message === message
-    ) as Record<string, unknown> | undefined;
+  return loggedValues.find(
+    (value: unknown) =>
+      typeof value === 'object' && value !== null && 'message' in value && value.message === message
+  ) as Record<string, unknown> | undefined;
 }
 
 type QueueMessage = {

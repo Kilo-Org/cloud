@@ -152,26 +152,17 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     const oldMtimes = new Map<string, number | undefined>();
     if (captureServices.includes('kiloclaw-tunnel')) {
       const tunnelEnvPath = path.join(repoRoot, 'services/kiloclaw/.dev.vars');
-      oldValues.set(
-        'tunnel',
-        readEnvValue(tunnelEnvPath, 'KILOCODE_API_BASE_URL')
-      );
+      oldValues.set('tunnel', readEnvValue(tunnelEnvPath, 'KILOCODE_API_BASE_URL'));
       oldMtimes.set('tunnel', readEnvMtime(tunnelEnvPath));
     }
     if (captureServices.includes('kiloclaw-stripe')) {
       const stripeEnvPath = path.join(repoRoot, '.env.development.local');
-      oldValues.set(
-        'stripe',
-        readEnvValue(stripeEnvPath, 'STRIPE_WEBHOOK_SECRET')
-      );
+      oldValues.set('stripe', readEnvValue(stripeEnvPath, 'STRIPE_WEBHOOK_SECRET'));
       oldMtimes.set('stripe', readEnvMtime(stripeEnvPath));
     }
     if (captureServices.includes('app-builder-tunnel')) {
       const appBuilderEnvPath = path.join(repoRoot, 'services/app-builder/.dev.vars');
-      oldValues.set(
-        'app-builder-tunnel',
-        readEnvValue(appBuilderEnvPath, 'BUILDER_HOSTNAME')
-      );
+      oldValues.set('app-builder-tunnel', readEnvValue(appBuilderEnvPath, 'BUILDER_HOSTNAME'));
       oldMtimes.set('app-builder-tunnel', readEnvMtime(appBuilderEnvPath));
     }
 

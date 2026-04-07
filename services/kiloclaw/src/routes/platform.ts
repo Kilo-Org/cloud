@@ -130,19 +130,23 @@ platform.use('*', async (c, next) => {
 
     if (billingContext) {
       const statusCode = c.res.status;
-      logBillingPlatform(error ? 'error' : 'info', 'Finished billing-correlated kiloclaw platform request', {
-        ...billingContext,
-        billingComponent: 'kiloclaw_platform',
-        event: 'downstream_action',
-        outcome: error ? 'failed' : 'completed',
-        method,
-        path,
-        durationMs,
-        statusCode,
-        userId: userId || undefined,
-        instanceId,
-        ...(error ? { error } : {}),
-      });
+      logBillingPlatform(
+        error ? 'error' : 'info',
+        'Finished billing-correlated kiloclaw platform request',
+        {
+          ...billingContext,
+          billingComponent: 'kiloclaw_platform',
+          event: 'downstream_action',
+          outcome: error ? 'failed' : 'completed',
+          method,
+          path,
+          durationMs,
+          statusCode,
+          userId: userId || undefined,
+          instanceId,
+          ...(error ? { error } : {}),
+        }
+      );
     }
 
     // Skip analytics for routes with no user context (e.g. /versions) unless

@@ -8,16 +8,16 @@ Use this filter for every billing lifecycle query in Axiom:
 
 Important dimensions:
 
-| Field | Meaning |
-| --- | --- |
-| `billingComponent` | `worker`, `side_effects`, or `kiloclaw_platform` |
-| `billingRunId` | One hourly billing run across all sweeps |
-| `billingSweep` | The current sweep name |
-| `billingCallId` | One downstream call from the worker |
-| `billingAttempt` | Queue delivery attempt number |
-| `event` | `run_started`, `sweep_started`, `sweep_completed`, `sweep_failed`, `queue_retry`, `run_completed`, `run_failed`, `downstream_call`, `downstream_action`, `request_rejected` |
-| `outcome` | `started`, `completed`, `failed`, `retry`, or `discarded` |
-| `durationMs` | Elapsed time for a sweep or downstream request |
+| Field              | Meaning                                                                                                                                                                     |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `billingComponent` | `worker`, `side_effects`, or `kiloclaw_platform`                                                                                                                            |
+| `billingRunId`     | One hourly billing run across all sweeps                                                                                                                                    |
+| `billingSweep`     | The current sweep name                                                                                                                                                      |
+| `billingCallId`    | One downstream call from the worker                                                                                                                                         |
+| `billingAttempt`   | Queue delivery attempt number                                                                                                                                               |
+| `event`            | `run_started`, `sweep_started`, `sweep_completed`, `sweep_failed`, `queue_retry`, `run_completed`, `run_failed`, `downstream_call`, `downstream_action`, `request_rejected` |
+| `outcome`          | `started`, `completed`, `failed`, `retry`, or `discarded`                                                                                                                   |
+| `durationMs`       | Elapsed time for a sweep or downstream request                                                                                                                              |
 
 ## Saved Queries
 

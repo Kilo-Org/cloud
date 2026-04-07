@@ -239,10 +239,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function createSweepContext(
-  message: BillingSweepMessage,
-  attempt: number
-): SweepExecutionContext {
+function createSweepContext(message: BillingSweepMessage, attempt: number): SweepExecutionContext {
   return {
     billingFlow: BILLING_FLOW,
     billingRunId: message.runId,

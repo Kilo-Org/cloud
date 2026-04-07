@@ -117,8 +117,35 @@ async function saveDbSnapshot(
 ): Promise<void> {
   const MANAGER_LOG = '[process-manager]';
   try {
-    const dbPath = `/tmp/agent-home-${agentId}/.local/share/kilo/kilo.db`;
+    const dbDir = `/tmp/agent-home-${agentId}/.local/share/kilo`;
+    const dbPath = `${dbDir}/kilo.db`;
     await fs.access(dbPath);
+
+    // SQLite WAL mode stores recent writes in -wal/-shm files. We must
+    // checkpoint the WAL into the main DB file before snapshotting so the
+    // snapshot contains all data. Use bun's built-in SQLite to run PRAGMA
+    // wal_checkpoint(TRUNCATE) which merges the WAL and truncates it.
+    try {
+      const checkpoint = Bun.spawn(
+        [
+          'bun',
+          '-e',
+          `new (require("bun:sqlite").Database)(process.argv[1]).run("PRAGMA wal_checkpoint(TRUNCATE)")`,
+          dbPath,
+        ],
+        { stdout: 'pipe', stderr: 'pipe' }
+      );
+      const exitCode = await checkpoint.exited;
+      if (exitCode === 0) {
+        console.log(`${MANAGER_LOG} WAL checkpoint succeeded for ${agentId}`);
+      } else {
+        const stderr = await new Response(checkpoint.stderr).text();
+        console.warn(`${MANAGER_LOG} WAL checkpoint exited ${exitCode} for ${agentId}: ${stderr}`);
+      }
+    } catch (err) {
+      console.warn(`${MANAGER_LOG} WAL checkpoint failed for ${agentId}:`, err);
+    }
+
     const buffer = await fs.readFile(dbPath);
     const resp = await fetch(
       `${apiUrl}/api/towns/${townId}/rigs/${rigId}/agents/${agentId}/db-snapshot`,
@@ -819,23 +846,37 @@ export async function startAgent(
       sessionCounted = true;
     }
 
-    // 2. Create a session
-    const sessionResult = await client.session.create({ body: {} });
-
-    // Parse and store the session ID immediately so the catch block can
-    // abort an orphaned session if startupAbortController fires during
-    // the await above.
-    const rawSession: unknown = sessionResult.data ?? sessionResult;
-    const parsed = SessionResponse.safeParse(rawSession);
-    if (!parsed.success) {
-      console.error(
-        `${MANAGER_LOG} SDK session.create returned unexpected shape:`,
-        JSON.stringify(rawSession).slice(0, 200),
-        parsed.error.issues
+    // 2. Resume an existing session (from hydrated kilo.db) or create a new one.
+    // After DB hydration, the SDK server may have sessions from a prior
+    // container lifecycle. Resuming avoids losing conversation history.
+    let sessionId: string;
+    const existingSessions = await client.session.list();
+    const sessions = (existingSessions.data ?? []) as Array<{
+      id: string;
+      time?: { updated?: number };
+    }>;
+    if (sessions.length > 0) {
+      // Pick the most recently updated session
+      const sorted = [...sessions].sort((a, b) => (b.time?.updated ?? 0) - (a.time?.updated ?? 0));
+      sessionId = sorted[0].id;
+      console.log(
+        `${MANAGER_LOG} Resuming existing session ${sessionId} (${sessions.length} session(s) found)`
       );
-      throw new Error('SDK session.create response missing required "id" field');
+    } else {
+      const sessionResult = await client.session.create({ body: {} });
+      const rawSession: unknown = sessionResult.data ?? sessionResult;
+      const parsed = SessionResponse.safeParse(rawSession);
+      if (!parsed.success) {
+        console.error(
+          `${MANAGER_LOG} SDK session.create returned unexpected shape:`,
+          JSON.stringify(rawSession).slice(0, 200),
+          parsed.error.issues
+        );
+        throw new Error('SDK session.create response missing required "id" field');
+      }
+      sessionId = parsed.data.id;
+      console.log(`${MANAGER_LOG} Created new session ${sessionId}`);
     }
-    const sessionId = parsed.data.id;
     agent.sessionId = sessionId;
 
     // Now check if startup was cancelled while creating the session.

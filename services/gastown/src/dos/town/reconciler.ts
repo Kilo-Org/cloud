@@ -1172,6 +1172,7 @@ export function reconcileReviewQueue(
   // Direct-merge strategy MR beads (no pr_url, refinery merges itself)
   // still need the refinery — but those are only created when
   // merge_strategy='direct', which inherently requires the refinery.
+  const fastTrackedBeadIds = new Set<string>();
   if (!refineryCodeReview) {
     const openMrs = z
       .object({ bead_id: z.string() })
@@ -1189,6 +1190,7 @@ export function reconcileReviewQueue(
         ),
       ]);
     for (const { bead_id } of openMrs) {
+      fastTrackedBeadIds.add(bead_id);
       actions.push({
         type: 'transition_bead',
         bead_id,
@@ -1204,26 +1206,28 @@ export function reconcileReviewQueue(
   // Always runs for direct-merge MR beads (refinery performs the merge).
   // When code_review=false AND merge_strategy=pr, MR beads with pr_url
   // were fast-tracked above, so only direct-merge MR beads remain for
-  // Rules 5-6.
+  // Rules 5-6. Filter out any bead fast-tracked in this same pass.
   {
     // Rule 5: Pop open MR bead for idle refinery
-    // Get all rigs that have open MR beads
-    const rigsWithOpenMrs = z
-      .object({ rig_id: z.string() })
-      .array()
-      .parse([
-        ...query(
-          sql,
-          /* sql */ `
+    // Get all rigs that have open MR beads (excluding fast-tracked ones)
+    const rigsWithOpenMrs = (() => {
+      const excludeClause =
+        fastTrackedBeadIds.size > 0
+          ? `AND b.${beads.columns.bead_id} NOT IN (${[...fastTrackedBeadIds].map(() => '?').join(',')})`
+          : '';
+      const rows = sql.exec(
+        /* sql */ `
         SELECT DISTINCT b.${beads.columns.rig_id}
         FROM ${beads} b
         WHERE b.${beads.columns.type} = 'merge_request'
           AND b.${beads.columns.status} = 'open'
           AND b.${beads.columns.rig_id} IS NOT NULL
+          ${excludeClause}
       `,
-          []
-        ),
-      ]);
+        ...(fastTrackedBeadIds.size > 0 ? [...fastTrackedBeadIds] : [])
+      );
+      return z.object({ rig_id: z.string() }).array().parse([...rows]);
+    })();
 
     for (const { rig_id } of rigsWithOpenMrs) {
       // Check if rig already has an in_progress MR that needs the refinery.
@@ -1270,25 +1274,27 @@ export function reconcileReviewQueue(
         ),
       ]);
 
-      // Get oldest open MR for this rig
-      const oldestMr = z
-        .object({ bead_id: z.string() })
-        .array()
-        .parse([
-          ...query(
-            sql,
-            /* sql */ `
+      // Get oldest open MR for this rig (excluding fast-tracked ones)
+      const oldestMr = (() => {
+        const excludeClause =
+          fastTrackedBeadIds.size > 0
+            ? `AND ${beads.bead_id} NOT IN (${[...fastTrackedBeadIds].map(() => '?').join(',')})`
+            : '';
+        const rows = sql.exec(
+          /* sql */ `
           SELECT ${beads.bead_id}
           FROM ${beads}
           WHERE ${beads.type} = 'merge_request'
             AND ${beads.status} = 'open'
             AND ${beads.rig_id} = ?
+            ${excludeClause}
           ORDER BY ${beads.columns.created_at} ASC
           LIMIT 1
         `,
-            [rig_id]
-          ),
-        ]);
+            ...(fastTrackedBeadIds.size > 0 ? [rig_id, ...fastTrackedBeadIds] : [rig_id])
+        );
+        return z.object({ bead_id: z.string() }).array().parse([...rows]);
+      })();
 
       if (oldestMr.length === 0) continue;
 

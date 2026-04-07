@@ -35,6 +35,7 @@ import type { BYOKResult, Provider } from '@/lib/providers/types';
 import PROVIDERS from '@/lib/providers/provider-definitions';
 import { getDirectByokModel } from '@/lib/providers/direct-byok';
 import { CustomLlmDefinitionSchema, type CustomLlmProvider } from '@kilocode/db';
+import { addCacheBreakpoints } from '@/lib/providers/openrouter/request-helpers';
 
 function inferSupportedChatApis(aiSdkProvider: CustomLlmProvider) {
   return aiSdkProvider === 'anthropic'
@@ -138,6 +139,9 @@ export async function getProvider(
             Object.assign(context.request.body, customLlm.extra_body ?? {});
             Object.assign(context.extraHeaders, customLlm.extra_headers ?? {});
             context.request.body.model = customLlm.internal_id;
+            if (customLlm.add_cache_breakpoints) {
+              addCacheBreakpoints(context.request);
+            }
           },
         },
         userByok: null,

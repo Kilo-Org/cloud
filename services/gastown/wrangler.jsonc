@@ -84,9 +84,7 @@
 
   "ai": { "binding": "AI" },
 
-  "kv_namespaces": [
-    { "binding": "AGENT_DB_SNAPSHOTS_KV", "id": "" },
-  ],
+  "kv_namespaces": [{ "binding": "AGENT_DB_SNAPSHOTS_KV", "id": "" }],
 
   "analytics_engine_datasets": [{ "binding": "GASTOWN_AE", "dataset": "gastown_events" }],
 

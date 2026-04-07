@@ -69,7 +69,9 @@ export class TownContainerDO extends Container<Env> {
 
   async updateRegistry(registry: unknown): Promise<void> {
     await this.ctx.storage.put('container:registry', registry);
-    console.log(`${TC_LOG} updateRegistry: updated (${Array.isArray(registry) ? registry.length : '?'} entries)`);
+    console.log(
+      `${TC_LOG} updateRegistry: updated (${Array.isArray(registry) ? registry.length : '?'} entries)`
+    );
   }
 
   async getRegistry(): Promise<unknown> {

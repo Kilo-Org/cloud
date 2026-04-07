@@ -761,6 +761,7 @@ app.get('/api/towns/:townId/container-registry', async c => {
 
 app.post('/api/towns/:townId/container-registry', async c => {
   const townId = c.req.param('townId');
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- JSON payload is any
   const body = await c.req.json();
   const tc = getTownContainerStub(c.env, townId);
   // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime

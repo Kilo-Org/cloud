@@ -1182,7 +1182,6 @@ export function reconcileReviewQueue(
               ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
             WHERE b.${beads.columns.type} = 'merge_request'
               AND b.${beads.columns.status} = 'open'
-              AND rm.${review_metadata.columns.pr_url} <> ''
           `,
           []
         ),

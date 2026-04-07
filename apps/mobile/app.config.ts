@@ -1,5 +1,12 @@
-/** @type {import('expo/config').ExpoConfig} */
-const config = {
+import type { ExpoConfig } from 'expo/config';
+import { ENV_KEYS } from './src/lib/env-keys';
+
+const missing = Object.values(ENV_KEYS).filter((key) => !process.env[key]);
+if (missing.length > 0) {
+  throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+}
+
+const config: ExpoConfig = {
   name: 'KiloClaw',
   owner: 'kilocode',
   slug: 'kilo-app',
@@ -105,10 +112,9 @@ const config = {
     reactCompiler: true,
   },
   extra: {
-    apiBaseUrl: process.env.API_BASE_URL,
-    webBaseUrl: process.env.WEB_BASE_URL,
-    appsFlyerDevKey: process.env.APPSFLYER_DEV_KEY,
-    appsFlyerAppId: process.env.APPSFLYER_APP_ID,
+    ...Object.fromEntries(
+      Object.entries(ENV_KEYS).map(([key, env]) => [key, process.env[env]]),
+    ),
     router: {},
     eas: {
       projectId: '2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4',
@@ -116,4 +122,4 @@ const config = {
   },
 };
 
-module.exports = config;
+export default config;

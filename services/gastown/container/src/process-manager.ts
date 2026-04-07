@@ -963,7 +963,7 @@ export async function stopAgent(agentId: string): Promise<void> {
   const apiUrl = agent.gastownApiUrl;
   const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
   if (apiUrl && token) {
-    void saveDbSnapshot(agentId, apiUrl, token, agent.rigId, agent.townId);
+    await saveDbSnapshot(agentId, apiUrl, token, agent.rigId, agent.townId);
   }
 }
 
@@ -1507,6 +1507,7 @@ export async function stopAll(): Promise<void> {
   eventAbortControllers.clear();
 
   // Abort all running sessions and save DB snapshots
+  const snapshotPromises: Promise<void>[] = [];
   for (const agent of agents.values()) {
     if (agent.status === 'running' || agent.status === 'starting') {
       try {
@@ -1526,10 +1527,13 @@ export async function stopAll(): Promise<void> {
       const apiUrl = agent.gastownApiUrl;
       const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
       if (apiUrl && token) {
-        void saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId);
+        snapshotPromises.push(saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId));
       }
     }
   }
+
+  // Await all snapshot saves before closing servers
+  await Promise.all(snapshotPromises);
 
   // Close all SDK servers
   for (const [, instance] of sdkInstances) {

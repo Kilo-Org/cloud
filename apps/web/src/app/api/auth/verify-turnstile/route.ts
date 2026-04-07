@@ -1,4 +1,4 @@
-import { NEXTAUTH_SECRET, TURNSTILE_SECRET_KEY } from '@/lib/config.server';
+import { NEXTAUTH_SECRET, NEXTAUTH_URL, TURNSTILE_SECRET_KEY } from '@/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
@@ -55,10 +55,11 @@ export async function POST(request: NextRequest) {
   });
 
   const res = NextResponse.json({ success: true });
+  const useSecureCookies = NEXTAUTH_URL?.startsWith('https://') ?? false;
   res.cookies.set('turnstile_jwt', verificationJWT, {
     httpOnly: true,
-    secure: process.env.NODE_ENV !== 'development',
-    sameSite: 'lax',
+    sameSite: useSecureCookies ? 'none' : 'lax',
+    secure: useSecureCookies,
     path: '/',
     maxAge: 60 * 60,
   });

@@ -8,7 +8,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { router, procedure, adminProcedure } from './init';
 import { resolveWastelandOwnership } from './ownership';
-import { getWastelandDOStub, type WastelandMemberResult } from '../dos/WastelandDO.stub';
+import { getWastelandDOStub, type WastelandMemberResult } from '../dos/Wasteland.do';
 import { getWastelandContainerStub } from '../dos/WastelandContainer.do';
 import { getWastelandRegistryStub } from '../dos/WastelandRegistry.do';
 import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.util';

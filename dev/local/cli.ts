@@ -35,6 +35,7 @@ import {
   startServiceInTmux,
   startInfra,
   readEnvValue,
+  readEnvMtime,
   waitForEnvValueChange,
 } from './runner';
 
@@ -148,23 +149,21 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
 
   if (captureServices.length > 0) {
     const oldValues = new Map<string, string | undefined>();
+    const oldMtimes = new Map<string, number | undefined>();
     if (captureServices.includes('kiloclaw-tunnel')) {
-      oldValues.set(
-        'tunnel',
-        readEnvValue(path.join(repoRoot, 'services/kiloclaw/.dev.vars'), 'KILOCODE_API_BASE_URL')
-      );
+      const tunnelEnvPath = path.join(repoRoot, 'services/kiloclaw/.dev.vars');
+      oldValues.set('tunnel', readEnvValue(tunnelEnvPath, 'KILOCODE_API_BASE_URL'));
+      oldMtimes.set('tunnel', readEnvMtime(tunnelEnvPath));
     }
     if (captureServices.includes('kiloclaw-stripe')) {
-      oldValues.set(
-        'stripe',
-        readEnvValue(path.join(repoRoot, '.env.development.local'), 'STRIPE_WEBHOOK_SECRET')
-      );
+      const stripeEnvPath = path.join(repoRoot, '.env.development.local');
+      oldValues.set('stripe', readEnvValue(stripeEnvPath, 'STRIPE_WEBHOOK_SECRET'));
+      oldMtimes.set('stripe', readEnvMtime(stripeEnvPath));
     }
     if (captureServices.includes('app-builder-tunnel')) {
-      oldValues.set(
-        'app-builder-tunnel',
-        readEnvValue(path.join(repoRoot, 'services/app-builder/.dev.vars'), 'BUILDER_HOSTNAME')
-      );
+      const appBuilderEnvPath = path.join(repoRoot, 'services/app-builder/.dev.vars');
+      oldValues.set('app-builder-tunnel', readEnvValue(appBuilderEnvPath, 'BUILDER_HOSTNAME'));
+      oldMtimes.set('app-builder-tunnel', readEnvMtime(appBuilderEnvPath));
     }
 
     for (const name of captureServices) {
@@ -181,7 +180,8 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
           path.join(repoRoot, 'services/kiloclaw/.dev.vars'),
           'KILOCODE_API_BASE_URL',
           oldValues.get('tunnel'),
-          30_000
+          30_000,
+          oldMtimes.get('tunnel')
         ).then(ready => {
           if (ready) {
             console.log('  Tunnel URL captured');
@@ -198,7 +198,8 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
           path.join(repoRoot, '.env.development.local'),
           'STRIPE_WEBHOOK_SECRET',
           oldValues.get('stripe'),
-          30_000
+          30_000,
+          oldMtimes.get('stripe')
         ).then(ready => {
           if (ready) {
             console.log('  Stripe webhook secret captured');
@@ -215,7 +216,8 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
           path.join(repoRoot, 'services/app-builder/.dev.vars'),
           'BUILDER_HOSTNAME',
           oldValues.get('app-builder-tunnel'),
-          30_000
+          30_000,
+          oldMtimes.get('app-builder-tunnel')
         ).then(ready => {
           if (ready) {
             console.log('  App builder tunnel URL captured');

@@ -293,16 +293,31 @@ export function readEnvValue(filePath: string, key: string): string | undefined 
   return match ? match[1] : undefined;
 }
 
+export function readEnvMtime(filePath: string): number | undefined {
+  try {
+    return fs.statSync(filePath).mtimeMs;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function waitForEnvValueChange(
   filePath: string,
   key: string,
   previousValue: string | undefined,
-  timeoutMs: number
+  timeoutMs: number,
+  previousMtimeMs?: number
 ): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const current = readEnvValue(filePath, key);
-    if (current !== undefined && current !== previousValue) return true;
+    const currentMtimeMs = readEnvMtime(filePath);
+    const fileWasRewritten =
+      previousMtimeMs !== undefined &&
+      currentMtimeMs !== undefined &&
+      currentMtimeMs > previousMtimeMs;
+
+    if (current !== undefined && (current !== previousValue || fileWasRewritten)) return true;
     await sleep(500);
   }
   return false;

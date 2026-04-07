@@ -26,6 +26,7 @@ import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/im
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { z } from 'zod';
 import { withDORetry } from '@kilocode/worker-utils';
+import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
@@ -53,11 +54,64 @@ const KiloCodeConfigPatchSchema = z.object({
 
 const platform = new Hono<AppEnv>();
 
+type BillingPlatformLogFields = {
+  billingFlow?: string;
+  billingRunId?: string;
+  billingSweep?: string;
+  billingCallId?: string;
+  billingAttempt?: number;
+  billingComponent: 'kiloclaw_platform';
+  event: 'downstream_action';
+  outcome: 'started' | 'completed' | 'failed';
+  method: string;
+  path: string;
+  durationMs?: number;
+  statusCode?: number;
+  userId?: string;
+  instanceId?: string;
+  error?: string;
+};
+
+function logBillingPlatform(
+  level: 'info' | 'error',
+  message: string,
+  fields: BillingPlatformLogFields
+) {
+  const record = JSON.stringify({
+    level,
+    message,
+    ...fields,
+  });
+
+  if (level === 'error') {
+    console.error(record);
+    return;
+  }
+  console.log(record);
+}
+
 // Analytics middleware — runs for every platform route. Captures timing and
 // error state. Skips emitting for routes with no user context (e.g. /versions)
 // unless an error occurred.
 platform.use('*', async (c, next) => {
   const start = c.get('requestStartTime') ?? performance.now();
+  const billingContext = readBillingCorrelationHeaders(c.req.raw.headers);
+  const method = c.req.method;
+  const path = c.req.path;
+  const instanceId = c.req.query('instanceId') ?? undefined;
+
+  if (billingContext) {
+    logBillingPlatform('info', 'Starting billing-correlated kiloclaw platform request', {
+      ...billingContext,
+      billingComponent: 'kiloclaw_platform',
+      event: 'downstream_action',
+      outcome: 'started',
+      method,
+      path,
+      instanceId,
+    });
+  }
+
   let error: string | undefined;
   try {
     await next();
@@ -69,12 +123,31 @@ platform.use('*', async (c, next) => {
     throw err;
   } finally {
     const durationMs = performance.now() - start;
-    const method = c.req.method;
-    const path = c.req.path;
 
     // userId is always read from Hono context — set by parseBody() for
     // POST/PATCH routes, or by setValidatedQueryUserId() for GET/DELETE routes.
     const userId = c.get('userId') || '';
+
+    if (billingContext) {
+      const statusCode = c.res.status;
+      logBillingPlatform(
+        error ? 'error' : 'info',
+        'Finished billing-correlated kiloclaw platform request',
+        {
+          ...billingContext,
+          billingComponent: 'kiloclaw_platform',
+          event: 'downstream_action',
+          outcome: error ? 'failed' : 'completed',
+          method,
+          path,
+          durationMs,
+          statusCode,
+          userId: userId || undefined,
+          instanceId,
+          ...(error ? { error } : {}),
+        }
+      );
+    }
 
     // Skip analytics for routes with no user context (e.g. /versions) unless
     // they errored — no userId means nothing useful to attribute.

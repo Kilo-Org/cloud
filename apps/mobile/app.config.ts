@@ -47,6 +47,11 @@ const config: ExpoConfig = {
       monochromeImage: './assets/images/android-icon-foreground.png',
     },
     predictiveBackGestureEnabled: false,
+    blockedPermissions: [
+      'android.permission.READ_MEDIA_IMAGES',
+      'android.permission.READ_MEDIA_VIDEO',
+      'android.permission.READ_MEDIA_AUDIO',
+    ],
   },
   plugins: [
     [
@@ -82,13 +87,6 @@ const config: ExpoConfig = {
       {
         photosPermission: 'Allow $(PRODUCT_NAME) to access your photos to share images in chat.',
         cameraPermission: 'Allow $(PRODUCT_NAME) to access your camera to take photos for chat.',
-      },
-    ],
-    [
-      'expo-media-library',
-      {
-        photosPermission: 'Allow $(PRODUCT_NAME) to access your photos to save and share media.',
-        savePhotosPermission: 'Allow $(PRODUCT_NAME) to save photos to your library.',
       },
     ],
     [

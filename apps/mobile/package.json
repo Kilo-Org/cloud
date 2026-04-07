@@ -45,7 +45,6 @@
     "expo-image-picker": "~55.0.14",
     "expo-insights": "55.0.12",
     "expo-linking": "~55.0.9",
-    "expo-media-library": "~55.0.10",
     "expo-router": "~55.0.8",
     "expo-secure-store": "~55.0.9",
     "expo-sharing": "~55.0.14",

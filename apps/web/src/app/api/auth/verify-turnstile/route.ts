@@ -57,8 +57,8 @@ export async function POST(request: NextRequest) {
   const res = NextResponse.json({ success: true });
   res.cookies.set('turnstile_jwt', verificationJWT, {
     httpOnly: true,
-    secure: process.env.NODE_ENV !== 'development',
-    sameSite: 'lax',
+    sameSite: 'none',
+    secure: true,
     path: '/',
     maxAge: 60 * 60,
   });

@@ -61,6 +61,7 @@ import {
   WORKOS_API_KEY,
   WORKOS_CLIENT_ID,
   NEXTAUTH_SECRET,
+  NEXTAUTH_URL,
   GITLAB_CLIENT_ID,
   GITLAB_CLIENT_SECRET,
   DISCORD_OAUTH_CLIENT_ID,
@@ -384,8 +385,25 @@ const logger: LoggerInstance = {
   error: sentryLogger('NEXTAUTH', 'error'),
 };
 
+const useSecureCookies = NEXTAUTH_URL?.startsWith('https://') ?? false;
+const cookiePrefix = useSecureCookies ? '__Secure-' : '';
+
 const authOptions: NextAuthOptions = {
   secret: NEXTAUTH_SECRET,
+  cookies: {
+    // Apple Sign In uses response_mode=form_post, which is a cross-site POST
+    // from appleid.apple.com. SameSite=Lax (the default) cookies are not sent
+    // on cross-site POSTs, so the PKCE code_verifier cookie gets dropped.
+    pkceCodeVerifier: {
+      name: `${cookiePrefix}next-auth.pkce.code_verifier`,
+      options: {
+        httpOnly: true,
+        sameSite: 'none',
+        path: '/',
+        secure: true,
+      },
+    },
+  },
   providers: [
     GoogleProvider({
       clientId: GOOGLE_CLIENT_ID,

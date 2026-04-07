@@ -541,136 +541,7 @@ export async function runKiloClawBillingLifecycleCron(
     }
   }
 
-  // ── Sweep 0a: Trial ending-soon warning ─────────────────────────────
-  const trialWarningCutoff = new Date(Date.now() + TRIAL_WARNING_DAYS * MS_PER_DAY).toISOString();
-  const trialWarningRows = await database
-    .select({
-      user_id: kiloclaw_subscriptions.user_id,
-      email: kilocode_users.google_user_email,
-      trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
-    })
-    .from(kiloclaw_subscriptions)
-    .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
-    .where(
-      and(
-        eq(kiloclaw_subscriptions.status, 'trialing'),
-        gte(kiloclaw_subscriptions.trial_ends_at, now),
-        lte(kiloclaw_subscriptions.trial_ends_at, trialWarningCutoff),
-        isNull(kiloclaw_subscriptions.suspended_at)
-      )
-    );
-
-  for (const row of trialWarningRows) {
-    try {
-      if (!row.trial_ends_at) continue;
-      const daysRemaining = Math.ceil(
-        (new Date(row.trial_ends_at).getTime() - Date.now()) / MS_PER_DAY
-      );
-
-      if (daysRemaining <= 1) {
-        // 1-day warning — more urgent, replaces the ending-soon message
-        const sent = await trySendEmail(
-          database,
-          row.user_id,
-          row.email,
-          'claw_trial_1d',
-          'clawTrialExpiresTomorrow',
-          { claw_url: clawUrl },
-          summary
-        );
-        if (sent) summary.trial_warnings++;
-      } else {
-        // Ending-soon warning (idempotent — skipped if already sent).
-        // Key kept as 'claw_trial_5d' so users warned under the old 5-day
-        // threshold aren't re-notified after the threshold changed to 2 days.
-        const sent = await trySendEmail(
-          database,
-          row.user_id,
-          row.email,
-          'claw_trial_5d',
-          'clawTrialEndingSoon',
-          { days_remaining: String(daysRemaining), claw_url: clawUrl },
-          summary,
-          `Your KiloClaw Trial Ends in ${daysRemaining} Days`
-        );
-        if (sent) summary.trial_warnings++;
-      }
-    } catch (error) {
-      summary.errors++;
-      captureException(error);
-      logError('Sweep 0a (trial warning) failed for user', {
-        user_id: row.user_id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  // ── Sweep 0b: Earlybird Warnings ───────────────────────────────────
-  const earlybirdExpiry = new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE);
-  const daysUntilEarlybird = Math.ceil((earlybirdExpiry.getTime() - Date.now()) / MS_PER_DAY);
-
-  if (daysUntilEarlybird > 0 && daysUntilEarlybird <= 14) {
-    const earlybirdRows = await database
-      .select({
-        user_id: kiloclaw_earlybird_purchases.user_id,
-        email: kilocode_users.google_user_email,
-      })
-      .from(kiloclaw_earlybird_purchases)
-      .innerJoin(kilocode_users, eq(kiloclaw_earlybird_purchases.user_id, kilocode_users.id))
-      .leftJoin(
-        kiloclaw_subscriptions,
-        eq(kiloclaw_earlybird_purchases.user_id, kiloclaw_subscriptions.user_id)
-      )
-      .where(
-        and(
-          sql`(${kiloclaw_subscriptions.status} IS NULL OR ${kiloclaw_subscriptions.status} NOT IN ('active', 'trialing'))`,
-          isNull(kiloclaw_subscriptions.suspended_at)
-        )
-      );
-
-    for (const row of earlybirdRows) {
-      try {
-        const expiryDate = formatDateForEmail(earlybirdExpiry);
-
-        if (daysUntilEarlybird <= 1) {
-          // 1-day warning — more urgent, replaces the 14-day message
-          const sent = await trySendEmail(
-            database,
-            row.user_id,
-            row.email,
-            'claw_earlybird_1d',
-            'clawEarlybirdExpiresTomorrow',
-            { expiry_date: expiryDate, claw_url: clawUrl },
-            summary
-          );
-          if (sent) summary.earlybird_warnings++;
-        } else {
-          // 14-day warning (idempotent — skipped if already sent)
-          const sent = await trySendEmail(
-            database,
-            row.user_id,
-            row.email,
-            'claw_earlybird_14d',
-            'clawEarlybirdEndingSoon',
-            {
-              days_remaining: String(daysUntilEarlybird),
-              expiry_date: expiryDate,
-              claw_url: clawUrl,
-            },
-            summary
-          );
-          if (sent) summary.earlybird_warnings++;
-        }
-      } catch (error) {
-        summary.errors++;
-        captureException(error);
-        logError('Sweep 0b (earlybird warning) failed for user', {
-          user_id: row.user_id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-  }
+  // ── Enforcement sweeps (run first — must complete before timeout) ────
 
   // ── Sweep 1: Trial Expiry ──────────────────────────────────────────
   const expiredTrials = await database
@@ -845,50 +716,6 @@ export async function runKiloClawBillingLifecycleCron(
       summary.errors++;
       captureException(error);
       logError('Sweep 2 (subscription expiry) failed for user', {
-        user_id: row.user_id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  // ── Sweep 2.5: Destruction 2-day Warning ───────────────────────────
-  const twoDaysFromNow = new Date(Date.now() + DESTRUCTION_WARNING_DAYS * MS_PER_DAY).toISOString();
-  const destructionWarningRows = await database
-    .select({
-      user_id: kiloclaw_subscriptions.user_id,
-      email: kilocode_users.google_user_email,
-      destruction_deadline: kiloclaw_subscriptions.destruction_deadline,
-    })
-    .from(kiloclaw_subscriptions)
-    .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
-    .where(
-      and(
-        gte(kiloclaw_subscriptions.destruction_deadline, now),
-        lte(kiloclaw_subscriptions.destruction_deadline, twoDaysFromNow),
-        isNotNull(kiloclaw_subscriptions.suspended_at)
-      )
-    );
-
-  for (const row of destructionWarningRows) {
-    try {
-      if (!row.destruction_deadline) continue;
-      const sent = await trySendEmail(
-        database,
-        row.user_id,
-        row.email,
-        'claw_destruction_warning',
-        'clawDestructionWarning',
-        {
-          destruction_date: formatDateForEmail(new Date(row.destruction_deadline)),
-          claw_url: clawUrl,
-        },
-        summary
-      );
-      if (sent) summary.destruction_warnings++;
-    } catch (error) {
-      summary.errors++;
-      captureException(error);
-      logError('Sweep 2.5 (destruction warning) failed for user', {
         user_id: row.user_id,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -1106,6 +933,186 @@ export async function runKiloClawBillingLifecycleCron(
         user_id: row.user_id,
         error: error instanceof Error ? error.message : String(error),
       });
+    }
+  }
+
+  // ── Advisory email sweeps (safe to skip on timeout) ─────────────────
+  // Refresh timestamp so advisory queries use wall-clock time, not the
+  // potentially-stale `now` captured before enforcement sweeps ran.
+  const advisoryNow = new Date().toISOString();
+
+  // ── Sweep 2.5: Destruction 2-day Warning ───────────────────────────
+  const twoDaysFromNow = new Date(Date.now() + DESTRUCTION_WARNING_DAYS * MS_PER_DAY).toISOString();
+  const destructionWarningRows = await database
+    .select({
+      user_id: kiloclaw_subscriptions.user_id,
+      email: kilocode_users.google_user_email,
+      destruction_deadline: kiloclaw_subscriptions.destruction_deadline,
+    })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .where(
+      and(
+        gte(kiloclaw_subscriptions.destruction_deadline, advisoryNow),
+        lte(kiloclaw_subscriptions.destruction_deadline, twoDaysFromNow),
+        isNotNull(kiloclaw_subscriptions.suspended_at)
+      )
+    );
+
+  for (const row of destructionWarningRows) {
+    try {
+      if (!row.destruction_deadline) continue;
+      const sent = await trySendEmail(
+        database,
+        row.user_id,
+        row.email,
+        'claw_destruction_warning',
+        'clawDestructionWarning',
+        {
+          destruction_date: formatDateForEmail(new Date(row.destruction_deadline)),
+          claw_url: clawUrl,
+        },
+        summary
+      );
+      if (sent) summary.destruction_warnings++;
+    } catch (error) {
+      summary.errors++;
+      captureException(error);
+      logError('Sweep 2.5 (destruction warning) failed for user', {
+        user_id: row.user_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  // ── Sweep 0a: Trial ending-soon warning ─────────────────────────────
+  const trialWarningCutoff = new Date(Date.now() + TRIAL_WARNING_DAYS * MS_PER_DAY).toISOString();
+  const trialWarningRows = await database
+    .select({
+      user_id: kiloclaw_subscriptions.user_id,
+      email: kilocode_users.google_user_email,
+      trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
+    })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.status, 'trialing'),
+        gte(kiloclaw_subscriptions.trial_ends_at, advisoryNow),
+        lte(kiloclaw_subscriptions.trial_ends_at, trialWarningCutoff),
+        isNull(kiloclaw_subscriptions.suspended_at)
+      )
+    );
+
+  for (const row of trialWarningRows) {
+    try {
+      if (!row.trial_ends_at) continue;
+      const daysRemaining = Math.ceil(
+        (new Date(row.trial_ends_at).getTime() - Date.now()) / MS_PER_DAY
+      );
+
+      if (daysRemaining <= 1) {
+        // 1-day warning — more urgent, replaces the ending-soon message
+        const sent = await trySendEmail(
+          database,
+          row.user_id,
+          row.email,
+          'claw_trial_1d',
+          'clawTrialExpiresTomorrow',
+          { claw_url: clawUrl },
+          summary
+        );
+        if (sent) summary.trial_warnings++;
+      } else {
+        // Ending-soon warning (idempotent — skipped if already sent).
+        // Key kept as 'claw_trial_5d' so users warned under the old 5-day
+        // threshold aren't re-notified after the threshold changed to 2 days.
+        const sent = await trySendEmail(
+          database,
+          row.user_id,
+          row.email,
+          'claw_trial_5d',
+          'clawTrialEndingSoon',
+          { days_remaining: String(daysRemaining), claw_url: clawUrl },
+          summary,
+          `Your KiloClaw Trial Ends in ${daysRemaining} Days`
+        );
+        if (sent) summary.trial_warnings++;
+      }
+    } catch (error) {
+      summary.errors++;
+      captureException(error);
+      logError('Sweep 0a (trial warning) failed for user', {
+        user_id: row.user_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  // ── Sweep 0b: Earlybird Warnings ───────────────────────────────────
+  const earlybirdExpiry = new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE);
+  const daysUntilEarlybird = Math.ceil((earlybirdExpiry.getTime() - Date.now()) / MS_PER_DAY);
+
+  if (daysUntilEarlybird > 0 && daysUntilEarlybird <= 14) {
+    const earlybirdRows = await database
+      .select({
+        user_id: kiloclaw_earlybird_purchases.user_id,
+        email: kilocode_users.google_user_email,
+      })
+      .from(kiloclaw_earlybird_purchases)
+      .innerJoin(kilocode_users, eq(kiloclaw_earlybird_purchases.user_id, kilocode_users.id))
+      .leftJoin(
+        kiloclaw_subscriptions,
+        eq(kiloclaw_earlybird_purchases.user_id, kiloclaw_subscriptions.user_id)
+      )
+      .where(
+        and(
+          sql`(${kiloclaw_subscriptions.status} IS NULL OR ${kiloclaw_subscriptions.status} NOT IN ('active', 'trialing'))`,
+          isNull(kiloclaw_subscriptions.suspended_at)
+        )
+      );
+
+    for (const row of earlybirdRows) {
+      try {
+        const expiryDate = formatDateForEmail(earlybirdExpiry);
+
+        if (daysUntilEarlybird <= 1) {
+          // 1-day warning — more urgent, replaces the 14-day message
+          const sent = await trySendEmail(
+            database,
+            row.user_id,
+            row.email,
+            'claw_earlybird_1d',
+            'clawEarlybirdExpiresTomorrow',
+            { expiry_date: expiryDate, claw_url: clawUrl },
+            summary
+          );
+          if (sent) summary.earlybird_warnings++;
+        } else {
+          // 14-day warning (idempotent — skipped if already sent)
+          const sent = await trySendEmail(
+            database,
+            row.user_id,
+            row.email,
+            'claw_earlybird_14d',
+            'clawEarlybirdEndingSoon',
+            {
+              days_remaining: String(daysUntilEarlybird),
+              expiry_date: expiryDate,
+              claw_url: clawUrl,
+            },
+            summary
+          );
+          if (sent) summary.earlybird_warnings++;
+        }
+      } catch (error) {
+        summary.errors++;
+        captureException(error);
+        logError('Sweep 0b (earlybird warning) failed for user', {
+          user_id: row.user_id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
 

@@ -28,6 +28,7 @@ import { allow_fake_login, ORGANIZATION_ID_HEADER } from './constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { redirect } from 'next/navigation';
+import { IMPACT_CLICK_ID_COOKIE } from '@/lib/impact-affiliate-utils';
 import { isOrganizationHardLocked } from '@/lib/organizations/trial-utils';
 import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
 import { secondsInDay } from 'date-fns/constants';
@@ -302,18 +303,26 @@ function createAccountInfo(
 
 async function getImpactClickIdFromAuthFlow(): Promise<string | null> {
   const cookieStore = await cookies();
+
+  // Prefer im_ref from the callback URL (explicitly passed through the auth flow)
   const callbackUrlCookie =
     cookieStore.get('__Secure-next-auth.callback-url')?.value ??
     cookieStore.get('next-auth.callback-url')?.value;
 
-  if (!callbackUrlCookie) return null;
-
-  try {
-    const callbackUrl = new URL(callbackUrlCookie, 'http://localhost');
-    return callbackUrl.searchParams.get('im_ref');
-  } catch {
-    return null;
+  if (callbackUrlCookie) {
+    try {
+      const callbackUrl = new URL(callbackUrlCookie, 'http://localhost');
+      const imRef = callbackUrl.searchParams.get('im_ref')?.trim();
+      if (imRef) return imRef;
+    } catch {
+      // fall through to cookie fallback
+    }
   }
+
+  // Fall back to the shared parent-domain cookie written by kilo.ai. This is
+  // our bridge cookie for auth redirects, not the native IR_<campaignId> UTT
+  // cookie set by Impact itself.
+  return cookieStore.get(IMPACT_CLICK_ID_COOKIE)?.value?.trim() || null;
 }
 
 type ExtendedProfile = Profile & {

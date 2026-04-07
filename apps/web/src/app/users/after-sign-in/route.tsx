@@ -3,7 +3,11 @@ import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
 import PostHogClient from '@/lib/posthog';
 import { getAffiliateAttribution, recordAffiliateAttribution } from '@/lib/affiliate-attribution';
-import { shouldTrackImpactSignupFallback } from '@/lib/impact-affiliate-utils';
+import {
+  IMPACT_CLICK_ID_COOKIE,
+  IMPACT_TRACKED_CLICK_ID_COOKIE,
+  shouldTrackImpactSignupFallback,
+} from '@/lib/impact-affiliate-utils';
 import { trackSignUp } from '@/lib/impact';
 import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
@@ -86,7 +90,17 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const impactClickId = url.searchParams.get('im_ref')?.trim();
+  // Resolve the Impact click ID: prefer the explicit URL param, fall back to
+  // the shared parent-domain cookie written by kilo.ai. This is intentionally
+  // separate from Impact's native IR_<campaignId> UTT cookie.
+  const imRefParam = url.searchParams.get('im_ref')?.trim();
+  const impactCookieValue = imRefParam
+    ? null
+    : request.cookies.get(IMPACT_TRACKED_CLICK_ID_COOKIE)?.value
+      ? null // already captured from cookie on a previous sign-in
+      : request.cookies.get(IMPACT_CLICK_ID_COOKIE)?.value?.trim() || null;
+  const impactClickId = imRefParam || impactCookieValue;
+
   if (user && impactClickId) {
     const existingAttribution = await getAffiliateAttribution(user.id, 'impact');
 
@@ -123,5 +137,19 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(new URL(responsePath, APP_URL));
+  const response = NextResponse.redirect(new URL(responsePath, APP_URL));
+
+  // When the attribution came from the cookie (not the URL), mark it as
+  // tracked so we don't repeat the DB lookup on every subsequent sign-in.
+  if (impactCookieValue && !request.cookies.get(IMPACT_TRACKED_CLICK_ID_COOKIE)?.value) {
+    response.cookies.set(IMPACT_TRACKED_CLICK_ID_COOKIE, impactCookieValue, {
+      path: '/',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 365 * 24 * 60 * 60, // 1 year
+    });
+  }
+
+  return response;
 }

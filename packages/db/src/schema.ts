@@ -3354,13 +3354,27 @@ export const agent_environment_profile_repo_bindings = pgTable(
     profile_id: uuid()
       .notNull()
       .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    // Ownership: exactly one must be set (mirrors agent_environment_profiles pattern)
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    uniqueIndex('UQ_agent_env_profile_repo_bindings_repo_platform_profile').on(
-      table.repo_full_name,
-      table.platform,
-      table.profile_id
+    // One binding per repo+platform per user
+    uniqueIndex('UQ_agent_env_profile_repo_bindings_user')
+      .on(table.repo_full_name, table.platform, table.owned_by_user_id)
+      .where(isNotNull(table.owned_by_user_id)),
+    // One binding per repo+platform per org
+    uniqueIndex('UQ_agent_env_profile_repo_bindings_org')
+      .on(table.repo_full_name, table.platform, table.owned_by_organization_id)
+      .where(isNotNull(table.owned_by_organization_id)),
+    // Owner check constraint (exactly one must be set)
+    check(
+      'agent_env_profile_repo_bindings_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
     ),
   ]
 );

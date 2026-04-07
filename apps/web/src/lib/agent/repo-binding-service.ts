@@ -3,9 +3,8 @@ import { TRPCError } from '@trpc/server';
 import type { ProfileOwner } from './types';
 import { verifyProfileOwnership } from './profile-utils';
 import {
+  upsertBinding,
   findBinding,
-  updateBindingProfile,
-  insertBinding,
   deleteBinding,
   selectBindingsWithProfiles,
 } from './repo-binding-db';
@@ -19,7 +18,7 @@ type RepoBinding = {
 
 /**
  * Bind an environment profile to a repository.
- * If the owner already has a binding for this repo+platform, updates it to the new profile.
+ * Atomic upsert — safe against concurrent calls for the same owner+repo+platform.
  */
 export async function bindProfileToRepo(
   owner: ProfileOwner,
@@ -28,20 +27,11 @@ export async function bindProfileToRepo(
   profileId: string
 ): Promise<void> {
   await verifyProfileOwnership(profileId, owner);
-
-  const repoLower = repoFullName.toLowerCase();
-  const existing = await findBinding(owner, repoLower, platform);
-
-  if (existing) {
-    await updateBindingProfile(existing.bindingId, profileId);
-  } else {
-    await insertBinding(repoLower, platform, profileId);
-  }
+  await upsertBinding(owner, repoFullName.toLowerCase(), platform, profileId);
 }
 
 /**
  * Remove the profile binding for a repository.
- * Verifies ownership by joining through the profile before deleting.
  */
 export async function unbindRepo(
   owner: ProfileOwner,

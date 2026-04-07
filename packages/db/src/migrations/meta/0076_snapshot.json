@@ -1,5 +1,5 @@
 {
-  "id": "929f499a-107b-4e48-b6b9-4a47305af051",
+  "id": "b3ee3f96-61b6-4cbb-8a6a-4c78748e0d11",
   "prevId": "cb9b2887-c537-4f83-9fe8-0bfa2b6b96c7",
   "version": "7",
   "dialect": "postgresql",
@@ -319,6 +319,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "owned_by_organization_id": {
+          "name": "owned_by_organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owned_by_user_id": {
+          "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -328,8 +340,8 @@
         }
       },
       "indexes": {
-        "UQ_agent_env_profile_repo_bindings_repo_platform_profile": {
-          "name": "UQ_agent_env_profile_repo_bindings_repo_platform_profile",
+        "UQ_agent_env_profile_repo_bindings_user": {
+          "name": "UQ_agent_env_profile_repo_bindings_user",
           "columns": [
             {
               "expression": "repo_full_name",
@@ -344,13 +356,42 @@
               "nulls": "last"
             },
             {
-              "expression": "profile_id",
+              "expression": "owned_by_user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
+          "where": "\"agent_environment_profile_repo_bindings\".\"owned_by_user_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_agent_env_profile_repo_bindings_org": {
+          "name": "UQ_agent_env_profile_repo_bindings_org",
+          "columns": [
+            {
+              "expression": "repo_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"agent_environment_profile_repo_bindings\".\"owned_by_organization_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -369,12 +410,43 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "agent_environment_profile_repo_bindings_owned_by_organization_id_organizations_id_fk": {
+          "name": "agent_environment_profile_repo_bindings_owned_by_organization_id_organizations_id_fk",
+          "tableFrom": "agent_environment_profile_repo_bindings",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "owned_by_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "agent_environment_profile_repo_bindings_owned_by_user_id_kilocode_users_id_fk": {
+          "name": "agent_environment_profile_repo_bindings_owned_by_user_id_kilocode_users_id_fk",
+          "tableFrom": "agent_environment_profile_repo_bindings",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "owned_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "agent_env_profile_repo_bindings_owner_check": {
+          "name": "agent_env_profile_repo_bindings_owner_check",
+          "value": "(\n        (\"agent_environment_profile_repo_bindings\".\"owned_by_user_id\" IS NOT NULL AND \"agent_environment_profile_repo_bindings\".\"owned_by_organization_id\" IS NULL) OR\n        (\"agent_environment_profile_repo_bindings\".\"owned_by_user_id\" IS NULL AND \"agent_environment_profile_repo_bindings\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.agent_environment_profile_vars": {

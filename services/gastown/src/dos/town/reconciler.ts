@@ -1160,18 +1160,14 @@ export function reconcileReviewQueue(
     }
   }
 
-  // When refinery code review is disabled, fast-track ALL open MR beads
-  // to in_progress so poll_pr handles them once pr_url is populated.
-  // This must include beads without pr_url yet (timing window between
-  // review_submitted and the polecat setting pr_url) to prevent Rules 5-6
-  // from dispatching the refinery for a code review that shouldn't happen.
-  //
-  // Direct-merge strategy MR beads (no pr_url, refinery merges itself)
-  // still need the refinery — but those are only created when
-  // merge_strategy='direct', which inherently requires the refinery.
+  // When refinery code review is disabled, fast-track open MR beads that have
+  // a pr_url (PR-strategy). These bypass the refinery entirely — the merge
+  // is handled by the user/CI via the PR. Direct-merge MR beads (no pr_url)
+  // always need the refinery to perform the merge itself, so they must NOT
+  // be fast-tracked here regardless of the code_review setting.
   const fastTrackedBeadIds = new Set<string>();
   if (!refineryCodeReview) {
-    const openMrs = z
+    const prStrategyMrs = z
       .object({ bead_id: z.string() })
       .array()
       .parse([
@@ -1180,13 +1176,16 @@ export function reconcileReviewQueue(
           /* sql */ `
             SELECT b.${beads.columns.bead_id}
             FROM ${beads} b
+            INNER JOIN ${review_metadata} rm
+              ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
             WHERE b.${beads.columns.type} = 'merge_request'
               AND b.${beads.columns.status} = 'open'
+              AND rm.${review_metadata.columns.pr_url} IS NOT NULL
           `,
           []
         ),
       ]);
-    for (const { bead_id } of openMrs) {
+    for (const { bead_id } of prStrategyMrs) {
       fastTrackedBeadIds.add(bead_id);
       actions.push({
         type: 'transition_bead',
@@ -1199,10 +1198,11 @@ export function reconcileReviewQueue(
     }
   }
 
-  // Rules 5-6: Refinery dispatch for open MR beads.
+  // Rules 5-6: Refinery dispatch for direct-merge MR beads.
   // Always runs for direct-merge MR beads (refinery performs the merge).
-  // When code_review=false AND merge_strategy=pr, MR beads are fast-tracked
-  // above — only direct-merge MR beads (not in fastTrackedBeadIds) remain.
+  // When code_review=false AND merge_strategy=pr, MR beads with pr_url are
+  // fast-tracked above — only direct-merge MR beads (not in fastTrackedBeadIds)
+  // remain for Rules 5-6.
   {
     // Rule 5: Pop open MR bead for idle refinery
     // Get all rigs that have open MR beads, excluding fast-tracked ones

@@ -85,7 +85,7 @@ type KiloPassSubscriptionAlertView =
       kind: 'paused';
       variant: 'default';
       title: 'Subscription paused';
-      description: 'Your Kilo Pass subscription is paused in Stripe. Open the customer portal to resume billing.';
+      description: string;
     }
   | {
       kind: 'past_due';
@@ -150,6 +150,7 @@ export type KiloPassSubscriptionInfoView = {
 
   actions: {
     resume: { label: 'Resume subscription' } | null;
+    resumePaused: { label: 'Resume subscription' } | null;
     manage: { label: string; variant: ButtonVariant } | null;
     cancel: { label: 'Cancel subscription' } | null;
   };
@@ -289,12 +290,15 @@ export function deriveKiloPassSubscriptionInfoView(
 
   const alerts: KiloPassSubscriptionAlertView[] = [];
   if (status.kind === 'paused') {
+    const resumeDateLabel = formatIsoDateLabel({ iso: subscription.resumesAt });
+    const description = resumeDateLabel
+      ? `Your subscription is paused. It will automatically resume on ${resumeDateLabel}.`
+      : 'Your subscription is paused.';
     alerts.push({
       kind: 'paused',
       variant: 'default',
       title: 'Subscription paused',
-      description:
-        'Your Kilo Pass subscription is paused in Stripe. Open the customer portal to resume billing.',
+      description,
     });
   }
   if (status.kind === 'past_due') {
@@ -349,16 +353,13 @@ export function deriveKiloPassSubscriptionInfoView(
   const tierConfig = KILO_PASS_TIER_CONFIG[subscription.tier];
   const predictedStreakMonths = Math.max(1, subscription.currentStreakMonths + 1);
 
-  const manageLabel = needsPaymentFix
-    ? 'Fix payment'
-    : status.kind === 'paused'
-      ? 'Resume in Stripe'
-      : 'Manage subscription';
+  const manageLabel = needsPaymentFix ? 'Fix payment' : 'Manage subscription';
   const manageVariant: ButtonVariant = needsPaymentFix ? 'default' : 'outline';
 
   const canManageSubscription = !status.isEnded;
   const canCancelSubscription = subscription.status === 'active' && !subscription.cancelAtPeriodEnd;
   const canResumeSubscription = !status.isEnded && subscription.cancelAtPeriodEnd;
+  const canResumePausedSubscription = subscription.status === 'paused';
 
   return {
     header: {
@@ -408,6 +409,7 @@ export function deriveKiloPassSubscriptionInfoView(
     },
     actions: {
       resume: canResumeSubscription ? { label: 'Resume subscription' } : null,
+      resumePaused: canResumePausedSubscription ? { label: 'Resume subscription' } : null,
       manage: canManageSubscription ? { label: manageLabel, variant: manageVariant } : null,
       cancel: canCancelSubscription ? { label: 'Cancel subscription' } : null,
     },

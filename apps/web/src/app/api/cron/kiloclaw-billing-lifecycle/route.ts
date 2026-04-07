@@ -5,6 +5,8 @@ import { CRON_SECRET } from '@/lib/config.server';
 import { sentryLogger } from '@/lib/utils.server';
 import { runKiloClawBillingLifecycleCron } from '@/lib/kiloclaw/billing-lifecycle-cron';
 
+export const maxDuration = 800;
+
 if (!CRON_SECRET) {
   throw new Error('CRON_SECRET is not configured in environment variables');
 }

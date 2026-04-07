@@ -8,6 +8,7 @@ import type Stripe from 'stripe';
 import type { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { getOpenPauseEvent } from '@/lib/kilo-pass/pause-events';
 
 type Db = typeof defaultDb;
 type DbOrTx = Db | DrizzleTransaction;
@@ -22,6 +23,7 @@ export type KiloPassSubscriptionState = {
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
   startedAt: string | null;
+  resumesAt: string | null;
 };
 
 type KiloPassSubscriptionRowForState = {
@@ -122,15 +124,26 @@ export async function getKiloPassStateForUser(
   const selected = pickSubscriptionForState(subscriptions);
   if (!selected) return null;
 
+  // Check for an open pause event. Stripe keeps status 'active' when pause_collection
+  // is first set (the status changes to 'paused' only at the next billing cycle), so we
+  // derive the paused state from the pause event table rather than the DB status.
+  const openPause = await getOpenPauseEvent(db, {
+    kiloPassSubscriptionId: selected.subscriptionId,
+  });
+  const isPaused = openPause != null;
+  const resumesAt =
+    isPaused && openPause.resumes_at ? normalizeTimestampToIso(openPause.resumes_at) : null;
+
   return {
     subscriptionId: selected.subscriptionId,
     stripeSubscriptionId: selected.stripeSubscriptionId,
     tier: selected.tier,
     cadence: selected.cadence,
-    status: selected.status,
+    status: isPaused ? 'paused' : selected.status,
     cancelAtPeriodEnd: selected.cancelAtPeriodEnd,
     currentStreakMonths: selected.currentStreakMonths,
     nextYearlyIssueAt: normalizeTimestampToIso(selected.nextYearlyIssueAt),
     startedAt: normalizeTimestampToIso(selected.startedAt),
+    resumesAt,
   };
 }

@@ -411,14 +411,10 @@ export const byokRouter = createTRPCRouter({
 
         const directByokProvider = DIRECT_BYOK_PROVIDERS.find(plan => plan.id === provider);
         if (directByokProvider) {
-          if (directByokProvider.ai_sdk_provider === 'openai-compatible') {
-            return {
-              finalProvider: provider,
-              model: createAiSdkProvider(directByokProvider, decryptedKey.decryptedAPIKey)(model),
-            };
-          } else {
-            throw new Error('Unrecognized AI SDK provider: ' + directByokProvider.ai_sdk_provider);
-          }
+          return {
+            finalProvider: provider,
+            model: createAiSdkProvider(directByokProvider, decryptedKey.decryptedAPIKey)(model),
+          };
         }
 
         const [finalProvider, byokList] = getVercelInferenceProviderConfigForUserByok(decryptedKey);
@@ -441,9 +437,16 @@ export const byokRouter = createTRPCRouter({
         const output = await generateText({
           model,
           prompt: 'Say hi',
-          maxOutputTokens: 100,
+          maxOutputTokens: 1000,
           providerOptions,
         });
+
+        if (output.finishReason !== 'stop') {
+          return {
+            success: false,
+            message: `API key (${decryptedKey.providerId}) test failed with finish reason: ${output.finishReason}`,
+          };
+        }
 
         const metadata = output.providerMetadata?.gateway?.routing as
           | { originalModelId?: string; finalProvider?: string }

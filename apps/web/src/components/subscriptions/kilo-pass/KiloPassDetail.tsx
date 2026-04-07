@@ -102,7 +102,7 @@ export function KiloPassDetail() {
   }
 
   async function handleResume() {
-    await trpcClient.kiloPass.resumeSubscription.mutate();
+    await trpcClient.kiloPass.resumeCancelledSubscription.mutate();
     toast.success('Subscription resumed');
     await refreshData();
   }

@@ -337,6 +337,40 @@ export const kilo_pass_issuances = pgTable(
 export type KiloPassIssuance = typeof kilo_pass_issuances.$inferSelect;
 export type NewKiloPassIssuance = typeof kilo_pass_issuances.$inferInsert;
 
+export const kilo_pass_pause_events = pgTable(
+  'kilo_pass_pause_events',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_pass_subscription_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_subscriptions.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    paused_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    resumes_at: timestamp({ withTimezone: true, mode: 'string' }),
+    resumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_kilo_pass_pause_events_subscription_id').on(table.kilo_pass_subscription_id),
+    uniqueIndex('UQ_kilo_pass_pause_events_one_open_per_sub')
+      .on(table.kilo_pass_subscription_id)
+      .where(sql`${table.resumed_at} IS NULL`),
+    check(
+      'kilo_pass_pause_events_resumed_at_after_paused_at_check',
+      sql`${table.resumed_at} IS NULL OR ${table.resumed_at} >= ${table.paused_at}`
+    ),
+  ]
+);
+
+export type KiloPassPauseEvent = typeof kilo_pass_pause_events.$inferSelect;
+export type NewKiloPassPauseEvent = typeof kilo_pass_pause_events.$inferInsert;
+
 export const kilo_pass_issuance_items = pgTable(
   'kilo_pass_issuance_items',
   {

@@ -24,7 +24,7 @@ import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
 import { writeKiloCliConfig } from './kilo-cli-config';
 import { writeGogCredentials } from './gog-credentials';
 import { startWatchRenewal, stopWatchRenewal } from './gmail-watch-renewal';
-import { bootstrap } from './bootstrap';
+import { bootstrapCritical, bootstrapNonCritical } from './bootstrap';
 import type { ControllerStateRef, ControllerState } from './bootstrap';
 import { getOpenclawVersion } from './openclaw-version';
 import { startCheckin } from './checkin';
@@ -264,12 +264,12 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     });
   });
 
-  // ── Phase 2: Bootstrap ──────────────────────────────────────────────
-  // Decrypts env vars, sets up directories, applies feature flags, runs
-  // onboard/doctor, patches config, builds gateway args. Updates
-  // controllerState as it progresses through each phase.
+  // ── Phase 2: Critical bootstrap ─────────────────────────────────────
+  // Decrypts env vars, sets up directories, applies feature flags, and
+  // builds gateway args. Failures here are fatal because route auth and
+  // runtime config depend on the decrypted env.
   try {
-    await bootstrap(env, phase => {
+    await bootstrapCritical(env, phase => {
       controllerState.current = { state: 'bootstrapping', phase };
     });
   } catch (err) {
@@ -290,24 +290,10 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     return;
   }
 
-  // ── Phase 4: Best-effort pre-gateway setup ──────────────────────────
-  try {
-    writeKiloCliConfig(env as Record<string, string | undefined>);
-  } catch (err) {
-    console.error('[kilo-cli] Failed to write config:', err);
-  }
-
-  try {
-    await writeGogCredentials(env as Record<string, string | undefined>);
-  } catch (err) {
-    console.error('[gog] Failed to write credentials:', err);
-  }
-
-  // ── Phase 5: Create supervisors and register routes ─────────────────
-  // Routes are registered unconditionally so /_kilo/version, /_kilo/config/*,
-  // and /_kilo/env/* are available even if the gateway fails to start.
-  // The catch-all proxy returns 503 "Gateway not ready" when the supervisor
-  // isn't running, which is the correct behavior for degraded mode.
+  // ── Phase 4: Create supervisors and register routes ─────────────────
+  // Routes are registered before the doctor/onboard path runs so the
+  // controller's recovery APIs remain available if non-critical bootstrap
+  // later fails.
   const pc = createPairingCache();
   pairingCache = pc;
 
@@ -374,7 +360,6 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     })
   );
 
-  // Activate the Hono app and WebSocket handler.
   app = honoApp;
   const wsState = { activeConnections: 0 };
   wsUpgradeRef.handler = (req, socket, head) => {
@@ -389,7 +374,36 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     });
   };
 
-  // ── Phase 6: Start gateway ──────────────────────────────────────────
+  // ── Phase 5: Non-critical bootstrap ─────────────────────────────────
+  const nonCriticalResult = await bootstrapNonCritical(env, phase => {
+    controllerState.current = { state: 'bootstrapping', phase };
+  });
+  if (!nonCriticalResult.ok) {
+    controllerState.current = {
+      state: 'degraded',
+      error: toPublicDegradedError(nonCriticalResult.phase),
+    };
+    console.error(
+      `[controller] Non-critical bootstrap failed during ${nonCriticalResult.phase}, running in degraded mode:`,
+      nonCriticalResult.error
+    );
+    return;
+  }
+
+  // ── Phase 6: Best-effort pre-gateway setup ──────────────────────────
+  try {
+    writeKiloCliConfig(env as Record<string, string | undefined>);
+  } catch (err) {
+    console.error('[kilo-cli] Failed to write config:', err);
+  }
+
+  try {
+    await writeGogCredentials(env as Record<string, string | undefined>);
+  } catch (err) {
+    console.error('[gog] Failed to write credentials:', err);
+  }
+
+  // ── Phase 7: Start gateway ──────────────────────────────────────────
   controllerState.current = { state: 'starting' };
   console.log('[controller] Bootstrap complete, starting gateway...');
 

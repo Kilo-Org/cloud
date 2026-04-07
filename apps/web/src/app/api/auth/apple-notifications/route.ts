@@ -7,6 +7,7 @@ import { user_auth_provider } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest } from '@/lib/utils.server';
+import { APPLE_CLIENT_ID } from '@/lib/config.server';
 
 const APPLE_JWKS_URL = 'https://appleid.apple.com/auth/keys';
 
@@ -51,7 +52,11 @@ function jwkToPem(jwk: AppleJWK): string {
 }
 
 function verifyAppleJwt(token: string, pem: string): AppleEvent {
-  const payload = jwt.verify(token, pem, { algorithms: ['RS256'] });
+  const payload = jwt.verify(token, pem, {
+    algorithms: ['RS256'],
+    issuer: 'https://appleid.apple.com',
+    audience: APPLE_CLIENT_ID,
+  });
   if (typeof payload === 'string' || !payload) {
     throw new Error('Invalid JWT payload');
   }

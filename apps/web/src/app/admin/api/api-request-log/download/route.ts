@@ -2,9 +2,13 @@ import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
-import { and, gte, lte, eq, asc } from 'drizzle-orm';
+import { and, gte, lte, eq, asc, or } from 'drizzle-orm';
 import archiver from 'archiver';
 import { PassThrough } from 'node:stream';
+import { sql } from 'drizzle-orm';
+import crypto from 'node:crypto';
+import PROVIDERS from '@/lib/providers/provider-definitions';
+import type { Provider } from '@/lib/providers/types';
 
 function formatTimestamp(isoString: string): string {
   return isoString.replaceAll(':', '-').replaceAll(' ', '_');
@@ -54,6 +58,24 @@ function jsonError(message: string, status: number) {
   });
 }
 
+function generateProviderSpecificHash(payload: string, provider: Provider): string {
+  const salt = 'd20250815';
+  const pepper =
+    provider.id === 'vercel'
+      ? 'vercel'
+      : provider.id === 'openrouter'
+        ? 'henk is a boss'
+        : provider.apiUrl;
+  return crypto
+    .createHash('sha256')
+    .update(salt + pepper + payload)
+    .digest('base64');
+}
+
+function hashSessionId(userId: string, sessionId: string, provider: Provider): string {
+  return generateProviderSpecificHash(userId + '-' + sessionId, provider);
+}
+
 export async function GET(request: NextRequest) {
   await connection();
 
@@ -66,6 +88,8 @@ export async function GET(request: NextRequest) {
   const userId = searchParams.get('userId');
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
+  const model = searchParams.get('model');
+  const sessionId = searchParams.get('sessionId');
 
   if (!userId || !startDate || !endDate) {
     return jsonError('userId, startDate, and endDate are required', 400);
@@ -77,17 +101,36 @@ export async function GET(request: NextRequest) {
     return jsonError('Invalid date format. Use YYYY-MM-DD.', 400);
   }
 
-  const rows = await db
-    .select()
-    .from(api_request_log)
-    .where(
-      and(
-        eq(api_request_log.kilo_user_id, userId),
-        gte(api_request_log.created_at, parsedStart.toISOString()),
-        lte(api_request_log.created_at, parsedEnd.toISOString())
-      )
-    )
-    .orderBy(asc(api_request_log.created_at));
+  const conditions = [
+    eq(api_request_log.kilo_user_id, userId),
+    gte(api_request_log.created_at, parsedStart.toISOString()),
+    lte(api_request_log.created_at, parsedEnd.toISOString()),
+  ];
+
+  if (model) {
+    conditions.push(eq(api_request_log.model, model));
+  }
+
+  let rows;
+  if (sessionId) {
+    const hashes = Object.values(PROVIDERS).map(provider =>
+      hashSessionId(userId, sessionId, provider)
+    );
+    const promptCacheKeyConditions = hashes.map(
+      h => sql`${api_request_log.request}->>'prompt_cache_key' = ${h}`
+    );
+    rows = await db
+      .select()
+      .from(api_request_log)
+      .where(and(...conditions, or(...promptCacheKeyConditions)))
+      .orderBy(asc(api_request_log.created_at));
+  } else {
+    rows = await db
+      .select()
+      .from(api_request_log)
+      .where(and(...conditions))
+      .orderBy(asc(api_request_log.created_at));
+  }
 
   if (rows.length === 0) {
     return jsonError('No records found for the given criteria', 404);

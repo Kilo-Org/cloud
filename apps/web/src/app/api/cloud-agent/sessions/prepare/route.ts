@@ -186,11 +186,16 @@ export async function POST(request: Request) {
         ? { type: 'organization', id: input.organizationId }
         : { type: 'user', id: user.id };
 
+      const repoFullName = input.githubRepo ?? input.gitlabProject;
+      const platform = input.gitlabProject ? PLATFORM.GITLAB : PLATFORM.GITHUB;
+
       const merged = await mergeProfileConfiguration({
         profileName: input.profileName,
         owner,
         // In org context, pass userId to enable fallback to personal profiles
         userId: input.organizationId ? user.id : undefined,
+        repoFullName,
+        platform,
         envVars: input.envVars,
         setupCommands: input.setupCommands,
       });

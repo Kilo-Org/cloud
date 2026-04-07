@@ -203,10 +203,15 @@ export const organizationCloudAgentRouter = createTRPCRouter({
       } = input;
 
       try {
+        const repoFullName = githubRepo ?? gitlabProject;
+        const platform = gitlabProject ? PLATFORM.GITLAB : PLATFORM.GITHUB;
+
         const merged = await mergeProfileConfiguration({
           profileName,
           owner: { type: 'organization', id: organizationId },
           userId: ctx.user.id,
+          repoFullName,
+          platform,
           envVars,
           setupCommands,
         });
@@ -277,10 +282,15 @@ export const organizationCloudAgentRouter = createTRPCRouter({
       } = input;
 
       try {
+        const repoFullName = githubRepo ?? gitlabProject;
+        const platform = gitlabProject ? PLATFORM.GITLAB : PLATFORM.GITHUB;
+
         const merged = await mergeProfileConfiguration({
           profileName,
           owner: { type: 'organization', id: organizationId },
           userId: ctx.user.id,
+          repoFullName,
+          platform,
           envVars,
           setupCommands,
         });

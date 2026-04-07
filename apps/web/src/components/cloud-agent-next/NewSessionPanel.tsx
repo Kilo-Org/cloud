@@ -912,6 +912,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               <Separator />
               <div className="p-4">
                 <AdvancedConfig
+                  label=""
                   organizationId={organizationId}
                   selectedProfileId={selectedProfileId}
                   onProfileSelect={handleProfileSelect}
@@ -921,6 +922,8 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                   effectiveSetupCommands={effectiveSetupCommands}
                   onManualEnvVarsChange={setManualEnvVars}
                   onManualSetupCommandsChange={setManualSetupCommands}
+                  repoFullName={selectedRepo || undefined}
+                  platform={selectedPlatform}
                 />
               </div>
             </PopoverContent>

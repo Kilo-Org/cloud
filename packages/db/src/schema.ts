@@ -3337,6 +3337,39 @@ export const agent_environment_profile_commands = pgTable(
 
 export type AgentEnvironmentProfileCommand = typeof agent_environment_profile_commands.$inferSelect;
 
+// ============ AGENT ENVIRONMENT PROFILE REPO BINDINGS ============
+// Bind a single environment profile to a repository so sessions auto-inherit it
+
+export const agent_environment_profile_repo_bindings = pgTable(
+  'agent_environment_profile_repo_bindings',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    repo_full_name: text().notNull(),
+    platform: text({ enum: ['github', 'gitlab'] })
+      .notNull()
+      .default('github'),
+    profile_id: uuid()
+      .notNull()
+      .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_agent_env_profile_repo_bindings_repo_platform_profile').on(
+      table.repo_full_name,
+      table.platform,
+      table.profile_id
+    ),
+  ]
+);
+
+export type AgentEnvironmentProfileRepoBinding =
+  typeof agent_environment_profile_repo_bindings.$inferSelect;
+export type NewAgentEnvironmentProfileRepoBinding =
+  typeof agent_environment_profile_repo_bindings.$inferInsert;
+
 // ============ APP BUILDER FEEDBACK ============
 
 export const app_builder_feedback = pgTable(

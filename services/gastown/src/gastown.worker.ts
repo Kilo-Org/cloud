@@ -589,10 +589,8 @@ app.get('/api/towns/:townId/drain-status', c =>
 // Simple pass-through to TownContainerDO registry.
 // Protected by authMiddleware (accepts container JWTs), not kiloAuthMiddleware.
 
-app.use(
-  '/api/towns/:townId/container-registry',
-  async (c: Context<GastownEnv, string>, next) =>
-    c.env.ENVIRONMENT === 'development' ? next() : authMiddleware(c, next)
+app.use('/api/towns/:townId/container-registry', async (c: Context<GastownEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : authMiddleware(c, next)
 );
 
 app.get('/api/towns/:townId/container-registry', async c => {
@@ -605,7 +603,7 @@ app.get('/api/towns/:townId/container-registry', async c => {
 
 app.post('/api/towns/:townId/container-registry', async c => {
   const townId = c.req.param('townId');
-  const body = await c.req.json();
+  const body: unknown = await c.req.json();
   const tc = getTownContainerStub(c.env, townId);
   // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
   await tc.updateRegistry(body);
@@ -800,8 +798,6 @@ app.get('/api/users/:userId/towns/:townId/events', c =>
     handleListTownEvents(c, c.req.param())
   )
 );
-
-
 
 // ── Town Container ──────────────────────────────────────────────────────
 // These routes proxy commands to the container's control server via DO.fetch().

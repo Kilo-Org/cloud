@@ -98,7 +98,9 @@ async function hydrateDbFromSnapshot(
     const dir = `/tmp/agent-home-${agentId}/.local/share/kilo`;
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(`${dir}/kilo.db`, Buffer.from(buffer));
-    console.log(`${MANAGER_LOG} Hydrated DB snapshot for agent ${agentId} (${buffer.byteLength} bytes)`);
+    console.log(
+      `${MANAGER_LOG} Hydrated DB snapshot for agent ${agentId} (${buffer.byteLength} bytes)`
+    );
   } catch (err) {
     console.warn(`${MANAGER_LOG} DB hydration failed for agent ${agentId}:`, err);
   }
@@ -131,7 +133,9 @@ async function saveDbSnapshot(
       console.warn(`${MANAGER_LOG} Failed to save DB snapshot for ${agentId}: ${resp.status}`);
       return;
     }
-    console.log(`${MANAGER_LOG} Saved DB snapshot for agent ${agentId} (${buffer.byteLength} bytes)`);
+    console.log(
+      `${MANAGER_LOG} Saved DB snapshot for agent ${agentId} (${buffer.byteLength} bytes)`
+    );
   } catch (err) {
     if ((err as { code?: string }).code === 'ENOENT') {
       console.log(`${MANAGER_LOG} No kilo.db found for agent ${agentId}, skipping snapshot save`);
@@ -1551,7 +1555,9 @@ export async function bootHydration(): Promise<void> {
   const token = process.env.GASTOWN_CONTAINER_TOKEN;
 
   if (!apiUrl || !townId || !token) {
-    console.log(`${LOG} Missing GASTOWN_API_URL, GASTOWN_TOWN_ID, or GASTOWN_CONTAINER_TOKEN — skipping boot hydration`);
+    console.log(
+      `${LOG} Missing GASTOWN_API_URL, GASTOWN_TOWN_ID, or GASTOWN_CONTAINER_TOKEN — skipping boot hydration`
+    );
     return;
   }
 

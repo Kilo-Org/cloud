@@ -603,7 +603,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const isFreeModelRequiringCostRemoval =
     (provider.id === 'openrouter' || provider.id === 'vercel') &&
     isKiloFreeModel(originalModelIdLowerCased);
-  const isStealthModelRequiringNameRemoval = isKiloStealthModel(originalModelIdLowerCased);
+  const isStealthModelRequiringNameRemoval =
+    provider.id !== 'martian' && isKiloStealthModel(originalModelIdLowerCased);
   const isProviderRequiringResponseFixes = provider.id === 'corethink';
 
   if (

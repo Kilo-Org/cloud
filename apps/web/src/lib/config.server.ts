@@ -123,6 +123,12 @@ export const DISCORD_OAUTH_CLIENT_SECRET = getEnvVariable('DISCORD_OAUTH_CLIENT_
 export const DISCORD_OAUTH_BOT_TOKEN = getEnvVariable('DISCORD_OAUTH_BOT_TOKEN');
 export const DISCORD_SERVER_ID = getEnvVariable('DISCORD_SERVER_ID');
 
+// Apple Sign In
+export const APPLE_CLIENT_ID = getEnvVariable('APPLE_CLIENT_ID');
+export const APPLE_TEAM_ID = getEnvVariable('APPLE_TEAM_ID');
+export const APPLE_KEY_ID = getEnvVariable('APPLE_KEY_ID');
+export const APPLE_PRIVATE_KEY = getEnvVariable('APPLE_PRIVATE_KEY');
+
 // Posts user feedback into a fixed Slack channel in the Kilo workspace.
 // Expected to be a Slack Incoming Webhook URL.
 export const SLACK_USER_FEEDBACK_WEBHOOK_URL = getEnvVariable('SLACK_USER_FEEDBACK_WEBHOOK_URL');

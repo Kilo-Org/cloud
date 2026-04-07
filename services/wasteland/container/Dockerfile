@@ -1,10 +1,13 @@
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y \
-    curl git ca-certificates jq \
+    curl git ca-certificates jq unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Wasteland CLI (remote mode — no Dolt needed)
+# Install Dolt (required by wl CLI)
+RUN curl -L https://github.com/dolthub/dolt/releases/latest/download/install.sh | bash
+
+# Install Wasteland CLI
 # Pin to specific version for reproducibility
 ARG WL_VERSION=0.3.0
 RUN curl -fsSL https://github.com/gastownhall/wasteland/releases/download/v${WL_VERSION}/wasteland_${WL_VERSION}_linux_amd64.tar.gz \

@@ -47,6 +47,30 @@ export class WastelandContainerDO extends Container<Env> {
     console.log(`${WC_LOG} setEnvVar: ${key} stored (${value.length} chars)`);
   }
 
+  /**
+   * Initialize the wl CLI with the DoltHub upstream. This must be called
+   * after storing the DOLTHUB_TOKEN so the container can authenticate.
+   */
+  async initWl(upstream: string, token: string): Promise<void> {
+    try {
+      const res = await this.fetch(
+        new Request('http://container/wl/init', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ upstream, token }),
+        })
+      );
+      if (!res.ok) {
+        const err = await res.text();
+        console.error(`${WC_LOG} wl init failed: ${err}`);
+      } else {
+        console.log(`${WC_LOG} wl init succeeded for upstream=${upstream}`);
+      }
+    } catch (err) {
+      console.error(`${WC_LOG} wl init fetch failed:`, err);
+    }
+  }
+
   async deleteEnvVar(key: string): Promise<void> {
     const stored = (await this.ctx.storage.get<Record<string, string>>('container:envVars')) ?? {};
     delete stored[key];

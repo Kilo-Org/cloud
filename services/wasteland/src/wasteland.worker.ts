@@ -18,7 +18,7 @@ import { getWastelandRegistryStub } from './dos/WastelandRegistry.do';
 // ── DO Exports ──────────────────────────────────────────────────────────
 // Wrangler requires these exports to match the class_name bindings in wrangler.jsonc.
 
-export { WastelandDO } from './dos/WastelandDO.stub';
+export { WastelandDO } from './dos/Wasteland.do';
 export { WastelandContainerDO } from './dos/WastelandContainer.do';
 export { WastelandRegistryDO } from './dos/WastelandRegistry.do';
 
@@ -104,17 +104,13 @@ app.get('/health', async (c: Context<WastelandEnv>) => {
 // Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for all /api/*
 // routes. Skipped in development mode for easier local testing.
 
-app.use('/api/*', async (c: Context<WastelandEnv, string>, next) =>
-  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
-);
+app.use('/api/*', kiloAuthMiddleware);
 
 // ── tRPC ────────────────────────────────────────────────────────────────
 // Serve the wasteland tRPC router directly. The frontend tRPC client
 // connects here instead of going through the Next.js proxy layer.
 
-app.use('/trpc/*', async (c: Context<WastelandEnv, string>, next) =>
-  c.env.ENVIRONMENT === 'development' ? next() : kiloAuthMiddleware(c, next)
-);
+app.use('/trpc/*', kiloAuthMiddleware);
 app.use(
   '/trpc/*',
   trpcServer({

@@ -81,12 +81,17 @@ const DoneBodySchema = z.object({
   evidence: z.string().min(1),
 });
 
+const InitBodySchema = z.object({
+  upstream: z.string().min(1),
+  token: z.string().min(1),
+});
+
 const PostBodySchema = z.object({
   upstream: z.string().min(1),
   title: z.string().min(1),
   description: z.string().min(1),
   bounty: z.number().optional(),
-  priority: z.enum(['low', 'medium', 'high']).optional(),
+  priority: z.number().int().min(0).max(3).optional(),
   type: z.enum(['feature', 'bug', 'docs', 'other']).optional(),
 });
 
@@ -182,6 +187,7 @@ function buildEnv(token: string, upstream: string): Record<string, string> {
 const startTime = Date.now();
 let lastOperationTimestamp: string | null = null;
 let cachedWlVersion: string | null = null;
+const joinedUpstreams = new Set<string>();
 
 async function getWlVersion(): Promise<string> {
   if (cachedWlVersion) return cachedWlVersion;
@@ -192,6 +198,21 @@ async function getWlVersion(): Promise<string> {
     cachedWlVersion = 'unknown';
   }
   return cachedWlVersion;
+}
+
+async function joinUpstream(token: string, upstream: string): Promise<void> {
+  if (joinedUpstreams.has(upstream)) return;
+
+  const env = buildEnv(token, upstream);
+  const result = await execWl(['join', upstream], env);
+
+  if (result.exitCode !== 0) {
+    log.error('wl join failed', { upstream, stderr: result.stderr });
+    throw new Error(`wl join failed: ${result.stderr}`);
+  }
+
+  joinedUpstreams.add(upstream);
+  log.info('wl join succeeded', { upstream });
 }
 
 function uptimeSeconds(): number {
@@ -388,7 +409,7 @@ async function handleDone(req: Request): Promise<Response> {
   }
 }
 
-async function handlePost(req: Request): Promise<Response> {
+  async function handlePost(req: Request): Promise<Response> {
   const token = extractToken(req);
   if (!token) return errorResponse('Missing DOLTHUB_TOKEN header', 401);
 
@@ -403,12 +424,11 @@ async function handlePost(req: Request): Promise<Response> {
       args.push('--bounty', String(body.data.bounty));
     }
     if (body.data.priority !== undefined) {
-      args.push('--priority', body.data.priority);
+      args.push('--priority', String(body.data.priority));
     }
     if (body.data.type !== undefined) {
       args.push('--type', body.data.type);
     }
-    args.push('--json');
     const result = await execWl(args, env);
 
     if (result.exitCode !== 0) {
@@ -416,31 +436,26 @@ async function handlePost(req: Request): Promise<Response> {
       return errorResponse(`wl post failed: ${result.stderr}`, 502);
     }
 
-    let parsed: z.infer<typeof PostOutputSchema>;
-    try {
-      parsed = PostOutputSchema.parse(JSON.parse(result.stdout));
-    } catch (err) {
-      log.error('failed to parse post output', { stdout: result.stdout, error: String(err) });
-      return errorResponse('Failed to parse wl post output', 502);
-    }
+    // wl post outputs the item ID as a plain string (not JSON)
+    const itemId = result.stdout.trim();
 
     // Verify mutation — check that the new item exists
-    if (parsed.itemId) {
+    if (itemId) {
       const verification = await verifyItemState(
         token,
         body.data.upstream,
-        parsed.itemId,
+        itemId,
         item => item.title === body.data.title
       );
       if (!verification.verified) {
-        log.warn('post verification failed — mutation may be a no-op', { itemId: parsed.itemId });
+        log.warn('post verification failed — mutation may be a no-op', { itemId });
         return errorResponse('Post mutation could not be verified — possible no-op', 409);
       }
     }
 
     lastOperationTimestamp = new Date().toISOString();
-    log.info('wl post completed', { itemId: parsed.itemId });
-    return jsonResponse({ success: true, itemId: parsed.itemId });
+    log.info('wl post completed', { itemId });
+    return jsonResponse({ success: true, itemId });
   } finally {
     mutationMutex.release();
   }
@@ -527,6 +542,19 @@ async function handleHealth(): Promise<Response> {
   });
 }
 
+async function handleInit(req: Request): Promise<Response> {
+  const body = await parseBody(req, InitBodySchema);
+  if ('error' in body) return body.error;
+
+  try {
+    await joinUpstream(body.data.token, body.data.upstream);
+    return jsonResponse({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return errorResponse(`Init failed: ${message}`, 500);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
@@ -537,6 +565,7 @@ const routes: Array<{ method: string; path: string; handler: RouteHandler }> = [
   { method: 'POST', path: '/wl/browse', handler: handleBrowse },
   { method: 'POST', path: '/wl/claim', handler: handleClaim },
   { method: 'POST', path: '/wl/done', handler: handleDone },
+  { method: 'POST', path: '/wl/init', handler: handleInit },
   { method: 'POST', path: '/wl/post', handler: handlePost },
   { method: 'POST', path: '/wl/sync', handler: handleSync },
   { method: 'POST', path: '/wl/join', handler: handleJoin },

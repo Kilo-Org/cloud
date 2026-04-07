@@ -8,7 +8,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { router, procedure, adminProcedure } from './init';
 import { resolveWastelandOwnership } from './ownership';
-import { getWastelandDOStub, type WastelandMemberResult } from '../dos/WastelandDO.stub';
+import { getWastelandDOStub, type WastelandMemberResult } from '../dos/Wasteland.do';
 import { getWastelandContainerStub } from '../dos/WastelandContainer.do';
 import { getWastelandRegistryStub } from '../dos/WastelandRegistry.do';
 import { deriveEncryptionKey, encryptToken, decryptToken } from '../util/crypto.util';
@@ -439,6 +439,11 @@ export const wastelandRouter = router({
       if (config && config.owner_user_id === ctx.userId) {
         const container = getWastelandContainerStub(ctx.env, input.wastelandId);
         await container.setEnvVar('DOLTHUB_TOKEN', input.dolthubToken);
+
+        // Initialize wl with the upstream if configured
+        if (config.dolthub_upstream) {
+          await container.initWl(config.dolthub_upstream, input.dolthubToken);
+        }
       }
 
       meterEvent(ctx.env, {
@@ -724,7 +729,7 @@ export const wastelandRouter = router({
             upstream: config.dolthub_upstream,
             title: input.title,
             description: input.description,
-            ...(input.priority !== undefined ? { priority: input.priority } : {}),
+            ...(input.priority !== undefined ? { priority: { low: 0, medium: 1, high: 2, critical: 3 }[input.priority] } : {}),
             ...(input.type !== undefined ? { type: input.type } : {}),
           }),
         })

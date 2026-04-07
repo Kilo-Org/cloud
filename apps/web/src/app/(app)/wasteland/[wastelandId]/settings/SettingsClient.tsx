@@ -78,11 +78,13 @@ export function SettingsClient({ wastelandId }: Props) {
   // ── Local form state ───────────────────────────────────────────────
   const [name, setName] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
+  const [dolthubUpstream, setDolthubUpstream] = useState('');
   const [initialized, setInitialized] = useState(false);
 
   if (wasteland && !initialized) {
     setName(wasteland.name);
     setVisibility(wasteland.visibility);
+    setDolthubUpstream(wasteland.dolthub_upstream ?? '');
     setInitialized(true);
   }
 
@@ -123,6 +125,7 @@ export function SettingsClient({ wastelandId }: Props) {
       wastelandId,
       name: name.trim() || undefined,
       visibility,
+      dolthubUpstream: dolthubUpstream.trim() || undefined,
     });
   }
 
@@ -206,17 +209,25 @@ export function SettingsClient({ wastelandId }: Props) {
                 </div>
               </div>
 
-              {wasteland?.dolthub_upstream && (
+              {wasteland?.dolthub_upstream ? (
                 <FieldGroup label="DoltHub Upstream">
                   <div className="flex items-center gap-2 rounded-md border border-white/[0.06] bg-white/[0.02] px-3 py-2">
                     <Database className="size-3.5 text-white/30" />
                     <span className="font-mono text-xs text-white/60">
                       {wasteland.dolthub_upstream}
                     </span>
-                    <Badge variant="outline" className="ml-auto text-[9px] text-white/30">
-                      read-only
-                    </Badge>
                   </div>
+                </FieldGroup>
+              ) : (
+                <FieldGroup label="DoltHub Upstream">
+                  <Input
+                    placeholder="i.e. dolthub/username/repo"
+                    value={dolthubUpstream}
+                    onChange={e => setDolthubUpstream(e.target.value)}
+                  />
+                  <p className="text-[11px] text-white/30">
+                    The DoltHub repository for this wasteland's bounty board.
+                  </p>
                 </FieldGroup>
               )}
             </div>

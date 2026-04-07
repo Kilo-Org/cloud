@@ -589,6 +589,12 @@ app.get('/api/towns/:townId/drain-status', c =>
 // Simple pass-through to TownContainerDO registry.
 // Protected by authMiddleware (accepts container JWTs), not kiloAuthMiddleware.
 
+app.use(
+  '/api/towns/:townId/container-registry',
+  async (c: Context<GastownEnv, string>, next) =>
+    c.env.ENVIRONMENT === 'development' ? next() : authMiddleware(c, next)
+);
+
 app.get('/api/towns/:townId/container-registry', async c => {
   const townId = c.req.param('townId');
   const tc = getTownContainerStub(c.env, townId);
@@ -609,6 +615,7 @@ app.post('/api/towns/:townId/container-registry', async c => {
 // ── Agent DB Snapshot ───────────────────────────────────────────────────
 // Stored in the AGENT_DB_SNAPSHOTS_KV namespace keyed by agentId.
 // Protected by authMiddleware (accepts container JWTs), not kiloAuthMiddleware.
+// Registered after authMiddleware but before kiloAuthMiddleware wildcard.
 
 app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c => {
   const { agentId } = c.req.param();

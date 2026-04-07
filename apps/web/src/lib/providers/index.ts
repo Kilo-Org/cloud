@@ -44,7 +44,7 @@ function inferSupportedChatApis(aiSdkProvider: CustomLlmProvider) {
       : (['chat_completions'] as const);
 }
 
-async function checkDirectByokBYOK(
+async function checkDirectBYOK(
   user: User | AnonymousUserContext,
   requestedModel: string,
   organizationId: string | undefined
@@ -95,7 +95,7 @@ export async function getProvider(
   organizationId: string | undefined,
   taskId: string | undefined
 ): Promise<{ provider: Provider; userByok: BYOKResult[] | null; bypassAccessCheck: boolean }> {
-  const directByokByok = await checkDirectByokBYOK(user, requestedModel, organizationId);
+  const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {
     return directByokByok;
   }

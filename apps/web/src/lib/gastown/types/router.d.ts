@@ -504,6 +504,13 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         git_author_name?: string | undefined;
         git_author_email?: string | undefined;
         disable_ai_coauthor: boolean;
+        custom_instructions?:
+          | {
+              polecat?: string | undefined;
+              refinery?: string | undefined;
+              mayor?: string | undefined;
+            }
+          | undefined;
       };
       meta: object;
     }>;
@@ -561,6 +568,13 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
           git_author_name?: string | undefined;
           git_author_email?: string | undefined;
           disable_ai_coauthor?: boolean | undefined;
+          custom_instructions?:
+            | {
+                polecat?: string | undefined;
+                refinery?: string | undefined;
+                mayor?: string | undefined;
+              }
+            | undefined;
         };
       };
       output: {
@@ -612,6 +626,13 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
         git_author_name?: string | undefined;
         git_author_email?: string | undefined;
         disable_ai_coauthor: boolean;
+        custom_instructions?:
+          | {
+              polecat?: string | undefined;
+              refinery?: string | undefined;
+              mayor?: string | undefined;
+            }
+          | undefined;
       };
       meta: object;
     }>;
@@ -1815,6 +1836,13 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             git_author_name?: string | undefined;
             git_author_email?: string | undefined;
             disable_ai_coauthor: boolean;
+            custom_instructions?:
+              | {
+                  polecat?: string | undefined;
+                  refinery?: string | undefined;
+                  mayor?: string | undefined;
+                }
+              | undefined;
           };
           meta: object;
         }>;
@@ -1872,6 +1900,13 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
               git_author_name?: string | undefined;
               git_author_email?: string | undefined;
               disable_ai_coauthor?: boolean | undefined;
+              custom_instructions?:
+                | {
+                    polecat?: string | undefined;
+                    refinery?: string | undefined;
+                    mayor?: string | undefined;
+                  }
+                | undefined;
             };
           };
           output: {
@@ -1923,6 +1958,13 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
             git_author_name?: string | undefined;
             git_author_email?: string | undefined;
             disable_ai_coauthor: boolean;
+            custom_instructions?:
+              | {
+                  polecat?: string | undefined;
+                  refinery?: string | undefined;
+                  mayor?: string | undefined;
+                }
+              | undefined;
           };
           meta: object;
         }>;

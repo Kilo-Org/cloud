@@ -2476,6 +2476,49 @@ export class TownDO extends DurableObject<Env> {
     // model from the updated town config automatically.
   }
 
+  /**
+   * Rewrite the running mayor's AGENTS.md with the current system prompt
+   * (including custom instructions). Called when custom instructions change
+   * so the mayor picks them up on its next session restart.
+   */
+  async updateMayorSystemPrompt(): Promise<void> {
+    const townId = this.townId;
+    const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0];
+    if (!mayor) return;
+
+    const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
+    const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
+    if (!isAlive) return;
+
+    const townConfig = await this.getTownConfig();
+    const systemPrompt = dispatch.appendCustomInstructions(
+      dispatch.systemPromptForRole({
+        role: 'mayor',
+        identity: mayor.identity,
+        agentName: 'mayor',
+        rigId: `mayor-${townId}`,
+        townId,
+        gates: townConfig.refinery?.gates ?? [],
+      }),
+      'mayor',
+      townConfig
+    );
+
+    const updated = await dispatch.updateMayorSystemPromptInContainer(
+      this.env,
+      townId,
+      mayor.id,
+      systemPrompt
+    );
+    if (updated) {
+      console.log(`${TOWN_LOG} updateMayorSystemPrompt: rewrote AGENTS.md for mayor ${mayor.id}`);
+    } else {
+      console.warn(
+        `${TOWN_LOG} updateMayorSystemPrompt: failed to rewrite AGENTS.md for mayor ${mayor.id}`
+      );
+    }
+  }
+
   async getMayorStatus(): Promise<{
     configured: boolean;
     townId: string;

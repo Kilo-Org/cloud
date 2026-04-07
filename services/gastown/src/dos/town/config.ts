@@ -101,6 +101,23 @@ export async function updateTownConfig(
               update.container.sleep_after_minutes ?? current.container?.sleep_after_minutes,
           }
         : current.container,
+    custom_instructions:
+      update.custom_instructions !== undefined
+        ? {
+            polecat:
+              'polecat' in update.custom_instructions
+                ? update.custom_instructions.polecat
+                : current.custom_instructions?.polecat,
+            refinery:
+              'refinery' in update.custom_instructions
+                ? update.custom_instructions.refinery
+                : current.custom_instructions?.refinery,
+            mayor:
+              'mayor' in update.custom_instructions
+                ? update.custom_instructions.mayor
+                : current.custom_instructions?.mayor,
+          }
+        : current.custom_instructions,
   };
 
   const validated = TownConfigSchema.parse(merged);

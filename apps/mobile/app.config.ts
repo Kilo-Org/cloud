@@ -3,7 +3,11 @@ import { ENV_KEYS } from './src/lib/env-keys.ts';
 
 const missing = Object.values(ENV_KEYS).filter(key => !process.env[key]);
 if (missing.length > 0) {
-  throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  const message = `Missing required environment variables: ${missing.join(', ')}`;
+  if (process.env.CI) {
+    throw new Error(message);
+  }
+  console.warn(`⚠️  ${message}`);
 }
 
 const config: ExpoConfig = {

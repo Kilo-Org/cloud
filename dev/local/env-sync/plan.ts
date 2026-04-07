@@ -154,9 +154,9 @@ function extractSecretsStoreBindings(repoRoot: string, workerDir: string): Secre
 // Local secrets store check (via wrangler CLI)
 // ---------------------------------------------------------------------------
 
-function listLocalStoreSecrets(repoRoot: string, storeId: string): string {
+function listLocalStoreSecrets(repoRoot: string, workerDir: string, storeId: string): string {
   const result = spawnSync('pnpm', ['wrangler', 'secrets-store', 'secret', 'list', storeId], {
-    cwd: repoRoot,
+    cwd: path.join(repoRoot, workerDir),
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -175,6 +175,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
       devVarsChanges: [],
       envDevLocalChanges: [],
       secretStoreWarnings: [],
+      secretStoreAutoCreates: [],
       consistencyWarnings: [],
       missingEnvLocal: true,
     };
@@ -281,9 +282,9 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
   const envDevLocalChanges: EnvDevLocalChange[] = [];
   const processEnvDevLocal = !serviceFilter || serviceFilter.has('nextjs');
 
-  const envDevLocalExamplePath = path.join(repoRoot, '.env.development.local.example');
+  const envDevLocalExamplePath = path.join(repoRoot, 'apps/web/.env.development.local.example');
   if (processEnvDevLocal && fs.existsSync(envDevLocalExamplePath)) {
-    const envDevLocalPath = path.join(repoRoot, '.env.development.local');
+    const envDevLocalPath = path.join(repoRoot, 'apps/web/.env.development.local');
     const envDevLocal = readEnvFile(envDevLocalPath);
     const exampleContent = fs.readFileSync(envDevLocalExamplePath, 'utf-8');
     const entries = parseExampleFile(exampleContent);
@@ -301,11 +302,13 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
 
       // Effective value: .env.development.local overrides .env.local
       const effectiveValue = envDevLocal.get(entry.key) ?? envLocal.get(entry.key);
+      const isMissing = !envDevLocal.has(entry.key);
 
-      if (effectiveValue !== expectedValue) {
+      // Add change if: (1) key is missing from file, or (2) value differs from expected
+      if (isMissing || effectiveValue !== expectedValue) {
         envDevLocalChanges.push({
           key: entry.key,
-          oldValue: effectiveValue,
+          oldValue: isMissing ? undefined : effectiveValue,
           newValue: expectedValue,
         });
       }
@@ -314,6 +317,8 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
 
   // --- Secrets store warnings ---
   const secretStoreWarnings: SecretStoreWarning[] = [];
+  const secretStoreAutoCreates: SecretStoreAutoCreate[] = [];
+  // Cache keyed by workerDir+storeId — wrangler scopes secret visibility per worker locally
   const storeOutputCache = new Map<string, string>();
 
   for (const [name, svc] of services) {
@@ -322,14 +327,38 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     const bindings = extractSecretsStoreBindings(repoRoot, svc.dir);
     if (bindings.length === 0) continue;
 
-    const missingBindings = bindings.filter(b => {
-      let output = storeOutputCache.get(b.store_id);
+    const missingBindings: SecretStoreBinding[] = [];
+
+    for (const b of bindings) {
+      const cacheKey = `${svc.dir}:${b.store_id}`;
+      let output = storeOutputCache.get(cacheKey);
       if (output === undefined) {
-        output = listLocalStoreSecrets(repoRoot, b.store_id);
-        storeOutputCache.set(b.store_id, output);
+        output = listLocalStoreSecrets(repoRoot, svc.dir, b.store_id);
+        storeOutputCache.set(cacheKey, output);
       }
-      return !output.includes(b.secret_name);
-    });
+
+      if (output.includes(b.secret_name)) {
+        continue; // Secret exists, nothing to do
+      }
+
+      // Try to map secret name to .env.local key via naming convention
+      // Strip _PROD or _DEV suffix to get base key
+      const envLocalKey = b.secret_name.replace(/_(PROD|DEV)$/, '');
+      const value = envLocal.get(envLocalKey);
+
+      if (value) {
+        // Can auto-create from .env.local
+        secretStoreAutoCreates.push({
+          workerDir: svc.dir,
+          binding: b,
+          envLocalKey,
+          value,
+        });
+      } else {
+        // Missing and no source value - warn
+        missingBindings.push(b);
+      }
+    }
 
     if (missingBindings.length > 0) {
       secretStoreWarnings.push({ workerDir: svc.dir, bindings: missingBindings });
@@ -368,6 +397,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     devVarsChanges,
     envDevLocalChanges,
     secretStoreWarnings,
+    secretStoreAutoCreates,
     consistencyWarnings,
     missingEnvLocal: false,
   };

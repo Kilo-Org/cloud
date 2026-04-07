@@ -14,3 +14,9 @@ GITHUB_LITE_APP_PRIVATE_KEY=
 # GitLab App credentials (optional, used as fallback when metadata lacks client credentials)
 GITLAB_CLIENT_ID=
 GITLAB_CLIENT_SECRET=
+
+# Hyperdrive binding for database connectivity
+HYPERDRIVE=
+
+# KV namespace binding for token caching
+TOKEN_CACHE=

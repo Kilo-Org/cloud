@@ -13,10 +13,15 @@
 #                                          or ask a team member for values)
 
 # Auth (synced automatically from Vercel by the dev-start script)
+# JWT verification secret (shared with Next.js for token signing/verification)
+# @from NEXTAUTH_SECRET
 NEXTAUTH_SECRET=dev-secret-change-me
+# Platform API authentication key (for internal service-to-service calls)
+# @from INTERNAL_API_SECRET
 INTERNAL_API_SECRET=dev-internal-secret
 
 # Auth (static defaults — these work as-is for local dev)
+# HMAC secret for deriving per-sandbox gateway tokens (machine authentication)
 GATEWAY_TOKEN_SECRET=dev-gateway-secret-kiloclaw
 # Override WORKER_ENV to "development" for local development.
 # Production default is set in wrangler.jsonc. This selects the development
@@ -50,6 +55,9 @@ FLY_REGION=us,eu
 # Docker image tag on registry.fly.io/{FLY_REGISTRY_APP}:{tag}.
 # Set automatically by scripts/push-dev.sh, or use "latest" to start.
 FLY_IMAGE_TAG=latest
+# Docker image digest (sha256:...) for immutable image references.
+# Set automatically by scripts/push-dev.sh when pushing images.
+FLY_IMAGE_DIGEST=
 # OpenClaw version (must match the openclaw@x.x.x version in the Dockerfile).
 # Used by the worker to self-register the version → image tag mapping in KV,
 # enabling per-user version tracking. Without this, version tracking fields

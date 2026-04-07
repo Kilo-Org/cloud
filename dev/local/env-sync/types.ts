@@ -39,11 +39,19 @@ type ConsistencyWarning = {
   entries: { workerDir: string; workerKey: string; value: string }[];
 };
 
+type SecretStoreAutoCreate = {
+  workerDir: string;
+  binding: SecretStoreBinding;
+  envLocalKey: string;
+  value: string;
+};
+
 type EnvSyncPlan = {
   lanIp: string | undefined;
   devVarsChanges: DevVarsFileChange[];
   envDevLocalChanges: EnvDevLocalChange[];
   secretStoreWarnings: SecretStoreWarning[];
+  secretStoreAutoCreates: SecretStoreAutoCreate[];
   consistencyWarnings: ConsistencyWarning[];
   missingEnvLocal: boolean;
 };
@@ -87,6 +95,7 @@ export type {
   EnvDevLocalChange,
   SecretStoreBinding,
   SecretStoreWarning,
+  SecretStoreAutoCreate,
   ConsistencyWarning,
   EnvSyncPlan,
   Annotation,

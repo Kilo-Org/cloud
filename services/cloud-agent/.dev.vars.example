@@ -1,7 +1,9 @@
 # Shared secret for JWT token validation (same as NextAuth.js secret)
+# @from NEXTAUTH_SECRET
 NEXTAUTH_SECRET=your-nextauth-secret-here
 
 # Shared secret for internal API calls, same as .env.development.
+# @from INTERNAL_API_SECRET
 INTERNAL_API_SECRET=your-internal-api-secret-here
 
 # Optional: Override Kilocode credentials in session environment variables used during kilocode invocation
@@ -9,8 +11,8 @@ INTERNAL_API_SECRET=your-internal-api-secret-here
 # Use these to inject test/dev credentials while maintaining proper authentication with credentials sent
 # Affects:
 #   - Session environment variables (KILOCODE_TOKEN and KILOCODE_ORG_ID)
-# 
-# Note: With the introduction of server-backed sessions, these should probably not be used any more, 
+#
+# Note: With the introduction of server-backed sessions, these should probably not be used any more,
 # you should set KILOCODE_BACKEND_BASE_URL instead and use local dev only.
 #KILOCODE_TOKEN_OVERRIDE=your-override-token-here
 #KILOCODE_ORG_ID_OVERRIDE=your-override-org-id-here
@@ -58,6 +60,8 @@ GITHUB_APP_PRIVATE_KEY=
 GITHUB_LITE_APP_ID=
 # @pkcs8
 GITHUB_LITE_APP_PRIVATE_KEY=
+GITHUB_LITE_APP_SLUG=
+GITHUB_LITE_APP_BOT_USER_ID=
 
 # Agent Environment Profile Secrets Decryption
 # Used to decrypt encrypted secrets from agent environment profiles at session execution time.

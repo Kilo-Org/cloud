@@ -5,7 +5,8 @@
 # Generate with: openssl rand -base64 32
 JWT_SECRET=your-secret-key-at-least-32-bytes-long
 
-# Session duration in seconds for JWT tokens (optional, configured in wrangler.jsonc)
+# Session duration in seconds for JWT tokens
+# Optional: already configured in wrangler.jsonc
 SESSION_DURATION_SECONDS=604800
 
 # Backend authentication token for Management API endpoints (required)

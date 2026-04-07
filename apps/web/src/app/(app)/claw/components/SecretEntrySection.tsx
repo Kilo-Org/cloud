@@ -19,6 +19,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { ChannelTokenInput } from './ChannelTokenInput';
 import { getDescription, getIcon } from './secret-ui-adapter';
 
+/** Field keys that are not sensitive and should render as plain text inputs. */
+const PLAIN_TEXT_FIELDS: ReadonlySet<string> = new Set(['githubUsername', 'githubEmail']);
+
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
 export function SecretEntrySection({
@@ -181,7 +184,7 @@ export function SecretEntrySection({
                     {field.label}
                   </Label>
                 )}
-                {field.secret === false ? (
+                {PLAIN_TEXT_FIELDS.has(field.key) ? (
                   <Input
                     id={`settings-${field.key}`}
                     type="text"
@@ -190,7 +193,6 @@ export function SecretEntrySection({
                     onChange={e => setToken(field.key, e.target.value)}
                     disabled={isSaving}
                     maxLength={field.maxLength}
-                    data-1p-ignore
                     autoComplete="off"
                   />
                 ) : (

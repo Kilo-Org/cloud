@@ -107,7 +107,6 @@ const SECRET_CATALOG_RAW = [
         validationMessage:
           'GitHub usernames can only contain alphanumeric characters and hyphens, and cannot start or end with a hyphen.',
         maxLength: 39,
-        secret: false,
       },
       {
         key: 'githubEmail',
@@ -118,7 +117,6 @@ const SECRET_CATALOG_RAW = [
         validationPattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
         validationMessage: 'Enter a valid email address.',
         maxLength: 254,
-        secret: false,
       },
       {
         key: 'githubToken',

@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Plus, Server } from 'lucide-react-native';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { EmptyState } from '@/components/empty-state';
@@ -43,7 +43,7 @@ export default function KiloClawInstanceList() {
     if (isDestroying) {
       return;
     }
-    if (lockReason) {
+    if (lockReason && Platform.OS !== 'ios') {
       router.push(billingPath);
     } else {
       router.push(chatPath);
@@ -54,7 +54,7 @@ export default function KiloClawInstanceList() {
     if (isDestroying) {
       return;
     }
-    if (lockReason) {
+    if (lockReason && Platform.OS !== 'ios') {
       router.push(billingPath);
     } else {
       router.push(dashboardPath);

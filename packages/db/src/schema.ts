@@ -208,6 +208,7 @@ export const kilocode_users = pgTable(
     openrouter_upstream_safety_identifier: text(),
     vercel_downstream_safety_identifier: text(),
     customer_source: text(),
+    account_deletion_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),

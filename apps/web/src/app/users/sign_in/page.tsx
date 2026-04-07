@@ -2,13 +2,17 @@ import { allow_fake_login } from '@/lib/constants';
 import { getAuthPageProps } from '@/lib/auth/auth-page-wrapper';
 import { AuthPageLayout } from '@/components/auth/AuthPageLayout';
 import { SignInForm } from '@/components/auth/SignInForm';
+import { isAppleSignInEnabled } from '@/lib/auth/apple-feature-flag';
 
 export default async function SignInPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string>>;
 }) {
-  const { params, error } = await getAuthPageProps(searchParams);
+  const [{ params, error }, appleSignInEnabled] = await Promise.all([
+    getAuthPageProps(searchParams),
+    isAppleSignInEnabled(),
+  ]);
   const ssoMode = params['sso'] === 'true' || !!params['domain'];
 
   return (
@@ -27,6 +31,7 @@ export default async function SignInPage({
           }
           ssoMode={ssoMode}
           emailOnly={ssoMode}
+          appleSignInEnabled={appleSignInEnabled}
         />
       </div>
     </AuthPageLayout>

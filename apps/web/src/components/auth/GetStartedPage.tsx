@@ -9,6 +9,7 @@ type GetStartedPageProps = {
   searchParams: Record<string, string>;
   error?: string;
   signUpText?: string;
+  appleSignInEnabled?: boolean;
 };
 
 export function GetStartedPage({
@@ -17,6 +18,7 @@ export function GetStartedPage({
   searchParams,
   error,
   signUpText,
+  appleSignInEnabled,
 }: GetStartedPageProps) {
   const searchParamsWithCallback = useMemo(
     () => ({ ...searchParams, callbackPath }),
@@ -32,6 +34,7 @@ export function GetStartedPage({
           isSignUp={true}
           allowFakeLogin={allow_fake_login}
           title={title}
+          appleSignInEnabled={appleSignInEnabled}
           subtitle={
             signUpText ??
             `After you sign up, you can directly get started with free models, or top up, and get

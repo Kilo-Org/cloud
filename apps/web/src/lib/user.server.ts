@@ -23,6 +23,7 @@ import GitlabProvider from 'next-auth/providers/gitlab';
 import LinkedInProvider from 'next-auth/providers/linkedin';
 import DiscordProvider from 'next-auth/providers/discord';
 import WorkOSProvider from 'next-auth/providers/workos';
+import AppleProvider from 'next-auth/providers/apple';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { allow_fake_login, ORGANIZATION_ID_HEADER } from './constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -65,6 +66,10 @@ import {
   DISCORD_OAUTH_CLIENT_ID,
   DISCORD_OAUTH_CLIENT_SECRET,
   BLACKLIST_TLDS,
+  APPLE_CLIENT_ID,
+  APPLE_TEAM_ID,
+  APPLE_KEY_ID,
+  APPLE_PRIVATE_KEY,
 } from '@/lib/config.server';
 import jwt from 'jsonwebtoken';
 import type { UUID } from 'node:crypto';
@@ -92,6 +97,30 @@ const BLACKLIST_DOMAINS = blacklistDomainsEnv
   ? blacklistDomainsEnv.split('|').map((domain: string) => domain.trim())
   : [];
 
+function generateAppleClientSecret(): string {
+  if (!APPLE_PRIVATE_KEY || !APPLE_KEY_ID || !APPLE_TEAM_ID || !APPLE_CLIENT_ID) {
+    return '';
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const sixMonths = 180 * 24 * 60 * 60;
+
+  return jwt.sign(
+    {
+      iss: APPLE_TEAM_ID,
+      iat: now,
+      exp: now + sixMonths,
+      aud: 'https://appleid.apple.com',
+      sub: APPLE_CLIENT_ID,
+    },
+    APPLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    {
+      algorithm: 'ES256',
+      keyid: APPLE_KEY_ID,
+    }
+  );
+}
+
 function createGoogleAccountInfo(
   account: Account,
   user: NextUser | AdapterUser,
@@ -111,6 +140,24 @@ function createGoogleAccountInfo(
     provider: account.provider,
     provider_account_id: account.providerAccountId,
     display_name: null, // Google OAuth does not provide a public profile URL
+  };
+}
+
+function createAppleAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== 'apple') return null;
+  assert(user.email, 'User email is required for Apple auth');
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || user.email.split('@')[0],
+    google_user_image_url: '',
+    hosted_domain: hosted_domain_specials.apple,
+    provider: account.provider,
+    provider_account_id: account.providerAccountId,
+    display_name: null,
   };
 }
 
@@ -286,6 +333,7 @@ function createAccountInfo(
 ): CreateOrUpdateUserArgs {
   const accountInfo =
     createGoogleAccountInfo(account, user, profile) ??
+    createAppleAccountInfo(account, user) ??
     createGitHubAccountInfo(account, user, profile) ??
     createGitlabAccountInfo(account, user) ??
     createLinkedInAccountInfo(account, user) ??
@@ -342,6 +390,10 @@ const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: GOOGLE_CLIENT_ID,
       clientSecret: GOOGLE_CLIENT_SECRET,
+    }),
+    AppleProvider({
+      clientId: APPLE_CLIENT_ID ?? '',
+      clientSecret: generateAppleClientSecret(),
     }),
     GithubProvider({
       clientId: GITHUB_CLIENT_ID,

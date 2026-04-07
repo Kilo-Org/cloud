@@ -32,7 +32,7 @@ export const IMPACT_AUTH_TOKEN = getEnvVariable('IMPACT_AUTH_TOKEN') || '';
 export const IMPACT_CAMPAIGN_ID = getEnvVariable('IMPACT_CAMPAIGN_ID') || '';
 
 if (!NEXTAUTH_SECRET) throw new Error('NEXTAUTH_SECRET is required JWT signing');
-if (!TURNSTILE_SECRET_KEY) throw new Error('NEXTAUTH_SECRET is required JWT signing');
+if (!TURNSTILE_SECRET_KEY) throw new Error('TURNSTILE_SECRET_KEY is required');
 
 export const STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID = getEnvVariable(
   'STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID'
@@ -122,6 +122,12 @@ export const DISCORD_OAUTH_CLIENT_ID = getEnvVariable('DISCORD_OAUTH_CLIENT_ID')
 export const DISCORD_OAUTH_CLIENT_SECRET = getEnvVariable('DISCORD_OAUTH_CLIENT_SECRET');
 export const DISCORD_OAUTH_BOT_TOKEN = getEnvVariable('DISCORD_OAUTH_BOT_TOKEN');
 export const DISCORD_SERVER_ID = getEnvVariable('DISCORD_SERVER_ID');
+
+// Apple Sign In
+export const APPLE_CLIENT_ID = getEnvVariable('APPLE_CLIENT_ID');
+export const APPLE_TEAM_ID = getEnvVariable('APPLE_TEAM_ID');
+export const APPLE_KEY_ID = getEnvVariable('APPLE_KEY_ID');
+export const APPLE_PRIVATE_KEY = getEnvVariable('APPLE_PRIVATE_KEY');
 
 // Posts user feedback into a fixed Slack channel in the Kilo workspace.
 // Expected to be a Slack Incoming Webhook URL.

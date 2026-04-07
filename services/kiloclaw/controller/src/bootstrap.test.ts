@@ -815,6 +815,30 @@ describe('bootstrapCritical', () => {
 // ---- bootstrapNonCritical ----
 
 describe('bootstrapNonCritical', () => {
+  it('returns github failure and stops subsequent steps', async () => {
+    const harness = fakeDeps();
+    const phases: string[] = [];
+    (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) => {
+      if (cmd === 'gh') {
+        throw new Error('gh auth failed');
+      }
+      return '';
+    });
+
+    const result = await bootstrapNonCritical(
+      {
+        GITHUB_TOKEN: 'gh-token',
+        KILOCODE_API_KEY: 'api-key',
+        OPENCLAW_GATEWAY_TOKEN: 'gw-token',
+      },
+      phase => phases.push(phase),
+      harness.deps
+    );
+
+    expect(result).toEqual({ ok: false, phase: 'github', error: 'gh auth failed' });
+    expect(phases).toEqual(['github']);
+  });
+
   it('returns ok when doctor/onboard succeeds', async () => {
     const harness = fakeDeps();
     const phases: string[] = [];

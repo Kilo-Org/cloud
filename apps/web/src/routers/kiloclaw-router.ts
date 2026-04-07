@@ -2080,7 +2080,7 @@ export const kiloclawRouter = createTRPCRouter({
     return client.restoreConfig(ctx.user.id, undefined, workerInstanceId(instance));
   }),
 
-  getGoogleSetupCommand: clawAccessProcedure.query(({ ctx }) => {
+  getGoogleSetupCommand: clawAccessProcedure.query(async ({ ctx }) => {
     // Short-lived token — the user should run the setup command promptly.
     // Regenerated on each page load, so 1 hour is sufficient.
     const token = generateApiToken(ctx.user, undefined, {
@@ -2092,9 +2092,12 @@ export const kiloclawRouter = createTRPCRouter({
       ? ` --worker-url=${process.env.KILOCLAW_API_URL ?? 'http://localhost:8795'}`
       : '';
     const gmailPushFlag = isDev ? ' --gmail-push-worker-url=${GMAIL_PUSH_WORKER_URL}' : '';
+    const instance = await getActiveInstance(ctx.user.id);
+    const iid = workerInstanceId(instance);
+    const instanceFlag = iid ? ` --instance-id=${iid}` : '';
     const imageUrl = `ghcr.io/kilo-org/google-setup${imageTag}`;
     return {
-      command: `docker pull ${imageUrl} ; docker run -it --network host ${imageUrl} --token="${token}"${workerFlag}${gmailPushFlag}`,
+      command: `docker pull ${imageUrl} ; docker run -it --network host ${imageUrl} --token="${token}"${instanceFlag}${workerFlag}${gmailPushFlag}`,
     };
   }),
 

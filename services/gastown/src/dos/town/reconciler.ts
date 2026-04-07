@@ -1269,7 +1269,8 @@ export function reconcileReviewQueue(
         ),
       ]);
 
-      // Get oldest open MR for this rig
+      // Get oldest open direct-merge MR for this rig (pr_url IS NULL indicates
+      // direct-merge strategy; PR-strategy beads have pr_url set once CI posts)
       const oldestMr = z
         .object({ bead_id: z.string() })
         .array()
@@ -1277,13 +1278,15 @@ export function reconcileReviewQueue(
           ...query(
             sql,
             /* sql */ `
-          SELECT ${beads.bead_id}
-          FROM ${beads}
-          WHERE ${beads.type} = 'merge_request'
-            AND ${beads.status} = 'open'
-            AND ${beads.rig_id} = ?
-            AND ${beads.columns.pr_url} IS NULL
-          ORDER BY ${beads.columns.created_at} ASC
+          SELECT b.${beads.bead_id}
+          FROM ${beads} b
+          INNER JOIN ${review_metadata} rm
+            ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
+          WHERE b.${beads.type} = 'merge_request'
+            AND b.${beads.status} = 'open'
+            AND b.${beads.rig_id} = ?
+            AND rm.${review_metadata.columns.pr_url} IS NULL
+          ORDER BY b.${beads.columns.created_at} ASC
           LIMIT 1
         `,
             [rig_id]

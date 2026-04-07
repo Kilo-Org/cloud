@@ -85,8 +85,16 @@ export async function waitForPort(port: number, name: string, maxWaitMs: number)
 
 export function buildStartCommand(serviceName: string): string {
   const svc = getService(serviceName);
-  const parts: string[] = [];
 
+  // Use pnpm --filter instead of cd to avoid cwd issues on restart —
+  // after ctrl-c the shell stays in the service dir, so a relative cd
+  // would try to descend into <dir>/<dir> which doesn't exist.
+  if (svc.dir !== '.' && svc.command[0] === 'pnpm') {
+    const [, ...rest] = svc.command;
+    return `pnpm --filter {./${svc.dir}} ${rest.join(' ')}`;
+  }
+
+  const parts: string[] = [];
   if (svc.dir !== '.') parts.push(`cd ${svc.dir}`);
   parts.push(svc.command.join(' '));
 
@@ -285,16 +293,31 @@ export function readEnvValue(filePath: string, key: string): string | undefined 
   return match ? match[1] : undefined;
 }
 
+export function readEnvMtime(filePath: string): number | undefined {
+  try {
+    return fs.statSync(filePath).mtimeMs;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function waitForEnvValueChange(
   filePath: string,
   key: string,
   previousValue: string | undefined,
-  timeoutMs: number
+  timeoutMs: number,
+  previousMtimeMs?: number
 ): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const current = readEnvValue(filePath, key);
-    if (current !== undefined && current !== previousValue) return true;
+    const currentMtimeMs = readEnvMtime(filePath);
+    const fileWasRewritten =
+      previousMtimeMs !== undefined &&
+      currentMtimeMs !== undefined &&
+      currentMtimeMs > previousMtimeMs;
+
+    if (current !== undefined && (current !== previousValue || fileWasRewritten)) return true;
     await sleep(500);
   }
   return false;

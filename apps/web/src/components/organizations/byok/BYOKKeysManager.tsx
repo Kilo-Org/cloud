@@ -42,7 +42,7 @@ import {
   VercelUserByokInferenceProviderIdSchema,
   AwsCredentialsSchema,
 } from '@/lib/providers/openrouter/inference-provider-id';
-import CODING_PLANS from '@/lib/providers/coding-plans/coding-plan-definitions';
+import DIRECT_BYOK_PROVIDERS from '@/lib/providers/direct-byok/direct-byok-definitions';
 import * as z from 'zod';
 
 // Hardcoded BYOK providers list
@@ -59,12 +59,12 @@ const VERCEL_BYOK_PROVIDERS = [
   { id: VercelUserByokInferenceProviderIdSchema.enum.zai, name: 'Z.ai (pay as you go)' },
 ] as const;
 
-const CODING_PLAN_PROVIDERS = CODING_PLANS.map(plan => ({
+const DIRECT_BYOK_PROVIDERS_LIST = DIRECT_BYOK_PROVIDERS.map(plan => ({
   id: plan.id,
   name: plan.name,
 }));
 
-const BYOK_PROVIDERS = [...CODING_PLAN_PROVIDERS, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
+const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
   a.name.localeCompare(b.name)
 );
 

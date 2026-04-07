@@ -21,7 +21,8 @@ export type KiloPassSubscriptionInfo = {
     isOpeningCustomerPortal: boolean;
     cancelSubscription: (params?: { onSuccess?: () => void }) => void;
     isCancelingSubscription: boolean;
-    resumeSubscription: () => void;
+    resumeCancelledSubscription: () => void;
+    resumePausedSubscription: () => void;
     isResumingSubscription: boolean;
   };
 };
@@ -87,13 +88,13 @@ export function KiloPassSubscriptionInfoProvider(props: {
     [isCancelingSubscription, queryClient, trpc, trpcClient]
   );
 
-  const resumeSubscription = useCallback(() => {
+  const resumeCancelledSubscription = useCallback(() => {
     if (isResumingSubscription) return;
     setIsResumingSubscription(true);
 
     void (async () => {
       try {
-        await trpcClient.kiloPass.resumeSubscription.mutate();
+        await trpcClient.kiloPass.resumeCancelledSubscription.mutate();
         toast('Subscription resumed');
         void queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() });
       } catch (error) {
@@ -104,6 +105,24 @@ export function KiloPassSubscriptionInfoProvider(props: {
       }
     })();
   }, [isResumingSubscription, queryClient, trpc, trpcClient]);
+
+  const resumePausedSubscription = useCallback(() => {
+    if (isResumingSubscription) return;
+    setIsResumingSubscription(true);
+
+    void (async () => {
+      try {
+        await trpcClient.kiloPass.resumePausedSubscription.mutate();
+        toast('Subscription resumed');
+        void queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to resume subscription';
+        toast.error(message);
+      } finally {
+        setIsResumingSubscription(false);
+      }
+    })();
+  }, [isResumingSubscription, trpcClient, queryClient, trpc]);
 
   const view = useMemo(() => deriveKiloPassSubscriptionInfoView(subscription), [subscription]);
 
@@ -116,7 +135,8 @@ export function KiloPassSubscriptionInfoProvider(props: {
         isOpeningCustomerPortal,
         cancelSubscription,
         isCancelingSubscription,
-        resumeSubscription,
+        resumeCancelledSubscription,
+        resumePausedSubscription,
         isResumingSubscription,
       },
     }),
@@ -127,7 +147,8 @@ export function KiloPassSubscriptionInfoProvider(props: {
       isOpeningCustomerPortal,
       cancelSubscription,
       isCancelingSubscription,
-      resumeSubscription,
+      resumeCancelledSubscription,
+      resumePausedSubscription,
       isResumingSubscription,
     ]
   );

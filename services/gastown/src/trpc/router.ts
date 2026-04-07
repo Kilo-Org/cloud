@@ -998,6 +998,18 @@ export const gastownRouter = router({
         console.warn('[gastown-trpc] updateTownConfig: syncConfigToContainer failed:', err);
       }
 
+      // Rewrite the mayor's AGENTS.md when custom instructions change so the
+      // running mayor picks them up on its next session restart.
+      const mayorInstructionsChanged =
+        result.custom_instructions?.mayor !== existingConfig.custom_instructions?.mayor;
+      if (mayorInstructionsChanged) {
+        try {
+          await townStub.updateMayorSystemPrompt();
+        } catch (err) {
+          console.warn('[gastown-trpc] updateTownConfig: updateMayorSystemPrompt failed:', err);
+        }
+      }
+
       // Hot-update the running mayor session when the effective model or
       // auth-relevant config changed. The SDK server is a child process
       // that captures env at spawn time, so it must be restarted to pick

@@ -56,10 +56,14 @@ export const ALARM_INTERVAL_RUNNING_MS = 5 * 60 * 1000; // 5 min
 export const ALARM_INTERVAL_STARTING_MS = 60 * 1000; // 1 min
 /** Restarting: wait for restartMachine() background work and reconcile quickly */
 export const ALARM_INTERVAL_RESTARTING_MS = 60 * 1000; // 1 min
+/** Recovering: relocate onto a new volume/host and reconcile quickly */
+export const ALARM_INTERVAL_RECOVERING_MS = 60 * 1000; // 1 min
 /** Maximum time to stay in 'starting' before falling back to 'stopped' */
 export const STARTING_TIMEOUT_MS = 5 * 60 * 1000; // 5 min
 /** Maximum time to stay in 'restarting' before surfacing a timeout */
 export const RESTARTING_TIMEOUT_MS = 5 * 60 * 1000; // 5 min
+/** Maximum time to stay in 'recovering' before surfacing a timeout */
+export const RECOVERING_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
 /** Destroying: retry pending deletes quickly */
 export const ALARM_INTERVAL_DESTROYING_MS = 60 * 1000; // 1 min
 /** Provisioned/stopped: slow drift detection */
@@ -67,8 +71,11 @@ export const ALARM_INTERVAL_IDLE_MS = 30 * 60 * 1000; // 30 min
 /** Random jitter added to alarm scheduling to prevent Fly API bursts */
 export const ALARM_JITTER_MS = 60 * 1000; // 0-60s
 
-/** Consecutive failed health checks before marking a running instance as stopped */
-export const SELF_HEAL_THRESHOLD = 5;
+/** Consecutive Fly `stopped` confirmations before triggering unexpected-stop recovery */
+export const SELF_HEAL_THRESHOLD = 1;
+
+/** Retain a replaced volume for rollback/debug only when snapshots exist. */
+export const PREVIOUS_VOLUME_RETENTION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /** Minimum interval between live Fly API checks in getStatus() (30 seconds).
  *  At 10s UI poll interval, only ~1 in 3 polls will hit Fly. */

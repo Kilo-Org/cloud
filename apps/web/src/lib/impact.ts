@@ -1,12 +1,7 @@
 import 'server-only';
 
 import { createHash } from 'crypto';
-import {
-  IMPACT_ACCOUNT_SID,
-  IMPACT_AUTH_TOKEN,
-  IMPACT_CAMPAIGN_ID,
-  IS_IN_AUTOMATED_TEST,
-} from '@/lib/config.server';
+import { IMPACT_ACCOUNT_SID, IMPACT_AUTH_TOKEN, IMPACT_CAMPAIGN_ID } from '@/lib/config.server';
 import { sentryLogger } from '@/lib/utils.server';
 
 const logInfo = sentryLogger('impact', 'info');
@@ -223,12 +218,10 @@ async function sendImpactConversion(
       });
 
       if (response.ok) {
-        if (IS_IN_AUTOMATED_TEST) {
-          logInfo('Impact conversion sent', {
-            event_name: eventName,
-            action_tracker_id: payload.ActionTrackerId,
-          });
-        }
+        logInfo('Impact conversion sent', {
+          event_name: eventName,
+          action_tracker_id: payload.ActionTrackerId,
+        });
         return;
       }
 

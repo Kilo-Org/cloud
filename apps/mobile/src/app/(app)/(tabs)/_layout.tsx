@@ -1,12 +1,17 @@
 import * as Haptics from 'expo-haptics';
 import { Tabs } from 'expo-router';
 import { Bot, MessageSquare } from 'lucide-react-native';
+import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+const ANDROID_TAB_BAR_EXTRA_PADDING = 4;
+
 export default function TabsLayout() {
   const colors = useThemeColors();
+  const { bottom } = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -18,6 +23,9 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: colors.background,
           borderTopColor: colors.border,
+          ...(Platform.OS === 'android' && {
+            height: 50 + bottom + ANDROID_TAB_BAR_EXTRA_PADDING,
+          }),
         },
       }}
     >

@@ -97,6 +97,11 @@ function formatEpochTime(epoch: number | null): string {
   return new Date(epoch).toLocaleString();
 }
 
+function formatEpochRelativeTime(epoch: number | null): string {
+  if (epoch === null) return '—';
+  return formatDistanceToNow(new Date(epoch), { addSuffix: true });
+}
+
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -163,6 +168,10 @@ function StatusBadge({ status }: { status: string | null }) {
       return <Badge className="bg-blue-500">Starting</Badge>;
     case 'restarting':
       return <Badge className="bg-amber-500">Restarting</Badge>;
+    case 'recovering':
+      return <Badge className="bg-orange-600">Recovering</Badge>;
+    case 'restoring':
+      return <Badge className="bg-violet-600">Restoring</Badge>;
     case 'stopped':
       return <Badge variant="secondary">Stopped</Badge>;
     case 'provisioned':
@@ -386,12 +395,14 @@ const PHASE_LABELS: Record<ReassociatePhase, string> = {
 
 function VolumeReassociationCard({
   userId,
+  instanceId,
   currentStatus,
   currentMachineId,
   previousVolumeId,
   onStatusChange,
 }: {
   userId: string;
+  instanceId: string;
   currentStatus: string | null;
   currentMachineId: string | null;
   previousVolumeId: string | null;
@@ -412,7 +423,7 @@ function VolumeReassociationCard({
     error: candidatesError,
     refetch: refetchCandidates,
   } = useQuery({
-    ...trpc.admin.kiloclawInstances.candidateVolumes.queryOptions({ userId }),
+    ...trpc.admin.kiloclawInstances.candidateVolumes.queryOptions({ userId, instanceId }),
     enabled: expanded,
   });
 
@@ -431,7 +442,7 @@ function VolumeReassociationCard({
   // Poll parent status during active phases
   const polling = phase === 'stopping' || phase === 'starting' || phase === 'waiting';
   useQuery({
-    queryKey: ['volume-reassociate-poll', userId, polling],
+    queryKey: ['volume-reassociate-poll', userId, instanceId, polling],
     queryFn: async () => {
       void queryClient.invalidateQueries({
         queryKey: trpc.admin.kiloclawInstances.get.queryKey(),
@@ -472,18 +483,18 @@ function VolumeReassociationCard({
       // Step 1: Stop if not already stopped
       if (!isStopped) {
         setPhase('stopping');
-        await machineStop({ userId });
+        await machineStop({ userId, instanceId });
         // Wait for stopped state
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
 
       // Step 2: Reassociate
       setPhase('reassociating');
-      await reassociate({ userId, newVolumeId: selectedVolumeId, reason });
+      await reassociate({ userId, instanceId, newVolumeId: selectedVolumeId, reason });
 
       // Step 3: Start
       setPhase('starting');
-      await machineStart({ userId });
+      await machineStart({ userId, instanceId });
 
       // Step 4: Wait for running
       setPhase('waiting');
@@ -1169,6 +1180,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [restoreSnapshotDialogOpen, setRestoreSnapshotDialogOpen] = useState(false);
   const [restoreSnapshotId, setRestoreSnapshotId] = useState<string | null>(null);
   const [restoreReason, setRestoreReason] = useState('');
+  const [cleanupRecoveryVolumeDialogOpen, setCleanupRecoveryVolumeDialogOpen] = useState(false);
   const [awaitingRestoreCompletion, setAwaitingRestoreCompletion] = useState(false);
 
   const { data, isLoading, error } = useQuery({
@@ -1355,9 +1367,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   };
 
   const machineControlsEnabled =
-    data?.destroyed_at === null && data?.workerStatus?.status !== 'restoring';
+    data?.destroyed_at === null &&
+    data?.workerStatus?.status !== 'restoring' &&
+    data?.workerStatus?.status !== 'recovering';
   const hasMachine = !!data?.workerStatus?.flyMachineId;
-  const canRetryRecovery =
+  const canRetryMetadataRecovery =
     data?.destroyed_at === null &&
     !data?.workerStatus?.flyMachineId &&
     data?.workerStatus?.status === 'stopped';
@@ -1445,14 +1459,32 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const { mutateAsync: forceRetryRecovery, isPending: isRetryingRecovery } = useMutation(
     trpc.admin.kiloclawInstances.forceRetryRecovery.mutationOptions({
       onSuccess: () => {
-        toast.success('Recovery retry requested');
+        toast.success('Metadata recovery retry requested');
         invalidateMachineQueries();
       },
       onError: err => {
-        toast.error(`Failed to retry recovery: ${err.message}`);
+        toast.error(`Failed to retry metadata recovery: ${err.message}`);
       },
     })
   );
+
+  const { mutateAsync: cleanupRecoveryPreviousVolume, isPending: isCleaningRecoveryVolume } =
+    useMutation(
+      trpc.admin.kiloclawInstances.cleanupRecoveryPreviousVolume.mutationOptions({
+        onSuccess: data => {
+          toast.success(
+            data.deletedVolumeId
+              ? `Retained recovery volume deleted: ${data.deletedVolumeId}`
+              : 'No retained recovery volume to delete'
+          );
+          invalidateMachineQueries();
+          setCleanupRecoveryVolumeDialogOpen(false);
+        },
+        onError: err => {
+          toast.error(`Failed to delete retained recovery volume: ${err.message}`);
+        },
+      })
+    );
 
   const { mutateAsync: gatewayStart, isPending: isGatewayStarting } = useMutation(
     trpc.admin.kiloclawInstances.gatewayStart.mutationOptions({
@@ -1555,11 +1587,13 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
   const isActive = data.destroyed_at === null;
   const machineStatus = data.workerStatus?.status ?? null;
+  const isRecovering = machineStatus === 'recovering';
   const machineRestartBlocked =
     machineStatus === 'provisioned' ||
     machineStatus === 'destroying' ||
     machineStatus === 'starting' ||
-    machineStatus === 'restarting';
+    machineStatus === 'restarting' ||
+    machineStatus === 'recovering';
   const machineActionPending =
     isMachineStarting ||
     isMachineStopping ||
@@ -1593,7 +1627,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       variant="destructive"
                       size="sm"
                       onClick={() => setDestroyDialogOpen(true)}
-                      disabled={data.workerStatus?.status === 'restoring'}
+                      disabled={
+                        data.workerStatus?.status === 'restoring' ||
+                        data.workerStatus?.status === 'recovering'
+                      }
                     >
                       <Trash2 className="mr-1 h-4 w-4" />
                       Destroy Instance
@@ -1791,7 +1828,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <CardTitle>Live Worker Status</CardTitle>
                 <CardDescription>Real-time status from the KiloClaw Durable Object</CardDescription>
               </div>
-              {canRetryRecovery && (
+              {canRetryMetadataRecovery && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1805,7 +1842,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   ) : (
                     <RotateCw className="mr-1 h-4 w-4" />
                   )}
-                  Retry Recovery
+                  Retry Metadata Recovery
                 </Button>
               )}
             </div>
@@ -2000,6 +2037,95 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             ) : null}
           </CardContent>
         </Card>
+
+        {data.workerStatus && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <CardTitle>Unexpected Stop Recovery</CardTitle>
+                  <CardDescription>
+                    Alarm-driven relocation state and retained recovery volume cleanup
+                  </CardDescription>
+                </div>
+                {data.workerStatus.recoveryPreviousVolumeId && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={isCleaningRecoveryVolume || isRecovering}
+                    onClick={() => setCleanupRecoveryVolumeDialogOpen(true)}
+                  >
+                    {isCleaningRecoveryVolume ? (
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="mr-1 h-4 w-4" />
+                    )}
+                    Delete Retained Volume
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isRecovering && (
+                <Alert className="border-orange-500/30 bg-orange-500/10">
+                  <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+                  <AlertDescription className="text-orange-700 dark:text-orange-300">
+                    The instance is currently relocating after an unexpected Fly stop.
+                    {data.workerStatus.recoveryStartedAt !== null &&
+                      ` Recovery began ${formatEpochRelativeTime(
+                        data.workerStatus.recoveryStartedAt
+                      )}.`}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <DetailField label="Current Recovery State">
+                  {isRecovering ? <StatusBadge status="recovering" /> : 'Idle'}
+                </DetailField>
+                <DetailField label="Recovery Started At">
+                  {formatEpochTime(data.workerStatus.recoveryStartedAt)}
+                </DetailField>
+                <DetailField label="Pending Replacement Volume">
+                  <code className="text-xs">
+                    {data.workerStatus.pendingRecoveryVolumeId ?? '—'}
+                  </code>
+                </DetailField>
+                <DetailField label="Retained Old Volume">
+                  <code className="text-xs">
+                    {data.workerStatus.recoveryPreviousVolumeId ?? '—'}
+                  </code>
+                </DetailField>
+                <DetailField label="Retained Volume Cleanup Deadline">
+                  {data.workerStatus.recoveryPreviousVolumeCleanupAfter !== null ? (
+                    <span
+                      title={formatEpochTime(data.workerStatus.recoveryPreviousVolumeCleanupAfter)}
+                    >
+                      {formatEpochRelativeTime(
+                        data.workerStatus.recoveryPreviousVolumeCleanupAfter
+                      )}
+                    </span>
+                  ) : (
+                    '—'
+                  )}
+                </DetailField>
+                <DetailField label="Last Recovery Error">
+                  {data.workerStatus.lastRecoveryErrorMessage ? (
+                    <span className="text-destructive text-xs">
+                      <code>{data.workerStatus.lastRecoveryErrorMessage}</code>
+                      <br />
+                      <span className="text-muted-foreground">
+                        {formatEpochTime(data.workerStatus.lastRecoveryErrorAt)}
+                      </span>
+                    </span>
+                  ) : (
+                    '—'
+                  )}
+                </DetailField>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Events */}
         {data.sandbox_id && (
@@ -2313,9 +2439,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         )}
 
         {/* Volume Reassociation (danger zone) */}
-        {isActive && data.workerStatus && (
+        {isActive && data.workerStatus && data.workerStatus.status !== 'recovering' && (
           <VolumeReassociationCard
             userId={data.user_id}
+            instanceId={data.id}
             currentStatus={data.workerStatus.status}
             currentMachineId={data.workerStatus.flyMachineId}
             previousVolumeId={data.workerStatus.previousVolumeId ?? null}
@@ -2426,7 +2553,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                               disabled={
                                 (snap.status !== 'created' && snap.status !== 'complete') ||
                                 data?.workerStatus?.status === 'restoring' ||
-                                data?.workerStatus?.status === 'destroying'
+                                data?.workerStatus?.status === 'destroying' ||
+                                data?.workerStatus?.status === 'recovering'
                               }
                               onClick={() => {
                                 setRestoreSnapshotId(snap.id);
@@ -2514,7 +2642,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <AdminFileEditor userId={data.user_id} />
+              <AdminFileEditor userId={data.user_id} instanceId={data.id} />
             </CardContent>
           </Card>
         )}
@@ -2619,6 +2747,53 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 ) : (
                   'Restore Snapshot'
                 )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={cleanupRecoveryVolumeDialogOpen}
+          onOpenChange={isCleaningRecoveryVolume ? () => {} : setCleanupRecoveryVolumeDialogOpen}
+        >
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="text-destructive flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Delete Retained Recovery Volume
+              </DialogTitle>
+              <DialogDescription className="pt-3">
+                This will permanently delete the retained old recovery volume.
+                <span className="text-foreground mt-2 block font-medium">
+                  Volume:{' '}
+                  <code className="text-xs">
+                    {data?.workerStatus?.recoveryPreviousVolumeId ?? '—'}
+                  </code>
+                </span>
+                <span className="mt-2 block">
+                  If Fly still reports an attached machine on that volume, the cleanup will
+                  force-destroy that machine first.
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <DialogClose asChild>
+                <Button variant="secondary" disabled={isCleaningRecoveryVolume}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                variant="destructive"
+                disabled={isCleaningRecoveryVolume || !data?.workerStatus?.recoveryPreviousVolumeId}
+                onClick={() =>
+                  void cleanupRecoveryPreviousVolume({
+                    userId: data.user_id,
+                    instanceId: data.id,
+                  })
+                }
+              >
+                {isCleaningRecoveryVolume && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                Delete Volume
               </Button>
             </DialogFooter>
           </DialogContent>

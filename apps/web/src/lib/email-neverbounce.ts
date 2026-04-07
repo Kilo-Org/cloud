@@ -13,12 +13,26 @@ type NeverBounceResponse = {
 
 const BLOCKED_RESULTS = new Set<NeverBounceResult>(['invalid', 'disposable']);
 
+// Domains where NeverBounce verification is skipped because their email
+// infrastructure is known to cause false negatives (legitimate addresses
+// reported as invalid). Apple iCloud is the primary offender.
+const NEVERBOUNCE_BYPASS_DOMAINS = new Set(['icloud.com', 'me.com']);
+
+function shouldBypassVerification(email: string): boolean {
+  const domain = email.split('@')[1]?.toLowerCase();
+  return domain !== undefined && NEVERBOUNCE_BYPASS_DOMAINS.has(domain);
+}
+
 /**
  * Returns true if the email is safe to send to, false if it should be skipped.
  * If NeverBounce is not configured or the check fails, defaults to allowing the send.
  */
 export async function verifyEmail(email: string): Promise<boolean> {
   if (!NEVERBOUNCE_API_KEY) {
+    return true;
+  }
+
+  if (shouldBypassVerification(email)) {
     return true;
   }
 

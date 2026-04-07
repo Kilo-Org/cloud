@@ -2,6 +2,7 @@
 
 import { Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import {
   OrganizationPlanSchema,
   type OrganizationPlan,
@@ -27,7 +28,7 @@ export function PlanCard({
   currentPlan,
   onSelect,
   billingCycle,
-  className = '',
+  className,
 }: PlanCardProps) {
   const planName = plan === 'teams' ? 'Teams' : 'Enterprise';
 
@@ -37,33 +38,40 @@ export function PlanCard({
   const isUpgrade = currentIndex < cardIndex;
   const isDowngrade = currentIndex > cardIndex;
 
+  const badgeLabel = isCurrent
+    ? 'CURRENT PLAN'
+    : isUpgrade
+      ? 'UPGRADE'
+      : isDowngrade
+        ? 'DOWNGRADE'
+        : null;
+  const badgeClassName = isCurrent ? 'bg-orange-600' : isUpgrade ? 'bg-green-600' : 'bg-gray-600';
+
   return (
-    <div
+    <button
+      type="button"
       onClick={onSelect}
-      className={`relative w-84 rounded-lg border-2 p-6 transition-all ${
+      className={cn(
+        'relative flex flex-col gap-6 rounded-lg border-2 p-6 text-left transition-all',
         isSelected
           ? 'border-blue-500 bg-blue-950/20'
-          : 'border-gray-700 bg-gray-900 hover:border-gray-600'
-      } ${!isSelected ? 'cursor-pointer opacity-50' : ''} ${className}`}
+          : 'border-gray-700 bg-gray-900 hover:border-gray-600',
+        !isSelected && 'cursor-pointer opacity-50',
+        className
+      )}
     >
       {/* Plan Badge */}
-      {isCurrent && (
-        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-orange-600">
-          CURRENT PLAN
+      {badgeLabel && (
+        <Badge className={cn('absolute -top-3 left-1/2 -translate-x-1/2', badgeClassName)}>
+          {badgeLabel}
         </Badge>
-      )}
-      {isUpgrade && (
-        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-600">UPGRADE</Badge>
-      )}
-      {isDowngrade && (
-        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gray-600">DOWNGRADE</Badge>
       )}
 
       {/* Plan Name */}
-      <h3 className="mb-2 text-center text-xl font-semibold text-white">{planName}</h3>
+      <h3 className="text-center text-xl font-semibold text-white">{planName}</h3>
 
       {/* Price */}
-      <div className="mb-6 text-center">
+      <div className="text-center">
         <div className="text-4xl font-bold text-white">
           ${pricePerMonth}
           <span className="text-lg font-normal text-gray-400">/user/month</span>
@@ -74,9 +82,9 @@ export function PlanCard({
       </div>
 
       {/* Features List */}
-      <ul className="mb-6 space-y-3">
-        {features.map((feature, index) => (
-          <li key={index} className="flex items-start gap-2 text-sm text-gray-300">
+      <ul className="space-y-3">
+        {features.map(feature => (
+          <li key={feature} className="flex items-start gap-2 text-sm text-gray-300">
             <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
             <span>{feature}</span>
           </li>
@@ -84,12 +92,15 @@ export function PlanCard({
       </ul>
 
       {/* Selection Indicator */}
-      {isSelected && (
-        <div className="flex items-center justify-center gap-2 text-sm font-medium text-blue-400">
-          <Check className="h-4 w-4" />
-          Selected
-        </div>
-      )}
-    </div>
+      <div
+        className={cn(
+          'flex items-center justify-center gap-2 text-sm font-medium',
+          isSelected ? 'text-blue-400' : 'text-gray-500'
+        )}
+      >
+        <Check className="h-4 w-4" />
+        {isSelected ? 'Selected' : 'Select plan'}
+      </div>
+    </button>
   );
 }

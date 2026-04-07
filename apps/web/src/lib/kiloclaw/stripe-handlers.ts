@@ -610,21 +610,29 @@ export async function handleKiloClawSubscriptionCreated(params: {
 
   if (didProcess && convertedFromTrial) {
     await runAfterResponse(async () => {
-      const tracking = await getImpactTrackingContext(kiloUserId, metadata.impactClickId);
-      if (!tracking) {
-        logWarning('KiloClaw trial conversion missing user for Impact trial end', {
+      try {
+        const tracking = await getImpactTrackingContext(kiloUserId, metadata.impactClickId);
+        if (!tracking) {
+          logWarning('KiloClaw trial conversion missing user for Impact trial end', {
+            stripe_event_id: eventId,
+            user_id: kiloUserId,
+          });
+          return;
+        }
+
+        await trackTrialEnd({
+          clickId: tracking.clickId,
+          customerId: kiloUserId,
+          customerEmail: tracking.customerEmail,
+          eventDate: new Date(),
+        });
+      } catch (error) {
+        logWarning('Impact trial end tracking failed', {
           stripe_event_id: eventId,
           user_id: kiloUserId,
+          error: error instanceof Error ? error.message : String(error),
         });
-        return;
       }
-
-      await trackTrialEnd({
-        clickId: tracking.clickId,
-        customerId: kiloUserId,
-        customerEmail: tracking.customerEmail,
-        eventDate: new Date(),
-      });
     });
   }
 
@@ -1093,32 +1101,40 @@ export async function handleKiloClawInvoicePaid(params: {
   });
 
   await runAfterResponse(async () => {
-    const tracking = await getImpactTrackingContext(metadata.kiloUserId, metadata.impactClickId);
-    if (!tracking) {
-      logWarning('KiloClaw invoice.paid user not found for Impact tracking', {
+    try {
+      const tracking = await getImpactTrackingContext(metadata.kiloUserId, metadata.impactClickId);
+      if (!tracking) {
+        logWarning('KiloClaw invoice.paid user not found for Impact tracking', {
+          stripe_event_id: eventId,
+          kilo_user_id: metadata.kiloUserId,
+        });
+        return;
+      }
+
+      const eventDate =
+        invoice.status_transitions?.paid_at != null
+          ? new Date(invoice.status_transitions.paid_at * 1000)
+          : new Date();
+      const salePayload = {
+        clickId: tracking.clickId,
+        customerId: metadata.kiloUserId,
+        customerEmail: tracking.customerEmail,
+        orderId: invoice.id,
+        amount: invoice.amount_paid / 100,
+        currencyCode: invoice.currency ?? 'usd',
+        eventDate,
+        itemCategory: getImpactItemCategory(plan),
+        itemName: getImpactItemName(plan),
+      };
+
+      await trackSale(salePayload);
+    } catch (error) {
+      logWarning('Impact sale tracking failed', {
         stripe_event_id: eventId,
-        kilo_user_id: metadata.kiloUserId,
+        user_id: metadata.kiloUserId,
+        error: error instanceof Error ? error.message : String(error),
       });
-      return;
     }
-
-    const eventDate =
-      invoice.status_transitions?.paid_at != null
-        ? new Date(invoice.status_transitions.paid_at * 1000)
-        : new Date();
-    const basePayload = {
-      clickId: tracking.clickId,
-      customerId: metadata.kiloUserId,
-      customerEmail: tracking.customerEmail,
-      orderId: invoice.id,
-      amount: invoice.amount_paid / 100,
-      currencyCode: invoice.currency ?? 'usd',
-      eventDate,
-      itemCategory: getImpactItemCategory(plan),
-      itemName: getImpactItemName(plan),
-    };
-
-    await trackSale(basePayload);
   });
 
   // Fire PostHog revenue tracking event in the background

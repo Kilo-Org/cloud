@@ -31,6 +31,7 @@ export const subjects = {
   clawEarlybirdExpiresTomorrow: 'Your KiloClaw Earlybird Access Expires Tomorrow',
   clawInstanceReady: 'Your KiloClaw Instance Is Ready',
   clawCreditRenewalFailed: 'Action Required: KiloClaw Hosting Renewal Failed',
+  accountDeletionRequest: 'Kilo: Account Deletion Request Received',
 } as const;
 
 export type TemplateName = keyof typeof subjects;
@@ -349,4 +350,24 @@ export async function sendOssExistingOrgProvisionedEmail(
   await Promise.all(
     data.to.map(to => send({ to, templateName: 'ossExistingOrgProvisioned', templateVars }))
   );
+}
+
+export async function sendAccountDeletionConfirmationEmail(to: string): Promise<SendResult> {
+  return send({
+    to,
+    templateName: 'accountDeletionRequest',
+    templateVars: { email: to },
+  });
+}
+
+export async function sendAccountDeletionSupportNotification(
+  userEmail: string,
+  userId: string
+): Promise<void> {
+  await sendViaMailgun({
+    to: 'hi@kilocode.ai',
+    subject: `Account Deletion Request — ${userEmail}`,
+    html: `<p>User <strong>${userEmail}</strong> (ID: <code>${userId}</code>) has requested account deletion from the mobile app.</p>`,
+    replyTo: userEmail,
+  });
 }

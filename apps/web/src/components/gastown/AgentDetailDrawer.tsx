@@ -80,7 +80,7 @@ export function AgentDetailDrawer({
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
         <Drawer.Content
-          className="fixed top-0 right-0 bottom-0 z-50 flex w-[480px] max-w-[94vw] flex-col outline-none"
+          className="fixed top-0 right-0 bottom-0 z-50 flex w-[600px] max-w-[94vw] flex-col outline-none"
           style={{ '--initial-transform': 'calc(100% + 8px)' } as React.CSSProperties}
         >
           <div className="flex h-full flex-col overflow-hidden rounded-l-2xl border-l border-white/[0.08] bg-[oklch(0.12_0_0)]">

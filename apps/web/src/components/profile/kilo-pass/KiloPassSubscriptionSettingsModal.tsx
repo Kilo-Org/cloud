@@ -1,7 +1,7 @@
 'use client';
 
 import { Settings } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -19,11 +19,9 @@ import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
 import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
-import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
+import { showCancelFlow } from '@/lib/churnkey/loader';
 
 import { getTierName } from './utils';
-import { CancelKiloPassSubscriptionModal } from './CancelKiloPassSubscriptionModal';
-import { KiloPassCancellationFeedbackModal } from './KiloPassCancellationFeedbackModal';
 import { useKiloPassSubscriptionInfo } from './useKiloPassSubscriptionInfo';
 import {
   getCadenceLabel,
@@ -52,49 +50,39 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
   const scheduleChange = useMutation(trpc.kiloPass.scheduleChange.mutationOptions());
   const cancelScheduledChange = useMutation(trpc.kiloPass.cancelScheduledChange.mutationOptions());
 
-  const [panel, setPanel] = useState<'main' | 'update'>('main');
-  const [cancelOpen, setCancelOpen] = useState(false);
-  const [cancellationFeedbackOpen, setCancellationFeedbackOpen] = useState(false);
-  const [selectedCancellationReasons, setSelectedCancellationReasons] = useState<string[]>([]);
-  const [cancellationFreeformText, setCancellationFreeformText] = useState('');
-  const [isCancelingSubscriptionWithFeedback, setIsCancelingSubscriptionWithFeedback] =
-    useState(false);
+  const [panel, setPanel] = useState<'main' | 'update'>('update');
   const [isCancelingPendingChangeUntilRefetch, setIsCancelingPendingChangeUntilRefetch] =
     useState(false);
 
   const scheduledChange = scheduledChangeQuery.data?.scheduledChange ?? null;
 
+  const closeModal = () => {
+    setPanel('update');
+    onClose();
+  };
+
   const [targetTier, setTargetTier] = useState<KiloPassTier>(subscription.tier);
   const [targetCadence, setTargetCadence] = useState<KiloPassCadence>(subscription.cadence);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTargetTier(subscription.tier);
+      setTargetCadence(subscription.cadence);
+    }
+  }, [isOpen, subscription.tier, subscription.cadence]);
 
   useEffect(() => {
     if (isOpen && scheduledChange) {
       setTargetTier(scheduledChange.toTier);
       setTargetCadence(scheduledChange.toCadence);
-      return;
     }
-
-    if (isOpen) {
-      setTargetTier(subscription.tier);
-      setTargetCadence(subscription.cadence);
-    }
-  }, [
-    isOpen,
-    scheduledChange?.status,
-    scheduledChange?.toTier,
-    scheduledChange?.toCadence,
-    subscription.tier,
-    subscription.cadence,
-  ]);
+  }, [isOpen, scheduledChange]);
 
   const isCancelingPendingChange =
     cancelScheduledChange.isPending || isCancelingPendingChangeUntilRefetch;
 
   const isMutating =
-    scheduleChange.isPending ||
-    isCancelingPendingChange ||
-    actions.isCancelingSubscription ||
-    isCancelingSubscriptionWithFeedback;
+    scheduleChange.isPending || isCancelingPendingChange || actions.isCancelingSubscription;
 
   const isSameSelection =
     targetTier === subscription.tier && targetCadence === subscription.cadence;
@@ -164,7 +152,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
           };
     }
 
-    let message;
+    let message: string;
 
     if (isCadenceChange) {
       message = `Cadence changes take effect on ${effectiveAtLabel}.`;
@@ -223,11 +211,11 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
         targetCadence,
       });
       toast(`Change scheduled for ${formatIsoDateString_UsaDateOnlyFormat(result.effectiveAt)}`);
+      closeModal();
       await queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() });
       await queryClient.invalidateQueries({
         queryKey: trpc.kiloPass.getScheduledChange.queryKey(),
       });
-      setPanel('main');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to schedule change';
       toast.error(message);
@@ -255,115 +243,54 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
 
   const cancelAction = view.actions.cancel;
   const resumeAction = view.actions.resume;
+  const resumePausedAction = view.actions.resumePaused;
 
   const isUpdateSubscriptionDisabled = view.status.isPendingCancellation;
 
   const pendingChange = Boolean(scheduledChange);
-  const showUpdatePanel = panel === 'update';
+  const showUpdatePanel = panel === 'update' && !pendingChange;
 
-  const cancellationReasons = useMemo(() => {
-    const reasons = [
-      'Too expensive',
-      'Not using it enough',
-      'Missing features',
-      'Bugs / reliability issues',
-      'Performance issues',
-      'Using another tool',
-    ];
-    // Fisher-Yates shuffle
-    for (let i = reasons.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [reasons[i], reasons[j]] = [reasons[j], reasons[i]];
-    }
-    return [...reasons, 'Other'];
-  }, []);
+  const handleOpenCancelFlow = useCallback(async () => {
+    try {
+      const { hash, customerId } = await trpcClient.kiloPass.getChurnkeyAuthHash.query();
+      onClose();
 
-  const toggleCancellationReason = (reason: string) => {
-    setSelectedCancellationReasons(current =>
-      current.includes(reason) ? current.filter(r => r !== reason) : [...current, reason]
-    );
-  };
-
-  const buildFeedbackText = (params: { selectedReasons: string[]; freeformText: string }) => {
-    const lines: string[] = [];
-    if (params.selectedReasons.length > 0) {
-      lines.push('Reasons:');
-      for (const r of params.selectedReasons) lines.push(r);
-    }
-    const trimmed = params.freeformText.trim();
-    if (trimmed.length > 0) {
-      if (lines.length > 0) lines.push('');
-      lines.push('Feedback:');
-      lines.push(trimmed);
-    }
-    return lines.join('\n');
-  };
-
-  const cancelSubscriptionWithFeedback = () => {
-    if (isCancelingSubscriptionWithFeedback) return;
-    setIsCancelingSubscriptionWithFeedback(true);
-
-    const selectedReasons = selectedCancellationReasons;
-    const freeformText = cancellationFreeformText;
-    const hasReasons = selectedReasons.length > 0;
-    const hasFreeform = freeformText.trim().length > 0;
-    const shouldSubmitFeedback = hasReasons || hasFreeform;
-
-    const feedback_text = buildFeedbackText({ selectedReasons, freeformText });
-
-    const context_json = {
-      subscription,
-      ui: {
-        selectedReasons,
-        freeformText,
-      },
-    };
-
-    const cancelPromise = trpcClient.kiloPass.cancelSubscription.mutate();
-    const feedbackPromise = shouldSubmitFeedback
-      ? trpcClient.userFeedback.create
-          .mutate({
-            feedback_text,
-            feedback_for: FeedbackFor.KiloPass,
-            feedback_batch: 'kilo_pass_cancellation_web',
-            source: FeedbackSource.Web,
-            context_json,
-          })
-          // Non-blocking: feedback errors should never interfere with cancellation.
-          .catch(() => {})
-      : Promise.resolve();
-
-    void cancelPromise
-      .then(async () => {
-        toast('Cancellation scheduled');
-        void queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() });
-        await queryClient.invalidateQueries({
-          queryKey: trpc.kiloPass.getScheduledChange.queryKey(),
-        });
-
-        setCancellationFeedbackOpen(false);
-        setSelectedCancellationReasons([]);
-        setCancellationFreeformText('');
-      })
-      .catch(error => {
-        const message = error instanceof Error ? error.message : 'Failed to cancel subscription';
-        toast.error(message);
-      })
-      .finally(() => {
-        // Make sure we re-enable the modal button even if invalidations fail.
-        setIsCancelingSubscriptionWithFeedback(false);
+      await showCancelFlow({
+        authHash: hash,
+        customerId,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
+        onCancel: async () => {
+          await trpcClient.kiloPass.cancelSubscription.mutate();
+          toast('Cancellation scheduled');
+          void queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() });
+          void queryClient.invalidateQueries({
+            queryKey: trpc.kiloPass.getScheduledChange.queryKey(),
+          });
+        },
+        onClose: () => {
+          // Also invalidate on close to catch discount-accepted or other state changes
+          void queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() });
+          void queryClient.invalidateQueries({
+            queryKey: trpc.kiloPass.getScheduledChange.queryKey(),
+          });
+        },
       });
-
-    // Fire and forget, but keep it tied to this invocation.
-    void feedbackPromise;
-  };
+    } catch (error) {
+      // If Churnkey SDK fails to load, fall back to direct cancellation
+      const message = error instanceof Error ? error.message : 'Failed to open cancel flow';
+      toast.error(message);
+      if (window.confirm('Are you sure you want to cancel your Kilo Pass subscription?')) {
+        actions.cancelSubscription();
+      }
+    }
+  }, [actions, onClose, queryClient, subscription.stripeSubscriptionId, trpc, trpcClient]);
 
   return (
     <Dialog
       open={isOpen}
       onOpenChange={open => {
         if (!open) {
-          setPanel('main');
+          setPanel('update');
           onClose();
         }
       }}
@@ -372,7 +299,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5 text-blue-400" />
-            Manage Kilo Pass
+            {showUpdatePanel ? 'Update Kilo Pass' : 'Manage Kilo Pass'}
           </DialogTitle>
           {showUpdatePanel ? null : (
             <DialogDescription className="text-muted-foreground">
@@ -406,9 +333,11 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
             onManagePaymentMethod={actions.openCustomerPortal}
             isOpeningCustomerPortal={actions.isOpeningCustomerPortal}
             resumeAction={resumeAction}
+            resumePausedAction={resumePausedAction}
             cancelAction={cancelAction}
-            onResumeSubscription={actions.resumeSubscription}
-            onOpenCancelSubscription={() => setCancelOpen(true)}
+            onResumeSubscription={actions.resumeCancelledSubscription}
+            onResumePausedSubscription={actions.resumePausedSubscription}
+            onOpenCancelSubscription={handleOpenCancelFlow}
             isResumingSubscription={actions.isResumingSubscription}
             isCancelingSubscription={actions.isCancelingSubscription}
           />
@@ -417,7 +346,7 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
         <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-between">
           {showUpdatePanel ? (
             <UpdateFooter
-              onBack={() => setPanel('main')}
+              onBack={() => closeModal()}
               onCancelPendingChange={handleCancelScheduledChange}
               onScheduleChange={handleScheduleChange}
               isMutating={isMutating}
@@ -427,43 +356,12 @@ export function KiloPassSubscriptionSettingsModal(props: SettingsModalProps) {
               isSameSelection={isSameSelection}
             />
           ) : (
-            <Button variant="outline" onClick={onClose} disabled={isMutating}>
+            <Button variant="outline" onClick={closeModal} disabled={isMutating}>
               Close
             </Button>
           )}
         </DialogFooter>
       </DialogContent>
-
-      <CancelKiloPassSubscriptionModal
-        isOpen={cancelOpen}
-        onClose={() => setCancelOpen(false)}
-        onConfirm={() => {
-          setCancelOpen(false);
-          setCancellationFeedbackOpen(true);
-        }}
-        isLoading={actions.isCancelingSubscription}
-        cadence={subscription.cadence}
-        tier={subscription.tier}
-        currentStreakMonths={subscription.currentStreakMonths}
-        subscriptionActiveUntilLabel={view.dates.nextBillingDateLabel}
-      />
-
-      <KiloPassCancellationFeedbackModal
-        isOpen={cancellationFeedbackOpen}
-        onClose={() => setCancellationFeedbackOpen(false)}
-        isCanceling={actions.isCancelingSubscription || isCancelingSubscriptionWithFeedback}
-        reasons={cancellationReasons}
-        selectedReasons={selectedCancellationReasons}
-        onToggleReason={toggleCancellationReason}
-        freeformText={cancellationFreeformText}
-        onChangeFreeformText={setCancellationFreeformText}
-        onKeepSubscription={() => {
-          setCancellationFeedbackOpen(false);
-          setSelectedCancellationReasons([]);
-          setCancellationFreeformText('');
-        }}
-        onCancelSubscription={cancelSubscriptionWithFeedback}
-      />
     </Dialog>
   );
 }

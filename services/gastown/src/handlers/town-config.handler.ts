@@ -40,7 +40,18 @@ export async function handleUpdateTownConfig(c: Context<GastownEnv>, params: { t
   }
 
   const townDO = getTownDOStub(c.env, params.townId);
+  const existingConfig = await townDO.getTownConfig();
   const config = await townDO.updateTownConfig(parsed.data);
+
+  // Rewrite the mayor's AGENTS.md when custom instructions change
+  if (config.custom_instructions?.mayor !== existingConfig.custom_instructions?.mayor) {
+    try {
+      await townDO.updateMayorSystemPrompt();
+    } catch (err) {
+      console.warn(`${LOG} handleUpdateTownConfig: updateMayorSystemPrompt failed:`, err);
+    }
+  }
+
   console.log(`${LOG} handleUpdateTownConfig: town=${params.townId} updated config`);
   return c.json(resSuccess(maskSensitiveValues(config)));
 }

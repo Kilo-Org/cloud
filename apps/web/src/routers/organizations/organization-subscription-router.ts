@@ -32,6 +32,10 @@ import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/
 import { BillingCycleSchema } from '@/lib/organizations/organization-types';
 import { successResult } from '@/lib/maybe-result';
 import { client } from '@/lib/stripe-client';
+import {
+  billingHistoryResponseSchema,
+  mapStripeInvoiceToBillingHistoryEntry,
+} from '@/lib/subscriptions/subscription-center';
 
 const SubscriptionRequestSchema = OrganizationIdInputSchema.extend({
   seats: z.number().int().min(1).max(100),
@@ -48,6 +52,7 @@ const OrganizationSubscriptionResponseSchema = z.object({
   subscription: z.custom<Stripe.Subscription>().nullable(),
   seatsUsed: z.number(),
   totalSeats: z.number(),
+  paidSeatItemId: z.string().nullable(),
 });
 
 type OrganizationSubscriptionResponse = z.infer<typeof OrganizationSubscriptionResponseSchema>;
@@ -62,6 +67,10 @@ const UpdateSeatCountResponseSchema = z.object({
   message: z.string().optional(),
   requiresAction: z.boolean().optional(),
   paymentIntentClientSecret: z.string().optional(),
+});
+
+const CursorInputSchema = OrganizationIdInputSchema.extend({
+  cursor: z.string().optional(),
 });
 
 const ChangeBillingCycleInputSchema = OrganizationIdInputSchema.extend({
@@ -79,7 +88,7 @@ const ResubscribeDefaultsResponseSchema = z.object({
 });
 
 export const organizationsSubscriptionRouter = createTRPCRouter({
-  get: organizationMemberProcedure
+  get: organizationBillingProcedure
     .input(OrganizationIdInputSchema)
     .output(OrganizationSubscriptionResponseSchema)
     .query(async ({ input }): Promise<OrganizationSubscriptionResponse> => {
@@ -95,12 +104,13 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
           subscription: null,
           seatsUsed: usages.used,
           totalSeats: usages.total,
+          paidSeatItemId: null,
         };
       }
 
       // Fetch the subscription information from Stripe — including ended
       // subscriptions so the overview card can show the resubscribe UI.
-      let subscription = null;
+      let subscription: Stripe.Subscription | null = null;
       try {
         subscription = await retrieveSubscription(latestPurchase.subscription_stripe_id);
       } catch (error) {
@@ -111,7 +121,10 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         // Continue without Stripe data - we still have the purchase record
       }
 
-      return { subscription, seatsUsed: usages.used, totalSeats: usages.total };
+      const paidSeatItemId =
+        subscription?.items.data.find(item => KNOWN_SEAT_PRICE_IDS.has(item.price.id))?.id ?? null;
+
+      return { subscription, seatsUsed: usages.used, totalSeats: usages.total, paidSeatItemId };
     }),
 
   getResubscribeDefaults: organizationMemberProcedure
@@ -335,6 +348,31 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       });
 
       return { url: session.url };
+    }),
+
+  getBillingHistory: organizationBillingProcedure
+    .input(CursorInputSchema)
+    .output(billingHistoryResponseSchema)
+    .query(async ({ input }) => {
+      const latestPurchase = await getMostRecentSeatPurchase(input.organizationId);
+      if (!latestPurchase) {
+        return { entries: [], hasMore: false, cursor: null };
+      }
+
+      const customerId = await getOrCreateStripeCustomerIdForOrganization(input.organizationId);
+
+      const invoices = await client.invoices.list({
+        customer: customerId,
+        subscription: latestPurchase.subscription_stripe_id,
+        limit: 25,
+        ...(input.cursor ? { starting_after: input.cursor } : {}),
+      });
+
+      return {
+        entries: invoices.data.map(mapStripeInvoiceToBillingHistoryEntry),
+        hasMore: invoices.has_more,
+        cursor: invoices.has_more ? (invoices.data.at(-1)?.id ?? null) : null,
+      };
     }),
 
   changeBillingCycle: organizationBillingMutationProcedure

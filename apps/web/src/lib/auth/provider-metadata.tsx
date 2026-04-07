@@ -1,3 +1,4 @@
+import { AppleLogo } from '@/components/auth/AppleLogo';
 import { DiscordLogo } from '@/components/auth/DiscordLogo';
 import { GitHubLogo } from '@/components/auth/GitHubLogo';
 import { GitLabLogo } from '@/components/auth/GitLabLogo';
@@ -18,6 +19,7 @@ const fakeLoginIcon = (
 // Single source of truth: array of all authentication providers with full metadata.
 const AllAuthProviders = [
   { id: 'email', name: 'Email', icon: <Mail /> },
+  { id: 'apple', name: 'Apple', icon: <AppleLogo /> },
   { id: 'google', name: 'Google', icon: <GoogleLogo /> },
   { id: 'github', name: 'GitHub', icon: <GitHubLogo /> },
   { id: 'gitlab', name: 'GitLab', icon: <GitLabLogo className="size-5" /> },

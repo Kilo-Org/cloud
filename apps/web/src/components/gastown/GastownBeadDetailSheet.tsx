@@ -63,16 +63,14 @@ export function GastownBeadDetailSheet({
       <SheetContent
         side="right"
         className={cn(
-          'w-[540px] max-w-[92vw] border-white/10 bg-[color:oklch(0.155_0_0)]',
+          'w-[660px] max-w-[92vw] border-white/10 bg-[color:oklch(0.155_0_0)]',
           'shadow-[0_30px_120px_-70px_rgba(0,0,0,0.95)]'
         )}
       >
         <SheetHeader className="gap-2">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <SheetTitle className="truncate text-base text-white/90">
-                {bead?.title ?? 'Bead'}
-              </SheetTitle>
+              <SheetTitle className="text-base text-white/90">{bead?.title ?? 'Bead'}</SheetTitle>
               <SheetDescription className="mt-1 text-xs text-white/45">
                 Click-through audit trail: events, status changes, hooks, and mail.
               </SheetDescription>

@@ -5,6 +5,7 @@ import {
   credit_transactions,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
+  kilo_pass_pause_events,
   kilo_pass_scheduled_changes,
   kilo_pass_subscriptions,
   microdollar_usage,
@@ -16,7 +17,7 @@ import {
   KiloPassScheduledChangeStatus,
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import crypto from 'crypto';
 import {
   computeMonthlyCadenceBonusPercent,
@@ -29,6 +30,7 @@ import {
 } from '@/lib/kilo-pass/constants';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import type { BillingHistoryEntry } from '@/lib/subscriptions/subscription-center';
 import type Stripe from 'stripe';
 
 type StripeMock = {
@@ -50,6 +52,9 @@ type StripeMock = {
     sessions: {
       create: ReturnType<typeof jest.fn>;
     };
+  };
+  invoices: {
+    list: ReturnType<typeof jest.fn>;
   };
 };
 
@@ -94,7 +99,8 @@ type KiloPassCaller = {
   }>;
   getCustomerPortalUrl: (input: { returnUrl?: string }) => Promise<{ url: string }>;
   cancelSubscription: () => Promise<{ success: boolean }>;
-  resumeSubscription: () => Promise<{ success: boolean }>;
+  resumeCancelledSubscription: () => Promise<{ success: boolean }>;
+  resumePausedSubscription: () => Promise<{ success: boolean }>;
   scheduleChange: (input: {
     targetTier: KiloPassTier;
     targetCadence: KiloPassCadence;
@@ -104,6 +110,22 @@ type KiloPassCaller = {
     tier: KiloPassTier;
     cadence: KiloPassCadence;
   }) => Promise<{ url: string | null }>;
+  getBillingHistory: (input: { cursor?: string }) => Promise<{
+    entries: BillingHistoryEntry[];
+    hasMore: boolean;
+    cursor: string | null;
+  }>;
+  getCreditHistory: (input: { cursor?: string }) => Promise<{
+    entries: Array<{
+      id: string;
+      date: string;
+      amountUsd: number;
+      kind: KiloPassIssuanceItemKind;
+      description: string;
+    }>;
+    hasMore: boolean;
+    cursor: string | null;
+  }>;
 };
 
 type Caller = { kiloPass: KiloPassCaller };
@@ -130,6 +152,9 @@ jest.mock('@/lib/stripe-client', () => {
       sessions: {
         create: jest.fn(),
       },
+    },
+    invoices: {
+      list: jest.fn(),
     },
   };
 
@@ -257,6 +282,7 @@ describe('kiloPassRouter', () => {
     stripeMock.subscriptionSchedules.release.mockReset();
     stripeMock.checkout.sessions.create.mockReset();
     stripeMock.billingPortal.sessions.create.mockReset();
+    stripeMock.invoices.list.mockReset();
   });
 
   describe('getState', () => {
@@ -717,6 +743,24 @@ describe('kiloPassRouter', () => {
       expect(result.subscription).toBeNull();
     });
 
+    it('returns isEligibleForFirstMonthPromo=false after the promo cutoff', async () => {
+      // If the current time is at or after the cutoff, even a user with no subscriptions
+      // should see isEligibleForFirstMonthPromo=false.
+      const now = new Date();
+      const cutoff = KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toDate();
+      if (now >= cutoff) {
+        const user = await insertTestUser({
+          google_user_email: 'kilo-pass-promo-cutoff-ineligible@example.com',
+        });
+
+        const caller = await createCallerForUser(user.id);
+        const result = await caller.kiloPass.getState();
+
+        expect(result.isEligibleForFirstMonthPromo).toBe(false);
+        expect(result.subscription).toBeNull();
+      }
+    });
+
     it('returns isEligibleForFirstMonthPromo=false when user has a canceled subscription', async () => {
       const stripeMock = getStripeMock();
       stripeMock.subscriptions.retrieve.mockResolvedValue({
@@ -974,7 +1018,7 @@ describe('kiloPassRouter', () => {
     });
   });
 
-  describe('resumeSubscription', () => {
+  describe('resumeCancelledSubscription', () => {
     it('throws when subscription is not pending cancellation', async () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-resume-not-pending@example.com',
@@ -989,7 +1033,7 @@ describe('kiloPassRouter', () => {
       });
 
       const caller = await createCallerForUser(user.id);
-      await expect(caller.kiloPass.resumeSubscription()).rejects.toThrow(
+      await expect(caller.kiloPass.resumeCancelledSubscription()).rejects.toThrow(
         'Kilo Pass subscription is not pending cancellation.'
       );
     });
@@ -1017,7 +1061,7 @@ describe('kiloPassRouter', () => {
         .where(eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_test_resume_me'));
 
       const caller = await createCallerForUser(user.id);
-      const result = await caller.kiloPass.resumeSubscription();
+      const result = await caller.kiloPass.resumeCancelledSubscription();
 
       expect(result).toEqual({ success: true });
       expect(stripeMock.subscriptions.update).toHaveBeenCalledWith('sub_test_resume_me', {
@@ -1031,6 +1075,80 @@ describe('kiloPassRouter', () => {
       expect(updated?.status).toBe('active');
       expect(updated?.cancel_at_period_end).toBe(false);
       expect(updated?.ended_at).toBeNull();
+    });
+  });
+
+  describe('resumePausedSubscription', () => {
+    it('clears pause_collection on Stripe and closes the pause event in DB', async () => {
+      const stripeMock = getStripeMock();
+      stripeMock.subscriptions.update.mockResolvedValue({});
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-resume-paused-success@example.com',
+      });
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_resume_paused',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'paused',
+      });
+
+      // Insert an open pause event for the subscription
+      await db.insert(kilo_pass_pause_events).values({
+        kilo_pass_subscription_id: subscriptionId,
+        paused_at: new Date('2026-01-01T00:00:00.000Z').toISOString(),
+        resumes_at: null,
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.resumePausedSubscription();
+
+      expect(result).toEqual({ success: true });
+      expect(stripeMock.subscriptions.update).toHaveBeenCalledWith('sub_test_resume_paused', {
+        pause_collection: '',
+      });
+
+      // Verify the pause event was closed (resumed_at is set)
+      const openEvent = await db
+        .select()
+        .from(kilo_pass_pause_events)
+        .where(
+          and(
+            eq(kilo_pass_pause_events.kilo_pass_subscription_id, subscriptionId),
+            isNull(kilo_pass_pause_events.resumed_at)
+          )
+        );
+      expect(openEvent).toHaveLength(0);
+    });
+
+    it('throws when subscription is not paused', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-resume-paused-not-paused@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_resume_paused_active',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloPass.resumePausedSubscription()).rejects.toThrow(
+        'Subscription is not paused.'
+      );
+    });
+
+    it('throws when user has no subscription', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-resume-paused-no-sub@example.com',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloPass.resumePausedSubscription()).rejects.toThrow(
+        'No Kilo Pass subscription found.'
+      );
     });
   });
 
@@ -1110,9 +1228,11 @@ describe('kiloPassRouter', () => {
         ),
       });
       expect(rows).toHaveLength(1);
-      expect(rows[0]?.status).toBe(KiloPassScheduledChangeStatus.NotStarted);
-      expect(rows[0]?.stripe_schedule_id).toBe(scheduleId);
-      expect(new Date(rows[0]?.effective_at ?? '').toISOString()).toBe(
+      const row = rows[0];
+      if (!row) throw new Error('Expected at least one scheduled change row');
+      expect(row.status).toBe(KiloPassScheduledChangeStatus.NotStarted);
+      expect(row.stripe_schedule_id).toBe(scheduleId);
+      expect(new Date(row.effective_at).toISOString()).toBe(
         new Date(stripePeriodEndSeconds * 1000).toISOString()
       );
     });
@@ -1348,7 +1468,10 @@ describe('kiloPassRouter', () => {
       });
 
       const updateCall = stripeMock.subscriptionSchedules.update.mock.calls[0];
-      const phases = updateCall?.[1]?.phases;
+      if (!updateCall) throw new Error('Expected subscriptionSchedules.update to have been called');
+      const updateArgs = updateCall[1];
+      if (!updateArgs) throw new Error('Expected update call to have a second argument');
+      const phases = updateArgs.phases;
       const newPhase = phases?.[1];
 
       // Yearly tier upgrades should NOT prorate — remaining credits at the old tier
@@ -1407,7 +1530,10 @@ describe('kiloPassRouter', () => {
       });
 
       const updateCall = stripeMock.subscriptionSchedules.update.mock.calls[0];
-      const phases = updateCall?.[1]?.phases;
+      if (!updateCall) throw new Error('Expected subscriptionSchedules.update to have been called');
+      const updateArgs = updateCall[1];
+      if (!updateArgs) throw new Error('Expected update call to have a second argument');
+      const phases = updateArgs.phases;
       const newPhase = phases?.[1];
 
       // Cadence changes (monthly→yearly) must reset the billing anchor so Stripe
@@ -1475,6 +1601,94 @@ describe('kiloPassRouter', () => {
       // The API releases the schedule; the DB row is deleted asynchronously by the Stripe
       // `subscription_schedule.updated` webhook when it transitions to released/canceled/completed.
       expect(updated).toBeTruthy();
+    });
+  });
+
+  describe('getBillingHistory', () => {
+    it('returns empty entries when user has no kilo pass subscription', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-billing-history-no-sub@example.com',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getBillingHistory({});
+
+      expect(result).toEqual({ entries: [], hasMore: false, cursor: null });
+    });
+
+    it('returns mapped invoices scoped to the kilo pass subscription', async () => {
+      const stripeMock = getStripeMock();
+      const invoiceCreatedTs = Math.floor(Date.now() / 1000) - 86400;
+      stripeMock.invoices.list.mockResolvedValue({
+        data: [
+          {
+            id: 'in_test_1',
+            created: invoiceCreatedTs,
+            amount_due: 1900,
+            currency: 'usd',
+            status: 'paid',
+            hosted_invoice_url: 'https://stripe.example.test/invoice/1',
+            invoice_pdf: 'https://stripe.example.test/invoice/1.pdf',
+            lines: { data: [{ description: 'Kilo Pass Tier 19' }] },
+          },
+        ],
+      });
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-billing-history-ok@example.com',
+      });
+      await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_billing_history_test',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getBillingHistory({});
+
+      expect(stripeMock.invoices.list).toHaveBeenCalledWith(
+        expect.objectContaining({ subscription: 'sub_billing_history_test' })
+      );
+      expect(result.entries).toHaveLength(1);
+      const entry = result.entries[0];
+      if (!entry) throw new Error('Expected at least one billing history entry');
+      expect(entry.kind).toBe('stripe');
+      if (entry.kind !== 'stripe') throw new Error('Expected stripe entry');
+      expect(entry.id).toBe('in_test_1');
+      expect(entry.amountCents).toBe(1900);
+      expect(entry.currency).toBe('usd');
+      expect(entry.status).toBe('paid');
+      expect(result.hasMore).toBe(false);
+      expect(result.cursor).toBeNull();
+    });
+  });
+
+  describe('getCreditHistory', () => {
+    it('returns issuance items for the current subscription', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-credit-history-ok@example.com',
+      });
+
+      const { id: subscriptionId } = await insertSubscription({
+        kiloUserId: user.id,
+        stripeSubscriptionId: 'sub_test_credit_history',
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+        status: 'active',
+      });
+
+      await insertBaseCreditsIssuance({ subscriptionId, kiloUserId: user.id });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getCreditHistory({});
+
+      expect(result.entries.length).toBeGreaterThanOrEqual(1);
+      const entry = result.entries[0];
+      if (!entry) throw new Error('Expected at least one credit history entry');
+      expect(entry.kind).toBe('base');
+      expect(entry.amountUsd).toBe(10);
     });
   });
 

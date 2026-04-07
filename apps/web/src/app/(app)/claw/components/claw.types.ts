@@ -88,6 +88,10 @@ export const CLAW_STATUS_BADGE: Record<
     label: 'Restarting',
     className: 'border-amber-500/30 bg-amber-500/15 text-amber-400 animate-pulse',
   },
+  recovering: {
+    label: 'Recovering',
+    className: 'border-orange-500/30 bg-orange-500/15 text-orange-400 animate-pulse',
+  },
   stopped: {
     label: 'Machine Stopped',
     className: 'border-red-500/30 bg-red-500/15 text-red-400',

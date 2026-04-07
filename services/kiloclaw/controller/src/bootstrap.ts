@@ -559,7 +559,7 @@ export function buildGatewayArgs(env: EnvLike): string[] {
 /** Yield to the event loop so the HTTP server can process pending requests. */
 const yieldToEventLoop = (): Promise<void> => new Promise(resolve => setImmediate(resolve));
 
-export async function bootstrap(
+export async function bootstrapCritical(
   env: EnvLike,
   setPhase: (phase: string) => void,
   deps: BootstrapDeps = defaultDeps
@@ -576,28 +576,68 @@ export async function bootstrap(
   applyFeatureFlags(env, deps);
 
   generateHooksToken(env);
-  await yieldToEventLoop();
-
-  setPhase('github');
-  configureGitHub(env, deps);
-  await yieldToEventLoop();
-
-  setPhase('linear');
-  configureLinear(env);
-  await yieldToEventLoop();
-
-  const configExists = deps.existsSync(CONFIG_PATH);
-  setPhase(configExists ? 'doctor' : 'onboard');
-  runOnboardOrDoctor(env, deps);
-  await yieldToEventLoop();
-
-  updateToolsMdSection(true, KILO_CLI_SECTION_CONFIG, deps);
-  updateToolsMdSection(!!env.KILOCLAW_GOG_CONFIG_TARBALL, GOG_SECTION_CONFIG, deps);
-  updateToolsMdSection(!!env.OP_SERVICE_ACCOUNT_TOKEN, OP_SECTION_CONFIG, deps);
-  updateToolsMdSection(!!env.LINEAR_API_KEY, LINEAR_SECTION_CONFIG, deps);
-
-  // Write mcporter config for MCP servers (AgentCard, etc.)
-  writeMcporterConfig(env);
-
   env.KILOCLAW_GATEWAY_ARGS = JSON.stringify(buildGatewayArgs(env));
+  await yieldToEventLoop();
+}
+
+export type BootstrapNonCriticalResult = { ok: true } | { ok: false; phase: string; error: string };
+
+type BootstrapStep = { phase: string; run: () => void | Promise<void> };
+
+export async function bootstrapNonCritical(
+  env: EnvLike,
+  setPhase: (phase: string) => void,
+  deps: BootstrapDeps = defaultDeps
+): Promise<BootstrapNonCriticalResult> {
+  await yieldToEventLoop();
+  const configPhase = deps.existsSync(CONFIG_PATH) ? 'doctor' : 'onboard';
+
+  const steps: BootstrapStep[] = [
+    { phase: 'github', run: () => configureGitHub(env, deps) },
+    { phase: 'linear', run: () => configureLinear(env) },
+    { phase: configPhase, run: () => runOnboardOrDoctor(env, deps) },
+    {
+      phase: 'tools-md',
+      run: () => {
+        updateToolsMdSection(true, KILO_CLI_SECTION_CONFIG, deps);
+        updateToolsMdSection(!!env.KILOCLAW_GOG_CONFIG_TARBALL, GOG_SECTION_CONFIG, deps);
+        updateToolsMdSection(!!env.OP_SERVICE_ACCOUNT_TOKEN, OP_SECTION_CONFIG, deps);
+        updateToolsMdSection(!!env.LINEAR_API_KEY, LINEAR_SECTION_CONFIG, deps);
+      },
+    },
+    {
+      phase: 'mcporter',
+      run: () => {
+        writeMcporterConfig(env);
+      },
+    },
+  ];
+
+  for (const step of steps) {
+    try {
+      setPhase(step.phase);
+      await step.run();
+      await yieldToEventLoop();
+    } catch (error) {
+      return {
+        ok: false,
+        phase: step.phase,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
+export async function bootstrap(
+  env: EnvLike,
+  setPhase: (phase: string) => void,
+  deps: BootstrapDeps = defaultDeps
+): Promise<void> {
+  await bootstrapCritical(env, setPhase, deps);
+  const result = await bootstrapNonCritical(env, setPhase, deps);
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
 }

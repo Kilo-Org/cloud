@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { runAgent, resolveGitCredentials } from './agent-runner';
+import { runAgent, resolveGitCredentials, writeMayorSystemPromptToAgentsMd } from './agent-runner';
 import {
   stopAgent,
   sendMessage,
@@ -315,6 +315,29 @@ app.patch('/agents/:agentId/model', async c => {
     parsed.data.smallModel,
     parsed.data.conversationHistory
   );
+  return c.json({ updated: true });
+});
+
+// PUT /agents/:agentId/system-prompt
+// Rewrite the mayor's AGENTS.md with an updated system prompt.
+// Used when custom instructions change so the running mayor picks them up
+// on its next session restart without a full container restart.
+app.put('/agents/:agentId/system-prompt', async c => {
+  const { agentId } = c.req.param();
+  const agent = getAgentStatus(agentId);
+  if (!agent) {
+    return c.json({ error: `Agent ${agentId} not found` }, 404);
+  }
+  const body: unknown = await c.req.json().catch(() => null);
+  if (
+    !body ||
+    typeof body !== 'object' ||
+    !('systemPrompt' in body) ||
+    typeof body.systemPrompt !== 'string'
+  ) {
+    return c.json({ error: 'Missing or invalid systemPrompt field' }, 400);
+  }
+  await writeMayorSystemPromptToAgentsMd(agent.workdir, body.systemPrompt);
   return c.json({ updated: true });
 });
 

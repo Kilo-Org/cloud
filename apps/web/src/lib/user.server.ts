@@ -23,11 +23,13 @@ import GitlabProvider from 'next-auth/providers/gitlab';
 import LinkedInProvider from 'next-auth/providers/linkedin';
 import DiscordProvider from 'next-auth/providers/discord';
 import WorkOSProvider from 'next-auth/providers/workos';
+import AppleProvider from 'next-auth/providers/apple';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { allow_fake_login, ORGANIZATION_ID_HEADER } from './constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { redirect } from 'next/navigation';
+import { IMPACT_CLICK_ID_COOKIE } from '@/lib/impact-affiliate-utils';
 import { isOrganizationHardLocked } from '@/lib/organizations/trial-utils';
 import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
 import { secondsInDay } from 'date-fns/constants';
@@ -59,11 +61,16 @@ import {
   WORKOS_API_KEY,
   WORKOS_CLIENT_ID,
   NEXTAUTH_SECRET,
+  NEXTAUTH_URL,
   GITLAB_CLIENT_ID,
   GITLAB_CLIENT_SECRET,
   DISCORD_OAUTH_CLIENT_ID,
   DISCORD_OAUTH_CLIENT_SECRET,
   BLACKLIST_TLDS,
+  APPLE_CLIENT_ID,
+  APPLE_TEAM_ID,
+  APPLE_KEY_ID,
+  APPLE_PRIVATE_KEY,
 } from '@/lib/config.server';
 import jwt from 'jsonwebtoken';
 import type { UUID } from 'node:crypto';
@@ -91,6 +98,30 @@ const BLACKLIST_DOMAINS = blacklistDomainsEnv
   ? blacklistDomainsEnv.split('|').map((domain: string) => domain.trim())
   : [];
 
+function generateAppleClientSecret(): string {
+  if (!APPLE_PRIVATE_KEY || !APPLE_KEY_ID || !APPLE_TEAM_ID || !APPLE_CLIENT_ID) {
+    return '';
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const sixMonths = 180 * 24 * 60 * 60;
+
+  return jwt.sign(
+    {
+      iss: APPLE_TEAM_ID,
+      iat: now,
+      exp: now + sixMonths,
+      aud: 'https://appleid.apple.com',
+      sub: APPLE_CLIENT_ID,
+    },
+    APPLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    {
+      algorithm: 'ES256',
+      keyid: APPLE_KEY_ID,
+    }
+  );
+}
+
 function createGoogleAccountInfo(
   account: Account,
   user: NextUser | AdapterUser,
@@ -110,6 +141,24 @@ function createGoogleAccountInfo(
     provider: account.provider,
     provider_account_id: account.providerAccountId,
     display_name: null, // Google OAuth does not provide a public profile URL
+  };
+}
+
+function createAppleAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== 'apple') return null;
+  assert(user.email, 'User email is required for Apple auth');
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || user.email.split('@')[0],
+    google_user_image_url: '',
+    hosted_domain: hosted_domain_specials.apple,
+    provider: account.provider,
+    provider_account_id: account.providerAccountId,
+    display_name: null,
   };
 }
 
@@ -285,6 +334,7 @@ function createAccountInfo(
 ): CreateOrUpdateUserArgs {
   const accountInfo =
     createGoogleAccountInfo(account, user, profile) ??
+    createAppleAccountInfo(account, user) ??
     createGitHubAccountInfo(account, user, profile) ??
     createGitlabAccountInfo(account, user) ??
     createLinkedInAccountInfo(account, user) ??
@@ -302,18 +352,26 @@ function createAccountInfo(
 
 async function getImpactClickIdFromAuthFlow(): Promise<string | null> {
   const cookieStore = await cookies();
+
+  // Prefer im_ref from the callback URL (explicitly passed through the auth flow)
   const callbackUrlCookie =
     cookieStore.get('__Secure-next-auth.callback-url')?.value ??
     cookieStore.get('next-auth.callback-url')?.value;
 
-  if (!callbackUrlCookie) return null;
-
-  try {
-    const callbackUrl = new URL(callbackUrlCookie, 'http://localhost');
-    return callbackUrl.searchParams.get('im_ref');
-  } catch {
-    return null;
+  if (callbackUrlCookie) {
+    try {
+      const callbackUrl = new URL(callbackUrlCookie, 'http://localhost');
+      const imRef = callbackUrl.searchParams.get('im_ref')?.trim();
+      if (imRef) return imRef;
+    } catch {
+      // fall through to cookie fallback
+    }
   }
+
+  // Fall back to the shared parent-domain cookie written by kilo.ai. This is
+  // our bridge cookie for auth redirects, not the native IR_<campaignId> UTT
+  // cookie set by Impact itself.
+  return cookieStore.get(IMPACT_CLICK_ID_COOKIE)?.value?.trim() || null;
 }
 
 type ExtendedProfile = Profile & {
@@ -327,12 +385,33 @@ const logger: LoggerInstance = {
   error: sentryLogger('NEXTAUTH', 'error'),
 };
 
+const useSecureCookies = NEXTAUTH_URL?.startsWith('https://') ?? false;
+const cookiePrefix = useSecureCookies ? '__Secure-' : '';
+
 const authOptions: NextAuthOptions = {
   secret: NEXTAUTH_SECRET,
+  cookies: {
+    // Apple Sign In uses response_mode=form_post, which is a cross-site POST
+    // from appleid.apple.com. SameSite=Lax (the default) cookies are not sent
+    // on cross-site POSTs, so the PKCE code_verifier cookie gets dropped.
+    pkceCodeVerifier: {
+      name: `${cookiePrefix}next-auth.pkce.code_verifier`,
+      options: {
+        httpOnly: true,
+        sameSite: 'none',
+        path: '/',
+        secure: true,
+      },
+    },
+  },
   providers: [
     GoogleProvider({
       clientId: GOOGLE_CLIENT_ID,
       clientSecret: GOOGLE_CLIENT_SECRET,
+    }),
+    AppleProvider({
+      clientId: APPLE_CLIENT_ID ?? '',
+      clientSecret: generateAppleClientSecret(),
     }),
     GithubProvider({
       clientId: GITHUB_CLIENT_ID,

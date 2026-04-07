@@ -127,6 +127,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'kiloclaw-tunnel'],
     dir: 'services/kiloclaw',
   },
+  'kiloclaw-billing': {
+    group: 'kiloclaw',
+    dependsOn: ['postgres', 'nextjs', 'kiloclaw'],
+    dir: 'services/kiloclaw-billing',
+  },
   // observability
   'cloudflare-o11y': {
     group: 'observability',

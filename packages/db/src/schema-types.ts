@@ -166,6 +166,7 @@ export type AffiliateProvider = (typeof AffiliateProvider)[keyof typeof Affiliat
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.reassociate',
   'kiloclaw.snapshot.restore',
+  'kiloclaw.recovery.cleanup_retained_volume',
   'kiloclaw.subscription.update_trial_end',
   'kiloclaw.subscription.reset_trial',
   'kiloclaw.machine.start',
@@ -293,6 +294,7 @@ export type EncryptedData = {
 // --- AuthProviderId ---
 
 export type AuthProviderId =
+  | 'apple'
   | 'email'
   | 'google'
   | 'github'
@@ -902,6 +904,7 @@ export const CustomLlmDefinitionSchema = z
     api_key: z.string(),
     organization_ids: z.array(z.string()),
     supports_image_input: z.boolean().optional(),
+    add_cache_breakpoints: z.boolean().optional(),
     extra_headers: CustomLlmExtraHeadersSchema.optional(),
     extra_body: CustomLlmExtraBodySchema.optional(),
     remove_from_body: z.array(z.string()).optional(),

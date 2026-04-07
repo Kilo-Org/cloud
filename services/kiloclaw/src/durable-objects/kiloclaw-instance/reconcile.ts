@@ -8,6 +8,7 @@ import {
   STARTUP_TIMEOUT_SECONDS,
   STARTING_TIMEOUT_MS,
   RESTARTING_TIMEOUT_MS,
+  RECOVERING_TIMEOUT_MS,
   getProactiveRefreshThresholdMs,
 } from '../../config';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../../utils/env-encryption';
@@ -28,6 +29,22 @@ import { ensureVolume, staleProvisionAgeMs } from './fly-machines';
 import { mintFreshApiKey } from './config';
 import * as gateway from './gateway';
 import { writeEvent, eventContextFromState } from '../../utils/analytics';
+
+export type ReconcileWithFlyResult = {
+  beginUnexpectedStopRecovery?: {
+    flyState: 'stopped';
+    failCount: number;
+  };
+  completeUnexpectedStopRecovery?: true;
+  failedUnexpectedStopRecovery?: {
+    errorMessage: string;
+    label: string;
+  };
+  timedOutUnexpectedStopRecovery?: {
+    errorMessage: string;
+    durationMs?: number;
+  };
+};
 
 function emitStartFailedEvent(
   env: { KILOCLAW_AE?: AnalyticsEngineDataset },
@@ -59,25 +76,34 @@ export async function reconcileWithFly(
   triggerDestroy: () => Promise<void>,
   /** Callback for marking Postgres row destroyed during finalization. */
   markDestroyedInPostgres?: (userId: string, sandboxId: string) => Promise<boolean>
-): Promise<void> {
+): Promise<ReconcileWithFlyResult> {
   const rctx = createReconcileContext(state, env, reason);
 
   if (state.status === 'destroying') {
     await retryPendingDestroy(flyConfig, ctx, state, rctx, markDestroyedInPostgres);
-    return;
+    return {};
   }
 
   if (state.status === 'starting') {
     await reconcileStarting(flyConfig, ctx, state, env, rctx);
-    return;
+    return {};
   }
 
   if (state.status === 'restarting') {
     await reconcileRestarting(flyConfig, ctx, state, env, rctx);
-    return;
+    return {};
   }
 
-  const machineReconciled = await reconcileMachine(flyConfig, ctx, state, rctx);
+  if (state.status === 'recovering') {
+    return reconcileRecovering(flyConfig, state, rctx);
+  }
+
+  const { reconciled: machineReconciled, result } = await reconcileMachine(
+    flyConfig,
+    ctx,
+    state,
+    rctx
+  );
 
   // Auto-destroy stale provisioned instances
   const staleAge = staleProvisionAgeMs(state);
@@ -91,11 +117,12 @@ export async function reconcileWithFly(
     state.pendingPostgresMarkOnFinalize = true;
     await ctx.storage.put(storageUpdate({ pendingPostgresMarkOnFinalize: true }));
     await triggerDestroy();
-    return;
+    return {};
   }
 
   await reconcileVolume(flyConfig, ctx, state, env, rctx);
   await reconcileApiKeyExpiry(flyConfig, ctx, state, env, rctx);
+  return result;
 }
 
 // ---- API key proactive refresh ----
@@ -617,22 +644,22 @@ async function reconcileMachine(
   ctx: DurableObjectState,
   state: InstanceMutableState,
   rctx: ReconcileContext
-): Promise<boolean> {
+): Promise<{ reconciled: boolean; result: ReconcileWithFlyResult }> {
   if (!state.flyMachineId) {
-    return attemptMetadataRecovery(flyConfig, ctx, state, rctx);
+    return { reconciled: await attemptMetadataRecovery(flyConfig, ctx, state, rctx), result: {} };
   }
 
   try {
     const machine = await fly.getMachine(flyConfig, state.flyMachineId);
-    await syncStatusWithFly(ctx, state, machine.state, rctx);
+    const result = await syncStatusWithFly(ctx, state, machine.state, rctx);
     await reconcileMachineMount(flyConfig, ctx, state, machine, rctx);
-    return true;
+    return { reconciled: true, result };
   } catch (err) {
     if (fly.isFlyNotFound(err)) {
       await handleMachineGone(ctx, state, rctx);
-      return true;
+      return { reconciled: true, result: {} };
     }
-    return false;
+    return { reconciled: false, result: {} };
   }
 }
 
@@ -744,7 +771,7 @@ export async function syncStatusWithFly(
   state: InstanceMutableState,
   flyState: string,
   rctx: ReconcileContext
-): Promise<void> {
+): Promise<ReconcileWithFlyResult> {
   if (flyState === 'started' && state.status !== 'running') {
     rctx.log('sync_status', {
       old_state: state.status,
@@ -769,7 +796,7 @@ export async function syncStatusWithFly(
         lastStartedAt: state.lastStartedAt,
       })
     );
-    return;
+    return {};
   }
 
   if (flyState === 'started' && state.status === 'running') {
@@ -777,7 +804,7 @@ export async function syncStatusWithFly(
       state.healthCheckFailCount = 0;
       await ctx.storage.put(storageUpdate({ healthCheckFailCount: 0 }));
     }
-    return;
+    return {};
   }
 
   // destroyed means the Fly machine is gone — clear the stale ID immediately
@@ -801,11 +828,11 @@ export async function syncStatusWithFly(
         healthCheckFailCount: 0,
       })
     );
-    return;
+    return {};
   }
 
   // failed is definitively terminal — transition immediately without waiting for
-  // SELF_HEAL_THRESHOLD consecutive checks like we do for stopped/created.
+  // the unexpected-stop recovery confirmation path used for stopped.
   if (flyState === 'failed' && state.status !== 'stopped') {
     const wasStarting = state.status === 'starting';
     rctx.log('sync_status_failed', {
@@ -828,33 +855,120 @@ export async function syncStatusWithFly(
     if (wasStarting) {
       emitStartFailedEvent(rctx.env, state, 'fly_failed_state', 'fly machine entered failed state');
     }
-    return;
+    return {};
   }
 
-  if ((flyState === 'stopped' || flyState === 'created') && state.status === 'running') {
+  if (flyState === 'stopped' && state.status === 'running') {
     state.healthCheckFailCount++;
     await ctx.storage.put(storageUpdate({ healthCheckFailCount: state.healthCheckFailCount }));
 
     if (state.healthCheckFailCount >= SELF_HEAL_THRESHOLD) {
-      rctx.log('mark_stopped', {
+      rctx.log('unexpected_stop_recovery_trigger', {
         old_state: 'running',
-        new_state: 'stopped',
+        new_state: 'recovering',
         fly_state: flyState,
         fail_count: state.healthCheckFailCount,
         value: SELF_HEAL_THRESHOLD,
       });
-      state.status = 'stopped';
-      state.lastStoppedAt = Date.now();
-      state.healthCheckFailCount = 0;
-      await ctx.storage.put(
-        storageUpdate({
-          status: 'stopped',
-          lastStoppedAt: state.lastStoppedAt,
-          healthCheckFailCount: 0,
-        })
-      );
+      return {
+        beginUnexpectedStopRecovery: {
+          flyState,
+          failCount: state.healthCheckFailCount,
+        },
+      };
     }
   }
+
+  return {};
+}
+
+async function reconcileRecovering(
+  flyConfig: FlyClientConfig,
+  state: InstanceMutableState,
+  rctx: ReconcileContext
+): Promise<ReconcileWithFlyResult> {
+  const recoveryStartedAt = state.recoveryStartedAt;
+  const isTimedOut =
+    recoveryStartedAt !== null && Date.now() - recoveryStartedAt > RECOVERING_TIMEOUT_MS;
+
+  if (state.flyMachineId) {
+    try {
+      const machine = await fly.getMachine(flyConfig, state.flyMachineId);
+
+      if (machine.state === 'started') {
+        rctx.log('unexpected_stop_recovery_machine_started', {
+          machine_id: state.flyMachineId,
+          old_state: 'recovering',
+          new_state: 'running',
+        });
+        return { completeUnexpectedStopRecovery: true };
+      }
+
+      if (
+        machine.state === 'stopped' ||
+        machine.state === 'failed' ||
+        machine.state === 'destroyed'
+      ) {
+        const errorMessage = `unexpected stop recovery replacement machine entered ${machine.state}`;
+        rctx.log('unexpected_stop_recovery_terminal_machine_state', {
+          machine_id: state.flyMachineId,
+          fly_state: machine.state,
+          error: errorMessage,
+          old_state: 'recovering',
+          new_state: 'stopped',
+        });
+        return {
+          failedUnexpectedStopRecovery: {
+            errorMessage,
+            label: `alarm_${machine.state}`,
+          },
+        };
+      }
+
+      rctx.log('unexpected_stop_recovery_waiting_for_start', {
+        machine_id: state.flyMachineId,
+        fly_state: machine.state,
+      });
+    } catch (err) {
+      if (fly.isFlyNotFound(err)) {
+        const errorMessage = 'unexpected stop recovery replacement machine disappeared';
+        rctx.log('unexpected_stop_recovery_machine_gone', {
+          machine_id: state.flyMachineId,
+          error: errorMessage,
+          old_state: 'recovering',
+          new_state: 'stopped',
+        });
+        return {
+          failedUnexpectedStopRecovery: {
+            errorMessage,
+            label: 'alarm_machine_gone',
+          },
+        };
+      }
+
+      doError(state, 'reconcileRecovering: transient error checking replacement machine', {
+        error: toLoggable(err),
+      });
+    }
+  }
+
+  if (!isTimedOut) return {};
+
+  const errorMessage = 'unexpected stop recovery timed out';
+  const durationMs = recoveryStartedAt ? Date.now() - recoveryStartedAt : undefined;
+  rctx.log('unexpected_stop_recovery_timeout', {
+    old_state: 'recovering',
+    new_state: 'stopped',
+    durationMs,
+    error: errorMessage,
+  });
+
+  return {
+    timedOutUnexpectedStopRecovery: {
+      errorMessage,
+      durationMs,
+    },
+  };
 }
 
 export async function markRestartSuccessful(

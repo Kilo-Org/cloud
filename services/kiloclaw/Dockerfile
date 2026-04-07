@@ -95,14 +95,13 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/b
 # ── Builder stage: compile the controller with Bun ────────────────────
 # Bun is only needed to bundle the controller TypeScript into a single JS
 # file. By building in a separate stage, Bun (~100MB) stays out of the
-# final image. (Bun was also installed to /root/.bun/ which gets shadowed
-# by the Fly Volume mount at /root, so it was unreachable at runtime anyway.)
+# final image. Bun installed to /root/.bun/ which gets shadowed by the
+# Fly Volume mount at /root, so it was unreachable at runtime anyway.
 FROM debian:bookworm-slim AS controller-builder
 
-ARG BUN_VERSION=1.2.4
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl unzip \
-    && curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}" \
+    && curl -fsSL https://bun.sh/install | bash -s "bun-v1.2.4" \
     && rm -rf /var/lib/apt/lists/*
 ENV PATH="/root/.bun/bin:$PATH"
 

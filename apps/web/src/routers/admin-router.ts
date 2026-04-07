@@ -54,7 +54,7 @@ import {
 import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
 import { fromMicrodollars } from '@/lib/utils';
 import { sum } from 'drizzle-orm';
-import { CRON_SECRET, KILOCLAW_BILLING_ENFORCEMENT } from '@/lib/config.server';
+import { CRON_SECRET } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
 import { revalidatePath } from 'next/cache';
 import { recomputeUserBalances } from '@/lib/recomputeUserBalances';
@@ -63,6 +63,7 @@ import { client as stripeClient } from '@/lib/stripe-client';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import { kilo_pass_scheduled_changes } from '@kilocode/db/schema';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
+import { getEffectiveKiloClawSubscriptionForUser } from '@/lib/kiloclaw/access-state';
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
@@ -501,10 +502,8 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
       }
 
-      const [subscription, earlybird, activeInstance] = await Promise.all([
-        db.query.kiloclaw_subscriptions.findFirst({
-          where: eq(kiloclaw_subscriptions.user_id, input.userId),
-        }),
+      const [entitlement, earlybird, activeInstance] = await Promise.all([
+        getEffectiveKiloClawSubscriptionForUser(input.userId),
         db.query.kiloclaw_earlybird_purchases.findFirst({
           columns: { id: true },
           where: eq(kiloclaw_earlybird_purchases.user_id, input.userId),
@@ -525,29 +524,12 @@ export const adminRouter = createTRPCRouter({
           )
         : 0;
 
-      let hasAccess = !KILOCLAW_BILLING_ENFORCEMENT;
-      let accessReason: 'trial' | 'subscription' | 'earlybird' | null = null;
-
-      if (
-        subscription?.status === 'active' ||
-        (subscription?.status === 'past_due' && !subscription.suspended_at)
-      ) {
-        hasAccess = true;
-        accessReason = 'subscription';
-      } else if (
-        subscription?.status === 'trialing' &&
-        subscription.trial_ends_at &&
-        new Date(subscription.trial_ends_at) > now
-      ) {
-        hasAccess = true;
-        accessReason = 'trial';
-      } else if (earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now) {
-        hasAccess = true;
-        accessReason = 'earlybird';
-      }
+      const hasEarlybirdAccess = !!earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now;
+      const hasAccess = hasEarlybirdAccess || entitlement.accessReason !== null;
+      const accessReason = hasEarlybirdAccess ? 'earlybird' : entitlement.accessReason;
 
       return {
-        subscription: subscription ?? null,
+        subscription: entitlement.subscription,
         hasAccess,
         accessReason,
         earlybird: earlybird

@@ -99,8 +99,8 @@ function makeProductTelemetry() {
   };
 }
 
-async function makeAuthHeaders() {
-  const gatewayToken = await deriveGatewayToken(sandboxId, 'gateway-secret');
+async function makeAuthHeaders(targetSandboxId = sandboxId) {
+  const gatewayToken = await deriveGatewayToken(targetSandboxId, 'gateway-secret');
   return {
     'content-type': 'application/json',
     authorization: 'Bearer kilo-key-1',
@@ -339,5 +339,40 @@ describe('POST /checkin', () => {
     );
 
     expect(response.status).toBe(204);
+  });
+
+  it('includes instanceId when dispatching instance-ready notifications for instance-keyed sandboxes', async () => {
+    const tryMarkInstanceReady = vi.fn().mockResolvedValue({ shouldNotify: true, userId: null });
+    const env = makeEnv({ tryMarkInstanceReady, internalApiSecret: 'internal-secret' });
+    const instanceId = '11111111-1111-4111-8111-111111111111';
+    const instanceSandboxId = 'ki_11111111111141118111111111111111';
+    const headers = await makeAuthHeaders(instanceSandboxId);
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+    const response = await controller.request(
+      '/checkin',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(makeBody({ sandboxId: instanceSandboxId, loadAvg5m: 0.05 })),
+      },
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(fetchSpy).toHaveBeenCalledWith('https://kilo.test/api/internal/kiloclaw/instance-ready', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-Secret': 'internal-secret',
+      },
+      body: JSON.stringify({
+        userId: 'user-1',
+        sandboxId: instanceSandboxId,
+        instanceId,
+      }),
+    });
   });
 });

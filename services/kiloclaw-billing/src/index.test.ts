@@ -65,7 +65,7 @@ describe('kiloclaw billing worker handler', () => {
       credit_renewals_past_due: 0,
       credit_renewals_auto_top_up: 0,
       credit_renewals_skipped_duplicate: 0,
-      interrupted_auto_resumes: 0,
+      interrupted_auto_resume_requests: 0,
       trial_warnings: 0,
       earlybird_warnings: 0,
       sweep1_trial_expiry: 0,

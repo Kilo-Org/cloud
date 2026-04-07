@@ -6,12 +6,6 @@ import type { User } from '@kilocode/db/schema';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
-// Enable billing enforcement so clawAccessProcedure actually gates
-jest.mock('@/lib/config.server', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
-  return { ...actual, KILOCLAW_BILLING_ENFORCEMENT: true };
-});
-
 // Mock KiloClawInternalClient to avoid real HTTP calls
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockSendChatMessage: jest.Mock<any> = jest.fn();

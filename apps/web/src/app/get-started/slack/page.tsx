@@ -4,6 +4,7 @@ import { getAuthPageProps } from '@/lib/auth/auth-page-wrapper';
 import { AuthPageLayout } from '@/components/auth/AuthPageLayout';
 import { SignInForm } from '@/components/auth/SignInForm';
 import { allow_fake_login } from '@/lib/constants';
+import { isAppleSignInEnabled } from '@/lib/auth/apple-feature-flag';
 import { SlackGetStartedFlow } from './_components/SlackGetStartedFlow';
 
 export default async function GetStartedSlackPage({
@@ -15,7 +16,10 @@ export default async function GetStartedSlackPage({
 
   // If user is not authenticated, show sign-up form
   if (!user) {
-    const { params, error } = await getAuthPageProps(searchParams);
+    const [{ params, error }, appleSignInEnabled] = await Promise.all([
+      getAuthPageProps(searchParams),
+      isAppleSignInEnabled(),
+    ]);
     return (
       <AuthPageLayout>
         <div className="mt-4 flex flex-col items-center">
@@ -26,6 +30,7 @@ export default async function GetStartedSlackPage({
             allowFakeLogin={allow_fake_login}
             title="Get Started with Kilo for Slack"
             subtitle="Sign up to connect Kilo to your Slack workspace and start chatting with AI directly from Slack."
+            appleSignInEnabled={appleSignInEnabled}
           />
         </div>
       </AuthPageLayout>

@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { Mail, SquareUserRound } from 'lucide-react';
 import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
 import { OAuthProviderIds, ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
+import { useMemo } from 'react';
 
 type SignInFormProps = {
   searchParams: Record<string, string>;
@@ -24,6 +25,7 @@ type SignInFormProps = {
   emailOnly?: boolean; // If true, only show email input (for SSO page)
   ssoMode?: boolean; // If true, triggers SSO-specific messaging and email input view
   storybookInitialState?: SignInFormInitialState;
+  appleSignInEnabled?: boolean;
 };
 
 export function SignInForm({
@@ -36,6 +38,7 @@ export function SignInForm({
   emailOnly = false,
   ssoMode = false,
   storybookInitialState,
+  appleSignInEnabled = true,
 }: SignInFormProps) {
   const flow = useSignInFlow({
     searchParams,
@@ -44,6 +47,18 @@ export function SignInForm({
     isSignUp,
     storybookInitialState,
   });
+
+  const oauthProviders = useMemo(
+    () => (appleSignInEnabled ? OAuthProviderIds : OAuthProviderIds.filter(p => p !== 'apple')),
+    [appleSignInEnabled]
+  );
+  const nonSSOProviders = useMemo(
+    () =>
+      appleSignInEnabled
+        ? ProdNonSSOAuthProviders
+        : ProdNonSSOAuthProviders.filter(p => p !== 'apple'),
+    [appleSignInEnabled]
+  );
 
   // Show minimal loading state while checking localStorage for returning user hint
   // This prevents flash of "new user" UI before switching to "returning user" UI
@@ -191,7 +206,7 @@ export function SignInForm({
                     {/* Expandable other methods section */}
                     {flow.showOtherMethods ? (
                       <AuthProviderButtons
-                        providers={ProdNonSSOAuthProviders.filter(p => p !== lastAuthMethod)}
+                        providers={nonSSOProviders.filter(p => p !== lastAuthMethod)}
                         onProviderClick={flow.handleOAuthClick}
                       />
                     ) : (
@@ -296,7 +311,7 @@ export function SignInForm({
                   <div className="mx-auto max-w-md space-y-4">
                     {/* OAuth provider buttons - Google first */}
                     <AuthProviderButtons
-                      providers={OAuthProviderIds}
+                      providers={oauthProviders}
                       onProviderClick={flow.handleOAuthClick}
                     />
                     <SignInButton onClick={flow.handleShowEmailInput}>

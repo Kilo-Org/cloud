@@ -1,7 +1,7 @@
 import type { DirectByokProvider } from '@/lib/providers/direct-byok/types';
-import byteplusCodingModels from './byteplus-coding-models';
-import kimiCodingModels from './kimi-coding-models';
-import neuralwattModels from './neurowatt-models';
-import zaiCodingModels from './zai-coding-models';
+import byteplusCoding from './byteplus-coding';
+import kimiCoding from './kimi-coding';
+import neuralwatt from './neurowatt';
+import zaiCoding from './zai-coding';
 
-export default [byteplusCodingModels, kimiCodingModels, neuralwattModels, zaiCodingModels] satisfies ReadonlyArray<DirectByokProvider>;
+export default [byteplusCoding, kimiCoding, neuralwatt, zaiCoding] satisfies ReadonlyArray<DirectByokProvider>;

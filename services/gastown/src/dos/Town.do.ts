@@ -4530,7 +4530,7 @@ Respond with ONLY a JSON object (no markdown, no explanation): { "blocking": tru
     const candidates = [
       ...query(
         this.sql,
-        /* sql */ `${ESCALATION_JOIN} WHERE ${escalation_metadata.acknowledged} = 0 AND ${escalation_metadata.re_escalation_count} < ?`,
+        /* sql */ `${ESCALATION_JOIN} WHERE ${beads.status} != 'closed' AND ${escalation_metadata.acknowledged} = 0 AND ${escalation_metadata.re_escalation_count} < ?`,
         [MAX_RE_ESCALATIONS]
       ),
     ].map(r => toEscalation(EscalationBeadRecord.parse(r)));

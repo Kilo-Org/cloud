@@ -85,6 +85,8 @@
   "ai": { "binding": "AI" },
 
   "kv_namespaces": [
+    // Run `wrangler kv:namespace create AGENT_DB_SNAPSHOTS_KV` to get the namespace ID,
+    // then update this id field with the value returned.
     { "binding": "AGENT_DB_SNAPSHOTS_KV", "id": "" },
   ],
 

@@ -815,7 +815,7 @@ describe('bootstrapCritical', () => {
 // ---- bootstrapNonCritical ----
 
 describe('bootstrapNonCritical', () => {
-  it('returns github failure and stops subsequent steps', async () => {
+  it('treats github CLI failures as best-effort and continues', async () => {
     const harness = fakeDeps();
     const phases: string[] = [];
     (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mockImplementation((cmd: string) => {
@@ -830,13 +830,43 @@ describe('bootstrapNonCritical', () => {
         GITHUB_TOKEN: 'gh-token',
         KILOCODE_API_KEY: 'api-key',
         OPENCLAW_GATEWAY_TOKEN: 'gw-token',
+        AUTO_APPROVE_DEVICES: 'true',
       },
       phase => phases.push(phase),
       harness.deps
     );
 
-    expect(result).toEqual({ ok: false, phase: 'github', error: 'gh auth failed' });
-    expect(phases).toEqual(['github']);
+    expect(result).toEqual({ ok: true });
+    expect(phases).toEqual(['github', 'linear', 'onboard', 'tools-md', 'mcporter']);
+  });
+
+  it('returns tools-md failure and stops before mcporter', async () => {
+    const harness = fakeDeps();
+    const phases: string[] = [];
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p.endsWith('openclaw.json')) return false;
+      if (p.endsWith('workspace/TOOLS.md')) return true;
+      return false;
+    });
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p.endsWith('workspace/TOOLS.md')) {
+        throw new Error('tools read failed');
+      }
+      return '';
+    });
+
+    const result = await bootstrapNonCritical(
+      {
+        KILOCODE_API_KEY: 'api-key',
+        OPENCLAW_GATEWAY_TOKEN: 'gw-token',
+        AUTO_APPROVE_DEVICES: 'true',
+      },
+      phase => phases.push(phase),
+      harness.deps
+    );
+
+    expect(result).toEqual({ ok: false, phase: 'tools-md', error: 'tools read failed' });
+    expect(phases).toEqual(['github', 'linear', 'onboard', 'tools-md']);
   });
 
   it('returns ok when doctor/onboard succeeds', async () => {

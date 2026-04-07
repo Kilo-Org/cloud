@@ -1,5 +1,5 @@
 import type { Plugin } from '@kilocode/plugin';
-import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { createClientFromEnv, createMayorClientFromEnv, GastownApiError } from './client';
 import { createTools } from './tools';
 import { createMayorTools } from './mayor-tools';
@@ -17,10 +17,10 @@ const CONTEXT_FILE = '/tmp/gastown-dashboard-context.json';
 
 type ContextSnapshot = { context: string; receivedAt: number };
 
-function readDashboardContextBlock(): string | null {
+async function readDashboardContextBlock(): Promise<string | null> {
   let snapshots: ContextSnapshot[];
   try {
-    const raw = readFileSync(CONTEXT_FILE, 'utf-8');
+    const raw = await readFile(CONTEXT_FILE, 'utf-8');
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) return null;
     snapshots = parsed;
@@ -170,7 +170,7 @@ export const GastownPlugin: Plugin = async ({ client }) => {
         const idx = output.system.findIndex(s => s.includes(marker));
         if (idx !== -1) output.system.splice(idx, 1);
 
-        const dashboardContext = readDashboardContextBlock();
+        const dashboardContext = await readDashboardContextBlock();
         if (dashboardContext) {
           output.system.push(
             [`--- DASHBOARD CONTEXT ---`, dashboardContext, `--- END DASHBOARD CONTEXT ---`].join(

@@ -577,6 +577,9 @@ async function subscribeToEvents(
       }
     })();
 
+    agents.delete(agent.agentId);
+    void pushRegistry();
+
     void reportAgentCompleted(agent, 'completed');
 
     // Release SDK session so the server can shut down when idle
@@ -868,6 +871,8 @@ export async function startAgent(
       port,
     });
 
+    void pushRegistry();
+
     return agent;
   } catch (err) {
     // On abort, clean up silently — the new startAgent invocation will
@@ -979,6 +984,9 @@ export async function stopAgent(agentId: string): Promise<void> {
       console.warn(`${MANAGER_LOG} stopAgent: saveDbSnapshot failed for ${agentId}:`, err);
     });
   }
+
+  agents.delete(agentId);
+  void pushRegistry();
 }
 
 /**
@@ -1505,6 +1513,8 @@ export async function drainAll(): Promise<void> {
     }
   }
 
+  await pushRegistry();
+
   console.log(`${DRAIN_LOG} Drain complete`);
 }
 
@@ -1544,6 +1554,47 @@ export async function stopAll(): Promise<void> {
     instance.server.close();
   }
   sdkInstances.clear();
+
+  agents.clear();
+  await pushRegistry();
+}
+
+async function pushRegistry(): Promise<void> {
+  const apiUrl = process.env.GASTOWN_API_URL;
+  const token = process.env.GASTOWN_CONTAINER_TOKEN;
+  const townId = process.env.GASTOWN_TOWN_ID;
+  if (!apiUrl || !token || !townId) return;
+
+  const agentEntries = [...agents.values()].map(a => ({
+    request: {
+      agentId: a.agentId,
+      rigId: a.rigId,
+      townId: a.townId,
+      role: a.role,
+      name: a.name,
+      model: a.model ?? '',
+      prompt: '',
+    },
+    workdir: a.workdir,
+    env: a.startupEnv,
+  }));
+
+  try {
+    const resp = await fetch(`${apiUrl}/api/towns/${townId}/container-registry`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(agentEntries),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!resp.ok) {
+      console.warn(`${MANAGER_LOG} pushRegistry: failed ${resp.status}`);
+    }
+  } catch (err) {
+    console.warn(`${MANAGER_LOG} pushRegistry: error:`, err);
+  }
 }
 
 const ContainerRegistryEntry = z.object({

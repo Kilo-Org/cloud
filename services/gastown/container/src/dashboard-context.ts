@@ -11,7 +11,7 @@
  * growth.
  */
 
-import { writeFileSync, readFileSync, renameSync } from 'node:fs';
+import { writeFile, readFile, rename } from 'node:fs/promises';
 import { z } from 'zod';
 
 const ContextSnapshotSchema = z.object({
@@ -31,17 +31,15 @@ const CONTEXT_FILE_TMP = '/tmp/gastown-dashboard-context.json.tmp';
 // ── Writer (control-server process) ──────────────────────────────────
 
 /** Called by the control-server when the TownDO pushes a new snapshot. */
-export function pushContext(context: string): void {
-  const existing = readSnapshots();
+export async function pushContext(context: string): Promise<void> {
+  const existing = await readSnapshots();
   existing.push({ context, receivedAt: Date.now() });
   if (existing.length > MAX_SNAPSHOTS) {
     existing.splice(0, existing.length - MAX_SNAPSHOTS);
   }
   try {
-    // Write to a temp file then atomically rename to avoid the plugin
-    // reading truncated JSON during a concurrent readFileSync.
-    writeFileSync(CONTEXT_FILE_TMP, JSON.stringify(existing));
-    renameSync(CONTEXT_FILE_TMP, CONTEXT_FILE);
+    await writeFile(CONTEXT_FILE_TMP, JSON.stringify(existing));
+    await rename(CONTEXT_FILE_TMP, CONTEXT_FILE);
   } catch {
     // Best-effort — don't crash the control-server
   }
@@ -53,8 +51,8 @@ export function pushContext(context: string): void {
  * Build a combined context block from all retained snapshots.
  * Returns null if no context has been pushed.
  */
-export function buildContextBlock(): string | null {
-  const snapshots = readSnapshots();
+export async function buildContextBlock(): Promise<string | null> {
+  const snapshots = await readSnapshots();
   if (snapshots.length === 0) return null;
 
   const latest = snapshots[snapshots.length - 1];
@@ -75,9 +73,9 @@ export function buildContextBlock(): string | null {
 
 // ── Shared helpers ───────────────────────────────────────────────────
 
-function readSnapshots(): ContextSnapshot[] {
+async function readSnapshots(): Promise<ContextSnapshot[]> {
   try {
-    const raw = readFileSync(CONTEXT_FILE, 'utf-8');
+    const raw = await readFile(CONTEXT_FILE, 'utf-8');
     const parsed: unknown = JSON.parse(raw);
     return z.array(ContextSnapshotSchema).parse(parsed);
   } catch {

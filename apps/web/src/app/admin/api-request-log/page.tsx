@@ -17,6 +17,8 @@ export default function ApiRequestLogPage() {
   const [userId, setUserId] = useState('');
   const [startDate, setStartDate] = useState(weekAgo);
   const [endDate, setEndDate] = useState(today);
+  const [model, setModel] = useState('');
+  const [sessionId, setSessionId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   function handleDownload() {
@@ -36,6 +38,12 @@ export default function ApiRequestLogPage() {
       startDate,
       endDate,
     });
+    if (model.trim()) {
+      params.append('model', model.trim());
+    }
+    if (sessionId.trim()) {
+      params.append('sessionId', sessionId.trim());
+    }
 
     // Navigate directly to preserve server-side streaming
     window.location.href = `/admin/api/api-request-log/download?${params}`;
@@ -78,6 +86,27 @@ export default function ApiRequestLogPage() {
                   type="date"
                   value={endDate}
                   onChange={e => setEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="model">Model (optional)</Label>
+                <Input
+                  id="model"
+                  placeholder="Enter model name"
+                  value={model}
+                  onChange={e => setModel(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sessionId">Session ID (optional)</Label>
+                <Input
+                  id="sessionId"
+                  placeholder="Enter session ID"
+                  value={sessionId}
+                  onChange={e => setSessionId(e.target.value)}
                 />
               </div>
             </div>

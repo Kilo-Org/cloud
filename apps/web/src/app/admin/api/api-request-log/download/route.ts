@@ -5,6 +5,7 @@ import { api_request_log } from '@kilocode/db/schema';
 import { and, gte, lte, eq, asc } from 'drizzle-orm';
 import archiver from 'archiver';
 import { PassThrough } from 'node:stream';
+import { createHash } from 'node:crypto';
 
 function formatTimestamp(isoString: string): string {
   return isoString.replaceAll(':', '-').replaceAll(' ', '_');
@@ -54,6 +55,19 @@ function jsonError(message: string, status: number) {
   });
 }
 
+function generateProviderSpecificHash(payload: string, provider: string): string {
+  const salt = 'd20250815';
+  const pepper =
+    provider === 'vercel' ? 'vercel' : provider === 'openrouter' ? 'henk is a boss' : provider;
+  return createHash('sha256')
+    .update(salt + pepper + payload)
+    .digest('base64');
+}
+
+function hashTaskId(userId: string, taskId: string, provider: string): string {
+  return generateProviderSpecificHash(userId + '-' + taskId, provider);
+}
+
 export async function GET(request: NextRequest) {
   await connection();
 
@@ -67,6 +81,10 @@ export async function GET(request: NextRequest) {
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
 
+  // Optional filters
+  const modelFilter = searchParams.get('model');
+  const sessionIdFilter = searchParams.get('sessionId');
+
   if (!userId || !startDate || !endDate) {
     return jsonError('userId, startDate, and endDate are required', 400);
   }
@@ -77,7 +95,7 @@ export async function GET(request: NextRequest) {
     return jsonError('Invalid date format. Use YYYY-MM-DD.', 400);
   }
 
-  const rows = await db
+  let rows = await db
     .select()
     .from(api_request_log)
     .where(
@@ -88,6 +106,21 @@ export async function GET(request: NextRequest) {
       )
     )
     .orderBy(asc(api_request_log.created_at));
+
+  // Apply optional filters
+  if (modelFilter) {
+    rows = rows.filter(row => row.model === modelFilter);
+  }
+
+  if (sessionIdFilter) {
+    rows = rows.filter(row => {
+      if (!row.prompt_cache_key || !row.provider || !row.kilo_user_id) {
+        return false;
+      }
+      const expectedHash = hashTaskId(row.kilo_user_id, sessionIdFilter, row.provider);
+      return expectedHash === row.prompt_cache_key;
+    });
+  }
 
   if (rows.length === 0) {
     return jsonError('No records found for the given criteria', 404);
@@ -111,7 +144,7 @@ export async function GET(request: NextRequest) {
     const responseExt = isJson(row.response) ? 'json' : 'txt';
     const responseContent = tryFormatJson(row.response);
     if (responseContent) {
-      archive.append(responseContent, { name: `${ts}_${id}_response.${responseExt}` });
+      archive.append(responseContent, { name: `${ts}_${id}_response.${responseExt}` );
     }
   }
 

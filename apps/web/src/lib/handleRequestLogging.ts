@@ -43,17 +43,18 @@ export function handleRequestLogging(params: {
   after(async () => {
     try {
       const apiRequestLogId = await db
-        .insert(api_request_log)
-        .values({
-          kilo_user_id: user?.id,
-          organization_id: organization_id,
-          status_code: clonedResponse.status,
-          model,
-          provider,
-          request: request.body,
-          response: await clonedResponse.text(),
-        })
-        .returning({ id: api_request_log.id });
+.insert(api_request_log)
+      .values({
+        kilo_user_id: user?.id,
+        organization_id: organization_id,
+        status_code: clonedResponse.status,
+        model,
+        provider,
+        request: request.body,
+        response: await clonedResponse.text(),
+        prompt_cache_key: request.body.prompt_cache_key ?? null,
+      })
+      .returning({ id: api_request_log.id });
       logExceptInTest(
         '[handleRequestLogging] Inserted into api_request_log',
         apiRequestLogId[0].id

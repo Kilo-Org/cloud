@@ -1,4 +1,5 @@
 import { startControlServer } from './control-server';
+import { bootHydration } from './process-manager';
 import { log } from './logger';
 
 log.info('container.cold_start', { uptime: 0, ts: new Date().toISOString() });
@@ -13,3 +14,5 @@ process.on('SIGTERM', () => {
 });
 
 startControlServer();
+
+void bootHydration();

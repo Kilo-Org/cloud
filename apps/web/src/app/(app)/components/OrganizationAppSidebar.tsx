@@ -174,7 +174,6 @@ export default function OrganizationAppSidebar({
       icon: Webhook,
       url: `/organizations/${organizationId}/cloud/triggers`,
     },
-
     // Gastown requires non-billing_manager role; hide for billing-only users
     ...(currentRole !== 'billing_manager'
       ? [

@@ -748,6 +748,45 @@ app.get('/api/users/:userId/towns/:townId/events', c =>
   )
 );
 
+// ── Container Registry ─────────────────────────────────────────────────
+// Simple pass-through to TownContainerDO registry.
+
+app.get('/api/towns/:townId/container-registry', async c => {
+  const townId = c.req.param('townId');
+  const tc = getTownContainerStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const registry = await tc.getRegistry();
+  return c.json({ success: true, data: registry });
+});
+
+app.post('/api/towns/:townId/container-registry', async c => {
+  const townId = c.req.param('townId');
+  const body = await c.req.json();
+  const tc = getTownContainerStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  await tc.updateRegistry(body);
+  return c.json({ success: true });
+});
+
+// ── Agent DB Snapshot ───────────────────────────────────────────────────
+// Stored in the AGENT_DB_SNAPSHOTS_KV namespace keyed by agentId.
+
+app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c => {
+  const { agentId } = c.req.param();
+  const snapshot = await c.env.AGENT_DB_SNAPSHOTS_KV.get(agentId, 'arrayBuffer');
+  if (!snapshot) return c.json({ success: false, error: 'Snapshot not found' }, 404);
+  return new Response(snapshot, {
+    headers: { 'Content-Type': 'application/octet-stream' },
+  });
+});
+
+app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c => {
+  const { agentId } = c.req.param();
+  const body = await c.req.arrayBuffer();
+  await c.env.AGENT_DB_SNAPSHOTS_KV.put(agentId, body);
+  return c.json({ success: true });
+});
+
 // ── Town Container ──────────────────────────────────────────────────────
 // These routes proxy commands to the container's control server via DO.fetch().
 // Protected by Cloudflare Access at the perimeter; no additional auth required.

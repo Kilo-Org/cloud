@@ -43,6 +43,8 @@ export const SecretFieldDefinitionSchema = z
     validationMessage: z.string().optional(),
     envVar: z.string(), // container env var name
     maxLength: z.number().int().positive(), // max input length
+    /** Whether the field value is sensitive and should be masked in the UI. Defaults to true. */
+    secret: z.boolean().optional(),
   })
   .readonly();
 

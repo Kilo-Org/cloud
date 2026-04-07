@@ -11,6 +11,7 @@ import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -180,14 +181,28 @@ export function SecretEntrySection({
                     {field.label}
                   </Label>
                 )}
-                <ChannelTokenInput
-                  id={`settings-${field.key}`}
-                  placeholder={configured ? field.placeholderConfigured : field.placeholder}
-                  value={tokens[field.key] ?? ''}
-                  onChange={v => setToken(field.key, v)}
-                  disabled={isSaving}
-                  maxLength={field.maxLength}
-                />
+                {field.secret === false ? (
+                  <Input
+                    id={`settings-${field.key}`}
+                    type="text"
+                    placeholder={configured ? field.placeholderConfigured : field.placeholder}
+                    value={tokens[field.key] ?? ''}
+                    onChange={e => setToken(field.key, e.target.value)}
+                    disabled={isSaving}
+                    maxLength={field.maxLength}
+                    data-1p-ignore
+                    autoComplete="off"
+                  />
+                ) : (
+                  <ChannelTokenInput
+                    id={`settings-${field.key}`}
+                    placeholder={configured ? field.placeholderConfigured : field.placeholder}
+                    value={tokens[field.key] ?? ''}
+                    onChange={v => setToken(field.key, v)}
+                    disabled={isSaving}
+                    maxLength={field.maxLength}
+                  />
+                )}
               </div>
             ))}
 

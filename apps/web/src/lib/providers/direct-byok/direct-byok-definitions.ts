@@ -236,4 +236,57 @@ export default [
       },
     ],
   },
+  {
+    id: 'neuralwatt',
+    name: 'NeuralWatt',
+    base_url: 'https://api.neuralwatt.com/v1',
+    ai_sdk_provider: 'openai-compatible',
+    transformRequest(context) {
+      context.request.body.thinking = {
+        type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
+      };
+    },
+    models: [
+      {
+        id: 'moonshotai/Kimi-K2.5',
+        name: 'Kimi-K2.5',
+        description:
+          "Moonshot AI's latest flagship coding model with 262K context, optimized for complex agentic programming tasks and long-horizon code generation.",
+        flags: ['recommended'],
+        context_length: 262144,
+        max_completion_tokens: 32768,
+        variants: REASONING_VARIANTS_BINARY,
+      },
+      {
+        id: 'Qwen/Qwen3.5-397B-A17B-FP8',
+        name: 'Qwen3.5-397B-A17B-FP8',
+        description:
+          "Alibaba's largest open-weight model with 397B parameters and FP8 quantization, offering exceptional performance on complex reasoning and coding tasks.",
+        flags: ['recommended'],
+        context_length: 262144,
+        max_completion_tokens: 32768,
+        variants: REASONING_VARIANTS_BINARY,
+      },
+      {
+        id: 'zai-org/GLM-5-FP8',
+        name: 'GLM-5-FP8',
+        description:
+          "Z.ai's flagship GLM-5 model with FP8 quantization, engineered for complex systems design and long-horizon agent workflows with production-grade performance.",
+        flags: ['recommended'],
+        context_length: 202752,
+        max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
+      },
+      {
+        id: 'MiniMaxAI/MiniMax-M2.5',
+        name: 'MiniMax-M2.5',
+        description:
+          "MiniMax's latest multimodal model with strong reasoning and coding capabilities, supporting up to 196K context tokens.",
+        flags: [],
+        context_length: 196608,
+        max_completion_tokens: 131072,
+        variants: REASONING_VARIANTS_BINARY,
+      },
+    ],
+  },
 ] satisfies ReadonlyArray<DirectByokProvider>;

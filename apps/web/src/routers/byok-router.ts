@@ -31,8 +31,8 @@ import { getVercelInferenceProviderConfigForUserByok } from '@/lib/providers/ver
 import { decryptByokRow } from '@/lib/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
-import CODING_PLANS from '@/lib/providers/coding-plans/coding-plan-definitions';
-import { createAiSdkProvider, formatCodingPlanModelId } from '@/lib/providers/coding-plans';
+import DIRECT_BYOK_PROVIDERS from '@/lib/providers/direct-byok/direct-byok-definitions';
+import { createAiSdkProvider, formatDirectByokModelId } from '@/lib/providers/direct-byok';
 
 const fetchSupportedModels = unstable_cache(
   async (): Promise<Record<string, string[]>> => {
@@ -90,11 +90,11 @@ const fetchSupportedModels = unstable_cache(
       }
     }
 
-    for (const provider of CODING_PLANS) {
+    for (const provider of DIRECT_BYOK_PROVIDERS) {
       for (const model of provider.models) {
         if (!result[provider.id]) result[provider.id] = [];
         result[provider.id].push(
-          model.name + ' (' + formatCodingPlanModelId(provider, model) + ')'
+          model.name + ' (' + formatDirectByokModelId(provider, model) + ')'
         );
       }
     }
@@ -409,15 +409,15 @@ export const byokRouter = createTRPCRouter({
         const provider = UserByokProviderIdSchema.parse(decryptedKey.providerId);
         const model = UserByokTestModels[provider];
 
-        const codingPlanProvider = CODING_PLANS.find(plan => plan.id === provider);
-        if (codingPlanProvider) {
-          if (codingPlanProvider.ai_sdk_provider === 'openai-compatible') {
+        const directByokProvider = DIRECT_BYOK_PROVIDERS.find(plan => plan.id === provider);
+        if (directByokProvider) {
+          if (directByokProvider.ai_sdk_provider === 'openai-compatible') {
             return {
               finalProvider: provider,
-              model: createAiSdkProvider(codingPlanProvider, decryptedKey.decryptedAPIKey)(model),
+              model: createAiSdkProvider(directByokProvider, decryptedKey.decryptedAPIKey)(model),
             };
           } else {
-            throw new Error('Unrecognized AI SDK provider: ' + codingPlanProvider.ai_sdk_provider);
+            throw new Error('Unrecognized AI SDK provider: ' + directByokProvider.ai_sdk_provider);
           }
         }
 

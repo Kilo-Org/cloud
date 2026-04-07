@@ -2,7 +2,7 @@ import { Code2 } from 'lucide-react';
 import { AvailableProductCard } from '@/components/subscriptions/AvailableProductCard';
 import { SubscriptionGroup } from '@/components/subscriptions/SubscriptionGroup';
 
-export function CodingPlansGroup({ accordionValue }: { accordionValue?: string }) {
+export function DirectByokGroup({ accordionValue }: { accordionValue?: string }) {
   return (
     <SubscriptionGroup
       title="Coding Plans"

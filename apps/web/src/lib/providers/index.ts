@@ -33,7 +33,7 @@ import { isMinimaxModel } from '@/lib/providers/minimax';
 import { isXiaomiModel } from '@/lib/providers/xiaomi';
 import type { BYOKResult, Provider } from '@/lib/providers/types';
 import PROVIDERS from '@/lib/providers/provider-definitions';
-import { getCodingPlanModel } from '@/lib/providers/coding-plans';
+import { getDirectByokModel } from '@/lib/providers/direct-byok';
 import { CustomLlmDefinitionSchema, type CustomLlmProvider } from '@kilocode/db';
 
 function inferSupportedChatApis(aiSdkProvider: CustomLlmProvider) {
@@ -44,30 +44,31 @@ function inferSupportedChatApis(aiSdkProvider: CustomLlmProvider) {
       : (['chat_completions'] as const);
 }
 
-async function checkCodingPlanBYOK(
+async function checkDirectByokBYOK(
   user: User | AnonymousUserContext,
   requestedModel: string,
   organizationId: string | undefined
 ) {
-  const { provider: codingPlan, model: codingPlanModel } = getCodingPlanModel(requestedModel);
-  if (!codingPlan || !codingPlanModel) {
+  const { provider: directByokProvider, model: directByokModel } =
+    getDirectByokModel(requestedModel);
+  if (!directByokProvider || !directByokModel) {
     return null;
   }
   const userByok = organizationId
-    ? await getBYOKforOrganization(db, organizationId, [codingPlan.id])
-    : await getBYOKforUser(db, user.id, [codingPlan.id]);
+    ? await getBYOKforOrganization(db, organizationId, [directByokProvider.id])
+    : await getBYOKforUser(db, user.id, [directByokProvider.id]);
   if (!userByok || userByok.length === 0) {
     return null;
   }
   return {
     provider: {
       id: 'coding-plan',
-      apiUrl: codingPlan.base_url,
+      apiUrl: directByokProvider.base_url,
       apiKey: userByok[0].decryptedAPIKey,
-      supportedChatApis: inferSupportedChatApis(codingPlan.ai_sdk_provider),
+      supportedChatApis: inferSupportedChatApis(directByokProvider.ai_sdk_provider),
       transformRequest(context) {
-        context.request.body.model = codingPlanModel.id;
-        codingPlan.transformRequest(context);
+        context.request.body.model = directByokModel.id;
+        directByokProvider.transformRequest(context);
       },
     } satisfies Provider,
     userByok,
@@ -95,9 +96,9 @@ export async function getProvider(
   organizationId: string | undefined,
   taskId: string | undefined
 ): Promise<{ provider: Provider; userByok: BYOKResult[] | null; bypassAccessCheck: boolean }> {
-  const codingPlanByok = await checkCodingPlanBYOK(user, requestedModel, organizationId);
-  if (codingPlanByok) {
-    return codingPlanByok;
+  const directByokResult = await checkDirectByokBYOK(user, requestedModel, organizationId);
+  if (directByokResult) {
+    return directByokResult;
   }
 
   const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);

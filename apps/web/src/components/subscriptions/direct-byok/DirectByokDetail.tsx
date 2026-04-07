@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DetailPageHeader } from '@/components/subscriptions/DetailPageHeader';
 
-export function CodingPlanDetail() {
+export function DirectByokDetail() {
   return (
     <div className="space-y-6">
       <DetailPageHeader

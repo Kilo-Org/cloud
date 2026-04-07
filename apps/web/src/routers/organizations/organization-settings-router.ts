@@ -17,7 +17,7 @@ import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
 import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { listAvailableCustomLlms } from '@/lib/custom-llm/listAvailableCustomLlms';
-import { getCodingPlanModelsForOrganization } from '@/lib/providers/coding-plans';
+import { getDirectByokModelsForOrganization } from '@/lib/providers/direct-byok';
 
 /**
  * Allowlist of organization IDs that are allowed to modify experimental settings
@@ -175,7 +175,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
         filteredModels = models;
       }
 
-      filteredModels.push(...(await getCodingPlanModelsForOrganization(organizationId)));
+      filteredModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
       filteredModels.push(...(await listAvailableCustomLlms(organizationId)));
 
       return {

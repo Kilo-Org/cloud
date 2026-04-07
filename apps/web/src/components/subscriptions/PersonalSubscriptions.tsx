@@ -9,8 +9,8 @@ import { isKiloclawTerminal, isKiloPassTerminal } from './helpers';
 import { TerminalToggle } from './TerminalToggle';
 import { KiloPassGroup } from './kilo-pass/KiloPassGroup';
 import { KiloClawGroup } from './kiloclaw/KiloClawGroup';
-import { CodingPlansGroup } from './coding-plans/CodingPlansGroup';
-import { ENABLE_CODING_PLAN_SUBSCRIPTIONS } from '@/lib/constants';
+import { DirectByokGroup } from './direct-byok/DirectByokGroup';
+import { ENABLE_DIRECT_BYOK_SUBSCRIPTIONS } from '@/lib/constants';
 
 export function PersonalSubscriptions() {
   const [showTerminal, setShowTerminal] = useState(false);
@@ -50,8 +50,8 @@ export function PersonalSubscriptions() {
       >
         <KiloPassGroup showTerminal={showTerminal} accordionValue="kilo-pass" />
         <KiloClawGroup showTerminal={showTerminal} accordionValue="kiloclaw" />
-        {ENABLE_CODING_PLAN_SUBSCRIPTIONS ? (
-          <CodingPlansGroup accordionValue="coding-plans" />
+        {ENABLE_DIRECT_BYOK_SUBSCRIPTIONS ? (
+          <DirectByokGroup accordionValue="coding-plans" />
         ) : null}
       </Accordion>
     </PageLayout>

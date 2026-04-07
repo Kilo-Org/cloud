@@ -1,4 +1,4 @@
-import { COMPATIBLE_USER_AGENT, type CodingPlanProvider } from '@/lib/providers/coding-plans/types';
+import { COMPATIBLE_USER_AGENT, type DirectByokProvider } from '@/lib/providers/direct-byok/types';
 import {
   REASONING_VARIANTS_BINARY,
   REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
@@ -236,4 +236,4 @@ export default [
       },
     ],
   },
-] satisfies ReadonlyArray<CodingPlanProvider>;
+] satisfies ReadonlyArray<DirectByokProvider>;

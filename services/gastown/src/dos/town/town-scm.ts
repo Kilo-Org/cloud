@@ -346,15 +346,12 @@ export async function checkPRFeedback(
   let allChecksPass = false;
   let hasUncheckedRuns = false;
   try {
-    const prRes = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/pulls/${numberStr}`,
-      { headers }
-    );
+    const prRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${numberStr}`, {
+      headers,
+    });
     if (prRes.ok) {
       const prRaw: unknown = await prRes.json();
-      const prData = z
-        .object({ head: z.object({ sha: z.string() }).optional() })
-        .safeParse(prRaw);
+      const prData = z.object({ head: z.object({ sha: z.string() }).optional() }).safeParse(prRaw);
       const sha = prData.success ? prData.data.head?.sha : undefined;
       if (sha) {
         const checksRes = await fetch(

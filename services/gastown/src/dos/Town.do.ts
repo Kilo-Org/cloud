@@ -349,13 +349,22 @@ export class TownDO extends DurableObject<Env> {
         await dispatch.stopAgentInContainer(this.env, this.townId, agentId);
       },
       checkPRStatus: async prUrl => {
-        return scm.checkPRStatus({ env: this.env, townId: this.townId, getTownConfig: () => this.getTownConfig() }, prUrl);
+        return scm.checkPRStatus(
+          { env: this.env, townId: this.townId, getTownConfig: () => this.getTownConfig() },
+          prUrl
+        );
       },
       checkPRFeedback: async prUrl => {
-        return scm.checkPRFeedback({ env: this.env, townId: this.townId, getTownConfig: () => this.getTownConfig() }, prUrl);
+        return scm.checkPRFeedback(
+          { env: this.env, townId: this.townId, getTownConfig: () => this.getTownConfig() },
+          prUrl
+        );
       },
       mergePR: async prUrl => {
-        return scm.mergePR({ env: this.env, townId: this.townId, getTownConfig: () => this.getTownConfig() }, prUrl);
+        return scm.mergePR(
+          { env: this.env, townId: this.townId, getTownConfig: () => this.getTownConfig() },
+          prUrl
+        );
       },
       getTownConfig: async () => {
         return this.getTownConfig();

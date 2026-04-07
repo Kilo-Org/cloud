@@ -8,7 +8,8 @@
 
 import { createKilo, type KiloClient } from '@kilocode/sdk';
 import { z } from 'zod';
-import type { ManagedAgent, StartAgentRequest } from './types';
+import * as fs from 'node:fs';
+import { type ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
 import { buildKiloConfigContent } from './agent-runner';
 import { log } from './logger';
@@ -112,6 +113,79 @@ export function getAgentEvents(agentId: string, afterId = 0): BufferedEvent[] {
   const buf = agentEventBuffers.get(agentId);
   if (!buf) return [];
   return buf.filter(e => e.id > afterId);
+}
+
+async function saveDbSnapshot(
+  agent: ManagedAgent,
+  apiUrl: string,
+  authToken: string
+): Promise<void> {
+  const dbPath = `/tmp/agent-home-${agent.agentId}/.local/share/kilo/kilo.db`;
+  try {
+    await fs.promises.access(dbPath);
+  } catch {
+    console.log(`${MANAGER_LOG} saveDb: no DB file at ${dbPath}, skipping save`);
+    return;
+  }
+  try {
+    const data = await fs.promises.readFile(dbPath);
+    const resp = await fetch(
+      `${apiUrl}/api/towns/${agent.townId}/rigs/${agent.rigId}/agents/${agent.agentId}/db-snapshot`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: data,
+        signal: AbortSignal.timeout(30_000),
+      }
+    );
+    if (!resp.ok) {
+      console.warn(
+        `${MANAGER_LOG} saveDb: failed to save snapshot for ${agent.agentId}: ${resp.status}`
+      );
+    } else {
+      console.log(`${MANAGER_LOG} saveDb: saved ${data.byteLength} bytes for ${agent.agentId}`);
+    }
+  } catch (err) {
+    console.warn(`${MANAGER_LOG} saveDb: failed for ${agent.agentId}:`, err);
+  }
+}
+
+async function hydrateDbFromSnapshot(
+  agentId: string,
+  rigId: string,
+  townId: string,
+  apiUrl: string,
+  authToken: string
+): Promise<void> {
+  const dbDir = `/tmp/agent-home-${agentId}/.local/share/kilo`;
+  try {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${authToken}`,
+      'X-Gastown-Agent-Id': agentId,
+      'X-Gastown-Rig-Id': rigId,
+    };
+    const resp = await fetch(
+      `${apiUrl}/api/towns/${townId}/rigs/${rigId}/agents/${agentId}/db-snapshot`,
+      { headers, signal: AbortSignal.timeout(10_000) }
+    );
+    if (!resp.ok) {
+      console.log(`${MANAGER_LOG} hydrateDb: no snapshot found for ${agentId} (${resp.status})`);
+      return;
+    }
+    const buffer = await resp.arrayBuffer();
+    if (buffer.byteLength === 0) {
+      console.log(`${MANAGER_LOG} hydrateDb: empty snapshot for ${agentId}`);
+      return;
+    }
+    await fs.promises.mkdir(dbDir, { recursive: true });
+    await fs.promises.writeFile(`${dbDir}/kilo.db`, Buffer.from(buffer));
+    console.log(`${MANAGER_LOG} hydrateDb: restored ${buffer.byteLength} bytes for ${agentId}`);
+  } catch (err) {
+    console.warn(`${MANAGER_LOG} hydrateDb: failed for ${agentId}:`, err);
+  }
 }
 
 function broadcastEvent(agentId: string, event: string, data: unknown): void {
@@ -492,6 +566,17 @@ async function subscribeToEvents(
     agent.status = 'exited';
     agent.exitReason = 'completed';
     broadcastEvent(agent.agentId, 'agent.exited', { reason: 'completed' });
+
+    void (async () => {
+      const apiUrl = agent.gastownApiUrl;
+      const token = agent.gastownContainerToken;
+      if (apiUrl && token) {
+        await saveDbSnapshot(agent, apiUrl, token).catch(err => {
+          console.warn(`${MANAGER_LOG} exitAgent: saveDbSnapshot failed for ${agent.agentId}:`, err);
+        });
+      }
+    })();
+
     void reportAgentCompleted(agent, 'completed');
 
     // Release SDK session so the server can shut down when idle
@@ -669,6 +754,24 @@ export async function startAgent(
   const { signal } = startupAbortController;
   let sessionCounted = false;
   try {
+    // 0. Hydrate the agent's persisted DB from the KV snapshot before
+    // starting the SDK server. This lets the agent resume its session
+    // history on disk.
+    const apiUrl = agent.gastownApiUrl;
+    const token =
+      process.env.GASTOWN_CONTAINER_TOKEN ??
+      agent.gastownContainerToken ??
+      agent.gastownSessionToken;
+    if (apiUrl && token) {
+      await hydrateDbFromSnapshot(
+        request.agentId,
+        request.rigId,
+        request.townId,
+        apiUrl,
+        token
+      );
+    }
+
     // 1. Ensure SDK server is running for this workdir
     const { client, port } = await ensureSDKServer(workdir, env);
     agent.serverPort = port;
@@ -868,6 +971,14 @@ export async function stopAgent(agentId: string): Promise<void> {
   agent.exitReason = 'stopped';
   log.info('agent.exit', { agentId, reason: 'stopped', exitReason: 'stopped' });
   broadcastEvent(agentId, 'agent.exited', { reason: 'stopped' });
+
+  const apiUrl = agent.gastownApiUrl;
+  const token = agent.gastownContainerToken;
+  if (apiUrl && token) {
+    await saveDbSnapshot(agent, apiUrl, token).catch(err => {
+      console.warn(`${MANAGER_LOG} stopAgent: saveDbSnapshot failed for ${agentId}:`, err);
+    });
+  }
 }
 
 /**
@@ -1285,6 +1396,14 @@ export async function drainAll(): Promise<void> {
       agent.exitReason = 'container eviction';
       frozen.push(agent);
       console.log(`${DRAIN_LOG} Phase 3: froze agent ${agent.agentId}`);
+
+      const apiUrl = agent.gastownApiUrl;
+      const token = agent.gastownContainerToken;
+      if (apiUrl && token) {
+        await saveDbSnapshot(agent, apiUrl, token).catch(err => {
+          console.warn(`${DRAIN_LOG} Phase 3: saveDbSnapshot failed for ${agent.agentId}:`, err);
+        });
+      }
     } catch (err) {
       // Freeze failed — the session may still be writing to the
       // worktree. Skip this agent in 4b to avoid .git/index.lock
@@ -1425,4 +1544,86 @@ export async function stopAll(): Promise<void> {
     instance.server.close();
   }
   sdkInstances.clear();
+}
+
+const ContainerRegistryEntry = z.object({
+  request: StartAgentRequest,
+  workdir: z.string(),
+  env: z.record(z.string(), z.string()),
+});
+
+const ContainerRegistry = z.object({
+  agents: z.array(ContainerRegistryEntry),
+});
+
+type ContainerRegistryData = z.infer<typeof ContainerRegistry>;
+
+export async function bootHydration(): Promise<void> {
+  const townId = process.env.GASTOWN_TOWN_ID;
+  const apiUrl = process.env.GASTOWN_API_URL;
+  const token = process.env.GASTOWN_CONTAINER_TOKEN;
+
+  if (!townId || !apiUrl || !token) {
+    console.log(
+      `${MANAGER_LOG} bootHydration: skipping (townId=${!!townId} apiUrl=${!!apiUrl} token=${!!token})`
+    );
+    return;
+  }
+
+  console.log(`${MANAGER_LOG} bootHydration: fetching container-registry for town ${townId}`);
+
+  try {
+    const resp = await fetch(`${apiUrl}/api/towns/${townId}/container-registry`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (!resp.ok) {
+      console.warn(
+        `${MANAGER_LOG} bootHydration: registry fetch failed ${resp.status}`
+      );
+      return;
+    }
+
+    const raw: unknown = await resp.json();
+    const parsed = ContainerRegistry.safeParse(raw);
+
+    if (!parsed.success) {
+      console.warn(
+        `${MANAGER_LOG} bootHydration: unexpected registry shape:`,
+        parsed.error.issues
+      );
+      return;
+    }
+
+    const { agents: agentEntries } = parsed.data;
+
+    if (agentEntries.length === 0) {
+      console.log(`${MANAGER_LOG} bootHydration: no agents to resume`);
+      return;
+    }
+
+    console.log(
+      `${MANAGER_LOG} bootHydration: resuming ${agentEntries.length} agent(s)`
+    );
+
+    for (const entry of agentEntries) {
+      const { request, workdir, env } = entry;
+      console.log(
+        `${MANAGER_LOG} bootHydration: resuming agent ${request.agentId} (${request.role})`
+      );
+      try {
+        await startAgent(request, workdir, env);
+      } catch (err) {
+        console.warn(
+          `${MANAGER_LOG} bootHydration: failed to resume agent ${request.agentId}:`,
+          err
+        );
+      }
+    }
+  } catch (err) {
+    console.warn(`${MANAGER_LOG} bootHydration: error:`, err);
+  }
 }

@@ -105,7 +105,7 @@ export default [
   },
   {
     id: 'neuralwatt',
-    name: 'NeuralWatt',
+    name: 'Neuralwatt',
     base_url: 'https://api.neuralwatt.com/v1',
     ai_sdk_provider: 'openai-compatible',
     transformRequest(_context) {},

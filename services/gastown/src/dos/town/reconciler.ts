@@ -1282,6 +1282,7 @@ export function reconcileReviewQueue(
           WHERE ${beads.type} = 'merge_request'
             AND ${beads.status} = 'open'
             AND ${beads.rig_id} = ?
+            AND ${beads.columns.pr_url} IS NULL
           ORDER BY ${beads.columns.created_at} ASC
           LIMIT 1
         `,

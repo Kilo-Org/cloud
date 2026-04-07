@@ -1,0 +1,10 @@
+{
+  "id": "kiloclaw-customizer",
+  "name": "KiloClawCustomizer",
+  "description": "KiloClaw customization plugin for OpenClaw",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

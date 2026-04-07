@@ -59,6 +59,14 @@ RUN npm install -g mcporter@0.7.3
 ARG STREAM_CHAT_CACHE_BUSTER=1
 RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#fix/plugin-name-resolution
 
+# Install KiloClaw customizer plugin for OpenClaw (vendored in-repo)
+COPY plugins/kiloclaw-customizer/ /tmp/kiloclaw-customizer/
+RUN cd /tmp/kiloclaw-customizer \
+    && PKG_TGZ="$(npm pack --silent)" \
+    && npm install -g "./${PKG_TGZ}" \
+    && cd / \
+    && rm -rf /tmp/kiloclaw-customizer
+
 # Install summarize (web page summarization CLI)
 RUN npm install -g @steipete/summarize@0.12.0
 

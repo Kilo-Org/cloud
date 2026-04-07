@@ -1,7 +1,7 @@
 import type { ExpoConfig } from 'expo/config';
-import { ENV_KEYS } from './src/lib/env-keys';
+import { ENV_KEYS } from './src/lib/env-keys.ts';
 
-const missing = Object.values(ENV_KEYS).filter((key) => !process.env[key]);
+const missing = Object.values(ENV_KEYS).filter(key => !process.env[key]);
 if (missing.length > 0) {
   throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
 }
@@ -112,9 +112,7 @@ const config: ExpoConfig = {
     reactCompiler: true,
   },
   extra: {
-    ...Object.fromEntries(
-      Object.entries(ENV_KEYS).map(([key, env]) => [key, process.env[env]]),
-    ),
+    ...Object.fromEntries(Object.entries(ENV_KEYS).map(([key, env]) => [key, process.env[env]])),
     router: {},
     eas: {
       projectId: '2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4',

@@ -28,12 +28,13 @@ jobs:
           username: x
           password: ${{ secrets.FLY_DEV_API_TOKEN }}
 
-      - name: Generate image tag
+      - name: Generate image tag and cache bust value
         id: tag
         run: |
-          TAG="dev-$(date +%s)"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "Tag: ${TAG}"
+          TIMESTAMP=$(date +%s)
+          echo "tag=dev-${TIMESTAMP}" >> "$GITHUB_OUTPUT"
+          echo "cache_bust=${TIMESTAMP}" >> "$GITHUB_OUTPUT"
+          echo "Tag: dev-${TIMESTAMP}"
 
       - name: Compute source content hash
         id: content-hash
@@ -73,7 +74,7 @@ jobs:
             registry.fly.io/kiloclaw-registry-dev:${{ steps.tag.outputs.tag }}
           build-args: |
             CONTROLLER_COMMIT=${{ github.sha }}
-            CONTROLLER_CACHE_BUST=$(date +%s)
+            CONTROLLER_CACHE_BUST=${{ steps.tag.outputs.cache_bust }}
 
       - name: Extract image digest
         id: digest

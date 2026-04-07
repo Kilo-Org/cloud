@@ -1,6 +1,7 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import {
   addCacheBreakpoints,
+  isReasoningExplicitlyDisabled,
   removeChatCompletionsReasoning,
   scrubOpenCodeSpecificProperties,
 } from '@/lib/providers/openrouter/request-helpers';
@@ -21,9 +22,7 @@ export default {
     apiKey: getEnvVariable('ALIBABA_API_KEY'),
     supportedChatApis: ['chat_completions'],
     transformRequest(context) {
-      if (context.request.kind === 'chat_completions' || context.request.kind === 'responses') {
-        context.request.body.enable_thinking = true;
-      }
+      context.request.body.enable_thinking = !isReasoningExplicitlyDisabled(context.request);
       addCacheBreakpoints(context.request);
     },
   },

@@ -115,7 +115,7 @@ export default [
         name: 'Kimi-K2.5',
         description:
           'Kimi-K2.5 is a large-scale Mixture-of-Experts language model with strong performance on coding, math, and reasoning tasks, supporting a 256K context window.',
-        flags: ['recommended'],
+        flags: ['recommended', 'vision'],
         context_length: 262144,
         max_completion_tokens: 32768,
         variants: null,

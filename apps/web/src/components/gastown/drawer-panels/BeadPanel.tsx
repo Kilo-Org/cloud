@@ -245,7 +245,7 @@ export function BeadPanel({
               className="h-7 border-white/10 bg-white/5 text-sm font-semibold text-white/90"
             />
           ) : (
-            <span className="truncate text-base font-semibold text-white/90">{bead.title}</span>
+            <span className="text-base font-semibold text-white/90">{bead.title}</span>
           )}
           <button
             onClick={editing ? cancelEdit : enterEditMode}

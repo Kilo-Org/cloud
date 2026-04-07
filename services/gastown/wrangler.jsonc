@@ -82,6 +82,8 @@
     },
   ],
 
+  "ai": { "binding": "AI" },
+
   "analytics_engine_datasets": [{ "binding": "GASTOWN_AE", "dataset": "gastown_events" }],
 
   "services": [
@@ -145,6 +147,8 @@
           "entrypoint": "GitTokenRPCEntrypoint",
         },
       ],
+      "ai": { "binding": "AI" },
+
       "analytics_engine_datasets": [{ "binding": "GASTOWN_AE", "dataset": "gastown_events" }],
       "secrets_store_secrets": [
         {

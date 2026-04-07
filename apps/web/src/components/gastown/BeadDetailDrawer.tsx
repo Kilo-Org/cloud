@@ -67,7 +67,7 @@ export function BeadDetailDrawer({
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
         <Drawer.Content
-          className="fixed top-0 right-0 bottom-0 z-50 flex w-[520px] max-w-[94vw] flex-col outline-none"
+          className="fixed top-0 right-0 bottom-0 z-50 flex w-[640px] max-w-[94vw] flex-col outline-none"
           style={{ '--initial-transform': 'calc(100% + 8px)' } as React.CSSProperties}
         >
           <div className="flex h-full flex-col overflow-hidden rounded-l-2xl border-l border-white/[0.08] bg-[oklch(0.12_0_0)]">
@@ -76,7 +76,7 @@ export function BeadDetailDrawer({
               <div className="min-w-0 flex-1">
                 <Drawer.Title className="flex items-center gap-2 text-base font-semibold text-white/90">
                   <Hexagon className="size-4 shrink-0 text-[color:oklch(95%_0.15_108_/_0.7)]" />
-                  <span className="truncate">{bead?.title ?? 'Bead'}</span>
+                  <span>{bead?.title ?? 'Bead'}</span>
                 </Drawer.Title>
                 <Drawer.Description className="mt-1.5 text-xs text-white/35">
                   Full inspection view — metadata, body, and event timeline.

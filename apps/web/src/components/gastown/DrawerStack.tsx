@@ -94,7 +94,7 @@ export function DrawerStackProvider({
 
 // ── Renderer ─────────────────────────────────────────────────────────────
 
-const DRAWER_WIDTH = 500;
+const DRAWER_WIDTH = 620;
 /** How many px each background layer shifts left per depth level */
 const DEPTH_OFFSET = 40;
 /** Extra shift on hover */

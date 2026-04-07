@@ -16,7 +16,7 @@ export default function ClawNewPage() {
   const { data: billing } = billingQuery;
   const { data: status, isLoading: statusLoading } = statusQuery;
 
-  const hasInstance = !!status?.status || billing?.instance !== null;
+  const hasInstance = !!status?.status || billing?.instance != null;
 
   useEffect(() => {
     if (!billingQuery.isLoading && !statusLoading && hasInstance) {

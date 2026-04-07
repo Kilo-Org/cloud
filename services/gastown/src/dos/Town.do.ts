@@ -4042,7 +4042,7 @@ export class TownDO extends DurableObject<Env> {
     const candidates = [
       ...query(
         this.sql,
-        /* sql */ `${ESCALATION_JOIN} WHERE ${escalation_metadata.acknowledged} = 0 AND ${escalation_metadata.re_escalation_count} < ?`,
+        /* sql */ `${ESCALATION_JOIN} WHERE ${beads.status} NOT IN ('closed', 'failed') AND ${escalation_metadata.acknowledged} = 0 AND ${escalation_metadata.re_escalation_count} < ?`,
         [MAX_RE_ESCALATIONS]
       ),
     ].map(r => toEscalation(EscalationBeadRecord.parse(r)));

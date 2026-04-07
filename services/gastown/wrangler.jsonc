@@ -84,6 +84,8 @@
 
   "ai": { "binding": "AI" },
 
+  // Note: For AGENT_DB_SNAPSHOTS_KV, create it using `wrangler kv:namespace create AGENT_DB_SNAPSHOTS_KV`
+  // and inject the real ID in the production environment using Cloudflare dashboard or CI.
   "kv_namespaces": [
     { "binding": "AGENT_DB_SNAPSHOTS_KV", "id": "" },
   ],

@@ -737,19 +737,12 @@ app.get('/api/towns/:townId/cloudflare-debug', async c => {
   });
 });
 
-// ── Town Events ─────────────────────────────────────────────────────────
-
-app.use('/api/users/:userId/towns/:townId/events', async (c: Context<GastownEnv, string>, next) =>
-  townAuthMiddleware(c, next)
-);
-app.get('/api/users/:userId/towns/:townId/events', c =>
-  instrumented(c, 'GET /api/users/:userId/towns/:townId/events', () =>
-    handleListTownEvents(c, c.req.param())
-  )
-);
-
 // ── Container Registry ─────────────────────────────────────────────────
 // Simple pass-through to TownContainerDO registry.
+
+app.use('/api/towns/:townId/container-registry', async (c: Context<GastownEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : authMiddleware(c, next)
+);
 
 app.get('/api/towns/:townId/container-registry', async c => {
   const townId = c.req.param('townId');
@@ -761,12 +754,23 @@ app.get('/api/towns/:townId/container-registry', async c => {
 
 app.post('/api/towns/:townId/container-registry', async c => {
   const townId = c.req.param('townId');
-  const body = await c.req.json();
+  const body = await c.req.json<unknown>();
   const tc = getTownContainerStub(c.env, townId);
   // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
   await tc.updateRegistry(body);
   return c.json({ success: true });
 });
+
+// ── Town Events ─────────────────────────────────────────────────────────
+
+app.use('/api/users/:userId/towns/:townId/events', async (c: Context<GastownEnv, string>, next) =>
+  townAuthMiddleware(c, next)
+);
+app.get('/api/users/:userId/towns/:townId/events', c =>
+  instrumented(c, 'GET /api/users/:userId/towns/:townId/events', () =>
+    handleListTownEvents(c, c.req.param())
+  )
+);
 
 // ── Agent DB Snapshot ───────────────────────────────────────────────────
 // Stored in the AGENT_DB_SNAPSHOTS_KV namespace keyed by agentId.
@@ -780,7 +784,7 @@ app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c =>
   });
 });
 
-app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c => {
+app.put('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c => {
   const { agentId } = c.req.param();
   const body = await c.req.arrayBuffer();
   await c.env.AGENT_DB_SNAPSHOTS_KV.put(agentId, body);

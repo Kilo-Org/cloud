@@ -5,4 +5,4 @@ export const ENV_KEYS = {
   webBaseUrl: 'WEB_BASE_URL',
   appsFlyerDevKey: 'APPSFLYER_DEV_KEY',
   appsFlyerAppId: 'APPSFLYER_APP_ID',
-} as const;
+};

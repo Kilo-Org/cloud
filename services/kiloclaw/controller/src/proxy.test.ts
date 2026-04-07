@@ -265,9 +265,11 @@ describe('WebSocket proxy', () => {
     expect(forwarded?.['host']).toBe('127.0.0.1:3001');
     // Upstream proxy headers must be stripped so the gateway's
     // isLocalDirectRequest check doesn't treat the request as proxied/remote.
-    expect(forwarded?.['x-forwarded-for']).toBeUndefined();
-    expect(forwarded?.['x-real-ip']).toBeUndefined();
-    expect(forwarded?.['x-forwarded-host']).toBeUndefined();
+      expect(forwarded?.['forwarded']).toBeUndefined();
+      expect(forwarded?.['x-forwarded-for']).toBeUndefined();
+      expect(forwarded?.['x-forwarded-proto']).toBeUndefined();
+      expect(forwarded?.['x-real-ip']).toBeUndefined();
+      expect(forwarded?.['x-forwarded-host']).toBeUndefined();
     expect((clientSocket as unknown as FakeSocket).pipe).toHaveBeenCalledWith(backendSocket);
     expect(backendSocket.pipe).toHaveBeenCalledWith(clientSocket);
   });

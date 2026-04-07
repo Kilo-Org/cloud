@@ -98,6 +98,7 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
     GASTOWN_TOWN_ID: request.townId,
     GASTOWN_AGENT_ROLE: request.role,
     KILOCODE_FEATURE: 'gastown',
+    KILO_TEST_HOME: `/tmp/agent-home-${request.agentId}`,
 
     GIT_AUTHOR_NAME: authorName,
     GIT_AUTHOR_EMAIL: authorEmail,

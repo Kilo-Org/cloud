@@ -12,6 +12,7 @@ import {
   authMiddleware,
   agentOnlyMiddleware,
   townIdMiddleware,
+  isContainerAuth,
   type AuthVariables,
 } from './middleware/auth.middleware';
 import { kiloAuthMiddleware } from './middleware/kilo-auth.middleware';
@@ -616,9 +617,13 @@ app.post('/api/towns/:townId/container-registry', async c => {
 // Stored in the AGENT_DB_SNAPSHOTS_KV namespace keyed by agentId.
 // Protected by authMiddleware (accepts container JWTs), not kiloAuthMiddleware.
 // Registered after authMiddleware but before kiloAuthMiddleware wildcard.
+// Explicit container-or-matching-agent check ensures no cross-agent snapshot access.
 
 app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c => {
   const { agentId } = c.req.param();
+  if (!isContainerAuth(c) && c.get('agentJWT')?.agentId !== agentId) {
+    return c.json({ success: false, error: 'Forbidden' }, 403);
+  }
   const snapshot = await c.env.AGENT_DB_SNAPSHOTS_KV.get(agentId, 'arrayBuffer');
   if (!snapshot) return c.json({ success: false, error: 'Snapshot not found' }, 404);
   return new Response(snapshot, {
@@ -628,6 +633,9 @@ app.get('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c =>
 
 app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c => {
   const { agentId } = c.req.param();
+  if (!isContainerAuth(c) && c.get('agentJWT')?.agentId !== agentId) {
+    return c.json({ success: false, error: 'Forbidden' }, 403);
+  }
   const body = await c.req.arrayBuffer();
   await c.env.AGENT_DB_SNAPSHOTS_KV.put(agentId, body);
   return c.json({ success: true });

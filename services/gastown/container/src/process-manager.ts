@@ -963,7 +963,7 @@ export async function stopAgent(agentId: string): Promise<void> {
   const apiUrl = agent.gastownApiUrl;
   const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
   if (apiUrl && token) {
-    void saveDbSnapshot(agentId, apiUrl, token, agent.rigId, agent.townId);
+    await saveDbSnapshot(agentId, apiUrl, token, agent.rigId, agent.townId);
   }
 }
 

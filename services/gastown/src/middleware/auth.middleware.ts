@@ -153,3 +153,24 @@ export function getEnforcedAgentId(c: Context<GastownEnv>): string | null {
   if (!jwt) return null;
   return jwt.agentId;
 }
+
+/**
+ * Returns true when the request was authenticated with a container JWT
+ * (scope: 'container'), which does not carry an agentId. Used to distinguish
+ * container-scoped calls from per-agent calls in routes that need an explicit
+ * container-or-matching-agent ownership check.
+ */
+export function isContainerAuth(c: Context<GastownEnv>): boolean {
+  const jwt = c.get('agentJWT');
+  return !jwt || jwt.agentId === '';
+}
+
+/**
+ * Returns the agentId enforced by the JWT. For container JWTs this is ''
+ * (empty string), meaning no specific agent is identified — the request
+ * is scoped to the town/rig via the container token.
+ */
+export function getJWTAgentId(c: Context<GastownEnv>): string {
+  const jwt = c.get('agentJWT');
+  return jwt?.agentId ?? '';
+}

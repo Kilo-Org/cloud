@@ -32,7 +32,10 @@ import { decryptByokRow } from '@/lib/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@/lib/providers/vercel/mapModelIdToVercel';
 import DIRECT_BYOK_PROVIDERS from '@/lib/providers/direct-byok/direct-byok-definitions';
-import { createDirectByokAiSdkProvider, formatDirectByokModelId } from '@/lib/providers/direct-byok';
+import {
+  createDirectByokAiSdkProvider,
+  formatDirectByokModelId,
+} from '@/lib/providers/direct-byok';
 
 const fetchSupportedModels = unstable_cache(
   async (): Promise<Record<string, string[]>> => {
@@ -414,7 +417,10 @@ export const byokRouter = createTRPCRouter({
           if (directByokProvider.ai_sdk_provider === 'openai-compatible') {
             return {
               finalProvider: provider,
-              model: createDirectByokAiSdkProvider(directByokProvider, decryptedKey.decryptedAPIKey)(model),
+              model: createDirectByokAiSdkProvider(
+                directByokProvider,
+                decryptedKey.decryptedAPIKey
+              )(model),
             };
           } else {
             throw new Error('Unrecognized AI SDK provider: ' + directByokProvider.ai_sdk_provider);

@@ -102,7 +102,10 @@ export async function getDirectByokModelsForUser(userId: string) {
   return userByok ? getDirectByokModels(userByok.map(ub => ub.providerId)) : [];
 }
 
-export function createDirectByokAiSdkProvider(directByokProvider: DirectByokProvider, apiKey: string) {
+export function createDirectByokAiSdkProvider(
+  directByokProvider: DirectByokProvider,
+  apiKey: string
+) {
   if (directByokProvider.ai_sdk_provider === 'openai-compatible') {
     return createOpenAICompatible({
       baseURL: directByokProvider.base_url,

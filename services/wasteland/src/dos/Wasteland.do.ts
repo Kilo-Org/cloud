@@ -4,10 +4,7 @@ import * as memberOps from './wasteland/members';
 import * as credentialOps from './wasteland/credentials';
 import * as townOps from './wasteland/towns';
 import * as wantedBoardOps from './wasteland/wanted-board';
-import {
-  wasteland_config,
-  WastelandConfigRecord,
-} from '../db/tables/wasteland-config.table';
+import { wasteland_config, WastelandConfigRecord } from '../db/tables/wasteland-config.table';
 import { query } from '../util/query.util';
 
 export type WastelandConfigResult = {
@@ -109,13 +106,7 @@ export class WastelandDO extends DurableObject<Env> {
     if (this.wastelandId) {
       return configOps.getConfig(this.sql, this.wastelandId);
     }
-    const rows = [
-      ...query(
-        this.sql,
-        /* sql */ `SELECT * FROM ${wasteland_config} LIMIT 1`,
-        []
-      ),
-    ];
+    const rows = [...query(this.sql, /* sql */ `SELECT * FROM ${wasteland_config} LIMIT 1`, [])];
     if (rows.length === 0) return null;
     const config = WastelandConfigRecord.parse(rows[0]);
     this.wastelandId = config.wasteland_id;

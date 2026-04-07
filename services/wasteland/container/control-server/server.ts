@@ -409,7 +409,7 @@ async function handleDone(req: Request): Promise<Response> {
   }
 }
 
-  async function handlePost(req: Request): Promise<Response> {
+async function handlePost(req: Request): Promise<Response> {
   const token = extractToken(req);
   if (!token) return errorResponse('Missing DOLTHUB_TOKEN header', 401);
 

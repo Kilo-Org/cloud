@@ -20,11 +20,7 @@ type AppleJWK = {
 };
 
 type AppleEvent = {
-  type:
-    | 'consent-revoked'
-    | 'account-delete'
-    | 'email-disabled'
-    | 'email-enabled';
+  type: 'consent-revoked' | 'account-delete' | 'email-disabled' | 'email-enabled';
   sub: string;
   email?: string;
   is_private_email?: string;
@@ -111,10 +107,7 @@ export async function POST(request: NextRequest) {
 
     const { kid } = decoded.header;
     if (!kid) {
-      return NextResponse.json(
-        { error: 'Missing kid in JWT header' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing kid in JWT header' }, { status: 400 });
     }
 
     // Fetch Apple's public keys and find the matching one
@@ -126,10 +119,7 @@ export async function POST(request: NextRequest) {
       const freshKeys = await getApplePublicKeys();
       const retryKey = freshKeys.find(k => k.kid === kid);
       if (!retryKey) {
-        return NextResponse.json(
-          { error: 'No matching Apple public key' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'No matching Apple public key' }, { status: 400 });
       }
       const pem = jwkToPem(retryKey);
       const event = verifyAppleJwt(payload, pem);
@@ -145,9 +135,6 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     captureException(error);
     logExceptInTest(`Apple notification error: ${error}`);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

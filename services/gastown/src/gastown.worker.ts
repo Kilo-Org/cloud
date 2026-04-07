@@ -642,13 +642,18 @@ app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
   kiloAuthMiddleware(c, next)
 );
 // Town routes: kilo auth + admin audit + town ownership check (supports both personal and org-owned towns).
-app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) =>
-  kiloAuthMiddleware(c, async () => {
+// Skip for container-registry routes which use authMiddleware with container JWT support.
+app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
+  const path = c.req.path;
+  if (path.includes('/container-registry')) {
+    return next();
+  }
+  await kiloAuthMiddleware(c, async () => {
     await adminAuditMiddleware(c, async () => {
       await townAuthMiddleware(c, next);
     });
-  })
-);
+  });
+});
 
 // ── Org Auth ────────────────────────────────────────────────────────────
 // Kilo user auth + org membership check for all org routes.

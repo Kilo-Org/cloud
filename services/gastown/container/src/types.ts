@@ -135,6 +135,9 @@ export type ManagedAgent = {
   model: string | null;
   /** Full env dict from buildAgentEnv, stored so model hot-swap can replay it. */
   startupEnv: Record<string, string>;
+  /** Original StartAgentRequest, stored so the container registry can
+   *  serialize it for boot hydration after eviction. */
+  startupRequest: StartAgentRequest;
   /** AbortController for the in-flight startup sequence. Aborted when a
    *  restart is requested while the agent is still in 'starting' status,
    *  preventing orphaned sessions from leaking. */

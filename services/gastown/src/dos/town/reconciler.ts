@@ -1198,11 +1198,11 @@ export function reconcileReviewQueue(
   }
 
   // Rules 5-6: Refinery dispatch for open MR beads.
-  // Always runs for direct-merge MR beads (refinery performs the merge).
-  // When code_review=false AND merge_strategy=pr, MR beads with pr_url
-  // were fast-tracked above, so only direct-merge MR beads remain for
-  // Rules 5-6.
-  {
+  // Only runs when code review is enabled. When code_review=false, the
+  // fast-track above transitions all open MR beads to in_progress so
+  // poll_pr handles auto-merge. Direct-merge MR beads are only created
+  // when merge_strategy='direct', which inherently requires code_review.
+  if (refineryCodeReview) {
     // Rule 5: Pop open MR bead for idle refinery
     // Get all rigs that have open MR beads
     const rigsWithOpenMrs = z

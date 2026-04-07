@@ -33,8 +33,10 @@ const sdkInstances = new Map<string, SDKInstance>();
 const eventAbortControllers = new Map<string, AbortController>();
 // Event sinks for WebSocket forwarding
 const eventSinks = new Set<(agentId: string, event: string, data: unknown) => void>();
-// Per-agent idle timers — fires exit when no nudges arrive
-const idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+// Per-agent idle timers — fires exit when no nudges arrive.
+// Stores both the timer handle and the onExit callback so drainAll()
+// can re-arm timers with a shorter timeout without duplicating exit logic.
+const idleTimers = new Map<string, { timer: ReturnType<typeof setTimeout>; onExit: () => void }>();
 
 // Server-level lifecycle events that should NOT cancel an agent's idle
 // timer. These fire periodically (heartbeat) or on connect and don't
@@ -143,6 +145,42 @@ async function saveDbSnapshot(
     }
     console.warn(`${MANAGER_LOG} DB snapshot save failed for agent ${agentId}:`, err);
   }
+}
+
+/**
+ * Sync the in-memory agents Map to the container registry so bootHydration
+ * can resume agents after a container eviction. Only includes agents in
+ * 'running' or 'starting' status (not exited/failed).
+ *
+ * Fire-and-forget — failures are logged but don't block the caller.
+ */
+function syncRegistry(): void {
+  const apiUrl = process.env.GASTOWN_API_URL;
+  const townId = process.env.GASTOWN_TOWN_ID;
+  const token = process.env.GASTOWN_CONTAINER_TOKEN;
+  if (!apiUrl || !townId || !token) return;
+
+  const entries = [];
+  for (const agent of agents.values()) {
+    if (agent.status !== 'running' && agent.status !== 'starting') continue;
+    entries.push({
+      agentId: agent.agentId,
+      request: agent.startupRequest,
+      workdir: agent.workdir,
+      env: agent.startupEnv,
+    });
+  }
+
+  fetch(`${apiUrl}/api/towns/${townId}/container-registry`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(entries),
+  }).catch(err => {
+    console.warn(`${MANAGER_LOG} Failed to sync container registry:`, err);
+  });
 }
 
 export function registerEventSink(
@@ -458,9 +496,9 @@ async function writeEvictionCheckpoint(
  * Clear the idle timer for an agent (if any).
  */
 function clearIdleTimer(agentId: string): void {
-  const timer = idleTimers.get(agentId);
-  if (timer !== undefined) {
-    clearTimeout(timer);
+  const entry = idleTimers.get(agentId);
+  if (entry !== undefined) {
+    clearTimeout(entry.timer);
     idleTimers.delete(agentId);
   }
 }
@@ -534,9 +572,9 @@ async function handleIdleEvent(agent: ManagedAgent, onExit: () => void): Promise
     `${MANAGER_LOG} handleIdleEvent: no nudges for ${agentId}, idle timeout in ${timeoutMs}ms`
   );
 
-  idleTimers.set(
-    agentId,
-    setTimeout(() => {
+  idleTimers.set(agentId, {
+    onExit,
+    timer: setTimeout(() => {
       idleTimers.delete(agentId);
       if (agent.status === 'running') {
         console.log(
@@ -544,8 +582,8 @@ async function handleIdleEvent(agent: ManagedAgent, onExit: () => void): Promise
         );
         onExit();
       }
-    }, timeoutMs)
-  );
+    }, timeoutMs),
+  });
 }
 
 /**
@@ -572,6 +610,7 @@ async function subscribeToEvents(
     agent.exitReason = 'completed';
     broadcastEvent(agent.agentId, 'agent.exited', { reason: 'completed' });
     void reportAgentCompleted(agent, 'completed');
+    syncRegistry();
 
     // Release SDK session so the server can shut down when idle
     const inst = sdkInstances.get(agent.workdir);
@@ -749,6 +788,7 @@ export async function startAgent(
     completionCallbackUrl: request.envVars?.GASTOWN_COMPLETION_CALLBACK_URL ?? null,
     model: request.model ?? null,
     startupEnv: env,
+    startupRequest: request,
     startupAbortController,
   };
   agents.set(request.agentId, agent);
@@ -859,6 +899,7 @@ export async function startAgent(
       port,
     });
 
+    syncRegistry();
     return agent;
   } catch (err) {
     // On abort, clean up silently — the new startAgent invocation will
@@ -888,6 +929,7 @@ export async function startAgent(
       }
       if (agents.get(request.agentId) === agent) {
         agents.delete(request.agentId);
+        syncRegistry();
       }
       throw err;
     }
@@ -895,6 +937,7 @@ export async function startAgent(
     agent.status = 'failed';
     agent.startupAbortController = null;
     agent.exitReason = err instanceof Error ? err.message : String(err);
+    syncRegistry();
     if (sessionCounted) {
       const instance = sdkInstances.get(workdir);
       if (instance) instance.sessionCount--;
@@ -962,6 +1005,7 @@ export async function stopAgent(agentId: string): Promise<void> {
   agent.exitReason = 'stopped';
   log.info('agent.exit', { agentId, reason: 'stopped', exitReason: 'stopped' });
   broadcastEvent(agentId, 'agent.exited', { reason: 'stopped' });
+  syncRegistry();
 
   // Save DB snapshot before completing stop
   const apiUrl = agent.gastownApiUrl;
@@ -1301,6 +1345,33 @@ export async function drainAll(): Promise<void> {
     console.warn(`${DRAIN_LOG} Phase 1: TownDO notification failed, continuing:`, err);
   }
 
+  // ── Phase 1b: Shorten idle timers ──────────────────────────────────────
+  // Agents that are already idle (have a pending idle timer from a
+  // session.idle event before drain started) are sitting in 120s/600s
+  // timers. Replace them with short 10s timers so they exit promptly.
+  // We can re-use the stored onExit callback from the original timer.
+  for (const agent of agents.values()) {
+    if (agent.role === 'mayor') continue;
+    const entry = idleTimers.get(agent.agentId);
+    if (entry) {
+      console.log(
+        `${DRAIN_LOG} Shortening idle timer for ${agent.role}:${agent.agentId.slice(0, 8)}`
+      );
+      clearTimeout(entry.timer);
+      const { onExit } = entry;
+      idleTimers.set(agent.agentId, {
+        onExit,
+        timer: setTimeout(() => {
+          idleTimers.delete(agent.agentId);
+          if (agent.status === 'running') {
+            console.log(`${DRAIN_LOG} Shortened idle timer fired for ${agent.agentId.slice(0, 8)}`);
+            onExit();
+          }
+        }, 10_000),
+      });
+    }
+  }
+
   // ── Phase 2: Wait for agents to finish their current work ─────────────
   // No nudging — agents complete naturally (call gt_done, go idle, etc.).
   // The TownDO's draining flag blocks new dispatch so no new work starts.
@@ -1499,8 +1570,8 @@ export async function drainAll(): Promise<void> {
 
 export async function stopAll(): Promise<void> {
   // Cancel all idle timers
-  for (const [, timer] of idleTimers) {
-    clearTimeout(timer);
+  for (const [, entry] of idleTimers) {
+    clearTimeout(entry.timer);
   }
   idleTimers.clear();
 

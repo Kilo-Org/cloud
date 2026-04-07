@@ -2,9 +2,11 @@ import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
-import { and, gte, lte, eq, asc } from 'drizzle-orm';
+import { and, gte, lte, eq, asc, sql, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { PassThrough } from 'node:stream';
+import { generateProviderSpecificHash } from '@/lib/providerHash';
+import PROVIDERS from '@/lib/providers/provider-definitions';
 
 function formatTimestamp(isoString: string): string {
   return isoString.replaceAll(':', '-').replaceAll(' ', '_');
@@ -66,6 +68,8 @@ export async function GET(request: NextRequest) {
   const userId = searchParams.get('userId');
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
+  const model = searchParams.get('model');
+  const sessionId = searchParams.get('sessionId');
 
   if (!userId || !startDate || !endDate) {
     return jsonError('userId, startDate, and endDate are required', 400);
@@ -77,16 +81,30 @@ export async function GET(request: NextRequest) {
     return jsonError('Invalid date format. Use YYYY-MM-DD.', 400);
   }
 
+  const conditions: (SQL<unknown> | undefined)[] = [
+    eq(api_request_log.kilo_user_id, userId),
+    gte(api_request_log.created_at, parsedStart.toISOString()),
+    lte(api_request_log.created_at, parsedEnd.toISOString()),
+  ];
+
+  if (model) {
+    conditions.push(eq(api_request_log.model, model));
+  }
+
+  if (sessionId) {
+    const sessionHashes = [
+      generateProviderSpecificHash(userId + '-' + sessionId, PROVIDERS.VERCEL_AI_GATEWAY),
+      generateProviderSpecificHash(userId + '-' + sessionId, PROVIDERS.OPENROUTER),
+    ];
+    conditions.push(
+      sql`(${api_request_log.request}->>'prompt_cache_key') IN (${sql.join(sessionHashes, sql`, `)})`
+    );
+  }
+
   const rows = await db
     .select()
     .from(api_request_log)
-    .where(
-      and(
-        eq(api_request_log.kilo_user_id, userId),
-        gte(api_request_log.created_at, parsedStart.toISOString()),
-        lte(api_request_log.created_at, parsedEnd.toISOString())
-      )
-    )
+    .where(and(...conditions))
     .orderBy(asc(api_request_log.created_at));
 
   if (rows.length === 0) {

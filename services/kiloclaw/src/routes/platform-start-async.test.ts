@@ -65,9 +65,12 @@ describe('POST /start-async', () => {
 
   it('returns 200 and calls the DO async start path', async () => {
     const { env, startAsync } = makeEnv();
-    const { path, init } = postJson('/start-async?instanceId=11111111-1111-4111-8111-111111111111', {
-      userId: 'user-1',
-    });
+    const { path, init } = postJson(
+      '/start-async?instanceId=11111111-1111-4111-8111-111111111111',
+      {
+        userId: 'user-1',
+      }
+    );
 
     const response = await platform.request(path, init, env);
 
@@ -78,9 +81,12 @@ describe('POST /start-async', () => {
 
   it('logs billing-correlated async start requests with propagated context', async () => {
     const { env } = makeEnv();
-    const { path, init } = postJson('/start-async?instanceId=11111111-1111-4111-8111-111111111111', {
-      userId: 'user-1',
-    });
+    const { path, init } = postJson(
+      '/start-async?instanceId=11111111-1111-4111-8111-111111111111',
+      {
+        userId: 'user-1',
+      }
+    );
     const headers = new Headers(init.headers as Record<string, string>);
     headers.set('x-kiloclaw-billing-run-id', '11111111-1111-4111-8111-111111111111');
     headers.set('x-kiloclaw-billing-sweep', 'interrupted_auto_resume');

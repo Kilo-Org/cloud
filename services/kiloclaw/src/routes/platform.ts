@@ -1258,7 +1258,8 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
 
   try {
     const route = mode === 'async' ? '/api/platform/start-async' : '/api/platform/start';
-    const eventBase = mode === 'async' ? 'instance.async_start_requested' : 'instance.manual_start_succeeded';
+    const eventBase =
+      mode === 'async' ? 'instance.async_start_requested' : 'instance.manual_start_succeeded';
     const options = result.data.skipCooldown ? { skipCooldown: true } : undefined;
 
     if (mode === 'async') {
@@ -1289,7 +1290,8 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
   } catch (err) {
     const { message, status } = sanitizeError(err, 'start');
     writeEvent(c.env, {
-      event: mode === 'async' ? 'instance.async_start_request_failed' : 'instance.manual_start_failed',
+      event:
+        mode === 'async' ? 'instance.async_start_request_failed' : 'instance.manual_start_failed',
       delivery: 'http',
       route: mode === 'async' ? '/api/platform/start-async' : '/api/platform/start',
       userId: result.data.userId,

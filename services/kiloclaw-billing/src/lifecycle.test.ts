@@ -40,26 +40,29 @@ function createMockDb(selectResults: unknown[][]) {
       };
     }),
   }));
-  const transaction = vi.fn(async (callback: (tx: {
-    delete: ReturnType<typeof vi.fn>;
-    update: ReturnType<typeof vi.fn>;
-  }) => Promise<unknown>) =>
-    callback({
-      delete: vi.fn(() => ({
-        where: vi.fn(async whereArg => {
-          txDeletes.push(whereArg);
-          return undefined;
-        }),
-      })),
-      update: vi.fn(() => ({
-        set: vi.fn((values: Record<string, unknown>) => {
-          txUpdates.push(values);
-          return {
-            where: vi.fn(async () => undefined),
-          };
-        }),
-      })),
-    })
+  const transaction = vi.fn(
+    async (
+      callback: (tx: {
+        delete: ReturnType<typeof vi.fn>;
+        update: ReturnType<typeof vi.fn>;
+      }) => Promise<unknown>
+    ) =>
+      callback({
+        delete: vi.fn(() => ({
+          where: vi.fn(async whereArg => {
+            txDeletes.push(whereArg);
+            return undefined;
+          }),
+        })),
+        update: vi.fn(() => ({
+          set: vi.fn((values: Record<string, unknown>) => {
+            txUpdates.push(values);
+            return {
+              where: vi.fn(async () => undefined),
+            };
+          }),
+        })),
+      })
   );
 
   return {

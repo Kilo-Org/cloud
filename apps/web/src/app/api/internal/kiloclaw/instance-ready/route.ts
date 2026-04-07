@@ -31,7 +31,11 @@ function emailTypeKey(sandboxId: string): string {
   return `claw_instance_ready:${sandboxId}`;
 }
 
-function logInstanceReady(level: 'info' | 'error', message: string, fields: Record<string, unknown>) {
+function logInstanceReady(
+  level: 'info' | 'error',
+  message: string,
+  fields: Record<string, unknown>
+) {
   const record = JSON.stringify({
     level,
     message,

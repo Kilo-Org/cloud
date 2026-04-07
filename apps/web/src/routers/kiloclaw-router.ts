@@ -2540,8 +2540,8 @@ export const kiloclawRouter = createTRPCRouter({
       .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id));
     const sub =
       activeInstance && !activeInstance.destroyed_at
-        ? subscriptions.find(subscription => subscription.instance_id === activeInstance.id) ??
-          getEffectiveKiloClawSubscription(subscriptions, now)
+        ? (subscriptions.find(subscription => subscription.instance_id === activeInstance.id) ??
+          getEffectiveKiloClawSubscription(subscriptions, now))
         : getEffectiveKiloClawSubscription(subscriptions, now);
 
     const [earlybird] = await db

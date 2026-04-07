@@ -363,18 +363,21 @@ describe('POST /checkin', () => {
     );
 
     expect(response.status).toBe(204);
-    expect(fetchSpy).toHaveBeenCalledWith('https://kilo.test/api/internal/kiloclaw/instance-ready', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Internal-Secret': 'internal-secret',
-      },
-      body: JSON.stringify({
-        userId: 'user-1',
-        sandboxId: instanceSandboxId,
-        instanceId,
-      }),
-    });
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://kilo.test/api/internal/kiloclaw/instance-ready',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Internal-Secret': 'internal-secret',
+        },
+        body: JSON.stringify({
+          userId: 'user-1',
+          sandboxId: instanceSandboxId,
+          instanceId,
+        }),
+      }
+    );
   });
 
   it('still dispatches instance-ready notification when the one-time email gate is closed', async () => {
@@ -396,16 +399,19 @@ describe('POST /checkin', () => {
     );
 
     expect(response.status).toBe(204);
-    expect(fetchSpy).toHaveBeenCalledWith('https://kilo.test/api/internal/kiloclaw/instance-ready', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Internal-Secret': 'internal-secret',
-      },
-      body: JSON.stringify({
-        userId: 'user-1',
-        sandboxId,
-      }),
-    });
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://kilo.test/api/internal/kiloclaw/instance-ready',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Internal-Secret': 'internal-secret',
+        },
+        body: JSON.stringify({
+          userId: 'user-1',
+          sandboxId,
+        }),
+      }
+    );
   });
 });

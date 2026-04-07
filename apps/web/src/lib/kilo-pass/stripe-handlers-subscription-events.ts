@@ -7,8 +7,10 @@ import { eq } from 'drizzle-orm';
 
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
+import { openPauseEvent, closePauseEvent } from '@/lib/kilo-pass/pause-events';
 import { getKiloPassSubscriptionMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
 import { getStripeEndedAtIso } from '@/lib/kilo-pass/stripe-handlers-utils';
+import { client as stripe } from '@/lib/stripe-client';
 import type Stripe from 'stripe';
 import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
@@ -70,7 +72,7 @@ export async function handleKiloPassSubscriptionEvent(params: {
       ...(transitionedToEnded ? { current_streak_months: 0 } : {}),
     } satisfies Partial<typeof kilo_pass_subscriptions.$inferInsert>;
 
-    await tx
+    const upserted = await tx
       .insert(kilo_pass_subscriptions)
       .values({
         ...baseValues,
@@ -82,6 +84,33 @@ export async function handleKiloPassSubscriptionEvent(params: {
       .onConflictDoUpdate({
         target: kilo_pass_subscriptions.stripe_subscription_id,
         set: updateSet,
-      });
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
+
+    const kiloPassSubscriptionId = upserted[0]?.id;
+
+    if (kiloPassSubscriptionId) {
+      // Fetch pause_collection from the Stripe API (not included in the webhook type)
+      const freshSubscription = await stripe.subscriptions.retrieve(subscription.id);
+      const pauseCollection = freshSubscription.pause_collection;
+
+      if (pauseCollection && pauseCollection.behavior) {
+        // Subscription has an active pause — open a pause event
+        const resumesAtIso = pauseCollection.resumes_at
+          ? dayjs.unix(pauseCollection.resumes_at).utc().toISOString()
+          : null;
+        await openPauseEvent(tx, {
+          kiloPassSubscriptionId,
+          pausedAt: dayjs().utc().toISOString(),
+          resumesAt: resumesAtIso,
+        });
+      } else {
+        // No pause_collection — close any open pause event
+        await closePauseEvent(tx, {
+          kiloPassSubscriptionId,
+          resumedAt: dayjs().utc().toISOString(),
+        });
+      }
+    }
   });
 }

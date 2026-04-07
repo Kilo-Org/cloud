@@ -45,6 +45,7 @@ import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-s
 import { processTopUp } from '@/lib/credits';
 import { randomUUID } from 'node:crypto';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
+import { getPausedMonthSet } from '@/lib/kilo-pass/pause-events';
 
 async function maybeIssueYearlyRemainingCredits(params: {
   tx: DrizzleTransaction;
@@ -431,15 +432,31 @@ export async function handleKiloPassInvoicePaid(params: {
           )
         )
         .orderBy(desc(kilo_pass_issuances.issue_month))
-        .limit(24);
+        // Must match maxIterations in the streak walk below so the set covers the full window
+        .limit(36);
 
       const issueMonthSet = new Set(issuanceMonths.map(x => x.issueMonth));
 
+      const pausedMonthSet = await getPausedMonthSet(tx, {
+        kiloPassSubscriptionId,
+        fromIssueMonth: issueMonth,
+        maxMonthsBack: 36,
+      });
+
       let computedStreak = 0;
       let cursor = issueMonth;
-      while (issueMonthSet.has(cursor)) {
-        computedStreak += 1;
-        cursor = getPreviousIssueMonth(cursor);
+      const maxIterations = 36;
+      let iterations = 0;
+      while (iterations < maxIterations) {
+        if (issueMonthSet.has(cursor)) {
+          computedStreak += 1;
+          cursor = getPreviousIssueMonth(cursor);
+        } else if (pausedMonthSet.has(cursor)) {
+          cursor = getPreviousIssueMonth(cursor);
+        } else {
+          break;
+        }
+        iterations += 1;
       }
 
       const newStreakMonths = wasInactivePreviously ? 1 : Math.max(1, computedStreak);

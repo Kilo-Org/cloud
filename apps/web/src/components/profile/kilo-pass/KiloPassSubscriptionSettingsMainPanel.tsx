@@ -15,8 +15,10 @@ type MainPanelProps = {
   onManagePaymentMethod: () => void;
   isOpeningCustomerPortal: boolean;
   resumeAction: ActionLabel | null | undefined;
+  resumePausedAction: ActionLabel | null | undefined;
   cancelAction: ActionLabel | null | undefined;
   onResumeSubscription: () => void;
+  onResumePausedSubscription: () => void;
   onOpenCancelSubscription: () => void;
   isResumingSubscription: boolean;
   isCancelingSubscription: boolean;
@@ -32,8 +34,10 @@ export function MainPanel(props: MainPanelProps) {
     onManagePaymentMethod,
     isOpeningCustomerPortal,
     resumeAction,
+    resumePausedAction,
     cancelAction,
     onResumeSubscription,
+    onResumePausedSubscription,
     onOpenCancelSubscription,
     isResumingSubscription,
     isCancelingSubscription,
@@ -77,7 +81,16 @@ export function MainPanel(props: MainPanelProps) {
         )}
       </Button>
 
-      {resumeAction ? (
+      {resumePausedAction ? (
+        <Button
+          variant="default"
+          className="w-full justify-center"
+          onClick={onResumePausedSubscription}
+          disabled={isResumingSubscription}
+        >
+          {resumePausedAction.label}
+        </Button>
+      ) : resumeAction ? (
         <Button
           variant="default"
           className="w-full justify-center"

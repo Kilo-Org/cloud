@@ -4,7 +4,11 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
 import { free_model_usage } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
-import { PROMOTION_WINDOW_HOURS, PROMOTION_MAX_REQUESTS } from '@/lib/constants';
+import {
+  PROMOTION_WINDOW_HOURS,
+  PROMOTION_MAX_REQUESTS,
+  ADMIN_RATE_LIMIT_TEST_MODEL,
+} from '@/lib/constants';
 
 export type PromotedModelUsageStatsResponse = {
   // Current window stats (anonymous only, last PROMOTION_WINDOW_HOURS)
@@ -19,6 +23,7 @@ export type PromotedModelUsageStatsResponse = {
 };
 
 const ANONYMOUS_FILTER = sql`${free_model_usage.kilo_user_id} IS NULL`;
+const TEST_ROW_FILTER = sql`${free_model_usage.model} != ${ADMIN_RATE_LIMIT_TEST_MODEL}`;
 
 export async function GET(
   _request: NextRequest
@@ -36,7 +41,7 @@ export async function GET(
     })
     .from(free_model_usage)
     .where(
-      sql`${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(PROMOTION_WINDOW_HOURS))} hours' AND ${ANONYMOUS_FILTER}`
+      sql`${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(PROMOTION_WINDOW_HOURS))} hours' AND ${ANONYMOUS_FILTER} AND ${TEST_ROW_FILTER}`
     );
 
   // Count IPs at or above the promotion limit threshold using a SQL subquery (anonymous only)
@@ -48,7 +53,7 @@ export async function GET(
       sql`(
         SELECT ${free_model_usage.ip_address}
         FROM ${free_model_usage}
-        WHERE ${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(PROMOTION_WINDOW_HOURS))} hours' AND ${ANONYMOUS_FILTER}
+        WHERE ${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(PROMOTION_WINDOW_HOURS))} hours' AND ${ANONYMOUS_FILTER} AND ${TEST_ROW_FILTER}
         GROUP BY ${free_model_usage.ip_address}
         HAVING COUNT(*) >= ${PROMOTION_MAX_REQUESTS}
       ) sub`

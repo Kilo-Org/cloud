@@ -9,6 +9,7 @@ import { TRPCError } from '@trpc/server';
 import {
   FREE_MODEL_RATE_LIMIT_WINDOW_HOURS,
   FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
+  ADMIN_RATE_LIMIT_TEST_MODEL,
 } from '@/lib/constants';
 import { sql } from 'drizzle-orm';
 
@@ -72,7 +73,7 @@ export const adminFreeModelUsageRouter = createTRPCRouter({
 
     const rows = Array.from({ length: rowsNeeded }, () => ({
       ip_address: ipAddress,
-      model: 'admin-rate-limit-test',
+      model: ADMIN_RATE_LIMIT_TEST_MODEL,
     }));
 
     await db.insert(free_model_usage).values(rows);

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useKiloClawStatus } from '@/hooks/useKiloClaw';
 import { ClawGettingStarted } from '../components/ClawGettingStarted';
+import { WelcomePage } from '../components/billing/WelcomePage';
 
 export default function ClawNewPage() {
   const router = useRouter();
@@ -38,6 +39,20 @@ export default function ClawNewPage() {
         </p>
       </div>
     );
+  }
+
+  const isNewUser =
+    billing &&
+    !billing.hasAccess &&
+    billing.instance === null &&
+    !billing.earlybird &&
+    !billing.trial?.expired;
+
+  if (isNewUser) {
+    if (billing.trialEligible) {
+      return <ClawGettingStarted status={status} isNewSetup={false} onNewSetupChange={() => {}} />;
+    }
+    return <WelcomePage />;
   }
 
   return <ClawGettingStarted status={status} isNewSetup={false} onNewSetupChange={() => {}} />;

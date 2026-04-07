@@ -24,7 +24,7 @@ import {
   Wrench,
   Webhook,
   Settings,
-  Server,
+  MessageSquare,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo } from 'react';
@@ -131,19 +131,14 @@ export default function OrganizationAppSidebar({
     className?: string;
   }> = [
     {
-      title: 'Chat',
+      title: 'KiloClaw',
       icon: KiloCrabIcon,
+      url: `/organizations/${organizationId}/claw`,
+    },
+    {
+      title: 'Chat',
+      icon: MessageSquare,
       url: `/organizations/${organizationId}/claw/chat`,
-    },
-    {
-      title: 'Gateway',
-      icon: Server,
-      url: `/organizations/${organizationId}/claw/gateway`,
-    },
-    {
-      title: "What's New",
-      icon: Sparkles,
-      url: `/organizations/${organizationId}/claw/changelog`,
     },
     {
       title: 'Settings',

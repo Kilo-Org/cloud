@@ -1,7 +1,15 @@
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertTriangle, CreditCard, Newspaper, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+} from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { BillingBanner } from '@/components/kiloclaw/billing-banner';
@@ -96,7 +104,7 @@ export default function DashboardScreen() {
             </Pressable>
           )}
 
-          {billing && <BillingBanner billing={billing} />}
+          {billing && Platform.OS !== 'ios' && <BillingBanner billing={billing} />}
 
           <StatusCard
             status={status?.status}
@@ -124,16 +132,20 @@ export default function DashboardScreen() {
             <Text className="px-4 pt-3 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               More
             </Text>
-            <Pressable
-              className="flex-row items-center gap-3 px-4 py-3 active:opacity-70"
-              onPress={() => {
-                router.push(`/(app)/(tabs)/(1_kiloclaw)/${instanceId}/billing` as Href);
-              }}
-            >
-              <CreditCard size={18} color={colors.foreground} />
-              <Text className="flex-1 text-sm font-medium">Billing</Text>
-            </Pressable>
-            <View className="ml-14 h-px bg-border" />
+            {Platform.OS !== 'ios' && (
+              <>
+                <Pressable
+                  className="flex-row items-center gap-3 px-4 py-3 active:opacity-70"
+                  onPress={() => {
+                    router.push(`/(app)/(tabs)/(1_kiloclaw)/${instanceId}/billing` as Href);
+                  }}
+                >
+                  <CreditCard size={18} color={colors.foreground} />
+                  <Text className="flex-1 text-sm font-medium">Billing</Text>
+                </Pressable>
+                <View className="ml-14 h-px bg-border" />
+              </>
+            )}
             <Pressable
               className="flex-row items-center gap-3 px-4 py-3 active:opacity-70"
               onPress={() => {

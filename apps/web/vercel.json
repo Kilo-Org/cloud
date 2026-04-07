@@ -1,4 +1,16 @@
 {
+  "redirects": [
+    {
+      "source": "/claw",
+      "destination": "/claw/chat",
+      "permanent": false
+    },
+    {
+      "source": "/organizations/:orgId/claw",
+      "destination": "/organizations/:orgId/claw/chat",
+      "permanent": false
+    }
+  ],
   "crons": [
     {
       "path": "/api/cron/sync-model-stats",

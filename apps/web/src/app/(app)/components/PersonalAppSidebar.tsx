@@ -26,8 +26,9 @@ import {
   Webhook,
   Factory,
   Settings,
+  Sparkles,
   CreditCard,
-  MessageSquare,
+  Server,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
@@ -78,14 +79,24 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     className?: string;
   }> = [
     {
-      title: 'KiloClaw',
+      title: 'Chat',
       icon: KiloCrabIcon,
-      url: '/claw',
+      url: '/claw/chat',
     },
     {
-      title: 'Chat',
-      icon: MessageSquare,
-      url: '/claw/chat',
+      title: 'Gateway',
+      icon: Server,
+      url: '/claw/gateway',
+    },
+    {
+      title: 'Subscription',
+      icon: CreditCard,
+      url: '/claw/subscription',
+    },
+    {
+      title: "What's New",
+      icon: Sparkles,
+      url: '/claw/changelog',
     },
     {
       title: 'Settings',

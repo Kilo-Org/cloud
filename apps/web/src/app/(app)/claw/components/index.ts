@@ -1,8 +1,11 @@
 export { OpenClawButton } from './OpenClawButton';
-export { ClawDashboard } from './ClawDashboard';
+export { ClawGettingStarted } from './ClawGettingStarted';
 export { ClawHeader } from './ClawHeader';
 export { ClawChatPage } from './ClawChatPage';
 export { ClawSettingsPage } from './ClawSettingsPage';
+export { ClawGatewayPage } from './ClawGatewayPage';
+export { ClawSubscriptionPage } from './ClawSubscriptionPage';
+export { ClawChangelogPage } from './ClawChangelogPage';
 export { CreateInstanceCard } from './CreateInstanceCard';
 export { DetailTile } from './DetailTile';
 export { InstanceTab } from './InstanceTab';

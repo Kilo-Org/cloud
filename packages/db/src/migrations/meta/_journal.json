@@ -547,6 +547,13 @@
       "when": 1775642090552,
       "tag": "0077_puzzling_gabe_jones",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1775670564287,
+      "tag": "0078_light_jocasta",
+      "breakpoints": true
     }
   ]
 }

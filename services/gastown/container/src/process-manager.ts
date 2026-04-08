@@ -846,23 +846,31 @@ export async function startAgent(
       sessionCounted = true;
     }
 
-    // 2. Resume an existing session (from hydrated kilo.db) or create a new one.
-    // After DB hydration, the SDK server may have sessions from a prior
-    // container lifecycle. Resuming avoids losing conversation history.
-    let sessionId: string;
-    const existingSessions = await client.session.list();
-    const sessions = (existingSessions.data ?? []) as Array<{
-      id: string;
-      time?: { updated?: number };
-    }>;
-    if (sessions.length > 0) {
-      // Pick the most recently updated session
-      const sorted = [...sessions].sort((a, b) => (b.time?.updated ?? 0) - (a.time?.updated ?? 0));
-      sessionId = sorted[0].id;
-      console.log(
-        `${MANAGER_LOG} Resuming existing session ${sessionId} (${sessions.length} session(s) found)`
-      );
-    } else {
+    // 2. Resume an existing session or create a new one.
+    // Only the mayor resumes — it's a persistent conversational agent whose
+    // session history should survive container evictions. Non-mayor agents
+    // (polecats, refineries, triage) always get fresh sessions since they
+    // work on a new bead each dispatch.
+    let sessionId = '';
+    let resumed = false;
+    if (request.role === 'mayor') {
+      const existingSessions = await client.session.list();
+      const sessions = (existingSessions.data ?? []) as Array<{
+        id: string;
+        time?: { updated?: number };
+      }>;
+      if (sessions.length > 0) {
+        const sorted = [...sessions].sort(
+          (a, b) => (b.time?.updated ?? 0) - (a.time?.updated ?? 0)
+        );
+        sessionId = sorted[0].id;
+        resumed = true;
+        console.log(
+          `${MANAGER_LOG} Resuming existing mayor session ${sessionId} (${sessions.length} session(s) found)`
+        );
+      }
+    }
+    if (!resumed) {
       const sessionResult = await client.session.create({ body: {} });
       const rawSession: unknown = sessionResult.data ?? sessionResult;
       const parsed = SessionResponse.safeParse(rawSession);

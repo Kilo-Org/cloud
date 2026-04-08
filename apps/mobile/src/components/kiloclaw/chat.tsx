@@ -9,6 +9,7 @@ import { type Channel as StreamChannel, StreamChat } from 'stream-chat';
 import { Channel, Chat, MessageInput, MessageList, OverlayProvider } from 'stream-chat-expo';
 
 import { useBotOnlineStatus } from '@/components/kiloclaw/chat-hooks';
+import { NotificationPrompt } from '@/components/kiloclaw/notification-prompt';
 import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
@@ -259,6 +260,7 @@ function StreamChatUI({
           {/* eslint-disable-next-line typescript-eslint/no-unsafe-assignment -- expo-image is API-compatible with RN Image */}
           <Chat client={client} style={chatTheme} ImageComponent={ExpoImage as never}>
             <Channel channel={channel} keyboardVerticalOffset={headerHeight}>
+              <NotificationPrompt enabled={Boolean(channel)} />
               <MessageList />
               <MessageInput />
             </Channel>

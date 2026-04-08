@@ -77,7 +77,7 @@ export async function reconcileWithFly(
   /** Callback for marking Postgres row destroyed during finalization. */
   markDestroyedInPostgres?: (userId: string, sandboxId: string) => Promise<boolean>
 ): Promise<ReconcileWithFlyResult> {
-  const rctx = createReconcileContext(state, env, reason);
+  const rctx = createReconcileContext(state, env, reason, ctx);
 
   if (state.status === 'destroying') {
     await retryPendingDestroy(flyConfig, ctx, state, rctx, markDestroyedInPostgres);

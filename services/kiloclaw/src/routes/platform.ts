@@ -161,15 +161,19 @@ platform.use('*', async (c, next) => {
         }
       }
 
-      writeEvent(c.env, {
-        event: deriveHttpEventName(method, path),
-        delivery: 'http',
-        route: `${method} ${path}`,
-        error,
-        userId,
-        sandboxId,
-        durationMs,
-      });
+      writeEvent(
+        c.env,
+        {
+          event: deriveHttpEventName(method, path),
+          delivery: 'http',
+          route: `${method} ${path}`,
+          error,
+          userId,
+          sandboxId,
+          durationMs,
+        },
+        c.executionCtx
+      );
     }
   }
 });
@@ -1309,25 +1313,33 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
       }
     }
 
-    writeEvent(c.env, {
-      event: eventBase,
-      delivery: 'http',
-      route,
-      userId: result.data.userId,
-      durationMs: performance.now() - startedAt,
-    });
+    writeEvent(
+      c.env,
+      {
+        event: eventBase,
+        delivery: 'http',
+        route,
+        userId: result.data.userId,
+        durationMs: performance.now() - startedAt,
+      },
+      c.executionCtx
+    );
     return c.json({ ok: true });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'start');
-    writeEvent(c.env, {
-      event:
-        mode === 'async' ? 'instance.async_start_request_failed' : 'instance.manual_start_failed',
-      delivery: 'http',
-      route: mode === 'async' ? '/api/platform/start-async' : '/api/platform/start',
-      userId: result.data.userId,
-      error: message,
-      durationMs: performance.now() - startedAt,
-    });
+    writeEvent(
+      c.env,
+      {
+        event:
+          mode === 'async' ? 'instance.async_start_request_failed' : 'instance.manual_start_failed',
+        delivery: 'http',
+        route: mode === 'async' ? '/api/platform/start-async' : '/api/platform/start',
+        userId: result.data.userId,
+        error: message,
+        durationMs: performance.now() - startedAt,
+      },
+      c.executionCtx
+    );
     return jsonError(message, status);
   }
 }
@@ -1356,24 +1368,32 @@ platform.post('/force-retry-recovery', async c => {
       stub => stub.forceRetryRecovery(),
       'forceRetryRecovery'
     );
-    writeEvent(c.env, {
-      event: 'instance.force_retry_recovery_succeeded',
-      delivery: 'http',
-      route: '/api/platform/force-retry-recovery',
-      userId: result.data.userId,
-      durationMs: performance.now() - startedAt,
-    });
+    writeEvent(
+      c.env,
+      {
+        event: 'instance.force_retry_recovery_succeeded',
+        delivery: 'http',
+        route: '/api/platform/force-retry-recovery',
+        userId: result.data.userId,
+        durationMs: performance.now() - startedAt,
+      },
+      c.executionCtx
+    );
     return c.json({ ok });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'forceRetryRecovery');
-    writeEvent(c.env, {
-      event: 'instance.force_retry_recovery_failed',
-      delivery: 'http',
-      route: '/api/platform/force-retry-recovery',
-      userId: result.data.userId,
-      error: message,
-      durationMs: performance.now() - startedAt,
-    });
+    writeEvent(
+      c.env,
+      {
+        event: 'instance.force_retry_recovery_failed',
+        delivery: 'http',
+        route: '/api/platform/force-retry-recovery',
+        userId: result.data.userId,
+        error: message,
+        durationMs: performance.now() - startedAt,
+      },
+      c.executionCtx
+    );
     return jsonError(message, status);
   }
 });
@@ -1589,27 +1609,35 @@ platform.post('/send-chat-message', async c => {
 
     await sendMessage(apiKey, apiSecret, creds.channelId, creds.userId, message);
 
-    writeEvent(c.env, {
-      event: 'instance.webhook_chat_message_sent',
-      delivery: 'http',
-      route: '/api/platform/send-chat-message',
-      userId,
-      instanceId: instanceId ?? undefined,
-      channelId: creds.channelId,
-    });
+    writeEvent(
+      c.env,
+      {
+        event: 'instance.webhook_chat_message_sent',
+        delivery: 'http',
+        route: '/api/platform/send-chat-message',
+        userId,
+        instanceId: instanceId ?? undefined,
+        channelId: creds.channelId,
+      },
+      c.executionCtx
+    );
 
     return c.json({ success: true, channelId: creds.channelId });
   } catch (err) {
     const { message: errMsg, status } = sanitizeError(err, 'send-chat-message');
 
-    writeEvent(c.env, {
-      event: 'instance.webhook_chat_message_failed',
-      delivery: 'http',
-      route: '/api/platform/send-chat-message',
-      userId,
-      instanceId: instanceId ?? undefined,
-      error: errMsg,
-    });
+    writeEvent(
+      c.env,
+      {
+        event: 'instance.webhook_chat_message_failed',
+        delivery: 'http',
+        route: '/api/platform/send-chat-message',
+        userId,
+        instanceId: instanceId ?? undefined,
+        error: errMsg,
+      },
+      c.executionCtx
+    );
 
     return jsonError(errMsg, status);
   }

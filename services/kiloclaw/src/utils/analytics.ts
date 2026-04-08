@@ -98,13 +98,18 @@ export type KiloClawEventData = {
  *
  * Safe to call when bindings are absent (dev) — silently no-ops.
  * Best-effort: never throws.
+ *
+ * Pass ctx (DurableObjectState or ExecutionContext) when available so the
+ * pipeline send is registered with waitUntil and not cancelled when the
+ * handler completes before the flush resolves.
  */
 export function writeEvent(
   env: {
     KILOCLAW_AE?: AnalyticsEngineDataset;
     KILOCLAW_EVENTS_STREAM?: { send(r: Record<string, unknown>[]): Promise<void> };
   },
-  data: KiloClawEventData
+  data: KiloClawEventData,
+  ctx?: { waitUntil(p: Promise<unknown>): void }
 ): void {
   if (!env.KILOCLAW_AE) return;
   try {
@@ -135,7 +140,7 @@ export function writeEvent(
   // Changing fields? Update pipelines/events-schema.json (streams are immutable —
   // use pipelines/recreate-stream.sh to recreate).
   if (env.KILOCLAW_EVENTS_STREAM) {
-    env.KILOCLAW_EVENTS_STREAM.send([
+    const send = env.KILOCLAW_EVENTS_STREAM.send([
       {
         event: data.event,
         user_id: data.userId ?? '',
@@ -157,6 +162,7 @@ export function writeEvent(
     ]).catch(() => {
       // Best-effort — never throw from analytics
     });
+    ctx?.waitUntil(send);
   }
 }
 

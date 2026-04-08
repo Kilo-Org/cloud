@@ -168,18 +168,22 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       ...(data.durationMs !== undefined ? { durationMs: data.durationMs } : undefined),
       ...(data.value !== undefined ? { value: data.value } : undefined),
     });
-    writeEvent(this.env, {
-      ...data,
-      delivery: 'do',
-      userId: this.s.userId ?? undefined,
-      sandboxId: this.s.sandboxId ?? undefined,
-      flyAppName: this.s.flyAppName ?? undefined,
-      flyMachineId: this.s.flyMachineId ?? undefined,
-      openclawVersion: this.s.openclawVersion ?? undefined,
-      imageTag: this.s.trackedImageTag ?? undefined,
-      flyRegion: this.s.flyRegion ?? undefined,
-      status: data.status ?? this.s.status ?? undefined,
-    });
+    writeEvent(
+      this.env,
+      {
+        ...data,
+        delivery: 'do',
+        userId: this.s.userId ?? undefined,
+        sandboxId: this.s.sandboxId ?? undefined,
+        flyAppName: this.s.flyAppName ?? undefined,
+        flyMachineId: this.s.flyMachineId ?? undefined,
+        openclawVersion: this.s.openclawVersion ?? undefined,
+        imageTag: this.s.trackedImageTag ?? undefined,
+        flyRegion: this.s.flyRegion ?? undefined,
+        status: data.status ?? this.s.status ?? undefined,
+      },
+      this.ctx
+    );
   }
 
   private emitProvisioningFailed(label: string, error?: string): void {

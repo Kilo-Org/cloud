@@ -392,27 +392,35 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
     const { started } = await stub.start(userId);
     if (started) {
       const freshStatus = await stub.getStatus();
-      writeEvent(c.env, {
-        event: 'instance.crash_recovery_succeeded',
-        delivery: 'http',
-        userId,
-        sandboxId: freshStatus.sandboxId ?? undefined,
-        flyMachineId: freshStatus.flyMachineId ?? undefined,
-        flyAppName: freshStatus.flyAppName ?? undefined,
-        status: freshStatus.status ?? undefined,
-        durationMs: performance.now() - startedAt,
-      });
+      writeEvent(
+        c.env,
+        {
+          event: 'instance.crash_recovery_succeeded',
+          delivery: 'http',
+          userId,
+          sandboxId: freshStatus.sandboxId ?? undefined,
+          flyMachineId: freshStatus.flyMachineId ?? undefined,
+          flyAppName: freshStatus.flyAppName ?? undefined,
+          status: freshStatus.status ?? undefined,
+          durationMs: performance.now() - startedAt,
+        },
+        c.executionCtx
+      );
     }
     return true;
   } catch (err) {
-    writeEvent(c.env, {
-      event: 'instance.crash_recovery_failed',
-      delivery: 'http',
-      userId,
-      sandboxId: c.get('sandboxId') ?? undefined,
-      error: err instanceof Error ? err.message : String(err),
-      durationMs: performance.now() - startedAt,
-    });
+    writeEvent(
+      c.env,
+      {
+        event: 'instance.crash_recovery_failed',
+        delivery: 'http',
+        userId,
+        sandboxId: c.get('sandboxId') ?? undefined,
+        error: err instanceof Error ? err.message : String(err),
+        durationMs: performance.now() - startedAt,
+      },
+      c.executionCtx
+    );
     console.error('[PROXY] Crash recovery failed:', err);
   }
   return false;

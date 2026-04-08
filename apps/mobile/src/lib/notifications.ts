@@ -1,10 +1,17 @@
+import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { type Href, router } from 'expo-router';
 import { Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
-// Matches extra.eas.projectId in app.config.ts
-const EXPO_PROJECT_ID = '2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4';
+function getProjectId(): string {
+  const eas = expoConstants.expoConfig?.extra?.eas as { projectId?: string } | undefined;
+  const projectId = eas?.projectId;
+  if (!projectId) {
+    throw new Error('Missing extra.eas.projectId in app config');
+  }
+  return projectId;
+}
 
 // Tracks which chat instance screen is currently focused.
 // Read by the foreground notification handler to suppress notifications
@@ -97,7 +104,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 
   const tokenResponse = await Notifications.getExpoPushTokenAsync({
-    projectId: EXPO_PROJECT_ID,
+    projectId: getProjectId(),
   });
 
   return tokenResponse.data;
@@ -110,7 +117,7 @@ export async function getDevicePushToken(): Promise<string | null> {
   }
 
   const tokenResponse = await Notifications.getExpoPushTokenAsync({
-    projectId: EXPO_PROJECT_ID,
+    projectId: getProjectId(),
   });
   return tokenResponse.data;
 }

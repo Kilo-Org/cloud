@@ -286,19 +286,7 @@ async function applyUserBalanceUpdates(updates: UserBalanceUpdates): Promise<boo
 
 type UsageRecord = { cost: number; created_at: string };
 
-/** Merge two arrays that are each already sorted by `created_at`. */
+/** Merge two arrays into a single list sorted by `created_at`. */
 export function mergeSortedByCreatedAt(a: UsageRecord[], b: UsageRecord[]): UsageRecord[] {
-  const result: UsageRecord[] = [];
-  let i = 0;
-  let j = 0;
-  while (i < a.length && j < b.length) {
-    if (a[i].created_at <= b[j].created_at) {
-      result.push(a[i++]);
-    } else {
-      result.push(b[j++]);
-    }
-  }
-  while (i < a.length) result.push(a[i++]);
-  while (j < b.length) result.push(b[j++]);
-  return result;
+  return [...a, ...b].sort((x, y) => x.created_at.localeCompare(y.created_at));
 }

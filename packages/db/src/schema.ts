@@ -3813,3 +3813,32 @@ export const kiloclaw_cli_runs = pgTable(
 
 export type KiloClawCliRun = typeof kiloclaw_cli_runs.$inferSelect;
 export type NewKiloClawCliRun = typeof kiloclaw_cli_runs.$inferInsert;
+
+// ─── Push Notification Tokens ────────────────────────────────────────
+
+export const user_push_tokens = pgTable(
+  'user_push_tokens',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    token: text().notNull(),
+    platform: text().$type<'ios' | 'android'>().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_user_push_tokens_user_token').on(table.user_id, table.token),
+    index('IDX_user_push_tokens_user_id').on(table.user_id),
+  ]
+);
+
+export type UserPushToken = typeof user_push_tokens.$inferSelect;
+export type NewUserPushToken = typeof user_push_tokens.$inferInsert;

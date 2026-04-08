@@ -162,8 +162,8 @@ function ClawDashboardInner({
     if (initialIsNewSetupRef.current) {
       posthog?.capture('claw_setup_identity_viewed');
     }
-  // Intentionally mount-only. Re-entry is handled by the reset effect below.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Intentionally mount-only. Re-entry is handled by the reset effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Reset onboarding wizard to step 1 whenever we enter setup mode so that
@@ -315,7 +315,9 @@ function ClawDashboardInner({
             totalSteps={hasPairingStep ? 6 : 5}
             onComplete={() => {
               posthog?.capture('claw_setup_provisioned');
-              posthog?.capture(hasPairingStep ? 'claw_setup_pairing_viewed' : 'claw_setup_done_viewed');
+              posthog?.capture(
+                hasPairingStep ? 'claw_setup_pairing_viewed' : 'claw_setup_done_viewed'
+              );
               setOnboardingStep(hasPairingStep ? 'pairing' : 'done');
             }}
           />

@@ -1178,19 +1178,11 @@ export function reconcileReviewQueue(
     }
   }
 
-  // When refinery code review is disabled, fast-track ALL open MR beads
-  // to in_progress so poll_pr handles them once pr_url is populated.
-  // This must include beads without pr_url yet (timing window between
-  // review_submitted and the polecat setting pr_url) to prevent Rules 5-6
-  // from dispatching the refinery for a code review that shouldn't happen.
-  //
-  // Direct-merge strategy MR beads (no pr_url, refinery merges itself)
-  // still need the refinery — but those are only created when
-  // merge_strategy='direct', which inherently requires the refinery.
+  // When refinery code review is disabled, fast-track open MR beads that
+  // already have a pr_url to in_progress so poll_pr handles auto-merge.
+  // MR beads WITHOUT a pr_url still need the refinery to create the PR,
+  // so they stay open for Rules 5-6 to dispatch.
   if (!refineryCodeReview) {
-    // Fast-track open MR beads to in_progress so poll_pr handles auto-merge.
-    // EXCLUDE MR beads belonging to a review-and-merge convoy — those still
-    // need the refinery to perform the combined review+merge step.
     const openMrs = z
       .object({ bead_id: z.string() })
       .array()
@@ -1200,8 +1192,11 @@ export function reconcileReviewQueue(
           /* sql */ `
             SELECT b.${beads.columns.bead_id}
             FROM ${beads} b
+            JOIN ${review_metadata} rm
+              ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
             WHERE b.${beads.columns.type} = 'merge_request'
               AND b.${beads.columns.status} = 'open'
+              AND rm.${review_metadata.columns.pr_url} IS NOT NULL
               AND NOT EXISTS (
                 SELECT 1
                 FROM ${beads} parent

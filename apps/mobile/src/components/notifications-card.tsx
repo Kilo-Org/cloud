@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
+  getDevicePushToken,
   getNotificationPermissionStatus,
   getPlatform,
   registerForPushNotifications,
@@ -77,13 +78,13 @@ export function NotificationsCard() {
           setNotificationsEnabled(true);
         }
       } else {
-        const currentToken = pushTokens?.find(t => t.platform === getPlatform());
-        if (currentToken) {
-          unregisterToken.mutate({ token: currentToken.token });
+        const deviceToken = await getDevicePushToken();
+        if (deviceToken) {
+          unregisterToken.mutate({ token: deviceToken });
         }
       }
     },
-    [pushTokens, registerToken, unregisterToken]
+    [registerToken, unregisterToken]
   );
 
   return (

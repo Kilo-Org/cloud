@@ -96,6 +96,18 @@ export async function registerForPushNotifications(): Promise<string | null> {
   return tokenResponse.data;
 }
 
+export async function getDevicePushToken(): Promise<string | null> {
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== Notifications.PermissionStatus.GRANTED) {
+    return null;
+  }
+
+  const tokenResponse = await Notifications.getExpoPushTokenAsync({
+    projectId: '2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4',
+  });
+  return tokenResponse.data;
+}
+
 export async function getNotificationPermissionStatus(): Promise<
   'granted' | 'denied' | 'undetermined'
 > {

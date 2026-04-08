@@ -45,7 +45,7 @@ BACKEND_API_URL=http://localhost:3000
 
 # Fly.io Machines API
 # Token is auto-created/refreshed by the dev-start script.
-# @exec fly auth token --json | jq -r .token
+# @exec fly auth token
 FLY_API_TOKEN=
 # Fly org slug. The dev-start script reads this value for token creation.
 # Use "kilo-dev" for Kilo team members, or "personal" for your own Fly account.

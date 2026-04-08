@@ -378,7 +378,7 @@ function VersionPinCard({ userId, instanceId }: { userId: string; instanceId: st
 function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: string }) {
   const trpc = useTRPC();
   const [prompt, setPrompt] = useState('');
-  const [showOutput, setShowOutput] = useState(false);
+  const [showOutput, setShowOutput] = useState(true);
   const [runId, setRunId] = useState<string | null>(null);
 
   const { data: latestRuns } = useQuery(

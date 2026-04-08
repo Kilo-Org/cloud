@@ -22,6 +22,7 @@ import {
   createKiloClawAdminAuditLog,
   listKiloClawAdminAuditLogs,
 } from '@/lib/kiloclaw/admin-audit-log';
+import { createCliRun } from '@/lib/kiloclaw/cli-runs';
 import type {
   PlatformDebugStatusResponse,
   VolumeSnapshot,
@@ -567,6 +568,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           workerInstanceId(instance)
         );
 
+        await createCliRun({
+          userId: input.userId,
+          instanceId: instance?.id ?? null,
+          prompt: input.prompt,
+          startedAt: result.startedAt,
+          initiatedBy: 'admin',
+        });
+
         try {
           await createKiloClawAdminAuditLog({
             action: 'kiloclaw.cli_run.start',
@@ -574,7 +583,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_name: ctx.user.google_user_name,
             target_user_id: input.userId,
-            message: `CLI run started on instance ${instance?.id}: ${input.prompt.slice(0, 200)}`,
+            message: `CLI run started on instance ${instance?.id}`,
             metadata: {
               instanceId: instance?.id,
               promptLength: input.prompt.length,
@@ -609,6 +618,24 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       const instance = await resolveInstance(input.userId, input.instanceId);
       const client = new KiloClawInternalClient();
       const result = await client.cancelKiloCliRun(input.userId, workerInstanceId(instance));
+
+      if (result.ok) {
+        const instanceFilter = instance ? eq(kiloclaw_cli_runs.instance_id, instance.id) : undefined;
+        await db
+          .update(kiloclaw_cli_runs)
+          .set({
+            status: 'cancelled',
+            completed_at: new Date().toISOString(),
+          })
+          .where(
+            and(
+              eq(kiloclaw_cli_runs.user_id, input.userId),
+              instanceFilter,
+              eq(kiloclaw_cli_runs.status, 'running'),
+              eq(kiloclaw_cli_runs.initiated_by, 'admin')
+            )
+          );
+      }
 
       try {
         await createKiloClawAdminAuditLog({
@@ -653,14 +680,19 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         limit: z.number().min(1).max(100).default(25),
         search: z.string().optional(),
         status: z.enum(['all', 'running', 'completed', 'failed', 'cancelled']).default('all'),
+        initiatedBy: z.enum(['all', 'admin', 'user']).default('all'),
       })
     )
     .query(async ({ input }) => {
-      const { offset, limit, search, status } = input;
+      const { offset, limit, search, status, initiatedBy } = input;
       const conditions: SQL[] = [];
 
       if (status !== 'all') {
         conditions.push(eq(kiloclaw_cli_runs.status, status));
+      }
+
+      if (initiatedBy !== 'all') {
+        conditions.push(eq(kiloclaw_cli_runs.initiated_by, initiatedBy));
       }
 
       const searchTerm = search?.trim();
@@ -687,6 +719,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             exit_code: kiloclaw_cli_runs.exit_code,
             started_at: kiloclaw_cli_runs.started_at,
             completed_at: kiloclaw_cli_runs.completed_at,
+            initiated_by: kiloclaw_cli_runs.initiated_by,
           })
           .from(kiloclaw_cli_runs)
           .leftJoin(kilocode_users, eq(kiloclaw_cli_runs.user_id, kilocode_users.id))

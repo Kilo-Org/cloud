@@ -18,6 +18,41 @@ import { PartRenderer } from './PartRenderer';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { stripImageContext } from '@/lib/app-builder/message-utils';
 
+const URL_REGEX = /https?:\/\/[^\s<>"']+[^\s<>"'.,:;!?)]/g;
+
+/**
+ * Renders plain text with bare URLs converted to clickable links, preserving
+ * whitespace-pre-wrap formatting.
+ */
+function TextWithLinks({ text }: { text: string }) {
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  URL_REGEX.lastIndex = 0;
+  while ((match = URL_REGEX.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const url = match[0];
+    parts.push(
+      <a
+        key={match.index}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline opacity-80 hover:opacity-100"
+      >
+        {url}
+      </a>,
+    );
+    lastIndex = match.index + url.length;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return <>{parts}</>;
+}
+
 /**
  * Compaction separator component - shown when context is compacted
  */
@@ -162,7 +197,7 @@ export function MessageBubble({
         <div className="bg-primary text-primary-foreground max-w-[95%] rounded-lg p-3 sm:max-w-[85%] md:max-w-[80%] md:p-4">
           {userContent && (
             <p className="overflow-wrap-anywhere text-sm wrap-break-word whitespace-pre-wrap">
-              {userContent}
+              <TextWithLinks text={userContent} />
             </p>
           )}
           {fileParts.map((part, index) => (

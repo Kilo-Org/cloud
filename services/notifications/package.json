@@ -24,6 +24,7 @@
     "@kilocode/db": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
+    "expo-server-sdk": "^6.1.0",
     "hono": "catalog:",
     "stream-chat": "catalog:",
     "zod": "catalog:"

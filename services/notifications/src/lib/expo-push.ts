@@ -1,22 +1,7 @@
-const EXPO_PUSH_SEND_URL = 'https://exp.host/--/api/v2/push/send';
-const EXPO_PUSH_RECEIPTS_URL = 'https://exp.host/--/api/v2/push/getReceipts';
+import Expo from 'expo-server-sdk';
+import type { ExpoPushMessage, ExpoPushReceipt } from 'expo-server-sdk';
 
-export type ExpoPushMessage = {
-  to: string;
-  title: string;
-  body: string;
-  data?: Record<string, string>;
-  sound?: 'default' | null;
-  priority?: 'default' | 'normal' | 'high';
-};
-
-type ExpoPushTicket =
-  | { status: 'ok'; id: string }
-  | { status: 'error'; message: string; details?: { error: string } };
-
-type ExpoPushReceipt =
-  | { status: 'ok' }
-  | { status: 'error'; message: string; details?: { error: string } };
+export type { ExpoPushMessage } from 'expo-server-sdk';
 
 export type TicketTokenPair = {
   ticketId: string;
@@ -24,9 +9,7 @@ export type TicketTokenPair = {
 };
 
 export type SendResult = {
-  /** Ticket IDs paired with the token they were sent to (for receipt correlation) */
   ticketTokenPairs: TicketTokenPair[];
-  /** Tokens that are immediately known to be stale */
   staleTokens: string[];
 };
 
@@ -36,72 +19,52 @@ export async function sendPushNotifications(
 ): Promise<SendResult> {
   if (messages.length === 0) return { ticketTokenPairs: [], staleTokens: [] };
 
-  const res = await fetch(EXPO_PUSH_SEND_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(messages),
-  });
-
-  if (!res.ok) {
-    console.error(`Expo Push API error (${res.status}):`, await res.text().catch(() => ''));
-    return { ticketTokenPairs: [], staleTokens: [] };
-  }
-
-  const json: { data: ExpoPushTicket[] } = await res.json();
-  const { data: tickets } = json;
+  const expo = new Expo({ accessToken });
+  const chunks = expo.chunkPushNotifications(messages);
 
   const ticketTokenPairs: TicketTokenPair[] = [];
   const staleTokens: string[] = [];
 
-  for (let i = 0; i < tickets.length; i++) {
-    const ticket = tickets[i];
-    if (ticket.status === 'ok') {
-      ticketTokenPairs.push({ ticketId: ticket.id, token: messages[i].to });
-    } else if (ticket.details?.error === 'DeviceNotRegistered') {
-      staleTokens.push(messages[i].to);
+  for (const chunk of chunks) {
+    const tickets = await expo.sendPushNotificationsAsync(chunk);
+
+    for (let i = 0; i < tickets.length; i++) {
+      const ticket = tickets[i];
+      const to = chunk[i].to;
+      const token = typeof to === 'string' ? to : to[0];
+      if (ticket.status === 'ok') {
+        ticketTokenPairs.push({ ticketId: ticket.id, token });
+      } else if (ticket.details?.error === 'DeviceNotRegistered') {
+        staleTokens.push(token);
+      }
     }
   }
 
   return { ticketTokenPairs, staleTokens };
 }
 
-/**
- * Check push receipts for delayed errors. Returns tokens that should be removed.
- */
 export async function checkPushReceipts(
   ticketTokenPairs: TicketTokenPair[],
   accessToken: string
 ): Promise<string[]> {
   if (ticketTokenPairs.length === 0) return [];
 
+  const expo = new Expo({ accessToken });
   const ticketIds = ticketTokenPairs.map(p => p.ticketId);
-
-  const res = await fetch(EXPO_PUSH_RECEIPTS_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({ ids: ticketIds }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Expo Receipts API error (${res.status}): ${await res.text().catch(() => '')}`);
-  }
-
-  const receiptJson: { data: Record<string, ExpoPushReceipt> } = await res.json();
-  const { data: receipts } = receiptJson;
+  const chunks = expo.chunkPushNotificationReceiptIds(ticketIds);
 
   const ticketToToken = new Map(ticketTokenPairs.map(p => [p.ticketId, p.token]));
   const staleTokens: string[] = [];
 
-  for (const [ticketId, receipt] of Object.entries(receipts)) {
-    if (receipt.status === 'error' && receipt.details?.error === 'DeviceNotRegistered') {
-      const token = ticketToToken.get(ticketId);
-      if (token) staleTokens.push(token);
+  for (const chunk of chunks) {
+    const receipts: { [id: string]: ExpoPushReceipt } =
+      await expo.getPushNotificationReceiptsAsync(chunk);
+
+    for (const [ticketId, receipt] of Object.entries(receipts)) {
+      if (receipt.status === 'error' && receipt.details?.error === 'DeviceNotRegistered') {
+        const token = ticketToToken.get(ticketId);
+        if (token) staleTokens.push(token);
+      }
     }
   }
 

@@ -1,4 +1,9 @@
-import { PersistedStateSchema, type PersistedState } from '../../schemas/instance-config';
+import {
+  PersistedStateSchema,
+  type PersistedState,
+  type ProviderState,
+  type FlyProviderState,
+} from '../../schemas/instance-config';
 import type { InstanceMutableState } from './types';
 
 /**
@@ -12,6 +17,78 @@ export const STORAGE_KEYS = Object.keys(PersistedStateSchema.shape);
  */
 export function storageUpdate(update: Partial<PersistedState>): Partial<PersistedState> {
   return update;
+}
+
+export function buildFlyProviderState(
+  source: Pick<InstanceMutableState, 'flyAppName' | 'flyMachineId' | 'flyVolumeId' | 'flyRegion'>
+): FlyProviderState {
+  return {
+    provider: 'fly',
+    appName: source.flyAppName,
+    machineId: source.flyMachineId,
+    volumeId: source.flyVolumeId,
+    region: source.flyRegion,
+  };
+}
+
+export function hydrateFlyLegacyFieldsFromProviderState(
+  s: Pick<
+    InstanceMutableState,
+    'flyAppName' | 'flyMachineId' | 'flyVolumeId' | 'flyRegion' | 'providerState'
+  >
+): void {
+  if (s.providerState?.provider !== 'fly') return;
+  s.flyAppName = s.providerState.appName;
+  s.flyMachineId = s.providerState.machineId;
+  s.flyVolumeId = s.providerState.volumeId;
+  s.flyRegion = s.providerState.region;
+}
+
+export function syncProviderStateForStorage(
+  s: Pick<
+    InstanceMutableState,
+    'provider' | 'providerState' | 'flyAppName' | 'flyMachineId' | 'flyVolumeId' | 'flyRegion'
+  >,
+  patch: Partial<PersistedState>
+): Partial<PersistedState> {
+  const nextProvider = patch.provider ?? s.provider;
+  if (nextProvider !== 'fly') return patch;
+
+  const explicitProviderState = patch.providerState;
+  if (explicitProviderState) {
+    s.provider = 'fly';
+    s.providerState = explicitProviderState;
+    return {
+      ...patch,
+      provider: 'fly',
+    };
+  }
+
+  const touchesFlyLegacyFields =
+    'flyAppName' in patch ||
+    'flyMachineId' in patch ||
+    'flyVolumeId' in patch ||
+    'flyRegion' in patch ||
+    'provider' in patch;
+
+  if (!touchesFlyLegacyFields) return patch;
+
+  const nextState: ProviderState = {
+    provider: 'fly',
+    appName: 'flyAppName' in patch ? (patch.flyAppName ?? null) : s.flyAppName,
+    machineId: 'flyMachineId' in patch ? (patch.flyMachineId ?? null) : s.flyMachineId,
+    volumeId: 'flyVolumeId' in patch ? (patch.flyVolumeId ?? null) : s.flyVolumeId,
+    region: 'flyRegion' in patch ? (patch.flyRegion ?? null) : s.flyRegion,
+  };
+
+  s.provider = 'fly';
+  s.providerState = nextState;
+
+  return {
+    ...patch,
+    provider: 'fly',
+    providerState: nextState,
+  };
 }
 
 /**
@@ -30,6 +107,8 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.userId = d.userId || null;
     s.sandboxId = d.sandboxId || null;
     s.orgId = d.orgId;
+    s.provider = d.provider;
+    s.providerState = d.providerState;
     s.status = d.userId ? d.status : null;
     s.envVars = d.envVars;
     s.encryptedSecrets = d.encryptedSecrets;
@@ -49,6 +128,13 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.flyMachineId = d.flyMachineId;
     s.flyVolumeId = d.flyVolumeId;
     s.flyRegion = d.flyRegion;
+    if (s.provider === 'fly') {
+      if (s.providerState?.provider === 'fly') {
+        hydrateFlyLegacyFieldsFromProviderState(s);
+      } else {
+        s.providerState = buildFlyProviderState(s);
+      }
+    }
     s.machineSize = d.machineSize;
     s.healthCheckFailCount = d.healthCheckFailCount;
     s.pendingDestroyMachineId = d.pendingDestroyMachineId;
@@ -113,6 +199,8 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.userId = null;
   s.sandboxId = null;
   s.orgId = null;
+  s.provider = 'fly';
+  s.providerState = null;
   s.status = null;
   s.envVars = null;
   s.encryptedSecrets = null;
@@ -187,6 +275,8 @@ export function createMutableState(): InstanceMutableState {
     userId: null,
     sandboxId: null,
     orgId: null,
+    provider: 'fly',
+    providerState: null,
     status: null,
     envVars: null,
     encryptedSecrets: null,

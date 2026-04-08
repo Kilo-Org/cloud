@@ -55,6 +55,21 @@ export const CustomSecretMetaSchema = z.object({
 
 export type CustomSecretMeta = z.infer<typeof CustomSecretMetaSchema>;
 
+export const ProviderIdSchema = z.enum(['fly', 'northflank', 'aws', 'k8s']);
+export type ProviderId = z.infer<typeof ProviderIdSchema>;
+
+export const FlyProviderStateSchema = z.object({
+  provider: z.literal('fly'),
+  appName: z.string().nullable().default(null),
+  machineId: z.string().nullable().default(null),
+  volumeId: z.string().nullable().default(null),
+  region: z.string().nullable().default(null),
+});
+
+export const ProviderStateSchema = FlyProviderStateSchema;
+export type FlyProviderState = z.infer<typeof FlyProviderStateSchema>;
+export type ProviderState = z.infer<typeof ProviderStateSchema>;
+
 export const InstanceConfigSchema = z.object({
   envVars: z.record(envVarNameSchema, z.string()).optional(),
   encryptedSecrets: z.record(envVarNameSchema, EncryptedEnvelopeSchema).optional(),
@@ -128,6 +143,7 @@ export const ProvisionRequestSchema = z.object({
   instanceId: z.string().uuid().optional(),
   /** Optional org ID — null/absent means personal instance. */
   orgId: z.string().uuid().nullable().optional(),
+  provider: ProviderIdSchema.optional(),
   ...InstanceConfigSchema.omit({ googleCredentials: true }).shape,
 });
 
@@ -154,6 +170,8 @@ export const PersistedStateSchema = z.object({
   sandboxId: z.string().default(''),
   /** Organization ID — null for personal instances, set for org instances. */
   orgId: z.string().nullable().default(null),
+  provider: ProviderIdSchema.default('fly'),
+  providerState: ProviderStateSchema.nullable().default(null),
   status: z
     .enum([
       'provisioned',

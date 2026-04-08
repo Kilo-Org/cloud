@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class FakeDurableObject {},
@@ -122,5 +122,75 @@ describe('proxy recovering state', () => {
       error: 'Instance is recovering',
       hint: 'Your instance is being recovered after an unexpected stop. Please wait.',
     });
+  });
+});
+
+describe('proxy routing target usage', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('proxies through the provider routing target headers for /i routes', async () => {
+    const registryStub = {
+      listInstances: vi.fn(),
+    };
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'user-1',
+        sandboxId: 'sandbox-1',
+        status: 'running',
+        flyMachineId: 'machine-1',
+        flyAppName: 'test-app',
+      }),
+      getRoutingTarget: vi.fn().mockResolvedValue({
+        origin: 'https://test-app.fly.dev',
+        headers: {
+          'fly-force-instance-id': 'machine-1',
+          'x-provider-route': 'provider-hop',
+        },
+      }),
+    };
+    const fetchMock = vi.mocked(fetch).mockResolvedValue(
+      new Response('ok', {
+        status: 200,
+      })
+    );
+
+    const response = await worker.fetch(
+      new Request('https://example.com/i/550e8400-e29b-41d4-a716-446655440000/api/foo?bar=baz'),
+      {
+        NEXTAUTH_SECRET: 'nextauth-secret',
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        FLY_API_TOKEN: 'fly-token',
+        FLY_APP_NAME: 'test-app',
+        KILOCLAW_REGISTRY: {
+          idFromName: vi.fn().mockReturnValue('registry-id'),
+          get: vi.fn().mockReturnValue(registryStub),
+        },
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://test-app.fly.dev/api/foo?bar=baz',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.any(Headers),
+      })
+    );
+
+    const headers = fetchMock.mock.calls[0]?.[1] as { headers: Headers };
+    expect(headers.headers.get('fly-force-instance-id')).toBe('machine-1');
+    expect(headers.headers.get('x-provider-route')).toBe('provider-hop');
+    expect(headers.headers.get('x-kiloclaw-proxy-token')).toBeTruthy();
   });
 });

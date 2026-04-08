@@ -1,5 +1,11 @@
 import type { KiloClawEnv } from '../../types';
-import type { GoogleCredentials, PersistedState, MachineSize } from '../../schemas/instance-config';
+import type {
+  GoogleCredentials,
+  PersistedState,
+  MachineSize,
+  ProviderId,
+  ProviderState,
+} from '../../schemas/instance-config';
 import type { FlyClientConfig } from '../../fly/client';
 import {
   isInstanceKeyedSandboxId,
@@ -46,6 +52,8 @@ export type InstanceMutableState = {
   userId: string | null;
   sandboxId: string | null;
   orgId: string | null;
+  provider: ProviderId;
+  providerState: ProviderState | null;
   status: InstanceStatus | null;
   envVars: PersistedState['envVars'];
   encryptedSecrets: PersistedState['encryptedSecrets'];

@@ -380,6 +380,7 @@ platform.post('/provision', async c => {
     userId,
     instanceId,
     orgId,
+    provider,
     envVars,
     encryptedSecrets,
     channels,
@@ -409,7 +410,7 @@ platform.post('/provision', async c => {
             region,
             pinnedImageTag,
           },
-          instanceId || orgId ? { instanceId, orgId } : undefined
+          instanceId || orgId || provider ? { instanceId, orgId, provider } : undefined
         ),
       'provision'
     );

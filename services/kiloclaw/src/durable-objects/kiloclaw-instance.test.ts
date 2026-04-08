@@ -4778,6 +4778,30 @@ describe('provision: auto-start after fresh provision', () => {
     (flyClient.listMachines as Mock).mockResolvedValue([]);
   });
 
+  it('persists fly provider metadata alongside legacy fields', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', {});
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('provider')).toBe('fly');
+    expect(storage._store.get('providerState')).toEqual({
+      provider: 'fly',
+      appName: 'claw-user-1',
+      machineId: 'machine-1',
+      volumeId: 'vol-1',
+      region: 'iad',
+    });
+  });
+
   it('calls start() on fresh provision and ends in running state', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
 
@@ -4842,6 +4866,33 @@ describe('provision: auto-start after fresh provision', () => {
 
     expect(flyClient.createMachine).not.toHaveBeenCalled();
     expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('hydrates legacy fly fields from providerState on reload', async () => {
+    const storage = createFakeStorage();
+    await seedRunning(storage, {
+      provider: 'fly',
+      providerState: {
+        provider: 'fly',
+        appName: 'acct-provider-only',
+        machineId: 'machine-from-provider',
+        volumeId: 'vol-from-provider',
+        region: 'ord',
+      },
+      flyAppName: null,
+      flyMachineId: null,
+      flyVolumeId: null,
+      flyRegion: null,
+    });
+    const { instance } = createInstance(storage);
+
+    await instance.stop();
+
+    expect(flyClient.stopMachineAndWait).toHaveBeenCalledWith(
+      expect.objectContaining({ appName: 'acct-provider-only' }),
+      'machine-from-provider'
+    );
+    expect(storage._store.get('status')).toBe('stopped');
   });
 });
 

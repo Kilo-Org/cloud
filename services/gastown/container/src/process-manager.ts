@@ -919,22 +919,27 @@ export async function startAgent(
       throw new StartupAbortedError(request.agentId);
     }
 
-    await client.session.prompt({
-      path: { id: sessionId },
-      body: {
-        parts: [{ type: 'text', text: request.prompt }],
-        ...(modelParam ? { model: modelParam } : {}),
-        ...(request.systemPrompt ? { system: request.systemPrompt } : {}),
-      },
-    });
+    // Skip the initial prompt for resumed sessions — the conversation
+    // history is already in kilo.db and re-sending the startup prompt
+    // would create a duplicate turn.
+    if (!resumed) {
+      await client.session.prompt({
+        path: { id: sessionId },
+        body: {
+          parts: [{ type: 'text', text: request.prompt }],
+          ...(modelParam ? { model: modelParam } : {}),
+          ...(request.systemPrompt ? { system: request.systemPrompt } : {}),
+        },
+      });
 
-    // If the event stream errored while we were awaiting the prompt,
-    // the stream-error handler already set the agent to 'failed',
-    // reported completion, and decremented sessionCount. Mark
-    // sessionCounted false so the catch block doesn't double-decrement.
-    if (agent.status === 'failed') {
-      sessionCounted = false;
-      throw new Error('Event stream failed during initial prompt');
+      // If the event stream errored while we were awaiting the prompt,
+      // the stream-error handler already set the agent to 'failed',
+      // reported completion, and decremented sessionCount. Mark
+      // sessionCounted false so the catch block doesn't double-decrement.
+      if (agent.status === 'failed') {
+        sessionCounted = false;
+        throw new Error('Event stream failed during initial prompt');
+      }
     }
     agent.startupAbortController = null;
 
@@ -1250,7 +1255,8 @@ export async function updateAgentModel(
     //    The kilo.db on disk still has the prior session data, and the new
     //    kilo serve process reads it. For the mayor, resume so model swaps
     //    don't lose conversation history.
-    let newSessionId: string;
+    let newSessionId = '';
+    let resumedSession = false;
     if (agent.role === 'mayor') {
       const existing = await client.session.list();
       const sessions = (existing.data ?? []) as Array<{
@@ -1262,17 +1268,11 @@ export async function updateAgentModel(
           (a, b) => (b.time?.updated ?? 0) - (a.time?.updated ?? 0)
         );
         newSessionId = sorted[0].id;
+        resumedSession = true;
         console.log(`${MANAGER_LOG} updateAgentModel: resuming existing session ${newSessionId}`);
-      } else {
-        const sessionResult = await client.session.create({ body: {} });
-        const rawSession: unknown = sessionResult.data ?? sessionResult;
-        const parsed = SessionResponse.safeParse(rawSession);
-        if (!parsed.success) {
-          throw new Error('SDK session.create response missing required "id" field');
-        }
-        newSessionId = parsed.data.id;
       }
-    } else {
+    }
+    if (!resumedSession) {
       const sessionResult = await client.session.create({ body: {} });
       const rawSession: unknown = sessionResult.data ?? sessionResult;
       const parsed = SessionResponse.safeParse(rawSession);
@@ -1288,20 +1288,22 @@ export async function updateAgentModel(
       newInstance.sessionCount++;
     }
 
-    // Send the startup prompt, including conversation history if available
-    // so the mayor retains context across model changes (same mechanism
-    // used for container restarts — see PR #1494).
+    // Only send the startup prompt for new sessions. Resumed sessions
+    // already have conversation history in kilo.db — re-sending the
+    // prompt would create a duplicate/synthetic turn.
     const prompt = conversationHistory
       ? `${conversationHistory}\n\n${MAYOR_STARTUP_PROMPT}`
       : MAYOR_STARTUP_PROMPT;
-    const modelParam = { providerID: 'kilo', modelID: model };
-    await client.session.prompt({
-      path: { id: agent.sessionId },
-      body: {
-        parts: [{ type: 'text', text: prompt }],
-        model: modelParam,
-      },
-    });
+    if (!resumedSession) {
+      const modelParam = { providerID: 'kilo', modelID: model };
+      await client.session.prompt({
+        path: { id: agent.sessionId },
+        body: {
+          parts: [{ type: 'text', text: prompt }],
+          model: modelParam,
+        },
+      });
+    }
     agent.messageCount = 1;
 
     // 6. New server is healthy — now tear down the old one.

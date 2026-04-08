@@ -155,6 +155,18 @@ export class KiloClawInternalClient {
     );
   }
 
+  async startAsync(userId: string, instanceId?: string): Promise<{ ok: true }> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/start-async${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
   async stop(userId: string, instanceId?: string): Promise<{ ok: true }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(

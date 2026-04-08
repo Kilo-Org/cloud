@@ -3657,6 +3657,9 @@ export const kiloclaw_subscriptions = pgTable(
     past_due_since: timestamp({ withTimezone: true, mode: 'string' }),
     suspended_at: timestamp({ withTimezone: true, mode: 'string' }),
     destruction_deadline: timestamp({ withTimezone: true, mode: 'string' }),
+    auto_resume_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
+    auto_resume_retry_after: timestamp({ withTimezone: true, mode: 'string' }),
+    auto_resume_attempt_count: integer().notNull().default(0),
     auto_top_up_triggered_for_period: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -3667,6 +3670,7 @@ export const kiloclaw_subscriptions = pgTable(
   table => [
     index('IDX_kiloclaw_subscriptions_status').on(table.status),
     index('IDX_kiloclaw_subscriptions_stripe_schedule_id').on(table.stripe_schedule_id),
+    index('IDX_kiloclaw_subscriptions_auto_resume_retry_after').on(table.auto_resume_retry_after),
     enumCheck('kiloclaw_subscriptions_plan_check', table.plan, KiloClawPlan),
     enumCheck(
       'kiloclaw_subscriptions_scheduled_plan_check',

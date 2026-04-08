@@ -1247,7 +1247,7 @@ const StartRequestSchema = UserIdRequestSchema.extend({
   skipCooldown: z.boolean().optional(),
 });
 
-platform.post('/start', async c => {
+async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
   const result = await parseBody(c, StartRequestSchema);
   if ('error' in result) return result.error;
   const startedAt = performance.now();
@@ -1257,34 +1257,57 @@ platform.post('/start', async c => {
   const { instanceId } = iidResult;
 
   try {
+    const route = mode === 'async' ? '/api/platform/start-async' : '/api/platform/start';
+    const eventBase =
+      mode === 'async' ? 'instance.async_start_requested' : 'instance.manual_start_succeeded';
     const options = result.data.skipCooldown ? { skipCooldown: true } : undefined;
-    const { started } = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, instanceId),
-      stub => stub.start(result.data.userId, options),
-      'start'
-    );
-    if (started) {
-      writeEvent(c.env, {
-        event: 'instance.manual_start_succeeded',
-        delivery: 'http',
-        route: '/api/platform/start',
-        userId: result.data.userId,
-        durationMs: performance.now() - startedAt,
-      });
+
+    if (mode === 'async') {
+      await withDORetry(
+        instanceStubFactory(c.env, result.data.userId, instanceId),
+        stub => stub.startAsync(result.data.userId),
+        'startAsync'
+      );
+    } else {
+      const { started } = await withDORetry(
+        instanceStubFactory(c.env, result.data.userId, instanceId),
+        stub => stub.start(result.data.userId, options),
+        'start'
+      );
+      if (!started) {
+        return c.json({ ok: true });
+      }
     }
+
+    writeEvent(c.env, {
+      event: eventBase,
+      delivery: 'http',
+      route,
+      userId: result.data.userId,
+      durationMs: performance.now() - startedAt,
+    });
     return c.json({ ok: true });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'start');
     writeEvent(c.env, {
-      event: 'instance.manual_start_failed',
+      event:
+        mode === 'async' ? 'instance.async_start_request_failed' : 'instance.manual_start_failed',
       delivery: 'http',
-      route: '/api/platform/start',
+      route: mode === 'async' ? '/api/platform/start-async' : '/api/platform/start',
       userId: result.data.userId,
       error: message,
       durationMs: performance.now() - startedAt,
     });
     return jsonError(message, status);
   }
+}
+
+platform.post('/start', async c => {
+  return handleStartRequest(c, 'sync');
+});
+
+platform.post('/start-async', async c => {
+  return handleStartRequest(c, 'async');
 });
 
 // POST /api/platform/force-retry-recovery

@@ -64,7 +64,8 @@ async function notifyInstanceReady(
   backendOrigin: string,
   internalSecret: string,
   userId: string,
-  sandboxId: string
+  sandboxId: string,
+  instanceId?: string
 ): Promise<void> {
   const res = await fetch(`${backendOrigin}/api/internal/kiloclaw/instance-ready`, {
     method: 'POST',
@@ -72,7 +73,7 @@ async function notifyInstanceReady(
       'Content-Type': 'application/json',
       'X-Internal-Secret': internalSecret,
     },
-    body: JSON.stringify({ userId, sandboxId }),
+    body: JSON.stringify({ userId, sandboxId, instanceId }),
   });
   if (!res.ok) {
     console.error('[controller] instance-ready notification failed:', res.status, await res.text());
@@ -204,26 +205,31 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
     console.error('[controller] recordDiskStats failed (non-fatal):', err);
   }
 
-  // Instance readiness detection: when load drops below threshold, send a
-  // one-time "instance ready" email to the user via the Next.js internal API.
+  // Instance readiness detection: when load drops below threshold, notify the
+  // backend so it can send the one-time "instance ready" email and finalize
+  // any pending async auto-resume state for this instance.
   if (data.loadAvg5m <= INSTANCE_READY_LOAD_THRESHOLD) {
     try {
-      // Validate config before marking the DO flag so a misconfigured env var
-      // doesn't permanently prevent the email with no way to retry.
       const apiOrigin = backendApiOrigin(c.env.BACKEND_API_URL);
       const { shouldNotify } = await stub.tryMarkInstanceReady();
 
-      if (shouldNotify && c.env.INTERNAL_API_SECRET) {
+      if (c.env.INTERNAL_API_SECRET) {
         console.log('[controller] instance-ready: dispatching notification', {
           userId,
           sandboxId: data.sandboxId,
+          instanceId: isInstanceKeyedSandboxId(data.sandboxId) ? doKey : null,
+          shouldNotify,
         });
         waitUntil(
-          notifyInstanceReady(apiOrigin, c.env.INTERNAL_API_SECRET, userId, data.sandboxId).catch(
-            err => {
-              console.error('[controller] instance-ready notification error:', err);
-            }
-          )
+          notifyInstanceReady(
+            apiOrigin,
+            c.env.INTERNAL_API_SECRET,
+            userId,
+            data.sandboxId,
+            isInstanceKeyedSandboxId(data.sandboxId) ? doKey : undefined
+          ).catch(err => {
+            console.error('[controller] instance-ready notification error:', err);
+          })
         );
       }
     } catch (err) {

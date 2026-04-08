@@ -3,7 +3,7 @@
  *
  * Called by the KiloClaw CF Worker when a user's instance first reports low
  * load (loadAvg5m < 0.1), indicating the instance is ready. Sends a one-time
- * transactional email to the user.
+ * transactional email to the user and finalizes any pending async auto-resume.
  *
  * URL: POST /api/internal/kiloclaw/instance-ready
  * Protected by X-Internal-Secret header
@@ -18,15 +18,36 @@ import { send as sendEmail } from '@/lib/email';
 import { findUserById } from '@/lib/user';
 import { db } from '@/lib/drizzle';
 import { kiloclaw_email_log } from '@kilocode/db/schema';
+import { completeAutoResumeIfReady } from '@/lib/kiloclaw/instance-lifecycle';
 
 const BodySchema = z.object({
   userId: z.string().min(1),
   sandboxId: z.string().min(1),
+  instanceId: z.string().uuid().optional(),
 });
 
 /** Per-instance email type key. Includes sandboxId to support future multi-instance. */
 function emailTypeKey(sandboxId: string): string {
   return `claw_instance_ready:${sandboxId}`;
+}
+
+function logInstanceReady(
+  level: 'info' | 'error',
+  message: string,
+  fields: Record<string, unknown>
+) {
+  const record = JSON.stringify({
+    level,
+    message,
+    billingComponent: 'instance_ready',
+    ...fields,
+  });
+
+  if (level === 'error') {
+    console.error(record);
+    return;
+  }
+  console.log(record);
 }
 
 export async function POST(req: NextRequest) {
@@ -41,12 +62,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   }
 
-  const { userId, sandboxId } = parsed.data;
+  const { userId, sandboxId, instanceId } = parsed.data;
   const emailType = emailTypeKey(sandboxId);
 
   const user = await findUserById(userId);
   if (!user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  }
+
+  const resumeState = await completeAutoResumeIfReady(userId, sandboxId, instanceId);
+  if (resumeState.resumeCompleted) {
+    logInstanceReady('info', 'Completed async auto-resume on instance readiness', {
+      event: 'resume_completed',
+      outcome: 'completed',
+      userId,
+      instanceId: resumeState.instanceId,
+      sandboxId,
+    });
   }
 
   // Idempotent: insert-before-send with rollback on failure (matches billing cron pattern).
@@ -75,12 +107,23 @@ export async function POST(req: NextRequest) {
           and(eq(kiloclaw_email_log.user_id, userId), eq(kiloclaw_email_log.email_type, emailType))
         );
     } catch (deleteError) {
-      console.error(
-        '[instance-ready] Failed to roll back email log after send failure:',
-        deleteError
-      );
+      logInstanceReady('error', 'Failed to roll back instance-ready email log after send failure', {
+        event: 'email_rollback_failed',
+        outcome: 'failed',
+        userId,
+        instanceId: resumeState.instanceId,
+        sandboxId,
+        error: deleteError instanceof Error ? deleteError.message : String(deleteError),
+      });
     }
-    console.error('[instance-ready] Email send failed:', error);
+    logInstanceReady('error', 'Instance-ready email send failed', {
+      event: 'instance_ready_email_failed',
+      outcome: 'failed',
+      userId,
+      instanceId: resumeState.instanceId,
+      sandboxId,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json({ error: 'Email send failed' }, { status: 502 });
   }
 

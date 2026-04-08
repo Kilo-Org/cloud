@@ -1,5 +1,4 @@
 import { db, cleanupDbForTest } from '@/lib/drizzle';
-import { KILOCLAW_BILLING_ENFORCEMENT } from '@/lib/config.server';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -13,7 +12,6 @@ import type { User } from '@kilocode/db/schema';
 
 let adminUser: User;
 let targetUser: User;
-const expectedAccessWithoutEntitlement = !KILOCLAW_BILLING_ENFORCEMENT;
 
 function expectSameInstant(actual: string | null | undefined, expected: string) {
   expect(actual).not.toBeNull();
@@ -51,7 +49,7 @@ describe('admin.users.getKiloClawState', () => {
 
     expect(result).toEqual({
       subscription: null,
-      hasAccess: expectedAccessWithoutEntitlement,
+      hasAccess: false,
       accessReason: null,
       earlybird: null,
       activeInstanceId: null,
@@ -74,6 +72,33 @@ describe('admin.users.getKiloClawState', () => {
     expect(result.hasAccess).toBe(true);
     expect(result.accessReason).toBe('subscription');
     expect(result.earlybird).toBeNull();
+  });
+
+  it('prefers an active subscription over an older canceled row', async () => {
+    await db.insert(kiloclaw_subscriptions).values([
+      {
+        user_id: targetUser.id,
+        plan: 'standard',
+        status: 'canceled',
+        stripe_subscription_id: 'sub_admin_kiloclaw_canceled',
+        current_period_end: '2026-03-01T00:00:00.000Z',
+      },
+      {
+        user_id: targetUser.id,
+        plan: 'standard',
+        status: 'active',
+        stripe_subscription_id: 'sub_admin_kiloclaw_active_latest',
+        current_period_end: '2026-05-01T00:00:00.000Z',
+      },
+    ]);
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
+
+    expect(result.subscription?.status).toBe('active');
+    expect(result.subscription?.stripe_subscription_id).toBe('sub_admin_kiloclaw_active_latest');
+    expect(result.hasAccess).toBe(true);
+    expect(result.accessReason).toBe('subscription');
   });
 
   it('returns trial access for future trial end dates', async () => {
@@ -111,7 +136,7 @@ describe('admin.users.getKiloClawState', () => {
     const result = await caller.admin.users.getKiloClawState({ userId: targetUser.id });
 
     expectSameInstant(result.subscription?.trial_ends_at, expiredTrialEnd);
-    expect(result.hasAccess).toBe(expectedAccessWithoutEntitlement);
+    expect(result.hasAccess).toBe(false);
     expect(result.accessReason).toBeNull();
   });
 

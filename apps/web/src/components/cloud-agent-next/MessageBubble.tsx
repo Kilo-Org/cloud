@@ -18,6 +18,36 @@ import { PartRenderer } from './PartRenderer';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { stripImageContext } from '@/lib/app-builder/message-utils';
 
+import LinkifyIt from 'linkify-it';
+
+const linkify = new LinkifyIt();
+
+function TextWithLinks({ text }: { text: string }) {
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  for (const match of linkify.match(text) ?? []) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <a
+        key={match.index}
+        href={match.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline opacity-80 hover:opacity-100"
+      >
+        {match.text}
+      </a>
+    );
+    lastIndex = match.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return <>{parts}</>;
+}
+
 /**
  * Compaction separator component - shown when context is compacted
  */
@@ -162,7 +192,7 @@ export function MessageBubble({
         <div className="bg-primary text-primary-foreground max-w-[95%] rounded-lg p-3 sm:max-w-[85%] md:max-w-[80%] md:p-4">
           {userContent && (
             <p className="overflow-wrap-anywhere text-sm wrap-break-word whitespace-pre-wrap">
-              {userContent}
+              <TextWithLinks text={userContent} />
             </p>
           )}
           {fileParts.map((part, index) => (

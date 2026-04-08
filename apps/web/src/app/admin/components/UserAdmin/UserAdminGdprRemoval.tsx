@@ -148,7 +148,7 @@ export function UserAdminGdprRemoval(user: UserDetailProps) {
 function ViewGdprHandbookLink() {
   return (
     <a
-      href="https://docs.google.com/document/d/159ded7GLQpnw0SA02k8GmkOmf5AHMO09OTn4HRW4tUo/edit?tab=t.uuovqlbwb0d#heading=h.ffmi335edibb"
+      href="https://handbook.kilo.ai/cx/support/procedures#gdpr-compliant-account-removal"
       target="_blank"
       className="inline-flex items-center gap-1 text-sm text-blue-600 underline hover:text-blue-300"
     >

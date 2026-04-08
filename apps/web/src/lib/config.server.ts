@@ -208,11 +208,6 @@ export const STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID = getEnvVariable(
   'STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID'
 );
 
-// KiloClaw Billing Enforcement — opt-in gate for subscription/trial/earlybird checks.
-// When false (default), all billing gates are no-ops so users are never blocked.
-export const KILOCLAW_BILLING_ENFORCEMENT =
-  getEnvVariable('KILOCLAW_BILLING_ENFORCEMENT') === 'true';
-
 // Webhook Agent Ingest Worker
 export const WEBHOOK_AGENT_URL =
   getEnvVariable('WEBHOOK_AGENT_URL') || 'https://hooks.kilosessions.ai';

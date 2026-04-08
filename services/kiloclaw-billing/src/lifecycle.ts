@@ -32,6 +32,8 @@ const PAST_DUE_THRESHOLD_DAYS = 14;
 const TRIAL_WARNING_DAYS = 2;
 const DESTRUCTION_WARNING_DAYS = 2;
 const KILOCLAW_EARLYBIRD_EXPIRY_DATE = '2026-09-26';
+const AUTO_RESUME_INITIAL_BACKOFF_MS = 2 * 60 * 60 * 1000;
+const AUTO_RESUME_MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
 
 const KILOCLAW_PLAN_COST_MICRODOLLARS = {
   standard: 9_000_000,
@@ -60,7 +62,7 @@ type BillingSummary = {
   credit_renewals_past_due: number;
   credit_renewals_auto_top_up: number;
   credit_renewals_skipped_duplicate: number;
-  interrupted_auto_resumes: number;
+  interrupted_auto_resume_requests: number;
   trial_warnings: number;
   earlybird_warnings: number;
   sweep1_trial_expiry: number;
@@ -87,6 +89,7 @@ type CreditRenewalRow = {
   commit_ends_at: string | null;
   past_due_since: string | null;
   suspended_at: string | null;
+  auto_resume_attempt_count: number;
   auto_top_up_triggered_for_period: string | null;
   total_microdollars_acquired: number;
   microdollars_used: number;
@@ -116,6 +119,12 @@ type BillingEntityFields = {
   userId?: string;
   instanceId?: string;
   stripeSubscriptionId?: string;
+};
+
+type InterruptedAutoResumeRow = {
+  user_id: string;
+  instance_id: string | null;
+  auto_resume_attempt_count: number;
 };
 
 type SweepExecutionContext = BillingCorrelationContext & {
@@ -187,7 +196,7 @@ function createSummary(): BillingSummary {
     credit_renewals_past_due: 0,
     credit_renewals_auto_top_up: 0,
     credit_renewals_skipped_duplicate: 0,
-    interrupted_auto_resumes: 0,
+    interrupted_auto_resume_requests: 0,
     trial_warnings: 0,
     earlybird_warnings: 0,
     sweep1_trial_expiry: 0,
@@ -239,6 +248,84 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function getAutoResumeBackoffMs(consecutiveAttemptCount: number): number {
+  const multiplier = consecutiveAttemptCount <= 0 ? 1 : 2 ** consecutiveAttemptCount;
+  return Math.min(AUTO_RESUME_MAX_BACKOFF_MS, AUTO_RESUME_INITIAL_BACKOFF_MS * multiplier);
+}
+
+async function markAutoResumeRequested(
+  database: WorkerDb,
+  params: {
+    userId: string;
+    instanceId?: string;
+    requestedAtIso: string;
+    retryAfterIso: string;
+    attemptCount: number;
+  }
+): Promise<void> {
+  const subscriptionFilter = params.instanceId
+    ? and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId)
+      )
+    : eq(kiloclaw_subscriptions.user_id, params.userId);
+
+  await database
+    .update(kiloclaw_subscriptions)
+    .set({
+      auto_resume_requested_at: params.requestedAtIso,
+      auto_resume_retry_after: params.retryAfterIso,
+      auto_resume_attempt_count: params.attemptCount,
+    })
+    .where(subscriptionFilter);
+}
+
+async function clearAutoResumeState(
+  database: WorkerDb,
+  params: {
+    userId: string;
+    instanceId?: string;
+  }
+): Promise<void> {
+  const subscriptionFilter = params.instanceId
+    ? and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId)
+      )
+    : eq(kiloclaw_subscriptions.user_id, params.userId);
+
+  const resettableEmailTypes = [
+    'claw_suspended_trial',
+    'claw_suspended_subscription',
+    'claw_suspended_payment',
+    'claw_destruction_warning',
+    'claw_instance_destroyed',
+    'claw_credit_renewal_failed',
+  ];
+
+  await database.transaction(async tx => {
+    await tx
+      .delete(kiloclaw_email_log)
+      .where(
+        and(
+          eq(kiloclaw_email_log.user_id, params.userId),
+          inArray(kiloclaw_email_log.email_type, resettableEmailTypes)
+        )
+      );
+
+    await tx
+      .update(kiloclaw_subscriptions)
+      .set({
+        suspended_at: null,
+        destruction_deadline: null,
+        auto_resume_requested_at: null,
+        auto_resume_retry_after: null,
+        auto_resume_attempt_count: 0,
+      })
+      .where(subscriptionFilter);
+  });
+}
+
 function createSweepContext(message: BillingSweepMessage, attempt: number): SweepExecutionContext {
   return {
     billingFlow: BILLING_FLOW,
@@ -275,13 +362,6 @@ async function callBillingSideEffect<T extends SideEffectRequest>(
       },
     },
     async () => {
-      log('info', 'Starting billing side effect call', {
-        event: 'downstream_call',
-        outcome: 'started',
-        action: request.action,
-        ...entityFields,
-      });
-
       const headers = new Headers({
         'content-type': 'application/json',
         'x-internal-api-key': internalApiSecret,
@@ -315,17 +395,7 @@ async function callBillingSideEffect<T extends SideEffectRequest>(
         throw new Error(`Billing side effect failed (${response.status}): ${body}`);
       }
 
-      const result: SideEffectResponse<T> = await response.json();
-      log('info', 'Completed billing side effect call', {
-        event: 'downstream_call',
-        outcome: 'completed',
-        action: request.action,
-        statusCode: response.status,
-        durationMs,
-        ...entityFields,
-      });
-
-      return result;
+      return await response.json();
     }
   );
 }
@@ -358,14 +428,6 @@ async function requestKiloClaw<T>(
       },
     },
     async () => {
-      log('info', 'Starting kiloclaw platform call', {
-        event: 'downstream_call',
-        outcome: 'started',
-        action: init?.method ?? 'GET',
-        path,
-        ...entityFields,
-      });
-
       const headers = new Headers(init?.headers);
       headers.set('content-type', 'application/json');
       headers.set('x-internal-api-key', kiloclawInternalApiSecret);
@@ -397,22 +459,12 @@ async function requestKiloClaw<T>(
         throw new KiloClawApiError(response.status, responseBody);
       }
 
-      const result = (await response.json()) as T;
-      log('info', 'Completed kiloclaw platform call', {
-        event: 'downstream_call',
-        outcome: 'completed',
-        action: init?.method ?? 'GET',
-        path,
-        statusCode: response.status,
-        durationMs,
-        ...entityFields,
-      });
-      return result;
+      return (await response.json()) as T;
     }
   );
 }
 
-async function startInstance(
+async function startInstanceAsync(
   env: BillingWorkerEnv,
   context: SweepExecutionContext,
   userId: string,
@@ -422,7 +474,7 @@ async function startInstance(
   await requestKiloClaw<{ ok: true }>(
     env,
     context,
-    `/api/platform/start${params}`,
+    `/api/platform/start-async${params}`,
     {
       method: 'POST',
       body: JSON.stringify({ userId }),
@@ -645,16 +697,15 @@ async function autoResumeIfSuspended(
   env: BillingWorkerEnv,
   database: WorkerDb,
   context: SweepExecutionContext,
-  kiloUserId: string,
-  instanceId: string | undefined
-): Promise<void> {
-  const instanceFilter = instanceId
+  row: InterruptedAutoResumeRow
+): Promise<boolean> {
+  const instanceFilter = row.instance_id
     ? and(
-        eq(kiloclaw_instances.id, instanceId),
-        eq(kiloclaw_instances.user_id, kiloUserId),
+        eq(kiloclaw_instances.id, row.instance_id),
+        eq(kiloclaw_instances.user_id, row.user_id),
         isNull(kiloclaw_instances.destroyed_at)
       )
-    : and(eq(kiloclaw_instances.user_id, kiloUserId), isNull(kiloclaw_instances.destroyed_at));
+    : and(eq(kiloclaw_instances.user_id, row.user_id), isNull(kiloclaw_instances.destroyed_at));
 
   const [targetInstance] = await database
     .select({
@@ -665,54 +716,66 @@ async function autoResumeIfSuspended(
     .where(instanceFilter)
     .limit(1);
 
-  if (targetInstance) {
-    try {
-      await startInstance(env, context, kiloUserId, workerInstanceId(targetInstance));
-    } catch (error) {
-      log('error', 'Failed to auto-resume instance', {
-        userId: kiloUserId,
-        instanceId: targetInstance.id,
-        error: errorMessage(error),
-      });
-      return;
-    }
+  const nowIso = new Date().toISOString();
+  const nextAttemptCount = row.auto_resume_attempt_count + 1;
+  const retryAfterIso = new Date(
+    Date.now() + getAutoResumeBackoffMs(row.auto_resume_attempt_count)
+  ).toISOString();
+  const resolvedInstanceId = targetInstance?.id ?? row.instance_id ?? undefined;
+
+  if (!targetInstance) {
+    await clearAutoResumeState(database, {
+      userId: row.user_id,
+      instanceId: resolvedInstanceId,
+    });
+    log('info', 'Cleared auto-resume state because no active instance remains', {
+      event: 'resume_completed',
+      outcome: 'completed',
+      userId: row.user_id,
+      instanceId: resolvedInstanceId,
+      recoveryReason: 'no_active_instance',
+    });
+    return true;
   }
 
-  const resettableEmailTypes = [
-    'claw_suspended_trial',
-    'claw_suspended_subscription',
-    'claw_suspended_payment',
-    'claw_destruction_warning',
-    'claw_instance_destroyed',
-    'claw_credit_renewal_failed',
-  ];
+  try {
+    await startInstanceAsync(env, context, row.user_id, workerInstanceId(targetInstance));
+  } catch (error) {
+    await markAutoResumeRequested(database, {
+      userId: row.user_id,
+      instanceId: resolvedInstanceId,
+      requestedAtIso: nowIso,
+      retryAfterIso,
+      attemptCount: nextAttemptCount,
+    });
+    log('error', 'Failed to request async auto-resume', {
+      event: 'resume_request_failed',
+      outcome: 'failed',
+      userId: row.user_id,
+      instanceId: resolvedInstanceId,
+      retryAfter: retryAfterIso,
+      autoResumeAttemptCount: nextAttemptCount,
+      error: errorMessage(error),
+    });
+    throw error;
+  }
 
-  await database
-    .delete(kiloclaw_email_log)
-    .where(
-      and(
-        eq(kiloclaw_email_log.user_id, kiloUserId),
-        inArray(kiloclaw_email_log.email_type, resettableEmailTypes)
-      )
-    );
-
-  const subscriptionFilter = instanceId
-    ? and(
-        eq(kiloclaw_subscriptions.user_id, kiloUserId),
-        eq(kiloclaw_subscriptions.instance_id, instanceId)
-      )
-    : eq(kiloclaw_subscriptions.user_id, kiloUserId);
-
-  await database
-    .update(kiloclaw_subscriptions)
-    .set({ suspended_at: null, destruction_deadline: null })
-    .where(subscriptionFilter);
-
-  log('info', 'Auto-resume completed', {
-    userId: kiloUserId,
-    instanceId: instanceId ?? null,
-    hadActiveInstance: !!targetInstance,
+  await markAutoResumeRequested(database, {
+    userId: row.user_id,
+    instanceId: resolvedInstanceId,
+    requestedAtIso: nowIso,
+    retryAfterIso,
+    attemptCount: nextAttemptCount,
   });
+  log('info', 'Requested async auto-resume', {
+    event: 'resume_requested',
+    outcome: 'accepted',
+    userId: row.user_id,
+    instanceId: resolvedInstanceId,
+    retryAfter: retryAfterIso,
+    autoResumeAttemptCount: nextAttemptCount,
+  });
+  return true;
 }
 
 async function processCreditRenewalRow(
@@ -744,7 +807,6 @@ async function processCreditRenewalRow(
       .where(subscriptionWhere);
 
     summary.credit_renewals_canceled++;
-    log('info', 'Credit renewal canceled at period end', { userId });
     return;
   }
 
@@ -842,7 +904,6 @@ async function processCreditRenewalRow(
 
     if (!deductionIsNew) {
       summary.credit_renewals_skipped_duplicate++;
-      log('info', 'Credit renewal skipped duplicate deduction', { userId, deductionCategory });
       return;
     }
 
@@ -870,17 +931,14 @@ async function processCreditRenewalRow(
     }
 
     if (wasPastDue && row.suspended_at) {
-      await autoResumeIfSuspended(env, database, context, userId, row.instance_id ?? undefined);
+      await autoResumeIfSuspended(env, database, context, {
+        user_id: userId,
+        instance_id: row.instance_id,
+        auto_resume_attempt_count: row.auto_resume_attempt_count,
+      });
     }
 
     summary.credit_renewals++;
-    log('info', 'Credit renewal succeeded', {
-      userId,
-      plan: effectivePlan,
-      costMicrodollars,
-      newPeriodEnd,
-      applyingPlanSwitch,
-    });
     return;
   }
 
@@ -907,7 +965,6 @@ async function processCreditRenewalRow(
     }
 
     summary.credit_renewals_auto_top_up++;
-    log('info', 'Credit renewal auto top-up triggered', { userId });
     return;
   }
 
@@ -932,11 +989,6 @@ async function processCreditRenewalRow(
   );
 
   summary.credit_renewals_past_due++;
-  log('info', 'Credit renewal insufficient balance', {
-    userId,
-    effectiveBalance,
-    costMicrodollars,
-  });
 }
 
 async function runCreditRenewalSweep(
@@ -962,6 +1014,7 @@ async function runCreditRenewalSweep(
       commit_ends_at: kiloclaw_subscriptions.commit_ends_at,
       past_due_since: kiloclaw_subscriptions.past_due_since,
       suspended_at: kiloclaw_subscriptions.suspended_at,
+      auto_resume_attempt_count: kiloclaw_subscriptions.auto_resume_attempt_count,
       auto_top_up_triggered_for_period: kiloclaw_subscriptions.auto_top_up_triggered_for_period,
       total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
       microdollars_used: kilocode_users.microdollars_used,
@@ -1000,34 +1053,34 @@ async function runInterruptedAutoResumeSweep(
   context: SweepExecutionContext,
   summary: BillingSummary
 ): Promise<void> {
+  const now = new Date().toISOString();
   const interruptedResumeRows = await database
     .select({
       user_id: kiloclaw_subscriptions.user_id,
       instance_id: kiloclaw_subscriptions.instance_id,
+      auto_resume_attempt_count: kiloclaw_subscriptions.auto_resume_attempt_count,
     })
     .from(kiloclaw_subscriptions)
     .where(
       and(
         eq(kiloclaw_subscriptions.payment_source, 'credits'),
         eq(kiloclaw_subscriptions.status, 'active'),
-        isNotNull(kiloclaw_subscriptions.suspended_at)
+        isNotNull(kiloclaw_subscriptions.suspended_at),
+        sql`(${kiloclaw_subscriptions.auto_resume_retry_after} IS NULL OR ${kiloclaw_subscriptions.auto_resume_retry_after} <= ${now})`
       )
     );
 
   for (const row of interruptedResumeRows) {
     try {
-      await autoResumeIfSuspended(
-        env,
-        database,
-        context,
-        row.user_id,
-        row.instance_id ?? undefined
-      );
-      summary.interrupted_auto_resumes++;
+      const requested = await autoResumeIfSuspended(env, database, context, row);
+      if (requested) {
+        summary.interrupted_auto_resume_requests++;
+      }
     } catch (error) {
       summary.errors++;
       log('error', 'Interrupted auto-resume retry failed', {
         userId: row.user_id,
+        instanceId: row.instance_id ?? undefined,
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -1427,10 +1480,6 @@ async function runIntroScheduleRepairSweep(
       if (!repaired) continue;
 
       summary.sweep5_intro_schedules_repaired++;
-      log('info', 'Intro schedule repair sweep completed for row', {
-        userId: row.user_id,
-        stripeSubscriptionId: stripeSubId,
-      });
     } catch (error) {
       summary.errors++;
       log('error', 'Intro schedule repair sweep failed for user', {

@@ -20,7 +20,6 @@ import {
   KILOCLAW_API_URL,
   STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID,
   STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID,
-  KILOCLAW_BILLING_ENFORCEMENT,
 } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 import {
@@ -71,6 +70,10 @@ import {
   KILOCLAW_EARLYBIRD_EXPIRY_DATE,
   KILOCLAW_TRIAL_DURATION_DAYS,
 } from '@/lib/kiloclaw/constants';
+import {
+  getEffectiveKiloClawSubscription,
+  getKiloClawSubscriptionAccessReason,
+} from '@/lib/kiloclaw/access-state';
 import {
   enrollWithCredits as enrollWithCreditsImpl,
   getEffectiveCreditBalancePreview,
@@ -640,8 +643,6 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
 
     if (hasAccess) return;
   }
-
-  if (!KILOCLAW_BILLING_ENFORCEMENT) return;
 
   throw new TRPCError({
     code: 'FORBIDDEN',
@@ -2529,28 +2530,19 @@ export const kiloclawRouter = createTRPCRouter({
     }
 
     // Query subscription scoped to the active instance when possible.
-    // Falls back to user-level LIMIT 1 when no active instance exists
+    // Falls back to the user's effective subscription when no active instance exists
     // (e.g. user never provisioned — billing status is still useful for
     // showing trial eligibility).
-    const subQuery =
+    const now = new Date();
+    const subscriptions = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id));
+    const sub =
       activeInstance && !activeInstance.destroyed_at
-        ? db
-            .select()
-            .from(kiloclaw_subscriptions)
-            .where(
-              and(
-                eq(kiloclaw_subscriptions.user_id, ctx.user.id),
-                eq(kiloclaw_subscriptions.instance_id, activeInstance.id)
-              )
-            )
-            .limit(1)
-        : db
-            .select()
-            .from(kiloclaw_subscriptions)
-            .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
-            .orderBy(sql`CASE WHEN ${kiloclaw_subscriptions.plan} != 'trial' THEN 0 ELSE 1 END`)
-            .limit(1);
-    const [sub] = await subQuery;
+        ? (subscriptions.find(subscription => subscription.instance_id === activeInstance.id) ??
+          getEffectiveKiloClawSubscription(subscriptions, now))
+        : getEffectiveKiloClawSubscription(subscriptions, now);
 
     const [earlybird] = await db
       .select({ id: kiloclaw_earlybird_purchases.id })
@@ -2563,23 +2555,11 @@ export const kiloclawRouter = createTRPCRouter({
       ? Math.ceil((new Date(earlybirdExpiresAt).getTime() - Date.now()) / 86_400_000)
       : 0;
 
-    const now = new Date();
+    let accessReason: 'trial' | 'subscription' | 'earlybird' | null =
+      getKiloClawSubscriptionAccessReason(sub, now);
+    let hasAccess = accessReason !== null;
 
-    // Compute hasAccess — when enforcement is off, always grant access
-    let hasAccess = !KILOCLAW_BILLING_ENFORCEMENT;
-    let accessReason: 'trial' | 'subscription' | 'earlybird' | null = null;
-
-    if (sub?.status === 'active' || (sub?.status === 'past_due' && !sub.suspended_at)) {
-      hasAccess = true;
-      accessReason = 'subscription';
-    } else if (
-      sub?.status === 'trialing' &&
-      sub.trial_ends_at &&
-      new Date(sub.trial_ends_at) > now
-    ) {
-      hasAccess = true;
-      accessReason = 'trial';
-    } else if (earlybird && new Date(earlybirdExpiresAt) > now) {
+    if (!hasAccess && earlybird && new Date(earlybirdExpiresAt) > now) {
       hasAccess = true;
       accessReason = 'earlybird';
     }
@@ -2628,13 +2608,13 @@ export const kiloclawRouter = createTRPCRouter({
           plan: sub.plan as 'commit' | 'standard',
           status: sub.status as 'active' | 'past_due' | 'canceled' | 'unpaid',
           cancelAtPeriodEnd: sub.cancel_at_period_end,
-          currentPeriodEnd: sub.current_period_end ?? '',
-          commitEndsAt: sub.commit_ends_at,
+          currentPeriodEnd: normalizeTimestamp(sub.current_period_end) ?? '',
+          commitEndsAt: normalizeTimestamp(sub.commit_ends_at),
           scheduledPlan: sub.scheduled_plan,
           scheduledBy: sub.scheduled_by,
           hasStripeFunding,
           paymentSource: sub.payment_source ?? null,
-          creditRenewalAt: sub.credit_renewal_at ?? null,
+          creditRenewalAt: normalizeTimestamp(sub.credit_renewal_at),
           renewalCostMicrodollars,
           showConversionPrompt,
           pendingConversion: sub.pending_conversion ?? false,

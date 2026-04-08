@@ -93,12 +93,14 @@ export type KiloClawEventData = {
 };
 
 /**
- * Write a single event to Cloudflare Analytics Engine.
- * Safe to call when the binding is absent (dev) — silently no-ops.
+ * Write a single event to Cloudflare Analytics Engine and, if the Pipeline
+ * binding is present, dual-write to R2/Parquet for Snowflake export.
+ *
+ * Safe to call when bindings are absent (dev) — silently no-ops.
  * Best-effort: never throws.
  */
 export function writeEvent(
-  env: { KILOCLAW_AE?: AnalyticsEngineDataset },
+  env: { KILOCLAW_AE?: AnalyticsEngineDataset; KILOCLAW_EVENTS_STREAM?: { send(r: Record<string, unknown>[]): Promise<void> } },
   data: KiloClawEventData
 ): void {
   if (!env.KILOCLAW_AE) return;
@@ -124,6 +126,34 @@ export function writeEvent(
     });
   } catch {
     // Best-effort — never throw from analytics
+  }
+
+  // Dual-write to Pipeline for R2/Snowflake export.
+  // Changing fields? Update pipelines/events-schema.json (streams are immutable —
+  // use pipelines/recreate-stream.sh to recreate).
+  if (env.KILOCLAW_EVENTS_STREAM) {
+    env.KILOCLAW_EVENTS_STREAM.send([
+      {
+        event: data.event,
+        user_id: data.userId ?? '',
+        delivery: data.delivery ?? '',
+        route: data.route ?? '',
+        error: data.error ?? '',
+        fly_app_name: data.flyAppName ?? '',
+        fly_machine_id: data.flyMachineId ?? '',
+        sandbox_id: data.sandboxId ?? '',
+        status: data.status ?? '',
+        openclaw_version: data.openclawVersion ?? '',
+        image_tag: data.imageTag ?? '',
+        fly_region: data.flyRegion ?? '',
+        label: data.label ?? '',
+        duration_ms: data.durationMs ?? 0,
+        value: data.value ?? 0,
+        created_at: Date.now(),
+      },
+    ]).catch(() => {
+      // Best-effort — never throw from analytics
+    });
   }
 }
 

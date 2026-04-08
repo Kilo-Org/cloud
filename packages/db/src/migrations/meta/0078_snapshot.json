@@ -1,5 +1,5 @@
 {
-  "id": "d714acfd-0ae3-443e-894d-152d4d3eb741",
+  "id": "c8d2eb80-8ae7-4c0f-a39c-bb3063f2d520",
   "prevId": "e6d66f0a-b848-48f3-ba96-e13f501ec2e0",
   "version": "7",
   "dialect": "postgresql",
@@ -14679,15 +14679,9 @@
         }
       },
       "indexes": {
-        "UQ_user_push_tokens_user_token": {
-          "name": "UQ_user_push_tokens_user_token",
+        "UQ_user_push_tokens_token": {
+          "name": "UQ_user_push_tokens_token",
           "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
             {
               "expression": "token",
               "isExpression": false,

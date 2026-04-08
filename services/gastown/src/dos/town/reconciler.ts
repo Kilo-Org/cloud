@@ -1230,16 +1230,27 @@ export function reconcileReviewQueue(
   {
     // Rule 5: Pop open MR bead for idle refinery
     // Get all rigs that have open MR beads needing the refinery.
-    const convoyOnlyFilter = refineryCodeReview
+    // When code_review=false, only dispatch the refinery for:
+    //  1. MR beads without a pr_url (refinery needs to create the PR)
+    //  2. Convoy review-and-merge MR beads (refinery does combined review+merge)
+    // MR beads WITH a pr_url are handled by the fast-track → poll_pr pipeline.
+    const refineryNeededFilter = refineryCodeReview
       ? ''
       : /* sql */ `
-          AND EXISTS (
-            SELECT 1
-            FROM ${beads} parent
-            JOIN ${convoy_metadata} cm
-              ON cm.${convoy_metadata.columns.bead_id} = parent.${beads.columns.bead_id}
-            WHERE parent.${beads.columns.bead_id} = b.${beads.columns.parent_bead_id}
-              AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
+          AND (
+            NOT EXISTS (
+              SELECT 1 FROM ${review_metadata} rm2
+              WHERE rm2.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
+                AND rm2.${review_metadata.columns.pr_url} IS NOT NULL
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM ${beads} parent
+              JOIN ${convoy_metadata} cm
+                ON cm.${convoy_metadata.columns.bead_id} = parent.${beads.columns.bead_id}
+              WHERE parent.${beads.columns.bead_id} = b.${beads.columns.parent_bead_id}
+                AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
+            )
           )`;
     const rigsWithOpenMrs = z
       .object({ rig_id: z.string() })
@@ -1253,7 +1264,7 @@ export function reconcileReviewQueue(
         WHERE b.${beads.columns.type} = 'merge_request'
           AND b.${beads.columns.status} = 'open'
           AND b.${beads.columns.rig_id} IS NOT NULL
-          ${convoyOnlyFilter}
+          ${refineryNeededFilter}
       `,
           []
         ),
@@ -1317,7 +1328,7 @@ export function reconcileReviewQueue(
           WHERE b.${beads.columns.type} = 'merge_request'
             AND b.${beads.columns.status} = 'open'
             AND b.${beads.columns.rig_id} = ?
-            ${convoyOnlyFilter}
+            ${refineryNeededFilter}
           ORDER BY b.${beads.columns.created_at} ASC
           LIMIT 1
         `,

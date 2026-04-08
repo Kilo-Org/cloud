@@ -1618,7 +1618,7 @@ export class TownDO extends DurableObject<Env> {
       rigId: input.rig_id,
       beadId: input.bead_id,
     });
-    await this.armAlarmIfNeeded();
+    await this.escalateToActiveCadence();
   }
 
   async popReviewQueue(): Promise<ReviewQueueEntry | null> {
@@ -1825,7 +1825,7 @@ export class TownDO extends DurableObject<Env> {
       `${TOWN_LOG} requestChanges: refinery=${agentId} mr=${mrBead.bead_id} rework=${reworkBead.bead_id}`
     );
 
-    await this.armAlarmIfNeeded();
+    await this.escalateToActiveCadence();
     return { rework_bead_id: reworkBead.bead_id };
   }
 
@@ -2191,7 +2191,7 @@ export class TownDO extends DurableObject<Env> {
     this.dispatchAgent(hookedAgent, bead).catch(err =>
       console.error(`${TOWN_LOG} slingBead: fire-and-forget dispatchAgent failed:`, err)
     );
-    await this.armAlarmIfNeeded();
+    await this.escalateToActiveCadence();
     return { bead, agent: hookedAgent };
   }
 
@@ -3028,7 +3028,7 @@ export class TownDO extends DurableObject<Env> {
     }
 
     if (!isStaged) {
-      await this.armAlarmIfNeeded();
+      await this.escalateToActiveCadence();
     }
 
     const convoy = this.getConvoy(convoyId);
@@ -3096,7 +3096,7 @@ export class TownDO extends DurableObject<Env> {
       payload: { convoy_id: convoyId },
     });
 
-    await this.armAlarmIfNeeded();
+    await this.escalateToActiveCadence();
 
     const updatedConvoy = this.getConvoy(convoyId);
     if (!updatedConvoy) throw new Error(`Failed to re-fetch convoy after start: ${convoyId}`);
@@ -4216,6 +4216,19 @@ export class TownDO extends DurableObject<Env> {
     if (!current || current < Date.now()) {
       await this.ctx.storage.setAlarm(Date.now() + ACTIVE_ALARM_INTERVAL_MS);
     }
+  }
+
+  /**
+   * Switch to active alarm cadence immediately. Unlike armAlarmIfNeeded(),
+   * this unconditionally reschedules the next alarm to fire in 5s — even
+   * if an idle alarm is already set minutes in the future. Call this when
+   * new work is created (beads, convoys) so the reconciler picks it up
+   * promptly instead of waiting for the idle alarm to fire.
+   */
+  private async escalateToActiveCadence(): Promise<void> {
+    const storedId = await this.ctx.storage.get<string>('town:id');
+    if (!storedId) return;
+    await this.ctx.storage.setAlarm(Date.now() + ACTIVE_ALARM_INTERVAL_MS);
   }
 
   // ══════════════════════════════════════════════════════════════════

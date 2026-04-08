@@ -122,16 +122,18 @@ function RootLayoutNav() {
   ]);
 
   const trpc = useTRPC();
-  const registerPushToken = useMutation(
-    trpc.kiloclaw.registerPushToken.mutationOptions({})
-  );
+  const registerPushToken = useMutation(trpc.kiloclaw.registerPushToken.mutationOptions({}));
 
   useEffect(() => {
-    if (!token) {return;}
+    if (!token) {
+      return;
+    }
 
     async function reregisterToken() {
       const status = await getNotificationPermissionStatus();
-      if (status !== 'granted') {return;}
+      if (status !== 'granted') {
+        return;
+      }
 
       const pushToken = await registerForPushNotifications();
       if (pushToken) {

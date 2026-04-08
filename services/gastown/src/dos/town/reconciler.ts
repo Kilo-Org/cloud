@@ -1209,11 +1209,25 @@ export function reconcileReviewQueue(
   }
 
   // Rules 5-6: Refinery dispatch for open MR beads.
-  // Runs when code review is enabled OR for convoy review-and-merge MR
-  // beads (which need the refinery regardless of the code_review setting).
+  // When code_review=true: dispatches for all open MR beads.
+  // When code_review=false: only dispatches for convoy review-and-merge
+  // MR beads (the fast-track above already moved ordinary MR beads to
+  // in_progress as actions, but those haven't been applied to SQL yet —
+  // so we must filter here to avoid re-dispatching them).
   {
     // Rule 5: Pop open MR bead for idle refinery
-    // Get all rigs that have open MR beads
+    // Get all rigs that have open MR beads needing the refinery.
+    const convoyOnlyFilter = refineryCodeReview
+      ? ''
+      : /* sql */ `
+          AND EXISTS (
+            SELECT 1
+            FROM ${beads} parent
+            JOIN ${convoy_metadata} cm
+              ON cm.${convoy_metadata.columns.bead_id} = parent.${beads.columns.bead_id}
+            WHERE parent.${beads.columns.bead_id} = b.${beads.columns.parent_bead_id}
+              AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
+          )`;
     const rigsWithOpenMrs = z
       .object({ rig_id: z.string() })
       .array()
@@ -1226,6 +1240,7 @@ export function reconcileReviewQueue(
         WHERE b.${beads.columns.type} = 'merge_request'
           AND b.${beads.columns.status} = 'open'
           AND b.${beads.columns.rig_id} IS NOT NULL
+          ${convoyOnlyFilter}
       `,
           []
         ),
@@ -1276,7 +1291,7 @@ export function reconcileReviewQueue(
         ),
       ]);
 
-      // Get oldest open MR for this rig
+      // Get oldest open MR for this rig (filtered by convoy when code_review=false)
       const oldestMr = z
         .object({ bead_id: z.string() })
         .array()
@@ -1285,11 +1300,12 @@ export function reconcileReviewQueue(
             sql,
             /* sql */ `
           SELECT ${beads.bead_id}
-          FROM ${beads}
-          WHERE ${beads.type} = 'merge_request'
-            AND ${beads.status} = 'open'
-            AND ${beads.rig_id} = ?
-          ORDER BY ${beads.columns.created_at} ASC
+          FROM ${beads} b
+          WHERE b.${beads.columns.type} = 'merge_request'
+            AND b.${beads.columns.status} = 'open'
+            AND b.${beads.columns.rig_id} = ?
+            ${convoyOnlyFilter}
+          ORDER BY b.${beads.columns.created_at} ASC
           LIMIT 1
         `,
             [rig_id]

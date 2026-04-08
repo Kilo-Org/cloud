@@ -1246,16 +1246,44 @@ export async function updateAgentModel(
     const { client, port } = await ensureSDKServer(agent.workdir, hotSwapEnv);
     agent.serverPort = port;
 
-    // 5. Create a new session and send the startup prompt.
-    //    The system prompt lives in AGENTS.md (on disk), so kilo serve picks
-    //    it up automatically for every session.
-    const sessionResult = await client.session.create({ body: {} });
-    const rawSession: unknown = sessionResult.data ?? sessionResult;
-    const parsed = SessionResponse.safeParse(rawSession);
-    if (!parsed.success) {
-      throw new Error('SDK session.create response missing required "id" field');
+    // 5. Resume the existing session or create a new one.
+    //    The kilo.db on disk still has the prior session data, and the new
+    //    kilo serve process reads it. For the mayor, resume so model swaps
+    //    don't lose conversation history.
+    let newSessionId: string;
+    if (agent.role === 'mayor') {
+      const existing = await client.session.list();
+      const sessions = (existing.data ?? []) as Array<{
+        id: string;
+        time?: { updated?: number };
+      }>;
+      if (sessions.length > 0) {
+        const sorted = [...sessions].sort(
+          (a, b) => (b.time?.updated ?? 0) - (a.time?.updated ?? 0)
+        );
+        newSessionId = sorted[0].id;
+        console.log(
+          `${MANAGER_LOG} updateAgentModel: resuming existing session ${newSessionId}`
+        );
+      } else {
+        const sessionResult = await client.session.create({ body: {} });
+        const rawSession: unknown = sessionResult.data ?? sessionResult;
+        const parsed = SessionResponse.safeParse(rawSession);
+        if (!parsed.success) {
+          throw new Error('SDK session.create response missing required "id" field');
+        }
+        newSessionId = parsed.data.id;
+      }
+    } else {
+      const sessionResult = await client.session.create({ body: {} });
+      const rawSession: unknown = sessionResult.data ?? sessionResult;
+      const parsed = SessionResponse.safeParse(rawSession);
+      if (!parsed.success) {
+        throw new Error('SDK session.create response missing required "id" field');
+      }
+      newSessionId = parsed.data.id;
     }
-    agent.sessionId = parsed.data.id;
+    agent.sessionId = newSessionId;
 
     const newInstance = sdkInstances.get(agent.workdir);
     if (newInstance) {

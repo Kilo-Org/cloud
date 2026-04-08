@@ -4219,16 +4219,20 @@ export class TownDO extends DurableObject<Env> {
   }
 
   /**
-   * Switch to active alarm cadence immediately. Unlike armAlarmIfNeeded(),
-   * this unconditionally reschedules the next alarm to fire in 5s — even
-   * if an idle alarm is already set minutes in the future. Call this when
-   * new work is created (beads, convoys) so the reconciler picks it up
-   * promptly instead of waiting for the idle alarm to fire.
+   * Switch to active alarm cadence if the current alarm is too far out.
+   * Only shortens the alarm — never pushes it back. This avoids starving
+   * the reconciler during bursts of work creation (each call would
+   * otherwise reset the 5s countdown).
    */
   private async escalateToActiveCadence(): Promise<void> {
     const storedId = await this.ctx.storage.get<string>('town:id');
     if (!storedId) return;
-    await this.ctx.storage.setAlarm(Date.now() + ACTIVE_ALARM_INTERVAL_MS);
+
+    const target = Date.now() + ACTIVE_ALARM_INTERVAL_MS;
+    const current = await this.ctx.storage.getAlarm();
+    if (!current || current > target) {
+      await this.ctx.storage.setAlarm(target);
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════

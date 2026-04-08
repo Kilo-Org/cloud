@@ -40,7 +40,7 @@ export async function GET(): Promise<
 }
 
 const BATCH_SIZE = 1000;
-const BATCHES_PER_REQUEST = 10;
+const BATCHES_PER_REQUEST = 50;
 
 export async function POST(): Promise<NextResponse<BackfillBatchResponse | { error: string }>> {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });

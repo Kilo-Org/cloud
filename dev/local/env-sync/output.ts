@@ -147,8 +147,9 @@ function displayPlan(plan: EnvSyncPlan): void {
   if (plan.execWarnings.length > 0) {
     if (hasOutput) console.log();
     for (const warning of plan.execWarnings) {
+      const cmd = [warning.command, ...warning.args].join(' ');
       console.log(
-        `${YELLOW}⚠ ${warning.workerDir}${RESET}: ${RED}${warning.key}${RESET} — \`${warning.commandLine}\` failed`
+        `${YELLOW}⚠ ${warning.workerDir}${RESET}: ${RED}${warning.key}${RESET} — \`${cmd}\` failed`
       );
       console.log(`    Run the command manually to diagnose.`);
     }

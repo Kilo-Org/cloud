@@ -240,7 +240,8 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
           execWarnings.push({
             workerDir,
             key: entry.key,
-            commandLine: entry.annotation.commandLine,
+            command: entry.annotation.command,
+            args: entry.annotation.args,
           });
         }
       }

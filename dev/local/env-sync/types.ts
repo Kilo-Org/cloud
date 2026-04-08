@@ -49,7 +49,8 @@ type SecretStoreAutoCreate = {
 type ExecWarning = {
   workerDir: string;
   key: string;
-  commandLine: string;
+  command: string;
+  args: string[];
 };
 type EnvSyncPlan = {
   lanIp: string | undefined;
@@ -71,7 +72,7 @@ type Annotation =
   | { type: 'from'; envLocalKey: string }
   | { type: 'url'; services: { name: string; path?: string }[] }
   | { type: 'pkcs8' }
-  | { type: 'exec'; commandLine: string };
+  | { type: 'exec'; command: string; args: string[] };
 
 type ExampleEntry = {
   key: string;

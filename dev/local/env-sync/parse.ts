@@ -115,9 +115,9 @@ function parseAnnotation(directive: string, args: string): Annotation | undefine
     case 'pkcs8':
       return { type: 'pkcs8' };
     case 'exec': {
-      const commandLine = args.trim();
-      if (!commandLine) return undefined;
-      return { type: 'exec', commandLine };
+      const parts = args.trim().split(/\s+/);
+      if (parts.length === 0 || !parts[0]) return undefined;
+      return { type: 'exec', command: parts[0], args: parts.slice(1) };
     }
     default:
       return undefined;
@@ -256,10 +256,9 @@ function resolveAnnotatedValue(
     }
 
     case 'exec': {
-      const result = spawnSync(entry.annotation.commandLine, {
+      const result = spawnSync(entry.annotation.command, entry.annotation.args, {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
-        shell: true,
         timeout: 5000,
       });
       if (result.status === 0 && result.stdout.trim()) {

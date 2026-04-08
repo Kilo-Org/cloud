@@ -15,19 +15,19 @@ import type { KiloClawComparisonEntry } from './schemas';
 export const KILOCLAW_COMPARISON: KiloClawComparisonEntry[] = [
   {
     area: 'config_permissions',
-    summary: 'Config files are restricted to owner-only access (mode 600)',
+    summary: 'Config files are restricted to owner only access',
     detail:
-      'KiloClaw VMs are provisioned with strict file permissions. The OpenClaw config file ' +
-      'and all credential material are owned by a dedicated service user with mode 600. ' +
-      'No other process on the VM can read secrets from the config.',
+      'KiloClaw instances are provisioned with strict file permissions. The OpenClaw config file ' +
+      'and all credential material are owned by a dedicated service user. ' +
+      'No other process on the instance can read secrets from the config.',
     matchCheckIds: ['fs.config.perms_world_readable', 'fs.config.perms_group_readable'],
   },
   {
     area: 'authentication',
     summary: 'JWT + pepper auth on every request with automatic rotation',
     detail:
-      'KiloClaw enforces JWT-based authentication on every API request. Tokens are scoped ' +
-      'per-user, short-lived for session use, and long-lived tokens (device auth) are peppered ' +
+      'KiloClaw enforces JWT based authentication on every API request. Tokens are scoped ' +
+      'per user, short lived for session use, and long lived tokens (device auth) are peppered ' +
       'and stored encrypted. Token validation happens at the gateway layer before any request ' +
       'reaches the OpenClaw process.',
     matchCheckIds: [
@@ -42,7 +42,7 @@ export const KILOCLAW_COMPARISON: KiloClawComparisonEntry[] = [
     summary: 'Gateway bound to localhost; external access via authenticated reverse proxy only',
     detail:
       'KiloClaw instances run behind an authenticated reverse proxy. The OpenClaw gateway ' +
-      'binds to 127.0.0.1 and is never directly exposed to the internet. All external traffic ' +
+      'is never directly exposed to the internet. All external traffic ' +
       'is routed through the platform load balancer with TLS termination, rate limiting, and ' +
       'DDoS protection.',
     matchCheckIds: [
@@ -58,7 +58,7 @@ export const KILOCLAW_COMPARISON: KiloClawComparisonEntry[] = [
     detail:
       'API keys and credentials on KiloClaw are injected as encrypted environment variables ' +
       'at boot time, sourced from a secrets manager. They are never written to the config file ' +
-      'or any on-disk location. The OpenClaw process reads them from memory only.',
+      'or any on disk location. The OpenClaw process reads them from memory only.',
     matchCheckIds: [
       'secrets.plaintext_in_config',
       'secrets.api_key_exposed',
@@ -67,20 +67,17 @@ export const KILOCLAW_COMPARISON: KiloClawComparisonEntry[] = [
   },
   {
     area: 'network_allowlist',
-    summary: 'Strict IP allow-listing with default-deny firewall rules',
+    summary: 'Strict IP allow listing with default deny firewall rules',
     detail:
-      'KiloClaw VMs use a default-deny firewall. Only explicitly allowed IP ranges can reach ' +
-      'the gateway. The allow list is managed per-organization through the KiloClaw dashboard ' +
+      'KiloClaw instances use a default deny firewall. Only explicitly allowed IP ranges can reach ' +
+      'the gateway. The allow list is managed per organization through the KiloClaw dashboard ' +
       'and enforced at the network layer, not just the application layer.',
     matchCheckIds: ['net.no_allowlist', 'net.allowlist_too_broad', 'net.open_to_all'],
   },
   {
     area: 'update_policy',
-    summary: 'Automatic security patches with zero-downtime rolling updates',
-    detail:
-      'KiloClaw instances receive automatic security patches within 24 hours of release. ' +
-      'Updates are applied via rolling deployment with health checks — no user intervention ' +
-      'required, no downtime. Critical CVEs trigger immediate patching outside the normal cycle.',
+    summary: 'Security patches released quickly with proactive update alerts',
+    detail: 'KiloClaw instances receive automatic security patches.',
     matchCheckIds: [
       'version.outdated',
       'version.unsupported',
@@ -90,27 +87,11 @@ export const KILOCLAW_COMPARISON: KiloClawComparisonEntry[] = [
   },
   {
     area: 'audit_logging',
-    summary: 'Full request audit trail with 90-day retention',
+    summary: 'Full request audit trail with 90 day retention',
     detail:
       'Every API request to a KiloClaw instance is logged with timestamp, user ID, action, ' +
-      'and result. Logs are shipped to centralized storage with 90-day retention and are ' +
-      'available in the KiloClaw dashboard for review. Anomalous patterns trigger alerts.',
+      'and result.',
     matchCheckIds: ['audit.no_logging', 'audit.logs_world_readable', 'audit.no_retention'],
-  },
-  {
-    area: 'mcp_security',
-    summary: 'MCP servers vetted and sandboxed with network isolation',
-    detail:
-      'MCP servers on KiloClaw run in isolated containers with restricted network access. ' +
-      'Each server is vetted before inclusion in the marketplace. Servers cannot access the ' +
-      'host filesystem, other containers, or the OpenClaw config. Communication is limited ' +
-      'to the stdio transport with the parent OpenClaw process.',
-    matchCheckIds: [
-      'mcp.unvetted_server',
-      'mcp.server_network_access',
-      'mcp.server_fs_access',
-      'mcp.no_sandbox',
-    ],
   },
 ];
 

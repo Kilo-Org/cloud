@@ -6,7 +6,7 @@ describe('findComparisonForCheckId', () => {
     const result = findComparisonForCheckId('fs.config.perms_world_readable');
     expect(result).not.toBeNull();
     expect(result!.area).toBe('config_permissions');
-    expect(result!.summary).toContain('mode 600');
+    expect(result!.summary).toContain('owner only access');
   });
 
   it('returns the gateway exposure entry for net.gateway_exposed', () => {

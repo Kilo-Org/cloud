@@ -54,14 +54,14 @@ const KNOWN_CHECK_TEMPLATES: Record<string, CheckIdTemplate> = {
       'Anyone who can reach the gateway can use it without credentials.',
     risk:
       'Unauthorized users can execute commands, access conversations, and consume API credits. ' +
-      'This is the highest-risk configuration for an internet-exposed instance.',
+      'This is the highest risk configuration for an internet exposed instance.',
   },
   'net.gateway_exposed': {
     severity: 'warn',
     explanation:
-      'The OpenClaw gateway is bound to a non-localhost address, making it reachable from the network.',
+      'The OpenClaw gateway is bound to a non localhost address, making it reachable from the network.',
     risk:
-      'Network-adjacent attackers can connect directly to the gateway. ' +
+      'Network adjacent attackers can connect directly to the gateway. ' +
       'Combined with weak or no authentication, this enables unauthorized access.',
   },
   'net.gateway_open_to_world': {
@@ -70,7 +70,7 @@ const KNOWN_CHECK_TEMPLATES: Record<string, CheckIdTemplate> = {
       'The OpenClaw gateway is bound to 0.0.0.0, accepting connections from any IP address.',
     risk:
       'The instance is accessible from the entire internet. Without proper authentication and ' +
-      'allow-listing, this exposes the instance to brute force attacks, credential stuffing, and abuse.',
+      'allow listing, this exposes the instance to brute force attacks, credential stuffing, and abuse.',
   },
   'net.no_tls': {
     severity: 'warn',
@@ -84,7 +84,7 @@ const KNOWN_CHECK_TEMPLATES: Record<string, CheckIdTemplate> = {
     explanation:
       'No IP allow list is configured. The gateway accepts connections from any source IP.',
     risk:
-      'There is no network-layer restriction on who can attempt to connect. ' +
+      'There is no network layer restriction on who can attempt to connect. ' +
       'Authentication is the only barrier to unauthorized access.',
   },
   'secrets.plaintext_in_config': {
@@ -167,7 +167,9 @@ function mapFinding(finding: AuditFinding, isKiloClaw: boolean): ReportFinding {
     severity,
     title: finding.title,
     explanation: template?.explanation ?? finding.detail,
-    risk: template?.risk ?? `This finding has severity level: ${severity}.`,
+    risk:
+      template?.risk ??
+      `Your OpenClaw instance reports this finding and should be reviewed: ${finding.detail}`,
     fix: finding.remediation,
     kiloClawComparison: formatComparison(comparison, isKiloClaw),
   };
@@ -184,7 +186,7 @@ function formatComparison(
     return (
       `**KiloClaw default:** ${comparison.summary}. ` +
       `Your instance has diverged from this default configuration. ` +
-      `This may indicate a manual change or misconfiguration that should be reverted.`
+      `This may indicate a manual change or misconfiguration that should be reviewed.`
     );
   }
 

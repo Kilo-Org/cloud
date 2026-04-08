@@ -2,6 +2,12 @@ import { describe, expect, it, vi, type Mock } from 'vitest';
 import { controller } from './controller';
 import { deriveGatewayToken } from '../auth/gateway-token';
 
+type AnalyticsEngineDataPoint = {
+  blobs: string[];
+  doubles: number[];
+  indexes: string[];
+};
+
 vi.mock('cloudflare:workers', () => ({
   waitUntil: (p: Promise<unknown>) => p,
 }));
@@ -30,7 +36,7 @@ const sandboxId = 'dXNlci0x';
 function makeEnv(options?: {
   gatewayTokenSecret?: string;
   kilocodeApiKey?: string;
-  writeDataPoint?: (payload: unknown) => void;
+  writeDataPoint?: (payload: AnalyticsEngineDataPoint) => void;
   posthogKey?: string;
   hyperdriveConnectionString?: string;
   workerEnv?: string;
@@ -113,6 +119,17 @@ async function makeAuthHeaders(targetSandboxId = sandboxId) {
   };
 }
 
+function analyticsEvents(writeDataPoint: Mock): AnalyticsEngineDataPoint[] {
+  const calls = writeDataPoint.mock.calls as [AnalyticsEngineDataPoint][];
+  return calls.map(([call]) => call);
+}
+
+function firstAnalyticsEvent(writeDataPoint: Mock): AnalyticsEngineDataPoint {
+  const [call] = analyticsEvents(writeDataPoint);
+  expect(call).toBeDefined();
+  return call;
+}
+
 describe('POST /checkin', () => {
   it('returns 401 when required auth headers are missing', async () => {
     const response = await controller.request(
@@ -147,7 +164,7 @@ describe('POST /checkin', () => {
   });
 
   it('returns 204 and writes AE datapoint when both tokens are valid', async () => {
-    const writeDataPoint = vi.fn();
+    const writeDataPoint = vi.fn<(payload: AnalyticsEngineDataPoint) => void>();
     const env = makeEnv({ writeDataPoint });
     const headers = await makeAuthHeaders();
 
@@ -160,14 +177,14 @@ describe('POST /checkin', () => {
     expect(response.status).toBe(204);
     expect(writeDataPoint).toHaveBeenCalledTimes(1);
 
-    const call = writeDataPoint.mock.calls[0][0];
+    const call = firstAnalyticsEvent(writeDataPoint);
     expect(call.doubles).toHaveLength(8);
     expect(call.doubles[6]).toBe(-1);
     expect(call.doubles[7]).toBe(-1);
   });
 
   it('writes disk usage doubles when disk stats are present', async () => {
-    const writeDataPoint = vi.fn();
+    const writeDataPoint = vi.fn<(payload: AnalyticsEngineDataPoint) => void>();
     const env = makeEnv({ writeDataPoint });
     const headers = await makeAuthHeaders();
 
@@ -184,14 +201,16 @@ describe('POST /checkin', () => {
     expect(response.status).toBe(204);
     expect(writeDataPoint).toHaveBeenCalledTimes(1);
 
-    const call = writeDataPoint.mock.calls[0][0];
+    const call = firstAnalyticsEvent(writeDataPoint);
     expect(call.doubles).toHaveLength(8);
     expect(call.doubles[6]).toBe(1024000);
     expect(call.doubles[7]).toBe(5368709120);
   });
 
   it('still returns 204 when AE write throws', async () => {
-    const writeDataPoint = vi.fn().mockRejectedValue(new Error('AE error'));
+    const writeDataPoint = vi
+      .fn<(payload: AnalyticsEngineDataPoint) => Promise<void>>()
+      .mockRejectedValue(new Error('AE error'));
     const env = makeEnv({ writeDataPoint });
     const headers = await makeAuthHeaders();
 

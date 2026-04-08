@@ -160,6 +160,7 @@ export type UsageMetaData = {
   mode: string | null;
   auto_model: string | null;
   market_cost: number | null;
+  is_free: boolean | null;
 };
 
 export type OpenRouterError = {

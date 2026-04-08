@@ -3,7 +3,7 @@ import {
   kilocode_users,
   credit_transactions,
   microdollar_usage,
-  exa_monthly_usage,
+  exa_usage_log,
 } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { recomputeUserBalances, computeUserBalanceUpdates } from './recomputeUserBalances';
@@ -16,7 +16,7 @@ describe('recomputeUserBalances', () => {
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(microdollar_usage);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
-    await db.delete(exa_monthly_usage);
+    await db.delete(exa_usage_log);
     jest.clearAllMocks();
   });
 
@@ -240,7 +240,6 @@ describe('recomputeUserBalances', () => {
           original_transaction_id: null,
         },
       ],
-      exaChargedTotal: 0,
     });
 
     expect(result.updatesForOriginalBaseline).toHaveLength(0);
@@ -273,7 +272,6 @@ describe('recomputeUserBalances', () => {
           original_transaction_id: null,
         },
       ],
-      exaChargedTotal: 0,
     });
 
     expect(result.updatesForOriginalBaseline).toHaveLength(1);
@@ -306,7 +304,6 @@ describe('recomputeUserBalances', () => {
           original_transaction_id: null,
         },
       ],
-      exaChargedTotal: 0,
     });
 
     expect(result.updatesForOriginalBaseline).toHaveLength(0);
@@ -344,7 +341,6 @@ describe('recomputeUserBalances', () => {
         microdollars_used: 500,
         total_microdollars_acquired: 750, // 500+300+200+150 - 100 - 300 = 750
       },
-      exaChargedTotal: 0,
       usageRecords: [
         { cost: 100, created_at: T0 },
         { cost: 400, created_at: T2 },
@@ -460,14 +456,21 @@ describe('recomputeUserBalances', () => {
       created_at: oldDate,
     });
 
-    // Exa charged usage: $3 personal (no org)
-    await db.insert(exa_monthly_usage).values({
-      kilo_user_id: user.id,
-      month: '2026-03-01',
-      total_cost_microdollars: 13_000_000,
-      total_charged_microdollars: 3_000_000,
-      request_count: 5,
-    });
+    // Exa charged usage: $3 personal (no org), two requests
+    await db.insert(exa_usage_log).values([
+      {
+        kilo_user_id: user.id,
+        path: '/search',
+        cost_microdollars: 2_000_000,
+        charged_to_balance: true,
+      },
+      {
+        kilo_user_id: user.id,
+        path: '/search',
+        cost_microdollars: 1_000_000,
+        charged_to_balance: true,
+      },
+    ]);
 
     // Set user to match the combined usage ($2 LLM + $3 Exa = $5)
     await db
@@ -502,13 +505,12 @@ describe('recomputeUserBalances', () => {
     });
 
     // Exa charged usage: $5 in an org context (should be excluded from personal recompute)
-    await db.insert(exa_monthly_usage).values({
+    await db.insert(exa_usage_log).values({
       kilo_user_id: user.id,
       organization_id: orgId,
-      month: '2026-03-01',
-      total_cost_microdollars: 15_000_000,
-      total_charged_microdollars: 5_000_000,
-      request_count: 10,
+      path: '/search',
+      cost_microdollars: 5_000_000,
+      charged_to_balance: true,
     });
 
     await db
@@ -529,7 +531,7 @@ describe('recomputeUserBalances', () => {
     expect(updatedUser!.microdollars_used).toBe(0);
   });
 
-  test('pure: should include exaChargedTotal in microdollars_used', () => {
+  test('pure: should include Exa charged usage in microdollars_used', () => {
     const result = computeUserBalanceUpdates({
       user: {
         id: 'test-user',
@@ -537,7 +539,10 @@ describe('recomputeUserBalances', () => {
         microdollars_used: 5_000_000,
         total_microdollars_acquired: 100_000_000,
       },
-      usageRecords: [{ cost: 2_000_000, created_at: '2024-01-01T00:00:00Z' }],
+      usageRecords: [
+        { cost: 2_000_000, created_at: '2024-01-01T00:00:00Z' }, // LLM
+        { cost: 3_000_000, created_at: '2024-01-02T00:00:00Z' }, // Exa (already merged)
+      ],
       creditTransactions: [
         {
           id: 'tx-1',
@@ -551,7 +556,6 @@ describe('recomputeUserBalances', () => {
           original_transaction_id: null,
         },
       ],
-      exaChargedTotal: 3_000_000,
     });
 
     // microdollars_used should be LLM ($2) + Exa ($3) = $5

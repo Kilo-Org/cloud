@@ -9,7 +9,6 @@ import {
 import { ABUSE_CLASSIFICATION } from '@kilocode/db/schema-types';
 import { eq, sql } from 'drizzle-orm';
 import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
-import { captureException } from '@sentry/nextjs';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
 
 export type ExaMonthlyUsageResult = {
@@ -93,20 +92,15 @@ export async function recordExaUsage(params: {
     freeAllowanceMicrodollars,
   });
 
-  // 2. Append to the audit log (fire-and-forget — failure shouldn't block billing)
-  try {
-    await db.insert(exa_usage_log).values({
-      kilo_user_id: userId,
-      organization_id: organizationId ?? null,
-      path,
-      cost_microdollars: costMicrodollars,
-      charged_to_balance: chargedToBalance,
-    });
-  } catch (error) {
-    // Log table insert failure is non-fatal (partition might not exist yet)
-    console.error('[exa] failed to insert usage log', error);
-    captureException(error, { tags: { source: 'recordExaUsage-log' } });
-  }
+  // 2. Append to the usage log. This is the source of truth for balance
+  // recomputation, so we let insert errors propagate rather than swallowing them.
+  await db.insert(exa_usage_log).values({
+    kilo_user_id: userId,
+    organization_id: organizationId ?? null,
+    path,
+    cost_microdollars: costMicrodollars,
+    charged_to_balance: chargedToBalance,
+  });
 
   // 3. If over the free tier, deduct from the Kilo credit balance
   if (chargedToBalance && costMicrodollars > 0) {

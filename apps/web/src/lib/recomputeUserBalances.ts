@@ -9,10 +9,10 @@ import {
   kilocode_users,
   credit_transactions,
   microdollar_usage,
-  exa_monthly_usage,
+  exa_usage_log,
   type User,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, gt, asc, sql } from 'drizzle-orm';
+import { eq, and, isNull, gt, asc } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@/lib/maybe-result';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
 import { computeExpiration } from '@/lib/creditExpiration';
@@ -31,7 +31,7 @@ export type MigrationResult = Result<UserBalanceUpdates, string>;
  * 6. Updates the user record and transaction baselines (unless dryRun is true).
  *
  * Postconditions:
- * - microdollars_used = sum(microdollar_usage) + sum(exa_monthly_usage.total_charged, personal)
+ * - microdollars_used = sum(microdollar_usage) + sum(exa_usage_log where charged_to_balance, personal)
  * - total_microdollars_acquired = sum(credit_transactions) [including any new adjustment]
  * - All expiring credit transactions have expiration_baseline_microdollars_used set
  */
@@ -73,7 +73,7 @@ async function fetchUserBalanceData(userId: string) {
 
   if (!user) return null;
 
-  const usageRecords = await db
+  const llmUsage = await db
     .select({
       cost: microdollar_usage.cost,
       created_at: microdollar_usage.created_at,
@@ -87,6 +87,26 @@ async function fetchUserBalanceData(userId: string) {
       )
     )
     .orderBy(asc(microdollar_usage.created_at));
+
+  // Per-request Exa charges (personal only). Using the log instead of the
+  // monthly aggregate so each charge is interleaved chronologically with LLM
+  // usage — required for correct credit-expiration baselines.
+  const exaUsage = await db
+    .select({
+      cost: exa_usage_log.cost_microdollars,
+      created_at: exa_usage_log.created_at,
+    })
+    .from(exa_usage_log)
+    .where(
+      and(
+        eq(exa_usage_log.kilo_user_id, userId),
+        eq(exa_usage_log.charged_to_balance, true),
+        isNull(exa_usage_log.organization_id)
+      )
+    )
+    .orderBy(asc(exa_usage_log.created_at));
+
+  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage);
 
   const creditTransactions = await db
     .select({
@@ -107,27 +127,17 @@ async function fetchUserBalanceData(userId: string) {
     )
     .orderBy(asc(credit_transactions.created_at));
 
-  // Total Exa charged usage (personal only, excludes org-scoped charges).
-  // exa_monthly_usage is pre-aggregated per month so we sum across all months.
-  const [exaRow] = await db
-    .select({
-      total: sql<number>`coalesce(sum(${exa_monthly_usage.total_charged_microdollars}), 0)`,
-    })
-    .from(exa_monthly_usage)
-    .where(
-      and(eq(exa_monthly_usage.kilo_user_id, userId), isNull(exa_monthly_usage.organization_id))
-    );
-  const exaChargedTotal = Number(exaRow?.total ?? 0);
-
-  return { user, usageRecords, creditTransactions, exaChargedTotal };
+  return { user, usageRecords, creditTransactions };
 }
 
 export function computeUserBalanceUpdates(
   data: NonNullable<Awaited<ReturnType<typeof fetchUserBalanceData>>>
 ) {
-  const { user, usageRecords, creditTransactions, exaChargedTotal } = data;
+  const { user, usageRecords, creditTransactions } = data;
 
-  // Compute total usage AND original baselines in a single pass
+  // Compute total usage AND original baselines in a single pass.
+  // usageRecords contains both LLM and Exa charged records, merge-sorted
+  // by created_at, so baselines are computed at the correct points in time.
   const computedOriginalBaselines = new Map<string, number>();
   let usageIdx = 0;
   let cumulativeUsage = 0;
@@ -144,9 +154,6 @@ export function computeUserBalanceUpdates(
     cumulativeUsage += usageRecords[usageIdx].cost;
     usageIdx++;
   }
-
-  // Include Exa charged usage (pre-aggregated monthly, no per-request timestamps)
-  cumulativeUsage += exaChargedTotal;
 
   // Use computeExpiration to determine correct expiration baselines.
   // Start with original baselines, then merge in shifts from computeExpiration.
@@ -275,4 +282,23 @@ async function applyUserBalanceUpdates(updates: UserBalanceUpdates): Promise<boo
 
     return true;
   });
+}
+
+type UsageRecord = { cost: number; created_at: string };
+
+/** Merge two arrays that are each already sorted by `created_at`. */
+export function mergeSortedByCreatedAt(a: UsageRecord[], b: UsageRecord[]): UsageRecord[] {
+  const result: UsageRecord[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i].created_at <= b[j].created_at) {
+      result.push(a[i++]);
+    } else {
+      result.push(b[j++]);
+    }
+  }
+  while (i < a.length) result.push(a[i++]);
+  while (j < b.length) result.push(b[j++]);
+  return result;
 }

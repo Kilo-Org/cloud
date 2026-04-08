@@ -2,7 +2,7 @@ import {
   credit_transactions as creditTransactionsTable,
   organizations,
   microdollar_usage,
-  exa_monthly_usage,
+  exa_usage_log,
 } from '@kilocode/db/schema';
 import { recomputeOrganizationBalances } from './recomputeOrganizationBalances';
 import { db } from '@/lib/drizzle';
@@ -39,7 +39,7 @@ describe('recomputeOrganizationBalances', () => {
         .delete(creditTransactionsTable)
         .where(eq(creditTransactionsTable.organization_id, orgId));
       await db.delete(microdollar_usage).where(eq(microdollar_usage.organization_id, orgId));
-      await db.delete(exa_monthly_usage).where(eq(exa_monthly_usage.organization_id, orgId));
+      await db.delete(exa_usage_log).where(eq(exa_usage_log.organization_id, orgId));
       await db.delete(organizations).where(eq(organizations.id, orgId));
     }
   });
@@ -338,15 +338,23 @@ describe('recomputeOrganizationBalances', () => {
       created_at: '2024-02-01T00:00:00Z',
     });
 
-    // Exa charged usage: $3 for this org
-    await db.insert(exa_monthly_usage).values({
-      kilo_user_id: ownerId,
-      organization_id: orgId,
-      month: '2024-02-01',
-      total_cost_microdollars: 13_000_000,
-      total_charged_microdollars: 3_000_000,
-      request_count: 5,
-    });
+    // Exa charged usage: $3 for this org, two requests
+    await db.insert(exa_usage_log).values([
+      {
+        kilo_user_id: ownerId,
+        organization_id: orgId,
+        path: '/search',
+        cost_microdollars: 2_000_000,
+        charged_to_balance: true,
+      },
+      {
+        kilo_user_id: ownerId,
+        organization_id: orgId,
+        path: '/search',
+        cost_microdollars: 1_000_000,
+        charged_to_balance: true,
+      },
+    ]);
 
     const result = await recomputeOrganizationBalances({ organizationId: orgId });
     expect(result.success).toBe(true);

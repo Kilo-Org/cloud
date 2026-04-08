@@ -122,7 +122,9 @@ function RootLayoutNav() {
   ]);
 
   const trpc = useTRPC();
-  const registerPushToken = useMutation(trpc.kiloclaw.registerPushToken.mutationOptions({}));
+  const { mutate: registerPushToken } = useMutation(
+    trpc.kiloclaw.registerPushToken.mutationOptions({})
+  );
 
   useEffect(() => {
     if (!token) {
@@ -145,11 +147,11 @@ function RootLayoutNav() {
 
       const pushToken = await registerForPushNotifications();
       if (pushToken) {
-        registerPushToken.mutate({ token: pushToken, platform: getPlatform() });
+        registerPushToken({ token: pushToken, platform: getPlatform() });
       }
     }
     void reregisterToken();
-  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps -- only run on auth token change
+  }, [token, trpc, registerPushToken]);
 
   const needsForceUpdate = updateRequired && !inForceUpdate;
   const showingForceUpdate = updateRequired && inForceUpdate;

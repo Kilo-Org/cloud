@@ -2,17 +2,19 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { kiloclaw_admin_audit_logs } from '@kilocode/db/schema';
+import { kiloclaw_admin_audit_logs, kiloclaw_cli_runs, kiloclaw_instances } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mockGetDebugStatus: jest.Mock<any, any> = jest.fn();
 const mockDestroyFlyMachine: jest.Mock<any, any> = jest.fn();
+const mockGetKiloCliRunStatus: jest.Mock<any, any> = jest.fn();
 
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
   KiloClawInternalClient: jest.fn().mockImplementation(() => ({
     getDebugStatus: mockGetDebugStatus,
     destroyFlyMachine: mockDestroyFlyMachine,
+    getKiloCliRunStatus: mockGetKiloCliRunStatus,
   })),
   KiloClawApiError: class KiloClawApiError extends Error {
     statusCode: number;
@@ -28,6 +30,9 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
 
 let regularUser: User;
 let adminUser: User;
+let cliRunUser: User;
+let cliRunInstanceId: string;
+let cliRunId: string;
 
 const testAppName = 'acct-abc123def456';
 const testMachineId = 'd8901e123456';
@@ -42,15 +47,56 @@ beforeAll(async () => {
     google_user_email: 'admin-destroy-machine@admin.example.com',
     is_admin: true,
   });
+
+  cliRunUser = await insertTestUser({
+    google_user_email: 'admin-cli-run-target@example.com',
+    is_admin: false,
+  });
+
+  const [instance] = await db
+    .insert(kiloclaw_instances)
+    .values({
+      id: crypto.randomUUID(),
+      user_id: cliRunUser.id,
+      sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+    })
+    .returning({ id: kiloclaw_instances.id });
+
+  cliRunInstanceId = instance.id;
+
+  const [run] = await db
+    .insert(kiloclaw_cli_runs)
+    .values({
+      user_id: cliRunUser.id,
+      instance_id: cliRunInstanceId,
+      prompt: 'older admin-target run',
+      status: 'running',
+      started_at: '2026-04-08T12:00:00.000Z',
+      initiated_by: 'admin',
+    })
+    .returning({ id: kiloclaw_cli_runs.id });
+
+  cliRunId = run.id;
 });
 
 beforeEach(async () => {
   mockGetDebugStatus.mockReset();
   mockDestroyFlyMachine.mockReset();
+  mockGetKiloCliRunStatus.mockReset();
   // Clean audit logs between tests so counts are accurate
   await db
     .delete(kiloclaw_admin_audit_logs)
     .where(eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id));
+
+  await db
+    .update(kiloclaw_cli_runs)
+    .set({
+      status: 'running',
+      exit_code: null,
+      output: null,
+      completed_at: null,
+    })
+    .where(eq(kiloclaw_cli_runs.id, cliRunId));
 });
 
 /* eslint-disable drizzle/enforce-delete-with-where */
@@ -59,6 +105,8 @@ afterAll(async () => {
     await db
       .delete(kiloclaw_admin_audit_logs)
       .where(eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id));
+    await db.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.id, cliRunId));
+    await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, cliRunInstanceId));
   } catch {
     // Test DB may already be torn down
   }
@@ -242,5 +290,38 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
     ).rejects.toThrow('Invalid Fly machine ID');
 
     expect(mockGetDebugStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('admin.kiloclawInstances.getKiloCliRunStatus', () => {
+  it('does not overwrite a stored run when controller status belongs to a newer run', async () => {
+    mockGetKiloCliRunStatus.mockResolvedValue({
+      hasRun: true,
+      status: 'completed',
+      output: 'newer admin run output',
+      exitCode: 0,
+      startedAt: '2026-04-08T12:05:00Z',
+      completedAt: '2026-04-08T12:06:00Z',
+      prompt: 'newer admin run',
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.getKiloCliRunStatus({
+      userId: cliRunUser.id,
+      instanceId: cliRunInstanceId,
+      runId: cliRunId,
+    });
+
+    expect(result.status).toBe('completed');
+    expect(result.output).toBe('newer admin run output');
+
+    const [row] = await db
+      .select()
+      .from(kiloclaw_cli_runs)
+      .where(eq(kiloclaw_cli_runs.id, cliRunId));
+
+    expect(row.status).toBe('running');
+    expect(row.output).toBeNull();
+    expect(row.completed_at).toBeNull();
   });
 });

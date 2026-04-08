@@ -2,6 +2,7 @@ import { db } from '@/lib/drizzle';
 import { and, eq, type SQL } from 'drizzle-orm';
 import { kiloclaw_cli_runs } from '@kilocode/db/schema';
 import type { KiloClawCliRunInitiatedBy } from '@kilocode/db/schema';
+import type { KiloCliRunStatusResponse } from '@/lib/kiloclaw/types';
 
 export interface CreateCliRunParams {
   userId: string;
@@ -56,4 +57,22 @@ export async function markCliRunCancelled(params: CancelCliRunParams): Promise<v
       completed_at: new Date().toISOString(),
     })
     .where(and(...conditions));
+}
+
+export function shouldPersistCliRunControllerStatus(
+  row: { started_at: string | null },
+  controllerStatus: Pick<KiloCliRunStatusResponse, 'hasRun' | 'status' | 'startedAt'>
+): boolean {
+  if (!controllerStatus.hasRun || controllerStatus.status === 'running') {
+    return false;
+  }
+
+  const controllerStartedAtMs = controllerStatus.startedAt
+    ? Date.parse(controllerStatus.startedAt)
+    : Number.NaN;
+  const rowStartedAtMs = row.started_at ? Date.parse(row.started_at) : Number.NaN;
+
+  return Number.isFinite(controllerStartedAtMs) &&
+    Number.isFinite(rowStartedAtMs) &&
+    controllerStartedAtMs === rowStartedAtMs;
 }

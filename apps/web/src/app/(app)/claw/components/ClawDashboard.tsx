@@ -152,24 +152,19 @@ function ClawDashboardInner({
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const hasPairingStep = selectedChannelId === 'telegram' || selectedChannelId === 'discord';
 
-  // Fire a per-step viewed event whenever the active onboarding step changes.
-  // Distinct event names make PostHog Funnel charts trivial to build (no
-  // per-step property filters needed).
-  const STEP_VIEWED_EVENT: Record<typeof onboardingStep, string> = {
-    identity: 'claw_setup_identity_viewed',
-    permissions: 'claw_setup_permissions_viewed',
-    channels: 'claw_setup_channels_viewed',
-    provisioning: 'claw_setup_provisioning_viewed',
-    pairing: 'claw_setup_pairing_viewed',
-    done: 'claw_setup_done_viewed',
-  };
+  // Fire identity_viewed when the wizard first becomes active. Two entry
+  // points: initial mount with isNewSetup already true, and re-entry after a
+  // destroy + provision cycle. We avoid useEffect([onboardingStep, isNewSetup])
+  // because on re-entry that effect would fire with the stale step from the
+  // previous wizard run before the reset below can update onboardingStep.
+  const initialIsNewSetupRef = useRef(isNewSetup);
   useEffect(() => {
-    if (!isNewSetup) return;
-    posthog?.capture(STEP_VIEWED_EVENT[onboardingStep]);
-    // STEP_VIEWED_EVENT is a derived constant — only the meaningful state
-    // values that compose it need to be in the dep array.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onboardingStep, isNewSetup]);
+    if (initialIsNewSetupRef.current) {
+      posthog?.capture('claw_setup_identity_viewed');
+    }
+  // Intentionally mount-only. Re-entry is handled by the reset effect below.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Reset onboarding wizard to step 1 whenever we enter setup mode so that
   // a destroy → re-provision cycle always starts fresh.
@@ -181,6 +176,7 @@ function ClawDashboardInner({
       setBotIdentity(null);
       setChannelTokens(null);
       setSelectedChannelId(null);
+      posthog?.capture('claw_setup_identity_viewed');
     }
     prevIsNewSetup.current = isNewSetup;
   }, [isNewSetup]);
@@ -270,6 +266,7 @@ function ClawDashboardInner({
                 bot_nature: identity.botNature,
                 bot_emoji_is_custom: identity.botEmoji !== '🤖',
               });
+              posthog?.capture('claw_setup_permissions_viewed');
               setBotIdentity(identity);
               setOnboardingStep('permissions');
             }}
@@ -279,6 +276,7 @@ function ClawDashboardInner({
             instanceRunning={isRunning && gatewayStatus?.state === 'running'}
             onSelect={preset => {
               posthog?.capture('claw_setup_permissions_completed', { preset });
+              posthog?.capture('claw_setup_channels_viewed');
               setSelectedPreset(preset);
               setOnboardingStep('channels');
             }}
@@ -291,6 +289,7 @@ function ClawDashboardInner({
                 channel: channelId,
                 skipped: false,
               });
+              posthog?.capture('claw_setup_provisioning_viewed');
               setSelectedChannelId(channelId);
               setChannelTokens(tokens);
               setOnboardingStep('provisioning');
@@ -300,6 +299,7 @@ function ClawDashboardInner({
                 channel: null,
                 skipped: true,
               });
+              posthog?.capture('claw_setup_provisioning_viewed');
               setSelectedChannelId(null);
               setChannelTokens(null);
               setOnboardingStep('provisioning');
@@ -315,6 +315,7 @@ function ClawDashboardInner({
             totalSteps={hasPairingStep ? 6 : 5}
             onComplete={() => {
               posthog?.capture('claw_setup_provisioned');
+              posthog?.capture(hasPairingStep ? 'claw_setup_pairing_viewed' : 'claw_setup_done_viewed');
               setOnboardingStep(hasPairingStep ? 'pairing' : 'done');
             }}
           />
@@ -329,6 +330,7 @@ function ClawDashboardInner({
                 channel: selectedChannelId,
                 skipped: false,
               });
+              posthog?.capture('claw_setup_done_viewed');
               setOnboardingStep('done');
             }}
             onSkip={() => {
@@ -336,6 +338,7 @@ function ClawDashboardInner({
                 channel: selectedChannelId,
                 skipped: true,
               });
+              posthog?.capture('claw_setup_done_viewed');
               setOnboardingStep('done');
             }}
           />

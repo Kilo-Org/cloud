@@ -50,7 +50,8 @@ export async function sendPushNotifications(
     return { ticketTokenPairs: [], staleTokens: [] };
   }
 
-  const { data: tickets } = (await res.json()) as { data: ExpoPushTicket[] };
+  const json: { data: ExpoPushTicket[] } = await res.json();
+  const { data: tickets } = json;
 
   const ticketTokenPairs: TicketTokenPair[] = [];
   const staleTokens: string[] = [];
@@ -91,7 +92,8 @@ export async function checkPushReceipts(
     throw new Error(`Expo Receipts API error (${res.status}): ${await res.text().catch(() => '')}`);
   }
 
-  const { data: receipts } = (await res.json()) as { data: Record<string, ExpoPushReceipt> };
+  const receiptJson: { data: Record<string, ExpoPushReceipt> } = await res.json();
+  const { data: receipts } = receiptJson;
 
   const ticketToToken = new Map(ticketTokenPairs.map(p => [p.ticketId, p.token]));
   const staleTokens: string[] = [];

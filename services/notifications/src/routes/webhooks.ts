@@ -3,6 +3,15 @@ import { Hono } from 'hono';
 
 import { getNotificationChannelDO } from '../dos/NotificationChannelDO';
 
+type StreamChatWebhookPayload = {
+  type: string;
+  message?: {
+    text?: string;
+    user?: { id: string };
+  };
+  channel_id?: string;
+};
+
 const webhooks = new Hono<{ Bindings: Env }>();
 
 function verifyWebhookSignature(body: string, signature: string | null, secret: string): boolean {
@@ -24,7 +33,7 @@ webhooks.post('/stream-chat', async c => {
     return c.json({ error: 'Invalid signature' }, 401);
   }
 
-  const payload = JSON.parse(rawBody);
+  const payload = JSON.parse(rawBody) as StreamChatWebhookPayload;
 
   // Only handle new messages
   if (payload.type !== 'message.new') {

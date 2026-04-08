@@ -3873,3 +3873,40 @@ export const exa_usage_log = pgTable(
 );
 
 export type ExaUsageLog = typeof exa_usage_log.$inferSelect;
+
+// ============ SECURITY ADVISOR SCANS ============
+// Per-scan usage tracking for the security advisor feature.
+// Serves as both a rate-limiting table (COUNT in 24h window) and a usage/analytics ledger.
+
+export const security_advisor_scans = pgTable(
+  'security_advisor_scans',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    kilo_user_id: text().notNull(),
+    organization_id: text(),
+    source_platform: text().notNull(), // 'openclaw' | 'kiloclaw'
+    source_method: text().notNull(), // 'plugin' | 'api' | 'webhook' | 'cloud-agent'
+    plugin_version: text(),
+    openclaw_version: text(),
+    public_ip: text(), // Client-reported public IP (validated as IP format). Metadata only, not used for rate limiting.
+    // Audit result counts for analytics
+    findings_critical: integer().notNull().default(0),
+    findings_warn: integer().notNull().default(0),
+    findings_info: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    // Primary index for rate-limiting queries (user + time window)
+    index('idx_security_advisor_scans_user_created_at').on(table.kilo_user_id, table.created_at),
+    // Analytics: scans over time
+    index('idx_security_advisor_scans_created_at').on(table.created_at),
+    // Analytics: scans by source platform
+    index('idx_security_advisor_scans_platform').on(table.source_platform),
+  ]
+);
+
+export type SecurityAdvisorScan = typeof security_advisor_scans.$inferSelect;
+export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;

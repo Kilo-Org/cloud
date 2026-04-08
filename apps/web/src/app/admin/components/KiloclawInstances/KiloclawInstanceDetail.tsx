@@ -379,13 +379,31 @@ function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: st
   const trpc = useTRPC();
   const [prompt, setPrompt] = useState('');
   const [showOutput, setShowOutput] = useState(false);
+  const [runId, setRunId] = useState<string | null>(null);
+
+  const { data: latestRuns } = useQuery(
+    trpc.admin.kiloclawInstances.listKiloCliRuns.queryOptions(
+      { userId, limit: 20 },
+      { staleTime: 10_000 }
+    )
+  );
+
+  const selectedRunId =
+    runId ??
+    latestRuns?.runs.find(run => run.instance_id === instanceId && run.initiated_by === 'admin')?.id ??
+    null;
 
   const {
     data: runStatus,
     isLoading: statusLoading,
     refetch: refetchStatus,
   } = useQuery({
-    ...trpc.admin.kiloclawInstances.getKiloCliRunStatus.queryOptions({ userId, instanceId }),
+    ...trpc.admin.kiloclawInstances.getKiloCliRunStatus.queryOptions(
+      selectedRunId
+        ? { userId, instanceId, runId: selectedRunId }
+        : { userId, instanceId, runId: '00000000-0000-0000-0000-000000000000' }
+    ),
+    enabled: selectedRunId !== null,
     refetchInterval: query => (query?.state?.data?.status === 'running' ? 3000 : false),
   });
 
@@ -393,8 +411,9 @@ function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: st
 
   const { mutateAsync: startRun, isPending: isStarting } = useMutation(
     trpc.admin.kiloclawInstances.startKiloCliRun.mutationOptions({
-      onSuccess: () => {
+      onSuccess: result => {
         toast.success('CLI run started');
+        setRunId(result.id);
         setShowOutput(true);
         void refetchStatus();
       },
@@ -471,7 +490,7 @@ function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: st
             <Button
               size="sm"
               variant="destructive"
-              onClick={() => void cancelRun({ userId, instanceId })}
+              onClick={() => selectedRunId && void cancelRun({ userId, instanceId, runId: selectedRunId })}
               disabled={isCancelling}
             >
               {isCancelling ? (

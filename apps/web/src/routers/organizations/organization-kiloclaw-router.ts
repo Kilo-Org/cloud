@@ -34,7 +34,7 @@ import {
   restoreDestroyedInstance,
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
-import { createCliRun } from '@/lib/kiloclaw/cli-runs';
+import { createCliRun, markCliRunCancelled } from '@/lib/kiloclaw/cli-runs';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
@@ -1197,20 +1197,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const result = await client.cancelKiloCliRun(ctx.user.id, workerInstanceId(instance));
 
       if (result.ok) {
-        await db
-          .update(kiloclaw_cli_runs)
-          .set({
-            status: 'cancelled',
-            completed_at: new Date().toISOString(),
-          })
-          .where(
-            and(
-              eq(kiloclaw_cli_runs.id, input.runId),
-              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
-              eq(kiloclaw_cli_runs.instance_id, instance.id),
-              eq(kiloclaw_cli_runs.status, 'running')
-            )
-          );
+        await markCliRunCancelled({
+          runId: input.runId,
+          userId: ctx.user.id,
+          instanceId: instance.id,
+        });
       }
 
       return result;

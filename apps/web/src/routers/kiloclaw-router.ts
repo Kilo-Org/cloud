@@ -80,7 +80,7 @@ import {
   KILOCLAW_PLAN_COST_MICRODOLLARS,
   KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS,
 } from '@/lib/kiloclaw/credit-billing';
-import { createCliRun } from '@/lib/kiloclaw/cli-runs';
+import { createCliRun, markCliRunCancelled } from '@/lib/kiloclaw/cli-runs';
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
 import PostHogClient from '@/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
@@ -2136,23 +2136,11 @@ export const kiloclawRouter = createTRPCRouter({
 
       // Mark the specific run as cancelled in DB
       if (result.ok) {
-        const instanceFilter = instance
-          ? eq(kiloclaw_cli_runs.instance_id, instance.id)
-          : undefined;
-        await db
-          .update(kiloclaw_cli_runs)
-          .set({
-            status: 'cancelled',
-            completed_at: new Date().toISOString(),
-          })
-          .where(
-            and(
-              eq(kiloclaw_cli_runs.id, input.runId),
-              eq(kiloclaw_cli_runs.user_id, ctx.user.id),
-              instanceFilter,
-              eq(kiloclaw_cli_runs.status, 'running')
-            )
-          );
+        await markCliRunCancelled({
+          runId: input.runId,
+          userId: ctx.user.id,
+          instanceId: instance?.id ?? null,
+        });
       }
 
       return result;

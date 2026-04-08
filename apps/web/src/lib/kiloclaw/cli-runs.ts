@@ -1,4 +1,5 @@
 import { db } from '@/lib/drizzle';
+import { and, eq, type SQL } from 'drizzle-orm';
 import { kiloclaw_cli_runs } from '@kilocode/db/schema';
 import type { KiloClawCliRunInitiatedBy } from '@kilocode/db/schema';
 
@@ -24,4 +25,35 @@ export async function createCliRun(params: CreateCliRunParams): Promise<string> 
     .returning({ id: kiloclaw_cli_runs.id });
 
   return row.id;
+}
+
+export interface CancelCliRunParams {
+  runId: string;
+  userId: string;
+  instanceId?: string | null;
+  initiatedBy?: KiloClawCliRunInitiatedBy;
+}
+
+export async function markCliRunCancelled(params: CancelCliRunParams): Promise<void> {
+  const conditions: SQL[] = [
+    eq(kiloclaw_cli_runs.id, params.runId),
+    eq(kiloclaw_cli_runs.user_id, params.userId),
+    eq(kiloclaw_cli_runs.status, 'running'),
+  ];
+
+  if (params.instanceId) {
+    conditions.push(eq(kiloclaw_cli_runs.instance_id, params.instanceId));
+  }
+
+  if (params.initiatedBy) {
+    conditions.push(eq(kiloclaw_cli_runs.initiated_by, params.initiatedBy));
+  }
+
+  await db
+    .update(kiloclaw_cli_runs)
+    .set({
+      status: 'cancelled',
+      completed_at: new Date().toISOString(),
+    })
+    .where(and(...conditions));
 }

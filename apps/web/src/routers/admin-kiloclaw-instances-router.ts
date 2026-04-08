@@ -22,7 +22,7 @@ import {
   createKiloClawAdminAuditLog,
   listKiloClawAdminAuditLogs,
 } from '@/lib/kiloclaw/admin-audit-log';
-import { createCliRun } from '@/lib/kiloclaw/cli-runs';
+import { createCliRun, markCliRunCancelled } from '@/lib/kiloclaw/cli-runs';
 import type {
   PlatformDebugStatusResponse,
   VolumeSnapshot,
@@ -567,7 +567,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           workerInstanceId(instance)
         );
 
-        await createCliRun({
+        const runId = await createCliRun({
           userId: input.userId,
           instanceId: instance?.id ?? null,
           prompt: input.prompt,
@@ -592,72 +592,155 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           console.error('Failed to write audit log for startKiloCliRun:', auditErr);
         }
 
-        return result;
+        return { ...result, id: runId };
       } catch (err) {
         console.error('Failed to start kilo CLI run for user:', input.userId, err);
         throwKiloclawAdminError(err, fallbackMessage);
       }
     }),
 
-  getKiloCliRunStatus: adminProcedure.input(GatewayProcessSchema).query(async ({ input }) => {
-    const fallbackMessage = 'Failed to get kilo CLI run status';
-    try {
-      const instance = await resolveInstance(input.userId, input.instanceId);
-      const client = new KiloClawInternalClient();
-      return await client.getKiloCliRunStatus(input.userId, workerInstanceId(instance));
-    } catch (err) {
-      console.error('Failed to get kilo CLI run status for user:', input.userId, err);
-      throwKiloclawAdminError(err, fallbackMessage);
-    }
-  }),
-
-  cancelKiloCliRun: adminProcedure.input(GatewayProcessSchema).mutation(async ({ input, ctx }) => {
-    const fallbackMessage = 'Failed to cancel kilo CLI run';
-    try {
-      const instance = await resolveInstance(input.userId, input.instanceId);
-      const client = new KiloClawInternalClient();
-      const result = await client.cancelKiloCliRun(input.userId, workerInstanceId(instance));
-
-      if (result.ok) {
-        const instanceFilter = instance ? eq(kiloclaw_cli_runs.instance_id, instance.id) : undefined;
-        await db
-          .update(kiloclaw_cli_runs)
-          .set({
-            status: 'cancelled',
-            completed_at: new Date().toISOString(),
-          })
+  getKiloCliRunStatus: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid().optional(),
+        runId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      const fallbackMessage = 'Failed to get kilo CLI run status';
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        if (!instance) {
+          return {
+            hasRun: false,
+            status: null,
+            output: null,
+            exitCode: null,
+            startedAt: null,
+            completedAt: null,
+            prompt: null,
+          };
+        }
+        const [row] = await db
+          .select()
+          .from(kiloclaw_cli_runs)
           .where(
             and(
+              eq(kiloclaw_cli_runs.id, input.runId),
               eq(kiloclaw_cli_runs.user_id, input.userId),
-              instanceFilter,
-              eq(kiloclaw_cli_runs.status, 'running'),
-              eq(kiloclaw_cli_runs.initiated_by, 'admin')
+              eq(kiloclaw_cli_runs.initiated_by, 'admin'),
+              eq(kiloclaw_cli_runs.instance_id, instance.id)
             )
-          );
-      }
+          )
+          .limit(1);
 
+        if (!row) {
+          return {
+            hasRun: false,
+            status: null,
+            output: null,
+            exitCode: null,
+            startedAt: null,
+            completedAt: null,
+            prompt: null,
+          };
+        }
+
+        if (row.status !== 'running') {
+          return {
+            hasRun: true,
+            status: row.status,
+            output: row.output,
+            exitCode: row.exit_code,
+            startedAt: row.started_at,
+            completedAt: row.completed_at ?? null,
+            prompt: row.prompt,
+          };
+        }
+
+        const client = new KiloClawInternalClient();
+        const controllerStatus = await client.getKiloCliRunStatus(input.userId, workerInstanceId(instance));
+
+        if (controllerStatus.hasRun && controllerStatus.status !== 'running' && controllerStatus.startedAt) {
+          await db
+            .update(kiloclaw_cli_runs)
+            .set({
+              status: controllerStatus.status ?? 'failed',
+              exit_code: controllerStatus.exitCode,
+              output: controllerStatus.output,
+              completed_at: controllerStatus.completedAt ?? new Date().toISOString(),
+            })
+            .where(
+              and(
+                eq(kiloclaw_cli_runs.id, input.runId),
+                eq(kiloclaw_cli_runs.user_id, input.userId),
+                eq(kiloclaw_cli_runs.instance_id, instance.id),
+                eq(kiloclaw_cli_runs.initiated_by, 'admin'),
+                eq(kiloclaw_cli_runs.status, 'running')
+              )
+            );
+        }
+
+        return {
+          ...controllerStatus,
+          prompt: row.prompt,
+        };
+      } catch (err) {
+        console.error('Failed to get kilo CLI run status for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
+
+  cancelKiloCliRun: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid().optional(),
+        runId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const fallbackMessage = 'Failed to cancel kilo CLI run';
       try {
-        await createKiloClawAdminAuditLog({
-          action: 'kiloclaw.cli_run.cancel',
-          actor_id: ctx.user.id,
-          actor_email: ctx.user.google_user_email,
-          actor_name: ctx.user.google_user_name,
-          target_user_id: input.userId,
-          message: `CLI run cancelled on instance ${instance?.id}`,
-          metadata: {
-            instanceId: instance?.id,
-          },
-        });
-      } catch (auditErr) {
-        console.error('Failed to write audit log for cancelKiloCliRun:', auditErr);
-      }
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        if (!instance) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+        }
+        const client = new KiloClawInternalClient();
+        const result = await client.cancelKiloCliRun(input.userId, workerInstanceId(instance));
 
-      return result;
-    } catch (err) {
-      console.error('Failed to cancel kilo CLI run for user:', input.userId, err);
-      throwKiloclawAdminError(err, fallbackMessage);
-    }
-  }),
+        if (result.ok) {
+          await markCliRunCancelled({
+            runId: input.runId,
+            userId: input.userId,
+            instanceId: instance.id,
+            initiatedBy: 'admin',
+          });
+        }
+
+        try {
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.cli_run.cancel',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `CLI run cancelled on instance ${instance?.id}`,
+            metadata: {
+              instanceId: instance?.id,
+            },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for cancelKiloCliRun:', auditErr);
+        }
+
+        return result;
+      } catch (err) {
+        console.error('Failed to cancel kilo CLI run for user:', input.userId, err);
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
 
   listKiloCliRuns: adminProcedure
     .input(z.object({ userId: z.string().min(1), limit: z.number().min(1).max(50).default(20) }))

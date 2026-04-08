@@ -80,6 +80,7 @@ import {
   KILOCLAW_PLAN_COST_MICRODOLLARS,
   KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS,
 } from '@/lib/kiloclaw/credit-billing';
+import { createCliRun } from '@/lib/kiloclaw/cli-runs';
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
 import PostHogClient from '@/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
@@ -2031,19 +2032,15 @@ export const kiloclawRouter = createTRPCRouter({
         throw err;
       }
 
-      // Persist the run in the database and return its ID
-      const [row] = await db
-        .insert(kiloclaw_cli_runs)
-        .values({
-          user_id: ctx.user.id,
-          instance_id: instance?.id ?? null,
-          prompt: input.prompt,
-          status: 'running',
-          started_at: result.startedAt,
-        })
-        .returning({ id: kiloclaw_cli_runs.id });
+      const runId = await createCliRun({
+        userId: ctx.user.id,
+        instanceId: instance?.id ?? null,
+        prompt: input.prompt,
+        startedAt: result.startedAt,
+        initiatedBy: 'user',
+      });
 
-      return { ...result, id: row.id };
+      return { ...result, id: runId };
     }),
 
   getKiloCliRunStatus: clawAccessProcedure

@@ -3788,6 +3788,7 @@ export type NewBotRequest = typeof bot_requests.$inferInsert;
 // ─── KiloClaw CLI Runs ──────────────────────────────────────────────
 
 export type KiloClawCliRunStatus = 'running' | 'completed' | 'failed' | 'cancelled';
+export type KiloClawCliRunInitiatedBy = 'admin' | 'user';
 
 export const kiloclaw_cli_runs = pgTable(
   'kiloclaw_cli_runs',
@@ -3806,11 +3807,13 @@ export const kiloclaw_cli_runs = pgTable(
     output: text(),
     started_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    initiated_by: text().$type<KiloClawCliRunInitiatedBy>().notNull().default('user'),
   },
   table => [
     index('IDX_kiloclaw_cli_runs_user_id').on(table.user_id),
     index('IDX_kiloclaw_cli_runs_started_at').on(table.started_at),
     index('IDX_kiloclaw_cli_runs_instance_id').on(table.instance_id),
+    index('IDX_kiloclaw_cli_runs_initiated_by').on(table.initiated_by),
   ]
 );
 

@@ -34,6 +34,7 @@ import {
   restoreDestroyedInstance,
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
+import { createCliRun } from '@/lib/kiloclaw/cli-runs';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
@@ -1102,18 +1103,15 @@ export const organizationKiloclawRouter = createTRPCRouter({
         workerInstanceId(instance)
       );
 
-      const [row] = await db
-        .insert(kiloclaw_cli_runs)
-        .values({
-          user_id: ctx.user.id,
-          instance_id: instance.id,
-          prompt: input.prompt,
-          status: 'running',
-          started_at: result.startedAt,
-        })
-        .returning({ id: kiloclaw_cli_runs.id });
+      const runId = await createCliRun({
+        userId: ctx.user.id,
+        instanceId: instance.id,
+        prompt: input.prompt,
+        startedAt: result.startedAt,
+        initiatedBy: 'user',
+      });
 
-      return { ...result, id: row.id };
+      return { ...result, id: runId };
     }),
 
   getKiloCliRunStatus: organizationMemberProcedure

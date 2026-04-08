@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 const PAGE_SIZE = 25;
 
 type RunStatus = 'all' | 'running' | 'completed' | 'failed' | 'cancelled';
+type InitiatedBy = 'all' | 'admin' | 'user';
 
 function StatusBadge({ status }: { status: string }) {
   switch (status) {
@@ -87,6 +88,7 @@ export function CliRunsTab() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<RunStatus>('all');
+  const [initiatedByFilter, setInitiatedByFilter] = useState<InitiatedBy>('all');
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
   const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
@@ -108,6 +110,7 @@ export function CliRunsTab() {
         limit: PAGE_SIZE,
         search: debouncedSearch || undefined,
         status: statusFilter,
+        initiatedBy: initiatedByFilter,
       },
       { staleTime: 10_000 }
     )
@@ -145,6 +148,22 @@ export function CliRunsTab() {
             <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
+        <Select
+          value={initiatedByFilter}
+          onValueChange={v => {
+            setInitiatedByFilter(v as InitiatedBy);
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="w-[150px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All users</SelectItem>
+            <SelectItem value="admin">Admin</SelectItem>
+            <SelectItem value="user">User</SelectItem>
+          </SelectContent>
+        </Select>
         {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
         {pagination && (
           <span className="text-muted-foreground ml-auto text-sm">
@@ -174,6 +193,11 @@ export function CliRunsTab() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate font-mono text-xs">
                     {run.user_email ?? run.user_id}
+                    {run.initiated_by === 'admin' && (
+                      <Badge variant="outline" className="ml-1.5 border-purple-500/30 text-purple-400">
+                        Admin
+                      </Badge>
+                    )}
                   </span>
                   <StatusBadge status={run.status} />
                 </div>

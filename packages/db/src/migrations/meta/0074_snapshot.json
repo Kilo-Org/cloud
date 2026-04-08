@@ -1,5 +1,5 @@
 {
-  "id": "b388ac04-1238-495f-9954-0f3898a34f03",
+  "id": "fbba2a36-6512-4b62-a098-991cf3f3f30c",
   "prevId": "d96bf1bd-afa1-421a-afb2-d9b7fe1aab42",
   "version": "7",
   "dialect": "postgresql",
@@ -6718,115 +6718,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.kilo_pass_pause_events": {
-      "name": "kilo_pass_pause_events",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "kilo_pass_subscription_id": {
-          "name": "kilo_pass_subscription_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "paused_at": {
-          "name": "paused_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "resumes_at": {
-          "name": "resumes_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "resumed_at": {
-          "name": "resumed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "IDX_kilo_pass_pause_events_subscription_id": {
-          "name": "IDX_kilo_pass_pause_events_subscription_id",
-          "columns": [
-            {
-              "expression": "kilo_pass_subscription_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_kilo_pass_pause_events_one_open_per_sub": {
-          "name": "UQ_kilo_pass_pause_events_one_open_per_sub",
-          "columns": [
-            {
-              "expression": "kilo_pass_subscription_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"kilo_pass_pause_events\".\"resumed_at\" IS NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "kilo_pass_pause_events_kilo_pass_subscription_id_kilo_pass_subscriptions_id_fk": {
-          "name": "kilo_pass_pause_events_kilo_pass_subscription_id_kilo_pass_subscriptions_id_fk",
-          "tableFrom": "kilo_pass_pause_events",
-          "tableTo": "kilo_pass_subscriptions",
-          "columnsFrom": [
-            "kilo_pass_subscription_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "kilo_pass_pause_events_resumed_at_after_paused_at_check": {
-          "name": "kilo_pass_pause_events_resumed_at_after_paused_at_check",
-          "value": "\"kilo_pass_pause_events\".\"resumed_at\" IS NULL OR \"kilo_pass_pause_events\".\"resumed_at\" >= \"kilo_pass_pause_events\".\"paused_at\""
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.kilo_pass_scheduled_changes": {
       "name": "kilo_pass_scheduled_changes",
       "schema": "",
@@ -7538,6 +7429,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "initiated_by": {
+          "name": "initiated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'user'"
         }
       },
       "indexes": {
@@ -7576,6 +7474,21 @@
           "columns": [
             {
               "expression": "instance_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_cli_runs_initiated_by": {
+          "name": "IDX_kiloclaw_cli_runs_initiated_by",
+          "columns": [
+            {
+              "expression": "initiated_by",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

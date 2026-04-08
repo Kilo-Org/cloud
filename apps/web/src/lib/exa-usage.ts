@@ -31,6 +31,11 @@ export function getExaFreeAllowanceMicrodollars(_date: Date, _user: User): numbe
  * Returns the user's total Exa spend (microdollars) and stored free allowance
  * for the current calendar month. Aggregates across personal and org rows.
  *
+ * The free allowance is intentionally per-user, not per-context. This means
+ * org usage counts toward the same free tier as personal usage. Once exhausted,
+ * the charge goes to whichever context (personal or org) makes the request.
+ * This prevents gaming via multiple orgs.
+ *
  * `freeAllowance` is null when no rows exist yet (first request of the month),
  * signaling the caller to compute via `getExaFreeAllowanceMicrodollars`.
  */

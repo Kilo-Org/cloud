@@ -4,7 +4,7 @@ import { db } from '@/lib/drizzle';
 import { and, eq, isNull } from 'drizzle-orm';
 import { kiloclaw_instances } from '@kilocode/db/schema';
 import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 
 import { STREAM_CHAT_API_SECRET } from '@/lib/config.server';
 import { notifyUser } from '@/lib/push-notifications';
@@ -12,9 +12,7 @@ import { notifyUser } from '@/lib/push-notifications';
 function verifyWebhookSignature(body: string, signature: string | null): boolean {
   if (!signature || !STREAM_CHAT_API_SECRET) return false;
 
-  const expectedSignature = createHmac('sha256', STREAM_CHAT_API_SECRET)
-    .update(body)
-    .digest('hex');
+  const expectedSignature = createHmac('sha256', STREAM_CHAT_API_SECRET).update(body).digest('hex');
 
   return signature === expectedSignature;
 }
@@ -63,10 +61,7 @@ export async function POST(request: NextRequest) {
     })
     .from(kiloclaw_instances)
     .where(
-      and(
-        eq(kiloclaw_instances.sandbox_id, sandboxId),
-        isNull(kiloclaw_instances.destroyed_at)
-      )
+      and(eq(kiloclaw_instances.sandbox_id, sandboxId), isNull(kiloclaw_instances.destroyed_at))
     )
     .limit(1);
 
@@ -74,13 +69,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // Fire-and-forget — don't block the webhook response
-  void notifyUser({
-    userId: instance.user_id,
-    instanceId: instance.id,
-    instanceName: instance.name ?? 'Kilo',
-    messagePreview: messageText,
-  });
+  after(() =>
+    notifyUser({
+      userId: instance.user_id,
+      instanceId: instance.id,
+      instanceName: instance.name ?? 'Kilo',
+      messagePreview: messageText,
+    })
+  );
 
   return NextResponse.json({ ok: true });
 }

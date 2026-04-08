@@ -26,11 +26,16 @@ export class GrafanaContainer extends Container<Env> {
     if (needsStart) {
       const analyticsApiKey = await resolveSecret(this.env.CF_ANALYTICS_API_KEY);
       const gfSecretKey = await resolveSecret(this.env.GF_SECRET_KEY);
+      if (!analyticsApiKey || !gfSecretKey) {
+        return new Response('Grafana secrets unavailable; cannot start container', {
+          status: 503,
+        });
+      }
       this.envVars = {
         CF_CLICKHOUSE_URL: this.env.CF_CLICKHOUSE_URL,
         CF_ACCOUNT_ID: this.env.CF_ACCOUNT_ID,
-        CF_ANALYTICS_API_KEY: analyticsApiKey ?? '',
-        GF_SECRET_KEY: gfSecretKey ?? '',
+        CF_ANALYTICS_API_KEY: analyticsApiKey,
+        GF_SECRET_KEY: gfSecretKey,
       };
     }
 

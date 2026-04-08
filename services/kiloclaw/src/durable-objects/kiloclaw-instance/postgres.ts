@@ -12,11 +12,23 @@ import { getAppKey, getFlyConfig } from './types';
 import { storageUpdate } from './state';
 import { attemptMetadataRecovery } from './reconcile';
 import { doError, doWarn, toLoggable, createReconcileContext } from './log';
+import { isInstanceKeyedSandboxId } from '@kilocode/worker-utils/instance-id';
 
 type RestoreOpts = {
   /** If the DO has a stored sandboxId, use it for precise lookup. */
   sandboxId?: string | null;
 };
+
+export async function fallbackAppNameForRestore(
+  userId: string,
+  sandboxId: string,
+  prefix?: string
+): Promise<string> {
+  const appKey = getAppKey({ userId, sandboxId });
+  return isInstanceKeyedSandboxId(sandboxId)
+    ? appNameFromInstanceId(appKey, prefix)
+    : appNameFromUserId(appKey, prefix);
+}
 
 /**
  * Restore DO state from Postgres backup if SQLite was wiped.
@@ -63,10 +75,7 @@ export async function restoreFromPostgres(
     const appKey = getAppKey({ userId, sandboxId: instance.sandboxId });
     const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(appKey));
     const prefix = env.WORKER_ENV === 'development' ? 'dev' : undefined;
-    const isInstanceKeyed = appKey !== userId;
-    const fallbackAppName = isInstanceKeyed
-      ? await appNameFromInstanceId(appKey, prefix)
-      : await appNameFromUserId(userId, prefix);
+    const fallbackAppName = await fallbackAppNameForRestore(userId, instance.sandboxId, prefix);
     const recoveredAppName = (await appStub.getAppName()) ?? fallbackAppName;
 
     await ctx.storage.put(

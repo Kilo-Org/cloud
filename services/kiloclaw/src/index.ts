@@ -25,6 +25,7 @@ import { sandboxIdFromUserId } from './auth/sandbox-id';
 import { InstanceIdParam } from './schemas/instance-config';
 import { isValidInstanceId } from '@kilocode/worker-utils/instance-id';
 import { registerVersionIfNeeded } from './lib/image-version';
+import { resolveDoKeyForUser } from './lib/instance-routing';
 import { startingUpPage } from './pages/starting-up';
 import { buildForwardHeaders } from './utils/proxy-headers';
 import { KILOCLAW_ACTIVE_INSTANCE_COOKIE } from './config';
@@ -349,16 +350,21 @@ async function resolveRegistryEntry(c: Context<AppEnv>) {
     const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(entry.doKey));
     return { stub, entry };
   } catch (err) {
-    // Registry DO failed. Fall back to the legacy userId-keyed DO.
-    // Only preserves access for legacy instances (doKey = userId).
-    // For instance-keyed DOs (doKey = instanceId), this hits the wrong
-    // (empty) DO — the user sees "not provisioned" until the registry
-    // recovers. Acceptable: a broken registry is transient, and silently
-    // routing to the wrong DO would be worse.
-    console.error('[PROXY] Registry lookup failed, falling back to legacy DO:', err);
-    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(userId));
+    console.error(
+      '[PROXY] Registry lookup failed, falling back to Postgres-backed DO lookup:',
+      err
+    );
+    const fallbackDoKey =
+      (await resolveDoKeyForUser(c.env.HYPERDRIVE?.connectionString, userId).catch(fallbackErr => {
+        console.error(
+          '[PROXY] Postgres-backed DO lookup failed, falling back to userId:',
+          fallbackErr
+        );
+        return null;
+      })) ?? userId;
+    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(fallbackDoKey));
     const fallbackEntry: RegistryEntry = {
-      doKey: userId,
+      doKey: fallbackDoKey,
       instanceId: '',
       assignedUserId: userId,
       createdAt: '',

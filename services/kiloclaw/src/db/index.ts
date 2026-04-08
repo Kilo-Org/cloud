@@ -69,7 +69,14 @@ export async function getActiveInstance(db: WorkerDb, userId: string) {
       organization_id: kiloclaw_instances.organization_id,
     })
     .from(kiloclaw_instances)
-    .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        isNull(kiloclaw_instances.organization_id),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .orderBy(kiloclaw_instances.created_at)
     .limit(1)
     .then(rows => rows[0] ?? null);
 

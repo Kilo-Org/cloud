@@ -3,27 +3,10 @@ import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { CRON_SECRET } from '@/lib/config.server';
 import { sql } from 'drizzle-orm';
+import { format } from 'date-fns';
 
 if (!CRON_SECRET) {
   throw new Error('CRON_SECRET is not configured in environment variables');
-}
-
-/**
- * Format a Date as YYYY_MM for partition table naming.
- */
-function partitionSuffix(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  return `${y}_${m}`;
-}
-
-/**
- * Format a Date as YYYY-MM-DD (first of month) for partition range bounds.
- */
-function monthStart(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}-01`;
 }
 
 /**
@@ -47,12 +30,12 @@ export async function GET(request: Request) {
   for (let offset = 0; offset <= 2; offset++) {
     const target = new Date(now.getFullYear(), now.getMonth() + offset, 1);
     const nextMonth = new Date(target.getFullYear(), target.getMonth() + 1, 1);
-    const name = `exa_usage_log_${partitionSuffix(target)}`;
+    const name = `exa_usage_log_${format(target, 'yyyy_MM')}`;
 
     try {
       await db.execute(
         sql.raw(
-          `CREATE TABLE IF NOT EXISTS "${name}" PARTITION OF "exa_usage_log" FOR VALUES FROM ('${monthStart(target)}') TO ('${monthStart(nextMonth)}')`
+          `CREATE TABLE IF NOT EXISTS "${name}" PARTITION OF "exa_usage_log" FOR VALUES FROM ('${format(target, 'yyyy-MM-dd')}') TO ('${format(nextMonth, 'yyyy-MM-dd')}')`
         )
       );
       created.push(name);

@@ -36,6 +36,7 @@ import {
   kiloclaw_cli_runs,
   bot_requests,
   kiloclaw_admin_audit_logs,
+  security_advisor_scans,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import { softDeleteUser, SoftDeletePreconditionError, findUserById, findUsersByIds } from './user';
@@ -711,6 +712,30 @@ describe('User', () => {
       const usages = await db.select().from(free_model_usage);
       expect(usages).toHaveLength(2);
       expect(usages.every(u => u.kilo_user_id === null)).toBe(true);
+    });
+
+    it('should anonymize security_advisor_scans and null public_ip', async () => {
+      const user = await insertTestUser();
+
+      await db.insert(security_advisor_scans).values({
+        kilo_user_id: user.id,
+        source_platform: 'openclaw',
+        source_method: 'plugin',
+        public_ip: '203.0.113.42',
+        findings_critical: 1,
+        findings_warn: 0,
+        findings_info: 0,
+      });
+
+      await softDeleteUser(user.id);
+
+      const scans = await db.select().from(security_advisor_scans);
+      expect(scans).toHaveLength(1);
+      expect(scans[0].kilo_user_id).toBe('deleted');
+      expect(scans[0].public_ip).toBeNull();
+      // Analytics fields preserved
+      expect(scans[0].source_platform).toBe('openclaw');
+      expect(scans[0].findings_critical).toBe(1);
     });
 
     it('should preserve credit transactions', async () => {

@@ -3,6 +3,7 @@
 ## Problem
 
 `deductFromBalance()` in `exa-usage.ts` mutates the cached balance columns directly:
+
 - **Personal**: increments `kilocode_users.microdollars_used`
 - **Org**: calls `ingestOrganizationTokenUsage` which increments `organizations.microdollars_used`
 
@@ -49,6 +50,7 @@ return { user, usageRecords, creditTransactions };
 `computeUserBalanceUpdates` and `applyUserBalanceUpdates` need zero changes — they already work on the generic `{cost, created_at}[]` shape.
 
 Update the docstring postcondition:
+
 ```
 - microdollars_used = sum(microdollar_usage) + sum(exa charged usage)
 ```
@@ -85,7 +87,8 @@ function mergeSortedByCreatedAt(
   b: { cost: number; created_at: string }[]
 ): { cost: number; created_at: string }[] {
   const result = [];
-  let i = 0, j = 0;
+  let i = 0,
+    j = 0;
   while (i < a.length && j < b.length) {
     if (a[i].created_at <= b[j].created_at) result.push(a[i++]);
     else result.push(b[j++]);
@@ -101,18 +104,22 @@ Both recompute files can import this. If we don't want a new file, it can be def
 ### 4. Tests
 
 **`recomputeUserBalances.test.ts`**:
+
 - Add a test that inserts `exa_usage_log` rows with `charged_to_balance = true` alongside normal `microdollar_usage` rows, then verifies `recomputeUserBalances` includes both in `microdollars_used`.
 - Add a pure test for `computeUserBalanceUpdates` with a pre-merged usage array that includes both LLM and Exa records interleaved by time, verifying baselines are computed correctly.
 
 **`recomputeOrganizationBalances.test.ts`**:
+
 - Same pattern — insert Exa charged usage for an org and verify recompute includes it.
 
 ## Not in scope
 
 **Reliability of `exa_usage_log` inserts**: The audit log insert is currently fire-and-forget (`try/catch` that swallows errors at `exa-usage.ts:106-118`). If it fails, the balance deduction happens but no log row exists, so recompute would miss it. This is a pre-existing design tradeoff (partition might not exist). The risk is low because:
+
 - Partition maintenance runs monthly and creates partitions ahead of time
 - `exa_monthly_usage` (the counter) is always reliably written and could serve as a cross-check
 
 If we want to tighten this later, the options are:
+
 1. Make log inserts required when `charged_to_balance = true` (rethrow on failure)
 2. Add a cross-check in recompute: compare `sum(exa_usage_log.cost WHERE charged)` vs `sum(exa_monthly_usage.total_charged)` and log a warning on mismatch

@@ -39,9 +39,7 @@ describe('recomputeOrganizationBalances', () => {
         .delete(creditTransactionsTable)
         .where(eq(creditTransactionsTable.organization_id, orgId));
       await db.delete(microdollar_usage).where(eq(microdollar_usage.organization_id, orgId));
-      await db
-        .delete(exa_monthly_usage)
-        .where(eq(exa_monthly_usage.organization_id, orgId));
+      await db.delete(exa_monthly_usage).where(eq(exa_monthly_usage.organization_id, orgId));
       await db.delete(organizations).where(eq(organizations.id, orgId));
     }
   });

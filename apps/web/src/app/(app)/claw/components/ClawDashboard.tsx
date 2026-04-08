@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePostHog } from 'posthog-js/react';
 import { Check, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
@@ -108,6 +109,8 @@ function ClawDashboardInner({
 
   const { data: isServiceDegraded } = useClawServiceDegraded();
 
+  const posthog = usePostHog();
+
   const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
   const instanceYoung =
     instanceStatus !== null &&
@@ -148,6 +151,25 @@ function ClawDashboardInner({
   const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const hasPairingStep = selectedChannelId === 'telegram' || selectedChannelId === 'discord';
+
+  // Fire a per-step viewed event whenever the active onboarding step changes.
+  // Distinct event names make PostHog Funnel charts trivial to build (no
+  // per-step property filters needed).
+  const STEP_VIEWED_EVENT: Record<typeof onboardingStep, string> = {
+    identity: 'claw_setup_identity_viewed',
+    permissions: 'claw_setup_permissions_viewed',
+    channels: 'claw_setup_channels_viewed',
+    provisioning: 'claw_setup_provisioning_viewed',
+    pairing: 'claw_setup_pairing_viewed',
+    done: 'claw_setup_done_viewed',
+  };
+  useEffect(() => {
+    if (!isNewSetup) return;
+    posthog?.capture(STEP_VIEWED_EVENT[onboardingStep]);
+    // STEP_VIEWED_EVENT is a derived constant — only the meaningful state
+    // values that compose it need to be in the dep array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onboardingStep, isNewSetup]);
 
   // Reset onboarding wizard to step 1 whenever we enter setup mode so that
   // a destroy → re-provision cycle always starts fresh.
@@ -243,6 +265,11 @@ function ClawDashboardInner({
           <BotIdentityStep
             instanceRunning={isRunning && gatewayStatus?.state === 'running'}
             onContinue={identity => {
+              posthog?.capture('claw_setup_identity_completed', {
+                bot_name_is_custom: identity.botName !== 'KiloClaw',
+                bot_nature: identity.botNature,
+                bot_emoji_is_custom: identity.botEmoji !== '🤖',
+              });
               setBotIdentity(identity);
               setOnboardingStep('permissions');
             }}
@@ -251,6 +278,7 @@ function ClawDashboardInner({
           <PermissionStep
             instanceRunning={isRunning && gatewayStatus?.state === 'running'}
             onSelect={preset => {
+              posthog?.capture('claw_setup_permissions_completed', { preset });
               setSelectedPreset(preset);
               setOnboardingStep('channels');
             }}
@@ -259,11 +287,19 @@ function ClawDashboardInner({
           <ChannelSelectionStepView
             instanceRunning={isRunning && gatewayStatus?.state === 'running'}
             onSelect={(channelId, tokens) => {
+              posthog?.capture('claw_setup_channels_completed', {
+                channel: channelId,
+                skipped: false,
+              });
               setSelectedChannelId(channelId);
               setChannelTokens(tokens);
               setOnboardingStep('provisioning');
             }}
             onSkip={() => {
+              posthog?.capture('claw_setup_channels_completed', {
+                channel: null,
+                skipped: true,
+              });
               setSelectedChannelId(null);
               setChannelTokens(null);
               setOnboardingStep('provisioning');
@@ -277,7 +313,10 @@ function ClawDashboardInner({
             instanceRunning={isRunning && gatewayStatus?.state === 'running'}
             mutations={mutations}
             totalSteps={hasPairingStep ? 6 : 5}
-            onComplete={() => setOnboardingStep(hasPairingStep ? 'pairing' : 'done')}
+            onComplete={() => {
+              posthog?.capture('claw_setup_provisioned');
+              setOnboardingStep(hasPairingStep ? 'pairing' : 'done');
+            }}
           />
         ) : isNewSetup &&
           onboardingStep === 'pairing' &&
@@ -285,8 +324,20 @@ function ClawDashboardInner({
           <ChannelPairingStep
             channelId={selectedChannelId}
             mutations={mutations}
-            onComplete={() => setOnboardingStep('done')}
-            onSkip={() => setOnboardingStep('done')}
+            onComplete={() => {
+              posthog?.capture('claw_setup_pairing_completed', {
+                channel: selectedChannelId,
+                skipped: false,
+              });
+              setOnboardingStep('done');
+            }}
+            onSkip={() => {
+              posthog?.capture('claw_setup_pairing_completed', {
+                channel: selectedChannelId,
+                skipped: true,
+              });
+              setOnboardingStep('done');
+            }}
           />
         ) : isNewSetup ? (
           <Card className="mt-6 overflow-hidden">
@@ -331,6 +382,7 @@ function ClawDashboardInner({
                     asChild
                     variant="primary"
                     className="w-full min-w-[180px] bg-emerald-600 py-6 text-base text-white hover:bg-emerald-700"
+                    onClick={() => posthog?.capture('claw_setup_open_chat_clicked')}
                   >
                     <Link
                       href={`${organizationId ? `/organizations/${organizationId}/claw` : '/claw'}/chat`}
@@ -342,7 +394,10 @@ function ClawDashboardInner({
                 <Button
                   className="w-full py-6 text-base"
                   variant="outline"
-                  onClick={() => onNewSetupChange(false)}
+                  onClick={() => {
+                    posthog?.capture('claw_setup_close_wizard_clicked');
+                    onNewSetupChange(false);
+                  }}
                 >
                   <X className="mr-2 h-4 w-4" />
                   Close Wizard

@@ -1670,11 +1670,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     recoveryPreviousVolumeCleanupAfter: number | null;
     lastRecoveryErrorMessage: string | null;
     lastRecoveryErrorAt: number | null;
-      previousVolumeId: string | null;
-      restoreStartedAt: string | null;
-      pendingRestoreVolumeId: string | null;
-      instanceReadyEmailSent: boolean;
-    }> {
+    previousVolumeId: string | null;
+    restoreStartedAt: string | null;
+    pendingRestoreVolumeId: string | null;
+    instanceReadyEmailSent: boolean;
+  }> {
     await this.loadState();
     const alarmScheduledAt = await this.ctx.storage.getAlarm();
 

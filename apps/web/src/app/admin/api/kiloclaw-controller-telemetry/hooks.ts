@@ -10,12 +10,14 @@ export type ControllerTelemetryRow = {
   disk_total_bytes: number;
 };
 
-type ControllerTelemetryResponse = {
-  data: ControllerTelemetryRow[];
+type AnalyticsEngineResponse<T> = {
+  data: T[];
+  meta: { name: string; type: string }[];
+  rows: number;
 };
 
 export function useControllerTelemetryDiskUsage(sandboxId: string) {
-  return useQuery<ControllerTelemetryResponse>({
+  return useQuery<AnalyticsEngineResponse<ControllerTelemetryRow>>({
     queryKey: ['kiloclaw-controller-telemetry', 'disk-usage', sandboxId],
     queryFn: async () => {
       const response = await fetch(
@@ -24,9 +26,9 @@ export function useControllerTelemetryDiskUsage(sandboxId: string) {
       if (!response.ok) {
         throw new Error('Failed to fetch controller telemetry disk usage');
       }
-      return response.json() as Promise<ControllerTelemetryResponse>;
+      return response.json() as Promise<AnalyticsEngineResponse<ControllerTelemetryRow>>;
     },
     enabled: !!sandboxId,
-    staleTime: 60_000,
+    refetchInterval: 60_000,
   });
 }

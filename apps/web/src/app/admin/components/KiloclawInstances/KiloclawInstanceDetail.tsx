@@ -1695,10 +1695,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   const rows = aeDiskUsage.data?.data;
                   const aeRow = rows?.[0];
                   if (!aeRow) return formatVolumeUsageLine(null, null);
-                  const diskUsed =
-                    aeRow.disk_used_bytes >= 0 ? aeRow.disk_used_bytes : null;
-                  const diskTotal =
-                    aeRow.disk_total_bytes >= 0 ? aeRow.disk_total_bytes : null;
+                  const diskUsed = aeRow.disk_used_bytes >= 0 ? aeRow.disk_used_bytes : null;
+                  const diskTotal = aeRow.disk_total_bytes >= 0 ? aeRow.disk_total_bytes : null;
                   return formatVolumeUsageLine(diskUsed, diskTotal);
                 })()}
               </DetailField>

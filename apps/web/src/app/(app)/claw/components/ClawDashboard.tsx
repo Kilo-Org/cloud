@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Check, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
@@ -327,16 +328,15 @@ function ClawDashboardInner({
               <div className="flex w-full flex-col gap-3">
                 {gatewayStatus?.state === 'running' && (
                   <Button
+                    asChild
                     variant="primary"
                     className="w-full min-w-[180px] bg-emerald-600 py-6 text-base text-white hover:bg-emerald-700"
-                    onClick={() => {
-                      const base = organizationId
-                        ? `/organizations/${organizationId}/claw`
-                        : '/claw';
-                      window.location.href = `${base}/chat`;
-                    }}
                   >
-                    Open KiloClaw
+                    <Link
+                      href={`${organizationId ? `/organizations/${organizationId}/claw` : '/claw'}/chat`}
+                    >
+                      Open KiloClaw
+                    </Link>
                   </Button>
                 )}
                 <Button

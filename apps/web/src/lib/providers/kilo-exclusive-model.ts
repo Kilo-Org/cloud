@@ -1,22 +1,22 @@
 import type { OpenRouterInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import type { ProviderId } from '@/lib/providers/types';
 
-export type KiloFreeModelFlag = 'reasoning' | 'prompt_cache' | 'vision';
+export type KiloExclusiveModelFlag = 'free' | 'reasoning' | 'prompt_cache' | 'vision';
 
-export type KiloFreeModel = {
+export type KiloExclusiveModel = {
   public_id: string;
   display_name: string;
   description: string;
   context_length: number;
   max_completion_tokens: number;
   status: 'public' | 'hidden' | 'disabled';
-  flags: KiloFreeModelFlag[];
+  flags: KiloExclusiveModelFlag[];
   gateway: ProviderId;
   internal_id: string;
   inference_provider: OpenRouterInferenceProviderId | null;
 };
 
-export function convertFromKiloModel(model: KiloFreeModel) {
+export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
   return {
     id: model.public_id,
     canonical_slug: model.public_id,
@@ -26,7 +26,7 @@ export function convertFromKiloModel(model: KiloFreeModel) {
     description: model.description,
     context_length: model.context_length,
     architecture: {
-      modality: model.flags.includes('vision') ? 'text+image-\u003Etext' : 'text-\u003Etext',
+      modality: model.flags.includes('vision') ? 'text+image->text' : 'text->text',
       input_modalities: ['text'].concat(model.flags.includes('vision') ? ['image'] : []),
       output_modalities: ['text'],
       tokenizer: 'Other',

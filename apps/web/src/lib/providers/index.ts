@@ -11,7 +11,7 @@ import type {
 import { applyMistralModelSettings, isMistralModel } from '@/lib/providers/mistral';
 import { applyXaiModelSettings, isXaiModel } from '@/lib/providers/xai';
 import { shouldRouteToVercel } from '@/lib/providers/vercel';
-import { kiloFreeModels } from '@/lib/models';
+import { kiloExclusiveModels } from '@/lib/models';
 import {
   applyAnthropicModelSettings,
   isAnthropicModel,
@@ -157,9 +157,10 @@ export async function getProvider(
     }
   }
 
-  const kiloFreeModel = kiloFreeModels.find(m => m.public_id === requestedModel);
+  const kiloExclusiveModel = kiloExclusiveModels.find(m => m.public_id === requestedModel);
   const defaultProvider =
-    Object.values(PROVIDERS).find(p => p.id === kiloFreeModel?.gateway) ?? PROVIDERS.OPENROUTER;
+    Object.values(PROVIDERS).find(p => p.id === kiloExclusiveModel?.gateway) ??
+    PROVIDERS.OPENROUTER;
 
   if (
     defaultProvider.id === 'openrouter' &&
@@ -275,14 +276,14 @@ export function applyProviderSpecificLogic(
   extraHeaders: Record<string, string>,
   userByok: BYOKResult[] | null
 ) {
-  const kiloFreeModel = kiloFreeModels.find(m => m.public_id === requestedModel);
-  if (kiloFreeModel) {
-    requestToMutate.body.model = kiloFreeModel.internal_id;
-    if (kiloFreeModel.inference_provider) {
+  const kiloExclusiveModel = kiloExclusiveModels.find(m => m.public_id === requestedModel);
+  if (kiloExclusiveModel) {
+    requestToMutate.body.model = kiloExclusiveModel.internal_id;
+    if (kiloExclusiveModel.inference_provider) {
       if (requestToMutate.body.provider) {
-        requestToMutate.body.provider.only = [kiloFreeModel.inference_provider];
+        requestToMutate.body.provider.only = [kiloExclusiveModel.inference_provider];
       } else {
-        requestToMutate.body.provider = { only: [kiloFreeModel.inference_provider] };
+        requestToMutate.body.provider = { only: [kiloExclusiveModel.inference_provider] };
       }
     }
   }

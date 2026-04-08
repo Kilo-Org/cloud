@@ -29,7 +29,7 @@ import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/providers/openrouter';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from './getRootSpan';
-import { isKiloStealthModel, kiloFreeModels } from '@/lib/models';
+import { isKiloStealthModel, kiloExclusiveModels } from '@/lib/models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -209,7 +209,7 @@ export async function makeErrorReadable({
 
   // Sometimes we get generic or nonsensical errors when the context length is exceeded
   // (such as "Internal Server Error" or "No allowed providers are available for the selected model")
-  const model = kiloFreeModels.find(m => m.public_id === requestedModel);
+  const model = kiloExclusiveModels.find(m => m.public_id === requestedModel);
   if (model) {
     const estimatedTokenCount = estimateTokenCount(request);
     if (estimatedTokenCount >= model.context_length) {

@@ -1,6 +1,6 @@
-import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
+import type { KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
 
-export const corethink_free_model: KiloFreeModel = {
+export const corethink_free_model: KiloExclusiveModel = {
   public_id: 'corethink:free',
   display_name: 'CoreThink (free)',
   description:
@@ -8,7 +8,7 @@ export const corethink_free_model: KiloFreeModel = {
   context_length: 78_000,
   max_completion_tokens: 8192,
   status: 'public',
-  flags: [],
+  flags: ['free'],
   gateway: 'corethink',
   internal_id: 'corethink',
   inference_provider: 'corethink',

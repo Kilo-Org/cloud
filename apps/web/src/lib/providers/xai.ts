@@ -1,7 +1,7 @@
-import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
+import type { KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
 import type { GatewayRequest } from '@/lib/providers/openrouter/types';
 
-export const grok_code_fast_1_optimized_free_model: KiloFreeModel = {
+export const grok_code_fast_1_optimized_free_model: KiloExclusiveModel = {
   public_id: 'x-ai/grok-code-fast-1:optimized:free',
   display_name: 'xAI: Grok Code Fast 1 Optimized (free)',
   description:
@@ -9,7 +9,7 @@ export const grok_code_fast_1_optimized_free_model: KiloFreeModel = {
   context_length: 256_000,
   max_completion_tokens: 10_000,
   status: 'public',
-  flags: ['reasoning', 'prompt_cache'],
+  flags: ['free', 'reasoning', 'prompt_cache'],
   gateway: 'martian',
   internal_id: 'x-ai/grok-code-fast-1:optimized',
   inference_provider: 'stealth',

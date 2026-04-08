@@ -1,6 +1,6 @@
-import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
+import type { KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
 
-export const trinity_large_thinking_free_model: KiloFreeModel = {
+export const trinity_large_thinking_free_model: KiloExclusiveModel = {
   public_id: 'arcee-ai/trinity-large-thinking:free',
   display_name: 'Arcee AI: Trinity Large Thinking (free)',
   description:
@@ -8,7 +8,7 @@ export const trinity_large_thinking_free_model: KiloFreeModel = {
   context_length: 262_144,
   max_completion_tokens: 262_144,
   status: 'public',
-  flags: ['reasoning'],
+  flags: ['free', 'reasoning'],
   gateway: 'openrouter',
   internal_id: 'arcee-ai/trinity-large-thinking',
   inference_provider: 'arcee-ai',

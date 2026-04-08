@@ -1,6 +1,6 @@
-import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
+import type { KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
 
-export const qwen36_plus_free_model: KiloFreeModel = {
+export const qwen36_plus_free_model: KiloExclusiveModel = {
   public_id: 'qwen/qwen3.6-plus:free',
   display_name: 'Qwen: Qwen3.6 Plus (free)',
   description:
@@ -8,7 +8,7 @@ export const qwen36_plus_free_model: KiloFreeModel = {
   context_length: 1000000,
   max_completion_tokens: 65536,
   status: 'disabled',
-  flags: ['reasoning', 'prompt_cache', 'vision'],
+  flags: ['free', 'reasoning', 'prompt_cache', 'vision'],
   gateway: 'alibaba',
   internal_id: 'qwen3.6-plus',
   inference_provider: 'alibaba',

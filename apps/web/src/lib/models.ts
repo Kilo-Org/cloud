@@ -16,7 +16,7 @@ import {
 import { trinity_large_thinking_free_model } from '@/lib/providers/arcee';
 import { seed_20_pro_free_model } from '@/lib/providers/bytedance';
 import { corethink_free_model } from '@/lib/providers/corethink';
-import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
+import type { KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
 import { MINIMAX_CURRENT_MODEL_ID, minimax_m25_free_model } from '@/lib/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/providers/morph';
@@ -59,7 +59,7 @@ export async function getMonitoredModels() {
 
 export function isFreeModel(model: string): boolean {
   return (
-    isKiloFreeModel(model) ||
+    isKiloExclusiveFreeModel(model) ||
     model === KILO_AUTO_FREE_MODEL.id ||
     (model ?? '').endsWith(':free') ||
     model === 'openrouter/free' ||
@@ -67,15 +67,13 @@ export function isFreeModel(model: string): boolean {
   );
 }
 
-export function isKiloFreeModel(model: string): boolean {
-  return kiloFreeModels.some(m => m.public_id === model && m.status !== 'disabled');
+export function isKiloExclusiveFreeModel(model: string): boolean {
+  return kiloExclusiveModels.some(
+    m => m.public_id === model && m.status !== 'disabled' && m.flags.includes('free')
+  );
 }
 
-export function isDataCollectionRequiredOnKiloCodeOnly(model: string): boolean {
-  return kiloFreeModels.some(m => m.public_id === model && m.status !== 'disabled');
-}
-
-export const kiloFreeModels = [
+export const kiloExclusiveModels = [
   // Please do not remove models from this list immediately.
   // Instead, set status to 'disabled' first
   // and only remove when very few users are requesting it.
@@ -89,10 +87,10 @@ export const kiloFreeModels = [
   seed_20_pro_free_model,
   qwen36_plus_free_model,
   trinity_large_thinking_free_model,
-] as KiloFreeModel[];
+] as KiloExclusiveModel[];
 
 export function isKiloStealthModel(model: string): boolean {
-  return kiloFreeModels.some(m => m.public_id === model && m.inference_provider === 'stealth');
+  return kiloExclusiveModels.some(m => m.public_id === model && m.inference_provider === 'stealth');
 }
 
 function isOpenRouterStealthModel(model: string): boolean {
@@ -100,5 +98,7 @@ function isOpenRouterStealthModel(model: string): boolean {
 }
 
 export function isDeadFreeModel(model: string): boolean {
-  return !!kiloFreeModels.find(m => m.public_id === model && m.status === 'disabled');
+  return !!kiloExclusiveModels.find(
+    m => m.public_id === model && m.status === 'disabled' && m.flags.includes('free')
+  );
 }

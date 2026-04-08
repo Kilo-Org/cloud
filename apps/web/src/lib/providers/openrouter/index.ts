@@ -1,4 +1,4 @@
-import { isFreeModel, kiloFreeModels, preferredModels } from '@/lib/models';
+import { isFreeModel, kiloExclusiveModels, preferredModels } from '@/lib/models';
 import PROVIDERS from '@/lib/providers/provider-definitions';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
@@ -7,7 +7,7 @@ import {
 } from '@/lib/organizations/organization-types';
 import { errorExceptInTest } from '@/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { convertFromKiloModel } from '@/lib/providers/kilo-free-model';
+import { convertFromKiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
 import { isForbiddenFreeModel } from '@/lib/forbidden-free-models';
 import {
   getModelSettings,
@@ -57,10 +57,12 @@ function enhancedModelList(models: OpenRouterModel[]) {
   const enhancedModels = models
     .filter(
       (model: OpenRouterModel) =>
-        !kiloFreeModels.some(m => m.public_id === model.id) && !isForbiddenFreeModel(model.id)
+        !kiloExclusiveModels.some(m => m.public_id === model.id) && !isForbiddenFreeModel(model.id)
     )
     .concat(
-      kiloFreeModels.filter(m => m.status === 'public').map(model => convertFromKiloModel(model))
+      kiloExclusiveModels
+        .filter(m => m.status === 'public')
+        .map(model => convertFromKiloExclusiveModel(model))
     )
     .concat(autoModels)
     .map((model: OpenRouterModel) => {

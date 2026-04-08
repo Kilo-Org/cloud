@@ -1160,16 +1160,18 @@ export function reconcileReviewQueue(
     }
   }
 
-  // When refinery code review is disabled, fast-track PR-strategy MR beads
-  // (those with pr_url set) to in_progress so poll_pr handles them.
-  // This must include beads that may not yet have pr_url set (timing window
-  // between review_submitted and the polecat setting pr_url) to prevent
-  // Rules 5-6 from dispatching the refinery unnecessarily.
+  // When refinery code review is disabled, fast-track PR-strategy open MR beads
+  // to in_progress so poll_pr handles them once pr_url is populated.
+  // Only beads with a non-empty pr_url should be fast-tracked — these are
+  // MRs where the refinery review is skipped and merge happens via the GitHub PR workflow.
   //
-  // Direct-merge strategy MR beads (no pr_url) still need the refinery —
-  // they are excluded from fast-track so Rules 5-6 can dispatch them.
+  // Direct-merge strategy MR beads (no pr_url, refinery merges itself) are
+  // NOT fast-tracked — they need Rules 5-6 to dispatch the refinery for
+  // the actual merge. We identify these by joining to review_metadata and
+  // excluding beads with null or empty pr_url.
+  const fastTrackedBeadIds = new Set<string>();
   if (!refineryCodeReview) {
-    const openMrs = z
+    const prStrategyMrs = z
       .object({ bead_id: z.string() })
       .array()
       .parse([
@@ -1182,11 +1184,14 @@ export function reconcileReviewQueue(
               ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
             WHERE b.${beads.columns.type} = 'merge_request'
               AND b.${beads.columns.status} = 'open'
+              AND rm.${review_metadata.columns.pr_url} IS NOT NULL
+              AND rm.${review_metadata.columns.pr_url} != ''
           `,
           []
         ),
       ]);
-    for (const { bead_id } of openMrs) {
+    for (const { bead_id } of prStrategyMrs) {
+      fastTrackedBeadIds.add(bead_id);
       actions.push({
         type: 'transition_bead',
         bead_id,
@@ -1198,15 +1203,15 @@ export function reconcileReviewQueue(
     }
   }
 
-  // Rules 5-6: Refinery dispatch for open MR beads.
+  // Rules 5-6: Refinery dispatch for direct-merge MR beads.
   // Always runs for direct-merge MR beads (refinery performs the merge).
-  // When code_review=false AND merge_strategy=pr, MR beads with pr_url
-  // were fast-tracked above, so only direct-merge MR beads remain for
-  // Rules 5-6.
+  // When code_review=false AND merge_strategy=pr, MR beads with pr_url are
+  // fast-tracked above — only direct-merge MR beads (not in fastTrackedBeadIds)
+  // remain for Rules 5-6.
   {
     // Rule 5: Pop open MR bead for idle refinery
-    // Get all rigs that have open MR beads
-    const rigsWithOpenMrs = z
+    // Get all rigs that have open MR beads, excluding fast-tracked ones
+    const allRigsWithOpenMrs = z
       .object({ rig_id: z.string() })
       .array()
       .parse([
@@ -1223,30 +1228,36 @@ export function reconcileReviewQueue(
         ),
       ]);
 
-    for (const { rig_id } of rigsWithOpenMrs) {
+    for (const { rig_id } of allRigsWithOpenMrs) {
       // Check if rig already has an in_progress MR that needs the refinery.
-      // PR-strategy MR beads (pr_url IS NOT NULL) don't need the refinery —
+      // PR-strategy MR beads (non-empty pr_url) don't need the refinery —
       // the merge is handled by the user/CI via the PR. Only direct-strategy
-      // MRs (no pr_url, refinery merges to main itself) block the queue.
-      const inProgressCount = z
-        .object({ cnt: z.number() })
+      // MRs (no pr_url or fast-tracked) block the queue.
+      const blockingInProgressMrs = z
+        .object({ bead_id: z.string() })
         .array()
         .parse([
           ...query(
             sql,
             /* sql */ `
-          SELECT count(*) as cnt FROM ${beads} b
+          SELECT b.${beads.columns.bead_id} FROM ${beads} b
           INNER JOIN ${review_metadata} rm
             ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
           WHERE b.${beads.columns.type} = 'merge_request'
             AND b.${beads.columns.status} = 'in_progress'
             AND b.${beads.columns.rig_id} = ?
-            AND rm.${review_metadata.columns.pr_url} IS NULL
+            AND (rm.${review_metadata.columns.pr_url} IS NULL
+              OR rm.${review_metadata.columns.pr_url} = '')
         `,
             [rig_id]
           ),
         ]);
-      if ((inProgressCount[0]?.cnt ?? 0) > 0) continue;
+        const thisRigFastTracked = fastTrackedBeadIds.filter(id => {
+          const mr = mrBeads.find(m => m.bead_id === id);
+          return mr?.rig_id === rig_id;
+        });
+        const blockingCount = blockingInProgressMrs.length + thisRigFastTracked.length;
+        if (blockingCount > 0) continue;
 
       // Check if the refinery for this rig is idle and unhooked
       const refinery = AgentRow.array().parse([
@@ -1264,33 +1275,31 @@ export function reconcileReviewQueue(
             AND b.${beads.columns.rig_id} = ?
           LIMIT 1
         `,
-          [rig_id]
-        ),
-      ]);
+            [rig_id]
+          ),
+        ]);
 
-      // Get oldest open direct-merge MR for this rig (pr_url IS NULL indicates
-      // direct-merge strategy; PR-strategy beads have pr_url set once CI posts)
-      const oldestMr = z
+      // Get oldest open MR for this rig, excluding fast-tracked beads
+      const candidateMrs = z
         .object({ bead_id: z.string() })
         .array()
         .parse([
           ...query(
             sql,
             /* sql */ `
-          SELECT b.${beads.bead_id}
-          FROM ${beads} b
-          INNER JOIN ${review_metadata} rm
-            ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
-          WHERE b.${beads.type} = 'merge_request'
-            AND b.${beads.status} = 'open'
-            AND b.${beads.rig_id} = ?
-            AND rm.${review_metadata.columns.pr_url} IS NULL
-          ORDER BY b.${beads.columns.created_at} ASC
-          LIMIT 1
+          SELECT ${beads.bead_id}
+          FROM ${beads}
+          WHERE ${beads.type} = 'merge_request'
+            AND ${beads.status} = 'open'
+            AND ${beads.rig_id} = ?
+          ORDER BY ${beads.columns.created_at} ASC
         `,
             [rig_id]
           ),
         ]);
+
+      // Filter out fast-tracked beads
+      const oldestMr = candidateMrs.filter(mr => !fastTrackedBeadIds.has(mr.bead_id));
 
       if (oldestMr.length === 0) continue;
 
@@ -1369,6 +1378,9 @@ export function reconcileReviewQueue(
 
     for (const ref of idleRefineries) {
       if (!ref.current_hook_bead_id) continue;
+
+      // Skip fast-tracked PR-strategy MR beads — poll_pr handles them
+      if (fastTrackedBeadIds.has(ref.current_hook_bead_id)) continue;
 
       // Read the bead's dispatch_attempts for the per-bead circuit breaker
       const mrRows = z

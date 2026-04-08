@@ -4378,7 +4378,10 @@ export class TownDO extends DurableObject<Env> {
     }>
   ): Promise<boolean> {
     try {
-      const threadSummaries = threads.map((t, i) => {
+      const unresolvedThreads = threads.filter(t => !t.isResolved);
+      if (unresolvedThreads.length === 0) return false;
+
+      const threadSummaries = unresolvedThreads.map((t, i) => {
         const comments = t.comments?.nodes ?? [];
         const commentText = comments
           .map(c => {

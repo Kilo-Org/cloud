@@ -665,7 +665,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         }
 
         const client = new KiloClawInternalClient();
-        const controllerStatus = await client.getKiloCliRunStatus(input.userId, workerInstanceId(instance));
+        const controllerStatus = await client.getKiloCliRunStatus(
+          input.userId,
+          workerInstanceId(instance)
+        );
 
         if (shouldPersistCliRunControllerStatus(row, controllerStatus)) {
           await db

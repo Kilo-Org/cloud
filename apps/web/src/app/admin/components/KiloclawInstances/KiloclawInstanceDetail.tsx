@@ -391,7 +391,8 @@ function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: st
 
   const selectedRunId =
     runId ??
-    latestRuns?.runs.find(run => run.instance_id === instanceId && run.initiated_by === 'admin')?.id ??
+    latestRuns?.runs.find(run => run.instance_id === instanceId && run.initiated_by === 'admin')
+      ?.id ??
     null;
 
   const {
@@ -491,7 +492,9 @@ function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: st
             <Button
               size="sm"
               variant="destructive"
-              onClick={() => selectedRunId && void cancelRun({ userId, instanceId, runId: selectedRunId })}
+              onClick={() =>
+                selectedRunId && void cancelRun({ userId, instanceId, runId: selectedRunId })
+              }
               disabled={isCancelling}
             >
               {isCancelling ? (

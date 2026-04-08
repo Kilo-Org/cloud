@@ -9,7 +9,7 @@ Humans: follow instructions below or talk to [@iscekic](https://github.com/iscek
 Generally speaking, you only need a new dev build if making dependency/native changes.
 
 1. obtain Expo access
-2. `pnpx eas-cli login`
+2. `pnpx eas-cli login -b`
 
 ### Android
 

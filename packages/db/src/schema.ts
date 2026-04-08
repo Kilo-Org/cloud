@@ -3337,6 +3337,53 @@ export const agent_environment_profile_commands = pgTable(
 
 export type AgentEnvironmentProfileCommand = typeof agent_environment_profile_commands.$inferSelect;
 
+// ============ AGENT ENVIRONMENT PROFILE REPO BINDINGS ============
+// Bind a single environment profile to a repository so sessions auto-inherit it
+
+export const agent_environment_profile_repo_bindings = pgTable(
+  'agent_environment_profile_repo_bindings',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    repo_full_name: text().notNull(),
+    platform: text({ enum: ['github', 'gitlab'] })
+      .notNull()
+      .default('github'),
+    profile_id: uuid()
+      .notNull()
+      .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    // Ownership: exactly one must be set (mirrors agent_environment_profiles pattern)
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    // One binding per repo+platform per user
+    uniqueIndex('UQ_agent_env_profile_repo_bindings_user')
+      .on(table.repo_full_name, table.platform, table.owned_by_user_id)
+      .where(isNotNull(table.owned_by_user_id)),
+    // One binding per repo+platform per org
+    uniqueIndex('UQ_agent_env_profile_repo_bindings_org')
+      .on(table.repo_full_name, table.platform, table.owned_by_organization_id)
+      .where(isNotNull(table.owned_by_organization_id)),
+    // Owner check constraint (exactly one must be set)
+    check(
+      'agent_env_profile_repo_bindings_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+  ]
+);
+
+export type AgentEnvironmentProfileRepoBinding =
+  typeof agent_environment_profile_repo_bindings.$inferSelect;
+export type NewAgentEnvironmentProfileRepoBinding =
+  typeof agent_environment_profile_repo_bindings.$inferInsert;
+
 // ============ APP BUILDER FEEDBACK ============
 
 export const app_builder_feedback = pgTable(
@@ -3610,6 +3657,9 @@ export const kiloclaw_subscriptions = pgTable(
     past_due_since: timestamp({ withTimezone: true, mode: 'string' }),
     suspended_at: timestamp({ withTimezone: true, mode: 'string' }),
     destruction_deadline: timestamp({ withTimezone: true, mode: 'string' }),
+    auto_resume_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
+    auto_resume_retry_after: timestamp({ withTimezone: true, mode: 'string' }),
+    auto_resume_attempt_count: integer().notNull().default(0),
     auto_top_up_triggered_for_period: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -3620,6 +3670,7 @@ export const kiloclaw_subscriptions = pgTable(
   table => [
     index('IDX_kiloclaw_subscriptions_status').on(table.status),
     index('IDX_kiloclaw_subscriptions_stripe_schedule_id').on(table.stripe_schedule_id),
+    index('IDX_kiloclaw_subscriptions_auto_resume_retry_after').on(table.auto_resume_retry_after),
     enumCheck('kiloclaw_subscriptions_plan_check', table.plan, KiloClawPlan),
     enumCheck(
       'kiloclaw_subscriptions_scheduled_plan_check',

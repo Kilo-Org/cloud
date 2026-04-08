@@ -4,9 +4,9 @@ import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
-import { kiloclaw_subscriptions, kiloclaw_earlybird_purchases } from '@kilocode/db/schema';
+import { kiloclaw_earlybird_purchases } from '@kilocode/db/schema';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
-import { KILOCLAW_BILLING_ENFORCEMENT } from '@/lib/config.server';
+import { getEffectiveKiloClawSubscriptionForUser } from '@/lib/kiloclaw/access-state';
 import { baseProcedure } from '@/lib/trpc/init';
 
 /**
@@ -14,26 +14,12 @@ import { baseProcedure } from '@/lib/trpc/init';
  * Throws TRPCError FORBIDDEN if the user has no valid access.
  */
 export async function requireKiloClawAccess(userId: string): Promise<void> {
-  if (!KILOCLAW_BILLING_ENFORCEMENT) return;
+  const now = new Date();
 
   // 1. Active subscription
-  const [sub] = await db
-    .select({
-      status: kiloclaw_subscriptions.status,
-      trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
-      suspended_at: kiloclaw_subscriptions.suspended_at,
-    })
-    .from(kiloclaw_subscriptions)
-    .where(eq(kiloclaw_subscriptions.user_id, userId))
-    .limit(1);
-
-  if (sub) {
-    if (sub.status === 'active') return;
-    // past_due retains access only until the billing lifecycle cron suspends the
-    // account. Once suspended_at is set, the user must resolve payment first.
-    if (sub.status === 'past_due' && !sub.suspended_at) return;
-    if (sub.status === 'trialing' && sub.trial_ends_at && new Date(sub.trial_ends_at) > new Date())
-      return;
+  const { accessReason } = await getEffectiveKiloClawSubscriptionForUser(userId, now);
+  if (accessReason) {
+    return;
   }
 
   // 2. Earlybird not expired
@@ -43,7 +29,7 @@ export async function requireKiloClawAccess(userId: string): Promise<void> {
     .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
     .limit(1);
 
-  if (earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > new Date()) {
+  if (earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now) {
     return;
   }
 

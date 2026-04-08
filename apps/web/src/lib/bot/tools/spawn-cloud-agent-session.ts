@@ -64,7 +64,7 @@ export const spawnCloudAgentInputSchema = z.object({
   mode: z
     .enum(['code', 'ask'])
     .describe(
-      'The agent mode: "code" for making changes (creates a PR/MR), "ask" for questions and explanations about existing code.'
+      'The agent mode: "code" for making changes, "ask" for questions and explanations about existing code. When using "code", decide based on the conversation context whether the agent should create a new PR/MR or push to an existing one, and include that instruction in the prompt.'
     ),
 });
 
@@ -105,14 +105,7 @@ export default async function spawnCloudAgentSession(
     return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
   }
 
-  const isGitLab = !!args.gitlabProject;
-  let prompt =
-    mode === 'code'
-      ? args.prompt +
-        (isGitLab
-          ? '\n\nOpen a merge request with your changes and return the MR URL.'
-          : '\n\nOpen a pull request with your changes and return the PR URL.')
-      : args.prompt;
+  let prompt = args.prompt;
 
   // Append PR/MR signature to the prompt if available
   if (options?.prSignature) {

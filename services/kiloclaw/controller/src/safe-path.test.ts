@@ -28,6 +28,12 @@ describe('resolveSafePath', () => {
     expect(() => resolveSafePath('workspace/SOUL\0.md', ROOT)).toThrow();
   });
 
+  it('resolves the legacy bootstrap path in workspace', () => {
+    expect(resolveSafePath('workspace/BOOTSTRAP.md', ROOT)).toBe(
+      '/root/.openclaw/workspace/BOOTSTRAP.md'
+    );
+  });
+
   it('allows credentials directory', () => {
     expect(resolveSafePath('credentials/key.json', ROOT)).toBe(
       '/root/.openclaw/credentials/key.json'

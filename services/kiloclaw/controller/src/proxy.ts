@@ -152,10 +152,12 @@ export function handleWebSocketUpgrade(
   const forwardedHeaders = { ...req.headers };
   delete forwardedHeaders['x-kiloclaw-proxy-token'];
   // Rewrite Host so the gateway sees a loopback origin (matching the HTTP proxy path).
-  // Strip forwarded-* headers injected by upstream proxies (Fly, CF) so the gateway's
+  // Strip proxy/forwarding headers injected by upstream proxies (Fly, CF) so the gateway's
   // isLocalDirectRequest check doesn't conclude the request came from a remote client.
   forwardedHeaders['host'] = `${backendHost}:${backendPort}`;
+  delete forwardedHeaders['forwarded'];
   delete forwardedHeaders['x-forwarded-for'];
+  delete forwardedHeaders['x-forwarded-proto'];
   delete forwardedHeaders['x-real-ip'];
   delete forwardedHeaders['x-forwarded-host'];
 

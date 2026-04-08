@@ -32,6 +32,11 @@ export const GatewayCommandResponseSchema = z.object({
   ok: z.boolean(),
 });
 
+export const BotIdentityResponseSchema = z.object({
+  ok: z.boolean(),
+  path: z.string(),
+});
+
 export const ConfigRestoreResponseSchema = z.object({
   ok: z.boolean(),
   signaled: z.boolean(),

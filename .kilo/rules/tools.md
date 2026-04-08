@@ -10,3 +10,9 @@
 - The webserver should already be running. Read the dev server port from the `.dev-port` file in the project root (e.g., `cat .dev-port`), then access it via `http://localhost:<port>/`. If `.dev-port` does not exist, start the dev server by running `pnpm dev:start &` in the background, then wait for `.dev-port` to appear before reading the port from it.
 - If you need to log in as a fake user, open http://localhost:<port>/users/sign_in?fakeUser=<fake-email> where <port> is read from `.dev-port` (falling back to 3000) and <fake-email> is constructed from "kilo-", my username (based on homedir), and the time (include seconds) and then '@example.com'. If you need an admin account, the email address must end in @admin.example.com. After logging in, wait for the creating your account spinner to complete before proceeding. The admin panels can be accessed from your profile via the account icon in the top-right corner, which opens a drop-down, allowing access to the admin panel.
 - be sure to add the callbackPath url parameter to go directly to the page after logging in!
+- Dev services status and management:
+  - `cat dev/logs/manifest.json` — static snapshot of started services and ports (written on `dev:start`)
+  - `pnpm dev:status` — live status of running services with ports
+  - `pnpm dev:status --json` — machine-readable live status (session name, portOffset, services with name/port/status/group)
+  - `pnpm dev:restart <service>` — restart a running service (sends Ctrl-C and re-runs its start command)
+  - `tail -f dev/logs/<service>.log` — follow a service's log output in real time

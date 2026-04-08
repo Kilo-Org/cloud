@@ -12,6 +12,7 @@ export const METADATA_KEY_SANDBOX_ID = 'kiloclaw_sandbox_id';
 export const METADATA_KEY_ORG_ID = 'kiloclaw_org_id';
 export const METADATA_KEY_OPENCLAW_VERSION = 'kiloclaw_openclaw_version';
 export const METADATA_KEY_IMAGE_VARIANT = 'kiloclaw_image_variant';
+export const METADATA_KEY_DEV_CREATOR = 'kiloclaw_dev_creator';
 
 // ============================================================================
 // Machine config builder
@@ -23,6 +24,7 @@ export type MachineIdentity = {
   orgId: string | null;
   openclawVersion: string | null;
   imageVariant: string | null;
+  devCreator: string | null;
 };
 
 export function buildMachineConfig(
@@ -66,6 +68,7 @@ export function buildMachineConfig(
         [METADATA_KEY_OPENCLAW_VERSION]: identity.openclawVersion,
       }),
       ...(identity.imageVariant && { [METADATA_KEY_IMAGE_VARIANT]: identity.imageVariant }),
+      ...(identity.devCreator && { [METADATA_KEY_DEV_CREATOR]: identity.devCreator }),
     },
   };
 }

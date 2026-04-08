@@ -4,6 +4,7 @@ import {
   getEffectiveDefaultProfileId,
   getDefaultProfile,
 } from './profile-service';
+import { getBindingForRepo } from './repo-binding-service';
 import { getVarsForSession } from './profile-vars-service';
 import { getCommandsForSession } from './profile-commands-service';
 import type { EncryptedEnvelope } from '@/lib/encryption';
@@ -29,6 +30,8 @@ export type MergeProfileConfigurationArgs = {
   owner: ProfileOwner;
   /** When in org context, enables searching personal profiles and using effective default. */
   userId?: string;
+  repoFullName?: string;
+  platform?: 'github' | 'gitlab';
   envVars?: Record<string, string>;
   setupCommands?: string[];
 };
@@ -43,6 +46,8 @@ export async function mergeProfileConfiguration({
   profileName,
   owner,
   userId,
+  repoFullName,
+  platform,
   envVars = {},
   setupCommands = [],
 }: MergeProfileConfigurationArgs): Promise<MergeProfileConfigurationResult> {
@@ -50,68 +55,108 @@ export async function mergeProfileConfiguration({
   let mergedSetupCommands = [...setupCommands];
   let encryptedSecrets: Record<string, EncryptedEnvelope> | undefined;
 
-  // Resolve profile ID based on context
-  let profileId: string | null = null;
+  // Layer 1: Repo binding profile (base)
+  let repoBindingProfileId: string | null = null;
+  if (repoFullName && platform) {
+    repoBindingProfileId = await getBindingForRepo(owner, repoFullName, platform);
+  }
 
+  // Layer 2: User-selected or default profile (override)
+  let overrideProfileId: string | null = null;
   if (profileName) {
-    // When profileName is provided, search for it
-    // In org context with userId, try org profiles first, then personal
+    // Explicit profile name — resolve it
     if (owner.type === 'organization' && userId) {
-      profileId = await getProfileIdByName(profileName, owner);
-      if (!profileId) {
-        // Fall back to user's personal profile
-        profileId = await getProfileIdByName(profileName, { type: 'user', id: userId });
+      overrideProfileId = await getProfileIdByName(profileName, owner);
+      if (!overrideProfileId) {
+        overrideProfileId = await getProfileIdByName(profileName, { type: 'user', id: userId });
       }
     } else {
-      profileId = await getProfileIdByName(profileName, owner);
+      overrideProfileId = await getProfileIdByName(profileName, owner);
     }
 
-    if (!profileId) {
+    if (!overrideProfileId) {
       throw new ProfileNotFoundError(profileName);
     }
   } else {
-    // No profileName provided - use effective default
+    // No explicit profile — fall back to default
     if (owner.type === 'organization' && userId) {
-      // In org context, use effective default (org default > personal default)
-      profileId = await getEffectiveDefaultProfileId(userId, owner.id);
+      overrideProfileId = await getEffectiveDefaultProfileId(userId, owner.id);
     } else {
-      // In personal context, use user's default
       const defaultProfile = await getDefaultProfile(owner);
-      profileId = defaultProfile?.id ?? null;
+      overrideProfileId = defaultProfile?.id ?? null;
     }
   }
 
-  if (!profileId) {
-    return {
-      envVars: Object.keys(mergedEnvVars).length > 0 ? mergedEnvVars : undefined,
-      setupCommands: mergedSetupCommands.length > 0 ? mergedSetupCommands : undefined,
-      encryptedSecrets,
-    };
+  // Deduplicate: if both layers resolve to the same profile, skip the base layer
+  if (repoBindingProfileId && repoBindingProfileId === overrideProfileId) {
+    repoBindingProfileId = null;
   }
 
-  const [profileVars, profileCommands] = await Promise.all([
-    getVarsForSession(profileId),
-    getCommandsForSession(profileId),
-  ]);
+  // Load all profile data in parallel
+  const profilesToLoad: string[] = [];
+  if (repoBindingProfileId) profilesToLoad.push(repoBindingProfileId);
+  if (overrideProfileId) profilesToLoad.push(overrideProfileId);
 
-  const profileEnvVars: Record<string, string> = {};
-  const profileSecrets: Record<string, EncryptedEnvelope> = {};
+  const profileData = await Promise.all(
+    profilesToLoad.map(async profileId => {
+      const [vars, commands] = await Promise.all([
+        getVarsForSession(profileId),
+        getCommandsForSession(profileId),
+      ]);
+      return { profileId, vars, commands };
+    })
+  );
 
-  for (const variable of profileVars) {
-    if (variable.isSecret) {
-      // Secrets are stored as JSON strings in the database, parse and validate them
-      const parsed = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
-      profileSecrets[variable.key] = parsed;
-    } else {
-      profileEnvVars[variable.key] = variable.value;
+  // Build the layered result: repo binding vars < override vars < manual vars
+  const repoBindingData = repoBindingProfileId
+    ? profileData.find(d => d.profileId === repoBindingProfileId)
+    : null;
+  const overrideData = overrideProfileId
+    ? profileData.find(d => d.profileId === overrideProfileId)
+    : null;
+
+  // Process repo binding profile (base layer)
+  const baseEnvVars: Record<string, string> = {};
+  const baseSecrets: Record<string, EncryptedEnvelope> = {};
+  const baseCommands: string[] = [];
+
+  if (repoBindingData) {
+    for (const variable of repoBindingData.vars) {
+      if (variable.isSecret) {
+        const parsed = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
+        baseSecrets[variable.key] = parsed;
+      } else {
+        baseEnvVars[variable.key] = variable.value;
+      }
     }
+    baseCommands.push(...repoBindingData.commands);
   }
 
-  mergedEnvVars = { ...profileEnvVars, ...mergedEnvVars };
-  mergedSetupCommands = [...profileCommands, ...mergedSetupCommands];
+  // Process override profile
+  const overrideEnvVars: Record<string, string> = {};
+  const overrideSecrets: Record<string, EncryptedEnvelope> = {};
+  const overrideCommands: string[] = [];
 
-  if (Object.keys(profileSecrets).length > 0) {
-    encryptedSecrets = profileSecrets;
+  if (overrideData) {
+    for (const variable of overrideData.vars) {
+      if (variable.isSecret) {
+        const parsed = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
+        overrideSecrets[variable.key] = parsed;
+      } else {
+        overrideEnvVars[variable.key] = variable.value;
+      }
+    }
+    overrideCommands.push(...overrideData.commands);
+  }
+
+  // Merge env vars: base < override < manual
+  mergedEnvVars = { ...baseEnvVars, ...overrideEnvVars, ...envVars };
+  // Merge commands: base, then override, then manual
+  mergedSetupCommands = [...baseCommands, ...overrideCommands, ...setupCommands];
+  // Merge secrets: base < override (override wins on key collision)
+  const allSecrets = { ...baseSecrets, ...overrideSecrets };
+  if (Object.keys(allSecrets).length > 0) {
+    encryptedSecrets = allSecrets;
   }
 
   return {

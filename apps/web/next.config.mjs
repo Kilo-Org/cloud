@@ -9,7 +9,9 @@ const withBundleAnalyzer = NextBundleAnalyzer({
 });
 
 function validateGitLfs() {
-  const anLfsPath = 'public/kilo-anim.mp4';
+  // Resolve relative to this config file so the check works regardless of CWD
+  // (e.g. when Storybook loads this config from apps/storybook/)
+  const anLfsPath = resolve(import.meta.dirname, 'public/kilo-anim.mp4');
   const stats = statSync(anLfsPath, { throwIfNoEntry: false });
 
   if (!stats || stats.size < 1024)

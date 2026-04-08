@@ -5,6 +5,7 @@ import {
   type GatewayProcessStatus,
   GatewayProcessStatusSchema,
   GatewayCommandResponseSchema,
+  BotIdentityResponseSchema,
   ConfigRestoreResponseSchema,
   ControllerVersionResponseSchema,
   GatewayReadyResponseSchema,
@@ -192,6 +193,26 @@ export function restartGatewayProcess(
     '/_kilo/gateway/restart',
     'POST',
     GatewayCommandResponseSchema
+  );
+}
+
+export function writeBotIdentity(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  botIdentity: {
+    botName?: string | null;
+    botNature?: string | null;
+    botVibe?: string | null;
+    botEmoji?: string | null;
+  }
+): Promise<{ ok: boolean; path: string }> {
+  return callGatewayController(
+    state,
+    env,
+    '/_kilo/bot-identity',
+    'POST',
+    BotIdentityResponseSchema,
+    botIdentity
   );
 }
 

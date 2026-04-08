@@ -990,6 +990,56 @@ describe('User', () => {
       ).toBe(0);
     });
 
+    it('should delete kiloclaw_subscriptions and kiloclaw_cli_runs linked to a kiloclaw_instance for the user', async () => {
+      const user = await insertTestUser();
+
+      const [instance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: user.id,
+          sandbox_id: `test-gdpr-fk-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      await db.insert(kiloclaw_subscriptions).values({
+        user_id: user.id,
+        plan: 'standard',
+        status: 'canceled',
+        instance_id: instance.id,
+      });
+
+      await db.insert(kiloclaw_cli_runs).values({
+        user_id: user.id,
+        prompt: 'test fk ordering',
+        status: 'completed',
+        instance_id: instance.id,
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_instances)
+          .where(eq(kiloclaw_instances.user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_subscriptions)
+          .where(eq(kiloclaw_subscriptions.user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(kiloclaw_cli_runs)
+          .where(eq(kiloclaw_cli_runs.user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+    });
+
     it('should throw SoftDeletePreconditionError for active KiloClaw subscription', async () => {
       const user = await insertTestUser();
       await db.insert(kiloclaw_subscriptions).values({

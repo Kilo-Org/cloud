@@ -19,9 +19,11 @@ import type {
   PermissionState,
   MessageInfo,
   Part,
+  TextPart,
 } from './types';
 import type { QuestionInfo } from '@/types/opencode.gen';
 import { splitByContiguousPrefix } from '@/lib/utils/splitByContiguousPrefix';
+import { generateMessageId } from './message-id';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,6 +66,8 @@ type FetchedSessionData = {
   isInitiated: boolean;
   needsLegacyPrepare: boolean;
   isPreparingAsync: boolean;
+  prompt: string | null;
+  initialMessageId: string | null;
 };
 
 type PrepareInput = {
@@ -228,7 +232,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   // Internal atoms
   const sessionStorageAtom = atom<JotaiSessionStorage | null>(null);
-  const optimisticMessageAtom = atom<StoredMessage | null>(null);
   const rootSessionIdAtom = atom<string | null>(null);
 
   // Public writable atoms
@@ -268,8 +271,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (rootSessionId !== null && info.sessionID !== rootSessionId) continue;
       out.push({ info, parts: partsMap.get(id) ?? [] });
     }
-    const opt = get(optimisticMessageAtom);
-    if (opt) out.push(opt);
     return out;
   });
 
@@ -323,7 +324,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   function clearAllAtoms(): void {
     store.set(sessionStorageAtom, null);
-    store.set(optimisticMessageAtom, null);
     store.set(rootSessionIdAtom, null);
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
@@ -388,7 +388,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (act.type !== prevAct) {
         if (act.type === 'busy') {
           setIndicator(null);
-          store.set(optimisticMessageAtom, null);
         } else if (act.type === 'retrying') {
           setIndicator({
             type: 'warning',
@@ -462,6 +461,27 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     });
     store.set(sessionIdAtom, data.cloudAgentSessionId);
     store.set(sessionStorageAtom, jotaiStorage);
+
+    // Insert initial message for non-initiated sessions that have prompt and initialMessageId
+    if (!data.isInitiated && data.prompt && data.initialMessageId) {
+      jotaiStorage.upsertMessage({
+        id: data.initialMessageId,
+        sessionID: kiloSessionId,
+        role: 'user',
+        time: { created: Date.now() / 1000 },
+        agent: '',
+        model: { providerID: '', modelID: '' },
+      } satisfies MessageInfo);
+      jotaiStorage.upsertPart(data.initialMessageId, {
+        id: `${data.initialMessageId}-text`,
+        sessionID: kiloSessionId,
+        messageID: data.initialMessageId,
+        type: 'text',
+        text: data.prompt,
+        synthetic: true,
+      } satisfies TextPart);
+    }
+
     config.onKiloSessionCreated?.(kiloSessionId);
 
     const session = createCloudAgentSession({
@@ -567,36 +587,49 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }): Promise<void> {
     store.set(errorAtom, null);
     setIndicator(null);
-    const id = `optimistic-${crypto.randomUUID()}`;
-    store.set(optimisticMessageAtom, {
-      info: {
-        id,
-        sessionID: '',
+
+    const storage = store.get(sessionStorageAtom);
+    const kiloSessionId = activeSessionId;
+    const messageId = generateMessageId();
+    const shouldStoreOptimisticMessage = activeSessionType === 'cloud-agent';
+
+    if (storage && kiloSessionId && shouldStoreOptimisticMessage) {
+      storage.upsertMessage({
+        id: messageId,
+        sessionID: kiloSessionId,
         role: 'user',
         time: { created: Date.now() / 1000 },
         agent: '',
         model: { providerID: '', modelID: payload.model },
-      },
-      parts: [
-        { id: `${id}-text`, sessionID: '', messageID: id, type: 'text', text: payload.prompt },
-      ],
-    } satisfies StoredMessage);
+      });
+      storage.upsertPart(messageId, {
+        id: `${messageId}-text`,
+        sessionID: kiloSessionId,
+        messageID: messageId,
+        type: 'text',
+        text: payload.prompt,
+        synthetic: true,
+      });
+    }
+
     try {
       if (!currentSession) throw new Error('No active session');
       // Snapshot before await — switchSession() can overwrite these while send is in flight.
       const sessionType = activeSessionType;
-      const kiloSessionId = activeSessionId;
       await currentSession.send({
         prompt: payload.prompt,
         mode: payload.mode,
         model: payload.model,
         variant: payload.variant,
+        messageId,
       });
       if (sessionType === 'remote' && kiloSessionId) {
         config.onRemoteSessionMessageSent?.({ kiloSessionId });
       }
     } catch (err) {
-      store.set(optimisticMessageAtom, null);
+      if (storage && shouldStoreOptimisticMessage) {
+        storage.deleteMessage(messageId);
+      }
       store.set(failedPromptAtom, payload.prompt);
       config.onSendFailed?.(payload.prompt);
       setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });

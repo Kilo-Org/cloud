@@ -147,6 +147,10 @@ export async function buildUserEnvVars(
       instanceFeatures: state.instanceFeatures,
       execSecurity: state.execSecurity ?? undefined,
       execAsk: state.execAsk ?? undefined,
+      botName: state.botName ?? undefined,
+      botNature: state.botNature ?? undefined,
+      botVibe: state.botVibe ?? undefined,
+      botEmoji: state.botEmoji ?? undefined,
       orgId: state.orgId,
       customSecretMeta: state.customSecretMeta ?? undefined,
     }

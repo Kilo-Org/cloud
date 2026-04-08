@@ -25,6 +25,7 @@ export const OPENROUTER_API_KEY = getEnvVariable('OPENROUTER_API_KEY');
 export const MISTRAL_API_KEY = getEnvVariable('MISTRAL_API_KEY');
 export const OPENAI_API_KEY = getEnvVariable('OPENAI_API_KEY');
 export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
+export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
 export const CODE_REVIEW_WORKER_AUTH_TOKEN = getEnvVariable('CODE_REVIEW_WORKER_AUTH_TOKEN');
 export const IMPACT_ACCOUNT_SID = getEnvVariable('IMPACT_ACCOUNT_SID') || '';
@@ -206,11 +207,6 @@ export const STRIPE_KILOCLAW_EARLYBIRD_COUPON_ID = getEnvVariable(
 export const STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID = getEnvVariable(
   'STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID'
 );
-
-// KiloClaw Billing Enforcement — opt-in gate for subscription/trial/earlybird checks.
-// When false (default), all billing gates are no-ops so users are never blocked.
-export const KILOCLAW_BILLING_ENFORCEMENT =
-  getEnvVariable('KILOCLAW_BILLING_ENFORCEMENT') === 'true';
 
 // Webhook Agent Ingest Worker
 export const WEBHOOK_AGENT_URL =

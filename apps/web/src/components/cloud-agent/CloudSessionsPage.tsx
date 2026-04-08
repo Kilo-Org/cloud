@@ -692,6 +692,8 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
             effectiveSetupCommands={effectiveSetupCommands}
             onManualEnvVarsChange={setManualEnvVars}
             onManualSetupCommandsChange={setManualSetupCommands}
+            repoFullName={selectedRepo || undefined}
+            platform={selectedPlatform}
           />
 
           {/* Submit Button */}

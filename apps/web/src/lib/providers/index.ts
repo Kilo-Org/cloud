@@ -142,6 +142,13 @@ export async function getProvider(
             if (customLlm.add_cache_breakpoints) {
               addCacheBreakpoints(context.request);
             }
+            if (
+              customLlm.reasoning_summary &&
+              context.request.kind === 'responses' &&
+              context.request.body.reasoning
+            ) {
+              context.request.body.reasoning.summary = customLlm.reasoning_summary;
+            }
           },
         },
         userByok: null,

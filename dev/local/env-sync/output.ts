@@ -1,6 +1,12 @@
+import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { EnvSyncPlan } from './types';
+import type {
+  DevVarsFileChange,
+  EnvSyncPlan,
+  SecretStoreAutoCreate,
+  SecretStoreWarning,
+} from './types';
 import { formatValue } from './parse';
 
 // ---------------------------------------------------------------------------
@@ -18,14 +24,11 @@ const CYAN = '\x1b[36m';
 // Plan display
 // ---------------------------------------------------------------------------
 
-function truncateValue(value: string, maxLen = 50): string {
-  if (value.length <= maxLen) return value;
-  return value.slice(0, maxLen - 1) + '…';
-}
-
 function planHasChanges(plan: EnvSyncPlan): boolean {
   const hasDevVarsDrift = plan.devVarsChanges.some(c => c.isNew || c.keyChanges.length > 0);
-  return hasDevVarsDrift || plan.envDevLocalChanges.length > 0;
+  return (
+    hasDevVarsDrift || plan.envDevLocalChanges.length > 0 || plan.secretStoreAutoCreates.length > 0
+  );
 }
 
 function displayPlan(plan: EnvSyncPlan): void {
@@ -34,70 +37,97 @@ function displayPlan(plan: EnvSyncPlan): void {
     return;
   }
 
-  if (plan.lanIp) {
-    console.log(`${DIM}LAN IP: ${plan.lanIp}${RESET}`);
-    console.log();
-  }
-
   let hasOutput = false;
 
-  // .dev.vars changes
-  if (plan.devVarsChanges.length > 0) {
-    for (const change of plan.devVarsChanges) {
-      if (change.isNew) {
-        console.log(`${GREEN}+ ${change.workerDir}/.dev.vars${RESET} ${DIM}(new)${RESET}`);
-      } else {
-        console.log(`${CYAN}✎ ${change.workerDir}/.dev.vars${RESET}`);
-        for (const kc of change.keyChanges) {
-          if (kc.oldValue === undefined) {
-            console.log(`    ${GREEN}+ ${kc.key}${RESET} = ${truncateValue(kc.newValue)}`);
-          } else {
-            console.log(
-              `    ${YELLOW}~ ${kc.key}${RESET}: ${truncateValue(kc.oldValue)} → ${truncateValue(kc.newValue)}`
-            );
-          }
+  // ── Group per-service items by workerDir ──────────────────────────────
+
+  type ServiceGroup = {
+    devVars: DevVarsFileChange | undefined;
+    autoCreates: SecretStoreAutoCreate[];
+    warning: SecretStoreWarning | undefined;
+  };
+
+  const serviceMap = new Map<string, ServiceGroup>();
+
+  const getGroup = (dir: string): ServiceGroup => {
+    let g = serviceMap.get(dir);
+    if (!g) {
+      g = { devVars: undefined, autoCreates: [], warning: undefined };
+      serviceMap.set(dir, g);
+    }
+    return g;
+  };
+
+  for (const c of plan.devVarsChanges) getGroup(c.workerDir).devVars = c;
+  for (const c of plan.secretStoreAutoCreates) getGroup(c.workerDir).autoCreates.push(c);
+  for (const w of plan.secretStoreWarnings) getGroup(w.workerDir).warning = w;
+
+  // ── Render each service ───────────────────────────────────────────────
+
+  for (const [workerDir, group] of serviceMap) {
+    const dv = group.devVars;
+    const hasDevVars = dv && (dv.isNew || dv.keyChanges.length > 0 || dv.missingValues.length > 0);
+    if (!hasDevVars && group.autoCreates.length === 0 && !group.warning) continue;
+
+    if (hasOutput) console.log();
+    console.log(`${CYAN}${workerDir}${RESET}`);
+
+    // .dev.vars (skip keys already shown as ⊕ auto-creates)
+    if (dv) {
+      const autoCreateKeys = new Set(group.autoCreates.map(c => c.binding.secret_name));
+      if (dv.isNew) {
+        console.log(`  ${GREEN}+ .dev.vars${RESET} ${DIM}(new)${RESET}`);
+      }
+      for (const kc of dv.keyChanges) {
+        if (autoCreateKeys.has(kc.key)) continue;
+        if (kc.oldValue === undefined) {
+          console.log(`    ${GREEN}+ ${kc.key}${RESET}`);
+        } else {
+          console.log(`    ${YELLOW}~ ${kc.key}${RESET}`);
         }
       }
-      for (const missing of change.missingValues) {
+      for (const missing of dv.missingValues) {
         console.log(`    ${RED}⚠ ${missing}${RESET} — no value found`);
       }
     }
+
+    // Secrets store auto-creates
+    for (const create of group.autoCreates) {
+      console.log(
+        `    ${GREEN}⊕${RESET} secret: ${create.binding.secret_name} ${DIM}@from ${create.envLocalKey}${RESET}`
+      );
+    }
+
+    // Secrets store warnings
+    if (group.warning) {
+      console.log(`    ${YELLOW}⚠${RESET} secrets_store — missing local secrets:`);
+      for (const binding of group.warning.bindings) {
+        console.log(
+          `      ${binding.binding}: wrangler secrets-store secret create ${binding.store_id} --name ${binding.secret_name} --scopes workers`
+        );
+      }
+    }
+
     hasOutput = true;
   }
 
-  // .env.development.local changes
+  // ── .env.development.local (not per-service) ─────────────────────────
+
   if (plan.envDevLocalChanges.length > 0) {
     if (hasOutput) console.log();
     console.log(`${CYAN}✎ .env.development.local${RESET}`);
     for (const change of plan.envDevLocalChanges) {
       if (change.oldValue === undefined) {
-        console.log(`    ${GREEN}+ ${change.key}${RESET} = ${change.newValue}`);
+        console.log(`    ${GREEN}+ ${change.key}${RESET}`);
       } else {
-        console.log(
-          `    ${YELLOW}~ ${change.key}${RESET}: ${truncateValue(change.oldValue)} → ${change.newValue}`
-        );
+        console.log(`    ${YELLOW}~ ${change.key}${RESET}`);
       }
     }
     hasOutput = true;
   }
 
-  // Secrets store warnings
-  if (plan.secretStoreWarnings.length > 0) {
-    if (hasOutput) console.log();
-    for (const warning of plan.secretStoreWarnings) {
-      console.log(
-        `${YELLOW}⚠ ${warning.workerDir}${RESET} uses secrets_store — missing local secrets:`
-      );
-      for (const binding of warning.bindings) {
-        console.log(
-          `    ${binding.binding}: wrangler secrets-store secret create ${binding.store_id} --name ${binding.secret_name} --scopes workers`
-        );
-      }
-    }
-    hasOutput = true;
-  }
+  // ── Consistency warnings (cross-service) ──────────────────────────────
 
-  // Consistency warnings
   if (plan.consistencyWarnings.length > 0) {
     if (hasOutput) console.log();
     for (const warning of plan.consistencyWarnings) {
@@ -107,15 +137,36 @@ function displayPlan(plan: EnvSyncPlan): void {
           entry.workerKey !== warning.sourceKey
             ? `${entry.workerDir} (${entry.workerKey})`
             : entry.workerDir;
-        console.log(`    ${keyLabel}: ${truncateValue(entry.value)}`);
+        console.log(`    ${keyLabel}`);
       }
+    }
+    hasOutput = true;
+  }
+
+  // @exec annotation failures (always shown, even if existing value is preserved)
+  if (plan.execWarnings.length > 0) {
+    if (hasOutput) console.log();
+    for (const warning of plan.execWarnings) {
+      const cmd = [warning.command, ...warning.args].join(' ');
+      console.log(
+        `${YELLOW}⚠ ${warning.workerDir}${RESET}: ${RED}${warning.key}${RESET} — \`${cmd}\` failed`
+      );
+      console.log(`    Run the command manually to diagnose.`);
     }
     hasOutput = true;
   }
 
   if (!hasOutput) {
     console.log(`${GREEN}✓ All env vars are up to date${RESET}`);
+    return;
   }
+
+  // ── Legend ─────────────────────────────────────────────────────────────
+
+  console.log();
+  console.log(
+    `${DIM}${GREEN}+${RESET}${DIM} new  ${YELLOW}~${RESET}${DIM} changed  ${GREEN}⊕${RESET}${DIM} create secret  ${RED}⚠${RESET}${DIM} missing  ${RED}✗${RESET}${DIM} mismatch${RESET}`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +177,64 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// ---------------------------------------------------------------------------
+// Secrets store creation
+// ---------------------------------------------------------------------------
+
+function createSecretsStoreSecret(
+  repoRoot: string,
+  workerDir: string,
+  storeId: string,
+  secretName: string,
+  value: string
+): boolean {
+  const result = spawnSync(
+    'pnpm',
+    [
+      'wrangler',
+      'secrets-store',
+      'secret',
+      'create',
+      storeId,
+      '--name',
+      secretName,
+      '--scopes',
+      'workers',
+    ],
+    {
+      cwd: path.join(repoRoot, workerDir),
+      encoding: 'utf-8',
+      input: value, // Pass value via stdin for security
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }
+  );
+  return result.status === 0;
+}
+
+function applySecretsStoreAutoCreates(creates: SecretStoreAutoCreate[], repoRoot: string): void {
+  if (creates.length === 0) return;
+
+  console.log('\nCreating secrets store secrets...');
+  for (const create of creates) {
+    const success = createSecretsStoreSecret(
+      repoRoot,
+      create.workerDir,
+      create.binding.store_id,
+      create.binding.secret_name,
+      create.value
+    );
+    if (success) {
+      console.log(`  ✓ ${create.binding.secret_name}`);
+    } else {
+      console.error(`  ✗ ${create.binding.secret_name} (failed)`);
+    }
+  }
+}
+
 function applyPlan(plan: EnvSyncPlan, repoRoot: string): void {
+  // Create secrets store secrets first
+  applySecretsStoreAutoCreates(plan.secretStoreAutoCreates, repoRoot);
+
   for (const change of plan.devVarsChanges) {
     const devVarsPath = path.join(repoRoot, change.workerDir, '.dev.vars');
 
@@ -154,7 +262,7 @@ function applyPlan(plan: EnvSyncPlan, repoRoot: string): void {
   }
 
   if (plan.envDevLocalChanges.length > 0) {
-    const envDevLocalPath = path.join(repoRoot, '.env.development.local');
+    const envDevLocalPath = path.join(repoRoot, 'apps/web/.env.development.local');
 
     let existingContent = '';
     try {

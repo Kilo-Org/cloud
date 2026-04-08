@@ -389,6 +389,7 @@ export async function runUnexpectedStopRecoveryInBackground(
       orgId: state.orgId,
       openclawVersion: state.openclawVersion,
       imageVariant: state.imageVariant,
+      devCreator: env.WORKER_ENV === 'development' ? (env.DEV_CREATOR ?? null) : null,
     };
     const machineConfig = buildMachineConfig(
       getRegistryApp(env),

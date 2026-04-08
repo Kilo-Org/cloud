@@ -20,10 +20,11 @@ import { OpenClawButton } from './OpenClawButton';
 import { ChangelogTab } from './ChangelogTab';
 import { SubscriptionTab } from './SubscriptionTab';
 import { ChannelPairingStep } from './ChannelPairingStep';
+import { BotIdentityStep } from './BotIdentityStep';
 import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { PermissionStep } from './PermissionStep';
 import { ProvisioningStep } from './ProvisioningStep';
-import type { ExecPreset } from './claw.types';
+import type { BotIdentity, ExecPreset } from './claw.types';
 import { BillingWrapper } from './billing/BillingWrapper';
 
 function MaybeBillingWrapper({
@@ -140,9 +141,10 @@ function ClawDashboardInner({
   }, []);
 
   const [onboardingStep, setOnboardingStep] = useState<
-    'permissions' | 'channels' | 'provisioning' | 'pairing' | 'done'
-  >('permissions');
+    'identity' | 'permissions' | 'channels' | 'provisioning' | 'pairing' | 'done'
+  >('identity');
   const [selectedPreset, setSelectedPreset] = useState<ExecPreset | null>(null);
+  const [botIdentity, setBotIdentity] = useState<BotIdentity | null>(null);
   const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const hasPairingStep = selectedChannelId === 'telegram' || selectedChannelId === 'discord';
@@ -152,8 +154,9 @@ function ClawDashboardInner({
   const prevIsNewSetup = useRef(isNewSetup);
   useEffect(() => {
     if (isNewSetup && !prevIsNewSetup.current) {
-      setOnboardingStep('permissions');
+      setOnboardingStep('identity');
       setSelectedPreset(null);
+      setBotIdentity(null);
       setChannelTokens(null);
       setSelectedChannelId(null);
     }
@@ -236,6 +239,14 @@ function ClawDashboardInner({
             onProvisionStart={() => onNewSetupChange(true)}
             onProvisionFailed={() => onNewSetupChange(false)}
           />
+        ) : isNewSetup && onboardingStep === 'identity' ? (
+          <BotIdentityStep
+            instanceRunning={isRunning && gatewayStatus?.state === 'running'}
+            onContinue={identity => {
+              setBotIdentity(identity);
+              setOnboardingStep('permissions');
+            }}
+          />
         ) : isNewSetup && onboardingStep === 'permissions' ? (
           <PermissionStep
             instanceRunning={isRunning && gatewayStatus?.state === 'running'}
@@ -262,9 +273,10 @@ function ClawDashboardInner({
           <ProvisioningStep
             preset={selectedPreset}
             channelTokens={channelTokens}
+            botIdentity={botIdentity}
             instanceRunning={isRunning && gatewayStatus?.state === 'running'}
             mutations={mutations}
-            totalSteps={hasPairingStep ? 5 : 4}
+            totalSteps={hasPairingStep ? 6 : 5}
             onComplete={() => setOnboardingStep(hasPairingStep ? 'pairing' : 'done')}
           />
         ) : isNewSetup &&

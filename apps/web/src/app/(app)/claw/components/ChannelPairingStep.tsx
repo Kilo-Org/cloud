@@ -125,8 +125,8 @@ export function ChannelPairingStepView({
   if (matchingRequest) {
     return (
       <OnboardingStepView
-        currentStep={5}
-        totalSteps={5}
+        currentStep={6}
+        totalSteps={6}
         title={`Pair your ${meta.label} bot`}
         description={meta.instruction}
         contentClassName="gap-6"
@@ -186,8 +186,8 @@ export function ChannelPairingStepView({
 
   return (
     <OnboardingStepView
-      currentStep={5}
-      totalSteps={5}
+      currentStep={6}
+      totalSteps={6}
       title={`Pair your ${meta.label} bot`}
       description={meta.instruction}
       contentClassName="gap-8"

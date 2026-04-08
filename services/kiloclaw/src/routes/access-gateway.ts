@@ -117,10 +117,11 @@ async function resolveSandboxId(
 /**
  * Build the redirect URL after successful auth.
  *
- * For instance-keyed instances: /i/{instanceId}/#token={token}
- *   → subsequent requests go through the /i/:instanceId/* proxy route
- * For legacy: /#token={token}
- *   → subsequent requests go through the catch-all proxy route
+ * Always redirects to /#token={token} — the catch-all proxy uses the
+ * kiloclaw-active-instance cookie (set before this redirect) to route
+ * requests to the correct instance. The /i/{instanceId} prefix must
+ * never appear in the redirect URL because the OpenClaw SPA would use
+ * it as the WebSocket base path, bypassing cookie-based routing.
  */
 async function buildRedirectUrl(
   userId: string,
@@ -130,7 +131,12 @@ async function buildRedirectUrl(
   if (!env.GATEWAY_TOKEN_SECRET) return '/';
   const sandboxId = await resolveSandboxId(userId, env, instanceId);
   const token = await deriveGatewayToken(sandboxId, env.GATEWAY_TOKEN_SECRET);
-  const basePath = instanceId && isValidInstanceId(instanceId) ? `/i/${instanceId}/` : '/';
+  // Always redirect to '/' — never include the /i/{instanceId} prefix.
+  // The kiloclaw-active-instance cookie (set before this redirect) tells
+  // the catch-all proxy which instance to route to. Exposing the prefix
+  // in the URL would leak it to the OpenClaw SPA, which would then use
+  // it as the WebSocket target — bypassing cookie-based routing entirely.
+  const basePath = '/';
   return `${basePath}#token=${token}`;
 }
 

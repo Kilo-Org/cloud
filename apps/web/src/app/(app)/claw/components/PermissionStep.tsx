@@ -13,8 +13,8 @@ export function PermissionStep({
 }) {
   return (
     <OnboardingStepView
-      currentStep={2}
-      totalSteps={4}
+      currentStep={3}
+      totalSteps={5}
       title="Set Bot Permissions"
       description="Choose how your KiloClaw bot handles actions on your behalf."
       showProvisioningBanner={!instanceRunning}

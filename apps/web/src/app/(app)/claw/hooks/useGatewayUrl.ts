@@ -7,7 +7,7 @@ export function useGatewayUrl(status: KiloClawDashboardStatus | undefined) {
     if (!status?.userId) return baseUrl;
     const params = new URLSearchParams({ userId: status.userId });
     // Instance-keyed instances need the instanceId so the access gateway
-    // can resolve the correct sandboxId and redirect to /i/{instanceId}/.
+    // can resolve the correct sandboxId and set the active-instance cookie.
     if (status.instanceId) {
       params.set('instanceId', status.instanceId);
     }

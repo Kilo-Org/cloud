@@ -1,7 +1,9 @@
 # Shared secret for JWT token validation (same as NextAuth.js secret)
+# @from NEXTAUTH_SECRET
 NEXTAUTH_SECRET=your-nextauth-secret-here
 
 # Shared secret for internal API calls, same as .env.development.
+# @from INTERNAL_API_SECRET
 INTERNAL_API_SECRET=your-internal-api-secret-here
 
 # Optional: Override Kilocode credentials in session environment variables used during kilocode invocation
@@ -35,6 +37,10 @@ REAPER_INTERVAL_MS=300000
 STALE_THRESHOLD_MS=600000
 PENDING_START_TIMEOUT_MS=300000
 
+# Per-session sandbox org IDs (optional)
+# Comma-separated list of org IDs that use per-session sandboxes, or `*` for all orgs
+PER_SESSION_SANDBOX_ORG_IDS=
+
 # GitHub App credentials for git commit attribution
 # These identify commits as coming from the Kilo Code GitHub App
 # Format for git config:
@@ -58,6 +64,10 @@ GITHUB_LITE_APP_ID=
 # @pkcs8
 GITHUB_LITE_APP_PRIVATE_KEY=
 
+# GitHub Lite App slug and bot user ID for git commit attribution (optional)
+GITHUB_LITE_APP_SLUG=
+GITHUB_LITE_APP_BOT_USER_ID=
+
 # Agent Environment Profile Secrets Decryption
 # Used to decrypt encrypted secrets from agent environment profiles at session execution time.
 # This is a RSA private key that pairs with AGENT_ENV_VARS_PUBLIC_KEY in the backend.
@@ -69,6 +79,7 @@ AGENT_ENV_VARS_PRIVATE_KEY=""
 # R2 Attachments Bucket Readonly Access
 # 1pass (Cloudflare - R2 Cloud Agents Attachments Read Only)
 R2_ENDPOINT=""
+R2_ATTACHMENTS_BUCKET=""
 R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID=""
 R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY=""
 

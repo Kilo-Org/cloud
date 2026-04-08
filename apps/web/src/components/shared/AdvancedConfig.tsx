@@ -18,12 +18,14 @@
  */
 'use client';
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { ProfileSelector } from '@/components/cloud-agent/ProfileSelector';
 import { EnvVarsDialog } from '@/components/cloud-agent/EnvVarsDialog';
 import { SetupCommandsDialog } from '@/components/cloud-agent/SetupCommandsDialog';
 import { SaveProfileDialog } from '@/components/cloud-agent/SaveProfileDialog';
+import { RepoProfileBindingsDialog } from '@/components/cloud-agent/RepoProfileBindingsDialog';
+import { useRepoBindings, useProfiles, useCombinedProfiles } from '@/hooks/useCloudAgentProfiles';
 
 export type AdvancedConfigProps = {
   /** Organization ID (optional, for org context) */
@@ -50,6 +52,10 @@ export type AdvancedConfigProps = {
   description?: string;
   /** Optional className for the container */
   className?: string;
+  /** Currently selected repository full name (e.g. "owner/repo") */
+  repoFullName?: string;
+  /** Platform of the selected repository */
+  platform?: 'github' | 'gitlab';
 };
 
 /**
@@ -68,6 +74,8 @@ export const AdvancedConfig = memo(function AdvancedConfig({
   label = 'Advanced Configuration (Optional)',
   description = 'Select a profile to load saved configurations, and manually configure additional environment variables and setup commands',
   className,
+  repoFullName,
+  platform,
 }: AdvancedConfigProps) {
   // Convert effective envVars to array format for SaveProfileDialog
   const envVarsArray = useMemo(() => {
@@ -86,18 +94,106 @@ export const AdvancedConfig = memo(function AdvancedConfig({
   // Counts for display
   const envVarsCount = Object.keys(effectiveEnvVars).length;
   const commandsCount = effectiveSetupCommands.length;
-  const hasConfig = envVarsCount > 0 || commandsCount > 0;
+
+  // State for bindings dialog
+  const [showBindingsDialog, setShowBindingsDialog] = useState(false);
+
+  // Look up repo-bound profile when a repo is selected but no profile is explicitly chosen
+  const { data: repoBindings } = useRepoBindings({ organizationId, enabled: !!repoFullName });
+  const repoBoundProfile = useMemo(() => {
+    if (!repoFullName || !repoBindings) return null;
+    return (
+      repoBindings.find(
+        b =>
+          b.repoFullName.toLowerCase() === repoFullName.toLowerCase() &&
+          (!platform || b.platform === platform)
+      ) ?? null
+    );
+  }, [repoBindings, repoFullName, platform]);
+
+  // Resolve the selected profile's name for display
+  const { data: personalProfiles } = useProfiles({
+    enabled: !organizationId,
+  });
+  const { data: combinedProfiles } = useCombinedProfiles({
+    organizationId: organizationId ?? '',
+    enabled: !!organizationId,
+  });
+
+  // ---------------------------------------------------------------------------
+  // Internal sub-component for the configuration summary
+  // ---------------------------------------------------------------------------
+
+  function ConfigSummary({
+    repoBoundProfileName,
+    selectedProfileName,
+    hasManualConfig,
+    envVarsCount,
+    commandsCount,
+  }: {
+    repoBoundProfileName: string | null;
+    selectedProfileName: string | null;
+    hasManualConfig: boolean;
+    envVarsCount: number;
+    commandsCount: number;
+  }) {
+    const layers: string[] = [];
+    if (repoBoundProfileName) layers.push(repoBoundProfileName);
+    if (selectedProfileName) layers.push(selectedProfileName);
+    if (hasManualConfig) layers.push('manual overrides');
+
+    if (layers.length === 0 && envVarsCount === 0 && commandsCount === 0) return null;
+
+    const hasConfig = envVarsCount > 0 || commandsCount > 0;
+
+    return (
+      <div className="text-muted-foreground space-y-0.5 text-xs">
+        {layers.length > 0 && (
+          <p>
+            Profiles:{' '}
+            {layers.map((layer, i) => (
+              <span key={i}>
+                {i > 0 && ' + '}
+                {layer === 'manual overrides' ? (
+                  'manual overrides'
+                ) : (
+                  <>
+                    <span className="text-foreground font-medium">{layer}</span>
+                    {layer === repoBoundProfileName && !selectedProfileName && ' (repo default)'}
+                    {layer === repoBoundProfileName && selectedProfileName && ' (repo)'}
+                  </>
+                )}
+              </span>
+            ))}
+          </p>
+        )}
+        {hasConfig && (
+          <p>
+            Effective config: {envVarsCount} env var{envVarsCount !== 1 ? 's' : ''}, {commandsCount}{' '}
+            setup command
+            {commandsCount !== 1 ? 's' : ''}
+          </p>
+        )}
+      </div>
+    );
+  }
+  const selectedProfileName = useMemo(() => {
+    if (!selectedProfileId) return null;
+    const profiles = organizationId ? combinedProfiles?.allProfiles : personalProfiles;
+    return profiles?.find(p => p.id === selectedProfileId)?.name ?? null;
+  }, [selectedProfileId, organizationId, combinedProfiles, personalProfiles]);
 
   return (
     <div className={className ?? 'space-y-3'}>
-      <Label>{label}</Label>
+      {label && <Label>{label}</Label>}
 
-      {/* Profile Selector - Primary way to load env vars and commands */}
+      {/* Profile Selector */}
       <div className="flex items-center gap-2">
         <ProfileSelector
           organizationId={organizationId}
           selectedProfileId={selectedProfileId ?? null}
           onProfileSelect={onProfileSelect}
+          onRepoDefaultsClick={() => setShowBindingsDialog(true)}
         />
         {!selectedProfileId && hasManualConfig && (
           <SaveProfileDialog
@@ -114,16 +210,22 @@ export const AdvancedConfig = memo(function AdvancedConfig({
         <SetupCommandsDialog value={manualSetupCommands} onChange={onManualSetupCommandsChange} />
       </div>
 
-      {/* Show effective config summary if there's any */}
-      {hasConfig && (
-        <p className="text-xs text-gray-400">
-          {envVarsCount} environment variable
-          {envVarsCount !== 1 ? 's' : ''}, {commandsCount} setup command
-          {commandsCount !== 1 ? 's' : ''} configured
-        </p>
-      )}
+      {/* Configuration summary — shows the merge layers */}
+      <ConfigSummary
+        repoBoundProfileName={repoBoundProfile?.profileName ?? null}
+        selectedProfileName={selectedProfileName ?? null}
+        hasManualConfig={hasManualConfig}
+        envVarsCount={envVarsCount}
+        commandsCount={commandsCount}
+      />
 
-      <p className="text-xs text-gray-400">{description}</p>
+      {description && <p className="text-xs text-gray-400">{description}</p>}
+
+      <RepoProfileBindingsDialog
+        organizationId={organizationId}
+        open={showBindingsDialog}
+        onOpenChange={setShowBindingsDialog}
+      />
     </div>
   );
 });

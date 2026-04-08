@@ -46,6 +46,9 @@ export type KiloClawEnv = {
   FLY_IMAGE_DIGEST?: string;
   OPENCLAW_VERSION?: string;
 
+  // Developer identity (development only, auto-populated by dev-start from `fly auth whoami`)
+  DEV_CREATOR?: string;
+
   // Stream Chat (default channel for new instances)
   STREAM_CHAT_API_KEY?: string;
   STREAM_CHAT_API_SECRET?: string;

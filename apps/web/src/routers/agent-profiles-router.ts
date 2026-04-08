@@ -5,6 +5,7 @@ import * as z from 'zod';
 import * as profileService from '@/lib/agent/profile-service';
 import * as profileVarsService from '@/lib/agent/profile-vars-service';
 import * as profileCommandsService from '@/lib/agent/profile-commands-service';
+import * as repoBindingService from '@/lib/agent/repo-binding-service';
 import type { ProfileOwner } from '@/lib/agent/types';
 
 function isForeignKeyViolation(error: unknown): boolean {
@@ -318,5 +319,66 @@ export const agentProfilesRouter = createTRPCRouter({
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileCommandsService.setCommands(input.profileId, input.commands, owner);
       return { success: true };
+    }),
+
+  /**
+   * Bind an environment profile to a repository.
+   */
+  bindToRepo: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid().optional(),
+        profileId: z.uuid(),
+        repoFullName: z.string().min(1).max(500),
+        platform: z.enum(['github', 'gitlab']).default('github'),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await repoBindingService.bindProfileToRepo(
+        owner,
+        input.repoFullName,
+        input.platform,
+        input.profileId
+      );
+    }),
+
+  /**
+   * Remove the profile binding for a repository.
+   */
+  unbindRepo: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid().optional(),
+        repoFullName: z.string().min(1).max(500),
+        platform: z.enum(['github', 'gitlab']).default('github'),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await repoBindingService.unbindRepo(owner, input.repoFullName, input.platform);
+    }),
+
+  /**
+   * List all repo-profile bindings for the current user or organization.
+   */
+  listRepoBindings: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return repoBindingService.listBindings(owner);
     }),
 });

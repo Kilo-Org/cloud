@@ -169,7 +169,8 @@ export class SetupCommandFailedError extends Error {
     public readonly exitCode: number,
     public readonly stderr: string
   ) {
-    super(`Setup command failed: ${command}`);
+    const details = [`exit code ${exitCode}`, ...(stderr ? [stderr.trim()] : [])].join(': ');
+    super(`Setup command failed: ${command} (${details})`);
     this.name = 'SetupCommandFailedError';
   }
 }
@@ -1531,7 +1532,7 @@ export class SessionService {
   }
 
   /**
-   * Create a minimal cliSession in kilocode-backend.
+   * Create a minimal cliSession in the web app.
    * Uses the customer's auth token (forwarded from the original request).
    * Returns the generated kiloSessionId.
    */
@@ -1595,7 +1596,7 @@ export class SessionService {
   }
 
   /**
-   * Delete a cliSession in kilocode-backend.
+   * Delete a cliSession in the web app.
    * Used for rollback when DO prepare() fails after backend session was created.
    */
   async deleteKiloSessionInBackend(

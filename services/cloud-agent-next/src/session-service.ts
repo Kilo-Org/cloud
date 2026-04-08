@@ -245,7 +245,8 @@ export class SetupCommandFailedError extends Error {
     public readonly exitCode: number,
     public readonly stderr: string
   ) {
-    super(`Setup command failed: ${command}`);
+    const details = [`exit code ${exitCode}`, ...(stderr ? [stderr.trim()] : [])].join(': ');
+    super(`Setup command failed: ${command} (${details})`);
     this.name = 'SetupCommandFailedError';
   }
 }

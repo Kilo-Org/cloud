@@ -3,6 +3,7 @@
 API_URL=http://localhost:3000
 
 # Internal API secret for authentication (shared with backend)
+# @from INTERNAL_API_SECRET
 INTERNAL_API_SECRET=your-secret-here
 
 # Backend auth token for authenticating incoming requests from backend
@@ -16,3 +17,9 @@ CLOUD_AGENT_URL=http://localhost:8794
 # Cloud agent (next) URL for v2 code review execution
 # @url cloud-agent-next
 CLOUD_AGENT_NEXT_URL=http://localhost:8794
+
+# Environment setting
+ENVIRONMENT=development
+
+# Sentry DSN for error tracking (optional)
+# SENTRY_DSN=

@@ -3,7 +3,7 @@ import { isGemini3Model, isGeminiModel } from '@/lib/providers/google';
 import { isMinimaxModel } from '@/lib/providers/minimax';
 import { isMoonshotModel } from '@/lib/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/providers/openai';
-import { qwen35_plus_free_model, QWEN36_PLUS_FREE_MODEL_ID } from '@/lib/providers/qwen';
+import { qwen36_plus_free_model } from '@/lib/providers/qwen';
 import { isXaiModel } from '@/lib/providers/xai';
 import { isXiaomiModel } from '@/lib/providers/xiaomi';
 import { isZaiModel } from '@/lib/providers/zai';
@@ -84,7 +84,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
     isMoonshotModel(model) ||
     isZaiModel(model) ||
     isXiaomiModel(model) ||
-    model === QWEN36_PLUS_FREE_MODEL_ID
+    model === qwen36_plus_free_model.public_id
   ) {
     return REASONING_VARIANTS_BINARY;
   }
@@ -114,7 +114,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
 }
 
 function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
-  if (qwen35_plus_free_model.public_id === model) {
+  if (qwen36_plus_free_model.public_id === model) {
     // with 'openai' prompt caching doesn't seem to work
     return 'openai-compatible';
   }

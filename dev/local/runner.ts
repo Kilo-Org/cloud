@@ -119,7 +119,12 @@ export function startServiceInTmux(sessionName: string, serviceName: string): vo
     sendKeys(sessionName, serviceName, buildStartCommand(serviceName));
   }
   const logPath = path.join(findRepoRoot(), 'dev', 'logs', `${serviceName}.log`);
-  pipePane(sessionName, winIndex, 0, `cat >> ${shellQuote(logPath)}`);
+  pipePane(sessionName, winIndex, 0, buildLogPipeCommand(logPath));
+}
+
+function buildLogPipeCommand(logPath: string): string {
+  const filterPath = path.join(findRepoRoot(), 'dev', 'local', 'log-filter.ts');
+  return `tsx ${shellQuote(filterPath)} >> ${shellQuote(logPath)}`;
 }
 
 function shellQuote(value: string): string {

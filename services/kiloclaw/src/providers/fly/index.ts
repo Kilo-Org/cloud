@@ -9,9 +9,7 @@ import {
   type InstanceMutableState,
 } from '../../durable-objects/kiloclaw-instance/types';
 import * as flyMachines from '../../durable-objects/kiloclaw-instance/fly-machines';
-import {
-  getFlyProviderState,
-} from '../../durable-objects/kiloclaw-instance/state';
+import { getFlyProviderState } from '../../durable-objects/kiloclaw-instance/state';
 import { type InstanceProviderAdapter } from '../types';
 
 function registryAppKey(state: Pick<InstanceMutableState, 'userId' | 'sandboxId'>) {
@@ -41,7 +39,7 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
     };
   },
 
-  async ensureProvisioningResources({ env, state, orgId, machineSize, region }) {
+  async ensureProvisioningResources({ env, state, machineSize, region }) {
     const isNew = !state.status;
     let providerState = getFlyProviderState(state);
 

@@ -51,16 +51,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<GdprRemov
     );
   }
 
-  const warnings: string[] = [];
-  try {
-    await softDeleteUserExternalServices(user);
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'gdpr-removal-external' },
-      extra: { userId },
-    });
-    warnings.push('External service cleanup failed — check Sentry for details');
-  }
+  const warnings = await softDeleteUserExternalServices(user);
 
   return NextResponse.json({
     success: true,

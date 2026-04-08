@@ -15,13 +15,13 @@ import { generateInternalServiceToken } from '@/lib/tokens';
  * Delete user from Customer.io
  * Customer.io API docs: https://customer.io/docs/api/track/#operation/delete
  */
-async function deleteUserFromCustomerIO(email: string): Promise<void> {
+async function deleteUserFromCustomerIO(email: string): Promise<string | null> {
   const siteId = getEnvVariable('CUSTOMERIO_SITE_ID');
   const apiKey = getEnvVariable('CUSTOMERIO_API_KEY');
 
   if (!siteId || !apiKey) {
     warnExceptInTest('Customer.io credentials not configured, skipping deletion');
-    return;
+    return null;
   }
 
   try {
@@ -41,20 +41,22 @@ async function deleteUserFromCustomerIO(email: string): Promise<void> {
     } else {
       logExceptInTest(`Successfully deleted customer ${email} from Customer.io`);
     }
+    return null;
   } catch (error) {
-    const message = `Failed to delete user from Customer.io for email ${email}: ${error instanceof Error ? error.message : String(error)}`;
+    const message = `Failed to delete user from Customer.io: ${error instanceof Error ? error.message : String(error)}`;
     errorExceptInTest(message);
     captureException(error, {
       tags: { source: 'customerio-deletion' },
       extra: { email },
     });
+    return 'Customer.io deletion failed';
   }
 }
 
 /**
  * Delete CLI session blobs from R2 storage
  */
-async function deleteCliSessionBlobs(userId: string): Promise<void> {
+async function deleteCliSessionBlobs(userId: string): Promise<string | null> {
   try {
     // Fetch all CLI sessions owned by the user
     const userCliSessions = await db
@@ -115,6 +117,7 @@ async function deleteCliSessionBlobs(userId: string): Promise<void> {
     logExceptInTest(
       `Successfully deleted CLI session blobs for user: ${userId} (${userCliSessions.length} sessions, ${userSharedSessions.length} shared sessions)`
     );
+    return null;
   } catch (error) {
     const message = `Failed to delete CLI session blobs for user ${userId}: ${error instanceof Error ? error.message : String(error)}`;
     errorExceptInTest(message);
@@ -122,6 +125,7 @@ async function deleteCliSessionBlobs(userId: string): Promise<void> {
       tags: { source: 'cli-sessions-deletion' },
       extra: { userId },
     });
+    return 'CLI session blob deletion failed';
   }
 }
 
@@ -133,10 +137,10 @@ const V2_SESSION_DELETE_CONCURRENCY = 10;
  * This function calls the session ingest worker's delete endpoint for each session,
  * processing sessions in concurrent batches for performance.
  */
-async function deleteCliSessionV2Blobs(userId: string): Promise<void> {
+async function deleteCliSessionV2Blobs(userId: string): Promise<string | null> {
   if (!SESSION_INGEST_WORKER_URL) {
     warnExceptInTest('SESSION_INGEST_WORKER_URL not configured, skipping v2 session blob deletion');
-    return;
+    return null;
   }
 
   try {
@@ -148,7 +152,7 @@ async function deleteCliSessionV2Blobs(userId: string): Promise<void> {
 
     if (userV2Sessions.length === 0) {
       logExceptInTest(`No v2 CLI sessions found for user: ${userId}`);
-      return;
+      return null;
     }
 
     // Generate a token for the user to authenticate with the session ingest worker
@@ -198,6 +202,9 @@ async function deleteCliSessionV2Blobs(userId: string): Promise<void> {
     logExceptInTest(
       `Deleted v2 CLI session blobs for user: ${userId} (${successCount} succeeded, ${failCount} failed out of ${userV2Sessions.length} sessions)`
     );
+    return failCount > 0
+      ? `V2 session blob deletion partially failed (${failCount}/${userV2Sessions.length})`
+      : null;
   } catch (error) {
     const message = `Failed to delete v2 CLI session blobs for user ${userId}: ${error instanceof Error ? error.message : String(error)}`;
     errorExceptInTest(message);
@@ -205,6 +212,7 @@ async function deleteCliSessionV2Blobs(userId: string): Promise<void> {
       tags: { source: 'cli-sessions-v2-deletion' },
       extra: { userId },
     });
+    return 'V2 session blob deletion failed';
   }
 }
 
@@ -221,26 +229,17 @@ async function deleteCliSessionV2Blobs(userId: string): Promise<void> {
  * Each individual service handler is resilient - errors are caught and logged
  * to Sentry but don't prevent other services from being cleaned up.
  */
-export async function softDeleteUserExternalServices(user: User): Promise<void> {
+export async function softDeleteUserExternalServices(user: User): Promise<string[]> {
   logExceptInTest(`Soft-deleting user from external services: ${user.id}`);
 
-  const results = await Promise.allSettled([
+  const results = await Promise.all([
     deleteUserFromCustomerIO(user.google_user_email),
     deleteCliSessionBlobs(user.id),
     deleteCliSessionV2Blobs(user.id),
   ]);
 
-  // Log any unexpected top-level failures (individual handlers already catch their own errors)
-  for (const result of results) {
-    if (result.status === 'rejected') {
-      const message = `Unexpected external service deletion failure for user ${user.id}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`;
-      errorExceptInTest(message);
-      captureException(result.reason, {
-        tags: { source: 'external-services-soft-delete' },
-        extra: { userId: user.id },
-      });
-    }
-  }
+  const warnings = results.filter((r): r is string => r !== null);
 
   logExceptInTest(`Completed external service soft-delete for user: ${user.id}`);
+  return warnings;
 }

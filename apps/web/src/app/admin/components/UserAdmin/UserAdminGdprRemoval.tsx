@@ -14,7 +14,12 @@ import { AlertTriangle, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 import type { UserDetailProps } from '@/types/admin';
+
+type GdprRemovalResult =
+  | { error: string }
+  | { success: boolean; message: string; warnings?: string[] };
 
 export function UserAdminGdprRemoval(user: UserDetailProps) {
   const router = useRouter();
@@ -30,25 +35,43 @@ export function UserAdminGdprRemoval(user: UserDetailProps) {
     setShowGdprConfirmDialog(false);
     setIsProcessingGdprRequest(true);
 
-    const response = await fetch('/admin/api/users/gdpr-removal', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ userId: user.id }),
-    });
+    try {
+      const response = await fetch('/admin/api/users/gdpr-removal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
 
-    const result = await response.json();
+      const result: GdprRemovalResult = await response.json();
 
-    if (response.ok) {
-      console.log('GDPR data removal completed:', result.message);
-      // Redirect back to users list since this user no longer exists
-      router.push('/admin/users');
-    } else {
-      console.error('GDPR data removal failed:', result.error);
+      if (response.ok && 'success' in result) {
+        if (result.warnings?.length) {
+          toast.warning('GDPR deletion partially completed', {
+            description: result.warnings.join('\n'),
+            duration: 15_000,
+          });
+        } else {
+          toast.success('GDPR data removal completed');
+        }
+        router.push('/admin/users');
+      } else {
+        const errorMessage =
+          'error' in result ? result.error : `Server responded with ${response.status}`;
+        toast.error('GDPR data removal failed', {
+          description: errorMessage,
+          duration: 15_000,
+        });
+      }
+    } catch (error) {
+      toast.error('GDPR data removal failed', {
+        description: error instanceof Error ? error.message : 'Network error',
+        duration: 15_000,
+      });
+    } finally {
+      setIsProcessingGdprRequest(false);
     }
-
-    setIsProcessingGdprRequest(false);
   };
 
   const handleCancelGdprRequest = () => {

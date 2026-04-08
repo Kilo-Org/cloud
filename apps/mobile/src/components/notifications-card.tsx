@@ -29,6 +29,7 @@ export function NotificationsCard() {
         toast.success('Notifications enabled');
       },
       onError: error => {
+        setNotificationsEnabled(false);
         toast.error(error.message);
       },
     })

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { type Href, useRouter } from 'expo-router';
+import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image'; // eslint-disable-line no-restricted-imports -- raw expo-image needed for Stream Chat SDK ImageComponent prop
 import { Settings } from 'lucide-react-native';
 import { type Channel as StreamChannel, StreamChat } from 'stream-chat';
@@ -13,6 +13,7 @@ import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw';
+import { setActiveChatInstance } from '@/lib/notifications';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 
@@ -24,6 +25,15 @@ type KiloClawChatProps = {
 
 export function KiloClawChat({ instanceId, name, enabled }: Readonly<KiloClawChatProps>) {
   const { data: creds, isLoading, error } = useStreamChatCredentials(enabled);
+
+  useFocusEffect(
+    useCallback(() => {
+      setActiveChatInstance(instanceId);
+      return () => {
+        setActiveChatInstance(null);
+      };
+    }, [instanceId])
+  );
 
   if (!enabled) {
     return (

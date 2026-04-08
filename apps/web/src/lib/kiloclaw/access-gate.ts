@@ -17,7 +17,8 @@ export async function requireKiloClawAccess(userId: string): Promise<void> {
   const now = new Date();
 
   // 1. Active subscription
-  const { accessReason } = await getEffectiveKiloClawSubscriptionForUser(userId, now);
+  const { subscription, accessReason, subscriptionCount } =
+    await getEffectiveKiloClawSubscriptionForUser(userId, now);
   if (accessReason) {
     return;
   }
@@ -32,6 +33,25 @@ export async function requireKiloClawAccess(userId: string): Promise<void> {
   if (earlybird && new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > now) {
     return;
   }
+
+  console.warn(
+    JSON.stringify({
+      event: 'kiloclaw_access_denied',
+      userId,
+      subscriptionCount,
+      effectiveSubscription: subscription
+        ? {
+            id: subscription.id,
+            status: subscription.status,
+            plan: subscription.plan,
+            suspended_at: subscription.suspended_at,
+            instance_id: subscription.instance_id,
+          }
+        : 'none',
+      accessReason,
+      earlybirdFound: !!earlybird,
+    })
+  );
 
   throw new TRPCError({
     code: 'FORBIDDEN',

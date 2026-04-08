@@ -442,12 +442,20 @@ export async function handleKiloClawSubscriptionCreated(params: {
   let convertedFromTrial = false;
 
   await db.transaction(async tx => {
-    // Look up the user's active instance to link the subscription.
+    // Look up the user's active personal instance to link the subscription.
+    // Scoped to personal instances (organization_id IS NULL) so a checkout
+    // from the /claw page never attaches to an org-owned instance.  If no
+    // personal instance exists the subscription is inserted with
+    // instance_id = NULL and adoptOrphanedSubscription handles it later.
     const [activeInstance] = await tx
       .select({ id: kiloclaw_instances.id })
       .from(kiloclaw_instances)
       .where(
-        and(eq(kiloclaw_instances.user_id, kiloUserId), isNull(kiloclaw_instances.destroyed_at))
+        and(
+          eq(kiloclaw_instances.user_id, kiloUserId),
+          isNull(kiloclaw_instances.destroyed_at),
+          isNull(kiloclaw_instances.organization_id)
+        )
       )
       .limit(1);
 

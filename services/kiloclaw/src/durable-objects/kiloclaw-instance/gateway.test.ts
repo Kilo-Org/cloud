@@ -40,17 +40,18 @@ describe('gateway controller routing', () => {
     const expectedToken = await deriveGatewayToken('sandbox-1', 'gateway-secret');
 
     expect(result.state).toBe('running');
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://test-app.fly.dev/_kilo/gateway/status',
-      expect.objectContaining({
-        method: 'GET',
-        headers: expect.objectContaining({
-          Authorization: `Bearer ${expectedToken}`,
-          Accept: 'application/json',
-          'fly-force-instance-id': 'machine-1',
-        }),
-      })
-    );
+    const [targetUrl, init] = fetchMock.mock.calls[0] ?? [];
+    expect(targetUrl).toBe('https://test-app.fly.dev/_kilo/gateway/status');
+    expect(init).toBeDefined();
+    expect(init?.method).toBe('GET');
+
+    const headers = init?.headers;
+    expect(headers).toBeDefined();
+    expect(headers).toMatchObject({
+      Authorization: `Bearer ${expectedToken}`,
+      Accept: 'application/json',
+      'fly-force-instance-id': 'machine-1',
+    });
   });
 
   it('uses provider routing for health probes', async () => {
@@ -78,25 +79,18 @@ describe('gateway controller routing', () => {
 
     const expectedToken = await deriveGatewayToken('sandbox-1', 'gateway-secret');
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
-      'https://test-app.fly.dev/_kilo/gateway/status',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: `Bearer ${expectedToken}`,
-          Accept: 'application/json',
-          'fly-force-instance-id': 'machine-1',
-        }),
-      })
-    );
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      'https://test-app.fly.dev/',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          'fly-force-instance-id': 'machine-1',
-        }),
-      })
-    );
+    const [statusUrl, statusInit] = fetchMock.mock.calls[0] ?? [];
+    expect(statusUrl).toBe('https://test-app.fly.dev/_kilo/gateway/status');
+    expect(statusInit?.headers).toMatchObject({
+      Authorization: `Bearer ${expectedToken}`,
+      Accept: 'application/json',
+      'fly-force-instance-id': 'machine-1',
+    });
+
+    const [rootUrl, rootInit] = fetchMock.mock.calls[1] ?? [];
+    expect(rootUrl).toBe('https://test-app.fly.dev/');
+    expect(rootInit?.headers).toMatchObject({
+      'fly-force-instance-id': 'machine-1',
+    });
   });
 });

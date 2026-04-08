@@ -180,17 +180,18 @@ describe('proxy routing target usage', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://test-app.fly.dev/api/foo?bar=baz',
-      expect.objectContaining({
-        method: 'GET',
-        headers: expect.any(Headers),
-      })
-    );
+    const [targetUrl, init] = fetchMock.mock.calls[0] ?? [];
+    expect(targetUrl).toBe('https://test-app.fly.dev/api/foo?bar=baz');
+    expect(init).toBeDefined();
+    expect(init?.method).toBe('GET');
+    expect(init?.headers).toBeInstanceOf(Headers);
 
-    const headers = fetchMock.mock.calls[0]?.[1] as { headers: Headers };
-    expect(headers.headers.get('fly-force-instance-id')).toBe('machine-1');
-    expect(headers.headers.get('x-provider-route')).toBe('provider-hop');
-    expect(headers.headers.get('x-kiloclaw-proxy-token')).toBeTruthy();
+    const headers = init?.headers;
+    if (!(headers instanceof Headers)) {
+      throw new Error('Expected fetch headers to be a Headers instance');
+    }
+    expect(headers.get('fly-force-instance-id')).toBe('machine-1');
+    expect(headers.get('x-provider-route')).toBe('provider-hop');
+    expect(headers.get('x-kiloclaw-proxy-token')).toBeTruthy();
   });
 });

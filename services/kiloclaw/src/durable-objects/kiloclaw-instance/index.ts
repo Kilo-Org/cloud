@@ -30,10 +30,7 @@ import {
 import { resolveLatestVersion, resolveVersionByTag } from '../../lib/image-version';
 import { lookupCatalogVersion } from '../../lib/catalog-registration';
 import { ImageVariantSchema } from '../../schemas/image-version';
-import {
-  LIVE_CHECK_THROTTLE_MS,
-  OPENCLAW_BUILTIN_DEFAULT_MODEL,
-} from '../../config';
+import { LIVE_CHECK_THROTTLE_MS, OPENCLAW_BUILTIN_DEFAULT_MODEL } from '../../config';
 import {
   SECRET_CATALOG,
   FIELD_KEY_TO_ENV_VAR,
@@ -395,31 +392,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       ? syncProviderStateForStorage(
           this.s,
           storageUpdate({
-          ...configFields,
-          ...versionFields,
-          instanceFeatures: this.s.instanceFeatures,
-          provisionedAt: Date.now(),
-          lastStartedAt: null,
-          lastStoppedAt: null,
-          flyAppName: this.s.flyAppName,
-          flyMachineId: this.s.flyMachineId,
-          flyVolumeId: this.s.flyVolumeId,
-          flyRegion: this.s.flyRegion,
-          providerState: this.s.providerState,
-          healthCheckFailCount: 0,
-          pendingDestroyMachineId: null,
-          pendingDestroyVolumeId: null,
-          pendingPostgresMarkOnFinalize: false,
-          instanceReadyEmailSent: false,
-        })
+            ...configFields,
+            ...versionFields,
+            instanceFeatures: this.s.instanceFeatures,
+            provisionedAt: Date.now(),
+            lastStartedAt: null,
+            lastStoppedAt: null,
+            flyAppName: this.s.flyAppName,
+            flyMachineId: this.s.flyMachineId,
+            flyVolumeId: this.s.flyVolumeId,
+            flyRegion: this.s.flyRegion,
+            providerState: this.s.providerState,
+            healthCheckFailCount: 0,
+            pendingDestroyMachineId: null,
+            pendingDestroyVolumeId: null,
+            pendingPostgresMarkOnFinalize: false,
+            instanceReadyEmailSent: false,
+          })
         )
       : syncProviderStateForStorage(
           this.s,
           storageUpdate({
-          ...configFields,
-          ...versionFields,
-          instanceFeatures: this.s.instanceFeatures,
-        })
+            ...configFields,
+            ...versionFields,
+            instanceFeatures: this.s.instanceFeatures,
+          })
         );
 
     await this.ctx.storage.put(update);
@@ -2193,8 +2190,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           });
         }
       }
-
-      const flyConfig = getFlyConfig(this.env, this.s);
 
       const { envVars, minSecretsVersion } = await buildUserEnvVars(this.env, this.ctx, this.s);
       const guest = guestFromSize(this.s.machineSize);

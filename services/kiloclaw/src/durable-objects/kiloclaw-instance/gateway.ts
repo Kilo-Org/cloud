@@ -474,10 +474,7 @@ export async function patchOpenclawConfig(
  * Poll the gateway status endpoint until the OpenClaw gateway process
  * reports state === 'running'. On timeout, logs a warning but does NOT throw.
  */
-export async function waitForHealthy(
-  state: InstanceMutableState,
-  env: KiloClawEnv
-): Promise<void> {
+export async function waitForHealthy(state: InstanceMutableState, env: KiloClawEnv): Promise<void> {
   const routingTarget = await getProviderAdapter(env, state).getRoutingTarget({
     env,
     state,

@@ -3,8 +3,8 @@
 ## Purpose
 
 Track intentional phase-by-phase deviations, compatibility shims, and deferrals
- during the provider-interface extraction work. This log is expected to be used
- across phases and reviews.
+during the provider-interface extraction work. This log is expected to be used
+across phases and reviews.
 
 ## Phase 1
 

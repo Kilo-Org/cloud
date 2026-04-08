@@ -527,15 +527,13 @@ holds those resources.
 Likely future persisted shape:
 
 ```ts
-type ProviderMigrationState =
-  | null
-  | {
-      from: ProviderId;
-      to: ProviderId;
-      phase: 'preparing' | 'copying' | 'cutting_over' | 'cleaning_up' | 'failed';
-      targetState: unknown;
-      error: string | null;
-    };
+type ProviderMigrationState = null | {
+  from: ProviderId;
+  to: ProviderId;
+  phase: 'preparing' | 'copying' | 'cutting_over' | 'cleaning_up' | 'failed';
+  targetState: unknown;
+  error: string | null;
+};
 ```
 
 ## Implementation Sequence
@@ -570,6 +568,7 @@ Concrete scope:
   - implement it first in `src/providers/fly/index.ts`
     - `baseUrl` should remain `https://${appName}.fly.dev`
     - provider headers should include `fly-force-instance-id`
+
 - Move worker proxy URL/header construction behind provider routing
   - update `src/index.ts`
   - remove direct `https://${appName}.fly.dev...` construction in:

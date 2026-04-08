@@ -9,7 +9,10 @@ import {
   type InstanceMutableState,
 } from '../../durable-objects/kiloclaw-instance/types';
 import * as flyMachines from '../../durable-objects/kiloclaw-instance/fly-machines';
-import { storageUpdate, syncProviderStateForStorage } from '../../durable-objects/kiloclaw-instance/state';
+import {
+  storageUpdate,
+  syncProviderStateForStorage,
+} from '../../durable-objects/kiloclaw-instance/state';
 import { type InstanceProviderAdapter } from '../types';
 
 async function persistWithProviderState(
@@ -97,7 +100,15 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
     });
   },
 
-  async startRuntime({ env, ctx, state, machineConfig, minSecretsVersion, envRegion, onCapacityRecovery }) {
+  async startRuntime({
+    env,
+    ctx,
+    state,
+    machineConfig,
+    minSecretsVersion,
+    envRegion,
+    onCapacityRecovery,
+  }) {
     const flyConfig = getFlyConfig(env, state);
 
     try {
@@ -130,7 +141,13 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
 
       await onCapacityRecovery?.(err);
 
-      await flyMachines.replaceStrandedVolume(flyConfig, ctx, state, env, 'start_capacity_recovery');
+      await flyMachines.replaceStrandedVolume(
+        flyConfig,
+        ctx,
+        state,
+        env,
+        'start_capacity_recovery'
+      );
       await persistWithProviderState(ctx, state, {
         flyMachineId: state.flyMachineId,
         flyVolumeId: state.flyVolumeId,

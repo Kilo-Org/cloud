@@ -26,6 +26,14 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       capture_pageview: false, // We capture pageviews manually
       capture_pageleave: true, // Enable pageleave capture
       loaded: function (ph) {
+        if (!isProduction) {
+          // Opt out of capturing in non-production environments
+          ph.opt_out_capturing();
+          ph.set_config({ disable_session_recording: true });
+          console.log('PostHog capturing disabled in non-production environment');
+          return;
+        }
+
         // Capture the Meta Pixel browser cookie (_fbp) and store it as a person
         // property so the dbt attribution pipeline can forward it to the Meta
         // Conversions API.  _fbp is set by the Pixel script on first page load
@@ -35,13 +43,6 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
           .find(c => c.trim().startsWith('_fbp='))
           ?.split('=')[1];
         if (fbp) ph.setPersonProperties({ fbp });
-
-        if (!isProduction) {
-          // Opt out of capturing in non-production environments
-          ph.opt_out_capturing();
-          ph.set_config({ disable_session_recording: true });
-          console.log('PostHog capturing disabled in non-production environment');
-        }
       },
     });
     window.posthog = posthog; // Reveal PostHog object globally

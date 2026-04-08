@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
+import { NotificationsCard } from '@/components/notifications-card';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -216,6 +217,11 @@ export function ProfileScreen() {
             );
           })}
         </Animated.View>
+
+        {/* Notifications */}
+        <View className="mt-6">
+          <NotificationsCard />
+        </View>
 
         {/* Actions */}
         <View

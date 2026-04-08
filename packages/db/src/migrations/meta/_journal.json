@@ -568,6 +568,13 @@
       "when": 1775675341896,
       "tag": "0080_burly_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1775684695132,
+      "tag": "0081_moaning_mauler",
+      "breakpoints": true
     }
   ]
 }

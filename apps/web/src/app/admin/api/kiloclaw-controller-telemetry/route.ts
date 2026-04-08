@@ -54,24 +54,29 @@ export async function GET(
 
   const sqlQuery = buildQuery(sandboxId);
 
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/analytics_engine/sql`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: sqlQuery,
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Analytics Engine API error:', response.status, errorText);
-    return NextResponse.json(
-      { error: `Analytics Engine API error: ${response.status}` },
-      { status: 500 }
+  try {
+    const response = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/analytics_engine/sql`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: sqlQuery,
+      }
     );
-  }
 
-  const result: AnalyticsEngineResponse = await response.json();
-  return NextResponse.json(result);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Analytics Engine API error:', response.status, errorText);
+      return NextResponse.json(
+        { error: `Analytics Engine API error: ${response.status}` },
+        { status: 500 }
+      );
+    }
+
+    const result: AnalyticsEngineResponse = await response.json();
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('Analytics Engine request failed:', error);
+    return NextResponse.json({ error: 'Failed to query Analytics Engine' }, { status: 500 });
+  }
 }

@@ -34,7 +34,11 @@ import {
   restoreDestroyedInstance,
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
-import { createCliRun, markCliRunCancelled } from '@/lib/kiloclaw/cli-runs';
+import {
+  createCliRun,
+  markCliRunCancelled,
+  shouldPersistCliRunControllerStatus,
+} from '@/lib/kiloclaw/cli-runs';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
@@ -1160,11 +1164,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
         workerInstanceId(instance)
       );
 
-      if (
-        controllerStatus.hasRun &&
-        controllerStatus.status !== 'running' &&
-        controllerStatus.startedAt
-      ) {
+      if (shouldPersistCliRunControllerStatus(row, controllerStatus)) {
         await db
           .update(kiloclaw_cli_runs)
           .set({

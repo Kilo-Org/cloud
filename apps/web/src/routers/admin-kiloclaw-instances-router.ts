@@ -22,7 +22,11 @@ import {
   createKiloClawAdminAuditLog,
   listKiloClawAdminAuditLogs,
 } from '@/lib/kiloclaw/admin-audit-log';
-import { createCliRun, markCliRunCancelled } from '@/lib/kiloclaw/cli-runs';
+import {
+  createCliRun,
+  markCliRunCancelled,
+  shouldPersistCliRunControllerStatus,
+} from '@/lib/kiloclaw/cli-runs';
 import type {
   PlatformDebugStatusResponse,
   VolumeSnapshot,
@@ -663,7 +667,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         const client = new KiloClawInternalClient();
         const controllerStatus = await client.getKiloCliRunStatus(input.userId, workerInstanceId(instance));
 
-        if (controllerStatus.hasRun && controllerStatus.status !== 'running' && controllerStatus.startedAt) {
+        if (shouldPersistCliRunControllerStatus(row, controllerStatus)) {
           await db
             .update(kiloclaw_cli_runs)
             .set({

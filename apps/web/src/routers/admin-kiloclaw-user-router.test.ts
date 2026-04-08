@@ -289,17 +289,21 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
     const previousTrialEndsAt = '2026-03-20T23:59:59.000Z';
     const newTrialEndsAt = '2026-03-25T23:59:59.000Z';
 
-    await db.insert(kiloclaw_subscriptions).values({
-      user_id: targetUser.id,
-      plan: 'trial',
-      status: 'trialing',
-      trial_started_at: '2026-03-13T12:00:00.000Z',
-      trial_ends_at: previousTrialEndsAt,
-    });
+    const [sub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        plan: 'trial',
+        status: 'trialing',
+        trial_started_at: '2026-03-13T12:00:00.000Z',
+        trial_ends_at: previousTrialEndsAt,
+      })
+      .returning();
 
     const caller = await createCallerForUser(adminUser.id);
     const result = await caller.admin.users.updateKiloClawTrialEndAt({
       userId: targetUser.id,
+      subscriptionId: sub.id,
       trial_ends_at: newTrialEndsAt,
     });
 
@@ -339,35 +343,41 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
     await expect(
       caller.admin.users.updateKiloClawTrialEndAt({
         userId: 'missing-user',
+        subscriptionId: '00000000-0000-0000-0000-000000000000',
         trial_ends_at: '2026-03-25T23:59:59.000Z',
       })
     ).rejects.toThrow('User not found');
   });
 
-  it('rejects users without a KiloClaw subscription row', async () => {
+  it('rejects users without a matching KiloClaw subscription row', async () => {
     const caller = await createCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.users.updateKiloClawTrialEndAt({
         userId: targetUser.id,
+        subscriptionId: '00000000-0000-0000-0000-000000000000',
         trial_ends_at: '2026-03-25T23:59:59.000Z',
       })
     ).rejects.toThrow('No KiloClaw subscription found for this user');
   });
 
   it('rejects non-trialing and non-canceled subscription rows', async () => {
-    await db.insert(kiloclaw_subscriptions).values({
-      user_id: targetUser.id,
-      plan: 'standard',
-      status: 'active',
-      stripe_subscription_id: 'sub_admin_kiloclaw_non_trial',
-    });
+    const [sub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        plan: 'standard',
+        status: 'active',
+        stripe_subscription_id: 'sub_admin_kiloclaw_non_trial',
+      })
+      .returning();
 
     const caller = await createCallerForUser(adminUser.id);
 
     await expect(
       caller.admin.users.updateKiloClawTrialEndAt({
         userId: targetUser.id,
+        subscriptionId: sub.id,
         trial_ends_at: '2026-03-25T23:59:59.000Z',
       })
     ).rejects.toThrow(
@@ -379,19 +389,23 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
     const previousTrialEndsAt = '2026-03-15T23:59:59.000Z';
     const newTrialEndsAt = '2026-04-01T23:59:59.000Z';
 
-    await db.insert(kiloclaw_subscriptions).values({
-      user_id: targetUser.id,
-      plan: 'trial',
-      status: 'canceled',
-      trial_started_at: '2026-03-08T12:00:00.000Z',
-      trial_ends_at: previousTrialEndsAt,
-      suspended_at: '2026-03-16T00:00:00.000Z',
-      destruction_deadline: '2026-03-23T00:00:00.000Z',
-    });
+    const [sub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        plan: 'trial',
+        status: 'canceled',
+        trial_started_at: '2026-03-08T12:00:00.000Z',
+        trial_ends_at: previousTrialEndsAt,
+        suspended_at: '2026-03-16T00:00:00.000Z',
+        destruction_deadline: '2026-03-23T00:00:00.000Z',
+      })
+      .returning();
 
     const caller = await createCallerForUser(adminUser.id);
     const result = await caller.admin.users.updateKiloClawTrialEndAt({
       userId: targetUser.id,
+      subscriptionId: sub.id,
       trial_ends_at: newTrialEndsAt,
     });
 

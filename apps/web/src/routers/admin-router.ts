@@ -181,6 +181,7 @@ const GetKiloClawStateSchema = z.object({
 
 const UpdateKiloClawTrialEndAtSchema = z.object({
   userId: z.string(),
+  subscriptionId: z.string(),
   trial_ends_at: z.string().datetime(),
 });
 
@@ -590,7 +591,10 @@ export const adminRouter = createTRPCRouter({
         }
 
         const subscription = await db.query.kiloclaw_subscriptions.findFirst({
-          where: eq(kiloclaw_subscriptions.user_id, input.userId),
+          where: and(
+            eq(kiloclaw_subscriptions.id, input.subscriptionId),
+            eq(kiloclaw_subscriptions.user_id, input.userId)
+          ),
         });
 
         if (!subscription) {
@@ -633,7 +637,7 @@ export const adminRouter = createTRPCRouter({
                 suspended_at: null,
                 destruction_deadline: null,
               })
-              .where(eq(kiloclaw_subscriptions.user_id, input.userId));
+              .where(eq(kiloclaw_subscriptions.id, subscription.id));
 
             // Clear email logs so notifications can fire again for the new trial.
             // Unlike autoResumeIfSuspended (which preserves trial warnings as one-time events),
@@ -660,7 +664,7 @@ export const adminRouter = createTRPCRouter({
             await tx
               .update(kiloclaw_subscriptions)
               .set({ trial_ends_at: input.trial_ends_at })
-              .where(eq(kiloclaw_subscriptions.user_id, input.userId));
+              .where(eq(kiloclaw_subscriptions.id, subscription.id));
           }
 
           await createKiloClawAdminAuditLog({

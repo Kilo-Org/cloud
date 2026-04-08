@@ -138,12 +138,16 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
   );
 
   const handleTrialSave = () => {
-    if (!selectedDate) {
+    if (!selectedDate || !trialSubscriptionId) {
       toast.error('Select a trial end date');
       return;
     }
     const trialEndsAt = localDateInputToEndOfDayIso(selectedDate);
-    updateTrialEndAt.mutate({ userId, trial_ends_at: trialEndsAt });
+    updateTrialEndAt.mutate({
+      userId,
+      subscriptionId: trialSubscriptionId,
+      trial_ends_at: trialEndsAt,
+    });
   };
 
   const handleCancelConfirm = () => {
@@ -160,9 +164,9 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
     setTrialDialogOpen(true);
   };
 
-  const openCancelDialog = (subscriptionId: string) => {
+  const openCancelDialog = (subscriptionId: string, status: string) => {
     setCancelSubscriptionId(subscriptionId);
-    setCancelMode('period_end');
+    setCancelMode(status === 'past_due' ? 'immediate' : 'period_end');
     setCancelDialogOpen(true);
   };
 
@@ -347,7 +351,7 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                             variant="outline"
                             size="sm"
                             className="border-red-500/30 text-red-400 hover:bg-red-950/30"
-                            onClick={() => openCancelDialog(sub.id)}
+                            onClick={() => openCancelDialog(sub.id, sub.status)}
                           >
                             Cancel
                           </Button>
@@ -357,7 +361,7 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                             variant="outline"
                             size="sm"
                             className="border-red-500/30 text-red-400 hover:bg-red-950/30"
-                            onClick={() => openCancelDialog(sub.id)}
+                            onClick={() => openCancelDialog(sub.id, sub.status)}
                           >
                             Cancel Immediately
                           </Button>
@@ -470,21 +474,30 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
           </DialogHeader>
           <div className="space-y-3 py-4">
             <Label>Cancellation timing</Label>
-            <RadioButtonGroup
-              options={[
-                { value: 'period_end', label: 'At period end' },
-                { value: 'immediate', label: 'Immediately' },
-              ]}
-              value={cancelMode}
-              onChange={v => {
-                if (isCancelMode(v)) setCancelMode(v);
-              }}
-            />
-            <p className="text-muted-foreground text-xs">
-              {cancelMode === 'period_end'
-                ? 'No refund. The user keeps access until the current billing period ends.'
-                : 'No refund. Local access ends now. The lifecycle will suspend/stop the instance on its next run.'}
-            </p>
+            {cancelingSubscription?.status === 'past_due' ? (
+              <p className="text-muted-foreground text-xs">
+                Past-due subscriptions can only be canceled immediately. No refund. Local access
+                ends now. The lifecycle will suspend/stop the instance on its next run.
+              </p>
+            ) : (
+              <>
+                <RadioButtonGroup
+                  options={[
+                    { value: 'period_end', label: 'At period end' },
+                    { value: 'immediate', label: 'Immediately' },
+                  ]}
+                  value={cancelMode}
+                  onChange={v => {
+                    if (isCancelMode(v)) setCancelMode(v);
+                  }}
+                />
+                <p className="text-muted-foreground text-xs">
+                  {cancelMode === 'period_end'
+                    ? 'No refund. The user keeps access until the current billing period ends.'
+                    : 'No refund. Local access ends now. The lifecycle will suspend/stop the instance on its next run.'}
+                </p>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button

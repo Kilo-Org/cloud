@@ -9,6 +9,13 @@
   "placement": { "mode": "smart" },
   "observability": { "enabled": true },
 
+  "routes": [
+    {
+      "pattern": "notifications.kiloapps.io",
+      "custom_domain": true
+    }
+  ],
+
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",

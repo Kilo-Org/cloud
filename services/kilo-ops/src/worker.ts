@@ -19,9 +19,7 @@ export class GrafanaContainer extends Container<Env> {
   override async fetch(request: Request): Promise<Response> {
     const state = await this.getState();
     const needsStart =
-      state.status !== 'running' &&
-      state.status !== 'healthy' &&
-      state.status !== 'stopping';
+      state.status !== 'running' && state.status !== 'healthy' && state.status !== 'stopping';
 
     if (needsStart) {
       const analyticsApiKey = await resolveSecret(this.env.CF_ANALYTICS_API_KEY);
@@ -36,6 +34,7 @@ export class GrafanaContainer extends Container<Env> {
         CF_ACCOUNT_ID: this.env.CF_ACCOUNT_ID,
         CF_ANALYTICS_API_KEY: analyticsApiKey,
         GF_SECURITY_SECRET_KEY: gfSecretKey,
+        GF_SERVER_ROOT_URL: this.env.GF_SERVER_ROOT_URL,
       };
     }
 
@@ -77,6 +76,7 @@ app.all('/*', async c => {
     'x-webauth-user',
     'authorization',
     'cf-access-jwt-assertion',
+    'cookie',
   ]);
   const headers = new Headers();
   for (const [key, value] of c.req.raw.headers.entries()) {

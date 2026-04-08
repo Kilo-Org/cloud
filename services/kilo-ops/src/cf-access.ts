@@ -164,8 +164,7 @@ export async function verifyCfAccess(
   try {
     const { payload } = await validateAccessJWT(request, accessTeamDomain, accessAud);
     if ('email' in payload) {
-      const userPayload = payload as UserAccessPayload;
-      return userPayload.email;
+      return payload.email;
     }
     return null;
   } catch {

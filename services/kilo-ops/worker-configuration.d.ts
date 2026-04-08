@@ -12,6 +12,7 @@ declare namespace Cloudflare {
 		CF_ACCESS_AUD: '7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be';
 		CF_CLICKHOUSE_URL: string;
 		CF_ACCOUNT_ID: string;
+		GF_SERVER_ROOT_URL: string;
 		GRAFANA_CONTAINER: DurableObjectNamespace<import('./src/worker').GrafanaContainer>;
 	}
 }

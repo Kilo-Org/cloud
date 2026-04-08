@@ -904,6 +904,8 @@ export const CustomLlmDefinitionSchema = z
     api_key: z.string(),
     organization_ids: z.array(z.string()),
     supports_image_input: z.boolean().optional(),
+    add_cache_breakpoints: z.boolean().optional(),
+    reasoning_summary: z.enum(['auto', 'concise', 'detailed']).optional(),
     extra_headers: CustomLlmExtraHeadersSchema.optional(),
     extra_body: CustomLlmExtraBodySchema.optional(),
     remove_from_body: z.array(z.string()).optional(),

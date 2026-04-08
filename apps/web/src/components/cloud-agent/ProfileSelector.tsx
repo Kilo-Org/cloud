@@ -2,7 +2,16 @@
 'use client';
 
 import { useState } from 'react';
-import { FolderCog, Star, Settings, AlertCircle, Loader2, Building, User } from 'lucide-react';
+import {
+  FolderCog,
+  Star,
+  Settings,
+  AlertCircle,
+  Loader2,
+  Building,
+  User,
+  GitBranch,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -26,6 +35,7 @@ type ProfileSelectorProps = {
   selectedProfileId: string | null;
   onProfileSelect: (profileId: string | null) => void;
   onProfileApplied?: (profile: ProfileSummaryWithOwner) => void;
+  onRepoDefaultsClick?: () => void;
   disabled?: boolean;
   /**
    * When true and in org context, only show organization profiles (hide personal profiles).
@@ -39,6 +49,7 @@ export function ProfileSelector({
   selectedProfileId,
   onProfileSelect,
   onProfileApplied,
+  onRepoDefaultsClick,
   disabled = false,
   orgProfilesOnly = false,
 }: ProfileSelectorProps) {
@@ -73,6 +84,10 @@ export function ProfileSelector({
   const handleValueChange = (value: string) => {
     if (value === '__manage__') {
       setShowManageDialog(true);
+      return;
+    }
+    if (value === '__repo_defaults__') {
+      onRepoDefaultsClick?.();
       return;
     }
     if (value === '__none__') {
@@ -196,6 +211,14 @@ export function ProfileSelector({
               Manage profiles...
             </div>
           </SelectItem>
+          {onRepoDefaultsClick && (
+            <SelectItem value="__repo_defaults__">
+              <div className="flex items-center gap-2 font-medium">
+                <GitBranch className="h-4 w-4" />
+                Default profiles for repos...
+              </div>
+            </SelectItem>
+          )}
         </SelectContent>
       </Select>
 

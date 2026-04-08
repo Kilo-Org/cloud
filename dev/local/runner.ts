@@ -17,6 +17,7 @@ import {
   selectPane,
   setPaneTitle,
   setMainLeftLayout,
+  pipePane,
 } from './tmux';
 
 // ---------------------------------------------------------------------------
@@ -107,7 +108,7 @@ export function buildStartCommand(serviceName: string): string {
 
 export function startServiceInTmux(sessionName: string, serviceName: string): void {
   const svc = getService(serviceName);
-  createWindow(sessionName, serviceName);
+  const winIndex = createWindow(sessionName, serviceName);
   if (svc.type === 'infra') {
     sendKeys(
       sessionName,
@@ -117,6 +118,17 @@ export function startServiceInTmux(sessionName: string, serviceName: string): vo
   } else {
     sendKeys(sessionName, serviceName, buildStartCommand(serviceName));
   }
+  const logPath = path.join(findRepoRoot(), 'dev', 'logs', `${serviceName}.log`);
+  pipePane(sessionName, winIndex, 0, buildLogPipeCommand(logPath));
+}
+
+function buildLogPipeCommand(logPath: string): string {
+  const filterPath = path.join(findRepoRoot(), 'dev', 'local', 'log-filter.ts');
+  return `tsx ${shellQuote(filterPath)} >> ${shellQuote(logPath)}`;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
 export function stopServiceInTmux(sessionName: string, serviceName: string): void {
@@ -293,16 +305,31 @@ export function readEnvValue(filePath: string, key: string): string | undefined 
   return match ? match[1] : undefined;
 }
 
+export function readEnvMtime(filePath: string): number | undefined {
+  try {
+    return fs.statSync(filePath).mtimeMs;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function waitForEnvValueChange(
   filePath: string,
   key: string,
   previousValue: string | undefined,
-  timeoutMs: number
+  timeoutMs: number,
+  previousMtimeMs?: number
 ): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const current = readEnvValue(filePath, key);
-    if (current !== undefined && current !== previousValue) return true;
+    const currentMtimeMs = readEnvMtime(filePath);
+    const fileWasRewritten =
+      previousMtimeMs !== undefined &&
+      currentMtimeMs !== undefined &&
+      currentMtimeMs > previousMtimeMs;
+
+    if (current !== undefined && (current !== previousValue || fileWasRewritten)) return true;
     await sleep(500);
   }
   return false;

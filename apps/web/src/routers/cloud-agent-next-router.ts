@@ -66,9 +66,14 @@ export const cloudAgentNextRouter = createTRPCRouter({
         input;
 
       try {
+        const repoFullName = githubRepo ?? gitlabProject;
+        const platform = gitlabProject ? PLATFORM.GITLAB : PLATFORM.GITHUB;
+
         const merged = await mergeProfileConfiguration({
           profileName,
           owner: { type: 'user', id: ctx.user.id },
+          repoFullName,
+          platform,
           envVars,
           setupCommands,
         });

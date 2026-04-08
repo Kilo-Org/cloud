@@ -153,6 +153,7 @@ export class ExecutionOrchestrator {
     try {
       const result = await wrapperClient.prompt({
         prompt,
+        messageId: plan.messageId,
         model: wrapper.model,
         variant: wrapper.variant,
         agent: normalizedMode,

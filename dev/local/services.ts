@@ -30,6 +30,7 @@ const groups: ServiceGroup[] = [
   { id: 'auto-fix', label: 'Auto Fix', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'deploy', label: 'Deploy', alwaysOn: false },
   { id: 'observability', label: 'Observability', alwaysOn: false },
+  { id: 'storybook', label: 'Storybook', alwaysOn: false, sectionBreakBefore: true },
 ];
 
 type ServiceDef = {
@@ -127,6 +128,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'kiloclaw-tunnel'],
     dir: 'services/kiloclaw',
   },
+  'kiloclaw-billing': {
+    group: 'kiloclaw',
+    dependsOn: ['postgres', 'nextjs', 'kiloclaw'],
+    dir: 'services/kiloclaw-billing',
+  },
   // observability
   'cloudflare-o11y': {
     group: 'observability',
@@ -138,6 +144,8 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: [],
     dir: 'services/ai-attribution',
   },
+  // storybook
+  storybook: { group: 'storybook', dependsOn: [] },
   // gastown
   'cloudflare-gastown': {
     group: 'gastown',
@@ -252,6 +260,19 @@ function buildServiceDefs(): ServiceDef[] {
         port: 3000 + portOffset,
         dependsOn: meta.dependsOn,
         command: ['pnpm', 'run', 'dev'],
+        group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'storybook') {
+      defs.push({
+        name,
+        type: 'process',
+        dir: 'apps/storybook',
+        port: 6006 + portOffset,
+        dependsOn: meta.dependsOn,
+        command: ['pnpm', 'run', 'storybook', '--', '-p', String(6006 + portOffset)],
         group: meta.group,
       });
       continue;

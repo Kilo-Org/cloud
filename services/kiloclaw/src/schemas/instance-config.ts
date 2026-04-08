@@ -239,6 +239,10 @@ export const PersistedStateSchema = z.object({
   // null = use defaults (security: 'allowlist', ask: 'on-miss').
   execSecurity: z.string().nullable().default(null),
   execAsk: z.string().nullable().default(null),
+  botName: z.string().nullable().default(null),
+  botNature: z.string().nullable().default(null),
+  botVibe: z.string().nullable().default(null),
+  botEmoji: z.string().nullable().default(null),
   // Snapshot restore: tracks the volume before the most recent restore for admin revert path.
   previousVolumeId: z.string().nullable().default(null),
   // Snapshot restore: timestamp set at enqueue time. Used by alarm for stuck-restore detection

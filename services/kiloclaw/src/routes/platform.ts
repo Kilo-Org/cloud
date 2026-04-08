@@ -26,6 +26,7 @@ import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/im
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { z } from 'zod';
 import { withDORetry } from '@kilocode/worker-utils';
+import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
@@ -53,11 +54,64 @@ const KiloCodeConfigPatchSchema = z.object({
 
 const platform = new Hono<AppEnv>();
 
+type BillingPlatformLogFields = {
+  billingFlow?: string;
+  billingRunId?: string;
+  billingSweep?: string;
+  billingCallId?: string;
+  billingAttempt?: number;
+  billingComponent: 'kiloclaw_platform';
+  event: 'downstream_action';
+  outcome: 'started' | 'completed' | 'failed';
+  method: string;
+  path: string;
+  durationMs?: number;
+  statusCode?: number;
+  userId?: string;
+  instanceId?: string;
+  error?: string;
+};
+
+function logBillingPlatform(
+  level: 'info' | 'error',
+  message: string,
+  fields: BillingPlatformLogFields
+) {
+  const record = JSON.stringify({
+    level,
+    message,
+    ...fields,
+  });
+
+  if (level === 'error') {
+    console.error(record);
+    return;
+  }
+  console.log(record);
+}
+
 // Analytics middleware — runs for every platform route. Captures timing and
 // error state. Skips emitting for routes with no user context (e.g. /versions)
 // unless an error occurred.
 platform.use('*', async (c, next) => {
   const start = c.get('requestStartTime') ?? performance.now();
+  const billingContext = readBillingCorrelationHeaders(c.req.raw.headers);
+  const method = c.req.method;
+  const path = c.req.path;
+  const instanceId = c.req.query('instanceId') ?? undefined;
+
+  if (billingContext) {
+    logBillingPlatform('info', 'Starting billing-correlated kiloclaw platform request', {
+      ...billingContext,
+      billingComponent: 'kiloclaw_platform',
+      event: 'downstream_action',
+      outcome: 'started',
+      method,
+      path,
+      instanceId,
+    });
+  }
+
   let error: string | undefined;
   try {
     await next();
@@ -69,12 +123,31 @@ platform.use('*', async (c, next) => {
     throw err;
   } finally {
     const durationMs = performance.now() - start;
-    const method = c.req.method;
-    const path = c.req.path;
 
     // userId is always read from Hono context — set by parseBody() for
     // POST/PATCH routes, or by setValidatedQueryUserId() for GET/DELETE routes.
     const userId = c.get('userId') || '';
+
+    if (billingContext) {
+      const statusCode = c.res.status;
+      logBillingPlatform(
+        error ? 'error' : 'info',
+        'Finished billing-correlated kiloclaw platform request',
+        {
+          ...billingContext,
+          billingComponent: 'kiloclaw_platform',
+          event: 'downstream_action',
+          outcome: error ? 'failed' : 'completed',
+          method,
+          path,
+          durationMs,
+          statusCode,
+          userId: userId || undefined,
+          instanceId,
+          ...(error ? { error } : {}),
+        }
+      );
+    }
 
     // Skip analytics for routes with no user context (e.g. /versions) unless
     // they errored — no userId means nothing useful to attribute.
@@ -432,6 +505,14 @@ const ExecPresetPatchSchema = z.object({
   ask: z.string().optional(),
 });
 
+const BotIdentityPatchSchema = z.object({
+  userId: z.string().min(1),
+  botName: z.string().trim().min(1).max(80).nullable().optional(),
+  botNature: z.string().trim().min(1).max(120).nullable().optional(),
+  botVibe: z.string().trim().min(1).max(120).nullable().optional(),
+  botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
+});
+
 platform.patch('/exec-preset', async c => {
   const result = await parseBody(c, ExecPresetPatchSchema);
   if ('error' in result) return result.error;
@@ -450,6 +531,28 @@ platform.patch('/exec-preset', async c => {
     return c.json(updated, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'exec-preset patch');
+    return jsonError(message, status);
+  }
+});
+
+platform.patch('/bot-identity', async c => {
+  const result = await parseBody(c, BotIdentityPatchSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, botName, botNature, botVibe, botEmoji } = result.data;
+
+  try {
+    const updated = await withDORetry(
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
+      stub => stub.updateBotIdentity({ botName, botNature, botVibe, botEmoji }),
+      'updateBotIdentity'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'bot-identity patch');
     return jsonError(message, status);
   }
 });
@@ -1174,7 +1277,7 @@ const StartRequestSchema = UserIdRequestSchema.extend({
   skipCooldown: z.boolean().optional(),
 });
 
-platform.post('/start', async c => {
+async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
   const result = await parseBody(c, StartRequestSchema);
   if ('error' in result) return result.error;
   const startedAt = performance.now();
@@ -1184,34 +1287,57 @@ platform.post('/start', async c => {
   const { instanceId } = iidResult;
 
   try {
+    const route = mode === 'async' ? '/api/platform/start-async' : '/api/platform/start';
+    const eventBase =
+      mode === 'async' ? 'instance.async_start_requested' : 'instance.manual_start_succeeded';
     const options = result.data.skipCooldown ? { skipCooldown: true } : undefined;
-    const { started } = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, instanceId),
-      stub => stub.start(result.data.userId, options),
-      'start'
-    );
-    if (started) {
-      writeEvent(c.env, {
-        event: 'instance.manual_start_succeeded',
-        delivery: 'http',
-        route: '/api/platform/start',
-        userId: result.data.userId,
-        durationMs: performance.now() - startedAt,
-      });
+
+    if (mode === 'async') {
+      await withDORetry(
+        instanceStubFactory(c.env, result.data.userId, instanceId),
+        stub => stub.startAsync(result.data.userId),
+        'startAsync'
+      );
+    } else {
+      const { started } = await withDORetry(
+        instanceStubFactory(c.env, result.data.userId, instanceId),
+        stub => stub.start(result.data.userId, options),
+        'start'
+      );
+      if (!started) {
+        return c.json({ ok: true });
+      }
     }
+
+    writeEvent(c.env, {
+      event: eventBase,
+      delivery: 'http',
+      route,
+      userId: result.data.userId,
+      durationMs: performance.now() - startedAt,
+    });
     return c.json({ ok: true });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'start');
     writeEvent(c.env, {
-      event: 'instance.manual_start_failed',
+      event:
+        mode === 'async' ? 'instance.async_start_request_failed' : 'instance.manual_start_failed',
       delivery: 'http',
-      route: '/api/platform/start',
+      route: mode === 'async' ? '/api/platform/start-async' : '/api/platform/start',
       userId: result.data.userId,
       error: message,
       durationMs: performance.now() - startedAt,
     });
     return jsonError(message, status);
   }
+}
+
+platform.post('/start', async c => {
+  return handleStartRequest(c, 'sync');
+});
+
+platform.post('/start-async', async c => {
+  return handleStartRequest(c, 'async');
 });
 
 // POST /api/platform/force-retry-recovery

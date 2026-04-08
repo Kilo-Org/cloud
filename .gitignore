@@ -39,6 +39,8 @@ next-env.d.ts
 /dev/fixtures/
 /dev/*/fixtures/
 dev-debug-request-logs/*
+/dev/logs/
+/dev/*/logs/
 
 # testing
 /coverage

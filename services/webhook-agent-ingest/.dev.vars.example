@@ -1,5 +1,7 @@
 # Shared secrets (required for local dev — secrets store not available in wrangler dev)
+# @from NEXTAUTH_SECRET
 NEXTAUTH_SECRET=
+# @from INTERNAL_API_SECRET
 INTERNAL_API_SECRET=
 
 # Worker environment

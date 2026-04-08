@@ -24,6 +24,7 @@ import {
   isUserMessage,
   isAssistantMessage,
   isToolPart,
+  isTextPart,
   type EventMessageUpdated,
   type EventMessagePartUpdated,
   type EventMessagePartRemoved,
@@ -184,15 +185,25 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
 
   /**
    * Apply a part update to a message — upsert by part id.
+   * Returns false if the update was rejected (no mutation occurred), true otherwise.
    */
-  function applyPartToMessage(message: ProcessedMessage, part: Part): void {
+  function applyPartToMessage(message: ProcessedMessage, part: Part): boolean {
     const existingIndex = message.parts.findIndex(p => p.id === part.id);
+
+    // For user messages, don't allow an update to clear existing text from a text part.
+    if (isUserMessage(message.info) && existingIndex >= 0 && isTextPart(part) && !part.text) {
+      const existing = message.parts[existingIndex];
+      if (isTextPart(existing) && existing.text) {
+        return false;
+      }
+    }
 
     if (existingIndex >= 0) {
       message.parts[existingIndex] = part;
     } else {
       message.parts.push(part);
     }
+    return true;
   }
 
   /**
@@ -282,10 +293,12 @@ export function createEventProcessor(config: EventProcessorConfig = {}): EventPr
       return;
     }
 
-    applyPartToMessage(message, part);
-    const updatedPart = message.parts.find(p => p.id === part.id) ?? part;
-    callbacks.onPartUpdated?.(sessionId, messageId, part.id, updatedPart, parentSessionId);
-    checkAndHandleCompletion(sessionId, messageId, message);
+    const applied = applyPartToMessage(message, part);
+    if (applied) {
+      const updatedPart = message.parts.find(p => p.id === part.id) ?? part;
+      callbacks.onPartUpdated?.(sessionId, messageId, part.id, updatedPart, parentSessionId);
+      checkAndHandleCompletion(sessionId, messageId, message);
+    }
   }
 
   /**

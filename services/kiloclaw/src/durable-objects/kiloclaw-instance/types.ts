@@ -95,6 +95,10 @@ export type InstanceMutableState = {
   gmailPushOidcEmail: string | null;
   execSecurity: string | null;
   execAsk: string | null;
+  botName: string | null;
+  botNature: string | null;
+  botVibe: string | null;
+  botEmoji: string | null;
   // Snapshot restore tracking
   previousVolumeId: string | null;
   restoreStartedAt: string | null;

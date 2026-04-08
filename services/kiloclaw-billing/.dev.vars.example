@@ -1,0 +1,10 @@
+# Shared secret for internal API calls to the Next.js billing side-effect route.
+INTERNAL_API_SECRET=your-internal-api-secret-here
+
+# Shared secret for authenticated calls to the local kiloclaw worker's
+# /api/platform/* routes over the service binding.
+KILOCLAW_INTERNAL_API_SECRET=your-kiloclaw-internal-api-secret-here
+
+# Backend app origin for local internal API calls.
+# @url nextjs
+KILOCODE_BACKEND_BASE_URL=http://localhost:3000

@@ -378,3 +378,79 @@ export function useCombinedProfilesWithMutations(options: UseCombinedProfilesOpt
     ...mutations,
   };
 }
+
+type UseRepoBindingsOptions = {
+  organizationId?: string;
+  enabled?: boolean;
+};
+
+/**
+ * Hook to fetch repo-profile bindings for user or organization.
+ */
+export function useRepoBindings(options: UseRepoBindingsOptions = {}) {
+  const { organizationId, enabled = true } = options;
+  const trpc = useTRPC();
+
+  return useQuery(
+    trpc.agentProfiles.listRepoBindings.queryOptions(
+      { organizationId },
+      { enabled, staleTime: 30_000 }
+    )
+  );
+}
+
+/**
+ * Mutation hook to bind an environment profile to a repository.
+ * Invalidates listRepoBindings and profile caches on success.
+ */
+export function useBindRepoMutation(organizationId?: string) {
+  const queryClient = useQueryClient();
+  const trpc = useTRPC();
+
+  return useMutation(
+    trpc.agentProfiles.bindToRepo.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.agentProfiles.listRepoBindings.queryKey({ organizationId }),
+        });
+        // Also invalidate profile queries to ensure UI consistency
+        await queryClient.invalidateQueries({
+          queryKey: trpc.agentProfiles.list.queryKey({ organizationId }),
+        });
+        if (organizationId) {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.agentProfiles.listCombined.queryKey({ organizationId }),
+          });
+        }
+      },
+    })
+  );
+}
+
+/**
+ * Mutation hook to remove a profile binding from a repository.
+ * Invalidates listRepoBindings and profile caches on success.
+ */
+export function useUnbindRepoMutation(organizationId?: string) {
+  const queryClient = useQueryClient();
+  const trpc = useTRPC();
+
+  return useMutation(
+    trpc.agentProfiles.unbindRepo.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.agentProfiles.listRepoBindings.queryKey({ organizationId }),
+        });
+        // Also invalidate profile queries to ensure UI consistency
+        await queryClient.invalidateQueries({
+          queryKey: trpc.agentProfiles.list.queryKey({ organizationId }),
+        });
+        if (organizationId) {
+          await queryClient.invalidateQueries({
+            queryKey: trpc.agentProfiles.listCombined.queryKey({ organizationId }),
+          });
+        }
+      },
+    })
+  );
+}

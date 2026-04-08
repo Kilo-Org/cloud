@@ -21,7 +21,7 @@ import { MINIMAX_CURRENT_MODEL_ID, minimax_m25_free_model } from '@/lib/provider
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/providers/morph';
 import { gpt_oss_20b_free_model } from '@/lib/providers/openai';
-import { qwen35_plus_free_model } from '@/lib/providers/qwen';
+import { qwen36_plus_free_model } from '@/lib/providers/qwen';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 import { mimo_v2_omni_free_model, mimo_v2_pro_free_model } from '@/lib/providers/xiaomi';
 
@@ -87,7 +87,7 @@ export const kiloFreeModels = [
   morph_warp_grep_free_model,
   grok_code_fast_1_optimized_free_model,
   seed_20_pro_free_model,
-  qwen35_plus_free_model,
+  qwen36_plus_free_model,
   trinity_large_thinking_free_model,
 ] as KiloFreeModel[];
 

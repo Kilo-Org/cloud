@@ -2,11 +2,11 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
+import { getEffectiveKiloClawSubscriptionForUser } from '@/lib/kiloclaw/access-state';
 import {
   kilocode_users,
   organization_memberships,
   organizations,
-  kiloclaw_subscriptions,
   kiloclaw_earlybird_purchases,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -102,22 +102,9 @@ async function checkHasKiloPass(userId: string): Promise<boolean> {
 }
 
 async function checkHasKiloClaw(userId: string): Promise<boolean> {
-  const [sub] = await db
-    .select({
-      status: kiloclaw_subscriptions.status,
-      trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
-      suspended_at: kiloclaw_subscriptions.suspended_at,
-    })
-    .from(kiloclaw_subscriptions)
-    .where(eq(kiloclaw_subscriptions.user_id, userId))
-    .limit(1);
-
-  if (sub) {
-    if (sub.status === 'active') return true;
-    if (sub.status === 'past_due' && !sub.suspended_at) return true;
-    if (sub.status === 'trialing' && sub.trial_ends_at && new Date(sub.trial_ends_at) > new Date())
-      return true;
-  }
+  const now = new Date();
+  const { accessReason } = await getEffectiveKiloClawSubscriptionForUser(userId, now);
+  if (accessReason) return true;
 
   const [earlybird] = await db
     .select({ id: kiloclaw_earlybird_purchases.id })

@@ -9,6 +9,8 @@ import type {
   RegistryEntriesResponse,
   KiloCodeConfigPatchInput,
   KiloCodeConfigResponse,
+  BotIdentityPatchInput,
+  BotIdentityPatchResponse,
   ChannelsPatchInput,
   ChannelsPatchResponse,
   SecretsPatchInput,
@@ -155,6 +157,18 @@ export class KiloClawInternalClient {
     );
   }
 
+  async startAsync(userId: string, instanceId?: string): Promise<{ ok: true }> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/start-async${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
   async stop(userId: string, instanceId?: string): Promise<{ ok: true }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
@@ -272,6 +286,22 @@ export class KiloClawInternalClient {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/exec-preset${params}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ userId, ...patch }),
+      },
+      { userId }
+    );
+  }
+
+  async patchBotIdentity(
+    userId: string,
+    patch: BotIdentityPatchInput,
+    instanceId?: string
+  ): Promise<BotIdentityPatchResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/bot-identity${params}`,
       {
         method: 'PATCH',
         body: JSON.stringify({ userId, ...patch }),

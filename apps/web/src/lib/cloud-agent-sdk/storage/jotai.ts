@@ -236,6 +236,31 @@ function createJotaiStorage(store: JotaiStore): JotaiSessionStorage {
       }
       notify(subscribers, 'messageIds');
     },
+
+    deleteMessage(messageId) {
+      const messages = store.get(messagesAtom);
+      if (!messages.has(messageId)) return;
+
+      const nextMessages = new Map(messages);
+      nextMessages.delete(messageId);
+      store.set(messagesAtom, nextMessages);
+
+      const messageIds = store.get(messageIdsAtom);
+      const nextMessageIds = messageIds.filter(id => id !== messageId);
+      store.set(messageIdsAtom, nextMessageIds);
+
+      const allParts = store.get(partsAtom);
+      if (allParts.has(messageId)) {
+        const nextParts = new Map(allParts);
+        nextParts.delete(messageId);
+        store.set(partsAtom, nextParts);
+        partsSnapshot.delete(messageId);
+        notify(subscribers, `parts:${messageId}`);
+      }
+
+      notify(subscribers, `message:${messageId}`);
+      notify(subscribers, 'messageIds');
+    },
   };
 }
 

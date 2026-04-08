@@ -266,6 +266,33 @@ describe('getBillingStatus', () => {
     expect(result).not.toBeNull();
     expect(result.trialEligible).toBe(false);
   });
+
+  it('prefers an active subscription over an older canceled row', async () => {
+    await db.insert(kiloclaw_subscriptions).values([
+      {
+        user_id: user.id,
+        plan: 'standard',
+        status: 'canceled',
+        stripe_subscription_id: 'sub_status_canceled_old',
+        current_period_end: '2026-03-01T00:00:00.000Z',
+      },
+      {
+        user_id: user.id,
+        plan: 'standard',
+        status: 'active',
+        stripe_subscription_id: 'sub_status_active_latest',
+        current_period_end: '2026-05-01T00:00:00.000Z',
+      },
+    ]);
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.kiloclaw.getBillingStatus();
+
+    expect(result.hasAccess).toBe(true);
+    expect(result.accessReason).toBe('subscription');
+    expect(result.subscription?.status).toBe('active');
+    expect(result.subscription?.currentPeriodEnd).toBe('2026-05-01T00:00:00.000Z');
+  });
 });
 
 describe('subscription center procedures', () => {

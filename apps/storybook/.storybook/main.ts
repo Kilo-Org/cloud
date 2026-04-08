@@ -7,10 +7,11 @@ import webpack from 'webpack';
 
 // Load environment variables from .env files
 // This follows Next.js convention: .env.local > .env.development > .env
-const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-expand(dotenvConfig({ path: resolve(projectRoot, '.env.local') }));
-expand(dotenvConfig({ path: resolve(projectRoot, '.env.development') }));
-expand(dotenvConfig({ path: resolve(projectRoot, '.env') }));
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const webRoot = resolve(repoRoot, 'apps/web');
+expand(dotenvConfig({ path: resolve(repoRoot, '.env.local') }));
+expand(dotenvConfig({ path: resolve(webRoot, '.env.development') }));
+expand(dotenvConfig({ path: resolve(webRoot, '.env') }));
 
 const config: StorybookConfig = {
   stories: ['../stories/**/*.stories.@(js|jsx|mjs|ts|tsx)'],
@@ -18,12 +19,12 @@ const config: StorybookConfig = {
   framework: {
     name: '@storybook/nextjs',
     options: {
-      nextConfigPath: '../../next.config.mjs',
+      nextConfigPath: '../web/next.config.mjs',
     },
   },
-  staticDirs: ['../../public', '../public'],
+  staticDirs: ['../../web/public', '../public'],
   webpackFinal: async config => {
-    const srcDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../src');
+    const srcDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../web/src');
     const mocksDir = resolve(dirname(fileURLToPath(import.meta.url)), '../src/mocks');
 
     if (config.resolve) {

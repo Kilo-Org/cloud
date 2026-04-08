@@ -109,6 +109,12 @@ export const SendMessageV2Input = z
     images: ImagesSchema.optional().describe(
       'Optional image attachments to download from R2 to the sandbox'
     ),
+    messageId: z
+      .string()
+      .startsWith('msg_')
+      .length(30)
+      .optional()
+      .describe('Optional message ID for correlating the request'),
   })
   .extend(PromptPayload.shape)
   .refine(rejectCustomMode, {
@@ -228,6 +234,12 @@ export const PrepareSessionInput = z
       .describe(
         'When true, return immediately after creating IDs and run preparation asynchronously. Progress events are streamed via WebSocket.'
       ),
+    initialMessageId: z
+      .string()
+      .startsWith('msg_')
+      .length(30)
+      .optional()
+      .describe('Initial message ID for correlation with external systems'),
   })
   .refine(validateGitSource, {
     message: 'Must provide either githubRepo or gitUrl, but not both',
@@ -392,6 +404,9 @@ export const GetSessionOutput = z.object({
   callbackTarget: CallbackTargetSchema.optional().describe(
     'Callback target configuration for execution completion notifications'
   ),
+
+  // Initial message ID for correlation
+  initialMessageId: z.string().startsWith('msg_').length(30).optional(),
 
   // Versioning
   timestamp: z.number().describe('Last update timestamp'),

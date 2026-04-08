@@ -10,6 +10,7 @@ import {
   resolveGroups,
   topologicalSort,
   portOffset,
+  services,
 } from './services';
 import { syncEnvVars } from './env-sync';
 import {
@@ -29,13 +30,18 @@ import {
   setPaneTitle,
   enablePaneBorders,
   isTmuxAvailable,
+  findServicePane,
+  isPaneRunningCommand,
 } from './tmux';
 import {
   findRepoRoot,
   startServiceInTmux,
   startInfra,
   readEnvValue,
+  readEnvMtime,
   waitForEnvValueChange,
+  probePort,
+  restartServiceInTmux,
 } from './runner';
 
 // ---------------------------------------------------------------------------
@@ -135,6 +141,13 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     console.log();
   }
 
+  // --- Prepare log directory ---
+  const logDir = path.join(repoRoot, 'dev', 'logs');
+  fs.mkdirSync(logDir, { recursive: true });
+  for (const entry of fs.readdirSync(logDir)) {
+    fs.unlinkSync(path.join(logDir, entry));
+  }
+
   // --- Create tmux session ---
   createSession(sessionName);
 
@@ -148,23 +161,21 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
 
   if (captureServices.length > 0) {
     const oldValues = new Map<string, string | undefined>();
+    const oldMtimes = new Map<string, number | undefined>();
     if (captureServices.includes('kiloclaw-tunnel')) {
-      oldValues.set(
-        'tunnel',
-        readEnvValue(path.join(repoRoot, 'services/kiloclaw/.dev.vars'), 'KILOCODE_API_BASE_URL')
-      );
+      const tunnelEnvPath = path.join(repoRoot, 'services/kiloclaw/.dev.vars');
+      oldValues.set('tunnel', readEnvValue(tunnelEnvPath, 'KILOCODE_API_BASE_URL'));
+      oldMtimes.set('tunnel', readEnvMtime(tunnelEnvPath));
     }
     if (captureServices.includes('kiloclaw-stripe')) {
-      oldValues.set(
-        'stripe',
-        readEnvValue(path.join(repoRoot, '.env.development.local'), 'STRIPE_WEBHOOK_SECRET')
-      );
+      const stripeEnvPath = path.join(repoRoot, '.env.development.local');
+      oldValues.set('stripe', readEnvValue(stripeEnvPath, 'STRIPE_WEBHOOK_SECRET'));
+      oldMtimes.set('stripe', readEnvMtime(stripeEnvPath));
     }
     if (captureServices.includes('app-builder-tunnel')) {
-      oldValues.set(
-        'app-builder-tunnel',
-        readEnvValue(path.join(repoRoot, 'services/app-builder/.dev.vars'), 'BUILDER_HOSTNAME')
-      );
+      const appBuilderEnvPath = path.join(repoRoot, 'services/app-builder/.dev.vars');
+      oldValues.set('app-builder-tunnel', readEnvValue(appBuilderEnvPath, 'BUILDER_HOSTNAME'));
+      oldMtimes.set('app-builder-tunnel', readEnvMtime(appBuilderEnvPath));
     }
 
     for (const name of captureServices) {
@@ -181,7 +192,8 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
           path.join(repoRoot, 'services/kiloclaw/.dev.vars'),
           'KILOCODE_API_BASE_URL',
           oldValues.get('tunnel'),
-          30_000
+          30_000,
+          oldMtimes.get('tunnel')
         ).then(ready => {
           if (ready) {
             console.log('  Tunnel URL captured');
@@ -198,7 +210,8 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
           path.join(repoRoot, '.env.development.local'),
           'STRIPE_WEBHOOK_SECRET',
           oldValues.get('stripe'),
-          30_000
+          30_000,
+          oldMtimes.get('stripe')
         ).then(ready => {
           if (ready) {
             console.log('  Stripe webhook secret captured');
@@ -215,7 +228,8 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
           path.join(repoRoot, 'services/app-builder/.dev.vars'),
           'BUILDER_HOSTNAME',
           oldValues.get('app-builder-tunnel'),
-          30_000
+          30_000,
+          oldMtimes.get('app-builder-tunnel')
         ).then(ready => {
           if (ready) {
             console.log('  App builder tunnel URL captured');
@@ -276,8 +290,129 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   // --- Focus sidebar pane and attach ---
   selectPane(sessionName, 0, 0);
   selectWindow(sessionName, 0);
+
+  // --- Write manifest for agents ---
+  writeManifest(repoRoot, sessionName, serviceNames);
+
   console.log(`${GREEN}Started ${serviceNames.length} services in session ${sessionName}${RESET}`);
   attachSession(sessionName);
+}
+
+type ServiceStatus = 'up' | 'down';
+
+type StatusEntry = {
+  name: string;
+  port: number;
+  status: ServiceStatus;
+  group: string;
+};
+
+type ManifestEntry = {
+  name: string;
+  port: number;
+  group: string;
+  type: string;
+};
+
+type Manifest = {
+  session: string;
+  portOffset: number;
+  services: ManifestEntry[];
+};
+
+function writeManifest(repoRoot: string, sessionName: string, serviceNames: string[]): void {
+  const manifest: Manifest = {
+    session: sessionName,
+    portOffset,
+    services: serviceNames.map(name => {
+      const svc = getService(name);
+      return { name, port: svc.port, group: svc.group, type: svc.type };
+    }),
+  };
+  const manifestPath = path.join(repoRoot, 'dev', 'logs', 'manifest.json');
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+}
+
+async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
+  const sessionName = getSessionName();
+  if (!sessionExists(sessionName)) {
+    if (isJson) {
+      console.log(JSON.stringify({ session: sessionName, portOffset, services: [] }));
+    } else {
+      console.log('No dev session running');
+    }
+    return;
+  }
+
+  const runningServices = [...services.keys()].flatMap(name => {
+    const pane = findServicePane(sessionName, name);
+    return pane ? [{ name, pane }] : [];
+  });
+  if (runningServices.length === 0) {
+    if (isJson) {
+      console.log(JSON.stringify({ session: sessionName, portOffset, services: [] }));
+    } else {
+      console.log('No services running');
+    }
+    return;
+  }
+
+  const entries: StatusEntry[] = await Promise.all(
+    runningServices.map(async ({ name, pane }): Promise<StatusEntry> => {
+      const svc = getService(name);
+      const port = svc.port;
+      const isUp = port === 0 ? isPaneRunningCommand(sessionName, pane) : await probePort(port);
+      const status: ServiceStatus = isUp ? 'up' : 'down';
+      return {
+        name,
+        port,
+        status,
+        group: svc.group,
+      };
+    })
+  );
+
+  if (isJson) {
+    const result = { session: sessionName, portOffset, services: entries };
+    console.log(JSON.stringify(result));
+    return;
+  }
+
+  const nameWidth = Math.max(...entries.map(e => e.name.length), 8);
+  const portWidth = 6;
+  console.log(`${'SERVICE'.padEnd(nameWidth)}  PORT    STATUS`);
+  for (const e of entries) {
+    const portStr = e.port > 0 ? `:${e.port}` : 'n/a';
+    console.log(`${e.name.padEnd(nameWidth)}  ${portStr.padEnd(portWidth)}  ${e.status}`);
+  }
+}
+
+async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> {
+  if (!services.has(serviceName)) {
+    console.error(`Unknown service: ${serviceName}`);
+    process.exit(1);
+  }
+
+  const svc = getService(serviceName);
+  if (svc.type === 'infra') {
+    console.error(`dev:restart does not support infrastructure service: ${serviceName}`);
+    process.exit(1);
+  }
+
+  const sessionName = getSessionName();
+  if (!sessionExists(sessionName)) {
+    console.error('No dev session running');
+    process.exit(1);
+  }
+
+  const pane = findServicePane(sessionName, serviceName);
+  if (!pane) {
+    console.error(`Service ${serviceName} is not running`);
+    process.exit(1);
+  }
+
+  restartServiceInTmux(sessionName, serviceName);
+  console.log(`Restarted ${serviceName}`);
 }
 
 async function cmdStop(repoRoot: string): Promise<void> {
@@ -324,6 +459,8 @@ function printUsage(): void {
 Usage:
   dev:start [targets...]  Start services (default: core)
   dev:stop                Stop all services
+  dev:status [--json]     Show running services and their ports
+  dev:restart <service>   Restart a running service
   dev:env [targets...]    Sync env vars (.dev.vars + .env.development.local)
   dev:env --check         Validate env vars (CI mode)
   dev:env -y              Sync without confirmation
@@ -348,6 +485,18 @@ async function main() {
     case 'stop':
       await cmdStop(repoRoot);
       break;
+    case 'status':
+      await cmdStatus(repoRoot, args.includes('--json'));
+      break;
+    case 'restart': {
+      const serviceName = args[1];
+      if (!serviceName) {
+        console.error('Usage: dev:restart <service>');
+        process.exit(1);
+      }
+      await cmdRestart(serviceName, repoRoot);
+      break;
+    }
     case 'env':
       await cmdEnv(args.slice(1), repoRoot);
       break;

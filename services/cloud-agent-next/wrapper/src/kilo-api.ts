@@ -35,6 +35,7 @@ export type WrapperKiloClient = {
   getSession: (sessionId: string) => Promise<{ id: string }>;
   sendPromptAsync: (opts: {
     sessionId: string;
+    messageId?: string;
     parts?: Array<{ type: string; text: string }>;
     prompt?: string;
     variant?: string;
@@ -119,6 +120,7 @@ export function createWrapperKiloClient(
       // Use v2 client — it supports `variant` (thinking effort); v1 SDK omits it.
       await v2Client.session.promptAsync({
         sessionID: opts.sessionId,
+        messageID: opts.messageId,
         parts: textParts,
         ...(opts.variant ? { variant: opts.variant } : {}),
         ...(opts.model

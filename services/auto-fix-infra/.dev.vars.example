@@ -3,6 +3,7 @@
 API_URL=http://localhost:3000
 
 # Internal API secret for authentication (shared with backend)
+# @from INTERNAL_API_SECRET
 INTERNAL_API_SECRET=your-secret-here
 
 # Backend auth token for authenticating incoming requests from backend
@@ -14,3 +15,12 @@ BACKEND_AUTH_TOKEN=your-backend-auth-token
 # For production: use https://cloud-agent-next.kilosessions.ai
 # @url cloud-agent-next
 CLOUD_AGENT_URL=http://localhost:8794
+
+# Sentry DSN for error tracking (optional)
+SENTRY_DSN=
+
+# Cloudflare version metadata (optional, set by deployment)
+CF_VERSION_METADATA=
+
+# Environment name
+ENVIRONMENT=development

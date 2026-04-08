@@ -10,6 +10,7 @@ import { createCloudAgentSession } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import type { AssistantMessage, UserMessage } from '@/types/opencode.gen';
 import { kiloId, cloudAgentId, stubUserMessage } from './test-helpers';
+import type { ResolvedSession } from './types';
 
 // ---------------------------------------------------------------------------
 // Mock createCloudAgentSession — prevents real WebSocket connections
@@ -47,6 +48,7 @@ const mockSessionCallbacks: {
   onQuestionResolved?: (...args: unknown[]) => void;
   onPermissionAsked?: (...args: unknown[]) => void;
   onPermissionResolved?: (...args: unknown[]) => void;
+  onResolved?: (resolved: ResolvedSession) => void;
 } = {};
 
 let latestStorage: JotaiSessionStorage | null = null;
@@ -61,12 +63,18 @@ jest.mock('./session', () => ({
       onQuestionResolved?: (...args: unknown[]) => void;
       onPermissionAsked?: (...args: unknown[]) => void;
       onPermissionResolved?: (...args: unknown[]) => void;
+      onResolved?: (resolved: ResolvedSession) => void;
     }) => {
       latestStorage = sessionConfig.storage;
       mockSession.storage = sessionConfig.storage;
       // Capture the onSessionCreated callback and fire it when connect() is called,
       // simulating what the real session does after connecting and replaying the snapshot.
       mockSession.connect.mockImplementation(() => {
+        sessionConfig.onResolved?.({
+          type: 'cloud-agent',
+          kiloSessionId: kiloId(sessionConfig.kiloSessionId),
+          cloudAgentSessionId: cloudAgentId('agent-1'),
+        });
         sessionConfig.onSessionCreated?.({ id: sessionConfig.kiloSessionId, parentID: null });
       });
       mockSessionCallbacks.onSessionCreated = sessionConfig.onSessionCreated;
@@ -74,6 +82,7 @@ jest.mock('./session', () => ({
       mockSessionCallbacks.onQuestionResolved = sessionConfig.onQuestionResolved;
       mockSessionCallbacks.onPermissionAsked = sessionConfig.onPermissionAsked;
       mockSessionCallbacks.onPermissionResolved = sessionConfig.onPermissionResolved;
+      mockSessionCallbacks.onResolved = sessionConfig.onResolved;
       return mockSession;
     }
   ),
@@ -97,6 +106,8 @@ const defaultFetchedSession = {
   isInitiated: true,
   needsLegacyPrepare: false,
   isPreparingAsync: false,
+  prompt: null,
+  initialMessageId: null,
 } satisfies FetchedSessionData;
 
 function createMockConfig(overrides: Partial<SessionManagerConfig> = {}): SessionManagerConfig {
@@ -199,6 +210,7 @@ describe('createSessionManager', () => {
     mockSessionCallbacks.onPermissionAsked = undefined;
     mockSessionCallbacks.onPermissionResolved = undefined;
     mockSessionCallbacks.onSessionCreated = undefined;
+    mockSessionCallbacks.onResolved = undefined;
   });
 
   // -------------------------------------------------------------------------
@@ -373,6 +385,70 @@ describe('createSessionManager', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Initial message pre-insertion (new sessions before initiation)
+  // -------------------------------------------------------------------------
+
+  describe('initial message pre-insertion', () => {
+    it('pre-inserts user message for non-initiated sessions with prompt and initialMessageId', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          isInitiated: false,
+          prompt: 'Fix the bug',
+          initialMessageId: 'msg_000000000000AAAAAAAAAAAAAA',
+        }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      expect(messages).toHaveLength(1);
+      expect(messages[0]?.info.id).toBe('msg_000000000000AAAAAAAAAAAAAA');
+      expect(messages[0]?.info.role).toBe('user');
+      const textPart = messages[0]?.parts[0];
+      expect(textPart?.type).toBe('text');
+      if (textPart?.type === 'text') {
+        expect(textPart.text).toBe('Fix the bug');
+      }
+    });
+
+    it('does not pre-insert message when session is already initiated', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          isInitiated: true,
+          prompt: 'Fix the bug',
+          initialMessageId: 'msg_000000000000AAAAAAAAAAAAAA',
+        }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      expect(messages).toHaveLength(0);
+    });
+
+    it('does not pre-insert message when initialMessageId is null', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          isInitiated: false,
+          prompt: 'Fix the bug',
+          initialMessageId: null,
+        }),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      expect(messages).toHaveLength(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Overlapping switchSession
   // -------------------------------------------------------------------------
 
@@ -420,6 +496,8 @@ describe('createSessionManager', () => {
         ...defaultFetchedSession,
         cloudAgentSessionId: cloudAgentId('stale-agent'),
         model: 'stale-model',
+        prompt: null,
+        initialMessageId: null,
       } satisfies FetchedSessionData;
 
       const config = createMockConfig({
@@ -458,10 +536,35 @@ describe('createSessionManager', () => {
       await mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
 
       expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
         prompt: 'Hello',
         mode: 'code',
         model: 'claude-3-5-sonnet',
       });
+
+      const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      expect(messages).toHaveLength(1);
+      expect(messages[0]?.info.role).toBe('user');
+      expect(messages[0]?.info.id).toMatch(/^msg_/);
+    });
+
+    it('does not persist optimistic message for remote sessions', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      mockSession.send.mockResolvedValue(undefined);
+      await mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
+
+      expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        prompt: 'Hello',
+        mode: 'code',
+        model: 'claude-3-5-sonnet',
+      });
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
     });
 
     it('clears optimistic message and sets error indicator on failure', async () => {
@@ -513,6 +616,7 @@ describe('createSessionManager', () => {
       });
 
       expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
         prompt: 'Hello',
         mode: 'code',
         model: 'claude-3-5-sonnet',
@@ -530,6 +634,7 @@ describe('createSessionManager', () => {
       await mgr.send({ prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' });
 
       expect(mockSession.send).toHaveBeenCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
         prompt: 'Hello',
         mode: 'code',
         model: 'claude-3-5-sonnet',

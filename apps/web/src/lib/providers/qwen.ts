@@ -1,47 +1,5 @@
 import type { KiloExclusiveModel, Pricing, Usage } from '@/lib/providers/kilo-exclusive-model';
 
-const QWEN_256K_THRESHOLD = 256 * 1024;
-
-// Tier 1 pricing (<= 256k total input) - 35% lower than standard rates
-const qwenTier1Pricing: Pricing = {
-  prompt: 0.000000325,
-  completion: 0.00000195,
-  input_cache_read: 0.0000000325,
-  input_cache_write: 0.00000040625,
-  calculate_mUsd(usage: Usage, pricing: Pricing): number {
-    const inputCost = usage.inputTokens * pricing.prompt;
-    const outputCost = usage.outputTokens * pricing.completion;
-    const cacheReadCost =
-      pricing.input_cache_read !== null ? usage.cacheHitTokens * pricing.input_cache_read : 0;
-    const cacheWriteCost =
-      pricing.input_cache_write !== null ? usage.cacheWriteTokens * pricing.input_cache_write : 0;
-    return Math.round((inputCost + outputCost + cacheReadCost + cacheWriteCost) * 1000000);
-  },
-};
-
-// Tier 2 pricing (> 256k total input) - 35% lower than standard rates
-const qwenTier2Pricing: Pricing = {
-  prompt: 0.0000013,
-  completion: 0.0000039,
-  input_cache_read: 0.00000013,
-  input_cache_write: 0.000001625,
-  calculate_mUsd(usage: Usage, pricing: Pricing): number {
-    const inputCost = usage.inputTokens * pricing.prompt;
-    const outputCost = usage.outputTokens * pricing.completion;
-    const cacheReadCost =
-      pricing.input_cache_read !== null ? usage.cacheHitTokens * pricing.input_cache_read : 0;
-    const cacheWriteCost =
-      pricing.input_cache_write !== null ? usage.cacheWriteTokens * pricing.input_cache_write : 0;
-    return Math.round((inputCost + outputCost + cacheReadCost + cacheWriteCost) * 1000000);
-  },
-};
-
-export function calculateQwen36PlusCost(usage: Usage): number {
-  const totalInput = usage.inputTokens + usage.cacheWriteTokens + usage.cacheHitTokens;
-  const pricing = totalInput <= QWEN_256K_THRESHOLD ? qwenTier1Pricing : qwenTier2Pricing;
-  return pricing.calculate_mUsd(usage, pricing);
-}
-
 export const qwen36_plus_model: KiloExclusiveModel = {
   public_id: 'qwen/qwen3.6-plus',
   display_name: 'Qwen: Qwen3.6 Plus',
@@ -59,6 +17,28 @@ export const qwen36_plus_model: KiloExclusiveModel = {
     completion: 0.00000195,
     input_cache_read: 0.0000000325,
     input_cache_write: 0.00000040625,
-    calculate_mUsd: calculateQwen36PlusCost,
+    calculate: (usage: Usage, basePricing: Pricing) => {
+      const totalInput = usage.inputTokens + usage.cacheWriteTokens + usage.cacheHitTokens;
+      if (totalInput > 256 * 1024) {
+        return (
+          usage.inputTokens * 0.0000013 +
+          usage.outputTokens * 0.0000039 +
+          usage.cacheHitTokens * 0.00000013 +
+          usage.cacheWriteTokens * 0.000001625
+        );
+      }
+      return (
+        usage.inputTokens * basePricing.prompt +
+        usage.outputTokens * basePricing.completion +
+        usage.cacheHitTokens * (basePricing.input_cache_read ?? basePricing.prompt) +
+        usage.cacheWriteTokens * (basePricing.input_cache_write ?? basePricing.prompt)
+      );
+    },
   },
 };
+
+export function calculateQwen36PlusCost(usage: Usage): number {
+  return Math.round(
+    1_000_000 * (qwen36_plus_model.pricing?.calculate(usage, qwen36_plus_model.pricing) ?? 0)
+  );
+}

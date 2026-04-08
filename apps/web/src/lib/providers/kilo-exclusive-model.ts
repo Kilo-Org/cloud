@@ -15,7 +15,7 @@ export type Pricing = {
   completion: number;
   input_cache_read: number | null;
   input_cache_write: number | null;
-  calculate_mUsd(usage: Usage, pricing: Pricing): number;
+  calculate(usage: Usage, basePricing: Pricing): number;
 };
 
 export type KiloExclusiveModel = {
@@ -32,14 +32,11 @@ export type KiloExclusiveModel = {
   pricing: Pricing | null;
 };
 
-function formatPrice(price: number | null): string | undefined {
-  if (price === null) return undefined;
-  return price.toFixed(7);
+function formatPrice(price: number | null | undefined): string {
+  return (price ?? 0).toFixed(12);
 }
 
 export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
-  const pricing = model.pricing;
-  const isFree = !pricing;
   return {
     id: model.public_id,
     canonical_slug: model.public_id,
@@ -56,15 +53,14 @@ export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
       instruct_type: null,
     },
     pricing: {
-      prompt: isFree ? '0.0000000' : (formatPrice(pricing.prompt) ?? '0.0000000'),
-      completion: isFree ? '0.0000000' : (formatPrice(pricing.completion) ?? '0.0000000'),
+      prompt: formatPrice(model.pricing?.prompt),
+      completion: formatPrice(model.pricing?.completion),
       request: '0',
       image: '0',
       web_search: '0',
       internal_reasoning: '0',
-      input_cache_read: isFree
-        ? '0.00000000'
-        : (formatPrice(pricing.input_cache_read) ?? '0.00000000'),
+      input_cache_read: formatPrice(model.pricing?.input_cache_read),
+      input_cache_write: formatPrice(model.pricing?.input_cache_read),
     },
     top_provider: {
       context_length: model.context_length,

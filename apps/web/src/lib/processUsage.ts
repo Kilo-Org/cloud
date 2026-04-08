@@ -21,7 +21,12 @@ import { eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from './getRootSpan';
 import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
 import type { ProviderId } from '@/lib/providers/types';
-import { isFreeModel, isKiloStealthModel, kiloExclusiveModels } from '@/lib/models';
+import {
+  calculatKiloExclusiveCost_mUsd,
+  isFreeModel,
+  isKiloStealthModel,
+  kiloExclusiveModels,
+} from '@/lib/models';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
@@ -835,20 +840,9 @@ async function processTokenData(
     usageStats.model = usageContext.requested_model;
   }
 
-  // Calculate cost for Kilo exclusive models with pricing
-  const kiloExclusiveModel = kiloExclusiveModels.find(
-    m => m.public_id === usageContext.requested_model && m.pricing
-  );
-  if (kiloExclusiveModel?.pricing) {
-    usageStats.cost_mUsd = kiloExclusiveModel.pricing.calculate_mUsd(
-      {
-        inputTokens: usageStats.inputTokens,
-        outputTokens: usageStats.outputTokens,
-        cacheWriteTokens: usageStats.cacheWriteTokens,
-        cacheHitTokens: usageStats.cacheHitTokens,
-      },
-      kiloExclusiveModel.pricing
-    );
+  const kiloExclusiveCost_mUsd = calculatKiloExclusiveCost_mUsd(usageStats.model, usageStats);
+  if (kiloExclusiveCost_mUsd !== null) {
+    usageStats.cost_mUsd = kiloExclusiveCost_mUsd;
   }
 
   // Report upstream cost to abuse service BEFORE zeroing for free/BYOK

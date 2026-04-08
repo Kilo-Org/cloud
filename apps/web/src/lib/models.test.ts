@@ -51,7 +51,7 @@ describe('isFreeModel', () => {
         if (model.pricing) {
           expect(typeof model.pricing.prompt).toBe('number');
           expect(typeof model.pricing.completion).toBe('number');
-          expect(typeof model.pricing.calculate_mUsd).toBe('function');
+          expect(typeof model.pricing.calculate).toBe('function');
         }
       }
     });

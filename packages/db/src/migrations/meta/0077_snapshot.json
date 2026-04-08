@@ -1,5 +1,5 @@
 {
-  "id": "a7be3ea9-3a97-4831-8fc6-4bfbb743ef12",
+  "id": "d2e9953b-a7fd-49f3-b0c8-b112ec288004",
   "prevId": "b3ee3f96-61b6-4cbb-8a6a-4c78748e0d11",
   "version": "7",
   "dialect": "postgresql",
@@ -5976,6 +5976,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "month": {
           "name": "month",
           "type": "date",
@@ -6003,6 +6009,13 @@
           "notNull": true,
           "default": 0
         },
+        "free_allowance_microdollars": {
+          "name": "free_allowance_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 10000000
+        },
         "updated_at": {
           "name": "updated_at",
           "type": "timestamp with time zone",
@@ -6012,8 +6025,8 @@
         }
       },
       "indexes": {
-        "idx_exa_monthly_usage_user_month": {
-          "name": "idx_exa_monthly_usage_user_month",
+        "idx_exa_monthly_usage_personal": {
+          "name": "idx_exa_monthly_usage_personal",
           "columns": [
             {
               "expression": "kilo_user_id",
@@ -6029,6 +6042,35 @@
             }
           ],
           "isUnique": true,
+          "where": "\"exa_monthly_usage\".\"organization_id\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_exa_monthly_usage_org": {
+          "name": "idx_exa_monthly_usage_org",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "month",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"exa_monthly_usage\".\"organization_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

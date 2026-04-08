@@ -30,9 +30,9 @@ export function getExaFreeAllowanceMicrodollars(_date: Date, _user: User): numbe
 
 /**
  * Returns the user's total Exa spend (microdollars) and stored free allowance
- * for the current calendar month. Single-row lookup on the counter table — always O(1).
+ * for the current calendar month. Aggregates across personal and org rows.
  *
- * `freeAllowance` is null when no row exists yet (first request of the month),
+ * `freeAllowance` is null when no rows exist yet (first request of the month),
  * signaling the caller to compute via `getExaFreeAllowanceMicrodollars`.
  */
 export async function getExaMonthlyUsage(
@@ -41,19 +41,19 @@ export async function getExaMonthlyUsage(
 ): Promise<ExaMonthlyUsageResult> {
   const result = await fromDb
     .select({
-      total: exa_monthly_usage.total_cost_microdollars,
-      freeAllowance: exa_monthly_usage.free_allowance_microdollars,
+      total: sql<number>`coalesce(sum(${exa_monthly_usage.total_cost_microdollars}), 0)`,
+      freeAllowance: sql<number | null>`min(${exa_monthly_usage.free_allowance_microdollars})`,
     })
     .from(exa_monthly_usage)
     .where(
       sql`${exa_monthly_usage.kilo_user_id} = ${userId} AND ${exa_monthly_usage.month} = date_trunc('month', now())::date`
-    )
-    .limit(1);
+    );
 
-  return {
-    usage: result[0]?.total ?? 0,
-    freeAllowance: result[0]?.freeAllowance ?? null,
-  };
+  const total = Number(result[0]?.total ?? 0);
+  // min() returns null when there are no rows, which signals "no row yet"
+  const freeAllowance = result[0]?.freeAllowance != null ? Number(result[0].freeAllowance) : null;
+
+  return { usage: total, freeAllowance };
 }
 
 /**
@@ -83,24 +83,15 @@ export async function recordExaUsage(params: {
   // 1. Upsert the monthly counter (atomic increment).
   // free_allowance_microdollars is set on INSERT (first request of the month)
   // but NOT updated on conflict — the first-of-month value is locked in.
-  await db.execute(sql`
-    INSERT INTO ${exa_monthly_usage} (
-      kilo_user_id, month, total_cost_microdollars, total_charged_microdollars, request_count, free_allowance_microdollars
-    )
-    VALUES (
-      ${userId},
-      date_trunc('month', now())::date,
-      ${costMicrodollars},
-      ${chargedAmount},
-      1,
-      ${freeAllowanceMicrodollars}
-    )
-    ON CONFLICT (kilo_user_id, month) DO UPDATE SET
-      total_cost_microdollars = ${exa_monthly_usage.total_cost_microdollars} + ${costMicrodollars},
-      total_charged_microdollars = ${exa_monthly_usage.total_charged_microdollars} + ${chargedAmount},
-      request_count = ${exa_monthly_usage.request_count} + 1,
-      updated_at = now()
-  `);
+  // Two partial unique indexes exist: one for personal (org IS NULL) and one
+  // for org usage (org IS NOT NULL), so the upsert must target the right one.
+  await upsertMonthlyCounter({
+    userId,
+    organizationId,
+    costMicrodollars,
+    chargedAmount,
+    freeAllowanceMicrodollars,
+  });
 
   // 2. Append to the audit log (fire-and-forget — failure shouldn't block billing)
   try {
@@ -120,6 +111,56 @@ export async function recordExaUsage(params: {
   // 3. If over the free tier, deduct from the Kilo credit balance
   if (chargedToBalance && costMicrodollars > 0) {
     await deductFromBalance(userId, organizationId, costMicrodollars, path);
+  }
+}
+
+/**
+ * Upserts the monthly counter row, targeting the correct partial unique index
+ * based on whether the request is personal (no org) or org-scoped.
+ */
+async function upsertMonthlyCounter(params: {
+  userId: string;
+  organizationId: string | undefined;
+  costMicrodollars: number;
+  chargedAmount: number;
+  freeAllowanceMicrodollars: number;
+}): Promise<void> {
+  const { userId, organizationId, costMicrodollars, chargedAmount, freeAllowanceMicrodollars } =
+    params;
+
+  const doUpdateSet = sql`
+    total_cost_microdollars = ${exa_monthly_usage.total_cost_microdollars} + ${costMicrodollars},
+    total_charged_microdollars = ${exa_monthly_usage.total_charged_microdollars} + ${chargedAmount},
+    request_count = ${exa_monthly_usage.request_count} + 1,
+    updated_at = now()
+  `;
+
+  if (organizationId) {
+    await db.execute(sql`
+      INSERT INTO ${exa_monthly_usage} (
+        kilo_user_id, organization_id, month,
+        total_cost_microdollars, total_charged_microdollars, request_count, free_allowance_microdollars
+      ) VALUES (
+        ${userId}, ${organizationId}, date_trunc('month', now())::date,
+        ${costMicrodollars}, ${chargedAmount}, 1, ${freeAllowanceMicrodollars}
+      )
+      ON CONFLICT (kilo_user_id, organization_id, month)
+        WHERE organization_id IS NOT NULL
+      DO UPDATE SET ${doUpdateSet}
+    `);
+  } else {
+    await db.execute(sql`
+      INSERT INTO ${exa_monthly_usage} (
+        kilo_user_id, month,
+        total_cost_microdollars, total_charged_microdollars, request_count, free_allowance_microdollars
+      ) VALUES (
+        ${userId}, date_trunc('month', now())::date,
+        ${costMicrodollars}, ${chargedAmount}, 1, ${freeAllowanceMicrodollars}
+      )
+      ON CONFLICT (kilo_user_id, month)
+        WHERE organization_id IS NULL
+      DO UPDATE SET ${doUpdateSet}
+    `);
   }
 }
 

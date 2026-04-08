@@ -3821,6 +3821,7 @@ export const exa_monthly_usage = pgTable(
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey(),
     kilo_user_id: text().notNull(),
+    organization_id: uuid(),
     month: date({ mode: 'string' }).notNull(),
     total_cost_microdollars: bigint({ mode: 'number' }).notNull().default(0),
     total_charged_microdollars: bigint({ mode: 'number' }).notNull().default(0),
@@ -3828,7 +3829,16 @@ export const exa_monthly_usage = pgTable(
     free_allowance_microdollars: bigint({ mode: 'number' }).notNull().default(10_000_000),
     updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
-  table => [uniqueIndex('idx_exa_monthly_usage_user_month').on(table.kilo_user_id, table.month)]
+  table => [
+    // Personal usage: one row per user per month (no org)
+    uniqueIndex('idx_exa_monthly_usage_personal')
+      .on(table.kilo_user_id, table.month)
+      .where(isNull(table.organization_id)),
+    // Org usage: one row per user per org per month
+    uniqueIndex('idx_exa_monthly_usage_org')
+      .on(table.kilo_user_id, table.organization_id, table.month)
+      .where(isNotNull(table.organization_id)),
+  ]
 );
 
 export type ExaMonthlyUsage = typeof exa_monthly_usage.$inferSelect;

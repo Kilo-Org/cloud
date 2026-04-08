@@ -9,9 +9,10 @@ import {
   kilocode_users,
   credit_transactions,
   microdollar_usage,
+  exa_monthly_usage,
   type User,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, gt, asc } from 'drizzle-orm';
+import { eq, and, isNull, gt, asc, sql } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@/lib/maybe-result';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
 import { computeExpiration } from '@/lib/creditExpiration';
@@ -30,7 +31,7 @@ export type MigrationResult = Result<UserBalanceUpdates, string>;
  * 6. Updates the user record and transaction baselines (unless dryRun is true).
  *
  * Postconditions:
- * - microdollars_used = sum(microdollar_usage)
+ * - microdollars_used = sum(microdollar_usage) + sum(exa_monthly_usage.total_charged, personal)
  * - total_microdollars_acquired = sum(credit_transactions) [including any new adjustment]
  * - All expiring credit transactions have expiration_baseline_microdollars_used set
  */
@@ -106,13 +107,25 @@ async function fetchUserBalanceData(userId: string) {
     )
     .orderBy(asc(credit_transactions.created_at));
 
-  return { user, usageRecords, creditTransactions };
+  // Total Exa charged usage (personal only, excludes org-scoped charges).
+  // exa_monthly_usage is pre-aggregated per month so we sum across all months.
+  const [exaRow] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${exa_monthly_usage.total_charged_microdollars}), 0)`,
+    })
+    .from(exa_monthly_usage)
+    .where(
+      and(eq(exa_monthly_usage.kilo_user_id, userId), isNull(exa_monthly_usage.organization_id))
+    );
+  const exaChargedTotal = Number(exaRow?.total ?? 0);
+
+  return { user, usageRecords, creditTransactions, exaChargedTotal };
 }
 
 export function computeUserBalanceUpdates(
   data: NonNullable<Awaited<ReturnType<typeof fetchUserBalanceData>>>
 ) {
-  const { user, usageRecords, creditTransactions } = data;
+  const { user, usageRecords, creditTransactions, exaChargedTotal } = data;
 
   // Compute total usage AND original baselines in a single pass
   const computedOriginalBaselines = new Map<string, number>();
@@ -131,6 +144,9 @@ export function computeUserBalanceUpdates(
     cumulativeUsage += usageRecords[usageIdx].cost;
     usageIdx++;
   }
+
+  // Include Exa charged usage (pre-aggregated monthly, no per-request timestamps)
+  cumulativeUsage += exaChargedTotal;
 
   // Use computeExpiration to determine correct expiration baselines.
   // Start with original baselines, then merge in shifts from computeExpiration.

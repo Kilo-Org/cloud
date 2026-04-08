@@ -544,15 +544,8 @@
     {
       "idx": 77,
       "version": "7",
-      "when": 1775637521241,
-      "tag": "0077_overconfident_shaman",
-      "breakpoints": true
-    },
-    {
-      "idx": 78,
-      "version": "7",
-      "when": 1775640462010,
-      "tag": "0078_fluffy_freak",
+      "when": 1775642412678,
+      "tag": "0077_bouncy_blockbuster",
       "breakpoints": true
     }
   ]

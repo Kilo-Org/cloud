@@ -16,9 +16,10 @@ import {
   organizations,
   credit_transactions,
   microdollar_usage,
+  exa_monthly_usage,
   type Organization,
 } from '@kilocode/db/schema';
-import { eq, and, asc, gt } from 'drizzle-orm';
+import { eq, and, asc, gt, sql } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@/lib/maybe-result';
 import { computeExpiration } from '@/lib/creditExpiration';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
@@ -83,6 +84,15 @@ export async function recomputeOrganizationBalances(args: {
     .where(eq(credit_transactions.organization_id, args.organizationId))
     .orderBy(asc(credit_transactions.created_at));
 
+  // Total Exa charged usage for this org (pre-aggregated monthly)
+  const [exaRow] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${exa_monthly_usage.total_charged_microdollars}), 0)`,
+    })
+    .from(exa_monthly_usage)
+    .where(eq(exa_monthly_usage.organization_id, args.organizationId));
+  const exaChargedTotal = Number(exaRow?.total ?? 0);
+
   // Compute total usage AND original baselines in a single pass
   const computedOriginalBaselines = new Map<string, number>();
   let usageIdx = 0;
@@ -98,6 +108,9 @@ export async function recomputeOrganizationBalances(args: {
     cumulativeUsage += usageRecords[usageIdx].cost;
     usageIdx++;
   }
+
+  // Include Exa charged usage (pre-aggregated monthly, no per-request timestamps)
+  cumulativeUsage += exaChargedTotal;
 
   // Use computeExpiration to determine correct expiration baselines
   const expiringTransactions = creditTransactions

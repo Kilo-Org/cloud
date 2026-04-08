@@ -236,5 +236,73 @@ describe('Exa Usage Tracking', () => {
 
       expect(updated.microdollars_used).toBe(0);
     });
+
+    test('creates separate counter rows for personal and org usage', async () => {
+      const user = await insertTestUser();
+      const orgId = crypto.randomUUID();
+
+      // Personal request
+      await recordExaUsage({
+        userId: user.id,
+        organizationId: undefined,
+        path: '/search',
+        costMicrodollars: 3000,
+        chargedToBalance: false,
+        freeAllowanceMicrodollars: 10_000_000,
+      });
+
+      // Org request
+      await recordExaUsage({
+        userId: user.id,
+        organizationId: orgId,
+        path: '/search',
+        costMicrodollars: 5000,
+        chargedToBalance: false,
+        freeAllowanceMicrodollars: 10_000_000,
+      });
+
+      const rows = await db
+        .select()
+        .from(exa_monthly_usage)
+        .where(eq(exa_monthly_usage.kilo_user_id, user.id));
+
+      expect(rows).toHaveLength(2);
+
+      const personalRow = rows.find(r => r.organization_id === null);
+      const orgRow = rows.find(r => r.organization_id === orgId);
+      expect(personalRow!.total_cost_microdollars).toBe(3000);
+      expect(orgRow!.total_cost_microdollars).toBe(5000);
+    });
+
+    test('getExaMonthlyUsage aggregates across personal and org rows', async () => {
+      const user = await insertTestUser();
+      const orgId = crypto.randomUUID();
+
+      // Personal usage
+      await db.insert(exa_monthly_usage).values({
+        kilo_user_id: user.id,
+        month: sql`date_trunc('month', now())::date`.mapWith(String),
+        total_cost_microdollars: 3_000_000,
+        total_charged_microdollars: 0,
+        request_count: 5,
+        free_allowance_microdollars: 10_000_000,
+      });
+
+      // Org usage for the same user
+      await db.insert(exa_monthly_usage).values({
+        kilo_user_id: user.id,
+        organization_id: orgId,
+        month: sql`date_trunc('month', now())::date`.mapWith(String),
+        total_cost_microdollars: 5_000_000,
+        total_charged_microdollars: 0,
+        request_count: 10,
+        free_allowance_microdollars: 10_000_000,
+      });
+
+      const result = await getExaMonthlyUsage(user.id);
+      // Should sum both rows: 3M + 5M = 8M
+      expect(result.usage).toBe(8_000_000);
+      expect(result.freeAllowance).toBe(10_000_000);
+    });
   });
 });

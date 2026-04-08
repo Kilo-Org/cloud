@@ -540,6 +540,13 @@
       "when": 1775596598812,
       "tag": "0076_bizarre_katie_power",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1775642090552,
+      "tag": "0077_puzzling_gabe_jones",
+      "breakpoints": true
     }
   ]
 }

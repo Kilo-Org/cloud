@@ -2,6 +2,8 @@ import { db } from '@/lib/drizzle';
 import { eq, inArray } from 'drizzle-orm';
 import { user_push_tokens } from '@kilocode/db/schema';
 
+import { EXPO_ACCESS_TOKEN } from '@/lib/config.server';
+
 const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send';
 
 type ExpoPushMessage = {
@@ -22,7 +24,10 @@ export async function sendPushNotifications(messages: ExpoPushMessage[]): Promis
 
   const res = await fetch(EXPO_PUSH_API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(EXPO_ACCESS_TOKEN && { Authorization: `Bearer ${EXPO_ACCESS_TOKEN}` }),
+    },
     body: JSON.stringify(messages),
   });
 

@@ -63,5 +63,4 @@ export const STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE
 export const PROMOTION_MAX_REQUESTS = 10000;
 export const PROMOTION_WINDOW_HOURS = 24;
 
-/** $10/month free Exa allowance in microdollars */
 export const EXA_MONTHLY_ALLOWANCE_MICRODOLLARS = 10_000_000;

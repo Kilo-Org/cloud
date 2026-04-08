@@ -46,8 +46,7 @@ export type ReconcileContext = {
 export function createReconcileContext(
   state: InstanceMutableState,
   env: { KILOCLAW_AE?: AnalyticsEngineDataset },
-  reason: string,
-  ctx?: { waitUntil(p: Promise<unknown>): void }
+  reason: string
 ): ReconcileContext {
   return {
     state,
@@ -72,19 +71,15 @@ export function createReconcileContext(
         }
       }
 
-      writeEvent(
-        env,
-        {
-          event: `reconcile.${action}`,
-          delivery: 'reconcile',
-          label: typeof details.label === 'string' ? details.label : '',
-          error: errorStr,
-          durationMs: typeof details.durationMs === 'number' ? details.durationMs : undefined,
-          value: typeof details.value === 'number' ? details.value : undefined,
-          ...eventContextFromState(state),
-        },
-        ctx
-      );
+      writeEvent(env, {
+        event: `reconcile.${action}`,
+        delivery: 'reconcile',
+        label: typeof details.label === 'string' ? details.label : '',
+        error: errorStr,
+        durationMs: typeof details.durationMs === 'number' ? details.durationMs : undefined,
+        value: typeof details.value === 'number' ? details.value : undefined,
+        ...eventContextFromState(state),
+      });
     },
   };
 }

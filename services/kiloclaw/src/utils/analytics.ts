@@ -26,6 +26,8 @@
  *   index1  = event name (same as blob1, for fast SQL filtering)
  */
 
+import { waitUntil } from 'cloudflare:workers';
+
 /**
  * Known event names. The open `(string & {})` allows arbitrary HTTP-derived
  * event names while preserving autocomplete for known events.
@@ -96,20 +98,17 @@ export type KiloClawEventData = {
  * Write a single event to Cloudflare Analytics Engine and, if the Pipeline
  * binding is present, dual-write to R2/Parquet for Snowflake export.
  *
+ * The pipeline send is registered with the module-level waitUntil so it
+ * survives past the handler boundary regardless of where writeEvent is called.
  * Safe to call when bindings are absent (dev) — silently no-ops.
  * Best-effort: never throws.
- *
- * Pass ctx (DurableObjectState or ExecutionContext) when available so the
- * pipeline send is registered with waitUntil and not cancelled when the
- * handler completes before the flush resolves.
  */
 export function writeEvent(
   env: {
     KILOCLAW_AE?: AnalyticsEngineDataset;
     KILOCLAW_EVENTS_STREAM?: { send(r: Record<string, unknown>[]): Promise<void> };
   },
-  data: KiloClawEventData,
-  ctx?: { waitUntil(p: Promise<unknown>): void }
+  data: KiloClawEventData
 ): void {
   if (!env.KILOCLAW_AE) return;
   try {
@@ -140,29 +139,30 @@ export function writeEvent(
   // Changing fields? Update pipelines/events-schema.json (streams are immutable —
   // use pipelines/recreate-stream.sh to recreate).
   if (env.KILOCLAW_EVENTS_STREAM) {
-    const send = env.KILOCLAW_EVENTS_STREAM.send([
-      {
-        event: data.event,
-        user_id: data.userId ?? '',
-        delivery: data.delivery ?? '',
-        route: data.route ?? '',
-        error: data.error ?? '',
-        fly_app_name: data.flyAppName ?? '',
-        fly_machine_id: data.flyMachineId ?? '',
-        sandbox_id: data.sandboxId ?? '',
-        status: data.status ?? '',
-        openclaw_version: data.openclawVersion ?? '',
-        image_tag: data.imageTag ?? '',
-        fly_region: data.flyRegion ?? '',
-        label: data.label ?? '',
-        duration_ms: data.durationMs ?? 0,
-        value: data.value ?? 0,
-        created_at: Date.now(),
-      },
-    ]).catch(() => {
-      // Best-effort — never throw from analytics
-    });
-    ctx?.waitUntil(send);
+    waitUntil(
+      env.KILOCLAW_EVENTS_STREAM.send([
+        {
+          event: data.event,
+          user_id: data.userId ?? '',
+          delivery: data.delivery ?? '',
+          route: data.route ?? '',
+          error: data.error ?? '',
+          fly_app_name: data.flyAppName ?? '',
+          fly_machine_id: data.flyMachineId ?? '',
+          sandbox_id: data.sandboxId ?? '',
+          status: data.status ?? '',
+          openclaw_version: data.openclawVersion ?? '',
+          image_tag: data.imageTag ?? '',
+          fly_region: data.flyRegion ?? '',
+          label: data.label ?? '',
+          duration_ms: data.durationMs ?? 0,
+          value: data.value ?? 0,
+          created_at: Date.now(),
+        },
+      ]).catch(() => {
+        // Best-effort — never throw from analytics
+      })
+    );
   }
 }
 

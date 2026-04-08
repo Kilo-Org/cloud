@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { failureResult } from '@/lib/maybe-result';
 import type { User } from '@kilocode/db/schema';
-import { getExaMonthlyUsage, recordExaUsage } from '@/lib/exa-usage';
+import { getExaMonthlyUsage, getExaFreeAllowanceMicrodollars, recordExaUsage } from '@/lib/exa-usage';
+import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 
 // Capture promises scheduled via next/server `after` so tests can await them.
@@ -35,6 +36,7 @@ jest.mock('@/lib/organizations/organization-usage');
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetExaMonthlyUsage = jest.mocked(getExaMonthlyUsage);
+const mockedGetExaFreeAllowanceMicrodollars = jest.mocked(getExaFreeAllowanceMicrodollars);
 const mockedRecordExaUsage = jest.mocked(recordExaUsage);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
@@ -68,8 +70,9 @@ describe('POST /api/exa/[...path]', () => {
     jest.resetAllMocks();
     afterCallbacks = [];
     globalThis.fetch = mockedFetch;
-    // Default: user is within free tier
-    mockedGetExaMonthlyUsage.mockResolvedValue(0);
+    // Default: user is within free tier, no existing row
+    mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 0, freeAllowance: null });
+    mockedGetExaFreeAllowanceMicrodollars.mockReturnValue(EXA_MONTHLY_ALLOWANCE_MICRODOLLARS);
     mockedRecordExaUsage.mockResolvedValue();
   });
 
@@ -222,7 +225,7 @@ describe('POST /api/exa/[...path]', () => {
   describe('monthly allowance', () => {
     it('allows request when under the free tier', async () => {
       setUserAuth();
-      mockedGetExaMonthlyUsage.mockResolvedValue(5_000_000); // $5 used
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 5_000_000, freeAllowance: 10_000_000 });
       mockedFetch.mockResolvedValue(makeUpstreamResponse({ results: [] }));
 
       const { POST } = await import('./route');
@@ -234,7 +237,7 @@ describe('POST /api/exa/[...path]', () => {
 
     it('checks balance when free tier is exhausted', async () => {
       setUserAuth();
-      mockedGetExaMonthlyUsage.mockResolvedValue(10_000_000); // $10 used
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 10_000_000, freeAllowance: 10_000_000 });
       mockedGetBalanceAndOrgSettings.mockResolvedValue({ balance: 5.0 });
       mockedFetch.mockResolvedValue(makeUpstreamResponse({ results: [] }));
 
@@ -250,7 +253,7 @@ describe('POST /api/exa/[...path]', () => {
 
     it('returns 402 when free tier is exhausted and no balance', async () => {
       setUserAuth();
-      mockedGetExaMonthlyUsage.mockResolvedValue(10_000_000);
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 10_000_000, freeAllowance: 10_000_000 });
       mockedGetBalanceAndOrgSettings.mockResolvedValue({ balance: 0 });
 
       const { POST } = await import('./route');
@@ -265,7 +268,7 @@ describe('POST /api/exa/[...path]', () => {
     it('passes organizationId from auth to balance check', async () => {
       const orgId = 'org-456';
       setUserAuth('user-123', orgId);
-      mockedGetExaMonthlyUsage.mockResolvedValue(10_000_000);
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 10_000_000, freeAllowance: 10_000_000 });
       mockedGetBalanceAndOrgSettings.mockResolvedValue({ balance: 10.0 });
       mockedFetch.mockResolvedValue(makeUpstreamResponse({ results: [] }));
 
@@ -282,7 +285,7 @@ describe('POST /api/exa/[...path]', () => {
   describe('cost recording', () => {
     it('records cost from response via after callback (free tier)', async () => {
       setUserAuth();
-      mockedGetExaMonthlyUsage.mockResolvedValue(0);
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 0, freeAllowance: null });
       mockedFetch.mockResolvedValue(
         makeUpstreamResponse({ results: [], costDollars: { total: 0.007 } })
       );
@@ -297,12 +300,13 @@ describe('POST /api/exa/[...path]', () => {
         path: '/search',
         costMicrodollars: 7000,
         chargedToBalance: false,
+        freeAllowanceMicrodollars: EXA_MONTHLY_ALLOWANCE_MICRODOLLARS,
       });
     });
 
     it('records cost with chargedToBalance when over free tier', async () => {
       setUserAuth();
-      mockedGetExaMonthlyUsage.mockResolvedValue(10_000_000);
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 10_000_000, freeAllowance: 10_000_000 });
       mockedGetBalanceAndOrgSettings.mockResolvedValue({ balance: 5.0 });
       mockedFetch.mockResolvedValue(
         makeUpstreamResponse({ results: [], costDollars: { total: 0.005 } })
@@ -318,6 +322,7 @@ describe('POST /api/exa/[...path]', () => {
         path: '/search',
         costMicrodollars: 5000,
         chargedToBalance: true,
+        freeAllowanceMicrodollars: 10_000_000,
       });
     });
 

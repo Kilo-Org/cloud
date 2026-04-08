@@ -3825,6 +3825,7 @@ export const exa_monthly_usage = pgTable(
     total_cost_microdollars: bigint({ mode: 'number' }).notNull().default(0),
     total_charged_microdollars: bigint({ mode: 'number' }).notNull().default(0),
     request_count: integer().notNull().default(0),
+    free_allowance_microdollars: bigint({ mode: 'number' }).notNull().default(10_000_000),
     updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [uniqueIndex('idx_exa_monthly_usage_user_month').on(table.kilo_user_id, table.month)]

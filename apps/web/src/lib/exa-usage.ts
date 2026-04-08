@@ -4,26 +4,53 @@ import {
   exa_usage_log,
   kilocode_users,
   type MicrodollarUsage,
+  type User,
 } from '@kilocode/db/schema';
 import { ABUSE_CLASSIFICATION } from '@kilocode/db/schema-types';
 import { eq, sql } from 'drizzle-orm';
 import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
 import { captureException } from '@sentry/nextjs';
+import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
+
+export type ExaMonthlyUsageResult = {
+  /** Total spend in microdollars for the current month. */
+  usage: number;
+  /** Stored free allowance for this month, or null if no row exists yet. */
+  freeAllowance: number | null;
+};
 
 /**
- * Returns the user's total Exa spend (microdollars) for the current calendar month.
- * Single-row lookup on the counter table — always O(1).
+ * Returns the free Exa allowance for a given user-month.
+ * Pure function, no IO. Today returns the global constant for everyone.
+ * When per-user tiers are needed, modify this function only.
  */
-export async function getExaMonthlyUsage(userId: string): Promise<number> {
+export function getExaFreeAllowanceMicrodollars(_date: Date, _user: User): number {
+  return EXA_MONTHLY_ALLOWANCE_MICRODOLLARS;
+}
+
+/**
+ * Returns the user's total Exa spend (microdollars) and stored free allowance
+ * for the current calendar month. Single-row lookup on the counter table — always O(1).
+ *
+ * `freeAllowance` is null when no row exists yet (first request of the month),
+ * signaling the caller to compute via `getExaFreeAllowanceMicrodollars`.
+ */
+export async function getExaMonthlyUsage(userId: string): Promise<ExaMonthlyUsageResult> {
   const result = await db
-    .select({ total: exa_monthly_usage.total_cost_microdollars })
+    .select({
+      total: exa_monthly_usage.total_cost_microdollars,
+      freeAllowance: exa_monthly_usage.free_allowance_microdollars,
+    })
     .from(exa_monthly_usage)
     .where(
       sql`${exa_monthly_usage.kilo_user_id} = ${userId} AND ${exa_monthly_usage.month} = date_trunc('month', now())::date`
     )
     .limit(1);
 
-  return result[0]?.total ?? 0;
+  return {
+    usage: result[0]?.total ?? 0,
+    freeAllowance: result[0]?.freeAllowance ?? null,
+  };
 }
 
 /**
@@ -38,21 +65,25 @@ export async function recordExaUsage(params: {
   path: string;
   costMicrodollars: number;
   chargedToBalance: boolean;
+  freeAllowanceMicrodollars: number;
 }): Promise<void> {
-  const { userId, organizationId, path, costMicrodollars, chargedToBalance } = params;
+  const { userId, organizationId, path, costMicrodollars, chargedToBalance, freeAllowanceMicrodollars } = params;
   const chargedAmount = chargedToBalance ? costMicrodollars : 0;
 
-  // 1. Upsert the monthly counter (atomic increment)
+  // 1. Upsert the monthly counter (atomic increment).
+  // free_allowance_microdollars is set on INSERT (first request of the month)
+  // but NOT updated on conflict — the first-of-month value is locked in.
   await db.execute(sql`
     INSERT INTO ${exa_monthly_usage} (
-      kilo_user_id, month, total_cost_microdollars, total_charged_microdollars, request_count
+      kilo_user_id, month, total_cost_microdollars, total_charged_microdollars, request_count, free_allowance_microdollars
     )
     VALUES (
       ${userId},
       date_trunc('month', now())::date,
       ${costMicrodollars},
       ${chargedAmount},
-      1
+      1,
+      ${freeAllowanceMicrodollars}
     )
     ON CONFLICT (kilo_user_id, month) DO UPDATE SET
       total_cost_microdollars = ${exa_monthly_usage.total_cost_microdollars} + ${costMicrodollars},

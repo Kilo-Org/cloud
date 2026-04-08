@@ -1,0 +1,1 @@
+ALTER TABLE "exa_monthly_usage" ADD COLUMN "free_allowance_microdollars" bigint DEFAULT 10000000 NOT NULL;

@@ -280,14 +280,20 @@ jobs:
         run: |
           PROD_IMAGE="registry.fly.io/kiloclaw-machines:${{ needs.deploy.outputs.image-tag }}"
           DEV_IMAGE="registry.fly.io/kiloclaw-registry-dev:${{ steps.dev-tag.outputs.tag }}"
+          DEV_LATEST="registry.fly.io/kiloclaw-registry-dev:latest"
 
           echo "Tagging as: ${DEV_IMAGE}"
           docker tag "${PROD_IMAGE}" "${DEV_IMAGE}"
 
+          echo "Tagging as: ${DEV_LATEST}"
+          docker tag "${PROD_IMAGE}" "${DEV_LATEST}"
+
           echo "Pushing to dev registry..."
           docker push "${DEV_IMAGE}"
+          docker push "${DEV_LATEST}"
 
           echo "✅ Pushed dev image: ${DEV_IMAGE}"
+          echo "✅ Pushed dev latest: ${DEV_LATEST}"
 
       - name: Write dev .dev.vars summary
         run: |

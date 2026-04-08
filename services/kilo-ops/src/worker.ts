@@ -47,10 +47,14 @@ app.all('/*', async c => {
   const url = new URL(c.req.url);
   const container = getGrafanaContainerStub(c.env);
 
+  const STRIPPED_HEADERS = new Set([
+    'x-webauth-user',
+    'authorization',
+    'cf-access-jwt-assertion',
+  ]);
   const headers = new Headers();
   for (const [key, value] of c.req.raw.headers.entries()) {
-    const lower = key.toLowerCase();
-    if (lower === 'x-webauth-user') continue;
+    if (STRIPPED_HEADERS.has(key.toLowerCase())) continue;
     headers.set(key, value);
   }
   headers.set('X-WEBAUTH-USER', userIdentity);
@@ -69,6 +73,8 @@ app.all('/*', async c => {
 
   const containerUrl = `http://container${url.pathname}${url.search}`;
   const response = await container.fetch(containerUrl, init);
+
+  if (response.status === 101) return response;
 
   return new Response(response.body, {
     status: response.status,

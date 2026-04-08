@@ -3,7 +3,11 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { failureResult } from '@/lib/maybe-result';
 import type { User } from '@kilocode/db/schema';
-import { getExaMonthlyUsage, getExaFreeAllowanceMicrodollars, recordExaUsage } from '@/lib/exa-usage';
+import {
+  getExaMonthlyUsage,
+  getExaFreeAllowanceMicrodollars,
+  recordExaUsage,
+} from '@/lib/exa-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 

@@ -35,8 +35,11 @@ export function getExaFreeAllowanceMicrodollars(_date: Date, _user: User): numbe
  * `freeAllowance` is null when no row exists yet (first request of the month),
  * signaling the caller to compute via `getExaFreeAllowanceMicrodollars`.
  */
-export async function getExaMonthlyUsage(userId: string): Promise<ExaMonthlyUsageResult> {
-  const result = await db
+export async function getExaMonthlyUsage(
+  userId: string,
+  fromDb: typeof db = db
+): Promise<ExaMonthlyUsageResult> {
+  const result = await fromDb
     .select({
       total: exa_monthly_usage.total_cost_microdollars,
       freeAllowance: exa_monthly_usage.free_allowance_microdollars,
@@ -67,7 +70,14 @@ export async function recordExaUsage(params: {
   chargedToBalance: boolean;
   freeAllowanceMicrodollars: number;
 }): Promise<void> {
-  const { userId, organizationId, path, costMicrodollars, chargedToBalance, freeAllowanceMicrodollars } = params;
+  const {
+    userId,
+    organizationId,
+    path,
+    costMicrodollars,
+    chargedToBalance,
+    freeAllowanceMicrodollars,
+  } = params;
   const chargedAmount = chargedToBalance ? costMicrodollars : 0;
 
   // 1. Upsert the monthly counter (atomic increment).

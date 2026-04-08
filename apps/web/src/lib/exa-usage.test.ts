@@ -3,11 +3,7 @@ import { db } from '@/lib/drizzle';
 import { exa_monthly_usage, kilocode_users } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import {
-  getExaMonthlyUsage,
-  getExaFreeAllowanceMicrodollars,
-  recordExaUsage,
-} from './exa-usage';
+import { getExaMonthlyUsage, getExaFreeAllowanceMicrodollars, recordExaUsage } from './exa-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
 
 // Mock next/server's after function which requires request context

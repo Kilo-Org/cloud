@@ -10,6 +10,7 @@ import {
   recordExaUsage,
 } from '@/lib/exa-usage';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
+import { readDb } from '@/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
 
 const EXA_BASE_URL = 'https://api.exa.ai';
@@ -52,12 +53,17 @@ export async function POST(request: NextRequest) {
   // Check monthly allowance and balance.
   // freeAllowance is the stored value from the first request of the month;
   // null means no row yet, so we compute from the helper.
-  const { usage: monthlyUsage, freeAllowance: storedAllowance } = await getExaMonthlyUsage(user.id);
+  // Use read replica for monthly usage check - this is a read-only operation that can tolerate
+  // slight replication lag, and provides lower latency for US users
+  const { usage: monthlyUsage, freeAllowance: storedAllowance } = await getExaMonthlyUsage(
+    user.id,
+    readDb
+  );
   const allowance = storedAllowance ?? getExaFreeAllowanceMicrodollars(new Date(), user);
   const isPaidRequest = monthlyUsage >= allowance;
 
   if (isPaidRequest) {
-    const { balance } = await getBalanceAndOrgSettings(organizationId, user);
+    const { balance } = await getBalanceAndOrgSettings(organizationId, user, readDb);
     if (balance <= 0) {
       return NextResponse.json(
         {

@@ -2,6 +2,7 @@ import type { KiloClawEnv } from '../../types';
 import type { FlyClientConfig } from '../../fly/client';
 import type { FlyMachineConfig } from '../../fly/types';
 import type { FlyProviderState } from '../../schemas/instance-config';
+import type { RuntimeSpec } from '../../providers/types';
 import * as fly from '../../fly/client';
 import type { ProviderResult } from '../../providers/types';
 import {
@@ -29,6 +30,39 @@ type FlyRuntimeState = Pick<
   | 'flyMachineId'
   | 'flyRegion'
 >;
+
+export function buildFlyMachineConfig(
+  runtimeSpec: RuntimeSpec,
+  volumeId: string | null
+): FlyMachineConfig {
+  return {
+    image: runtimeSpec.imageRef,
+    env: runtimeSpec.env,
+    guest: guestFromSize(runtimeSpec.machineSize),
+    services: [
+      {
+        ports: [{ port: 443, handlers: ['tls', 'http'] }],
+        internal_port: runtimeSpec.controllerPort,
+        protocol: 'tcp',
+        autostart: false,
+        autostop: 'off',
+      },
+    ],
+    checks: {
+      controller: {
+        type: 'http',
+        port: runtimeSpec.controllerPort,
+        method: 'GET',
+        path: runtimeSpec.controllerHealthCheckPath,
+        interval: '30s',
+        timeout: '5s',
+        grace_period: '120s',
+      },
+    },
+    mounts: volumeId ? [{ volume: volumeId, path: runtimeSpec.rootMountPath }] : [],
+    metadata: runtimeSpec.metadata,
+  };
+}
 
 /**
  * Ensure a Fly Volume exists. Creates one if flyVolumeId is null.
@@ -216,7 +250,9 @@ export async function startExistingMachine(
 
     // failed machines are restartable via updateMachine (Fly re-launches on the next available host)
     if (machine.state === 'stopped' || machine.state === 'created' || machine.state === 'failed') {
-      await fly.updateMachine(flyConfig, providerState.machineId, machineConfig, { minSecretsVersion });
+      await fly.updateMachine(flyConfig, providerState.machineId, machineConfig, {
+        minSecretsVersion,
+      });
       await fly.waitForState(
         flyConfig,
         providerState.machineId,

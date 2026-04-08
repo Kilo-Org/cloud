@@ -121,10 +121,13 @@ across phases and reviews.
 - Reason: existing Fly behavior depends on persisting certain provider changes
   before startup waits, timeout handling, and retry paths complete.
 
-### D13. The adapter contract is still Fly-shaped after phase 3
+### D13. Fly-only helper internals remain Fly-shaped after phase 4
 
-- The adapter no longer mutates DO state directly, but it still accepts
-  Fly-oriented runtime inputs such as `FlyMachineConfig`.
-- Reason: provider-state ownership cleanup lands before contract
-  neutralization. Replacing Fly-shaped inputs with a provider-neutral runtime
-  spec is phase 4 work.
+- The provider adapter boundary now accepts a provider-neutral runtime spec
+  instead of `FlyMachineConfig`.
+- Existing Fly-only helper layers such as `fly-machines.ts`, recovery, and
+  reconcile internals still translate or consume Fly machine config types under
+  the adapter boundary.
+- Reason: phase 4 neutralizes the public adapter contract first. Fully
+  rewriting every remaining Fly-only helper to a neutral internal model is
+  deferred while those paths are still Fly-specific.

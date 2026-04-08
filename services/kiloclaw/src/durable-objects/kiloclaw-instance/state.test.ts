@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createMutableState } from './state';
-import {
-  applyProviderState,
-  getFlyProviderState,
-  syncProviderStateForStorage,
-} from './state';
+import { applyProviderState, getFlyProviderState, syncProviderStateForStorage } from './state';
 
 describe('provider state helpers', () => {
   it('hydrates legacy Fly fields from canonical providerState', () => {

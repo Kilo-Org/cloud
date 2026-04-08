@@ -1,4 +1,3 @@
-import type { FlyMachineConfig } from '../fly/types';
 import type { KiloClawEnv } from '../types';
 import type {
   MachineSize,
@@ -18,6 +17,16 @@ export type ProviderRoutingContext = Pick<ProviderContext, 'env' | 'state'>;
 export type ProviderRoutingTarget = {
   origin: string;
   headers: Record<string, string>;
+};
+
+export type RuntimeSpec = {
+  imageRef: string;
+  env: Record<string, string>;
+  machineSize: MachineSize | null;
+  rootMountPath: '/root';
+  controllerPort: number;
+  controllerHealthCheckPath: '/_kilo/health';
+  metadata: Record<string, string>;
 };
 
 export type ProviderObservation = {
@@ -42,9 +51,9 @@ export type EnsureStorageArgs = ProviderContext & {
 };
 
 export type StartRuntimeArgs = ProviderContext & {
-  machineConfig: FlyMachineConfig;
+  runtimeSpec: RuntimeSpec;
   minSecretsVersion?: number;
-  envRegion?: string;
+  preferredRegion?: string;
   onCapacityRecovery?: (error: unknown) => Promise<void> | void;
   onProviderResult?: (result: ProviderResult) => Promise<void>;
 };
@@ -52,7 +61,7 @@ export type StartRuntimeArgs = ProviderContext & {
 export type StopRuntimeArgs = ProviderContext;
 
 export type RestartRuntimeArgs = ProviderContext & {
-  machineConfig: FlyMachineConfig;
+  runtimeSpec: RuntimeSpec;
   minSecretsVersion?: number;
   onProviderResult?: (result: ProviderResult) => Promise<void>;
 };

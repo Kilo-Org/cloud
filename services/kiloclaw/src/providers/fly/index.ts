@@ -9,6 +9,7 @@ import {
   type InstanceMutableState,
 } from '../../durable-objects/kiloclaw-instance/types';
 import * as flyMachines from '../../durable-objects/kiloclaw-instance/fly-machines';
+import { buildFlyMachineConfig } from '../../durable-objects/kiloclaw-instance/fly-machines';
 import { getFlyProviderState } from '../../durable-objects/kiloclaw-instance/state';
 import { type InstanceProviderAdapter } from '../types';
 
@@ -104,9 +105,9 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
   async startRuntime({
     env,
     state,
-    machineConfig,
+    runtimeSpec,
     minSecretsVersion,
-    envRegion,
+    preferredRegion,
     onCapacityRecovery,
     onProviderResult,
   }) {
@@ -116,25 +117,27 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
 
     try {
       if (providerState.machineId) {
+        const machineConfig = buildFlyMachineConfig(runtimeSpec, providerState.volumeId);
         const result = await flyMachines.startExistingMachine(
           flyConfig,
           state,
           providerState,
           machineConfig,
           minSecretsVersion,
-          envRegion,
+          preferredRegion,
           onProviderResult
         );
         providerState = result.providerState;
         machineSizePatch = result.machineSize;
       } else {
+        const machineConfig = buildFlyMachineConfig(runtimeSpec, providerState.volumeId);
         const result = await flyMachines.createNewMachine(
           flyConfig,
           state,
           providerState,
           machineConfig,
           minSecretsVersion,
-          envRegion,
+          preferredRegion,
           onProviderResult
         );
         providerState = result.providerState;
@@ -166,9 +169,9 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
         flyConfig,
         state,
         providerState,
-        machineConfig,
+        buildFlyMachineConfig(runtimeSpec, providerState.volumeId),
         minSecretsVersion,
-        envRegion,
+        preferredRegion,
         onProviderResult
       );
       providerState = result.providerState;
@@ -198,16 +201,21 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
     };
   },
 
-  async restartRuntime({ env, state, machineConfig, minSecretsVersion, onProviderResult }) {
+  async restartRuntime({ env, state, runtimeSpec, minSecretsVersion, onProviderResult }) {
     const providerState = getFlyProviderState(state);
     if (!providerState.machineId) {
       throw new Error('No machine exists');
     }
 
     const flyConfig = getFlyConfig(env, state);
-    const updated = await fly.updateMachine(flyConfig, providerState.machineId, machineConfig, {
-      minSecretsVersion,
-    });
+    const updated = await fly.updateMachine(
+      flyConfig,
+      providerState.machineId,
+      buildFlyMachineConfig(runtimeSpec, providerState.volumeId),
+      {
+        minSecretsVersion,
+      }
+    );
     await onProviderResult?.({
       providerState,
       corePatch: {

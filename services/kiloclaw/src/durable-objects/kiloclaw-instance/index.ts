@@ -40,7 +40,7 @@ import {
   type SecretFieldKey,
 } from '@kilocode/kiloclaw-secret-catalog';
 import * as regionHelpers from '../regions';
-import { buildMachineConfig, guestFromSize } from '../machine-config';
+import { buildRuntimeSpec } from '../machine-config';
 import type { GatewayProcessStatus } from '../gateway-controller-types';
 
 // Domain modules
@@ -56,7 +56,7 @@ import {
 } from './state';
 import { nextAlarmTime, doLog, doError, doWarn, toLoggable, createReconcileContext } from './log';
 import { attemptMetadataRecovery } from './reconcile';
-import { resolveImageTag, getRegistryApp, buildUserEnvVars } from './config';
+import { buildUserEnvVars, resolveImageRef, resolveImageTag } from './config';
 import * as gateway from './gateway';
 import * as pairing from './pairing';
 import * as kiloCliRun from './kilo-cli-run';
@@ -1142,7 +1142,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     const { envVars, minSecretsVersion } = await buildUserEnvVars(this.env, this.ctx, this.s);
-    const guest = guestFromSize(this.s.machineSize);
     const imageTag = resolveImageTag(this.s, this.env);
     console.log(
       '[DO] startGateway: deploying with imageTag:',
@@ -1160,21 +1159,19 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       imageVariant: this.s.imageVariant,
       devCreator: this.env.WORKER_ENV === 'development' ? (this.env.DEV_CREATOR ?? null) : null,
     };
-    const machineConfig = buildMachineConfig(
-      getRegistryApp(this.env),
-      imageTag,
+    const runtimeSpec = buildRuntimeSpec(
+      resolveImageRef(this.s, this.env),
       envVars,
-      guest,
-      this.s.flyVolumeId,
+      this.s.machineSize,
       identity
     );
 
     const startResult = await this.provider().startRuntime({
       env: this.env,
       state: this.s,
-      machineConfig,
+      runtimeSpec,
       minSecretsVersion,
-      envRegion: this.env.FLY_REGION,
+      preferredRegion: this.env.FLY_REGION,
       onProviderResult: result => this.persistProviderResult(result),
       onCapacityRecovery: async err => {
         const code = err instanceof fly.FlyApiError ? err.status : 0;
@@ -2289,7 +2286,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       }
 
       const { envVars, minSecretsVersion } = await buildUserEnvVars(this.env, this.ctx, this.s);
-      const guest = guestFromSize(this.s.machineSize);
       const imageTag = resolveImageTag(this.s, this.env);
       doLog(this.s, 'restartMachine: deploying update', {
         imageTag,
@@ -2303,19 +2299,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         imageVariant: this.s.imageVariant,
         devCreator: this.env.WORKER_ENV === 'development' ? (this.env.DEV_CREATOR ?? null) : null,
       };
-      const machineConfig = buildMachineConfig(
-        getRegistryApp(this.env),
-        imageTag,
+      const runtimeSpec = buildRuntimeSpec(
+        resolveImageRef(this.s, this.env),
         envVars,
-        guest,
-        this.s.flyVolumeId,
+        this.s.machineSize,
         identity
       );
 
       const restart = await this.provider().restartRuntime({
         env: this.env,
         state: this.s,
-        machineConfig,
+        runtimeSpec,
         minSecretsVersion,
         onProviderResult: async result => {
           const currentStatus = await this.ctx.storage.get('status');

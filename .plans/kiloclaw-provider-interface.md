@@ -641,6 +641,8 @@ Known implementation risks:
 
 - Replace Fly-shaped runtime inputs such as `FlyMachineConfig` with a
   provider-neutral runtime spec
+- Move Fly-specific translation from runtime spec to `FlyMachineConfig` inside
+  the Fly adapter / Fly-only helper layer
 - Migrate the Fly adapter to the neutral contract before adding provider 2
 
 ### Phase 5: Capability Gating

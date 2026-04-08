@@ -617,10 +617,12 @@ async function reconcileVolume(
     );
     applyProviderState(state, providerState);
     await ctx.storage.put(
-      storageUpdate(syncProviderStateForStorage(state, {
-        provider: providerState.provider,
-        providerState,
-      }))
+      storageUpdate(
+        syncProviderStateForStorage(state, {
+          provider: providerState.provider,
+          providerState,
+        })
+      )
     );
     return;
   }
@@ -642,10 +644,12 @@ async function reconcileVolume(
       );
       applyProviderState(state, providerState);
       await ctx.storage.put(
-        storageUpdate(syncProviderStateForStorage(state, {
-          provider: providerState.provider,
-          providerState,
-        }))
+        storageUpdate(
+          syncProviderStateForStorage(state, {
+            provider: providerState.provider,
+            providerState,
+          })
+        )
       );
       rctx.log('replace_lost_volume', {
         data_loss: true,

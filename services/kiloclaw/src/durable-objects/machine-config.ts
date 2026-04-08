@@ -1,6 +1,7 @@
-import type { FlyMachineConfig } from '../fly/types';
 import type { MachineSize } from '../schemas/instance-config';
 import { OPENCLAW_PORT, DEFAULT_MACHINE_GUEST } from '../config';
+import type { RuntimeSpec } from '../providers/types';
+import type { FlyMachineConfig } from '../fly/types';
 
 // ============================================================================
 // Metadata keys set on every Fly Machine for recovery/orphan detection.
@@ -15,7 +16,7 @@ export const METADATA_KEY_IMAGE_VARIANT = 'kiloclaw_image_variant';
 export const METADATA_KEY_DEV_CREATOR = 'kiloclaw_dev_creator';
 
 // ============================================================================
-// Machine config builder
+// Neutral runtime spec builder
 // ============================================================================
 
 export type MachineIdentity = {
@@ -27,39 +28,19 @@ export type MachineIdentity = {
   devCreator: string | null;
 };
 
-export function buildMachineConfig(
-  registryApp: string,
-  imageTag: string,
+export function buildRuntimeSpec(
+  imageRef: string,
   envVars: Record<string, string>,
-  guest: FlyMachineConfig['guest'],
-  flyVolumeId: string | null,
+  machineSize: MachineSize | null,
   identity: MachineIdentity
-): FlyMachineConfig {
+): RuntimeSpec {
   return {
-    image: `registry.fly.io/${registryApp}:${imageTag}`,
+    imageRef,
     env: envVars,
-    guest,
-    services: [
-      {
-        ports: [{ port: 443, handlers: ['tls', 'http'] }],
-        internal_port: OPENCLAW_PORT,
-        protocol: 'tcp' as const,
-        autostart: false,
-        autostop: 'off',
-      },
-    ],
-    checks: {
-      controller: {
-        type: 'http',
-        port: OPENCLAW_PORT,
-        method: 'GET',
-        path: '/_kilo/health',
-        interval: '30s',
-        timeout: '5s',
-        grace_period: '120s',
-      },
-    },
-    mounts: flyVolumeId ? [{ volume: flyVolumeId, path: '/root' }] : [],
+    machineSize,
+    rootMountPath: '/root',
+    controllerPort: OPENCLAW_PORT,
+    controllerHealthCheckPath: '/_kilo/health',
     metadata: {
       [METADATA_KEY_USER_ID]: identity.userId,
       [METADATA_KEY_SANDBOX_ID]: identity.sandboxId,

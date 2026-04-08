@@ -3,7 +3,7 @@ import type { KiloClawEnv } from '../../types';
 import * as fly from '../../fly/client';
 import { PREVIOUS_VOLUME_RETENTION_MS } from '../../config';
 import * as regionHelpers from '../regions';
-import { buildMachineConfig, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
+import { buildRuntimeSpec, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
 import type { InstanceMutableState } from './types';
 import { getFlyConfig } from './types';
 import {
@@ -12,9 +12,10 @@ import {
   storageUpdate,
   syncProviderStateForStorage,
 } from './state';
-import { resolveImageTag, getRegistryApp, buildUserEnvVars } from './config';
+import { buildUserEnvVars, resolveImageRef, resolveImageTag } from './config';
 import * as gateway from './gateway';
 import * as flyMachines from './fly-machines';
+import { buildFlyMachineConfig } from './fly-machines';
 import { doError, doWarn, toLoggable } from './log';
 import type { KiloClawEventData, KiloClawEventName } from '../../utils/analytics';
 
@@ -397,12 +398,10 @@ export async function runUnexpectedStopRecoveryInBackground(
       imageVariant: state.imageVariant,
       devCreator: env.WORKER_ENV === 'development' ? (env.DEV_CREATOR ?? null) : null,
     };
-    const machineConfig = buildMachineConfig(
-      getRegistryApp(env),
-      imageTag,
+    const runtimeSpec = buildRuntimeSpec(
+      resolveImageRef(state, env),
       envVars,
-      guestFromSize(state.machineSize),
-      recoveryVolumeId,
+      state.machineSize,
       identity
     );
 
@@ -416,7 +415,7 @@ export async function runUnexpectedStopRecoveryInBackground(
           ...getFlyProviderState(state),
           region: state.flyRegion,
         },
-        machineConfig,
+        buildFlyMachineConfig(runtimeSpec, recoveryVolumeId),
         minSecretsVersion,
         env.FLY_REGION,
         async providerResult => {

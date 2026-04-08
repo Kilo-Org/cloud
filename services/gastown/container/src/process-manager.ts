@@ -1262,9 +1262,7 @@ export async function updateAgentModel(
           (a, b) => (b.time?.updated ?? 0) - (a.time?.updated ?? 0)
         );
         newSessionId = sorted[0].id;
-        console.log(
-          `${MANAGER_LOG} updateAgentModel: resuming existing session ${newSessionId}`
-        );
+        console.log(`${MANAGER_LOG} updateAgentModel: resuming existing session ${newSessionId}`);
       } else {
         const sessionResult = await client.session.create({ body: {} });
         const rawSession: unknown = sessionResult.data ?? sessionResult;

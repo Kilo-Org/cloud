@@ -16,6 +16,10 @@ import { Toaster } from 'sonner-native';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { initAppsFlyer } from '@/lib/appsflyer';
 import { ContextProvider, useAppContext } from '@/lib/context/context-context';
+import {
+  setupNotificationHandler,
+  setupNotificationResponseHandler,
+} from '@/lib/notifications';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
@@ -52,6 +56,7 @@ Sentry.init({
 });
 
 void SplashScreen.preventAutoHideAsync();
+setupNotificationHandler();
 
 function RootLayoutNav() {
   const { token, isLoading: authLoading } = useAuth();
@@ -157,6 +162,13 @@ function RootLayout() {
       initAppsFlyer();
     }
     void startAppsFlyer();
+  }, []);
+
+  useEffect(() => {
+    const subscription = setupNotificationResponseHandler();
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   return (

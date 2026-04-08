@@ -9,11 +9,11 @@ export type KiloOpsEnv = {
   };
 };
 
-const GRAFANA_DO_ID = 'grafana';
+const DEFAULT_COUNTRY = 'US';
 
 export class GrafanaContainer extends Container<Env> {
   defaultPort = 3000;
-  sleepAfter = '5m';
+  sleepAfter = '1h';
 
   override async fetch(request: Request): Promise<Response> {
     const state = await this.getState();
@@ -41,8 +41,8 @@ export class GrafanaContainer extends Container<Env> {
   }
 }
 
-function getGrafanaContainerStub(env: Env) {
-  return env.GRAFANA_CONTAINER.get(env.GRAFANA_CONTAINER.idFromName(GRAFANA_DO_ID));
+function getGrafanaContainerStub(env: Env, country: string) {
+  return env.GRAFANA_CONTAINER.get(env.GRAFANA_CONTAINER.idFromName(`grafana-${country}`));
 }
 
 async function resolveSecret(binding: SecretsStoreSecret | string): Promise<string | null> {
@@ -68,17 +68,19 @@ app.use('/*', async (c, next) => {
     return next();
   }
 
-  return withCloudflareAccess({
+  const mw = withCloudflareAccess({
     team: c.env.CF_ACCESS_TEAM,
     audience: c.env.CF_ACCESS_AUD,
-  })(c, next);
+  });
+  return mw(c as Parameters<typeof mw>[0], next);
 });
 
 app.all('/*', async c => {
   const userIdentity = c.get('userIdentity');
 
   const url = new URL(c.req.url);
-  const container = getGrafanaContainerStub(c.env);
+  const country = (c.req.header('cf-ipcountry') ?? DEFAULT_COUNTRY).toUpperCase();
+  const container = getGrafanaContainerStub(c.env, country);
 
   const STRIPPED_HEADERS = new Set([
     'x-webauth-user',

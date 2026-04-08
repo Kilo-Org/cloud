@@ -3,11 +3,11 @@ datasources:
   - name: Analytics Engine
     uid: bffxugc31cnpcc
     type: vertamedia-clickhouse-datasource
+    url: ${CF_CLICKHOUSE_URL}
     access: proxy
     isDefault: true
     editable: true
     jsonData:
-      dataSourceUrl: ${CF_CLICKHOUSE_URL}
       defaultDatabase: default
       httpHeaderName1: Authorization
       dialTimeout: 10

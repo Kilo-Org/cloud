@@ -1,4 +1,4 @@
-import { createMiddleware } from 'hono/factory';
+import type { MiddlewareHandler } from 'hono';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { KiloOpsEnv } from './worker';
 
@@ -21,7 +21,13 @@ function getJWKS(teamDomain: string) {
   return jwks;
 }
 
-export function withCloudflareAccess({ team, audience }: { team: string; audience: string }) {
+export function withCloudflareAccess({
+  team,
+  audience,
+}: {
+  team: string;
+  audience: string;
+}): MiddlewareHandler<KiloOpsEnv> {
   if (!/^[a-z0-9-]+$/.test(team)) {
     throw new Error(`Invalid CF Access team name: ${team}`);
   }
@@ -31,7 +37,7 @@ export function withCloudflareAccess({ team, audience }: { team: string; audienc
 
   const teamDomain = `https://${team}.cloudflareaccess.com`;
 
-  return createMiddleware<KiloOpsEnv>(async (c, next) => {
+  return async (c, next) => {
     const token = c.req.header('Cf-Access-Jwt-Assertion');
     if (!token) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -43,15 +49,16 @@ export function withCloudflareAccess({ team, audience }: { team: string; audienc
         audience,
       });
 
-      // Set the user identity from the CF Access JWT
       // User tokens have 'email', service tokens have 'common_name'
       const identity = (payload.email as string) ?? (payload.common_name as string) ?? 'unknown';
       c.set('userIdentity', identity);
     } catch (e) {
-      console.warn(`CF Access JWT validation failed: ${e instanceof Error ? e.message : 'unknown'}`);
+      console.warn(
+        `CF Access JWT validation failed: ${e instanceof Error ? e.message : 'unknown'}`
+      );
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
     await next();
-  });
+  };
 }

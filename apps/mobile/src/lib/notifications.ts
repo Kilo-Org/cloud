@@ -3,6 +3,9 @@ import { type Href, router } from 'expo-router';
 import { Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
+// Matches extra.eas.projectId in app.config.ts
+const EXPO_PROJECT_ID = '2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4';
+
 // Tracks which chat instance screen is currently focused.
 // Read by the foreground notification handler to suppress notifications
 // when the user is already viewing that chat.
@@ -52,9 +55,17 @@ export function setupNotificationHandler() {
             },
           },
         });
+        return suppressed;
       }
 
-      return suppressed;
+      // Non-chat notification — show normally
+      return {
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      };
     },
   });
 }
@@ -86,7 +97,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 
   const tokenResponse = await Notifications.getExpoPushTokenAsync({
-    projectId: '2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4',
+    projectId: EXPO_PROJECT_ID,
   });
 
   return tokenResponse.data;
@@ -99,7 +110,7 @@ export async function getDevicePushToken(): Promise<string | null> {
   }
 
   const tokenResponse = await Notifications.getExpoPushTokenAsync({
-    projectId: '2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4',
+    projectId: EXPO_PROJECT_ID,
   });
   return tokenResponse.data;
 }

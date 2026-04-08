@@ -1,7 +1,22 @@
 import type { OpenRouterInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import type { ProviderId } from '@/lib/providers/types';
 
-export type KiloExclusiveModelFlag = 'free' | 'reasoning' | 'prompt_cache' | 'vision';
+export type KiloExclusiveModelFlag = 'reasoning' | 'vision';
+
+export type Usage = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheWriteTokens: number;
+  cacheHitTokens: number;
+};
+
+export type Pricing = {
+  prompt: number;
+  completion: number;
+  input_cache_read: number | null;
+  input_cache_write: number | null;
+  calculate_mUsd(usage: Usage, pricing: Pricing): number;
+};
 
 export type KiloExclusiveModel = {
   public_id: string;
@@ -14,9 +29,17 @@ export type KiloExclusiveModel = {
   gateway: ProviderId;
   internal_id: string;
   inference_provider: OpenRouterInferenceProviderId | null;
+  pricing: Pricing | null;
 };
 
+function formatPrice(price: number | null): string | undefined {
+  if (price === null) return undefined;
+  return price.toFixed(7);
+}
+
 export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
+  const pricing = model.pricing;
+  const isFree = !pricing;
   return {
     id: model.public_id,
     canonical_slug: model.public_id,
@@ -33,13 +56,15 @@ export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
       instruct_type: null,
     },
     pricing: {
-      prompt: '0.0000000',
-      completion: '0.0000000',
+      prompt: isFree ? '0.0000000' : (formatPrice(pricing.prompt) ?? '0.0000000'),
+      completion: isFree ? '0.0000000' : (formatPrice(pricing.completion) ?? '0.0000000'),
       request: '0',
       image: '0',
       web_search: '0',
       internal_reasoning: '0',
-      input_cache_read: model.flags.includes('prompt_cache') ? '0.00000000' : undefined,
+      input_cache_read: isFree
+        ? '0.00000000'
+        : (formatPrice(pricing.input_cache_read) ?? '0.00000000'),
     },
     top_provider: {
       context_length: model.context_length,

@@ -1,7 +1,9 @@
 import type { KiloClawEnv } from '../../types';
 import type { FlyClientConfig } from '../../fly/client';
 import type { FlyMachineConfig } from '../../fly/types';
+import type { FlyProviderState } from '../../schemas/instance-config';
 import * as fly from '../../fly/client';
+import type { ProviderResult } from '../../providers/types';
 import {
   DEFAULT_VOLUME_SIZE_GB,
   STARTUP_TIMEOUT_SECONDS,
@@ -15,24 +17,34 @@ import {
 } from '../regions';
 import { guestFromSize, volumeNameFromSandboxId, METADATA_KEY_SANDBOX_ID } from '../machine-config';
 import type { InstanceMutableState } from './types';
-import { storageUpdate } from './state';
 import { reconcileLog, doError, doWarn, toLoggable } from './log';
+
+type FlyRuntimeState = Pick<
+  InstanceMutableState,
+  | 'userId'
+  | 'sandboxId'
+  | 'machineSize'
+  | 'lastStartedAt'
+  | 'flyAppName'
+  | 'flyMachineId'
+  | 'flyRegion'
+>;
 
 /**
  * Ensure a Fly Volume exists. Creates one if flyVolumeId is null.
  */
 export async function ensureVolume(
   flyConfig: FlyClientConfig,
-  ctx: DurableObjectState,
-  state: InstanceMutableState,
+  state: FlyRuntimeState,
+  providerState: FlyProviderState,
   env: KiloClawEnv,
   reason: string
-): Promise<void> {
-  if (state.flyVolumeId) return;
-  if (!state.sandboxId) return;
+): Promise<FlyProviderState> {
+  if (providerState.volumeId) return providerState;
+  if (!state.sandboxId) return providerState;
 
-  const regions = state.flyRegion
-    ? parseRegions(state.flyRegion)
+  const regions = providerState.region
+    ? parseRegions(providerState.region)
     : await resolveRegions(env.KV_CLAW_CACHE, env.FLY_REGION);
   const volume = await fly.createVolumeWithFallback(
     flyConfig,
@@ -49,15 +61,17 @@ export async function ensureVolume(
     }
   );
 
-  state.flyVolumeId = volume.id;
-  state.flyRegion = volume.region;
-  await ctx.storage.put(storageUpdate({ flyVolumeId: volume.id, flyRegion: volume.region }));
-
   reconcileLog(reason, 'create_volume', {
     fly_app_name: flyConfig.appName,
     volume_id: volume.id,
     region: volume.region,
   });
+
+  return {
+    ...providerState,
+    volumeId: volume.id,
+    region: volume.region,
+  };
 }
 
 /**
@@ -65,15 +79,15 @@ export async function ensureVolume(
  */
 export async function replaceStrandedVolume(
   flyConfig: FlyClientConfig,
-  ctx: DurableObjectState,
-  state: InstanceMutableState,
+  state: FlyRuntimeState & Pick<InstanceMutableState, 'flyMachineId'>,
+  providerState: FlyProviderState,
   env: KiloClawEnv,
   reason: string
-): Promise<void> {
-  if (!state.sandboxId || !state.flyVolumeId) return;
+): Promise<FlyProviderState> {
+  if (!state.sandboxId || !providerState.volumeId) return providerState;
 
-  const oldVolumeId = state.flyVolumeId;
-  const oldRegion = state.flyRegion;
+  const oldVolumeId = providerState.volumeId;
+  const oldRegion = providerState.region;
   const hasUserData = state.lastStartedAt !== null;
   const allRegions = await resolveRegions(env.KV_CLAW_CACHE, env.FLY_REGION);
   const regions = deprioritizeRegion(allRegions, oldRegion);
@@ -81,26 +95,20 @@ export async function replaceStrandedVolume(
 
   // Destroy existing machine if any — it's stuck on the constrained host.
   if (state.flyMachineId) {
-    let machineGone = false;
     try {
       await fly.destroyMachine(flyConfig, state.flyMachineId);
       reconcileLog(reason, 'destroy_stranded_machine', {
         fly_app_name: flyConfig.appName,
         machine_id: state.flyMachineId,
       });
-      machineGone = true;
     } catch (err) {
       if (fly.isFlyNotFound(err)) {
-        machineGone = true;
+        // already gone
       } else {
         doWarn(state, 'Failed to destroy stranded machine', {
           error: toLoggable(err),
         });
       }
-    }
-    if (machineGone) {
-      state.flyMachineId = null;
-      await ctx.storage.put(storageUpdate({ flyMachineId: null }));
     }
   }
 
@@ -121,8 +129,6 @@ export async function replaceStrandedVolume(
       regions,
       capacityErrorCallback
     );
-    state.flyVolumeId = forkedVolume.id;
-    state.flyRegion = forkedVolume.region;
     reconcileLog(reason, 'fork_stranded_volume', {
       fly_app_name: flyConfig.appName,
       old_volume_id: oldVolumeId,
@@ -130,11 +136,12 @@ export async function replaceStrandedVolume(
       new_volume_id: forkedVolume.id,
       new_region: forkedVolume.region,
     });
+    providerState = {
+      ...providerState,
+      volumeId: forkedVolume.id,
+      region: forkedVolume.region,
+    };
   } else {
-    state.flyVolumeId = null;
-    state.flyRegion = null;
-    await ctx.storage.put(storageUpdate({ flyVolumeId: null, flyRegion: null }));
-
     const freshVolume = await fly.createVolumeWithFallback(
       flyConfig,
       {
@@ -145,8 +152,6 @@ export async function replaceStrandedVolume(
       regions,
       capacityErrorCallback
     );
-    state.flyVolumeId = freshVolume.id;
-    state.flyRegion = freshVolume.region;
     reconcileLog(reason, 'create_replacement_volume', {
       fly_app_name: flyConfig.appName,
       old_volume_id: oldVolumeId,
@@ -154,11 +159,12 @@ export async function replaceStrandedVolume(
       new_volume_id: freshVolume.id,
       new_region: freshVolume.region,
     });
+    providerState = {
+      ...providerState,
+      volumeId: freshVolume.id,
+      region: freshVolume.region,
+    };
   }
-
-  await ctx.storage.put(
-    storageUpdate({ flyVolumeId: state.flyVolumeId, flyRegion: state.flyRegion })
-  );
 
   // Delete old volume (best-effort cleanup)
   try {
@@ -175,6 +181,8 @@ export async function replaceStrandedVolume(
       });
     }
   }
+
+  return providerState;
 }
 
 /**
@@ -183,48 +191,67 @@ export async function replaceStrandedVolume(
  */
 export async function startExistingMachine(
   flyConfig: FlyClientConfig,
-  ctx: DurableObjectState,
-  state: InstanceMutableState,
+  state: FlyRuntimeState,
+  providerState: FlyProviderState,
   initialMachineConfig: FlyMachineConfig,
   minSecretsVersion?: number,
-  envFlyRegion?: string
-): Promise<void> {
-  if (!state.flyMachineId) return;
+  envFlyRegion?: string,
+  onProviderResult?: (result: ProviderResult<FlyProviderState>) => Promise<void>
+): Promise<{ providerState: FlyProviderState; machineSize?: InstanceMutableState['machineSize'] }> {
+  if (!providerState.machineId) {
+    return { providerState };
+  }
 
   try {
-    const machine = await fly.getMachine(flyConfig, state.flyMachineId);
+    const machine = await fly.getMachine(flyConfig, providerState.machineId);
 
     // Backfill machineSize from live Fly machine config for legacy instances
     let machineConfig = initialMachineConfig;
+    let machineSizePatch: InstanceMutableState['machineSize'] | undefined;
     if (state.machineSize === null && machine.config?.guest) {
       const { cpus, memory_mb, cpu_kind } = machine.config.guest;
-      state.machineSize = { cpus, memory_mb, cpu_kind };
-      await ctx.storage.put(storageUpdate({ machineSize: state.machineSize }));
-      machineConfig = { ...machineConfig, guest: guestFromSize(state.machineSize) };
+      machineSizePatch = { cpus, memory_mb, cpu_kind };
+      machineConfig = { ...machineConfig, guest: guestFromSize(machineSizePatch) };
     }
 
     // failed machines are restartable via updateMachine (Fly re-launches on the next available host)
     if (machine.state === 'stopped' || machine.state === 'created' || machine.state === 'failed') {
-      await fly.updateMachine(flyConfig, state.flyMachineId, machineConfig, { minSecretsVersion });
-      await fly.waitForState(flyConfig, state.flyMachineId, 'started', STARTUP_TIMEOUT_SECONDS);
-      console.log('[DO] Machine updated and started:', state.flyMachineId);
+      await fly.updateMachine(flyConfig, providerState.machineId, machineConfig, { minSecretsVersion });
+      await fly.waitForState(
+        flyConfig,
+        providerState.machineId,
+        'started',
+        STARTUP_TIMEOUT_SECONDS
+      );
+      console.log('[DO] Machine updated and started:', providerState.machineId);
     } else if (machine.state === 'started') {
       console.log('[DO] Machine already started');
     } else {
-      await fly.waitForState(flyConfig, state.flyMachineId, 'started', STARTUP_TIMEOUT_SECONDS);
+      await fly.waitForState(
+        flyConfig,
+        providerState.machineId,
+        'started',
+        STARTUP_TIMEOUT_SECONDS
+      );
     }
+    return {
+      providerState,
+      ...(machineSizePatch !== undefined ? { machineSize: machineSizePatch } : {}),
+    };
   } catch (err) {
     if (fly.isFlyNotFound(err)) {
       console.log('[DO] Machine gone (404), creating new one');
-      state.flyMachineId = null;
-      await ctx.storage.put(storageUpdate({ flyMachineId: null }));
-      await createNewMachine(
+      return createNewMachine(
         flyConfig,
-        ctx,
         state,
+        {
+          ...providerState,
+          machineId: null,
+        },
         initialMachineConfig,
         minSecretsVersion,
-        envFlyRegion
+        envFlyRegion,
+        onProviderResult
       );
     } else {
       doError(state, 'Transient error starting existing machine', {
@@ -243,24 +270,33 @@ export async function startExistingMachine(
  */
 export async function createNewMachine(
   flyConfig: FlyClientConfig,
-  ctx: DurableObjectState,
-  state: InstanceMutableState,
+  state: Pick<InstanceMutableState, 'sandboxId'>,
+  providerState: FlyProviderState,
   machineConfig: FlyMachineConfig,
   minSecretsVersion?: number,
-  envFlyRegion?: string
-): Promise<void> {
+  envFlyRegion?: string,
+  onProviderResult?: (result: ProviderResult<FlyProviderState>) => Promise<void>
+): Promise<{ providerState: FlyProviderState }> {
   const machine = await fly.createMachine(flyConfig, machineConfig, {
     name: state.sandboxId ?? undefined,
-    region: state.flyRegion ?? envFlyRegion ?? undefined,
+    region: providerState.region ?? envFlyRegion ?? undefined,
     minSecretsVersion,
   });
-  state.flyMachineId = machine.id;
-
-  await ctx.storage.put(storageUpdate({ flyMachineId: machine.id }));
+  const nextProviderState = {
+    ...providerState,
+    machineId: machine.id,
+  } satisfies FlyProviderState;
+  await onProviderResult?.({
+    providerState: nextProviderState,
+  });
   console.log('[DO] Created Fly Machine:', machine.id, 'region:', machine.region);
 
   await fly.waitForState(flyConfig, machine.id, 'started', STARTUP_TIMEOUT_SECONDS);
   console.log('[DO] Machine started');
+
+  return {
+    providerState: nextProviderState,
+  };
 }
 
 /**

@@ -69,6 +69,9 @@ export type InstanceMutableState = {
   restartUpdateSent: boolean;
   lastStartedAt: number | null;
   lastStoppedAt: number | null;
+  // Legacy Fly compatibility mirrors. `providerState` is the canonical
+  // provider record; direct writes here must be followed by `persist()` so the
+  // storage sync helper can keep both representations aligned.
   flyAppName: string | null;
   flyMachineId: string | null;
   flyVolumeId: string | null;
@@ -152,7 +155,10 @@ export function getFlyConfig(env: KiloClawEnv, state: InstanceMutableState): Fly
   if (!env.FLY_API_TOKEN) {
     throw new Error('FLY_API_TOKEN is not configured');
   }
-  const appName = state.flyAppName ?? env.FLY_APP_NAME;
+  const appName =
+    (state.providerState?.provider === 'fly' ? state.providerState.appName : null) ??
+    state.flyAppName ??
+    env.FLY_APP_NAME;
   if (!appName) {
     throw new Error('No Fly app name: flyAppName not set and FLY_APP_NAME not configured');
   }

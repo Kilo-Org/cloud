@@ -6,6 +6,12 @@ import * as regionHelpers from '../regions';
 import { buildMachineConfig, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
 import type { InstanceMutableState } from './types';
 import { getFlyConfig } from './types';
+import {
+  applyProviderState,
+  getFlyProviderState,
+  storageUpdate,
+  syncProviderStateForStorage,
+} from './state';
 import { resolveImageTag, getRegistryApp, buildUserEnvVars } from './config';
 import * as gateway from './gateway';
 import * as flyMachines from './fly-machines';
@@ -403,13 +409,37 @@ export async function runUnexpectedStopRecoveryInBackground(
     const previousRegion = state.flyRegion;
     state.flyRegion = recoveryVolumeRegion ?? oldVolumeRegion ?? previousRegion;
     try {
-      await flyMachines.createNewMachine(
+      const result = await flyMachines.createNewMachine(
         flyConfig,
-        ctx,
         state,
+        {
+          ...getFlyProviderState(state),
+          region: state.flyRegion,
+        },
         machineConfig,
         minSecretsVersion,
-        env.FLY_REGION
+        env.FLY_REGION,
+        async providerResult => {
+          applyProviderState(state, providerResult.providerState);
+          await ctx.storage.put(
+            storageUpdate(
+              syncProviderStateForStorage(state, {
+                provider: providerResult.providerState.provider,
+                providerState: providerResult.providerState,
+                ...(providerResult.corePatch ?? {}),
+              })
+            )
+          );
+        }
+      );
+      applyProviderState(state, result.providerState);
+      await ctx.storage.put(
+        storageUpdate(
+          syncProviderStateForStorage(state, {
+            provider: result.providerState.provider,
+            providerState: result.providerState,
+          })
+        )
       );
     } catch (err) {
       const isStartupTimeout = err instanceof fly.FlyApiError && err.status === 408;

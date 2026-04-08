@@ -22,7 +22,13 @@ import {
 import { METADATA_KEY_USER_ID, METADATA_KEY_SANDBOX_ID } from '../machine-config';
 import type { InstanceMutableState, DestroyResult } from './types';
 import { getAppKey } from './types';
-import { storageUpdate, resetMutableState } from './state';
+import {
+  applyProviderState,
+  getFlyProviderState,
+  resetMutableState,
+  storageUpdate,
+  syncProviderStateForStorage,
+} from './state';
 import { doError, doWarn, toLoggable, createReconcileContext } from './log';
 import type { ReconcileContext } from './log';
 import { ensureVolume, staleProvisionAgeMs } from './fly-machines';
@@ -602,7 +608,20 @@ async function reconcileVolume(
   rctx: ReconcileContext
 ): Promise<void> {
   if (!state.flyVolumeId) {
-    await ensureVolume(flyConfig, ctx, state, env, rctx.reason);
+    const providerState = await ensureVolume(
+      flyConfig,
+      state,
+      getFlyProviderState(state),
+      env,
+      rctx.reason
+    );
+    applyProviderState(state, providerState);
+    await ctx.storage.put(
+      storageUpdate(syncProviderStateForStorage(state, {
+        provider: providerState.provider,
+        providerState,
+      }))
+    );
     return;
   }
 
@@ -614,7 +633,20 @@ async function reconcileVolume(
       const oldVolumeId = state.flyVolumeId;
       state.flyVolumeId = null;
       await ctx.storage.put(storageUpdate({ flyVolumeId: null }));
-      await ensureVolume(flyConfig, ctx, state, env, rctx.reason);
+      const providerState = await ensureVolume(
+        flyConfig,
+        state,
+        getFlyProviderState(state),
+        env,
+        rctx.reason
+      );
+      applyProviderState(state, providerState);
+      await ctx.storage.put(
+        storageUpdate(syncProviderStateForStorage(state, {
+          provider: providerState.provider,
+          providerState,
+        }))
+      );
       rctx.log('replace_lost_volume', {
         data_loss: true,
         old_volume_id: oldVolumeId,

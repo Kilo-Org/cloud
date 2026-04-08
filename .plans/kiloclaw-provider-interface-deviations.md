@@ -8,14 +8,15 @@ across phases and reviews.
 
 ## Phase 1
 
-### D1. Legacy Fly fields remain authoritative for compatibility
+### D1. Legacy Fly fields remain persisted compatibility mirrors
 
 - Status payloads and many internal helpers still read `flyAppName`,
   `flyMachineId`, `flyVolumeId`, and `flyRegion` directly.
-- `providerState` is being introduced in phase 1, but legacy Fly fields remain
-  the compatibility source of truth until later phases finish the migration.
-- Reason: preserve current behavior and public routes while extracting the Fly
-  provider boundary.
+- Phase 3 makes `providerState` the canonical provider record for the primary
+  lifecycle path, but the legacy Fly fields still remain in persisted state and
+  must be mirrored for compatibility.
+- Reason: preserve current behavior and public routes while existing callers
+  and helper modules still consume the legacy Fly fields.
 
 ### D2. Worker and controller routing remain Fly-specific in phase 1
 
@@ -81,6 +82,49 @@ across phases and reviews.
 - The worker proxy now fetches provider-derived transport coordinates through
   `getRoutingTarget()`, but it still uses `getStatus()` and legacy Fly fields
   such as `flyMachineId` to decide whether an instance is proxyable.
-- Reason: generic routability/status fields are phase 3 work. Phase 2 only
-  neutralizes the transport layer while preserving current public status
-  payloads and route behavior.
+- Reason: phase 2 only neutralizes the transport layer while preserving current
+  public status payloads and route behavior. Generic routability/status fields
+  remain deferred until a later phase.
+
+## Phase 3
+
+### D10. Canonical provider state is only wired through the primary lifecycle path
+
+- `provision`, `start`, `stop`, and restart/redeploy now apply explicit
+  provider results through `KiloClawInstance`, with `providerState` treated as
+  canonical provider data.
+- Direct Fly-only reconcile, recovery, snapshot, and admin/debug code paths
+  still mutate legacy Fly fields in place and rely on the storage sync bridge
+  for compatibility.
+- Reason: phase 3 starts with the main adapter-managed lifecycle path before
+  widening the refactor across all remaining Fly-only helper flows.
+
+### D11. Legacy Fly-field writes still exist outside the adapter-managed path
+
+- Several existing Fly reconciliation and recovery helpers still assign
+  `flyAppName`, `flyMachineId`, `flyVolumeId`, and `flyRegion` directly on the
+  mutable state object.
+- A comment convention and the storage sync helper now document that those
+  writes must be followed by `persist()` or a storage sync call, but the code
+  base does not yet enforce this mechanically.
+- Reason: removing every direct Fly-field write is broader than the initial
+  phase-3 slice; stronger enforcement or full removal is deferred.
+
+### D12. Adapter parity still requires mid-operation provider-result callbacks
+
+- To preserve Fly parity, the adapter-managed lifecycle path can emit
+  intermediate provider results back to `KiloClawInstance` before long waits or
+  retries, for example when a new machine ID or replacement volume ID must be
+  persisted immediately.
+- The adapter no longer writes DO storage directly, but the contract is not yet
+  a single final-result model.
+- Reason: existing Fly behavior depends on persisting certain provider changes
+  before startup waits, timeout handling, and retry paths complete.
+
+### D13. The adapter contract is still Fly-shaped after phase 3
+
+- The adapter no longer mutates DO state directly, but it still accepts
+  Fly-oriented runtime inputs such as `FlyMachineConfig`.
+- Reason: provider-state ownership cleanup lands before contract
+  neutralization. Replacing Fly-shaped inputs with a provider-neutral runtime
+  spec is phase 4 work.

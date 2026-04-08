@@ -1,11 +1,15 @@
 import type { FlyMachineConfig } from '../fly/types';
 import type { KiloClawEnv } from '../types';
-import type { ProviderId } from '../schemas/instance-config';
+import type {
+  MachineSize,
+  PersistedState,
+  ProviderId,
+  ProviderState,
+} from '../schemas/instance-config';
 import type { InstanceMutableState } from '../durable-objects/kiloclaw-instance/types';
 
 export type ProviderContext = {
   env: KiloClawEnv;
-  ctx: DurableObjectState;
   state: InstanceMutableState;
 };
 
@@ -14,6 +18,17 @@ export type ProviderRoutingContext = Pick<ProviderContext, 'env' | 'state'>;
 export type ProviderRoutingTarget = {
   origin: string;
   headers: Record<string, string>;
+};
+
+export type ProviderObservation = {
+  runtimeState?: 'starting' | 'running' | 'stopped' | 'failed';
+  machineSize?: MachineSize | null;
+};
+
+export type ProviderResult<TProviderState extends ProviderState = ProviderState> = {
+  providerState: TProviderState;
+  corePatch?: Partial<Pick<PersistedState, 'machineSize' | 'restartUpdateSent'>>;
+  observation?: ProviderObservation;
 };
 
 export type EnsureProvisioningResourcesArgs = ProviderContext & {
@@ -31,6 +46,7 @@ export type StartRuntimeArgs = ProviderContext & {
   minSecretsVersion?: number;
   envRegion?: string;
   onCapacityRecovery?: (error: unknown) => Promise<void> | void;
+  onProviderResult?: (result: ProviderResult) => Promise<void>;
 };
 
 export type StopRuntimeArgs = ProviderContext;
@@ -38,14 +54,15 @@ export type StopRuntimeArgs = ProviderContext;
 export type RestartRuntimeArgs = ProviderContext & {
   machineConfig: FlyMachineConfig;
   minSecretsVersion?: number;
+  onProviderResult?: (result: ProviderResult) => Promise<void>;
 };
 
 export type InstanceProviderAdapter = {
   readonly id: ProviderId;
   getRoutingTarget(args: ProviderRoutingContext): Promise<ProviderRoutingTarget>;
-  ensureProvisioningResources(args: EnsureProvisioningResourcesArgs): Promise<void>;
-  ensureStorage(args: EnsureStorageArgs): Promise<void>;
-  startRuntime(args: StartRuntimeArgs): Promise<void>;
-  stopRuntime(args: StopRuntimeArgs): Promise<void>;
-  restartRuntime(args: RestartRuntimeArgs): Promise<{ aborted?: boolean; instanceId?: string }>;
+  ensureProvisioningResources(args: EnsureProvisioningResourcesArgs): Promise<ProviderResult>;
+  ensureStorage(args: EnsureStorageArgs): Promise<ProviderResult>;
+  startRuntime(args: StartRuntimeArgs): Promise<ProviderResult>;
+  stopRuntime(args: StopRuntimeArgs): Promise<ProviderResult>;
+  restartRuntime(args: RestartRuntimeArgs): Promise<ProviderResult>;
 };

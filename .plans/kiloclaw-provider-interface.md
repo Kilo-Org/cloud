@@ -627,19 +627,29 @@ Known implementation risks:
 - WebSocket paths may have slightly different header handling than normal HTTP
   proxying and should be verified explicitly
 
-### Phase 3: State Migration
+### Phase 3: State Ownership Cleanup
 
-- Persist generic provider state
-- Expose generic provider status fields
-- Keep legacy Fly fields until all callers migrate
+- Make `providerState` the canonical provider record
+- Keep legacy Fly fields as compatibility mirrors derived from `providerState`
+- Stop provider adapters from mutating shared DO state in place
+- Have adapters return explicit provider results so `KiloClawInstance` owns
+  applying and persisting provider changes
+- Preserve Fly parity for long-running operations by letting adapters emit
+  intermediate provider results back to the DO before long waits or retries
 
-### Phase 4: Capability Gating
+### Phase 4: Contract Neutralization
+
+- Replace Fly-shaped runtime inputs such as `FlyMachineConfig` with a
+  provider-neutral runtime spec
+- Migrate the Fly adapter to the neutral contract before adding provider 2
+
+### Phase 5: Capability Gating
 
 - Mark snapshot, reassociation, and other Fly-only flows as optional provider
   capabilities
 - Update platform routes to reject unsupported provider capabilities clearly
 
-### Phase 5: First Non-Fly Provider
+### Phase 6: First Non-Fly Provider
 
 - Add either Northflank, AWS, or Kubernetes after Fly parity is green
 - Reuse the same core lifecycle and controller layers

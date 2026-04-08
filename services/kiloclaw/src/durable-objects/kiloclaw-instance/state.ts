@@ -31,6 +31,24 @@ export function buildFlyProviderState(
   };
 }
 
+export function getFlyProviderState(
+  source: Pick<
+    InstanceMutableState,
+    'providerState' | 'flyAppName' | 'flyMachineId' | 'flyVolumeId' | 'flyRegion'
+  >
+): FlyProviderState {
+  if (
+    source.providerState?.provider === 'fly' &&
+    source.providerState.appName === source.flyAppName &&
+    source.providerState.machineId === source.flyMachineId &&
+    source.providerState.volumeId === source.flyVolumeId &&
+    source.providerState.region === source.flyRegion
+  ) {
+    return source.providerState;
+  }
+  return buildFlyProviderState(source);
+}
+
 export function hydrateFlyLegacyFieldsFromProviderState(
   s: Pick<
     InstanceMutableState,
@@ -44,6 +62,21 @@ export function hydrateFlyLegacyFieldsFromProviderState(
   s.flyRegion = s.providerState.region;
 }
 
+export function applyProviderState(
+  s: Pick<
+    InstanceMutableState,
+    'provider' | 'providerState' | 'flyAppName' | 'flyMachineId' | 'flyVolumeId' | 'flyRegion'
+  >,
+  providerState: ProviderState
+): void {
+  s.provider = providerState.provider;
+  s.providerState = providerState;
+
+  if (providerState.provider === 'fly') {
+    hydrateFlyLegacyFieldsFromProviderState(s);
+  }
+}
+
 export function syncProviderStateForStorage(
   s: Pick<
     InstanceMutableState,
@@ -51,16 +84,28 @@ export function syncProviderStateForStorage(
   >,
   patch: Partial<PersistedState>
 ): Partial<PersistedState> {
+  // Temporary compatibility bridge while legacy Fly fields still exist in the
+  // persisted schema. New provider-aware code should prefer writing
+  // `providerState`; writes to legacy Fly fields should only happen alongside a
+  // follow-up `persist()` call so this helper can mirror them.
   const nextProvider = patch.provider ?? s.provider;
   if (nextProvider !== 'fly') return patch;
 
   const explicitProviderState = patch.providerState;
   if (explicitProviderState) {
-    s.provider = 'fly';
-    s.providerState = explicitProviderState;
+    applyProviderState(s, explicitProviderState);
+    if (explicitProviderState.provider === 'fly') {
+      return {
+        ...patch,
+        provider: 'fly',
+        flyAppName: explicitProviderState.appName,
+        flyMachineId: explicitProviderState.machineId,
+        flyVolumeId: explicitProviderState.volumeId,
+        flyRegion: explicitProviderState.region,
+      };
+    }
     return {
       ...patch,
-      provider: 'fly',
     };
   }
 
@@ -81,8 +126,7 @@ export function syncProviderStateForStorage(
     region: 'flyRegion' in patch ? (patch.flyRegion ?? null) : s.flyRegion,
   };
 
-  s.provider = 'fly';
-  s.providerState = nextState;
+  applyProviderState(s, nextState);
 
   return {
     ...patch,

@@ -32,6 +32,7 @@ import {
   kiloclaw_cli_runs,
   cloud_agent_webhook_triggers,
   credit_transactions,
+  user_push_tokens,
 } from '@kilocode/db/schema';
 import { and, eq, ne, desc, isNotNull, isNull, inArray, sql, like, or } from 'drizzle-orm';
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
@@ -1406,6 +1407,56 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
     }),
+
+  registerPushToken: clawAccessProcedure
+    .input(
+      z.object({
+        token: z.string().min(1),
+        platform: z.enum(['ios', 'android']),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .insert(user_push_tokens)
+        .values({
+          user_id: ctx.user.id,
+          token: input.token,
+          platform: input.platform,
+        })
+        .onConflictDoUpdate({
+          target: [user_push_tokens.user_id, user_push_tokens.token],
+          set: { updated_at: sql`now()` },
+        });
+      return { success: true };
+    }),
+
+  unregisterPushToken: clawAccessProcedure
+    .input(
+      z.object({
+        token: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .delete(user_push_tokens)
+        .where(
+          and(
+            eq(user_push_tokens.user_id, ctx.user.id),
+            eq(user_push_tokens.token, input.token)
+          )
+        );
+      return { success: true };
+    }),
+
+  getMyPushTokens: clawAccessProcedure.query(async ({ ctx }) => {
+    return db
+      .select({
+        token: user_push_tokens.token,
+        platform: user_push_tokens.platform,
+      })
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, ctx.user.id));
+  }),
 
   // Instance lifecycle
   start: clawAccessProcedure.mutation(async ({ ctx }) => {

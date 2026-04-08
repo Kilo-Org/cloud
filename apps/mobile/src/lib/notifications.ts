@@ -24,16 +24,14 @@ export function setActiveChatInstance(instanceId: string | null) {
   activeChatInstanceId = instanceId;
 }
 
-type NotificationData = {
-  instanceId?: string;
-};
+// Keep in sync with data field in services/notifications/src/dos/NotificationChannelDO.ts
+type NotificationData = { type: 'chat'; instanceId: string };
 
 export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
     // eslint-disable-next-line require-await -- expo-notifications requires async callback type but logic is synchronous
     handleNotification: async notification => {
       const data = notification.request.content.data as NotificationData | undefined;
-      const notificationInstanceId = data?.instanceId;
 
       const suppressed = {
         shouldShowAlert: false,
@@ -43,14 +41,14 @@ export function setupNotificationHandler() {
         shouldShowList: false,
       } as const;
 
-      // If the user is viewing the exact chat this notification is for, suppress it
-      if (notificationInstanceId && notificationInstanceId === activeChatInstanceId) {
-        return suppressed;
-      }
+      if (data?.type === 'chat') {
+        // If the user is viewing the exact chat this notification is for, suppress it
+        if (data.instanceId === activeChatInstanceId) {
+          return suppressed;
+        }
 
-      // User is in the app but not in this chat — show in-app banner via toast
-      // and suppress the system notification
-      if (notificationInstanceId) {
+        // User is in the app but not in this chat — show in-app banner via toast
+        // and suppress the system notification
         const title = notification.request.content.title ?? 'Kilo';
         const body = notification.request.content.body ?? '';
         toast(title, {
@@ -58,7 +56,7 @@ export function setupNotificationHandler() {
           action: {
             label: 'View',
             onClick: () => {
-              router.push(`/(app)/chat/${notificationInstanceId}` as Href);
+              router.push(`/(app)/chat/${data.instanceId}` as Href);
             },
           },
         });
@@ -80,10 +78,9 @@ export function setupNotificationHandler() {
 export function setupNotificationResponseHandler() {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
     const data = response.notification.request.content.data as NotificationData | undefined;
-    const instanceId = data?.instanceId;
 
-    if (instanceId) {
-      router.push(`/(app)/chat/${instanceId}` as Href);
+    if (data?.type === 'chat') {
+      router.push(`/(app)/chat/${data.instanceId}` as Href);
     }
   });
 

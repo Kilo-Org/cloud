@@ -78,7 +78,8 @@ export class NotificationChannelDO extends DurableObject<Env> {
       to: token,
       title: instance.name ?? 'Kilo',
       body: truncatedMessage,
-      data: { instanceId: instance.id },
+      // Keep in sync with NotificationData in apps/mobile/src/lib/notifications.ts
+      data: { type: 'chat', instanceId: instance.id },
       sound: 'default' as const,
       priority: 'high' as const,
     }));
@@ -89,9 +90,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
     // Immediately clean up tokens that are known stale
     if (staleTokens.length > 0) {
-      await db
-        .delete(user_push_tokens)
-        .where(inArray(user_push_tokens.token, staleTokens));
+      await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, staleTokens));
       console.log(`Cleaned up ${staleTokens.length} stale push token(s)`);
     }
 

@@ -1,4 +1,4 @@
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 
 import { db } from '@/lib/drizzle';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -14,7 +14,8 @@ function verifyWebhookSignature(body: string, signature: string | null): boolean
 
   const expectedSignature = createHmac('sha256', STREAM_CHAT_API_SECRET).update(body).digest('hex');
 
-  return signature === expectedSignature;
+  if (signature.length !== expectedSignature.length) return false;
+  return timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
 }
 
 type StreamChatWebhookPayload = {

@@ -22,6 +22,8 @@
     "worktree:prepare": "bash scripts/worktree-prepare.sh",
     "dev:start": "tsx dev/local/cli.ts up",
     "dev:stop": "tsx dev/local/cli.ts stop",
+    "dev:status": "tsx dev/local/cli.ts status",
+    "dev:restart": "tsx dev/local/cli.ts restart",
     "dev:env": "tsx dev/local/cli.ts env",
     "dev:discord-gateway-cron": "tsx dev/discord-gateway-cron.ts"
   },

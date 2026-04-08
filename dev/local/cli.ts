@@ -10,6 +10,7 @@ import {
   resolveGroups,
   topologicalSort,
   portOffset,
+  services,
 } from './services';
 import { syncEnvVars } from './env-sync';
 import {
@@ -29,6 +30,7 @@ import {
   setPaneTitle,
   enablePaneBorders,
   isTmuxAvailable,
+  findServicePane,
 } from './tmux';
 import {
   findRepoRoot,
@@ -37,6 +39,8 @@ import {
   readEnvValue,
   readEnvMtime,
   waitForEnvValueChange,
+  probePort,
+  restartServiceInTmux,
 } from './runner';
 
 // ---------------------------------------------------------------------------
@@ -134,6 +138,13 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     console.log(`${BOLD}Starting infrastructure…${RESET}`);
     await startInfra(repoRoot, serviceNames);
     console.log();
+  }
+
+  // --- Prepare log directory ---
+  const logDir = path.join(repoRoot, 'dev', 'logs');
+  fs.mkdirSync(logDir, { recursive: true });
+  for (const entry of fs.readdirSync(logDir)) {
+    fs.unlinkSync(path.join(logDir, entry));
   }
 
   // --- Create tmux session ---
@@ -278,8 +289,120 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   // --- Focus sidebar pane and attach ---
   selectPane(sessionName, 0, 0);
   selectWindow(sessionName, 0);
+
+  // --- Write manifest for agents ---
+  writeManifest(repoRoot, sessionName, serviceNames);
+
   console.log(`${GREEN}Started ${serviceNames.length} services in session ${sessionName}${RESET}`);
   attachSession(sessionName);
+}
+
+type ServiceStatus = 'up' | 'down';
+
+type StatusEntry = {
+  name: string;
+  port: number;
+  status: ServiceStatus;
+  group: string;
+};
+
+type ManifestEntry = {
+  name: string;
+  port: number;
+  group: string;
+  type: string;
+};
+
+type Manifest = {
+  session: string;
+  portOffset: number;
+  services: ManifestEntry[];
+};
+
+function writeManifest(repoRoot: string, sessionName: string, serviceNames: string[]): void {
+  const manifest: Manifest = {
+    session: sessionName,
+    portOffset,
+    services: serviceNames.map(name => {
+      const svc = getService(name);
+      return { name, port: svc.port, group: svc.group, type: svc.type };
+    }),
+  };
+  const manifestPath = path.join(repoRoot, 'dev', 'logs', 'manifest.json');
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+}
+
+async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
+  const sessionName = getSessionName();
+  if (!sessionExists(sessionName)) {
+    if (isJson) {
+      console.log(JSON.stringify({ session: sessionName, services: [] }));
+    } else {
+      console.log('No dev session running');
+    }
+    return;
+  }
+
+  const windows = listWindows(sessionName);
+  const runningServices = windows.filter(w => w.name !== 'dashboard');
+  if (runningServices.length === 0) {
+    if (isJson) {
+      console.log(JSON.stringify({ session: sessionName, portOffset, services: [] }));
+    } else {
+      console.log('No services running');
+    }
+    return;
+  }
+
+  const entries: StatusEntry[] = await Promise.all(
+    runningServices.map(async w => {
+      const svc = getService(w.name);
+      const port = svc.port;
+      const isUp = port > 0 ? await probePort(port) : false;
+      return {
+        name: w.name,
+        port,
+        status: isUp ? 'up' : ('down' as ServiceStatus),
+        group: svc.group,
+      };
+    })
+  );
+
+  if (isJson) {
+    const result = { session: sessionName, portOffset, services: entries };
+    console.log(JSON.stringify(result));
+    return;
+  }
+
+  const nameWidth = Math.max(...entries.map(e => e.name.length), 8);
+  const portWidth = 6;
+  console.log(`${'SERVICE'.padEnd(nameWidth)}  PORT    STATUS`);
+  for (const e of entries) {
+    const portStr = e.port > 0 ? `:${e.port}` : 'n/a';
+    console.log(`${e.name.padEnd(nameWidth)}  ${portStr.padEnd(portWidth)}  ${e.status}`);
+  }
+}
+
+async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> {
+  if (!services.has(serviceName)) {
+    console.error(`Unknown service: ${serviceName}`);
+    process.exit(1);
+  }
+
+  const sessionName = getSessionName();
+  if (!sessionExists(sessionName)) {
+    console.error('No dev session running');
+    process.exit(1);
+  }
+
+  const pane = findServicePane(sessionName, serviceName);
+  if (!pane) {
+    console.error(`Service ${serviceName} is not running`);
+    process.exit(1);
+  }
+
+  restartServiceInTmux(sessionName, serviceName);
+  console.log(`Restarted ${serviceName}`);
 }
 
 async function cmdStop(repoRoot: string): Promise<void> {
@@ -326,6 +449,8 @@ function printUsage(): void {
 Usage:
   dev:start [targets...]  Start services (default: core)
   dev:stop                Stop all services
+  dev:status [--json]     Show running services and their ports
+  dev:restart <service>   Restart a running service
   dev:env [targets...]    Sync env vars (.dev.vars + .env.development.local)
   dev:env --check         Validate env vars (CI mode)
   dev:env -y              Sync without confirmation
@@ -350,6 +475,18 @@ async function main() {
     case 'stop':
       await cmdStop(repoRoot);
       break;
+    case 'status':
+      await cmdStatus(repoRoot, args.includes('--json'));
+      break;
+    case 'restart': {
+      const serviceName = args[1];
+      if (!serviceName) {
+        console.error('Usage: dev:restart <service>');
+        process.exit(1);
+      }
+      await cmdRestart(serviceName, repoRoot);
+      break;
+    }
     case 'env':
       await cmdEnv(args.slice(1), repoRoot);
       break;

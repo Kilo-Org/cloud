@@ -359,6 +359,22 @@ function enablePaneBorders(sessionName: string, windowTarget: string | number): 
 }
 
 // ---------------------------------------------------------------------------
+// Pane logging
+// ---------------------------------------------------------------------------
+
+function pipePane(
+  sessionName: string,
+  windowTarget: string | number,
+  pane: number,
+  command: string
+): void {
+  execSync(
+    `tmux pipe-pane -t ${paneTarget(sessionName, windowTarget, pane)} -o ${escapeForShell(command)}`,
+    { stdio: 'ignore' }
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Utility
 // ---------------------------------------------------------------------------
 
@@ -411,6 +427,7 @@ export {
   selectPane,
   setPaneTitle,
   enablePaneBorders,
+  pipePane,
   isTmuxAvailable,
   isInsideTmux,
 };

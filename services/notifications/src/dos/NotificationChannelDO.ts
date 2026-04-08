@@ -2,32 +2,23 @@ import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
 import { kiloclaw_instances, user_push_tokens } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
+import type { Event } from 'stream-chat';
 
 import type { ExpoPushMessage, TicketTokenPair } from '../lib/expo-push';
 import { sendPushNotifications } from '../lib/expo-push';
-
-type WebhookPayload = {
-  type: string;
-  message?: {
-    text?: string;
-    user?: { id: string };
-  };
-  channel_id?: string;
-};
 
 type ReceiptCheckMessage = {
   ticketTokenPairs: TicketTokenPair[];
 };
 
+const DEDUP_PREFIX = 'dedup:';
 const DEDUP_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export class NotificationChannelDO extends DurableObject<Env> {
-  private seenWebhookIds = new Map<string, number>();
-
-  async processWebhook(payload: WebhookPayload, webhookId: string): Promise<Response> {
+  async processWebhook(payload: Event, webhookId: string): Promise<Response> {
     // Dedup: skip if we've seen this webhook ID recently
-    this.pruneExpiredEntries();
-    if (this.seenWebhookIds.has(webhookId)) {
+    const existing = await this.ctx.storage.get<number>(`${DEDUP_PREFIX}${webhookId}`);
+    if (existing) {
       return Response.json({ ok: true, deduplicated: true });
     }
 
@@ -67,7 +58,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
       .where(eq(user_push_tokens.user_id, instance.user_id));
 
     if (tokens.length === 0) {
-      this.seenWebhookIds.set(webhookId, Date.now());
+      await this.markSeen(webhookId);
       return Response.json({ ok: true });
     }
 
@@ -101,17 +92,32 @@ export class NotificationChannelDO extends DurableObject<Env> {
     }
 
     // Mark webhook as processed
-    this.seenWebhookIds.set(webhookId, Date.now());
+    await this.markSeen(webhookId);
 
     return Response.json({ ok: true });
   }
 
-  private pruneExpiredEntries() {
+  override async alarm(): Promise<void> {
+    // Prune expired dedup entries
+    const all = await this.ctx.storage.list<number>({ prefix: DEDUP_PREFIX });
     const now = Date.now();
-    for (const [id, timestamp] of this.seenWebhookIds) {
+    const expired: string[] = [];
+    for (const [key, timestamp] of all) {
       if (now - timestamp > DEDUP_TTL_MS) {
-        this.seenWebhookIds.delete(id);
+        expired.push(key);
       }
+    }
+    if (expired.length > 0) {
+      await this.ctx.storage.delete(expired);
+    }
+  }
+
+  private async markSeen(webhookId: string): Promise<void> {
+    await this.ctx.storage.put(`${DEDUP_PREFIX}${webhookId}`, Date.now());
+    // Ensure a cleanup alarm is scheduled
+    const currentAlarm = await this.ctx.storage.getAlarm();
+    if (!currentAlarm) {
+      await this.ctx.storage.setAlarm(Date.now() + DEDUP_TTL_MS);
     }
   }
 }

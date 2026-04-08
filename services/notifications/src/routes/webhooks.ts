@@ -1,16 +1,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Hono } from 'hono';
+import type { Event } from 'stream-chat';
 
 import { getNotificationChannelDO } from '../dos/NotificationChannelDO';
-
-type StreamChatWebhookPayload = {
-  type: string;
-  message?: {
-    text?: string;
-    user?: { id: string };
-  };
-  channel_id?: string;
-};
 
 const webhooks = new Hono<{ Bindings: Env }>();
 
@@ -33,7 +25,7 @@ webhooks.post('/stream-chat', async c => {
     return c.json({ error: 'Invalid signature' }, 401);
   }
 
-  const payload = JSON.parse(rawBody) as StreamChatWebhookPayload;
+  const payload = JSON.parse(rawBody) as Event;
 
   // Only handle new messages
   if (payload.type !== 'message.new') {

@@ -25,6 +25,7 @@
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
+    "stream-chat": "catalog:",
     "zod": "catalog:"
   }
 }

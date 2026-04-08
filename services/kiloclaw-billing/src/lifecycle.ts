@@ -1153,12 +1153,22 @@ async function destroyInstanceForEnforcement(
 ): Promise<void> {
   if (!row.instance_id) return;
 
-  await destroyInstance(
-    env,
-    context,
-    row.user_id,
-    workerInstanceId({ id: row.instance_id, sandbox_id: row.sandbox_id })
-  );
+  try {
+    await destroyInstance(
+      env,
+      context,
+      row.user_id,
+      workerInstanceId({ id: row.instance_id, sandbox_id: row.sandbox_id })
+    );
+  } catch (error) {
+    const isExpected = error instanceof KiloClawApiError && error.statusCode === 409;
+    log(isExpected ? 'info' : 'error', 'Destroy instance during billing enforcement failed', {
+      userId: row.user_id,
+      instanceId: row.instance_id,
+      statusCode: error instanceof KiloClawApiError ? error.statusCode : null,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 async function runTrialExpirySweep(

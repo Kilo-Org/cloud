@@ -421,7 +421,7 @@ describe('instance destruction sweep', () => {
     expect(deletes).toHaveLength(2);
   });
 
-  it('keeps non-404 platform destroy failures on the failed-row path', async () => {
+  it('logs non-404 platform destroy failures and preserves billing state transition', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const { db, updates, inserts, deletes } = createMockDb([
       [
@@ -452,17 +452,28 @@ describe('instance destruction sweep', () => {
       1
     );
 
-    expect(summary.errors).toBe(1);
-    expect(summary.sweep3_instance_destruction).toBe(0);
+    expect(summary.errors).toBe(0);
+    expect(summary.sweep3_instance_destruction).toBe(1);
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(globalThis.fetch).not.toHaveBeenCalled();
-    expect(updates).toHaveLength(0);
-    expect(inserts).toHaveLength(0);
-    expect(deletes).toHaveLength(0);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(inserts).toEqual([
+      {
+        user_id: 'user-1',
+        email_type: 'claw_instance_destroyed',
+      },
+    ]);
+    expect(updates).toHaveLength(2);
+    expect(updates[0].destroyed_at).toEqual(expect.any(String));
+    expect(updates[1]).toEqual({ destruction_deadline: null });
+    expect(deletes).toHaveLength(1);
     expect(loggedValues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           message: 'Kiloclaw platform call failed',
+          statusCode: 500,
+        }),
+        expect.objectContaining({
+          message: 'Destroy instance during billing enforcement failed',
           statusCode: 500,
         }),
       ])

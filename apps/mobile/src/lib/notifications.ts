@@ -10,10 +10,6 @@ import { toast } from 'sonner-native';
 // is registered once and must always read the latest value without stale closures.
 let activeChatInstanceId: string | null = null;
 
-export function getActiveChatInstanceId(): string | null {
-  return activeChatInstanceId;
-}
-
 export function setActiveChatInstance(instanceId: string | null) {
   activeChatInstanceId = instanceId;
 }

@@ -15,4 +15,7 @@ declare namespace Cloudflare {
 		GRAFANA_CONTAINER: DurableObjectNamespace<import('./src/worker').GrafanaContainer>;
 	}
 }
+interface SecretsStoreSecret {
+	get(): Promise<string>;
+}
 interface Env extends Cloudflare.Env {}

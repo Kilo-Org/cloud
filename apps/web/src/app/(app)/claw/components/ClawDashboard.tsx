@@ -16,7 +16,6 @@ import { ClawHeader } from './ClawHeader';
 import { CreateInstanceCard } from './CreateInstanceCard';
 import { InstanceControls } from './InstanceControls';
 import { InstanceTab } from './InstanceTab';
-import { OpenClawButton } from './OpenClawButton';
 import { ChangelogTab } from './ChangelogTab';
 import { SubscriptionTab } from './SubscriptionTab';
 import { ChannelPairingStep } from './ChannelPairingStep';
@@ -326,13 +325,20 @@ function ClawDashboardInner({
                 </div>
               )}
               <div className="flex w-full flex-col gap-3">
-                <OpenClawButton
-                  canShow={gatewayStatus?.state === 'running'}
-                  gatewayUrl={gatewayUrl}
-                  look="hero"
-                  label="Open KiloClaw"
-                  className="w-full py-6 text-base"
-                />
+                {gatewayStatus?.state === 'running' && (
+                  <Button
+                    variant="primary"
+                    className="w-full min-w-[180px] bg-emerald-600 py-6 text-base text-white hover:bg-emerald-700"
+                    onClick={() => {
+                      const base = organizationId
+                        ? `/organizations/${organizationId}/claw`
+                        : '/claw';
+                      window.location.href = `${base}/chat`;
+                    }}
+                  >
+                    Open KiloClaw
+                  </Button>
+                )}
                 <Button
                   className="w-full py-6 text-base"
                   variant="outline"

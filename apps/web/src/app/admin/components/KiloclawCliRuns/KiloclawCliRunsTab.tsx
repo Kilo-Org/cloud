@@ -194,7 +194,10 @@ export function CliRunsTab() {
                   <span className="truncate font-mono text-xs">
                     {run.user_email ?? run.user_id}
                     {run.initiated_by === 'admin' && (
-                      <Badge variant="outline" className="ml-1.5 border-purple-500/30 text-purple-400">
+                      <Badge
+                        variant="outline"
+                        className="ml-1.5 border-purple-500/30 text-purple-400"
+                      >
                         Admin
                       </Badge>
                     )}

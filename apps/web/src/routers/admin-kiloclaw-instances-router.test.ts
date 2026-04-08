@@ -2,7 +2,11 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { kiloclaw_admin_audit_logs, kiloclaw_cli_runs, kiloclaw_instances } from '@kilocode/db/schema';
+import {
+  kiloclaw_admin_audit_logs,
+  kiloclaw_cli_runs,
+  kiloclaw_instances,
+} from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

@@ -72,7 +72,9 @@ export function shouldPersistCliRunControllerStatus(
     : Number.NaN;
   const rowStartedAtMs = row.started_at ? Date.parse(row.started_at) : Number.NaN;
 
-  return Number.isFinite(controllerStartedAtMs) &&
+  return (
+    Number.isFinite(controllerStartedAtMs) &&
     Number.isFinite(rowStartedAtMs) &&
-    controllerStartedAtMs === rowStartedAtMs;
+    controllerStartedAtMs === rowStartedAtMs
+  );
 }

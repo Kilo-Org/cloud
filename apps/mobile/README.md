@@ -20,7 +20,7 @@ Generally speaking, you only need a new dev build if making dependency/native ch
 ### iOS
 
 1. add your device to the list of internal devices using `pnpx eas-cli device:create`
-2. follow instructions for how to install the provisioning profile on your device (it may involve a 1hr wait)
+2. install the provisioning profile on your device (it may involve a 1hr wait)
 3. create a new dev build using `pnpm build:ios`
 4. `pnpm start`
 5. open installed app on your phone

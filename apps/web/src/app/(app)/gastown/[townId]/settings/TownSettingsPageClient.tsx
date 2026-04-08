@@ -674,7 +674,10 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                     )}
                   </FieldGroup>
 
-                  <FieldGroup label="Small Model" hint="Lightweight model for titles, summaries, and explore subagent. Defaults to Claude Haiku if not set.">
+                  <FieldGroup
+                    label="Small Model"
+                    hint="Lightweight model for titles, summaries, and explore subagent. Defaults to Claude Haiku if not set."
+                  >
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
                         {modelsError ? (

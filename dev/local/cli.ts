@@ -343,8 +343,9 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
     return;
   }
 
-  const windows = listWindows(sessionName);
-  const runningServices = windows.filter(w => w.name !== 'dashboard');
+  const runningServices = [...services.keys()].filter(
+    name => findServicePane(sessionName, name) !== undefined
+  );
   if (runningServices.length === 0) {
     if (isJson) {
       console.log(JSON.stringify({ session: sessionName, portOffset, services: [] }));
@@ -355,14 +356,15 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   }
 
   const entries: StatusEntry[] = await Promise.all(
-    runningServices.map(async w => {
-      const svc = getService(w.name);
+    runningServices.map(async (name): Promise<StatusEntry> => {
+      const svc = getService(name);
       const port = svc.port;
-      const isUp = port > 0 ? await probePort(port) : false;
+      const isUp = port === 0 || (await probePort(port));
+      const status: ServiceStatus = isUp ? 'up' : 'down';
       return {
-        name: w.name,
+        name,
         port,
-        status: isUp ? 'up' : ('down' as ServiceStatus),
+        status,
         group: svc.group,
       };
     })
@@ -386,6 +388,12 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
 async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> {
   if (!services.has(serviceName)) {
     console.error(`Unknown service: ${serviceName}`);
+    process.exit(1);
+  }
+
+  const svc = getService(serviceName);
+  if (svc.type === 'infra') {
+    console.error(`dev:restart does not support infrastructure service: ${serviceName}`);
     process.exit(1);
   }
 

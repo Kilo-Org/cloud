@@ -24,6 +24,7 @@ const BodySchema = z.object({
   userId: z.string().min(1),
   sandboxId: z.string().min(1),
   instanceId: z.string().uuid().optional(),
+  shouldNotify: z.boolean().optional(),
 });
 
 /** Per-instance email type key. Includes sandboxId to support future multi-instance. */
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   }
 
-  const { userId, sandboxId, instanceId } = parsed.data;
+  const { userId, sandboxId, instanceId, shouldNotify } = parsed.data;
   const emailType = emailTypeKey(sandboxId);
 
   const user = await findUserById(userId);
@@ -79,6 +80,14 @@ export async function POST(req: NextRequest) {
       instanceId: resumeState.instanceId,
       sandboxId,
     });
+  }
+
+  // The controller calls this endpoint on every low-load checkin (for auto-resume
+  // completion above), but only sets shouldNotify=true on the first readiness
+  // detection per DO lifetime. Skip the email when shouldNotify is explicitly false
+  // to avoid sending stale "instance ready" emails to long-running instances.
+  if (shouldNotify === false) {
+    return NextResponse.json({ sent: false, reason: 'not_first_ready' });
   }
 
   // Idempotent: insert-before-send with rollback on failure (matches billing cron pattern).

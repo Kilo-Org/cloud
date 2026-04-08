@@ -3659,7 +3659,7 @@ export const kiloclaw_subscriptions = pgTable(
     destruction_deadline: timestamp({ withTimezone: true, mode: 'string' }),
     auto_resume_requested_at: timestamp({ withTimezone: true, mode: 'string' }),
     auto_resume_retry_after: timestamp({ withTimezone: true, mode: 'string' }),
-    auto_resume_failure_count: integer().notNull().default(0),
+    auto_resume_attempt_count: integer().notNull().default(0),
     auto_top_up_triggered_for_period: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })

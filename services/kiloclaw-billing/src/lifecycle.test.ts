@@ -104,7 +104,7 @@ describe('interrupted auto-resume sweep', () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';
     const { db, updates } = createMockDb([
-      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_failure_count: 0 }],
+      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_attempt_count: 0 }],
       [{ id: instanceId, sandbox_id: sandboxId }],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -132,7 +132,7 @@ describe('interrupted auto-resume sweep', () => {
     expect(updates).toHaveLength(1);
     expect(updates[0]).toEqual(
       expect.objectContaining({
-        auto_resume_failure_count: 1,
+        auto_resume_attempt_count: 1,
       })
     );
     expect(updates[0].auto_resume_requested_at).toEqual(expect.any(String));
@@ -145,7 +145,7 @@ describe('interrupted auto-resume sweep', () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const sandboxId = 'ki_11111111111141118111111111111111';
     const { db, updates } = createMockDb([
-      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_failure_count: 1 }],
+      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_attempt_count: 1 }],
       [{ id: instanceId, sandbox_id: sandboxId }],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -171,7 +171,7 @@ describe('interrupted auto-resume sweep', () => {
     expect(updates).toHaveLength(1);
     expect(updates[0]).toEqual(
       expect.objectContaining({
-        auto_resume_failure_count: 2,
+        auto_resume_attempt_count: 2,
       })
     );
     expect(updates[0].auto_resume_requested_at).toEqual(expect.any(String));
@@ -183,7 +183,7 @@ describe('interrupted auto-resume sweep', () => {
   it('clears stale suspension state when no active instance remains', async () => {
     const instanceId = '11111111-1111-4111-8111-111111111111';
     const { db, updates, txUpdates, txDeletes } = createMockDb([
-      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_failure_count: 1 }],
+      [{ user_id: 'user-1', instance_id: instanceId, auto_resume_attempt_count: 1 }],
       [],
     ]);
     mockGetWorkerDb.mockReturnValue(db);
@@ -209,7 +209,7 @@ describe('interrupted auto-resume sweep', () => {
         destruction_deadline: null,
         auto_resume_requested_at: null,
         auto_resume_retry_after: null,
-        auto_resume_failure_count: 0,
+        auto_resume_attempt_count: 0,
       },
     ]);
   });

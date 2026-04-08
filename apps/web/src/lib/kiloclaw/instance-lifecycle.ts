@@ -75,7 +75,7 @@ async function clearAutoResumeState(
         destruction_deadline: null,
         auto_resume_requested_at: null,
         auto_resume_retry_after: null,
-        auto_resume_failure_count: 0,
+        auto_resume_attempt_count: 0,
       })
       .where(subscriptionFilter);
   });
@@ -137,7 +137,7 @@ export async function autoResumeIfSuspended(
   }
 
   const [subscription] = await db
-    .select({ auto_resume_failure_count: kiloclaw_subscriptions.auto_resume_failure_count })
+    .select({ auto_resume_attempt_count: kiloclaw_subscriptions.auto_resume_attempt_count })
     .from(kiloclaw_subscriptions)
     .where(
       and(
@@ -147,10 +147,10 @@ export async function autoResumeIfSuspended(
     )
     .limit(1);
 
-  const nextFailureCount = (subscription?.auto_resume_failure_count ?? 0) + 1;
+  const nextAttemptCount = (subscription?.auto_resume_attempt_count ?? 0) + 1;
   const requestedAtIso = new Date().toISOString();
   const retryAfterIso = new Date(
-    Date.now() + getAutoResumeBackoffMs(subscription?.auto_resume_failure_count ?? 0)
+    Date.now() + getAutoResumeBackoffMs(subscription?.auto_resume_attempt_count ?? 0)
   ).toISOString();
 
   try {
@@ -162,7 +162,7 @@ export async function autoResumeIfSuspended(
       .set({
         auto_resume_requested_at: requestedAtIso,
         auto_resume_retry_after: retryAfterIso,
-        auto_resume_failure_count: nextFailureCount,
+        auto_resume_attempt_count: nextAttemptCount,
       })
       .where(
         and(
@@ -174,7 +174,7 @@ export async function autoResumeIfSuspended(
       user_id: kiloUserId,
       instance_id: targetInstance.id,
       retry_after: retryAfterIso,
-      auto_resume_failure_count: nextFailureCount,
+      auto_resume_attempt_count: nextAttemptCount,
       error: startError instanceof Error ? startError.message : String(startError),
     });
     return;
@@ -185,7 +185,7 @@ export async function autoResumeIfSuspended(
     .set({
       auto_resume_requested_at: requestedAtIso,
       auto_resume_retry_after: retryAfterIso,
-      auto_resume_failure_count: nextFailureCount,
+      auto_resume_attempt_count: nextAttemptCount,
     })
     .where(
       and(
@@ -198,7 +198,7 @@ export async function autoResumeIfSuspended(
     user_id: kiloUserId,
     instance_id: targetInstance.id,
     retry_after: retryAfterIso,
-    auto_resume_failure_count: nextFailureCount,
+    auto_resume_attempt_count: nextAttemptCount,
   });
 }
 
@@ -223,7 +223,7 @@ export async function completeAutoResumeIfReady(
       suspended_at: kiloclaw_subscriptions.suspended_at,
       auto_resume_requested_at: kiloclaw_subscriptions.auto_resume_requested_at,
       auto_resume_retry_after: kiloclaw_subscriptions.auto_resume_retry_after,
-      auto_resume_failure_count: kiloclaw_subscriptions.auto_resume_failure_count,
+      auto_resume_attempt_count: kiloclaw_subscriptions.auto_resume_attempt_count,
     })
     .from(kiloclaw_subscriptions)
     .where(
@@ -238,7 +238,7 @@ export async function completeAutoResumeIfReady(
     subscription?.suspended_at ||
     subscription?.auto_resume_requested_at ||
     subscription?.auto_resume_retry_after ||
-    (subscription?.auto_resume_failure_count ?? 0) > 0
+    (subscription?.auto_resume_attempt_count ?? 0) > 0
   );
 
   if (!hadPendingResume) {

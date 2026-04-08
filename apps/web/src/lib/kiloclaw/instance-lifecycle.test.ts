@@ -103,7 +103,7 @@ describe('instance lifecycle async resume', () => {
     const sandboxId = 'ki_11111111111141118111111111111111';
     selectResultsQueue.push(
       [{ id: instanceId, sandbox_id: sandboxId }],
-      [{ auto_resume_failure_count: 0 }]
+      [{ auto_resume_attempt_count: 0 }]
     );
     startAsyncMock.mockResolvedValueOnce({ ok: true });
 
@@ -113,7 +113,7 @@ describe('instance lifecycle async resume', () => {
     expect(updateSetCalls).toHaveLength(1);
     expect(updateSetCalls[0]).toEqual(
       expect.objectContaining({
-        auto_resume_failure_count: 1,
+        auto_resume_attempt_count: 1,
       })
     );
     expect(updateSetCalls[0].auto_resume_requested_at).toEqual(expect.any(String));
@@ -138,7 +138,7 @@ describe('instance lifecycle async resume', () => {
         destruction_deadline: null,
         auto_resume_requested_at: null,
         auto_resume_retry_after: null,
-        auto_resume_failure_count: 0,
+        auto_resume_attempt_count: 0,
       },
     ]);
   });
@@ -153,7 +153,7 @@ describe('instance lifecycle async resume', () => {
           suspended_at: '2026-04-07T20:00:00.000Z',
           auto_resume_requested_at: '2026-04-07T20:05:00.000Z',
           auto_resume_retry_after: '2026-04-07T22:05:00.000Z',
-          auto_resume_failure_count: 2,
+          auto_resume_attempt_count: 2,
         },
       ]
     );
@@ -169,7 +169,7 @@ describe('instance lifecycle async resume', () => {
       destruction_deadline: null,
       auto_resume_requested_at: null,
       auto_resume_retry_after: null,
-      auto_resume_failure_count: 0,
+      auto_resume_attempt_count: 0,
     });
   });
 
@@ -189,7 +189,7 @@ describe('instance lifecycle async resume', () => {
         destruction_deadline: null,
         auto_resume_requested_at: null,
         auto_resume_retry_after: null,
-        auto_resume_failure_count: 0,
+        auto_resume_attempt_count: 0,
       },
     ]);
   });
@@ -204,7 +204,7 @@ describe('instance lifecycle async resume', () => {
           suspended_at: null,
           auto_resume_requested_at: null,
           auto_resume_retry_after: null,
-          auto_resume_failure_count: 0,
+          auto_resume_attempt_count: 0,
         },
       ]
     );

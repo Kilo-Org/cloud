@@ -89,7 +89,7 @@ type CreditRenewalRow = {
   commit_ends_at: string | null;
   past_due_since: string | null;
   suspended_at: string | null;
-  auto_resume_failure_count: number;
+  auto_resume_attempt_count: number;
   auto_top_up_triggered_for_period: string | null;
   total_microdollars_acquired: number;
   microdollars_used: number;
@@ -124,7 +124,7 @@ type BillingEntityFields = {
 type InterruptedAutoResumeRow = {
   user_id: string;
   instance_id: string | null;
-  auto_resume_failure_count: number;
+  auto_resume_attempt_count: number;
 };
 
 type SweepExecutionContext = BillingCorrelationContext & {
@@ -260,7 +260,7 @@ async function markAutoResumeRequested(
     instanceId?: string;
     requestedAtIso: string;
     retryAfterIso: string;
-    failureCount: number;
+    attemptCount: number;
   }
 ): Promise<void> {
   const subscriptionFilter = params.instanceId
@@ -275,7 +275,7 @@ async function markAutoResumeRequested(
     .set({
       auto_resume_requested_at: params.requestedAtIso,
       auto_resume_retry_after: params.retryAfterIso,
-      auto_resume_failure_count: params.failureCount,
+      auto_resume_attempt_count: params.attemptCount,
     })
     .where(subscriptionFilter);
 }
@@ -320,7 +320,7 @@ async function clearAutoResumeState(
         destruction_deadline: null,
         auto_resume_requested_at: null,
         auto_resume_retry_after: null,
-        auto_resume_failure_count: 0,
+        auto_resume_attempt_count: 0,
       })
       .where(subscriptionFilter);
   });
@@ -717,9 +717,9 @@ async function autoResumeIfSuspended(
     .limit(1);
 
   const nowIso = new Date().toISOString();
-  const nextFailureCount = row.auto_resume_failure_count + 1;
+  const nextAttemptCount = row.auto_resume_attempt_count + 1;
   const retryAfterIso = new Date(
-    Date.now() + getAutoResumeBackoffMs(row.auto_resume_failure_count)
+    Date.now() + getAutoResumeBackoffMs(row.auto_resume_attempt_count)
   ).toISOString();
   const resolvedInstanceId = targetInstance?.id ?? row.instance_id ?? undefined;
 
@@ -746,7 +746,7 @@ async function autoResumeIfSuspended(
       instanceId: resolvedInstanceId,
       requestedAtIso: nowIso,
       retryAfterIso,
-      failureCount: nextFailureCount,
+      attemptCount: nextAttemptCount,
     });
     log('error', 'Failed to request async auto-resume', {
       event: 'resume_request_failed',
@@ -754,7 +754,7 @@ async function autoResumeIfSuspended(
       userId: row.user_id,
       instanceId: resolvedInstanceId,
       retryAfter: retryAfterIso,
-      autoResumeFailureCount: nextFailureCount,
+      autoResumeAttemptCount: nextAttemptCount,
       error: errorMessage(error),
     });
     throw error;
@@ -765,7 +765,7 @@ async function autoResumeIfSuspended(
     instanceId: resolvedInstanceId,
     requestedAtIso: nowIso,
     retryAfterIso,
-    failureCount: nextFailureCount,
+    attemptCount: nextAttemptCount,
   });
   log('info', 'Requested async auto-resume', {
     event: 'resume_requested',
@@ -773,7 +773,7 @@ async function autoResumeIfSuspended(
     userId: row.user_id,
     instanceId: resolvedInstanceId,
     retryAfter: retryAfterIso,
-    autoResumeFailureCount: nextFailureCount,
+    autoResumeAttemptCount: nextAttemptCount,
   });
   return true;
 }
@@ -934,7 +934,7 @@ async function processCreditRenewalRow(
       await autoResumeIfSuspended(env, database, context, {
         user_id: userId,
         instance_id: row.instance_id,
-        auto_resume_failure_count: row.auto_resume_failure_count,
+        auto_resume_attempt_count: row.auto_resume_attempt_count,
       });
     }
 
@@ -1014,7 +1014,7 @@ async function runCreditRenewalSweep(
       commit_ends_at: kiloclaw_subscriptions.commit_ends_at,
       past_due_since: kiloclaw_subscriptions.past_due_since,
       suspended_at: kiloclaw_subscriptions.suspended_at,
-      auto_resume_failure_count: kiloclaw_subscriptions.auto_resume_failure_count,
+      auto_resume_attempt_count: kiloclaw_subscriptions.auto_resume_attempt_count,
       auto_top_up_triggered_for_period: kiloclaw_subscriptions.auto_top_up_triggered_for_period,
       total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
       microdollars_used: kilocode_users.microdollars_used,
@@ -1058,7 +1058,7 @@ async function runInterruptedAutoResumeSweep(
     .select({
       user_id: kiloclaw_subscriptions.user_id,
       instance_id: kiloclaw_subscriptions.instance_id,
-      auto_resume_failure_count: kiloclaw_subscriptions.auto_resume_failure_count,
+      auto_resume_attempt_count: kiloclaw_subscriptions.auto_resume_attempt_count,
     })
     .from(kiloclaw_subscriptions)
     .where(

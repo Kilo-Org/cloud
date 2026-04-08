@@ -1255,9 +1255,12 @@ export function reconcileReviewQueue(
             [rig_id]
           ),
         ]);
-      // Also count fast-tracked beads (in in_progress with non-empty pr_url)
-      const blockingCount = blockingInProgressMrs.length + fastTrackedBeadIds.size;
-      if (blockingCount > 0) continue;
+        const thisRigFastTracked = fastTrackedBeadIds.filter(id => {
+          const mr = mrBeads.find(m => m.bead_id === id);
+          return mr?.rig_id === rig_id;
+        });
+        const blockingCount = blockingInProgressMrs.length + thisRigFastTracked.length;
+        if (blockingCount > 0) continue;
 
       // Check if the refinery for this rig is idle and unhooked
       const refinery = AgentRow.array().parse([

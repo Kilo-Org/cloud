@@ -47,7 +47,6 @@ function makeEnv(options?: {
     botVibe: 'Dry wit',
     botEmoji: '🤖',
   });
-  const recordDiskStats = vi.fn().mockResolvedValue(undefined);
   const tryMarkInstanceReady =
     options?.tryMarkInstanceReady ??
     vi.fn().mockResolvedValue({ shouldNotify: false, userId: null });
@@ -58,7 +57,7 @@ function makeEnv(options?: {
     INTERNAL_API_SECRET: options?.internalApiSecret,
     KILOCLAW_INSTANCE: {
       idFromName: (userId: string) => userId,
-      get: () => ({ getConfig, getStatus, recordDiskStats, tryMarkInstanceReady }),
+      get: () => ({ getConfig, getStatus, tryMarkInstanceReady }),
     },
     KILOCLAW_CONTROLLER_AE: options?.writeDataPoint
       ? {
@@ -160,6 +159,49 @@ describe('POST /checkin', () => {
 
     expect(response.status).toBe(204);
     expect(writeDataPoint).toHaveBeenCalledTimes(1);
+
+    const call = writeDataPoint.mock.calls[0][0];
+    expect(call.doubles).toHaveLength(8);
+    expect(call.doubles[6]).toBe(-1);
+    expect(call.doubles[7]).toBe(-1);
+  });
+
+  it('writes disk usage doubles when disk stats are present', async () => {
+    const writeDataPoint = vi.fn();
+    const env = makeEnv({ writeDataPoint });
+    const headers = await makeAuthHeaders();
+
+    const response = await controller.request(
+      '/checkin',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(makeBody({ diskUsedBytes: 1024000, diskTotalBytes: 5368709120 })),
+      },
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(writeDataPoint).toHaveBeenCalledTimes(1);
+
+    const call = writeDataPoint.mock.calls[0][0];
+    expect(call.doubles).toHaveLength(8);
+    expect(call.doubles[6]).toBe(1024000);
+    expect(call.doubles[7]).toBe(5368709120);
+  });
+
+  it('still returns 204 when AE write throws', async () => {
+    const writeDataPoint = vi.fn().mockRejectedValue(new Error('AE error'));
+    const env = makeEnv({ writeDataPoint });
+    const headers = await makeAuthHeaders();
+
+    const response = await controller.request(
+      '/checkin',
+      { method: 'POST', headers, body: JSON.stringify(makeBody()) },
+      env
+    );
+
+    expect(response.status).toBe(204);
   });
 
   it('does not call PostHog when productTelemetry is absent', async () => {

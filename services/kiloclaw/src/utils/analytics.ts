@@ -100,7 +100,10 @@ export type KiloClawEventData = {
  * Best-effort: never throws.
  */
 export function writeEvent(
-  env: { KILOCLAW_AE?: AnalyticsEngineDataset; KILOCLAW_EVENTS_STREAM?: { send(r: Record<string, unknown>[]): Promise<void> } },
+  env: {
+    KILOCLAW_AE?: AnalyticsEngineDataset;
+    KILOCLAW_EVENTS_STREAM?: { send(r: Record<string, unknown>[]): Promise<void> };
+  },
   data: KiloClawEventData
 ): void {
   if (!env.KILOCLAW_AE) return;

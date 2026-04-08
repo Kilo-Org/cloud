@@ -320,6 +320,13 @@ const patchChannelsSchema = z.object({
   slackAppToken: z.string().nullable().optional(),
 });
 
+const patchBotIdentitySchema = z.object({
+  botName: z.string().trim().min(1).max(80).nullable().optional(),
+  botNature: z.string().trim().min(1).max(120).nullable().optional(),
+  botVibe: z.string().trim().min(1).max(120).nullable().optional(),
+  botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
+});
+
 /**
  * Build the worker provision payload from plaintext channel tokens.
  * The worker expects the flat encrypted envelope shape for channels.
@@ -1587,6 +1594,14 @@ export const kiloclawRouter = createTRPCRouter({
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       return client.patchExecPreset(ctx.user.id, input, workerInstanceId(instance));
+    }),
+
+  patchBotIdentity: clawAccessProcedure
+    .input(patchBotIdentitySchema)
+    .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+      const client = new KiloClawInternalClient();
+      return client.patchBotIdentity(ctx.user.id, input, workerInstanceId(instance));
     }),
 
   /**

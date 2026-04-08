@@ -505,6 +505,14 @@ const ExecPresetPatchSchema = z.object({
   ask: z.string().optional(),
 });
 
+const BotIdentityPatchSchema = z.object({
+  userId: z.string().min(1),
+  botName: z.string().trim().min(1).max(80).nullable().optional(),
+  botNature: z.string().trim().min(1).max(120).nullable().optional(),
+  botVibe: z.string().trim().min(1).max(120).nullable().optional(),
+  botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
+});
+
 platform.patch('/exec-preset', async c => {
   const result = await parseBody(c, ExecPresetPatchSchema);
   if ('error' in result) return result.error;
@@ -523,6 +531,28 @@ platform.patch('/exec-preset', async c => {
     return c.json(updated, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'exec-preset patch');
+    return jsonError(message, status);
+  }
+});
+
+platform.patch('/bot-identity', async c => {
+  const result = await parseBody(c, BotIdentityPatchSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, botName, botNature, botVibe, botEmoji } = result.data;
+
+  try {
+    const updated = await withDORetry(
+      instanceStubFactory(c.env, userId, iidResult.instanceId),
+      stub => stub.updateBotIdentity({ botName, botNature, botVibe, botEmoji }),
+      'updateBotIdentity'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'bot-identity patch');
     return jsonError(message, status);
   }
 });

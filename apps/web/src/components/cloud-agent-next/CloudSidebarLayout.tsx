@@ -43,9 +43,12 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
   const projectFilterKey = `cloud-sessions:project-filter:${organizationId ?? 'personal'}`;
   const [platformFilter, setPlatformFilter] = useLocalStorage<string[]>(
     'cloud-sessions:platform-filter',
-    ['cloud-agent']
+    ['cloud-agent'],
+    { initializeWithValue: false }
   );
-  const [projectFilter, setProjectFilter] = useLocalStorage<string[]>(projectFilterKey, []);
+  const [projectFilter, setProjectFilter] = useLocalStorage<string[]>(projectFilterKey, [], {
+    initializeWithValue: false,
+  });
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 30)).toISOString(), []);
 

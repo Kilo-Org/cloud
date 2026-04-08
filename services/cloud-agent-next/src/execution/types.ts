@@ -138,6 +138,7 @@ type InitiateExecutionRequest = BaseExecutionRequest & {
 type InitiatePreparedRequest = BaseExecutionRequest & {
   kind: 'initiatePrepared';
   authToken?: string;
+  messageId?: string;
 };
 
 /**
@@ -151,6 +152,7 @@ type FollowupExecutionRequest = BaseExecutionRequest & {
   variant?: string;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
+  messageId?: string;
   tokenOverrides?: {
     githubToken?: string;
     gitToken?: string;
@@ -340,6 +342,8 @@ export type ExecutionPlan = {
   wrapper: WrapperPlan;
   /** Optional image attachments */
   images?: Images;
+  /** Optional message ID for correlating the request */
+  messageId?: string;
 };
 
 // ---------------------------------------------------------------------------

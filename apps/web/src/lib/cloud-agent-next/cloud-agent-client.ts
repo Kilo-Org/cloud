@@ -130,6 +130,8 @@ export type SendMessageInput = {
   condenseOnComplete?: boolean;
   /** Custom text to append to the system prompt */
   appendSystemPrompt?: string;
+  /** Message ID for correlating the request */
+  messageId?: string;
 };
 
 /** Output from V2 mutation procedures (WebSocket-based) */
@@ -199,6 +201,9 @@ export type GetSessionOutput = {
 
   // Callback configuration (debug-friendly, URL + headers)
   callbackTarget?: CallbackTarget;
+
+  // Initial message ID for correlation
+  initialMessageId?: string;
 
   // Versioning
   timestamp: number;

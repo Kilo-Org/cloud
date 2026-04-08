@@ -96,6 +96,7 @@ export async function ensureContainerToken(
   // Store for next boot
   try {
     await container.setEnvVar('GASTOWN_CONTAINER_TOKEN', token);
+    await container.setEnvVar('GASTOWN_TOWN_ID', townId);
   } catch (err) {
     console.warn(
       `${TOWN_LOG} ensureContainerToken: setEnvVar failed (container may not be running):`,
@@ -161,6 +162,7 @@ export async function forceRefreshContainerToken(
   // Store for next boot (best-effort — the critical step is the live push below)
   try {
     await container.setEnvVar('GASTOWN_CONTAINER_TOKEN', token);
+    await container.setEnvVar('GASTOWN_TOWN_ID', townId);
   } catch (err) {
     console.warn(
       `${TOWN_LOG} forceRefreshContainerToken: setEnvVar failed:`,

@@ -110,11 +110,16 @@ function InlineFileAttachment({ part }: { part: FilePart }) {
 }
 
 /**
- * Get user content by combining all text parts
+ * Get user content by combining all text parts.
+ * Prefers non-synthetic parts (server-confirmed) over synthetic ones
+ * (optimistic placeholders) to avoid duplication when both coexist.
+ * Only uses non-synthetic parts if they have non-empty text.
  */
 function getUserTextContent(parts: Part[]): string {
   const textParts = parts.filter(isTextPart);
-  return stripImageContext(textParts.map(p => p.text).join(''));
+  const nonSynthetic = textParts.filter(p => !p.synthetic && p.text.length > 0);
+  const effective = nonSynthetic.length > 0 ? nonSynthetic : textParts;
+  return stripImageContext(effective.map(p => p.text).join(''));
 }
 
 /**

@@ -405,7 +405,8 @@ async function requestKiloClaw<T>(
   context: SweepExecutionContext,
   path: string,
   init?: RequestInit,
-  entityFields: BillingEntityFields = {}
+  entityFields: BillingEntityFields = {},
+  options: { handledErrorStatuses?: readonly number[] } = {}
 ): Promise<T> {
   if (!env.KILOCLAW_INTERNAL_API_SECRET) {
     throw new Error('KILOCLAW_INTERNAL_API_SECRET is not configured');
@@ -447,15 +448,19 @@ async function requestKiloClaw<T>(
       const durationMs = performance.now() - startedAt;
       if (!response.ok) {
         const responseBody = await response.text();
-        log('error', 'Kiloclaw platform call failed', {
-          event: 'downstream_call',
-          outcome: 'failed',
-          action: init?.method ?? 'GET',
-          path,
-          statusCode: response.status,
-          durationMs,
-          ...entityFields,
-        });
+        const isHandledErrorStatus =
+          options.handledErrorStatuses?.includes(response.status) ?? false;
+        if (!isHandledErrorStatus) {
+          log('error', 'Kiloclaw platform call failed', {
+            event: 'downstream_call',
+            outcome: 'failed',
+            action: init?.method ?? 'GET',
+            path,
+            statusCode: response.status,
+            durationMs,
+            ...entityFields,
+          });
+        }
         throw new KiloClawApiError(response.status, responseBody);
       }
 
@@ -509,16 +514,36 @@ async function destroyInstance(
   instanceId?: string
 ): Promise<void> {
   const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
-  await requestKiloClaw<{ ok: true }>(
-    env,
-    context,
-    `/api/platform/destroy${params}`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ userId }),
-    },
-    { userId, instanceId }
-  );
+  const path = `/api/platform/destroy${params}`;
+  try {
+    await requestKiloClaw<{ ok: true }>(
+      env,
+      context,
+      path,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId, instanceId },
+      { handledErrorStatuses: [404] }
+    );
+  } catch (error) {
+    if (error instanceof KiloClawApiError && error.statusCode === 404) {
+      log('info', 'KiloClaw instance already gone during billing destroy', {
+        event: 'downstream_call',
+        outcome: 'completed',
+        action: 'POST',
+        path,
+        statusCode: 404,
+        idempotent: true,
+        userId,
+        instanceId,
+      });
+      return;
+    }
+
+    throw error;
+  }
 }
 
 async function trySendEmail(
@@ -1136,8 +1161,7 @@ async function destroyInstanceForEnforcement(
       workerInstanceId({ id: row.instance_id, sandbox_id: row.sandbox_id })
     );
   } catch (error) {
-    const isExpected =
-      error instanceof KiloClawApiError && (error.statusCode === 404 || error.statusCode === 409);
+    const isExpected = error instanceof KiloClawApiError && error.statusCode === 409;
     log(isExpected ? 'info' : 'error', 'Destroy instance during billing enforcement failed', {
       userId: row.user_id,
       instanceId: row.instance_id,

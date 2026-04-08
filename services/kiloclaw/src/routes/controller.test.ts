@@ -42,6 +42,10 @@ function makeEnv(options?: {
   });
   const getStatus = vi.fn().mockResolvedValue({
     userId: 'user-1',
+    botName: 'Milo',
+    botNature: 'Operations copilot',
+    botVibe: 'Dry wit',
+    botEmoji: '🤖',
   });
   const recordDiskStats = vi.fn().mockResolvedValue(undefined);
   const tryMarkInstanceReady =

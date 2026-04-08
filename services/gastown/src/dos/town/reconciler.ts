@@ -611,6 +611,24 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
         type: 'clear_agent_checkpoint',
         agent_id: agent.bead_id,
       });
+    } else if (hookedStatus === 'in_progress' || hookedStatus === 'open') {
+      // Idle agent hooked to a live bead — the dispatch started but the
+      // agent died (container failed to start, OOM, etc.) and agentCompleted
+      // set it to idle without unhooking. Reset the bead to open and unhook
+      // so the scheduling rules can re-dispatch.
+      actions.push({
+        type: 'unhook_agent',
+        agent_id: agent.bead_id,
+        reason: 'idle agent hooked to live bead (dispatch failed)',
+      });
+      actions.push({
+        type: 'transition_bead',
+        bead_id: agent.current_hook_bead_id,
+        from: hookedStatus,
+        to: 'open',
+        reason: 'agent went idle without completing work — reset for re-dispatch',
+        actor: 'system',
+      });
     }
   }
 
@@ -1160,17 +1178,14 @@ export function reconcileReviewQueue(
     }
   }
 
-  // When refinery code review is disabled, fast-track ALL open MR beads
-  // to in_progress so poll_pr handles them once pr_url is populated.
-  // This must include beads without pr_url yet (timing window between
-  // review_submitted and the polecat setting pr_url) to prevent Rules 5-6
-  // from dispatching the refinery for a code review that shouldn't happen.
-  //
-  // Direct-merge strategy MR beads (no pr_url, refinery merges itself)
-  // still need the refinery — but those are only created when
-  // merge_strategy='direct', which inherently requires the refinery.
+  // When refinery code review is disabled:
+  //  - MR beads WITH pr_url → fast-track to in_progress for poll_pr
+  //  - MR beads WITHOUT pr_url → fail them and reopen the source bead
+  //    (the polecat was supposed to create the PR via merge_strategy=pr
+  //    but didn't provide one — retry the source bead)
   if (!refineryCodeReview) {
-    const openMrs = z
+    // Fast-track: open MR beads with pr_url → in_progress
+    const openMrsWithPr = z
       .object({ bead_id: z.string() })
       .array()
       .parse([
@@ -1179,13 +1194,24 @@ export function reconcileReviewQueue(
           /* sql */ `
             SELECT b.${beads.columns.bead_id}
             FROM ${beads} b
+            JOIN ${review_metadata} rm
+              ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
             WHERE b.${beads.columns.type} = 'merge_request'
               AND b.${beads.columns.status} = 'open'
+              AND rm.${review_metadata.columns.pr_url} IS NOT NULL
+              AND NOT EXISTS (
+                SELECT 1
+                FROM ${beads} parent
+                JOIN ${convoy_metadata} cm
+                  ON cm.${convoy_metadata.columns.bead_id} = parent.${beads.columns.bead_id}
+                WHERE parent.${beads.columns.bead_id} = b.${beads.columns.parent_bead_id}
+                  AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
+              )
           `,
           []
         ),
       ]);
-    for (const { bead_id } of openMrs) {
+    for (const { bead_id } of openMrsWithPr) {
       actions.push({
         type: 'transition_bead',
         bead_id,
@@ -1195,16 +1221,88 @@ export function reconcileReviewQueue(
         actor: 'system',
       });
     }
+
+    // Orphan cleanup: open MR beads without pr_url that aren't convoy
+    // review-and-merge beads. The polecat should have created the PR
+    // (merge_strategy=pr) but didn't — fail the MR and reopen the
+    // source bead so another polecat can retry.
+    const orphanedMrs = z
+      .object({ bead_id: z.string(), source_bead_id: z.string().nullable() })
+      .array()
+      .parse([
+        ...query(
+          sql,
+          /* sql */ `
+            SELECT b.${beads.columns.bead_id},
+                   bd.${bead_dependencies.columns.depends_on_bead_id} AS source_bead_id
+            FROM ${beads} b
+            JOIN ${review_metadata} rm
+              ON rm.${review_metadata.columns.bead_id} = b.${beads.columns.bead_id}
+            LEFT JOIN ${bead_dependencies} bd
+              ON bd.${bead_dependencies.columns.bead_id} = b.${beads.columns.bead_id}
+              AND bd.${bead_dependencies.columns.dependency_type} = 'tracks'
+            WHERE b.${beads.columns.type} = 'merge_request'
+              AND b.${beads.columns.status} = 'open'
+              AND rm.${review_metadata.columns.pr_url} IS NULL
+              AND NOT EXISTS (
+                SELECT 1
+                FROM ${beads} parent
+                JOIN ${convoy_metadata} cm
+                  ON cm.${convoy_metadata.columns.bead_id} = parent.${beads.columns.bead_id}
+                WHERE parent.${beads.columns.bead_id} = b.${beads.columns.parent_bead_id}
+                  AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
+              )
+          `,
+          []
+        ),
+      ]);
+    for (const { bead_id, source_bead_id } of orphanedMrs) {
+      actions.push({
+        type: 'transition_bead',
+        bead_id,
+        from: 'open',
+        to: 'failed',
+        reason: 'MR bead has no pr_url and code review is disabled — polecat failed to create PR',
+        actor: 'system',
+      });
+      if (source_bead_id) {
+        actions.push({
+          type: 'transition_bead',
+          bead_id: source_bead_id,
+          from: 'in_review',
+          to: 'open',
+          reason: 'MR failed (no PR created) — reopening for retry',
+          actor: 'system',
+        });
+      }
+    }
   }
 
   // Rules 5-6: Refinery dispatch for open MR beads.
-  // Always runs for direct-merge MR beads (refinery performs the merge).
-  // When code_review=false AND merge_strategy=pr, MR beads with pr_url
-  // were fast-tracked above, so only direct-merge MR beads remain for
-  // Rules 5-6.
+  // When code_review=true: dispatches for all open MR beads.
+  // When code_review=false: only dispatches for convoy review-and-merge
+  // MR beads (the fast-track above already moved ordinary MR beads to
+  // in_progress as actions, but those haven't been applied to SQL yet —
+  // so we must filter here to avoid re-dispatching them).
   {
     // Rule 5: Pop open MR bead for idle refinery
-    // Get all rigs that have open MR beads
+    // Get all rigs that have open MR beads needing the refinery.
+    // When code_review=false, only dispatch the refinery for convoy
+    // review-and-merge MR beads (refinery does combined review+merge).
+    // MR beads WITH a pr_url are handled by the fast-track → poll_pr.
+    // MR beads WITHOUT a pr_url when merge_strategy=pr are orphaned
+    // (polecat should have created the PR) — Rule 2 handles them.
+    const refineryNeededFilter = refineryCodeReview
+      ? ''
+      : /* sql */ `
+          AND EXISTS (
+            SELECT 1
+            FROM ${beads} parent
+            JOIN ${convoy_metadata} cm
+              ON cm.${convoy_metadata.columns.bead_id} = parent.${beads.columns.bead_id}
+            WHERE parent.${beads.columns.bead_id} = b.${beads.columns.parent_bead_id}
+              AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
+          )`;
     const rigsWithOpenMrs = z
       .object({ rig_id: z.string() })
       .array()
@@ -1217,6 +1315,7 @@ export function reconcileReviewQueue(
         WHERE b.${beads.columns.type} = 'merge_request'
           AND b.${beads.columns.status} = 'open'
           AND b.${beads.columns.rig_id} IS NOT NULL
+          ${refineryNeededFilter}
       `,
           []
         ),
@@ -1267,7 +1366,7 @@ export function reconcileReviewQueue(
         ),
       ]);
 
-      // Get oldest open MR for this rig
+      // Get oldest open MR for this rig (filtered by convoy when code_review=false)
       const oldestMr = z
         .object({ bead_id: z.string() })
         .array()
@@ -1276,11 +1375,12 @@ export function reconcileReviewQueue(
             sql,
             /* sql */ `
           SELECT ${beads.bead_id}
-          FROM ${beads}
-          WHERE ${beads.type} = 'merge_request'
-            AND ${beads.status} = 'open'
-            AND ${beads.rig_id} = ?
-          ORDER BY ${beads.columns.created_at} ASC
+          FROM ${beads} b
+          WHERE b.${beads.columns.type} = 'merge_request'
+            AND b.${beads.columns.status} = 'open'
+            AND b.${beads.columns.rig_id} = ?
+            ${refineryNeededFilter}
+          ORDER BY b.${beads.columns.created_at} ASC
           LIMIT 1
         `,
             [rig_id]
@@ -1434,7 +1534,7 @@ export function reconcileReviewQueue(
         rig_id: mr.rig_id ?? ref.rig_id ?? '',
       });
     }
-  } // end refineryCodeReview gate (Rules 5–6)
+  } // end Rules 5–6 block
 
   // Rule 7: Working refinery hooked to a terminal MR bead — stop it.
   // This catches the race where auto-merge closes the MR bead while the

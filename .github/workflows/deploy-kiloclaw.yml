@@ -12,6 +12,11 @@ jobs:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     name: Deploy KiloClaw
+    outputs:
+      image-tag: ${{ steps.image-hash.outputs.tag }}
+      image-hash: ${{ steps.image-hash.outputs.hash }}
+      image-digest: ${{ steps.image-digest.outputs.digest }}
+      openclaw-version: ${{ steps.openclaw-version.outputs.version }}
 
     steps:
       - name: Checkout code
@@ -226,3 +231,92 @@ jobs:
                 }
               ]
             }
+
+  # ── Push prod image to dev registry ───────────────────────────
+  # Runs after the production deploy completes. Copies the prod image
+  # to the dev Fly registry so dev stays in sync automatically.
+  # continue-on-error ensures a dev push failure never blocks prod.
+  push-dev-image:
+    needs: [deploy]
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    name: Push Dev Image
+    continue-on-error: true
+
+    steps:
+      - name: Setup Docker Buildx
+        uses: useblacksmith/setup-docker-builder@5241b2e9423e8b1fa37ed6050ecb62d0fb9a4e38 # v1.6.0
+
+      # Login with prod credentials FIRST to pull the prod image
+      - name: Login to prod Fly Registry
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: registry.fly.io
+          username: x
+          password: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Pull prod image
+        run: |
+          PROD_IMAGE="registry.fly.io/kiloclaw-machines:${{ needs.deploy.outputs.image-tag }}"
+          echo "Pulling prod image: ${PROD_IMAGE}"
+          docker pull "${PROD_IMAGE}"
+
+      # Now switch to dev credentials for pushing
+      - name: Login to dev Fly Registry
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: registry.fly.io
+          username: x
+          password: ${{ secrets.FLY_DEV_API_TOKEN }}
+
+      - name: Generate dev image tag
+        id: dev-tag
+        run: |
+          TIMESTAMP=$(date +%s)
+          echo "tag=dev-${TIMESTAMP}" >> "$GITHUB_OUTPUT"
+          echo "Dev tag: dev-${TIMESTAMP}"
+
+      - name: Tag and push to dev registry
+        run: |
+          PROD_IMAGE="registry.fly.io/kiloclaw-machines:${{ needs.deploy.outputs.image-tag }}"
+          DEV_IMAGE="registry.fly.io/kiloclaw-registry-dev:${{ steps.dev-tag.outputs.tag }}"
+          DEV_LATEST="registry.fly.io/kiloclaw-registry-dev:latest"
+
+          echo "Tagging as: ${DEV_IMAGE}"
+          docker tag "${PROD_IMAGE}" "${DEV_IMAGE}"
+
+          echo "Tagging as: ${DEV_LATEST}"
+          docker tag "${PROD_IMAGE}" "${DEV_LATEST}"
+
+          echo "Pushing to dev registry..."
+          docker push "${DEV_IMAGE}"
+          docker push "${DEV_LATEST}"
+
+          echo "✅ Pushed dev image: ${DEV_IMAGE}"
+          echo "✅ Pushed dev latest: ${DEV_LATEST}"
+
+      - name: Write dev .dev.vars summary
+        run: |
+          TAG="${{ steps.dev-tag.outputs.tag }}"
+          DIGEST="${{ needs.deploy.outputs.image-digest }}"
+          OPENCLAW="${{ needs.deploy.outputs.openclaw-version }}"
+          CONTENT="${{ needs.deploy.outputs.image-hash }}"
+
+          {
+            echo ""
+            echo "## .dev.vars entries for KiloClaw worker"
+            echo ""
+            echo "Add or update these in \`services/kiloclaw/.dev.vars\`, then restart wrangler dev:"
+            echo ""
+            echo '```'
+            echo "FLY_IMAGE_TAG=${TAG}"
+            if [ -n "$DIGEST" ]; then
+              echo "FLY_IMAGE_DIGEST=${DIGEST}"
+            fi
+            echo "OPENCLAW_VERSION=${OPENCLAW}"
+            echo "FLY_IMAGE_CONTENT_HASH=${CONTENT}"
+            echo '```'
+            echo ""
+            echo "**Image pushed to:** \`registry.fly.io/kiloclaw-registry-dev:${TAG}\`"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"

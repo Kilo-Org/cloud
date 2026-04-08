@@ -67,6 +67,18 @@ export class TownContainerDO extends Container<Env> {
     console.log(`${TC_LOG} deleteEnvVar: ${key} removed`);
   }
 
+  async updateRegistry(registry: unknown): Promise<void> {
+    await this.ctx.storage.put('container:registry', registry);
+    console.log(
+      `${TC_LOG} updateRegistry: updated (${Array.isArray(registry) ? registry.length : '?'} entries)`
+    );
+  }
+
+  async getRegistry(): Promise<unknown> {
+    const registry = await this.ctx.storage.get<unknown>('container:registry');
+    return registry ?? [];
+  }
+
   override onStart(): void {
     console.log(`${TC_LOG} container started for DO id=${this.ctx.id.toString()}`);
   }

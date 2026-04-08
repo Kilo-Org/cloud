@@ -25,6 +25,7 @@ type Transport = {
     mode?: string;
     model?: string;
     variant?: string;
+    messageId?: string;
   }) => Promise<unknown>;
   interrupt?: () => Promise<unknown>;
   answer?: (payload: { requestId: string; answers: string[][] }) => Promise<unknown>;
@@ -50,6 +51,7 @@ type CloudAgentApi = {
     mode?: string;
     model?: string;
     variant?: string;
+    messageId?: string;
   }) => Promise<unknown>;
   interrupt: (payload: { sessionId: CloudAgentSessionId }) => Promise<unknown>;
   answer: (payload: {

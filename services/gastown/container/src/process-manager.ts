@@ -8,6 +8,7 @@
 
 import { createKilo, type KiloClient } from '@kilocode/sdk';
 import { z } from 'zod';
+import * as fs from 'node:fs/promises';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
 import { buildKiloConfigContent } from './agent-runner';
@@ -32,8 +33,10 @@ const sdkInstances = new Map<string, SDKInstance>();
 const eventAbortControllers = new Map<string, AbortController>();
 // Event sinks for WebSocket forwarding
 const eventSinks = new Set<(agentId: string, event: string, data: unknown) => void>();
-// Per-agent idle timers — fires exit when no nudges arrive
-const idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+// Per-agent idle timers — fires exit when no nudges arrive.
+// Stores both the timer handle and the onExit callback so drainAll()
+// can re-arm timers with a shorter timeout without duplicating exit logic.
+const idleTimers = new Map<string, { timer: ReturnType<typeof setTimeout>; onExit: () => void }>();
 
 // Server-level lifecycle events that should NOT cancel an agent's idle
 // timer. These fire periodically (heartbeat) or on connect and don't
@@ -64,6 +67,147 @@ let sdkServerLock: Promise<void> = Promise.resolve();
 
 export function getUptime(): number {
   return Date.now() - startTime;
+}
+
+async function hydrateDbFromSnapshot(
+  agentId: string,
+  apiUrl: string,
+  token: string,
+  rigId: string,
+  townId: string
+): Promise<void> {
+  const MANAGER_LOG = '[process-manager]';
+  try {
+    const resp = await fetch(
+      `${apiUrl}/api/towns/${townId}/rigs/${rigId}/agents/${agentId}/db-snapshot`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (!resp.ok) {
+      if (resp.status === 404) {
+        console.log(`${MANAGER_LOG} No DB snapshot found for agent ${agentId}, starting fresh`);
+        return;
+      }
+      console.warn(`${MANAGER_LOG} Failed to fetch DB snapshot for ${agentId}: ${resp.status}`);
+      return;
+    }
+    const buffer = await resp.arrayBuffer();
+    if (buffer.byteLength === 0) {
+      console.log(`${MANAGER_LOG} DB snapshot for ${agentId} is empty, skipping hydration`);
+      return;
+    }
+    const dir = `/tmp/agent-home-${agentId}/.local/share/kilo`;
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(`${dir}/kilo.db`, Buffer.from(buffer));
+    console.log(
+      `${MANAGER_LOG} Hydrated DB snapshot for agent ${agentId} (${buffer.byteLength} bytes)`
+    );
+  } catch (err) {
+    console.warn(`${MANAGER_LOG} DB hydration failed for agent ${agentId}:`, err);
+  }
+}
+
+async function saveDbSnapshot(
+  agentId: string,
+  apiUrl: string,
+  token: string,
+  rigId: string,
+  townId: string
+): Promise<void> {
+  const MANAGER_LOG = '[process-manager]';
+  try {
+    const dbDir = `/tmp/agent-home-${agentId}/.local/share/kilo`;
+    const dbPath = `${dbDir}/kilo.db`;
+    await fs.access(dbPath);
+
+    // SQLite WAL mode stores recent writes in -wal/-shm files. We must
+    // checkpoint the WAL into the main DB file before snapshotting so the
+    // snapshot contains all data. Use bun's built-in SQLite to run PRAGMA
+    // wal_checkpoint(TRUNCATE) which merges the WAL and truncates it.
+    try {
+      const checkpoint = Bun.spawn(
+        [
+          'bun',
+          '-e',
+          `new (require("bun:sqlite").Database)(process.argv[1]).run("PRAGMA wal_checkpoint(TRUNCATE)")`,
+          dbPath,
+        ],
+        { stdout: 'pipe', stderr: 'pipe' }
+      );
+      const exitCode = await checkpoint.exited;
+      if (exitCode === 0) {
+        console.log(`${MANAGER_LOG} WAL checkpoint succeeded for ${agentId}`);
+      } else {
+        const stderr = await new Response(checkpoint.stderr).text();
+        console.warn(`${MANAGER_LOG} WAL checkpoint exited ${exitCode} for ${agentId}: ${stderr}`);
+      }
+    } catch (err) {
+      console.warn(`${MANAGER_LOG} WAL checkpoint failed for ${agentId}:`, err);
+    }
+
+    const buffer = await fs.readFile(dbPath);
+    const resp = await fetch(
+      `${apiUrl}/api/towns/${townId}/rigs/${rigId}/agents/${agentId}/db-snapshot`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/octet-stream',
+        },
+        body: buffer,
+      }
+    );
+    if (!resp.ok) {
+      console.warn(`${MANAGER_LOG} Failed to save DB snapshot for ${agentId}: ${resp.status}`);
+      return;
+    }
+    console.log(
+      `${MANAGER_LOG} Saved DB snapshot for agent ${agentId} (${buffer.byteLength} bytes)`
+    );
+  } catch (err) {
+    if ((err as { code?: string }).code === 'ENOENT') {
+      console.log(`${MANAGER_LOG} No kilo.db found for agent ${agentId}, skipping snapshot save`);
+      return;
+    }
+    console.warn(`${MANAGER_LOG} DB snapshot save failed for agent ${agentId}:`, err);
+  }
+}
+
+/**
+ * Sync the in-memory agents Map to the container registry so bootHydration
+ * can resume agents after a container eviction. Only includes agents in
+ * 'running' or 'starting' status (not exited/failed).
+ *
+ * Fire-and-forget — failures are logged but don't block the caller.
+ */
+function syncRegistry(): void {
+  const apiUrl = process.env.GASTOWN_API_URL;
+  const townId = process.env.GASTOWN_TOWN_ID;
+  const token = process.env.GASTOWN_CONTAINER_TOKEN;
+  if (!apiUrl || !townId || !token) return;
+
+  const entries = [];
+  for (const agent of agents.values()) {
+    if (agent.status !== 'running' && agent.status !== 'starting') continue;
+    entries.push({
+      agentId: agent.agentId,
+      request: agent.startupRequest,
+      workdir: agent.workdir,
+      env: agent.startupEnv,
+    });
+  }
+
+  fetch(`${apiUrl}/api/towns/${townId}/container-registry`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(entries),
+  }).catch(err => {
+    console.warn(`${MANAGER_LOG} Failed to sync container registry:`, err);
+  });
 }
 
 export function registerEventSink(
@@ -379,9 +523,9 @@ async function writeEvictionCheckpoint(
  * Clear the idle timer for an agent (if any).
  */
 function clearIdleTimer(agentId: string): void {
-  const timer = idleTimers.get(agentId);
-  if (timer !== undefined) {
-    clearTimeout(timer);
+  const entry = idleTimers.get(agentId);
+  if (entry !== undefined) {
+    clearTimeout(entry.timer);
     idleTimers.delete(agentId);
   }
 }
@@ -455,9 +599,9 @@ async function handleIdleEvent(agent: ManagedAgent, onExit: () => void): Promise
     `${MANAGER_LOG} handleIdleEvent: no nudges for ${agentId}, idle timeout in ${timeoutMs}ms`
   );
 
-  idleTimers.set(
-    agentId,
-    setTimeout(() => {
+  idleTimers.set(agentId, {
+    onExit,
+    timer: setTimeout(() => {
       idleTimers.delete(agentId);
       if (agent.status === 'running') {
         console.log(
@@ -465,8 +609,8 @@ async function handleIdleEvent(agent: ManagedAgent, onExit: () => void): Promise
         );
         onExit();
       }
-    }, timeoutMs)
-  );
+    }, timeoutMs),
+  });
 }
 
 /**
@@ -493,6 +637,7 @@ async function subscribeToEvents(
     agent.exitReason = 'completed';
     broadcastEvent(agent.agentId, 'agent.exited', { reason: 'completed' });
     void reportAgentCompleted(agent, 'completed');
+    syncRegistry();
 
     // Release SDK session so the server can shut down when idle
     const inst = sdkInstances.get(agent.workdir);
@@ -503,6 +648,14 @@ async function subscribeToEvents(
         sdkInstances.delete(agent.workdir);
       }
     }
+
+    // Save DB snapshot before completing exit
+    const apiUrl = agent.gastownApiUrl;
+    const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+    if (apiUrl && token) {
+      void saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId);
+    }
+
     controller.abort();
   };
 
@@ -662,6 +815,7 @@ export async function startAgent(
     completionCallbackUrl: request.envVars?.GASTOWN_COMPLETION_CALLBACK_URL ?? null,
     model: request.model ?? null,
     startupEnv: env,
+    startupRequest: request,
     startupAbortController,
   };
   agents.set(request.agentId, agent);
@@ -669,6 +823,13 @@ export async function startAgent(
   const { signal } = startupAbortController;
   let sessionCounted = false;
   try {
+    // 0. Hydrate agent DB from KV snapshot before starting the SDK server
+    const apiUrl = agent.gastownApiUrl;
+    const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+    if (apiUrl && token) {
+      await hydrateDbFromSnapshot(request.agentId, apiUrl, token, request.rigId, request.townId);
+    }
+
     // 1. Ensure SDK server is running for this workdir
     const { client, port } = await ensureSDKServer(workdir, env);
     agent.serverPort = port;
@@ -685,23 +846,45 @@ export async function startAgent(
       sessionCounted = true;
     }
 
-    // 2. Create a session
-    const sessionResult = await client.session.create({ body: {} });
-
-    // Parse and store the session ID immediately so the catch block can
-    // abort an orphaned session if startupAbortController fires during
-    // the await above.
-    const rawSession: unknown = sessionResult.data ?? sessionResult;
-    const parsed = SessionResponse.safeParse(rawSession);
-    if (!parsed.success) {
-      console.error(
-        `${MANAGER_LOG} SDK session.create returned unexpected shape:`,
-        JSON.stringify(rawSession).slice(0, 200),
-        parsed.error.issues
-      );
-      throw new Error('SDK session.create response missing required "id" field');
+    // 2. Resume an existing session or create a new one.
+    // Only the mayor resumes — it's a persistent conversational agent whose
+    // session history should survive container evictions. Non-mayor agents
+    // (polecats, refineries, triage) always get fresh sessions since they
+    // work on a new bead each dispatch.
+    let sessionId = '';
+    let resumed = false;
+    if (request.role === 'mayor') {
+      const existingSessions = await client.session.list();
+      const sessions = (existingSessions.data ?? []) as Array<{
+        id: string;
+        time?: { updated?: number };
+      }>;
+      if (sessions.length > 0) {
+        const sorted = [...sessions].sort(
+          (a, b) => (b.time?.updated ?? 0) - (a.time?.updated ?? 0)
+        );
+        sessionId = sorted[0].id;
+        resumed = true;
+        console.log(
+          `${MANAGER_LOG} Resuming existing mayor session ${sessionId} (${sessions.length} session(s) found)`
+        );
+      }
     }
-    const sessionId = parsed.data.id;
+    if (!resumed) {
+      const sessionResult = await client.session.create({ body: {} });
+      const rawSession: unknown = sessionResult.data ?? sessionResult;
+      const parsed = SessionResponse.safeParse(rawSession);
+      if (!parsed.success) {
+        console.error(
+          `${MANAGER_LOG} SDK session.create returned unexpected shape:`,
+          JSON.stringify(rawSession).slice(0, 200),
+          parsed.error.issues
+        );
+        throw new Error('SDK session.create response missing required "id" field');
+      }
+      sessionId = parsed.data.id;
+      console.log(`${MANAGER_LOG} Created new session ${sessionId}`);
+    }
     agent.sessionId = sessionId;
 
     // Now check if startup was cancelled while creating the session.
@@ -736,22 +919,27 @@ export async function startAgent(
       throw new StartupAbortedError(request.agentId);
     }
 
-    await client.session.prompt({
-      path: { id: sessionId },
-      body: {
-        parts: [{ type: 'text', text: request.prompt }],
-        ...(modelParam ? { model: modelParam } : {}),
-        ...(request.systemPrompt ? { system: request.systemPrompt } : {}),
-      },
-    });
+    // Skip the initial prompt for resumed sessions — the conversation
+    // history is already in kilo.db and re-sending the startup prompt
+    // would create a duplicate turn.
+    if (!resumed) {
+      await client.session.prompt({
+        path: { id: sessionId },
+        body: {
+          parts: [{ type: 'text', text: request.prompt }],
+          ...(modelParam ? { model: modelParam } : {}),
+          ...(request.systemPrompt ? { system: request.systemPrompt } : {}),
+        },
+      });
 
-    // If the event stream errored while we were awaiting the prompt,
-    // the stream-error handler already set the agent to 'failed',
-    // reported completion, and decremented sessionCount. Mark
-    // sessionCounted false so the catch block doesn't double-decrement.
-    if (agent.status === 'failed') {
-      sessionCounted = false;
-      throw new Error('Event stream failed during initial prompt');
+      // If the event stream errored while we were awaiting the prompt,
+      // the stream-error handler already set the agent to 'failed',
+      // reported completion, and decremented sessionCount. Mark
+      // sessionCounted false so the catch block doesn't double-decrement.
+      if (agent.status === 'failed') {
+        sessionCounted = false;
+        throw new Error('Event stream failed during initial prompt');
+      }
     }
     agent.startupAbortController = null;
 
@@ -765,6 +953,7 @@ export async function startAgent(
       port,
     });
 
+    syncRegistry();
     return agent;
   } catch (err) {
     // On abort, clean up silently — the new startAgent invocation will
@@ -794,6 +983,7 @@ export async function startAgent(
       }
       if (agents.get(request.agentId) === agent) {
         agents.delete(request.agentId);
+        syncRegistry();
       }
       throw err;
     }
@@ -801,6 +991,7 @@ export async function startAgent(
     agent.status = 'failed';
     agent.startupAbortController = null;
     agent.exitReason = err instanceof Error ? err.message : String(err);
+    syncRegistry();
     if (sessionCounted) {
       const instance = sdkInstances.get(workdir);
       if (instance) instance.sessionCount--;
@@ -868,6 +1059,14 @@ export async function stopAgent(agentId: string): Promise<void> {
   agent.exitReason = 'stopped';
   log.info('agent.exit', { agentId, reason: 'stopped', exitReason: 'stopped' });
   broadcastEvent(agentId, 'agent.exited', { reason: 'stopped' });
+  syncRegistry();
+
+  // Save DB snapshot before completing stop
+  const apiUrl = agent.gastownApiUrl;
+  const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+  if (apiUrl && token) {
+    void saveDbSnapshot(agentId, apiUrl, token, agent.rigId, agent.townId);
+  }
 }
 
 /**
@@ -1052,36 +1251,59 @@ export async function updateAgentModel(
     const { client, port } = await ensureSDKServer(agent.workdir, hotSwapEnv);
     agent.serverPort = port;
 
-    // 5. Create a new session and send the startup prompt.
-    //    The system prompt lives in AGENTS.md (on disk), so kilo serve picks
-    //    it up automatically for every session.
-    const sessionResult = await client.session.create({ body: {} });
-    const rawSession: unknown = sessionResult.data ?? sessionResult;
-    const parsed = SessionResponse.safeParse(rawSession);
-    if (!parsed.success) {
-      throw new Error('SDK session.create response missing required "id" field');
+    // 5. Resume the existing session or create a new one.
+    //    The kilo.db on disk still has the prior session data, and the new
+    //    kilo serve process reads it. For the mayor, resume so model swaps
+    //    don't lose conversation history.
+    let newSessionId = '';
+    let resumedSession = false;
+    if (agent.role === 'mayor') {
+      const existing = await client.session.list();
+      const sessions = (existing.data ?? []) as Array<{
+        id: string;
+        time?: { updated?: number };
+      }>;
+      if (sessions.length > 0) {
+        const sorted = [...sessions].sort(
+          (a, b) => (b.time?.updated ?? 0) - (a.time?.updated ?? 0)
+        );
+        newSessionId = sorted[0].id;
+        resumedSession = true;
+        console.log(`${MANAGER_LOG} updateAgentModel: resuming existing session ${newSessionId}`);
+      }
     }
-    agent.sessionId = parsed.data.id;
+    if (!resumedSession) {
+      const sessionResult = await client.session.create({ body: {} });
+      const rawSession: unknown = sessionResult.data ?? sessionResult;
+      const parsed = SessionResponse.safeParse(rawSession);
+      if (!parsed.success) {
+        throw new Error('SDK session.create response missing required "id" field');
+      }
+      newSessionId = parsed.data.id;
+    }
+    agent.sessionId = newSessionId;
 
     const newInstance = sdkInstances.get(agent.workdir);
     if (newInstance) {
       newInstance.sessionCount++;
     }
 
-    // Send the startup prompt, including conversation history if available
-    // so the mayor retains context across model changes (same mechanism
-    // used for container restarts — see PR #1494).
+    // Only send the startup prompt for new sessions. Resumed sessions
+    // already have conversation history in kilo.db — re-sending the
+    // prompt would create a duplicate/synthetic turn.
     const prompt = conversationHistory
       ? `${conversationHistory}\n\n${MAYOR_STARTUP_PROMPT}`
       : MAYOR_STARTUP_PROMPT;
-    const modelParam = { providerID: 'kilo', modelID: model };
-    await client.session.prompt({
-      path: { id: agent.sessionId },
-      body: {
-        parts: [{ type: 'text', text: prompt }],
-        model: modelParam,
-      },
-    });
+    if (!resumedSession) {
+      const modelParam = { providerID: 'kilo', modelID: model };
+      await client.session.prompt({
+        path: { id: agent.sessionId },
+        body: {
+          parts: [{ type: 'text', text: prompt }],
+          model: modelParam,
+        },
+      });
+    }
     agent.messageCount = 1;
 
     // 6. New server is healthy — now tear down the old one.
@@ -1198,6 +1420,33 @@ export async function drainAll(): Promise<void> {
     }
   } catch (err) {
     console.warn(`${DRAIN_LOG} Phase 1: TownDO notification failed, continuing:`, err);
+  }
+
+  // ── Phase 1b: Shorten idle timers ──────────────────────────────────────
+  // Agents that are already idle (have a pending idle timer from a
+  // session.idle event before drain started) are sitting in 120s/600s
+  // timers. Replace them with short 10s timers so they exit promptly.
+  // We can re-use the stored onExit callback from the original timer.
+  for (const agent of agents.values()) {
+    if (agent.role === 'mayor') continue;
+    const entry = idleTimers.get(agent.agentId);
+    if (entry) {
+      console.log(
+        `${DRAIN_LOG} Shortening idle timer for ${agent.role}:${agent.agentId.slice(0, 8)}`
+      );
+      clearTimeout(entry.timer);
+      const { onExit } = entry;
+      idleTimers.set(agent.agentId, {
+        onExit,
+        timer: setTimeout(() => {
+          idleTimers.delete(agent.agentId);
+          if (agent.status === 'running') {
+            console.log(`${DRAIN_LOG} Shortened idle timer fired for ${agent.agentId.slice(0, 8)}`);
+            onExit();
+          }
+        }, 10_000),
+      });
+    }
   }
 
   // ── Phase 2: Wait for agents to finish their current work ─────────────
@@ -1375,7 +1624,14 @@ export async function drainAll(): Promise<void> {
         });
       }
 
-      // 4d: Report the agent as completed so the TownDO can unhook it
+      // 4d: Save DB snapshot
+      const apiUrl = agent.gastownApiUrl;
+      const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+      if (apiUrl && token) {
+        await saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId);
+      }
+
+      // 4e: Report the agent as completed so the TownDO can unhook it
       // and transition the bead. Without this, the bead stays in_progress
       // and the agent stays working until stale-bead recovery kicks in.
       if (agent.role !== 'mayor' && agent.role !== 'triage') {
@@ -1386,13 +1642,17 @@ export async function drainAll(): Promise<void> {
     }
   }
 
+  // Clear the container registry so bootHydration on the next container
+  // doesn't resurrect agents that were already force-saved during eviction.
+  syncRegistry();
+
   console.log(`${DRAIN_LOG} Drain complete`);
 }
 
 export async function stopAll(): Promise<void> {
   // Cancel all idle timers
-  for (const [, timer] of idleTimers) {
-    clearTimeout(timer);
+  for (const [, entry] of idleTimers) {
+    clearTimeout(entry.timer);
   }
   idleTimers.clear();
 
@@ -1402,7 +1662,7 @@ export async function stopAll(): Promise<void> {
   }
   eventAbortControllers.clear();
 
-  // Abort all running sessions
+  // Abort all running sessions and save DB snapshots
   for (const agent of agents.values()) {
     if (agent.status === 'running' || agent.status === 'starting') {
       try {
@@ -1417,6 +1677,13 @@ export async function stopAll(): Promise<void> {
       }
       agent.status = 'exited';
       agent.exitReason = 'container shutdown';
+
+      // Save DB snapshot before completing shutdown
+      const apiUrl = agent.gastownApiUrl;
+      const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+      if (apiUrl && token) {
+        void saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId);
+      }
     }
   }
 
@@ -1425,4 +1692,69 @@ export async function stopAll(): Promise<void> {
     instance.server.close();
   }
   sdkInstances.clear();
+}
+
+/**
+ * Boot-time agent hydration — fetches the container registry from the
+ * Gastown worker and resumes all registered agents.
+ *
+ * Called from main.ts when GASTOWN_TOWN_ID and GASTOWN_API_URL are set.
+ */
+export async function bootHydration(): Promise<void> {
+  const LOG = '[boot-hydration]';
+  const apiUrl = process.env.GASTOWN_API_URL;
+  const townId = process.env.GASTOWN_TOWN_ID;
+  const token = process.env.GASTOWN_CONTAINER_TOKEN;
+
+  if (!apiUrl || !townId || !token) {
+    console.log(
+      `${LOG} Missing GASTOWN_API_URL, GASTOWN_TOWN_ID, or GASTOWN_CONTAINER_TOKEN — skipping boot hydration`
+    );
+    return;
+  }
+
+  console.log(`${LOG} Fetching container registry for town=${townId}`);
+  let registry: unknown;
+  try {
+    const resp = await fetch(`${apiUrl}/api/towns/${townId}/container-registry`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) {
+      console.warn(`${LOG} Failed to fetch registry: ${resp.status}`);
+      return;
+    }
+    const json = (await resp.json()) as { data: unknown };
+    registry = json.data;
+  } catch (err) {
+    console.warn(`${LOG} Registry fetch failed:`, err);
+    return;
+  }
+
+  if (!Array.isArray(registry) || registry.length === 0) {
+    console.log(`${LOG} No agents in registry — nothing to hydrate`);
+    return;
+  }
+
+  console.log(`${LOG} Resuming ${registry.length} agent(s) from registry`);
+
+  for (const entry of registry as Record<string, unknown>[]) {
+    const agentId = entry.agentId as string | undefined;
+    const agentRequest = entry.request as StartAgentRequest | undefined;
+    const workdir = entry.workdir as string | undefined;
+    const env = entry.env as Record<string, string> | undefined;
+
+    if (!agentId || !agentRequest || !workdir || !env) {
+      console.warn(`${LOG} Skipping malformed registry entry:`, entry);
+      continue;
+    }
+
+    console.log(`${LOG} Resuming agent ${agentId} in ${workdir}`);
+    try {
+      await startAgent(agentRequest, workdir, env);
+      console.log(`${LOG} Agent ${agentId} resumed`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`${LOG} Failed to resume agent ${agentId}:`, msg);
+    }
+  }
 }

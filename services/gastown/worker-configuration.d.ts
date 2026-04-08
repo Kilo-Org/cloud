@@ -40,6 +40,7 @@ declare namespace Cloudflare {
 		AGENT: DurableObjectNamespace<import("./src/gastown.worker").AgentDO>;
 		GIT_TOKEN_SERVICE: GitTokenService;
 		AI: Ai;
+		AGENT_DB_SNAPSHOTS_KV: KVNamespace;
 	}
 	interface Env {
 		GASTOWN_AE: AnalyticsEngineDataset;
@@ -58,6 +59,7 @@ declare namespace Cloudflare {
 		AGENT: DurableObjectNamespace<import("./src/gastown.worker").AgentDO>;
 		GIT_TOKEN_SERVICE: GitTokenService;
 		AI: Ai;
+		AGENT_DB_SNAPSHOTS_KV: KVNamespace;
 		HYPERDRIVE?: Hyperdrive;
 		CF_VERSION_METADATA?: WorkerVersionMetadata;
 		SENTRY_DSN?: string; // worker secret

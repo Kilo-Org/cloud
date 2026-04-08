@@ -361,6 +361,9 @@ export function useOrgKiloClawMutations(organizationId: string) {
   const rawPatchExecPreset = useMutation(
     trpc.organizations.kiloclaw.patchExecPreset.mutationOptions({ onSuccess: invalidateStatus })
   );
+  const rawPatchBotIdentity = useMutation(
+    trpc.organizations.kiloclaw.patchBotIdentity.mutationOptions({ onSuccess: invalidateStatus })
+  );
   const rawPatchOpenclawConfig = useMutation(
     trpc.organizations.kiloclaw.patchOpenclawConfig.mutationOptions()
   );
@@ -409,6 +412,7 @@ export function useOrgKiloClawMutations(organizationId: string) {
     removeMyPin: bindVoid(rawRemoveMyPin),
     writeFile: bind(rawWriteFile),
     patchExecPreset: bind(rawPatchExecPreset),
+    patchBotIdentity: bind(rawPatchBotIdentity),
     patchOpenclawConfig: bind(rawPatchOpenclawConfig),
     disconnectGoogle: bindVoid(rawDisconnectGoogle),
     setGmailNotifications: bind(rawSetGmailNotifications),

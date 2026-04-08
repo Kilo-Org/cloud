@@ -20,6 +20,10 @@ const ProductTelemetrySchema = z.object({
   enabledChannels: z.array(z.string()),
   toolsProfile: z.string().nullable(),
   execSecurity: z.string().nullable(),
+  botName: z.string().nullable().optional(),
+  botNature: z.string().nullable().optional(),
+  botVibe: z.string().nullable().optional(),
+  botEmoji: z.string().nullable().optional(),
   browserEnabled: z.boolean(),
 });
 

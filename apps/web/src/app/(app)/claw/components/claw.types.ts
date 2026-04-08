@@ -5,6 +5,20 @@ export type ClawState = KiloClawDashboardStatus['status'];
 
 export type ExecPreset = 'always-ask' | 'never-ask';
 
+export type BotIdentity = {
+  botName: string;
+  botNature: string;
+  botVibe: string;
+  botEmoji: string;
+};
+
+export const DEFAULT_BOT_IDENTITY: BotIdentity = {
+  botName: 'KiloClaw',
+  botNature: 'AI executive assistant',
+  botVibe: 'Helpful, calm, and proactive',
+  botEmoji: '🦾',
+};
+
 export type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
 export function execPresetToConfig(preset: ExecPreset): { security: string; ask: string } {

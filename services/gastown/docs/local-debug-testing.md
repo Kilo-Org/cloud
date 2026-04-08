@@ -366,3 +366,123 @@ The `areThreadsBlocking` method logs its decision:
 ```
 
 If the AI call fails, it conservatively defaults to `blocking=true` and logs a warning.
+
+## 8. KV-Backed Agent Session Persistence
+
+Agent session state (kilo.db) is persisted to Cloudflare KV via the `AGENT_DB_SNAPSHOTS_KV` binding. The container registry (which agents should be running) is stored in the `TownContainerDO`'s persistent storage.
+
+### Architecture
+
+```
+Container Cold Start
+    │
+    ▼
+main.ts → bootHydration()
+    │
+    ├─ GET /container-registry → TownContainerDO.getRegistry()
+    │   (reads agent entries from DO persistent storage)
+    │
+    ▼ For each registered agent:
+startAgent()
+    │
+    └─ hydrateDbFromSnapshot()
+        └─ GET /db-snapshot → AGENT_DB_SNAPSHOTS_KV.get(agentId)
+            (restores kilo.db to /tmp/agent-home-{agentId}/)
+
+Agent Lifecycle (save snapshots):
+    ├─ Agent completes   → saveDbSnapshot()
+    ├─ Agent stopped     → saveDbSnapshot()
+    ├─ Container drain   → saveDbSnapshot() (awaited)
+    └─ Container shutdown → saveDbSnapshot() (fire-and-forget)
+```
+
+### KV Namespace Setup
+
+The `AGENT_DB_SNAPSHOTS_KV` binding in `wrangler.jsonc` must have a valid KV namespace ID for both production and dev environments. The dev env section must re-declare `kv_namespaces` (wrangler does not inherit it from the top level when other bindings are overridden).
+
+### Testing the Container Registry
+
+```bash
+# Read registry (should be empty or contain agent entries)
+curl -s $BASE/api/towns/$TOWN_ID/container-registry | python3 -m json.tool
+
+# Write a test entry
+curl -s -X POST $BASE/api/towns/$TOWN_ID/container-registry \
+  -H "Content-Type: application/json" \
+  -d '[{"agentId":"test-agent","request":{"role":"polecat"},"workdir":"/tmp/test","env":{}}]'
+
+# Verify persistence
+curl -s $BASE/api/towns/$TOWN_ID/container-registry | python3 -m json.tool
+
+# Clear registry
+curl -s -X POST $BASE/api/towns/$TOWN_ID/container-registry \
+  -H "Content-Type: application/json" \
+  -d '[]'
+```
+
+### Testing DB Snapshots
+
+```bash
+AGENT_ID="test-snapshot-agent"
+RIG_ID="test-rig"
+
+# GET non-existent snapshot (expect 404)
+curl -s -w "\n%{http_code}" $BASE/api/towns/$TOWN_ID/rigs/$RIG_ID/agents/$AGENT_ID/db-snapshot
+
+# POST a snapshot
+echo -n "test-data" > /tmp/test-snapshot.bin
+curl -s -X POST $BASE/api/towns/$TOWN_ID/rigs/$RIG_ID/agents/$AGENT_ID/db-snapshot \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @/tmp/test-snapshot.bin
+
+# GET and verify round-trip
+curl -s -o /tmp/snapshot-read.bin $BASE/api/towns/$TOWN_ID/rigs/$RIG_ID/agents/$AGENT_ID/db-snapshot
+diff /tmp/test-snapshot.bin /tmp/snapshot-read.bin && echo "PASS: round-trip match"
+```
+
+### Verifying Boot Hydration
+
+After a container restart, check the logs for hydration activity:
+
+```bash
+CONTAINER_ID=$(docker ps --format "{{.ID}}\t{{.Image}}" | grep towncontainerdo | head -1 | awk '{print $1}')
+docker logs $CONTAINER_ID 2>&1 | grep -E "boot-hydration|snapshot"
+```
+
+**Expected log entries:**
+
+- `[boot-hydration] Fetching container registry for town=<townId>` — registry fetch
+- `[boot-hydration] No agents in registry — nothing to hydrate` — if registry is empty
+- `[boot-hydration] Hydrating N agent(s)` — if agents are registered
+- `[process-manager] No DB snapshot found for agent <id>, starting fresh` — no prior snapshot
+- `[process-manager] Hydrated DB snapshot for agent <id>` — snapshot restored
+
+### Verifying Snapshot Save During Drain
+
+During graceful container eviction, snapshots are saved before exit:
+
+```bash
+grep -E "saveDbSnapshot|snapshot|kilo\.db" /tmp/drain-test.log
+```
+
+**Expected:** Either `Saved DB snapshot for agent <id>` (kilo.db exists) or `No kilo.db found for agent <id>, skipping snapshot save` (agents that didn't create a local DB).
+
+### Common Issues
+
+- **500 on db-snapshot endpoints**: The KV namespace ID is likely `"placeholder"`. Set the real ID in both the top-level and dev env `kv_namespaces` in `wrangler.jsonc`.
+- **Boot hydration skipped**: Check that `GASTOWN_API_URL`, `GASTOWN_TOWN_ID`, and `GASTOWN_CONTAINER_TOKEN` environment variables are set in the container. `GASTOWN_TOWN_ID` is passed by the worker on container provision.
+- **Snapshot save fails silently**: The `saveDbSnapshot` function catches errors and logs them as warnings. Check container logs for `saveDbSnapshot failed` messages.
+
+## 9. Re-Escalation Filtering
+
+The `reEscalateStaleEscalations()` function in `Town.do.ts` re-escalates unacknowledged escalation beads by bumping their severity over time. The query filters out beads with `status = 'closed'` or `status = 'failed'` to prevent phantom re-escalation messages for already-resolved beads.
+
+### Verifying the Filter
+
+The re-escalation logic runs in the DO alarm loop. To verify it works:
+
+1. Create an escalation bead, acknowledge it (sets status to closed)
+2. Verify the reconciler dry-run doesn't produce re-escalation actions for closed beads
+3. Check that only `open` unacknowledged escalation beads are candidates
+
+The filter is covered by the unit test suite (`pnpm --filter cloudflare-gastown test` — `pr-feedback.test.ts` covers `TownConfigSchema` and related escalation logic).

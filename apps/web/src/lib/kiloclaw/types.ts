@@ -38,6 +38,20 @@ export type KiloCodeConfigResponse = {
   kilocodeDefaultModel: string | null;
 };
 
+export type BotIdentityPatchInput = {
+  botName?: string | null;
+  botNature?: string | null;
+  botVibe?: string | null;
+  botEmoji?: string | null;
+};
+
+export type BotIdentityPatchResponse = {
+  botName: string | null;
+  botNature: string | null;
+  botVibe: string | null;
+  botEmoji: string | null;
+};
+
 /** Input to PATCH /api/platform/channels */
 export type ChannelsPatchInput = {
   channels: {
@@ -155,6 +169,10 @@ export type PlatformStatusResponse = {
   gmailNotificationsEnabled: boolean;
   execSecurity: string | null;
   execAsk: string | null;
+  botName: string | null;
+  botNature: string | null;
+  botVibe: string | null;
+  botEmoji: string | null;
 };
 
 /** A single registry DO's entries + migration status. */

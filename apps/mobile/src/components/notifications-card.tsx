@@ -104,6 +104,7 @@ export function NotificationsCard() {
         ) : (
           <Switch
             value={notificationsEnabled}
+            disabled={registerToken.isPending || unregisterToken.isPending}
             onValueChange={value => void handleToggleNotifications(value)}
           />
         )}

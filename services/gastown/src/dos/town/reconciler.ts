@@ -611,6 +611,24 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
         type: 'clear_agent_checkpoint',
         agent_id: agent.bead_id,
       });
+    } else if (hookedStatus === 'in_progress' || hookedStatus === 'open') {
+      // Idle agent hooked to a live bead — the dispatch started but the
+      // agent died (container failed to start, OOM, etc.) and agentCompleted
+      // set it to idle without unhooking. Reset the bead to open and unhook
+      // so the scheduling rules can re-dispatch.
+      actions.push({
+        type: 'unhook_agent',
+        agent_id: agent.bead_id,
+        reason: 'idle agent hooked to live bead (dispatch failed)',
+      });
+      actions.push({
+        type: 'transition_bead',
+        bead_id: agent.current_hook_bead_id,
+        from: hookedStatus,
+        to: 'open',
+        reason: 'agent went idle without completing work — reset for re-dispatch',
+        actor: 'system',
+      });
     }
   }
 

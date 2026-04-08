@@ -197,7 +197,10 @@ async function deductFromBalance(
 
     await ingestOrganizationTokenUsage(usageRecord);
   } else {
-    // Personal billing: directly increment the user's usage counter
+    // Personal billing: directly increment the user's usage counter.
+    // WARNING: Do NOT also insert into microdollar_usage here. Recompute
+    // (recomputeUserBalances) already picks up personal Exa charges from
+    // exa_usage_log. Adding a microdollar_usage row would double-count.
     await db
       .update(kilocode_users)
       .set({

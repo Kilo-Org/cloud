@@ -53,6 +53,8 @@
     "ENVIRONMENT": "production",
     "CF_ACCESS_TEAM": "engineering-e11",
     "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
+    "CF_CLICKHOUSE_URL": "https://api.cloudflare.com/client/v4/accounts/e115e769bcdd4c3d66af59d3332cb394/analytics_engine/sql",
+    "CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
   },
 
   "secrets_store_secrets": [
@@ -60,6 +62,16 @@
       "binding": "NEXTAUTH_SECRET",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "NEXTAUTH_SECRET",
+    },
+    {
+      "binding": "CF_ANALYTICS_API_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "O11Y_CF_AE_API_TOKEN",
+    },
+    {
+      "binding": "GF_SECRET_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "GF_SECRET_KEY",
     },
   ],
 

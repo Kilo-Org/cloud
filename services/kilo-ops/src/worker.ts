@@ -15,6 +15,27 @@ const GRAFANA_DO_ID = 'grafana';
 export class GrafanaContainer extends Container<Env> {
   defaultPort = 3000;
   sleepAfter = '5m';
+
+  override async fetch(request: Request): Promise<Response> {
+    const state = await this.getState();
+    const needsStart =
+      state.status !== 'running' &&
+      state.status !== 'healthy' &&
+      state.status !== 'stopping';
+
+    if (needsStart) {
+      const analyticsApiKey = await resolveSecret(this.env.CF_ANALYTICS_API_KEY);
+      const gfSecretKey = await resolveSecret(this.env.GF_SECRET_KEY);
+      this.envVars = {
+        CF_CLICKHOUSE_URL: this.env.CF_CLICKHOUSE_URL,
+        CF_ACCOUNT_ID: this.env.CF_ACCOUNT_ID,
+        CF_ANALYTICS_API_KEY: analyticsApiKey ?? '',
+        GF_SECRET_KEY: gfSecretKey ?? '',
+      };
+    }
+
+    return super.fetch(request);
+  }
 }
 
 function getGrafanaContainerStub(env: Env) {

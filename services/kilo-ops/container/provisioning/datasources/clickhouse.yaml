@@ -1,0 +1,17 @@
+apiVersion: 1
+datasources:
+  - name: Analytics Engine
+    type: vertamedia-clickhouse-datasource
+    access: proxy
+    isDefault: true
+    editable: true
+    jsonData:
+      dataSourceUrl: ${CF_CLICKHOUSE_URL}
+      username: ''
+      defaultDatabase: default
+      httpHeaderName1: Authorization
+      queryTimeout: 60
+      validateSql: false
+    secureJsonData:
+      httpHeaderValue1: Bearer ${CF_ANALYTICS_API_KEY}
+      xHeaderKey: Bearer ${CF_ANALYTICS_API_KEY}

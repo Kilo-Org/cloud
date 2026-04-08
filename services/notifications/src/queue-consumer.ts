@@ -9,10 +9,7 @@ type ReceiptCheckMessage = {
   ticketTokenPairs: TicketTokenPair[];
 };
 
-export async function queue(
-  batch: MessageBatch<ReceiptCheckMessage>,
-  env: Env
-): Promise<void> {
+export async function queue(batch: MessageBatch<ReceiptCheckMessage>, env: Env): Promise<void> {
   for (const msg of batch.messages) {
     try {
       await processReceiptCheck(env, msg.body);
@@ -33,9 +30,7 @@ async function processReceiptCheck(env: Env, message: ReceiptCheckMessage): Prom
 
   if (staleTokens.length > 0) {
     const db = getWorkerDb(env.HYPERDRIVE.connectionString);
-    await db
-      .delete(user_push_tokens)
-      .where(inArray(user_push_tokens.token, staleTokens));
+    await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, staleTokens));
     console.log(`Receipt check: cleaned up ${staleTokens.length} stale push token(s)`);
   }
 }

@@ -649,7 +649,13 @@ Known implementation risks:
 
 - Mark snapshot, reassociation, and other Fly-only flows as optional provider
   capabilities
+- Expose provider capability metadata through `KiloClawInstance` so route
+  handlers can validate the active provider before invoking Fly-only operations
 - Update platform routes to reject unsupported provider capabilities clearly
+- Keep generic runtime lifecycle operations such as start/stop/restart outside
+  these Fly-only capability gates
+- Enforce the first slice of capability checks at the platform/admin route
+  boundary while preserving existing Fly-only DO internals underneath
 
 ### Phase 6: First Non-Fly Provider
 

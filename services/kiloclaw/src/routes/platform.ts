@@ -32,6 +32,7 @@ import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
 import { deriveHttpEventName } from '../middleware/analytics';
 import { sendMessage } from '../stream-chat/client';
+import type { ProviderCapability } from '../providers/types';
 
 const GmailHistoryIdSchema = z.object({
   userId: z.string().min(1),
@@ -217,6 +218,26 @@ function parseInstanceIdQuery(
     };
   }
   return { instanceId: result.data };
+}
+
+async function requireProviderCapability(
+  c: Context<AppEnv>,
+  userId: string,
+  instanceId: string | undefined,
+  capability: ProviderCapability,
+  operation: string
+): Promise<Response | null> {
+  const metadata = await withDORetry(
+    instanceStubFactory(c.env, userId, instanceId),
+    stub => stub.getProviderMetadata(),
+    'getProviderMetadata'
+  );
+
+  if (metadata.capabilities[capability]) {
+    return null;
+  }
+
+  return jsonError(`${operation} is not supported for provider ${metadata.provider}`, 400);
 }
 
 function statusCodeFromError(err: unknown): number {
@@ -1728,6 +1749,15 @@ platform.get('/volume-snapshots', async c => {
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
 
+  const unsupported = await requireProviderCapability(
+    c,
+    userId,
+    iidResult.instanceId,
+    'volumeSnapshots',
+    'volume-snapshots'
+  );
+  if (unsupported) return unsupported;
+
   try {
     const snapshots = await withDORetry(
       instanceStubFactory(c.env, userId, iidResult.instanceId),
@@ -1751,6 +1781,15 @@ platform.get('/candidate-volumes', async c => {
 
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
+
+  const unsupported = await requireProviderCapability(
+    c,
+    userId,
+    iidResult.instanceId,
+    'candidateVolumes',
+    'candidate-volumes'
+  );
+  if (unsupported) return unsupported;
 
   try {
     const result = await withDORetry(
@@ -1780,6 +1819,15 @@ platform.post('/reassociate-volume', async c => {
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
 
+  const unsupported = await requireProviderCapability(
+    c,
+    result.data.userId,
+    iidResult.instanceId,
+    'volumeReassociation',
+    'reassociate-volume'
+  );
+  if (unsupported) return unsupported;
+
   try {
     const response = await withDORetry(
       instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
@@ -1806,6 +1854,15 @@ platform.post('/restore-volume-snapshot', async c => {
 
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
+
+  const unsupported = await requireProviderCapability(
+    c,
+    result.data.userId,
+    iidResult.instanceId,
+    'snapshotRestore',
+    'restore-volume-snapshot'
+  );
+  if (unsupported) return unsupported;
 
   try {
     const response = await withDORetry(
@@ -1997,6 +2054,15 @@ platform.post('/destroy-fly-machine', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   const { userId, appName, machineId } = result.data;
+  const unsupported = await requireProviderCapability(
+    c,
+    userId,
+    iidResult.instanceId,
+    'directMachineDestroy',
+    'destroy-fly-machine'
+  );
+  if (unsupported) return unsupported;
+
   const apiToken = c.env.FLY_API_TOKEN;
   if (!apiToken) {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);

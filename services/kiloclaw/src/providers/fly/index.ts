@@ -19,6 +19,13 @@ function registryAppKey(state: Pick<InstanceMutableState, 'userId' | 'sandboxId'
 
 export const flyProviderAdapter: InstanceProviderAdapter = {
   id: 'fly',
+  capabilities: {
+    volumeSnapshots: true,
+    candidateVolumes: true,
+    volumeReassociation: true,
+    snapshotRestore: true,
+    directMachineDestroy: true,
+  },
 
   async getRoutingTarget({ env, state }) {
     const flyState = getFlyProviderState(state);

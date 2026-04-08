@@ -19,6 +19,15 @@ export type ProviderRoutingTarget = {
   headers: Record<string, string>;
 };
 
+export type ProviderCapability =
+  | 'volumeSnapshots'
+  | 'candidateVolumes'
+  | 'volumeReassociation'
+  | 'snapshotRestore'
+  | 'directMachineDestroy';
+
+export type ProviderCapabilities = Record<ProviderCapability, boolean>;
+
 export type RuntimeSpec = {
   imageRef: string;
   env: Record<string, string>;
@@ -68,6 +77,7 @@ export type RestartRuntimeArgs = ProviderContext & {
 
 export type InstanceProviderAdapter = {
   readonly id: ProviderId;
+  readonly capabilities: ProviderCapabilities;
   getRoutingTarget(args: ProviderRoutingContext): Promise<ProviderRoutingTarget>;
   ensureProvisioningResources(args: EnsureProvisioningResourcesArgs): Promise<ProviderResult>;
   ensureStorage(args: EnsureStorageArgs): Promise<ProviderResult>;

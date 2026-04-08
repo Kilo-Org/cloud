@@ -131,3 +131,15 @@ across phases and reviews.
 - Reason: phase 4 neutralizes the public adapter contract first. Fully
   rewriting every remaining Fly-only helper to a neutral internal model is
   deferred while those paths are still Fly-specific.
+
+## Phase 5
+
+### D14. Capability gating is enforced at the route boundary first
+
+- Platform/admin routes now consult provider capabilities before invoking
+  Fly-only snapshot, reassociation, restore, and direct-machine-destroy flows.
+- The underlying DO methods and Fly-specific helper paths remain available
+  internally and are not yet wrapped in a second layer of capability checks.
+- Reason: phase 5 focuses on making the externally reachable admin/debug API
+  honest for non-Fly providers without broadening the refactor across every
+  internal Fly-only helper in the same change.

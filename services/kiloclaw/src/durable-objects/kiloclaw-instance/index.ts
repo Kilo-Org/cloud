@@ -88,7 +88,11 @@ import {
 import { writeEvent } from '../../utils/analytics';
 import type { KiloClawEventData, KiloClawEventName } from '../../utils/analytics';
 import { getProviderAdapter } from '../../providers';
-import type { ProviderResult, ProviderRoutingTarget } from '../../providers/types';
+import type {
+  ProviderCapabilities,
+  ProviderResult,
+  ProviderRoutingTarget,
+} from '../../providers/types';
 
 // Re-export extracted helpers so existing consumers don't break.
 export {
@@ -184,6 +188,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     } catch {
       return null;
     }
+  }
+
+  async getProviderMetadata(): Promise<{
+    provider: ProviderId;
+    capabilities: ProviderCapabilities;
+  }> {
+    await this.loadState();
+
+    return {
+      provider: this.s.provider,
+      capabilities: this.provider().capabilities,
+    };
   }
 
   /**

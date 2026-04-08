@@ -3835,7 +3835,7 @@ export const user_push_tokens = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    uniqueIndex('UQ_user_push_tokens_user_token').on(table.user_id, table.token),
+    uniqueIndex('UQ_user_push_tokens_token').on(table.token),
     index('IDX_user_push_tokens_user_id').on(table.user_id),
   ]
 );

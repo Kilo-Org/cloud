@@ -1424,8 +1424,8 @@ export const kiloclawRouter = createTRPCRouter({
           platform: input.platform,
         })
         .onConflictDoUpdate({
-          target: [user_push_tokens.user_id, user_push_tokens.token],
-          set: { updated_at: sql`now()` },
+          target: [user_push_tokens.token],
+          set: { user_id: ctx.user.id, platform: input.platform, updated_at: sql`now()` },
         });
       return { success: true };
     }),
@@ -1440,10 +1440,7 @@ export const kiloclawRouter = createTRPCRouter({
       await db
         .delete(user_push_tokens)
         .where(
-          and(
-            eq(user_push_tokens.user_id, ctx.user.id),
-            eq(user_push_tokens.token, input.token)
-          )
+          and(eq(user_push_tokens.user_id, ctx.user.id), eq(user_push_tokens.token, input.token))
         );
       return { success: true };
     }),

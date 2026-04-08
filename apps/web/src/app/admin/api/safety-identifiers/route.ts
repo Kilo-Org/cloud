@@ -6,7 +6,7 @@ import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/providerHash';
-import { isNull, count, or, desc, eq } from 'drizzle-orm';
+import { isNull, count, or, desc, sql } from 'drizzle-orm';
 
 const missingEither = or(
   isNull(kilocode_users.openrouter_upstream_safety_identifier),
@@ -20,6 +20,12 @@ export type SafetyIdentifierCountsResponse = {
 export type BackfillBatchResponse = {
   processed: number;
   remaining: boolean;
+};
+
+type SafetyIdentifierUpdate = {
+  id: string;
+  openrouter_upstream_safety_identifier: string;
+  vercel_downstream_safety_identifier: string;
 };
 
 export async function GET(): Promise<
@@ -43,40 +49,49 @@ export async function POST(): Promise<NextResponse<BackfillBatchResponse | { err
   let totalProcessed = 0;
 
   for (let i = 0; i < BATCHES_PER_REQUEST; i++) {
-    const processed = await db.transaction(async tran => {
-      const rows = await tran
-        .select({ id: kilocode_users.id })
-        .from(kilocode_users)
-        .where(missingEither)
-        .orderBy(desc(kilocode_users.created_at))
-        .limit(BATCH_SIZE);
+    const rows = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(missingEither)
+      .orderBy(desc(kilocode_users.created_at))
+      .limit(BATCH_SIZE);
 
-      for (const user of rows) {
-        const openrouter_upstream_safety_identifier = generateOpenRouterUpstreamSafetyIdentifier(
-          user.id
-        );
-        if (openrouter_upstream_safety_identifier === null) {
-          return null;
-        }
-        await tran
-          .update(kilocode_users)
-          .set({
-            openrouter_upstream_safety_identifier,
-            vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(user.id),
-          })
-          .where(eq(kilocode_users.id, user.id))
-          .execute();
-      }
-
-      return rows.length;
-    });
-
-    if (processed === null) {
-      return NextResponse.json(
-        { error: 'OPENROUTER_ORG_ID is not configured on this server' },
-        { status: 500 }
+    const updates: SafetyIdentifierUpdate[] = [];
+    for (const user of rows) {
+      const openrouter_upstream_safety_identifier = generateOpenRouterUpstreamSafetyIdentifier(
+        user.id
       );
+      if (openrouter_upstream_safety_identifier === null) {
+        return NextResponse.json(
+          { error: 'OPENROUTER_ORG_ID is not configured on this server' },
+          { status: 500 }
+        );
+      }
+      updates.push({
+        id: user.id,
+        openrouter_upstream_safety_identifier,
+        vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(user.id),
+      });
     }
+
+    if (updates.length > 0) {
+      await db.execute(sql`
+        UPDATE ${kilocode_users}
+        SET
+          openrouter_upstream_safety_identifier = safety_identifier_updates.openrouter_upstream_safety_identifier,
+          vercel_downstream_safety_identifier = safety_identifier_updates.vercel_downstream_safety_identifier
+        FROM (VALUES ${sql.join(
+          updates.map(
+            update =>
+              sql`(${update.id}, ${update.openrouter_upstream_safety_identifier}, ${update.vercel_downstream_safety_identifier})`
+          ),
+          sql`, `
+        )}) AS safety_identifier_updates(id, openrouter_upstream_safety_identifier, vercel_downstream_safety_identifier)
+        WHERE ${kilocode_users.id} = safety_identifier_updates.id
+      `);
+    }
+
+    const processed = rows.length;
 
     totalProcessed += processed;
 

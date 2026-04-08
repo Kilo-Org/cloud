@@ -65,7 +65,8 @@ async function notifyInstanceReady(
   internalSecret: string,
   userId: string,
   sandboxId: string,
-  instanceId?: string
+  instanceId?: string,
+  shouldNotify?: boolean
 ): Promise<void> {
   const res = await fetch(`${backendOrigin}/api/internal/kiloclaw/instance-ready`, {
     method: 'POST',
@@ -73,7 +74,7 @@ async function notifyInstanceReady(
       'Content-Type': 'application/json',
       'X-Internal-Secret': internalSecret,
     },
-    body: JSON.stringify({ userId, sandboxId, instanceId }),
+    body: JSON.stringify({ userId, sandboxId, instanceId, shouldNotify }),
   });
   if (!res.ok) {
     console.error('[controller] instance-ready notification failed:', res.status, await res.text());
@@ -226,7 +227,8 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
             c.env.INTERNAL_API_SECRET,
             userId,
             data.sandboxId,
-            isInstanceKeyedSandboxId(data.sandboxId) ? doKey : undefined
+            isInstanceKeyedSandboxId(data.sandboxId) ? doKey : undefined,
+            shouldNotify
           ).catch(err => {
             console.error('[controller] instance-ready notification error:', err);
           })

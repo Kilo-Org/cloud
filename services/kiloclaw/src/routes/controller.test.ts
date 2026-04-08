@@ -375,6 +375,7 @@ describe('POST /checkin', () => {
           userId: 'user-1',
           sandboxId: instanceSandboxId,
           instanceId,
+          shouldNotify: true,
         }),
       }
     );
@@ -410,6 +411,7 @@ describe('POST /checkin', () => {
         body: JSON.stringify({
           userId: 'user-1',
           sandboxId,
+          shouldNotify: false,
         }),
       }
     );

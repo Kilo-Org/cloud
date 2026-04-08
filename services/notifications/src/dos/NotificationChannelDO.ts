@@ -117,7 +117,10 @@ export class NotificationChannelDO extends DurableObject<Env> {
   }
 }
 
-export function getNotificationChannelDO(env: Env, channelId: string) {
+export function getNotificationChannelDO(
+  env: Env,
+  channelId: string
+): DurableObjectStub<NotificationChannelDO> {
   const id = env.NOTIFICATION_CHANNEL_DO.idFromName(channelId);
-  return env.NOTIFICATION_CHANNEL_DO.get(id);
+  return env.NOTIFICATION_CHANNEL_DO.get(id) as DurableObjectStub<NotificationChannelDO>;
 }

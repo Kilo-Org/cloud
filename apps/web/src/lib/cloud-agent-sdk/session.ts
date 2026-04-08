@@ -53,6 +53,7 @@ type CloudAgentSessionSendInput = {
   mode?: string;
   model?: string;
   variant?: string;
+  messageId?: string;
 };
 
 type CloudAgentSessionAnswerInput = {

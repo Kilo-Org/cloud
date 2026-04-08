@@ -23,6 +23,9 @@ type SessionStorage = {
 
   // Bulk operations
   clear(): void;
+
+  // Delete a message and all its parts
+  deleteMessage(messageId: string): void;
 };
 
 /**
@@ -33,6 +36,7 @@ type StorageMutation =
   | { type: 'upsert_message'; info: MessageInfo }
   | { type: 'upsert_part'; messageId: string; part: Part }
   | { type: 'apply_delta'; messageId: string; partId: string; field: string; delta: string }
-  | { type: 'delete_part'; messageId: string; partId: string };
+  | { type: 'delete_part'; messageId: string; partId: string }
+  | { type: 'delete_message'; messageId: string };
 
 export type { SessionStorage, StorageMutation };

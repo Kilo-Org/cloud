@@ -6,6 +6,16 @@ type ChatProcessor = {
   process(event: ChatEvent): void;
 };
 
+function hasTextField(part: { text?: string } | unknown): part is { text: string } {
+  return typeof part === 'object' && part !== null && 'text' in part;
+}
+
+function isSyntheticPart(part: unknown): boolean {
+  return (
+    typeof part === 'object' && part !== null && 'synthetic' in part && part.synthetic === true
+  );
+}
+
 function createChatProcessor(storage: SessionStorage): ChatProcessor {
   return {
     process(event) {
@@ -15,6 +25,13 @@ function createChatProcessor(storage: SessionStorage): ChatProcessor {
           break;
         case 'message.part.updated': {
           const stripped = stripPartContentIfFile(event.part);
+          if (hasTextField(stripped) && stripped.text === '' && !isSyntheticPart(stripped)) {
+            const existingParts = storage.getParts(stripped.messageID);
+            const existing = existingParts.find(p => p.id === stripped.id);
+            if (existing && hasTextField(existing) && existing.text.length > 0) {
+              break;
+            }
+          }
           storage.upsertPart(stripped.messageID, stripped);
           break;
         }

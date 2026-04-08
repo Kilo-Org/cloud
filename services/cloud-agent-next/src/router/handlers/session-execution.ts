@@ -173,6 +173,7 @@ export function createSessionExecutionV2Handlers() {
             variant: input.variant,
             autoCommit: input.autoCommit,
             condenseOnComplete: input.condenseOnComplete,
+            messageId: input.messageId,
             tokenOverrides: {
               githubToken: input.githubToken,
               gitToken: input.gitToken,

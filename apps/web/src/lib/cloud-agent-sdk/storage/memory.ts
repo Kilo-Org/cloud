@@ -208,6 +208,22 @@ function createMemoryStorage(): SessionStorage {
       }
       notify(subscribers, 'messageIds');
     },
+
+    deleteMessage(messageId) {
+      if (!messages.has(messageId)) return;
+
+      messages.delete(messageId);
+      messageIds = messageIds.filter(id => id !== messageId);
+
+      if (parts.has(messageId)) {
+        parts.delete(messageId);
+        partsSnapshot.delete(messageId);
+        notify(subscribers, `parts:${messageId}`);
+      }
+
+      notify(subscribers, `message:${messageId}`);
+      notify(subscribers, 'messageIds');
+    },
   };
 }
 

@@ -100,6 +100,67 @@ describe('createChatProcessor', () => {
       expect(storedFile.url).toBe('');
       expect(storedFile.source?.text.value).toBe('');
     });
+
+    it('does not replace text with empty non-synthetic part', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      // Add synthetic optimistic part with text
+      const syntheticPart = {
+        id: 'part-1',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'text' as const,
+        text: 'user message text',
+        synthetic: true,
+      };
+      processor.process({ type: 'message.part.updated', part: syntheticPart });
+      expect((storage.getParts('msg-1')[0] satisfies Part as TextPart).text).toBe(
+        'user message text'
+      );
+
+      // Server sends non-synthetic part with empty text
+      const nonSyntheticEmptyPart = {
+        id: 'part-1',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'text' as const,
+        text: '',
+        synthetic: false,
+      };
+      processor.process({ type: 'message.part.updated', part: nonSyntheticEmptyPart });
+
+      // Should preserve the existing text
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as TextPart).text).toBe('user message text');
+    });
+
+    it('does not replace text with empty server part that omits synthetic', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.process({
+        type: 'message.part.updated',
+        part: {
+          id: 'part-1',
+          sessionID: 'ses-1',
+          messageID: 'msg-1',
+          type: 'text',
+          text: 'user message text',
+          synthetic: true,
+        },
+      });
+
+      processor.process({
+        type: 'message.part.updated',
+        part: makeTextPart('part-1', 'msg-1', ''),
+      });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as TextPart).text).toBe('user message text');
+    });
   });
 
   describe('message.part.delta', () => {

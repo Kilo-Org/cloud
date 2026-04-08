@@ -65,6 +65,7 @@ import {
   detectGitPlatform,
 } from '@/components/cloud-agent-next/utils/git-utils';
 import type { AgentMode } from './types';
+import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
 
 type Repository = {
   id: number;
@@ -516,6 +517,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     setIsPreparing(true);
 
     try {
+      const initialMessageId = generateMessageId();
       const baseInput = {
         prompt: prompt.trim(),
         mode,
@@ -526,6 +528,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         profileName: selectedProfile?.name,
         autoCommit: true,
         autoInitiate: true,
+        initialMessageId,
       };
       let result: { kiloSessionId: string; cloudAgentSessionId: string };
 

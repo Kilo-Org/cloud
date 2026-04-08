@@ -330,6 +330,19 @@ function findServicePane(sessionName: string, serviceName: string): PaneInfo | u
   }
 }
 
+function isPaneRunningCommand(sessionName: string, pane: PaneInfo): boolean {
+  try {
+    const command = execSync(
+      `tmux display-message -p -t ${sessionName}:${pane.windowIndex}.${pane.paneIndex} "#{pane_current_command}"`,
+      { encoding: 'utf-8' }
+    ).trim();
+    const commandName = path.basename(command).replace(/^-/, '');
+    return commandName !== '' && !['bash', 'fish', 'nu', 'sh', 'tcsh', 'zsh'].includes(commandName);
+  } catch {
+    return false;
+  }
+}
+
 function selectPane(sessionName: string, windowTarget: string | number, pane: number): void {
   execSync(`tmux select-pane -t ${sessionName}:${windowTarget}.${pane}`, { stdio: 'ignore' });
 }
@@ -424,6 +437,7 @@ export {
   breakPane,
   countPanes,
   findServicePane,
+  isPaneRunningCommand,
   selectPane,
   setPaneTitle,
   enablePaneBorders,

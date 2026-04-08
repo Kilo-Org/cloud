@@ -31,6 +31,7 @@ import {
   enablePaneBorders,
   isTmuxAvailable,
   findServicePane,
+  isPaneRunningCommand,
 } from './tmux';
 import {
   findRepoRoot,
@@ -336,16 +337,17 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   const sessionName = getSessionName();
   if (!sessionExists(sessionName)) {
     if (isJson) {
-      console.log(JSON.stringify({ session: sessionName, services: [] }));
+      console.log(JSON.stringify({ session: sessionName, portOffset, services: [] }));
     } else {
       console.log('No dev session running');
     }
     return;
   }
 
-  const runningServices = [...services.keys()].filter(
-    name => findServicePane(sessionName, name) !== undefined
-  );
+  const runningServices = [...services.keys()].flatMap(name => {
+    const pane = findServicePane(sessionName, name);
+    return pane ? [{ name, pane }] : [];
+  });
   if (runningServices.length === 0) {
     if (isJson) {
       console.log(JSON.stringify({ session: sessionName, portOffset, services: [] }));
@@ -356,10 +358,10 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   }
 
   const entries: StatusEntry[] = await Promise.all(
-    runningServices.map(async (name): Promise<StatusEntry> => {
+    runningServices.map(async ({ name, pane }): Promise<StatusEntry> => {
       const svc = getService(name);
       const port = svc.port;
-      const isUp = port === 0 || (await probePort(port));
+      const isUp = port === 0 ? isPaneRunningCommand(sessionName, pane) : await probePort(port);
       const status: ServiceStatus = isUp ? 'up' : 'down';
       return {
         name,

@@ -1,9 +1,9 @@
 /* Content scanning for Tailwind v4 - scan both storybook and main app files */
 @source '../**/*.{js,ts,jsx,tsx}';
-@source '../../src/**/*.{js,ts,jsx,tsx}';
+@source '../../web/src/**/*.{js,ts,jsx,tsx}';
 
 @import 'tailwindcss';
-@import '../../src/app/globals.css';
+@import '../../web/src/app/globals.css';
 
 /* Override Storybook's default styles to match our dark theme */
 .sb-show-main {

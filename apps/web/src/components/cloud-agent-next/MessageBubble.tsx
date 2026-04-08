@@ -18,12 +18,27 @@ import { PartRenderer } from './PartRenderer';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { stripImageContext } from '@/lib/app-builder/message-utils';
 
-const URL_REGEX = /https?:\/\/[^\s<>"']+[^\s<>"'.,:;!?)]/g;
+const URL_REGEX = /https?:\/\/[^\s<>"']+/g;
 
-/**
- * Renders plain text with bare URLs converted to clickable links, preserving
- * whitespace-pre-wrap formatting.
- */
+function cleanUrl(url: string): { url: string; trailing: string } {
+  let trailing = '';
+
+  while (url.length > 0 && /[.,;:!?]$/.test(url)) {
+    trailing = url.slice(-1) + trailing;
+    url = url.slice(0, -1);
+  }
+
+  while (url.endsWith(')')) {
+    const opens = (url.match(/\(/g) || []).length;
+    const closes = (url.match(/\)/g) || []).length;
+    if (closes <= opens) break;
+    trailing = ')' + trailing;
+    url = url.slice(0, -1);
+  }
+
+  return { url, trailing };
+}
+
 function TextWithLinks({ text }: { text: string }) {
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -33,7 +48,8 @@ function TextWithLinks({ text }: { text: string }) {
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
-    const url = match[0];
+    const rawUrl = match[0];
+    const { url, trailing } = cleanUrl(rawUrl);
     parts.push(
       <a
         key={match.index}
@@ -43,9 +59,12 @@ function TextWithLinks({ text }: { text: string }) {
         className="underline opacity-80 hover:opacity-100"
       >
         {url}
-      </a>,
+      </a>
     );
-    lastIndex = match.index + url.length;
+    if (trailing) {
+      parts.push(trailing);
+    }
+    lastIndex = match.index + rawUrl.length;
   }
   if (lastIndex < text.length) {
     parts.push(text.slice(lastIndex));

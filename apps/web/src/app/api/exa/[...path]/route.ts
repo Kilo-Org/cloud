@@ -1,8 +1,9 @@
-import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
+import { NextResponse } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { EXA_API_KEY } from '@/lib/config.server';
 import { after } from 'next/server';
+import { wrapInSafeNextResponse } from '@/lib/llm-proxy-helpers';
 
 const EXA_BASE_URL = 'https://api.exa.ai';
 
@@ -23,7 +24,7 @@ function logExaCost(userId: string, path: string, responseBody: unknown) {
   }
 }
 
-export async function POST(request: NextRequest): Promise<NextResponseType<unknown>> {
+export async function POST(request: NextRequest) {
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
   if (authFailedResponse) return authFailedResponse;
 
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       'x-api-key': EXA_API_KEY,
     },
     body: requestBody,
+    signal: request.signal,
   });
 
   if (response.status >= 400) {
@@ -72,10 +74,5 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
   }
 
-  return new NextResponse(response.body, {
-    status: response.status,
-    headers: {
-      'Content-Type': response.headers.get('Content-Type') ?? 'application/json',
-    },
-  });
+  return wrapInSafeNextResponse(response);
 }

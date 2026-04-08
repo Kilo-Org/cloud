@@ -164,6 +164,77 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      # ── Push to dev Fly registry ──────────────────────────────
+      # Always push a timestamped copy to the dev registry so the
+      # dev environment stays in sync with production images.
+      - name: Login to dev Fly Registry
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: registry.fly.io
+          username: x
+          password: ${{ secrets.FLY_DEV_API_TOKEN }}
+
+      - name: Generate dev image tag
+        id: dev-tag
+        run: |
+          TIMESTAMP=$(date +%s)
+          echo "tag=dev-${TIMESTAMP}" >> "$GITHUB_OUTPUT"
+          echo "Dev tag: dev-${TIMESTAMP}"
+
+      - name: Push image to dev registry
+        id: dev-push
+        run: |
+          PROD_IMAGE="registry.fly.io/kiloclaw-machines:${{ steps.image-hash.outputs.tag }}"
+          DEV_IMAGE="registry.fly.io/kiloclaw-registry-dev:${{ steps.dev-tag.outputs.tag }}"
+
+          echo "Pulling prod image: ${PROD_IMAGE}"
+          docker pull "${PROD_IMAGE}"
+
+          echo "Tagging as: ${DEV_IMAGE}"
+          docker tag "${PROD_IMAGE}" "${DEV_IMAGE}"
+
+          echo "Pushing to dev registry..."
+          docker push "${DEV_IMAGE}"
+
+          echo "dev_image=${DEV_IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "✅ Pushed dev image: ${DEV_IMAGE}"
+
+      - name: Write dev .dev.vars summary
+        run: |
+          TAG="${{ steps.dev-tag.outputs.tag }}"
+          DIGEST="${{ steps.image-digest.outputs.digest }}"
+          OPENCLAW="${{ steps.openclaw-version.outputs.version }}"
+          CONTENT="${{ steps.image-hash.outputs.hash }}"
+
+          {
+            echo ""
+            echo "## .dev.vars entries for KiloClaw worker"
+            echo ""
+            echo "Add or update these in \`services/kiloclaw/.dev.vars\`, then restart wrangler dev:"
+            echo ""
+            echo '```'
+            echo "FLY_IMAGE_TAG=${TAG}"
+            if [ -n "$DIGEST" ]; then
+              echo "FLY_IMAGE_DIGEST=${DIGEST}"
+            fi
+            echo "OPENCLAW_VERSION=${OPENCLAW}"
+            echo "FLY_IMAGE_CONTENT_HASH=${CONTENT}"
+            echo '```'
+            echo ""
+            echo "**Image pushed to:** \`registry.fly.io/kiloclaw-registry-dev:${TAG}\`"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # ── Re-login to prod Fly registry ───────────────────────────
+      # Restore prod credentials so subsequent steps (worker deploy)
+      # work with the production registry.
+      - name: Login to prod Fly Registry
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: registry.fly.io
+          username: x
+          password: ${{ secrets.FLY_API_TOKEN }}
+
       # ── Deploy Worker (always runs) ─────────────────────────────
       # Worker always deploys with the content-hash image tag.
       # registerVersionIfNeeded() will no-op if the tag is already registered.

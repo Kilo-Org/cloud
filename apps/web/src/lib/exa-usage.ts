@@ -79,7 +79,19 @@ export async function recordExaUsage(params: {
   } = params;
   const chargedAmount = chargedToBalance ? costMicrodollars : 0;
 
-  // 1. Upsert the monthly counter (atomic increment).
+  // 1. Append to the usage log first. This is the source of truth for balance
+  // recomputation, so it must succeed before we touch any counters. If this
+  // fails (e.g. missing partition), nothing else is modified and recompute
+  // can still reconcile from the log rows that do exist.
+  await db.insert(exa_usage_log).values({
+    kilo_user_id: userId,
+    organization_id: organizationId ?? null,
+    path,
+    cost_microdollars: costMicrodollars,
+    charged_to_balance: chargedToBalance,
+  });
+
+  // 2. Upsert the monthly counter (atomic increment).
   // free_allowance_microdollars is set on INSERT (first request of the month)
   // but NOT updated on conflict — the first-of-month value is locked in.
   // Two partial unique indexes exist: one for personal (org IS NULL) and one
@@ -92,17 +104,8 @@ export async function recordExaUsage(params: {
     freeAllowanceMicrodollars,
   });
 
-  // 2. Append to the usage log. This is the source of truth for balance
-  // recomputation, so we let insert errors propagate rather than swallowing them.
-  await db.insert(exa_usage_log).values({
-    kilo_user_id: userId,
-    organization_id: organizationId ?? null,
-    path,
-    cost_microdollars: costMicrodollars,
-    charged_to_balance: chargedToBalance,
-  });
-
-  // 3. If over the free tier, deduct from the Kilo credit balance
+  // 3. If over the free tier, deduct from the Kilo credit balance.
+  // If this fails, the log row exists so recompute can recover.
   if (chargedToBalance && costMicrodollars > 0) {
     await deductFromBalance(userId, organizationId, costMicrodollars, path);
   }

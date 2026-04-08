@@ -1,8 +1,4 @@
 declare namespace Cloudflare {
-	interface SecretsStoreSecret {
-		readonly name: string;
-		readonly value: string;
-	}
 	interface GlobalProps {
 		mainModule: typeof import('./src/worker');
 		durableNamespaces: 'GrafanaContainer';

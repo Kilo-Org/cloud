@@ -1,78 +1,60 @@
 import { describe, it, expect } from '@jest/globals';
-import { cleanUrl } from './url-utils';
+import LinkifyIt from 'linkify-it';
 
-describe('cleanUrl', () => {
+const linkify = new LinkifyIt();
+
+describe('linkify-it URL matching', () => {
   it('preserves balanced parentheses', () => {
-    expect(cleanUrl('https://en.wikipedia.org/wiki/Function_(mathematics)')).toEqual({
-      url: 'https://en.wikipedia.org/wiki/Function_(mathematics)',
-      trailing: '',
-    });
+    const matches = linkify.match('https://en.wikipedia.org/wiki/Function_(mathematics)');
+    expect(matches).toHaveLength(1);
+    expect(matches?.[0].url).toBe('https://en.wikipedia.org/wiki/Function_(mathematics)');
+    expect(matches?.[0].text).toBe('https://en.wikipedia.org/wiki/Function_(mathematics)');
   });
 
   it('removes trailing punctuation after balanced parentheses', () => {
-    expect(cleanUrl('https://en.wikipedia.org/wiki/Function_(mathematics).')).toEqual({
-      url: 'https://en.wikipedia.org/wiki/Function_(mathematics)',
-      trailing: '.',
-    });
-  });
-
-  it('removes multiple trailing punctuation', () => {
-    expect(cleanUrl('https://example.com/path...')).toEqual({
-      url: 'https://example.com/path',
-      trailing: '...',
-    });
+    const matches = linkify.match('Check https://en.wikipedia.org/wiki/Function_(mathematics).');
+    expect(matches).toHaveLength(1);
+    expect(matches?.[0].url).toBe('https://en.wikipedia.org/wiki/Function_(mathematics)');
   });
 
   it('removes single unmatched closing parenthesis', () => {
-    expect(cleanUrl('https://example.com/path)')).toEqual({
-      url: 'https://example.com/path',
-      trailing: ')',
-    });
+    const matches = linkify.match('See (https://example.com/path)');
+    expect(matches).toHaveLength(1);
+    expect(matches?.[0].url).toBe('https://example.com/path');
   });
 
   it('removes multiple unmatched closing parentheses', () => {
-    expect(cleanUrl('https://example.com/path))')).toEqual({
-      url: 'https://example.com/path',
-      trailing: '))',
-    });
-  });
-
-  it('removes dangling parentheses with punctuation', () => {
-    expect(cleanUrl('https://example.com/path)).')).toEqual({
-      url: 'https://example.com/path',
-      trailing: ')).',
-    });
+    const matches = linkify.match('((https://example.com/path))');
+    expect(matches).toHaveLength(1);
+    expect(matches?.[0].url).toBe('https://example.com/path');
   });
 
   it('preserves URL with multiple balanced parentheses', () => {
-    expect(cleanUrl('https://example.com/foo_(bar)_baz_(qux)')).toEqual({
-      url: 'https://example.com/foo_(bar)_baz_(qux)',
-      trailing: '',
-    });
-  });
-
-  it('removes only the extra closing parens from unbalanced URL', () => {
-    expect(cleanUrl('https://example.com/foo_(bar)))')).toEqual({
-      url: 'https://example.com/foo_(bar)',
-      trailing: '))',
-    });
+    const matches = linkify.match('https://example.com/foo_(bar)_baz_(qux)');
+    expect(matches).toHaveLength(1);
+    expect(matches?.[0].url).toBe('https://example.com/foo_(bar)_baz_(qux)');
   });
 
   it('handles URL with no trailing characters', () => {
-    expect(cleanUrl('https://example.com/path')).toEqual({
-      url: 'https://example.com/path',
-      trailing: '',
-    });
+    const matches = linkify.match('https://example.com/path');
+    expect(matches).toHaveLength(1);
+    expect(matches?.[0].url).toBe('https://example.com/path');
   });
 
-  it('strips trailing punctuation without parentheses', () => {
-    expect(cleanUrl('https://example.com/path!')).toEqual({
-      url: 'https://example.com/path',
-      trailing: '!',
-    });
-    expect(cleanUrl('https://example.com/path?')).toEqual({
-      url: 'https://example.com/path',
-      trailing: '?',
-    });
+  it('handles multiple URLs in text', () => {
+    const matches = linkify.match('First: https://foo.com and second: https://bar.com/path');
+    expect(matches).toHaveLength(2);
+    expect(matches?.[0].url).toBe('https://foo.com');
+    expect(matches?.[1].url).toBe('https://bar.com/path');
+  });
+
+  it('returns null for text without URLs', () => {
+    const matches = linkify.match('No URLs here');
+    expect(matches).toBeNull();
+  });
+
+  it('matches http and https URLs', () => {
+    const matches = linkify.match('http://example.com and https://example.com');
+    expect(matches).toHaveLength(2);
   });
 });

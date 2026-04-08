@@ -18,36 +18,29 @@ import { PartRenderer } from './PartRenderer';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { stripImageContext } from '@/lib/app-builder/message-utils';
 
-import { cleanUrl } from './url-utils';
+import LinkifyIt from 'linkify-it';
 
-const URL_REGEX = /https?:\/\/[^\s<>"']+/g;
+const linkify = new LinkifyIt();
 
 function TextWithLinks({ text }: { text: string }) {
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  URL_REGEX.lastIndex = 0;
-  while ((match = URL_REGEX.exec(text)) !== null) {
+  for (const match of linkify.match(text) ?? []) {
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
-    const rawUrl = match[0];
-    const { url, trailing } = cleanUrl(rawUrl);
     parts.push(
       <a
         key={match.index}
-        href={url}
+        href={match.url}
         target="_blank"
         rel="noopener noreferrer"
         className="underline opacity-80 hover:opacity-100"
       >
-        {url}
+        {match.text}
       </a>
     );
-    if (trailing) {
-      parts.push(trailing);
-    }
-    lastIndex = match.index + rawUrl.length;
+    lastIndex = match.lastIndex;
   }
   if (lastIndex < text.length) {
     parts.push(text.slice(lastIndex));

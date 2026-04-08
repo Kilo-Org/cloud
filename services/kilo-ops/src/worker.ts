@@ -35,7 +35,7 @@ export class GrafanaContainer extends Container<Env> {
         CF_CLICKHOUSE_URL: this.env.CF_CLICKHOUSE_URL,
         CF_ACCOUNT_ID: this.env.CF_ACCOUNT_ID,
         CF_ANALYTICS_API_KEY: analyticsApiKey,
-        GF_SECRET_KEY: gfSecretKey,
+        GF_SECURITY_SECRET_KEY: gfSecretKey,
       };
     }
 

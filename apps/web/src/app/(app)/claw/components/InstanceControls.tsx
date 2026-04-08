@@ -152,7 +152,7 @@ export function InstanceControls({
                 if (e.key === 'Enter') handleSaveName();
                 if (e.key === 'Escape') {
                   setIsEditingName(false);
-                  setNameValue(status.name ?? '');
+                  setNameValue(status.name || status.botName || '');
                 }
               }}
             />
@@ -165,7 +165,7 @@ export function InstanceControls({
               className="h-8 w-8"
               onClick={() => {
                 setIsEditingName(false);
-                setNameValue(status.name ?? '');
+                setNameValue(status.name || status.botName || '');
               }}
             >
               <X className="h-4 w-4" />
@@ -173,13 +173,15 @@ export function InstanceControls({
           </>
         ) : (
           <>
-            <h2 className="text-lg font-semibold">{status.name || 'Unnamed instance'}</h2>
+            <h2 className="text-lg font-semibold">
+              {status.name || status.botName || 'Unnamed instance'}
+            </h2>
             <Button
               variant="ghost"
               size="icon"
               className="h-8 w-8"
               onClick={() => {
-                setNameValue(status.name ?? '');
+                setNameValue(status.name || status.botName || '');
                 setIsEditingName(true);
               }}
             >

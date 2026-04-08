@@ -308,6 +308,18 @@ export const organizationKiloclawRouter = createTRPCRouter({
         const code = message === 'No active instance found' ? 'NOT_FOUND' : 'BAD_REQUEST';
         throw new TRPCError({ code, message });
       }
+
+      // Best-effort: propagate the new name to the DO so IDENTITY.md stays in sync
+      try {
+        const client = new KiloClawInternalClient();
+        await client.patchBotIdentity(
+          ctx.user.id,
+          { botName: input.name },
+          workerInstanceId(instance)
+        );
+      } catch {
+        // Non-critical — the DB is the source of truth for the display name
+      }
     }),
 
   // ── Lifecycle ─────────────────────────────────────────────────
@@ -530,7 +542,19 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
-      return client.patchBotIdentity(ctx.user.id, input, workerInstanceId(instance));
+      const result = await client.patchBotIdentity(ctx.user.id, input, workerInstanceId(instance));
+
+      // Sync botName → Postgres so the dashboard display name stays in sync
+      if (input.botName !== undefined) {
+        try {
+          await renameOrgInstance(instance.id, ctx.user.id, input.organizationId, input.botName);
+        } catch {
+          // Best-effort: don't fail the mutation if the DB rename fails
+          // (e.g. botName exceeds 50-char DB limit)
+        }
+      }
+
+      return result;
     }),
 
   patchSecrets: organizationMemberMutationProcedure

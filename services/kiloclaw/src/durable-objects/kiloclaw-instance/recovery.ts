@@ -12,7 +12,7 @@ import {
   storageUpdate,
   syncProviderStateForStorage,
 } from './state';
-import { buildUserEnvVars, resolveImageRef, resolveImageTag } from './config';
+import { buildUserEnvVars, resolveImageRef } from './config';
 import * as gateway from './gateway';
 import * as flyMachines from './fly-machines';
 import { buildFlyMachineConfig } from './fly-machines';
@@ -389,7 +389,6 @@ export async function runUnexpectedStopRecoveryInBackground(
     }
 
     const { envVars, minSecretsVersion } = await buildUserEnvVars(env, ctx, state);
-    const imageTag = resolveImageTag(state, env);
     const identity = {
       userId: state.userId,
       sandboxId: state.sandboxId,

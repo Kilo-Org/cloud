@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import { services } from '../services';
@@ -96,7 +97,7 @@ function readEnvFile(filePath: string): Map<string, string> {
 // Annotation parser
 // ---------------------------------------------------------------------------
 
-const KNOWN_DIRECTIVES = new Set(['url', 'from', 'pkcs8']);
+const KNOWN_DIRECTIVES = new Set(['url', 'from', 'pkcs8', 'exec']);
 
 function parseAnnotation(directive: string, args: string): Annotation | undefined {
   switch (directive) {
@@ -113,6 +114,11 @@ function parseAnnotation(directive: string, args: string): Annotation | undefine
       return { type: 'from', envLocalKey: args.trim() };
     case 'pkcs8':
       return { type: 'pkcs8' };
+    case 'exec': {
+      const commandLine = args.trim();
+      if (!commandLine) return undefined;
+      return { type: 'exec', commandLine };
+    }
     default:
       return undefined;
   }
@@ -245,6 +251,20 @@ function resolveAnnotatedValue(
     case 'pkcs8': {
       const val = envLocal.get(key);
       if (val !== undefined) return { value: toPkcs8IfNeeded(val), resolved: true };
+      if (entry.defaultValue) return { value: entry.defaultValue, resolved: true };
+      return { value: '', resolved: false };
+    }
+
+    case 'exec': {
+      const result = spawnSync(entry.annotation.commandLine, {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: true,
+        timeout: 5000,
+      });
+      if (result.status === 0 && result.stdout.trim()) {
+        return { value: result.stdout.trim(), resolved: true };
+      }
       if (entry.defaultValue) return { value: entry.defaultValue, resolved: true };
       return { value: '', resolved: false };
     }

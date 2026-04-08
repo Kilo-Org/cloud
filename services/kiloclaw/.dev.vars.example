@@ -28,6 +28,11 @@ GATEWAY_TOKEN_SECRET=dev-gateway-secret-kiloclaw
 # Fly app naming prefix ("dev-") for per-user app creation.
 WORKER_ENV=development
 
+# Auto-populated by dev-start from `fly auth whoami`.
+# Tags Fly machines with developer identity for cleanup.
+# @exec fly auth whoami
+DEV_CREATOR=
+
 # Backend app origin for internal API calls (e.g. instance-ready email).
 # In dev, point this at your local Next.js server.
 BACKEND_API_URL=http://localhost:3000
@@ -40,7 +45,8 @@ BACKEND_API_URL=http://localhost:3000
 
 # Fly.io Machines API
 # Token is auto-created/refreshed by the dev-start script.
-FLY_API_TOKEN=fo1_...
+# @exec fly auth token --json | jq -r .token
+FLY_API_TOKEN=
 # Fly org slug. The dev-start script reads this value for token creation.
 # Use "kilo-dev" for Kilo team members, or "personal" for your own Fly account.
 FLY_ORG_SLUG=kilo-dev

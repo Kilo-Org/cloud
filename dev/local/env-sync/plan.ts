@@ -9,6 +9,7 @@ import type {
   EnvDevLocalChange,
   EnvSyncPlan,
   ExampleEntry,
+  ExecWarning,
   KeyChange,
   SecretStoreBinding,
   SecretStoreWarning,
@@ -177,6 +178,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
       secretStoreWarnings: [],
       secretStoreAutoCreates: [],
       consistencyWarnings: [],
+      execWarnings: [],
       missingEnvLocal: true,
     };
   }
@@ -208,6 +210,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
 
   // --- .dev.vars changes ---
   const devVarsChanges: DevVarsFileChange[] = [];
+  const execWarnings: ExecWarning[] = [];
   const allResolvedEntries = new Map<
     string,
     { vars: Map<string, string>; entries: ExampleEntry[] }
@@ -231,7 +234,16 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
         serviceUsesLanIp
       );
       resolvedVars.set(entry.key, value);
-      if (!resolved) unresolvedKeys.push(entry.key);
+      if (!resolved) {
+        unresolvedKeys.push(entry.key);
+        if (entry.annotation.type === 'exec') {
+          execWarnings.push({
+            workerDir,
+            key: entry.key,
+            commandLine: entry.annotation.commandLine,
+          });
+        }
+      }
     }
 
     allResolvedEntries.set(workerDir, { vars: resolvedVars, entries });
@@ -399,6 +411,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     secretStoreWarnings,
     secretStoreAutoCreates,
     consistencyWarnings,
+    execWarnings,
     missingEnvLocal: false,
   };
 }

@@ -355,6 +355,38 @@ fi
 
 echo "    Fly API token is valid."
 
+# ---------- Resolve developer identity for machine tagging ----------
+
+echo "==> Resolving developer identity..."
+if ! command -v fly &>/dev/null; then
+  echo ""
+  echo "WARNING: 'fly' CLI not found — cannot determine developer identity."
+  echo "  Dev Fly machines will not be tagged with your identity for cleanup."
+  echo "  Install the Fly CLI: https://fly.io/docs/flyctl/install/"
+  echo ""
+  DEV_CREATOR=""
+elif ! DEV_CREATOR="$(fly auth whoami 2>/dev/null)" || [ -z "$DEV_CREATOR" ]; then
+  echo ""
+  echo "WARNING: Could not determine your Fly identity."
+  echo "  'fly auth whoami' failed — are you logged in?"
+  echo "  Run 'fly auth login' to authenticate, then restart dev-start."
+  echo ""
+  echo "  Dev Fly machines will not be tagged with your identity."
+  echo "  This means cleanup scripts won't be able to find your machines."
+  echo ""
+  DEV_CREATOR=""
+else
+  echo "    Developer identity: $DEV_CREATOR"
+fi
+
+if grep -q '^DEV_CREATOR=' "$KILOCLAW_DIR/.dev.vars"; then
+  sed "s|^DEV_CREATOR=.*|DEV_CREATOR=$DEV_CREATOR|" \
+    "$KILOCLAW_DIR/.dev.vars" > "$KILOCLAW_DIR/.dev.vars.tmp"
+  mv "$KILOCLAW_DIR/.dev.vars.tmp" "$KILOCLAW_DIR/.dev.vars"
+else
+  echo "DEV_CREATOR=$DEV_CREATOR" >> "$KILOCLAW_DIR/.dev.vars"
+fi
+
 # ---------- Install dependencies ----------
 
 echo "==> Installing dependencies..."

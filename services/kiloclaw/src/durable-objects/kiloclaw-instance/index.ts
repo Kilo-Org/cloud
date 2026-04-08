@@ -1063,6 +1063,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       orgId: this.s.orgId,
       openclawVersion: this.s.openclawVersion,
       imageVariant: this.s.imageVariant,
+      devCreator: this.env.WORKER_ENV === 'development' ? (this.env.DEV_CREATOR ?? null) : null,
     };
     const machineConfig = buildMachineConfig(
       getRegistryApp(this.env),
@@ -2237,6 +2238,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         orgId: this.s.orgId,
         openclawVersion: this.s.openclawVersion,
         imageVariant: this.s.imageVariant,
+        devCreator: this.env.WORKER_ENV === 'development' ? (this.env.DEV_CREATOR ?? null) : null,
       };
       const machineConfig = buildMachineConfig(
         getRegistryApp(this.env),

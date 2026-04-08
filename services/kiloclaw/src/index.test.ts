@@ -42,6 +42,25 @@ vi.mock('./lib/image-version', async () => {
 
 import worker from './index';
 
+type FetchMock = ReturnType<
+  typeof vi.fn<(input: string | URL | Request, init?: RequestInit) => Promise<Response>>
+>;
+
+function getFetchCall(
+  fetchMock: FetchMock,
+  index = 0
+): { input: unknown; init: RequestInit | undefined } {
+  const call = fetchMock.mock.calls[index];
+  if (!call) {
+    throw new Error(`Expected fetch call at index ${index}`);
+  }
+
+  const input = call[0];
+  const rawInit = call[1];
+  const init = rawInit && typeof rawInit === 'object' ? rawInit : undefined;
+  return { input, init };
+}
+
 describe('platform route env validation', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -154,7 +173,8 @@ describe('proxy routing target usage', () => {
         },
       }),
     };
-    const fetchMock = vi.mocked(fetch).mockResolvedValue(
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+    fetchMock.mockResolvedValue(
       new Response('ok', {
         status: 200,
       })
@@ -180,8 +200,8 @@ describe('proxy routing target usage', () => {
     );
 
     expect(response.status).toBe(200);
-    const [targetUrl, init] = fetchMock.mock.calls[0] ?? [];
-    expect(targetUrl).toBe('https://test-app.fly.dev/api/foo?bar=baz');
+    const { input, init } = getFetchCall(fetchMock);
+    expect(input).toBe('https://test-app.fly.dev/api/foo?bar=baz');
     expect(init).toBeDefined();
     expect(init?.method).toBe('GET');
     expect(init?.headers).toBeInstanceOf(Headers);

@@ -3,6 +3,25 @@ import { deriveGatewayToken } from '../../auth/gateway-token';
 import { createMutableState } from './state';
 import { getGatewayProcessStatus, waitForHealthy } from './gateway';
 
+type FetchMock = ReturnType<
+  typeof vi.fn<(input: string | URL | Request, init?: RequestInit) => Promise<Response>>
+>;
+
+function getFetchCall(
+  fetchMock: FetchMock,
+  index = 0
+): { input: unknown; init: RequestInit | undefined } {
+  const call = fetchMock.mock.calls[index];
+  if (!call) {
+    throw new Error(`Expected fetch call at index ${index}`);
+  }
+
+  const input = call[0];
+  const rawInit = call[1];
+  const init = rawInit && typeof rawInit === 'object' ? rawInit : undefined;
+  return { input, init };
+}
+
 describe('gateway controller routing', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -15,7 +34,7 @@ describe('gateway controller routing', () => {
     state.flyAppName = 'test-app';
     state.flyMachineId = 'machine-1';
 
-    const fetchMock = vi.fn().mockResolvedValue(
+    const fetchMock: FetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
           state: 'running',
@@ -40,8 +59,8 @@ describe('gateway controller routing', () => {
     const expectedToken = await deriveGatewayToken('sandbox-1', 'gateway-secret');
 
     expect(result.state).toBe('running');
-    const [targetUrl, init] = fetchMock.mock.calls[0] ?? [];
-    expect(targetUrl).toBe('https://test-app.fly.dev/_kilo/gateway/status');
+    const { input, init } = getFetchCall(fetchMock);
+    expect(input).toBe('https://test-app.fly.dev/_kilo/gateway/status');
     expect(init).toBeDefined();
     expect(init?.method).toBe('GET');
 
@@ -61,7 +80,7 @@ describe('gateway controller routing', () => {
     state.flyAppName = 'test-app';
     state.flyMachineId = 'machine-1';
 
-    const fetchMock = vi
+    const fetchMock: FetchMock = vi
       .fn()
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ state: 'running' }), {
@@ -79,7 +98,7 @@ describe('gateway controller routing', () => {
 
     const expectedToken = await deriveGatewayToken('sandbox-1', 'gateway-secret');
 
-    const [statusUrl, statusInit] = fetchMock.mock.calls[0] ?? [];
+    const { input: statusUrl, init: statusInit } = getFetchCall(fetchMock, 0);
     expect(statusUrl).toBe('https://test-app.fly.dev/_kilo/gateway/status');
     expect(statusInit?.headers).toMatchObject({
       Authorization: `Bearer ${expectedToken}`,
@@ -87,7 +106,7 @@ describe('gateway controller routing', () => {
       'fly-force-instance-id': 'machine-1',
     });
 
-    const [rootUrl, rootInit] = fetchMock.mock.calls[1] ?? [];
+    const { input: rootUrl, init: rootInit } = getFetchCall(fetchMock, 1);
     expect(rootUrl).toBe('https://test-app.fly.dev/');
     expect(rootInit?.headers).toMatchObject({
       'fly-force-instance-id': 'machine-1',

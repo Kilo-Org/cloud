@@ -3809,3 +3809,49 @@ export const kiloclaw_cli_runs = pgTable(
 
 export type KiloClawCliRun = typeof kiloclaw_cli_runs.$inferSelect;
 export type NewKiloClawCliRun = typeof kiloclaw_cli_runs.$inferInsert;
+
+// ============ EXA USAGE TRACKING ============
+// Pre-aggregated monthly counter (hot path) + per-request audit log (partitioned)
+
+export const exa_monthly_usage = pgTable(
+  'exa_monthly_usage',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    kilo_user_id: text().notNull(),
+    month: date({ mode: 'string' }).notNull(),
+    total_cost_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    total_charged_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    request_count: integer().notNull().default(0),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [uniqueIndex('idx_exa_monthly_usage_user_month').on(table.kilo_user_id, table.month)]
+);
+
+export type ExaMonthlyUsage = typeof exa_monthly_usage.$inferSelect;
+
+// Per-request audit log — partitioned by month on created_at.
+// The Drizzle definition is for type inference; the actual table is created
+// as a partitioned table in the migration with hand-written SQL.
+export const exa_usage_log = pgTable(
+  'exa_usage_log',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    path: text().notNull(),
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    charged_to_balance: boolean().notNull().default(false),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.id, table.created_at] }),
+    index('idx_exa_usage_log_user_created').on(table.kilo_user_id, table.created_at),
+  ]
+);
+
+export type ExaUsageLog = typeof exa_usage_log.$inferSelect;

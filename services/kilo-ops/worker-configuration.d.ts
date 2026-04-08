@@ -4,7 +4,6 @@ declare namespace Cloudflare {
 		durableNamespaces: 'GrafanaContainer';
 	}
 	interface Env {
-		NEXTAUTH_SECRET: SecretsStoreSecret;
 		CF_ANALYTICS_API_KEY: SecretsStoreSecret;
 		GF_SECRET_KEY: SecretsStoreSecret;
 		ENVIRONMENT: 'production' | 'development';

@@ -12,11 +12,8 @@
   },
   "dependencies": {
     "@cloudflare/containers": "^0.1.0",
-    "@kilocode/worker-utils": "workspace:*",
     "hono": "catalog:",
-    "jose": "catalog:",
-    "workers-tagged-logger": "catalog:",
-    "zod": "catalog:"
+    "jose": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",

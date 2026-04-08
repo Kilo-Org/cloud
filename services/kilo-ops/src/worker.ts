@@ -1,7 +1,6 @@
 import { Container } from '@cloudflare/containers';
 import { Hono } from 'hono';
-import { extractBearerToken, verifyKiloToken } from '@kilocode/worker-utils';
-import { verifyCfAccess } from './cf-access';
+import { withCloudflareAccess } from './cf-access.middleware';
 
 export type KiloOpsEnv = {
   Bindings: Env;
@@ -63,11 +62,20 @@ const app = new Hono<KiloOpsEnv>();
 
 app.get('/healthz', c => c.json({ ok: true }));
 
-app.all('/*', async c => {
-  const userIdentity = await authenticate(c.req.raw, c.env);
-  if (!userIdentity) {
-    return c.json({ error: 'Unauthorized' }, 401);
+app.use('/*', async (c, next) => {
+  if (c.env.ENVIRONMENT === 'development') {
+    c.set('userIdentity', 'dev@kilo.dev');
+    return next();
   }
+
+  return withCloudflareAccess({
+    team: c.env.CF_ACCESS_TEAM,
+    audience: c.env.CF_ACCESS_AUD,
+  })(c, next);
+});
+
+app.all('/*', async c => {
+  const userIdentity = c.get('userIdentity');
 
   const url = new URL(c.req.url);
   const container = getGrafanaContainerStub(c.env);
@@ -108,28 +116,5 @@ app.all('/*', async c => {
     headers: response.headers,
   });
 });
-
-async function authenticate(request: Request, env: Env): Promise<string | null> {
-  const bearerToken = extractBearerToken(request.headers.get('Authorization'));
-  if (bearerToken) {
-    const identity = await verifyKiloJwt(bearerToken, env);
-    if (identity) return identity;
-  }
-
-  return verifyCfAccess(request, env.CF_ACCESS_TEAM, env.CF_ACCESS_AUD);
-}
-
-async function verifyKiloJwt(token: string, env: Env): Promise<string | null> {
-  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
-  if (!secret) return null;
-
-  try {
-    const payload = await verifyKiloToken(token, secret);
-    if (payload.isAdmin !== true) return null;
-    return payload.kiloUserId;
-  } catch {
-    return null;
-  }
-}
 
 export default app;

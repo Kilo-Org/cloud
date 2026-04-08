@@ -1170,6 +1170,9 @@ export function reconcileReviewQueue(
   // still need the refinery — but those are only created when
   // merge_strategy='direct', which inherently requires the refinery.
   if (!refineryCodeReview) {
+    // Fast-track open MR beads to in_progress so poll_pr handles auto-merge.
+    // EXCLUDE MR beads belonging to a review-and-merge convoy — those still
+    // need the refinery to perform the combined review+merge step.
     const openMrs = z
       .object({ bead_id: z.string() })
       .array()
@@ -1181,6 +1184,14 @@ export function reconcileReviewQueue(
             FROM ${beads} b
             WHERE b.${beads.columns.type} = 'merge_request'
               AND b.${beads.columns.status} = 'open'
+              AND NOT EXISTS (
+                SELECT 1
+                FROM ${beads} parent
+                JOIN ${convoy_metadata} cm
+                  ON cm.${convoy_metadata.columns.bead_id} = parent.${beads.columns.bead_id}
+                WHERE parent.${beads.columns.bead_id} = b.${beads.columns.parent_bead_id}
+                  AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
+              )
           `,
           []
         ),
@@ -1198,11 +1209,9 @@ export function reconcileReviewQueue(
   }
 
   // Rules 5-6: Refinery dispatch for open MR beads.
-  // Only runs when code review is enabled. When code_review=false, the
-  // fast-track above transitions all open MR beads to in_progress so
-  // poll_pr handles auto-merge. Direct-merge MR beads are only created
-  // when merge_strategy='direct', which inherently requires code_review.
-  if (refineryCodeReview) {
+  // Runs when code review is enabled OR for convoy review-and-merge MR
+  // beads (which need the refinery regardless of the code_review setting).
+  {
     // Rule 5: Pop open MR bead for idle refinery
     // Get all rigs that have open MR beads
     const rigsWithOpenMrs = z
@@ -1434,7 +1443,7 @@ export function reconcileReviewQueue(
         rig_id: mr.rig_id ?? ref.rig_id ?? '',
       });
     }
-  } // end refineryCodeReview gate (Rules 5–6)
+  } // end Rules 5–6 block
 
   // Rule 7: Working refinery hooked to a terminal MR bead — stop it.
   // This catches the race where auto-merge closes the MR bead while the

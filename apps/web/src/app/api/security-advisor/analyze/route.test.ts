@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { failureResult } from '@/lib/maybe-result';
-import { captureException } from '@sentry/nextjs';
 import type { User } from '@kilocode/db/schema';
 import {
   checkSecurityAdvisorRateLimit,
@@ -34,7 +33,6 @@ const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedCheckRateLimit = jest.mocked(checkSecurityAdvisorRateLimit);
 const mockedRecordScan = jest.mocked(recordSecurityAdvisorScan);
 const mockedTrackScan = jest.mocked(trackSecurityAdvisorScanCompleted);
-const mockedCaptureException = jest.mocked(captureException);
 
 function setUserAuth(id = 'user-123') {
   mockedGetUserFromAuth.mockResolvedValue({
@@ -216,7 +214,7 @@ describe('POST /api/security-advisor/analyze', () => {
     expect(data.error.code).toBe('rate_limited');
   });
 
-  it('records scan and fires PostHog event in after() callback', async () => {
+  it('records scan synchronously before response', async () => {
     setUserAuth();
     setRateLimitAllowed();
     const { POST } = await import('./route');
@@ -224,13 +222,7 @@ describe('POST /api/security-advisor/analyze', () => {
     const response = await POST(makeRequest() as never);
     expect(response.status).toBe(200);
 
-    // after() callbacks haven't fired yet
-    expect(mockedRecordScan).not.toHaveBeenCalled();
-    expect(mockedTrackScan).not.toHaveBeenCalled();
-
-    // Flush the after() callbacks
-    await flushAfterCallbacks();
-
+    // DB write happens synchronously (before response), not in after()
     expect(mockedRecordScan).toHaveBeenCalledWith(
       'user-123',
       'org-456',
@@ -239,6 +231,19 @@ describe('POST /api/security-advisor/analyze', () => {
         source: expect.objectContaining({ platform: 'openclaw' }),
       })
     );
+  });
+
+  it('fires PostHog event in after() callback', async () => {
+    setUserAuth();
+    setRateLimitAllowed();
+    const { POST } = await import('./route');
+
+    await POST(makeRequest() as never);
+
+    // PostHog fires in after() — not yet called
+    expect(mockedTrackScan).not.toHaveBeenCalled();
+
+    await flushAfterCallbacks();
 
     expect(mockedTrackScan).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -248,23 +253,6 @@ describe('POST /api/security-advisor/analyze', () => {
         sourcePlatform: 'openclaw',
         findingsCritical: 1,
       })
-    );
-  });
-
-  it('captures exception to Sentry when after() callback fails', async () => {
-    setUserAuth();
-    setRateLimitAllowed();
-    mockedRecordScan.mockRejectedValue(new Error('DB write failed'));
-
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest() as never);
-    expect(response.status).toBe(200);
-
-    await flushAfterCallbacks();
-
-    expect(mockedCaptureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({ tags: { source: 'security_advisor_after_callback' } })
     );
   });
 });

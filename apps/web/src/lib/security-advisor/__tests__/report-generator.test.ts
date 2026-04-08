@@ -61,9 +61,10 @@ describe('generateSecurityReport', () => {
       isKiloClaw: false,
     });
 
-    it('returns correct summary counts', () => {
-      expect(report.summary.critical).toBe(1);
-      expect(report.summary.warn).toBe(4);
+    it('returns summary counts recomputed from server-mapped severity', () => {
+      // auth.no_authentication is client-reported as warn but server maps to critical
+      expect(report.summary.critical).toBe(2); // fs.config + auth.no_auth
+      expect(report.summary.warn).toBe(3); // no_allowlist, outdated, no_tls
       expect(report.summary.info).toBe(1);
       expect(report.summary.passed).toBe(1); // gateway deep check passed
     });
@@ -250,6 +251,9 @@ describe('generateSecurityReport', () => {
 
       // Server overrides to critical
       expect(report.findings[0]!.severity).toBe('critical');
+      // Summary counts are recomputed from server-mapped findings, not client
+      expect(report.summary.critical).toBe(1);
+      expect(report.summary.info).toBe(0);
       // Should appear in recommendations as immediate priority (not skipped as info)
       expect(report.recommendations.length).toBeGreaterThan(0);
       expect(report.recommendations[0]!.priority).toBe('immediate');

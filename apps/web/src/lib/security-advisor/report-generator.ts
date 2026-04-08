@@ -140,10 +140,13 @@ export function generateSecurityReport(options: GenerateReportOptions): Generate
     check => typeof check === 'object' && check !== null && 'ok' in check && check.ok === true
   ).length;
 
+  // Recompute severity counts from server-mapped findings, not client-reported
+  // summary. Server may have overridden severity for known checkIds, so the
+  // client's counts can't be trusted.
   const summary = {
-    critical: audit.summary.critical,
-    warn: audit.summary.warn,
-    info: audit.summary.info,
+    critical: findings.filter(f => f.severity === 'critical').length,
+    warn: findings.filter(f => f.severity === 'warn').length,
+    info: findings.filter(f => f.severity === 'info').length,
     passed,
   };
 

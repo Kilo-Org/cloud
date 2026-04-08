@@ -54,10 +54,7 @@ export const SecurityAdvisorRequestSchema = z.object({
 
   publicIp: z
     .string()
-    .regex(
-      /^(?:\d{1,3}\.){3}\d{1,3}$|^[0-9a-fA-F:]+$/,
-      'Must be a valid IPv4 or IPv6 address'
-    )
+    .regex(/^(?:\d{1,3}\.){3}\d{1,3}$|^[0-9a-fA-F:]+$/, 'Must be a valid IPv4 or IPv6 address')
     .optional(),
 });
 export type SecurityAdvisorRequest = z.infer<typeof SecurityAdvisorRequestSchema>;

@@ -90,11 +90,13 @@ export async function POST(request: NextRequest) {
     isKiloClaw,
   });
 
-  // 7. Record scan in DB and fire PostHog event (non-blocking)
-  after(async () => {
-    try {
-      await recordSecurityAdvisorScan(user.id, organizationId ?? undefined, payload);
+  // 7. Record scan in DB (synchronous — must complete before response
+  // so the rate limit counter is accurate under concurrent requests)
+  await recordSecurityAdvisorScan(user.id, organizationId ?? undefined, payload);
 
+  // 8. Fire PostHog event (non-blocking — analytics don't need to block the response)
+  after(() => {
+    try {
       trackSecurityAdvisorScanCompleted({
         distinctId: user.id,
         userId: user.id,
@@ -103,17 +105,17 @@ export async function POST(request: NextRequest) {
         sourceMethod: payload.source.method,
         pluginVersion: payload.source.pluginVersion,
         openclawVersion: payload.source.openclawVersion,
-        findingsCritical: payload.audit.summary.critical,
-        findingsWarn: payload.audit.summary.warn,
-        findingsInfo: payload.audit.summary.info,
+        findingsCritical: report.summary.critical,
+        findingsWarn: report.summary.warn,
+        findingsInfo: report.summary.info,
         publicIp: payload.publicIp,
       });
     } catch (err) {
-      captureException(err, { tags: { source: 'security_advisor_after_callback' } });
+      captureException(err, { tags: { source: 'security_advisor_posthog' } });
     }
   });
 
-  // 8. Return structured response
+  // 9. Return structured response
   const response: SecurityAdvisorResponse = {
     apiVersion: API_VERSION,
     status: 'success',

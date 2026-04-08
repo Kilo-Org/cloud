@@ -12,20 +12,20 @@
       "enabled": true,
       "head_sampling_rate": 1,
       "persist": true,
-      "invocation_logs": true
+      "invocation_logs": true,
     },
     "traces": {
       "enabled": true,
       "persist": true,
-      "head_sampling_rate": 1
-    }
+      "head_sampling_rate": 1,
+    },
   },
   "upload_source_maps": true,
   "routes": [
     {
       "pattern": "ops.kiloapps.io/*",
-      "zone_name": "kiloapps.io"
-    }
+      "zone_name": "kiloapps.io",
+    },
   ],
   "workers_dev": false,
 
@@ -34,44 +34,42 @@
       "class_name": "GrafanaContainer",
       "image": "./container/Dockerfile",
       "sleepAfter": "5m",
-      "max_instances": 1
-    }
+      "max_instances": 1,
+    },
   ],
 
   "durable_objects": {
-    "bindings": [
-      { "name": "GRAFANA_CONTAINER", "class_name": "GrafanaContainer" }
-    ]
+    "bindings": [{ "name": "GRAFANA_CONTAINER", "class_name": "GrafanaContainer" }],
   },
 
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["GrafanaContainer"]
-    }
+      "new_sqlite_classes": ["GrafanaContainer"],
+    },
   ],
 
   "vars": {
     "ENVIRONMENT": "production",
     "CF_ACCESS_TEAM": "engineering-e11",
-    "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be"
+    "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
   },
 
   "secrets_store_secrets": [
     {
       "binding": "NEXTAUTH_SECRET",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-      "secret_name": "NEXTAUTH_SECRET"
-    }
+      "secret_name": "NEXTAUTH_SECRET",
+    },
   ],
 
   "env": {
     "dev": {
       "vars": {
-        "ENVIRONMENT": "development"
+        "ENVIRONMENT": "development",
       },
       "workers_dev": true,
-      "dev": { "port": 8805 }
-    }
-  }
+      "dev": { "port": 8805 },
+    },
+  },
 }

@@ -56,6 +56,7 @@ import {
   kiloclaw_email_log,
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
+  user_push_tokens,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, sql } from 'drizzle-orm';
 import { allow_fake_login } from './constants';
@@ -660,6 +661,7 @@ export async function softDeleteUser(userId: string) {
     await tx.delete(kiloclaw_email_log).where(eq(kiloclaw_email_log.user_id, userId));
     await tx.delete(kiloclaw_cli_runs).where(eq(kiloclaw_cli_runs.user_id, userId));
     await tx.delete(kiloclaw_instances).where(eq(kiloclaw_instances.user_id, userId));
+    await tx.delete(user_push_tokens).where(eq(user_push_tokens.user_id, userId));
     await tx.delete(user_period_cache).where(eq(user_period_cache.kilo_user_id, userId));
     await tx
       .delete(kilo_pass_scheduled_changes)

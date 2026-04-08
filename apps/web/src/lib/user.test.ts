@@ -36,6 +36,7 @@ import {
   kiloclaw_cli_runs,
   bot_requests,
   kiloclaw_admin_audit_logs,
+  user_push_tokens,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import { softDeleteUser, SoftDeletePreconditionError, findUserById, findUsersByIds } from './user';
@@ -695,6 +696,23 @@ describe('User', () => {
       expect(feedback).toHaveLength(1);
       expect(feedback[0].kilo_user_id).toBeNull();
       expect(feedback[0].feedback_text).toBe('Cloud agent is great!');
+    });
+
+    it('should delete user_push_tokens', async () => {
+      const user = await insertTestUser();
+      await db.insert(user_push_tokens).values({
+        user_id: user.id,
+        token: 'ExponentPushToken[test-token-123]',
+        platform: 'ios',
+      });
+
+      await softDeleteUser(user.id);
+
+      const tokens = await db
+        .select()
+        .from(user_push_tokens)
+        .where(eq(user_push_tokens.user_id, user.id));
+      expect(tokens).toHaveLength(0);
     });
 
     it('should nullify free_model_usage FK', async () => {

@@ -137,21 +137,13 @@ function RootLayoutNav() {
         return;
       }
 
-      // Only re-register if the user already has tokens on record.
-      // If they have none, they may have explicitly opted out — don't
-      // silently re-enable notifications on app launch.
-      const existing = await queryClient.fetchQuery(trpc.kiloclaw.getMyPushTokens.queryOptions());
-      if (existing.length === 0) {
-        return;
-      }
-
       const pushToken = await registerForPushNotifications();
       if (pushToken) {
         registerPushToken({ token: pushToken, platform: getPlatform() });
       }
     }
     void reregisterToken();
-  }, [token, trpc, registerPushToken]);
+  }, [token, registerPushToken]);
 
   const needsForceUpdate = updateRequired && !inForceUpdate;
   const showingForceUpdate = updateRequired && inForceUpdate;

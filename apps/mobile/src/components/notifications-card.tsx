@@ -82,6 +82,9 @@ export function NotificationsCard() {
         const deviceToken = await getDevicePushToken();
         if (deviceToken) {
           unregisterToken.mutate({ token: deviceToken });
+        } else {
+          // Token unavailable (e.g. permission revoked) — update UI to match
+          setNotificationsEnabled(false);
         }
       }
     },

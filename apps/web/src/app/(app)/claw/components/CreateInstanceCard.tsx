@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useClawLatestVersion, useClawMyPin } from '../hooks/useClawHooks';
 import { useClawContext } from './ClawContext';
-import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import { useUser } from '@/hooks/useUser';
@@ -39,13 +39,16 @@ export function CreateInstanceCard({
   const searchParams = useSearchParams();
   const { organizationId } = useClawContext();
   const isOrgContext = !!organizationId;
+  const setupReturnPath = organizationId
+    ? `/organizations/${organizationId}/claw/new`
+    : '/claw/new';
   // Billing status is personal-only; org uses org subscription checks
   const { data: billingStatus } = useQuery({
     ...trpc.kiloclaw.getBillingStatus.queryOptions(),
     enabled: !isOrgContext,
   });
   const { data: user, isLoading: isLoadingUser } = useUser();
-  const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
+  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
   const { data: myPin, isLoading: isLoadingPin, isError: isPinLookupError } = useClawMyPin();
   const { data: latestVersion, isLoading: isLoadingLatestVersion } = useClawLatestVersion();
   const [selectedModel, setSelectedModel] = useState('');
@@ -220,6 +223,7 @@ export function CreateInstanceCard({
         {needsCredits ? (
           <CreditsNudge
             selectedModel={selectedModel}
+            returnPath={setupReturnPath}
             onSwitchToFree={() => setSelectedModel(KILO_AUTO_FREE_MODEL.id)}
           />
         ) : (

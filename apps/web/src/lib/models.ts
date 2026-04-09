@@ -21,7 +21,7 @@ import { MINIMAX_CURRENT_MODEL_ID, minimax_m25_free_model } from '@/lib/provider
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/providers/morph';
 import { gpt_oss_20b_free_model } from '@/lib/providers/openai';
-import { qwen36_plus_free_model } from '@/lib/providers/qwen';
+import { qwen36_plus_model } from '@/lib/providers/qwen';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 import { mimo_v2_omni_free_model, mimo_v2_pro_free_model } from '@/lib/providers/xiaomi';
 
@@ -69,7 +69,7 @@ export function isFreeModel(model: string): boolean {
 
 export function isKiloExclusiveFreeModel(model: string): boolean {
   return kiloExclusiveModels.some(
-    m => m.public_id === model && m.status !== 'disabled' && m.flags.includes('free')
+    m => m.public_id === model && m.status !== 'disabled' && !m.pricing
   );
 }
 
@@ -85,7 +85,7 @@ export const kiloExclusiveModels = [
   morph_warp_grep_free_model,
   grok_code_fast_1_optimized_free_model,
   seed_20_pro_free_model,
-  qwen36_plus_free_model,
+  qwen36_plus_model,
   trinity_large_thinking_free_model,
 ] as KiloExclusiveModel[];
 
@@ -99,6 +99,10 @@ function isOpenRouterStealthModel(model: string): boolean {
 
 export function isDeadFreeModel(model: string): boolean {
   return !!kiloExclusiveModels.find(
-    m => m.public_id === model && m.status === 'disabled' && m.flags.includes('free')
+    m => m.public_id === model && m.status === 'disabled' && !m.pricing
   );
+}
+
+export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {
+  return kiloExclusiveModels.find(m => m.public_id === model && m.status !== 'disabled') ?? null;
 }

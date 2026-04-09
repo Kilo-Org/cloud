@@ -1,21 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CheckCircle2, ChevronDown, Gift, Scale, Zap } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Scale, Zap } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
-import {
-  KILO_AUTO_BALANCED_MODEL,
-  KILO_AUTO_FREE_MODEL,
-  KILO_AUTO_FRONTIER_MODEL,
-} from '@/lib/kilo-auto-model';
+import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FRONTIER_MODEL } from '@/lib/kilo-auto-model';
 
-const AUTO_CARD_MODEL_IDS = new Set([
-  KILO_AUTO_FRONTIER_MODEL.id,
-  KILO_AUTO_BALANCED_MODEL.id,
-  KILO_AUTO_FREE_MODEL.id,
-]);
+const AUTO_CARD_MODEL_IDS = new Set([KILO_AUTO_FRONTIER_MODEL.id, KILO_AUTO_BALANCED_MODEL.id]);
 
 type CostLevel = 0 | 1 | 2 | 3;
 type PerformanceLevel = 1 | 2 | 3;
@@ -54,17 +46,6 @@ const autoModelCards: AutoModelCard[] = [
     cost: 2,
     performance: 2,
     performanceDotColor: 'bg-blue-400',
-  },
-  {
-    id: KILO_AUTO_FREE_MODEL.id,
-    label: 'Free',
-    description: KILO_AUTO_FREE_MODEL.description,
-    icon: Gift,
-    iconBg: 'bg-emerald-500/20',
-    iconColor: 'text-emerald-400',
-    cost: 0,
-    performance: 1,
-    performanceDotColor: 'bg-emerald-400',
   },
 ];
 
@@ -148,7 +129,7 @@ export function AutoModelPicker({
           <legend className="text-muted-foreground pr-2 text-xs font-semibold tracking-wider uppercase">
             Kilo Auto
           </legend>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {availableAutoCards.map(card => {
               const selected = value === card.id;
               const Icon = card.icon;

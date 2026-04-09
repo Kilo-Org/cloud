@@ -19,13 +19,14 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
-import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useClawConfig, useClawMyPin, useClawGoogleSetupCommand } from '../hooks/useClawHooks';
 import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
+import { useClawContext } from './ClawContext';
 
 import { useDefaultModelSelection } from '../hooks/useDefaultModelSelection';
 import { getSettingsModelOptions } from './modelSupport';
@@ -530,7 +531,8 @@ export function SettingsTab({
 }) {
   const posthog = usePostHog();
   const { data: config } = useClawConfig();
-  const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
+  const { organizationId } = useClawContext();
+  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
   const isRunning = status.status === 'running';
   const {
     updateAvailable,

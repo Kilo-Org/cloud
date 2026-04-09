@@ -692,7 +692,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         >
           <textarea
             ref={textareaRef}
-            className="max-h-[50dvh] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-sm focus:ring-0 focus:outline-none"
+            className="max-h-[50dvh] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-base focus:ring-0 focus:outline-none md:text-sm"
             placeholder="What would you like to do?"
             rows={5}
             value={prompt}

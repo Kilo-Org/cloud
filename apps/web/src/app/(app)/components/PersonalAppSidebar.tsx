@@ -28,6 +28,7 @@ import {
   Settings,
   CreditCard,
   MessageSquare,
+  Sparkles,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
@@ -78,19 +79,29 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     className?: string;
   }> = [
     {
-      title: 'KiloClaw',
-      icon: KiloCrabIcon,
-      url: '/claw',
-    },
-    {
       title: 'Chat',
       icon: MessageSquare,
       url: '/claw/chat',
     },
     {
+      title: 'KiloClaw',
+      icon: KiloCrabIcon,
+      url: '/claw',
+    },
+    {
+      title: 'Subscription',
+      icon: CreditCard,
+      url: '/claw/subscription',
+    },
+    {
       title: 'Settings',
       icon: Settings,
       url: '/claw/settings',
+    },
+    {
+      title: "What's New",
+      icon: Sparkles,
+      url: '/claw/changelog',
     },
   ];
 

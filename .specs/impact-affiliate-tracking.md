@@ -121,7 +121,12 @@ This integration applies only to KiloClaw subscriptions.
 
 18. Conversion events SHOULD include a promo code when one was applied to the transaction.
 
-19. The SIGNUP event MUST only be sent for new user creation, not for returning users who sign in.
+19. The SIGNUP event MUST be sent at most once per user per provider, on that user's first attributed association for
+    the provider. This MAY occur during new user creation or during a later sign-in when an existing user first gains
+    affiliate attribution.
+
+20. Child conversion events (TRIAL_START, TRIAL_END, SALE) MUST NOT be sent before the parent SIGNUP event has been
+    successfully delivered.
 
 ### Client-Side Tracking (UTT)
 
@@ -210,3 +215,9 @@ attribution record. Updated to clarify that conversion events MUST only be sent 
 (i.e., users who arrived via an affiliate link). Sending events for non-affiliate users inflates Impact conversion
 volume with unattributable data. The click ID within the attribution record may still be empty/null — the attribution
 record itself is the gate, not the click ID value.
+
+### 2026-04-09 -- Queue parent-child delivery by attributed association
+
+Updated the SIGNUP rule to trigger once per user/provider on the first attributed association rather than only on new
+account creation. Added an invariant that child conversion events must not be sent before the parent SIGNUP event has
+been successfully delivered.

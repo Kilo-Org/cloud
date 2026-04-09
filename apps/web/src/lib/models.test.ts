@@ -21,10 +21,10 @@ describe('isFreeModel', () => {
       expect(isFreeModel('openrouter/sonoma-sky-beta')).toBe(true);
     });
 
-    test('should return true for enabled Kilo exclusive models with free flag', () => {
-      // Test with known Kilo exclusive models that are enabled and have free flag
+    test('should return true for enabled Kilo exclusive models with no pricing', () => {
+      // Test with known Kilo exclusive models that are enabled and have no pricing (free)
       const enabledFreeModels = kiloExclusiveModels.filter(
-        m => m.status === 'public' && m.flags.includes('free')
+        m => m.status === 'public' && !m.pricing
       );
 
       // Should have at least some enabled free models
@@ -36,20 +36,23 @@ describe('isFreeModel', () => {
       }
     });
 
-    test('should return true for all Kilo exclusive models', () => {
-      // All kilo exclusive models currently have 'free' in their flags
-      // This test ensures isFreeModel returns true for all of them
-      for (const model of kiloExclusiveModels) {
-        if (model.status !== 'disabled') {
-          expect(isFreeModel(model.public_id)).toBe(true);
-        }
+    test('should return false for enabled Kilo exclusive models with pricing', () => {
+      // Models with pricing should NOT be free
+      const pricedModels = kiloExclusiveModels.filter(m => m.status !== 'disabled' && !!m.pricing);
+
+      for (const model of pricedModels) {
+        expect(isFreeModel(model.public_id)).toBe(false);
       }
     });
 
-    test('all Kilo exclusive models should have free flag', () => {
-      // Verify that all kilo exclusive models have the 'free' flag
+    test('all Kilo exclusive models should have either no pricing or valid pricing', () => {
+      // Verify that all kilo exclusive models have valid pricing structure
       for (const model of kiloExclusiveModels) {
-        expect(model.flags.includes('free')).toBe(true);
+        if (model.pricing) {
+          expect(typeof model.pricing.prompt_per_million).toBe('number');
+          expect(typeof model.pricing.completion_per_million).toBe('number');
+          expect(typeof model.pricing.calculate_mUsd).toBe('function');
+        }
       }
     });
 

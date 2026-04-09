@@ -265,7 +265,7 @@ async function syncProviders() {
             provider_model_id: model.id,
             quantization: null,
             variant: 'default',
-            is_free: true,
+            is_free: !kfm.pricing,
             can_abort: true,
             max_prompt_tokens: model.top_provider.context_length,
             max_completion_tokens: model.top_provider.max_completion_tokens,

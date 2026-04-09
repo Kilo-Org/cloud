@@ -67,6 +67,7 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-image',
     'expo-secure-store',
+    'expo-notifications',
     'expo-web-browser',
     [
       '@sentry/react-native/expo',

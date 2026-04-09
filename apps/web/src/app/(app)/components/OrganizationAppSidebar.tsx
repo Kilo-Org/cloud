@@ -123,6 +123,8 @@ export default function OrganizationAppSidebar({
     },
   ];
 
+  const hasOwnerLevelAccess = currentRole === 'owner' || currentRole === 'billing_manager';
+
   // KiloClaw group
   const kiloClawItems: Array<{
     title: string;
@@ -131,19 +133,24 @@ export default function OrganizationAppSidebar({
     className?: string;
   }> = [
     {
-      title: 'KiloClaw',
-      icon: KiloCrabIcon,
-      url: `/organizations/${organizationId}/claw`,
-    },
-    {
       title: 'Chat',
       icon: MessageSquare,
       url: `/organizations/${organizationId}/claw/chat`,
     },
     {
+      title: 'KiloClaw',
+      icon: KiloCrabIcon,
+      url: `/organizations/${organizationId}/claw`,
+    },
+    {
       title: 'Settings',
       icon: Settings,
       url: `/organizations/${organizationId}/claw/settings`,
+    },
+    {
+      title: "What's New",
+      icon: Sparkles,
+      url: `/organizations/${organizationId}/claw/changelog`,
     },
   ];
 
@@ -222,7 +229,6 @@ export default function OrganizationAppSidebar({
       : []),
   ];
 
-  const hasOwnerLevelAccess = currentRole === 'owner' || currentRole === 'billing_manager';
   // Account group
   const accountItems: Array<{
     title: string;

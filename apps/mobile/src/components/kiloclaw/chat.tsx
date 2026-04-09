@@ -2,17 +2,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { type Href, useRouter } from 'expo-router';
+import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image'; // eslint-disable-line no-restricted-imports -- raw expo-image needed for Stream Chat SDK ImageComponent prop
 import { Settings } from 'lucide-react-native';
 import { type Channel as StreamChannel, StreamChat } from 'stream-chat';
 import { Channel, Chat, MessageInput, MessageList, OverlayProvider } from 'stream-chat-expo';
 
 import { useBotOnlineStatus } from '@/components/kiloclaw/chat-hooks';
+import { NotificationPrompt } from '@/components/kiloclaw/notification-prompt';
 import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw';
+import { setActiveChatInstance } from '@/lib/notifications';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 
@@ -24,6 +26,15 @@ type KiloClawChatProps = {
 
 export function KiloClawChat({ instanceId, name, enabled }: Readonly<KiloClawChatProps>) {
   const { data: creds, isLoading, error } = useStreamChatCredentials(enabled);
+
+  useFocusEffect(
+    useCallback(() => {
+      setActiveChatInstance(instanceId);
+      return () => {
+        setActiveChatInstance(null);
+      };
+    }, [instanceId])
+  );
 
   if (!enabled) {
     return (
@@ -249,6 +260,7 @@ function StreamChatUI({
           {/* eslint-disable-next-line typescript-eslint/no-unsafe-assignment -- expo-image is API-compatible with RN Image */}
           <Chat client={client} style={chatTheme} ImageComponent={ExpoImage as never}>
             <Channel channel={channel} keyboardVerticalOffset={headerHeight}>
+              <NotificationPrompt enabled={Boolean(channel)} />
               <MessageList />
               <MessageInput />
             </Channel>

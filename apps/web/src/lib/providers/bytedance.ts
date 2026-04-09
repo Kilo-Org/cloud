@@ -8,8 +8,9 @@ export const seed_20_pro_free_model: KiloExclusiveModel = {
   context_length: 256_000,
   max_completion_tokens: 128_000,
   status: 'public',
-  flags: ['free', 'reasoning', 'prompt_cache', 'vision'],
+  flags: ['reasoning', 'vision'],
   gateway: 'bytedance',
   internal_id: 'seed-2-0-pro-260328',
   inference_provider: 'seed',
+  pricing: null,
 };

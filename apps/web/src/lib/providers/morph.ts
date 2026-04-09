@@ -8,8 +8,9 @@ export const morph_warp_grep_free_model: KiloExclusiveModel = {
   context_length: 256000,
   max_completion_tokens: 32000,
   status: 'hidden',
-  flags: ['free'],
+  flags: [],
   gateway: 'morph',
   internal_id: 'morph-warp-grep-v2',
   inference_provider: 'morph',
+  pricing: null,
 };

@@ -568,6 +568,20 @@
       "when": 1775675341896,
       "tag": "0080_burly_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1775713186462,
+      "tag": "0081_loose_the_executioner",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1775730379116,
+      "tag": "0082_superb_william_stryker",
+      "breakpoints": true
     }
   ]
 }

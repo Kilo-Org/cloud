@@ -8,8 +8,9 @@ export const trinity_large_thinking_free_model: KiloExclusiveModel = {
   context_length: 262_144,
   max_completion_tokens: 262_144,
   status: 'public',
-  flags: ['free', 'reasoning'],
+  flags: ['reasoning'],
   gateway: 'openrouter',
   internal_id: 'arcee-ai/trinity-large-thinking',
   inference_provider: 'arcee-ai',
+  pricing: null,
 };

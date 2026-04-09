@@ -249,7 +249,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
     const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
 
     // No org instance → return a "no instance" sentinel so the frontend
-    // renders CreateInstanceCard. Without this guard, workerInstanceId(null)
+    // renders setup entry points. Without this guard, workerInstanceId(null)
     // → undefined → the worker queries the personal DO, leaking personal
     // instance status into the org context.
     if (!instance) {

@@ -33,7 +33,6 @@ export class GrafanaContainer extends Container<Env> {
         CF_ACCOUNT_ID: this.env.CF_ACCOUNT_ID,
         CF_ANALYTICS_API_KEY: analyticsApiKey,
         GF_SECURITY_SECRET_KEY: gfSecretKey,
-        GF_SERVER_ROOT_URL: this.env.GF_SERVER_ROOT_URL,
       };
     }
 
@@ -72,7 +71,7 @@ app.use('/*', async (c, next) => {
     team: c.env.CF_ACCESS_TEAM,
     audience: c.env.CF_ACCESS_AUD,
   });
-  return mw(c, next);
+  return mw(c as Parameters<typeof mw>[0], next);
 });
 
 app.all('/*', async c => {

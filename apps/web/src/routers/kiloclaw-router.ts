@@ -56,6 +56,7 @@ import {
 import { client as stripe } from '@/lib/stripe-client';
 import { APP_URL } from '@/lib/constants';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
+import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
 import { clawAccessProcedure } from '@/lib/kiloclaw/access-gate';
 import {
   getStripePriceIdForClawPlan,
@@ -83,7 +84,7 @@ import {
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
 import PostHogClient from '@/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
-import { trackTrialStart } from '@/lib/impact';
+import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
 
 /**
  * Error codes whose messages may contain raw internal details (e.g. filesystem
@@ -688,17 +689,20 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
       });
 
       void (async () => {
-        const attribution = await getAffiliateAttribution(userId, 'impact');
-        if (!attribution) return;
-
-        await trackTrialStart({
-          clickId: attribution.tracking_id,
-          customerId: userId,
-          customerEmail: userEmail,
+        await enqueueAffiliateEventForUser({
+          userId,
+          provider: 'impact',
+          eventType: 'trial_start',
+          dedupeKey: buildAffiliateEventDedupeKey({
+            provider: 'impact',
+            eventType: 'trial_start',
+            entityId: inserted.id,
+          }),
           eventDate: now,
+          orderId: IMPACT_ORDER_ID_MACRO,
         });
       })().catch(error => {
-        sentryLogger('kiloclaw-impact', 'warning')('Impact trial start tracking failed', {
+        sentryLogger('affiliate-events', 'warning')('Affiliate trial start enqueue failed', {
           user_id: userId,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -3050,14 +3054,14 @@ export const kiloclawRouter = createTRPCRouter({
             type: 'kiloclaw',
             plan: input.plan,
             kiloUserId: ctx.user.id,
-            impactClickId: attribution?.tracking_id ?? '',
+            affiliateTrackingId: attribution?.tracking_id ?? '',
           },
         },
         metadata: {
           type: 'kiloclaw',
           plan: input.plan,
           kiloUserId: ctx.user.id,
-          impactClickId: attribution?.tracking_id ?? '',
+          affiliateTrackingId: attribution?.tracking_id ?? '',
         },
       });
 

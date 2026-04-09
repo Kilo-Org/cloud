@@ -788,7 +788,7 @@ export function calculatKiloExclusiveCost_mUsd(
     captureMessage('SUSPICIOUS: negative uncached input tokens', {
       level: 'error',
       tags: { source: 'usage_processing' },
-      extra: { model },
+      extra: { model: model.public_id, usage },
     });
   }
   return Math.round(

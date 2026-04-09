@@ -6,7 +6,7 @@ import { Image } from '@/components/ui/image';
 
 export function KiloClawMessageAvatar(_props: MessageAvatarProps) {
   const { message, lastGroupMessage } = useMessageContext();
-  const isBotMessage = message.user?.id.startsWith('bot-');
+  const isBotMessage = message?.user?.id?.startsWith('bot-');
 
   if (!lastGroupMessage) {
     return <View className="w-8" />;

@@ -250,6 +250,30 @@ describe('POST /destroy-fly-machine', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it('still calls the Fly API when provider metadata lookup fails', async () => {
+    const { env, getProviderMetadata } = makeEnv();
+    getProviderMetadata.mockRejectedValueOnce(new Error('DO unavailable'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { path, init } = postJson('/destroy-fly-machine', {
+      userId: testUserId,
+      appName: testAppName,
+      machineId: testMachineId,
+    });
+
+    const resp = await platform.request(path, init, env);
+
+    expect(resp.status).toBe(200);
+    expect(await jsonBody(resp)).toEqual({ ok: true });
+    expect(fetchSpy).toHaveBeenCalledWith(
+      `https://api.machines.dev/v1/apps/${testAppName}/machines/${testMachineId}?force=true`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer fly-test-token' },
+      }
+    );
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
   it('wraps Fly API error status and body in error message', async () => {
     fetchSpy.mockResolvedValueOnce(new Response('machine not found', { status: 404 }));
     const { env } = makeEnv();

@@ -225,13 +225,26 @@ async function requireProviderCapability(
   userId: string,
   instanceId: string | undefined,
   capability: ProviderCapability,
-  operation: string
+  operation: string,
+  options?: { failOpen?: boolean }
 ): Promise<Response | null> {
-  const metadata = await withDORetry(
-    instanceStubFactory(c.env, userId, instanceId),
-    stub => stub.getProviderMetadata(),
-    'getProviderMetadata'
-  );
+  let metadata: {
+    provider: string;
+    capabilities: Record<ProviderCapability, boolean>;
+  };
+  try {
+    metadata = await withDORetry(
+      instanceStubFactory(c.env, userId, instanceId),
+      stub => stub.getProviderMetadata(),
+      'getProviderMetadata'
+    );
+  } catch (error) {
+    if (options?.failOpen) {
+      console.warn(`[platform] ${operation}: provider capability lookup failed, proceeding`, error);
+      return null;
+    }
+    throw error;
+  }
 
   if (metadata.capabilities[capability]) {
     return null;
@@ -2059,7 +2072,8 @@ platform.post('/destroy-fly-machine', async c => {
     userId,
     iidResult.instanceId,
     'directMachineDestroy',
-    'destroy-fly-machine'
+    'destroy-fly-machine',
+    { failOpen: true }
   );
   if (unsupported) return unsupported;
 

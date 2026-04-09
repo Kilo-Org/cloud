@@ -634,7 +634,9 @@ async function reconcileVolume(
       const repairStart = performance.now();
       const oldVolumeId = state.flyVolumeId;
       state.flyVolumeId = null;
-      await ctx.storage.put(storageUpdate({ flyVolumeId: null }));
+      await ctx.storage.put(
+        storageUpdate(syncProviderStateForStorage(state, { flyVolumeId: null }))
+      );
       const providerState = await ensureVolume(
         flyConfig,
         state,
@@ -781,7 +783,7 @@ export async function attemptMetadataRecovery(
       }
     }
 
-    await ctx.storage.put(storageUpdate(updates));
+    await ctx.storage.put(storageUpdate(syncProviderStateForStorage(state, updates)));
     rctx.log('recover_machine_from_metadata', {
       machine_id: candidate.id,
       fly_state: candidate.state,
@@ -1230,11 +1232,13 @@ async function recoverBoundMachineForDestroy(
     state.flyMachineId = machineId;
     state.lastBoundMachineRecoveryAt = null;
     await ctx.storage.put(
-      storageUpdate({
-        pendingDestroyMachineId: machineId,
-        flyMachineId: machineId,
-        lastBoundMachineRecoveryAt: null,
-      })
+      storageUpdate(
+        syncProviderStateForStorage(state, {
+          pendingDestroyMachineId: machineId,
+          flyMachineId: machineId,
+          lastBoundMachineRecoveryAt: null,
+        })
+      )
     );
     rctx.log('recover_bound_machine_for_destroy', {
       volume_id: state.pendingDestroyVolumeId,
@@ -1288,7 +1292,11 @@ export async function tryDeleteMachine(
 
   state.pendingDestroyMachineId = null;
   state.flyMachineId = null;
-  await ctx.storage.put(storageUpdate({ pendingDestroyMachineId: null, flyMachineId: null }));
+  await ctx.storage.put(
+    storageUpdate(
+      syncProviderStateForStorage(state, { pendingDestroyMachineId: null, flyMachineId: null })
+    )
+  );
   await clearDestroyError(ctx, state);
 }
 
@@ -1324,7 +1332,11 @@ export async function tryDeleteVolume(
 
   state.pendingDestroyVolumeId = null;
   state.flyVolumeId = null;
-  await ctx.storage.put(storageUpdate({ pendingDestroyVolumeId: null, flyVolumeId: null }));
+  await ctx.storage.put(
+    storageUpdate(
+      syncProviderStateForStorage(state, { pendingDestroyVolumeId: null, flyVolumeId: null })
+    )
+  );
   await clearDestroyError(ctx, state);
 }
 

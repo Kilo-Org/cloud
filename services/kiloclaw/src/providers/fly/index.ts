@@ -63,7 +63,10 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
     }
 
     if (isNew && !providerState.volumeId && state.sandboxId) {
-      const flyConfig = getFlyConfig(env, state);
+      const flyConfig = getFlyConfig(env, {
+        ...state,
+        providerState,
+      });
       const regions = region
         ? prepareRegions(parseRegions(region))
         : await resolveRegions(env.KV_CLAW_CACHE, env.FLY_REGION);

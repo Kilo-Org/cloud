@@ -451,6 +451,13 @@ describe('two-phase destroy', () => {
       status: 'destroying',
       flyMachineId: 'machine-1',
       flyVolumeId: 'vol-1',
+      providerState: {
+        provider: 'fly',
+        appName: 'acct-test',
+        machineId: 'machine-1',
+        volumeId: 'vol-1',
+        region: 'iad',
+      },
       pendingDestroyMachineId: 'machine-1',
       pendingDestroyVolumeId: 'vol-1',
     });
@@ -463,6 +470,13 @@ describe('two-phase destroy', () => {
 
     expect(storage._store.get('pendingDestroyMachineId')).toBeNull();
     expect(storage._store.get('pendingDestroyVolumeId')).toBe('vol-1');
+    expect(storage._store.get('providerState')).toEqual({
+      provider: 'fly',
+      appName: 'acct-test',
+      machineId: null,
+      volumeId: 'vol-1',
+      region: 'iad',
+    });
     expect(storage._store.size).toBeGreaterThan(0); // NOT cleared
 
     // Second alarm: volume delete now succeeds
@@ -4800,6 +4814,28 @@ describe('provision: auto-start after fresh provision', () => {
       volumeId: 'vol-1',
       region: 'iad',
     });
+  });
+
+  it('creates the initial volume in the freshly ensured Fly app', async () => {
+    const env = createFakeEnv();
+    const { instance, waitUntilPromises } = createInstance(undefined, env);
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', {});
+    await Promise.all(waitUntilPromises);
+
+    expect((flyClient.createVolumeWithFallback as Mock).mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        appName: 'claw-user-1',
+      })
+    );
   });
 
   it('calls start() on fresh provision and ends in running state', async () => {

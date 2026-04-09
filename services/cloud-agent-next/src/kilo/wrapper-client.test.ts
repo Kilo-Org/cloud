@@ -229,6 +229,15 @@ describe('WrapperClient', () => {
       expect(result.messageId).toBe('msg_generated_1');
     });
 
+    it('allows prompt responses without messageId', async () => {
+      const session = createMockSession(createSuccessResponse({ status: 'sent' }));
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      const result = await client.prompt({ prompt: 'Hello, world!' });
+
+      expect(result.messageId).toBeUndefined();
+    });
+
     it('sends prompt text', async () => {
       const session = createMockSession(
         createSuccessResponse({ status: 'sent', messageId: 'msg_1' })

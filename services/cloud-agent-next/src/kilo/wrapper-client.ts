@@ -555,13 +555,13 @@ export class WrapperClient {
    * Send a prompt to the wrapper.
    * Opens connection if idle, tracks in inflight.
    */
-  async prompt(options: WrapperPromptOptions): Promise<{ messageId: string }> {
+  async prompt(options: WrapperPromptOptions): Promise<{ messageId?: string }> {
     const response = await this.request<{
       status: string;
-      messageId: string;
+      messageId?: string;
     }>('POST', '/job/prompt', options);
 
-    return { messageId: response.messageId };
+    return response.messageId !== undefined ? { messageId: response.messageId } : {};
   }
 
   // ---------------------------------------------------------------------------

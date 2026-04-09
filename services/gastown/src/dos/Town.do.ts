@@ -4349,7 +4349,7 @@ export class TownDO extends DurableObject<Env> {
       agentCounts.total += c;
     }
 
-    // Bead counts
+    // Bead counts (live)
     const beadRows = [
       ...query(
         this.sql,

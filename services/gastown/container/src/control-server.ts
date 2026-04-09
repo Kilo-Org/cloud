@@ -313,7 +313,8 @@ app.patch('/agents/:agentId/model', async c => {
     agentId,
     parsed.data.model,
     parsed.data.smallModel,
-    parsed.data.conversationHistory
+    parsed.data.conversationHistory,
+    parsed.data.organizationId
   );
   return c.json({ updated: true });
 });

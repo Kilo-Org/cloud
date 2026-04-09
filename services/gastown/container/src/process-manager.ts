@@ -355,6 +355,17 @@ async function ensureSDKServer(
     const port = nextPort++;
     console.log(`${MANAGER_LOG} Starting SDK server on port ${port} for ${workdir}`);
 
+    // Keys that must remain in process.env after SDK server creation so
+    // subsequent extractOrganizationId() and model hot-swap calls can read
+    // them. Without this carve-out, keys that were absent from process.env
+    // before this call (common after container restart) would be deleted by
+    // the snapshot restore, losing KILO_CONFIG_CONTENT and the org ID.
+    const PERSIST_AFTER_CREATE = new Set([
+      'KILO_CONFIG_CONTENT',
+      'OPENCODE_CONFIG_CONTENT',
+      'GASTOWN_ORGANIZATION_ID',
+    ]);
+
     const envSnapshot: Record<string, string | undefined> = {};
     for (const key of Object.keys(env)) {
       envSnapshot[key] = process.env[key];
@@ -378,6 +389,10 @@ async function ensureSDKServer(
     } finally {
       process.chdir(prevCwd);
       for (const [key, prev] of Object.entries(envSnapshot)) {
+        // Keep config keys that should persist in process.env after server
+        // creation so downstream reads (extractOrganizationId, model updates)
+        // don't lose the values set by the caller.
+        if (PERSIST_AFTER_CREATE.has(key)) continue;
         if (prev === undefined) {
           delete process.env[key];
         } else {
@@ -814,6 +829,7 @@ export async function startAgent(
     gastownSessionToken: request.envVars?.GASTOWN_SESSION_TOKEN ?? null,
     completionCallbackUrl: request.envVars?.GASTOWN_COMPLETION_CALLBACK_URL ?? null,
     model: request.model ?? null,
+    organizationId: request.organizationId ?? null,
     startupEnv: env,
     startupRequest: request,
     startupAbortController,
@@ -1160,12 +1176,19 @@ export async function updateAgentModel(
   agentId: string,
   model: string,
   smallModel?: string,
-  conversationHistory?: string
+  conversationHistory?: string,
+  newOrganizationId?: string
 ): Promise<void> {
   const agent = agents.get(agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);
   if (agent.status !== 'running' && agent.status !== 'starting') {
     throw new Error(`Agent ${agentId} is not running (status: ${agent.status})`);
+  }
+
+  // Update organizationId on the agent struct so it persists across
+  // model hot-swaps and survives process.env changes.
+  if (newOrganizationId) {
+    agent.organizationId = newOrganizationId;
   }
 
   const oldInstance = sdkInstances.get(agent.workdir);
@@ -1181,8 +1204,11 @@ export async function updateAgentModel(
     `${MANAGER_LOG} updateAgentModel: restarting SDK server for agent ${agentId} with model=${model}`
   );
 
-  // 1. Preserve organizationId from the current config before we replace it
-  const organizationId = extractOrganizationId();
+  // 1. Preserve organizationId — prefer the durable value on the agent struct
+  //    (set at start-time from StartAgentRequest.organizationId and updated via
+  //    PATCH /model). Falls back to process.env extraction for legacy containers
+  //    where the struct field may not be populated yet.
+  const organizationId = agent.organizationId ?? extractOrganizationId();
 
   // 2. Rebuild KILO_CONFIG_CONTENT with the new model and update process.env
   //    so the next createKilo() spawns kilo serve with fresh config.

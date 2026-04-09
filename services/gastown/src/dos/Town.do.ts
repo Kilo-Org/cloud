@@ -4220,6 +4220,19 @@ export class TownDO extends DurableObject<Env> {
     try {
       const container = getTownContainerStub(this.env, townId);
       const headers: Record<string, string> = {};
+      // Always include X-Town-Config so the container's lastKnownTownConfig
+      // is populated immediately on the first health ping after a restart —
+      // before any /agents/start or PATCH /model calls arrive. Without this,
+      // updateMayorModel fires with null town config and loses org context.
+      try {
+        const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+        headers['X-Town-Config'] = JSON.stringify(containerConfig);
+      } catch (configErr) {
+        console.warn(
+          `${TOWN_LOG} ensureContainerReady: failed to build container config for X-Town-Config header:`,
+          configErr instanceof Error ? configErr.message : configErr
+        );
+      }
       // When draining AND enough time has passed for the old container
       // to have exited (drainAll waits up to 10 min + exit), pass the
       // nonce so the replacement container can acknowledge readiness.

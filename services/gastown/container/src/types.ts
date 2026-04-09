@@ -133,6 +133,9 @@ export type ManagedAgent = {
   completionCallbackUrl: string | null;
   /** Model ID used for this agent's sessions (e.g. "anthropic/claude-sonnet-4.6") */
   model: string | null;
+  /** Organization ID for billing — stored durably here so it survives
+   *  process.env snapshot/restore cycles (e.g. ensureSDKServer). */
+  organizationId: string | null;
   /** Full env dict from buildAgentEnv, stored so model hot-swap can replay it. */
   startupEnv: Record<string, string>;
   /** Original StartAgentRequest, stored so the container registry can

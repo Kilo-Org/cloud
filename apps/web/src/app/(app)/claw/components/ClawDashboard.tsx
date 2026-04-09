@@ -85,7 +85,7 @@ function ClawDashboardInner({ status }: { status: KiloClawDashboardStatus | unde
     instanceStatus !== null &&
     instanceStatus.provisionedAt !== null &&
     Date.now() - instanceStatus.provisionedAt < SEVEN_DAYS_MS;
-  const configServiceNudgeVisible = !instanceStatus || instanceYoung;
+  const configServiceNudgeVisible = instanceYoung;
 
   const VALID_TABS = ['instance', 'subscription'] as const;
   type TabValue = (typeof VALID_TABS)[number];
@@ -121,7 +121,6 @@ function ClawDashboardInner({ status }: { status: KiloClawDashboardStatus | unde
 
   const [upgradeRequested, setUpgradeRequested] = useState(false);
   const onUpgradeHandled = useCallback(() => setUpgradeRequested(false), []);
-  const onRedeploySuccess = useCallback(() => {}, []);
 
   const tabTriggerClass =
     'border-border text-muted-foreground hover:bg-muted hover:text-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground rounded-md border px-4 py-2 text-sm font-medium transition-colors data-[state=active]:shadow-none';
@@ -194,7 +193,6 @@ function ClawDashboardInner({ status }: { status: KiloClawDashboardStatus | unde
               <InstanceControls
                 status={instanceStatus}
                 mutations={mutations}
-                onRedeploySuccess={onRedeploySuccess}
                 upgradeRequested={upgradeRequested}
                 onUpgradeHandled={onUpgradeHandled}
               />

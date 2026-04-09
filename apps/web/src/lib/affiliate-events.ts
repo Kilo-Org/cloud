@@ -300,6 +300,40 @@ async function promoteBlockedChildren(
   return result.rows;
 }
 
+async function reconcileBlockedChildrenWithDeliveredParents(
+  database: DatabaseClient
+): Promise<AffiliateEventRow[]> {
+  const result = await database.execute<AffiliateEventRow>(sql`
+    UPDATE ${user_affiliate_events}
+    SET
+      ${sql.identifier(user_affiliate_events.delivery_state.name)} = 'queued',
+      ${sql.identifier(user_affiliate_events.next_retry_at.name)} = NULL,
+      ${sql.identifier(user_affiliate_events.claimed_at.name)} = NULL
+    WHERE ${user_affiliate_events.delivery_state} = 'blocked'
+      AND EXISTS (
+        SELECT 1
+        FROM ${user_affiliate_events} AS parent_event
+        WHERE parent_event.id = ${user_affiliate_events.parent_event_id}
+          AND parent_event.delivery_state = 'delivered'
+      )
+    RETURNING
+      ${user_affiliate_events.id},
+      ${user_affiliate_events.user_id},
+      ${user_affiliate_events.provider},
+      ${user_affiliate_events.event_type},
+      ${user_affiliate_events.dedupe_key},
+      ${user_affiliate_events.parent_event_id},
+      ${user_affiliate_events.delivery_state},
+      ${user_affiliate_events.payload_json},
+      ${user_affiliate_events.attempt_count},
+      ${user_affiliate_events.next_retry_at},
+      ${user_affiliate_events.claimed_at},
+      ${user_affiliate_events.created_at}
+  `);
+
+  return result.rows;
+}
+
 async function reclaimStaleSendingEvents(database: DatabaseClient): Promise<AffiliateEventRow[]> {
   const staleBefore = new Date(Date.now() - STALE_CLAIM_WINDOW_MS).toISOString();
   const result = await database.execute<AffiliateEventRow>(sql`
@@ -536,7 +570,6 @@ export async function enqueueAffiliateEventForUser(
     customerEmailHash: hashEmailForImpact(userRow.google_user_email),
     eventDate: new Date(attribution.created_at),
   });
-  const deliveryState = parentEvent.delivery_state === 'delivered' ? 'queued' : 'blocked';
 
   const [inserted] = await database
     .insert(user_affiliate_events)
@@ -546,7 +579,18 @@ export async function enqueueAffiliateEventForUser(
       event_type: params.eventType,
       dedupe_key: params.dedupeKey,
       parent_event_id: parentEvent.id,
-      delivery_state: deliveryState,
+      delivery_state: sql<AffiliateEventDeliveryState>`
+        CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM ${user_affiliate_events}
+            WHERE ${user_affiliate_events.id} = ${parentEvent.id}::uuid
+              AND ${user_affiliate_events.delivery_state} = 'delivered'
+          )
+          THEN 'queued'
+          ELSE 'blocked'
+        END
+      `,
       payload_json: buildAffiliateEventPayload({
         trackingId: attribution.tracking_id,
         customerId: params.userId,
@@ -593,6 +637,15 @@ export async function dispatchQueuedAffiliateEvents(params?: {
   for (const event of reclaimed) {
     logWarning('Reclaimed stale affiliate event claim', {
       ...buildAffiliateEventLogFields(event),
+      dispatch_source: 'cron',
+    });
+  }
+
+  const reconciledChildren = await reconcileBlockedChildrenWithDeliveredParents(database);
+  summary.unblocked += reconciledChildren.length;
+  for (const childEvent of reconciledChildren) {
+    logWarning('Recovered blocked affiliate child event after parent delivery', {
+      ...buildAffiliateEventLogFields(childEvent),
       dispatch_source: 'cron',
     });
   }

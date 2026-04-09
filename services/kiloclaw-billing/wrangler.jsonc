@@ -23,6 +23,9 @@
   },
   "vars": {
     "KILOCODE_BACKEND_BASE_URL": "https://app.kilo.ai",
+    "STRIPE_KILOCLAW_COMMIT_PRICE_ID": "price_1TCzaOJ7A6SsvrfSUxJtVRzj",
+    "STRIPE_KILOCLAW_STANDARD_PRICE_ID": "price_1TCzZKJ7A6SsvrfSCCw5IOyF",
+    "STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID": "price_1TE1qrJ7A6SsvrfSRcJySbHR",
   },
   "hyperdrive": [
     {

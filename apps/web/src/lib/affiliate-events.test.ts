@@ -237,4 +237,66 @@ describe('affiliate-events', () => {
     expect(summary.delivered).toBe(1);
     expect(row?.delivery_state).toBe('delivered');
   });
+
+  it('reconciles blocked children whose parent was already delivered', async () => {
+    const user = await insertTestUser();
+    const {
+      buildAffiliateEventDedupeKey,
+      dispatchQueuedAffiliateEvents,
+      enqueueAffiliateEventForUser,
+      recordAffiliateAttributionAndQueueParentEvent,
+    } = await import('@/lib/affiliate-events');
+
+    const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
+      userId: user.id,
+      provider: 'impact',
+      trackingId: 'impact-click-123',
+      customerEmail: user.google_user_email,
+      eventDate: new Date('2026-04-09T10:00:00.000Z'),
+    });
+
+    expect(parentEvent).not.toBeNull();
+
+    await enqueueAffiliateEventForUser({
+      userId: user.id,
+      provider: 'impact',
+      eventType: 'trial_start',
+      dedupeKey: buildAffiliateEventDedupeKey({
+        provider: 'impact',
+        eventType: 'trial_start',
+        entityId: 'trial-subscription-3',
+      }),
+      eventDate: new Date('2026-04-09T10:05:00.000Z'),
+      orderId: 'IR_AN_64_TS',
+    });
+
+    await db
+      .update(user_affiliate_events)
+      .set({
+        delivery_state: 'delivered',
+        claimed_at: null,
+        next_retry_at: null,
+      })
+      .where(eq(user_affiliate_events.id, parentEvent!.id));
+
+    const fetchMock: typeof fetch = jest.fn(async () => new Response('', { status: 200 }));
+    global.fetch = fetchMock;
+
+    const summary = await dispatchQueuedAffiliateEvents();
+    const rows = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+
+    expect(summary).toEqual({
+      reclaimed: 0,
+      claimed: 1,
+      delivered: 1,
+      retried: 0,
+      failed: 0,
+      unblocked: 1,
+    });
+    expect(rows.map(row => row.delivery_state).sort()).toEqual(['delivered', 'delivered']);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
 });

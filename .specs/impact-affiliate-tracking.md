@@ -13,6 +13,7 @@ retry strategies, and other implementation choices belong in plan documents and 
 Draft -- created 2026-03-31.
 Updated 2026-04-01 -- aligned with revised Impact integration document and implementation review.
 Updated 2026-04-06 -- clarify that conversion events require an affiliate attribution record.
+Updated 2026-04-09 -- treat pure-credit KiloClaw periods as sale events and exclude admin/org flows.
 
 ## Conventions
 
@@ -51,7 +52,8 @@ The system uses a hybrid tracking architecture: a client-side JavaScript tag (UT
 and server-side API calls for reliable conversion reporting that is resistant to ad blockers and browser tracking
 prevention.
 
-This integration applies only to KiloClaw subscriptions.
+This integration applies only to personal KiloClaw subscriptions. Organization-scoped KiloClaw instances are not
+eligible for affiliate tracking.
 
 ## Rules
 
@@ -87,7 +89,7 @@ This integration applies only to KiloClaw subscriptions.
    | SIGNUP      | 71655           | Lead            | New user creation (with attribution)          |
    | TRIAL_START | 71656           | Sale            | KiloClaw trial subscription becomes active    |
    | TRIAL_END   | 71658           | Sale            | KiloClaw trial subscription ends (any reason) |
-   | SALE        | 71659           | Sale            | Paid KiloClaw invoice settles                 |
+   | SALE        | 71659           | Sale            | Monetized KiloClaw payment period is funded   |
 
 9. Each conversion event sent to Impact.com MUST include:
    - An event timestamp
@@ -112,12 +114,13 @@ This integration applies only to KiloClaw subscriptions.
 
 14. VISIT events MUST NOT include `CustomerId` because the user does not yet exist.
 
-15. SALE events MUST include the invoice amount and currency.
+15. SALE events MUST include the monetized amount and currency for the funded KiloClaw period.
 
 16. SALE events MUST include the subscription plan identifier (e.g. `kiloclaw-standard`,
     `kiloclaw-commit`) as the item category.
 
-17. SALE events MUST be reported for every paid KiloClaw invoice on a subscription (both initial and renewal).
+17. SALE events MUST be reported for every monetized KiloClaw payment period (both initial and renewal), including
+    Stripe invoice settlements and pure-credit deductions.
 
 18. Conversion events SHOULD include a promo code when one was applied to the transaction.
 
@@ -127,6 +130,9 @@ This integration applies only to KiloClaw subscriptions.
 
 20. Child conversion events (TRIAL_START, TRIAL_END, SALE) MUST NOT be sent before the parent SIGNUP event has been
     successfully delivered.
+
+21. Admin-only subscription interventions (for example admin trial resets, admin cancellations, or manual trial-date
+    edits) MUST NOT emit affiliate conversion events. These are internal overrides, not customer lifecycle events.
 
 ### Client-Side Tracking (UTT)
 
@@ -221,3 +227,9 @@ record itself is the gate, not the click ID value.
 Updated the SIGNUP rule to trigger once per user/provider on the first attributed association rather than only on new
 account creation. Added an invariant that child conversion events must not be sent before the parent SIGNUP event has
 been successfully delivered.
+
+### 2026-04-09 -- Count pure-credit periods as sale events and exclude admin/org flows
+
+Clarified that SALE covers every monetized KiloClaw payment period, including pure-credit funding in addition to Stripe
+invoice settlements. Explicitly excluded organization-scoped KiloClaw instances and admin-only subscription
+interventions from affiliate tracking.

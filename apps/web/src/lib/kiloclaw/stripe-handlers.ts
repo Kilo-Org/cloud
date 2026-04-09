@@ -1109,6 +1109,7 @@ export async function handleKiloClawInvoicePaid(params: {
         eventDate,
         itemCategory: getImpactItemCategory(plan),
         itemName: getImpactItemName(plan),
+        itemSku: matchingPriceId,
       });
     } catch (error) {
       logWarning('Affiliate sale enqueue failed', {

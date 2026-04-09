@@ -11,6 +11,7 @@ import { convertFromKiloExclusiveModel } from '@/lib/providers/kilo-exclusive-mo
 import { isForbiddenFreeModel } from '@/lib/forbidden-free-models';
 import {
   getModelSettings,
+  getOpenClawSettings,
   getOpenCodeSettings,
   getVersionedModelSettings,
 } from '@/lib/providers/model-settings';
@@ -78,6 +79,7 @@ function enhancedModelList(models: OpenRouterModel[]) {
         settings: model.settings ?? getModelSettings(model.id),
         versioned_settings: model.versioned_settings ?? getVersionedModelSettings(model.id),
         opencode: model.opencode ?? getOpenCodeSettings(model.id),
+        openclaw: model.openclaw ?? getOpenClawSettings(model.id),
       };
     });
   const sortedModels = enhancedModels.sort((a, b) => {

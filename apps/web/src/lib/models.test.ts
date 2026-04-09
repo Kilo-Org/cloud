@@ -45,6 +45,19 @@ describe('isFreeModel', () => {
       }
     });
 
+    test('all Kilo exclusive models whose gateway is not openrouter must have inference_provider set', () => {
+      // The enterprise provider selection screen filters models by inference_provider to determine
+      // which provider a model belongs to. Without it, the screen cannot correctly display or
+      // enforce provider-level allow/deny lists for models routed through non-OpenRouter gateways.
+      const modelsWithDirectGateway = kiloExclusiveModels.filter(m => m.gateway !== 'openrouter');
+
+      expect(modelsWithDirectGateway.length).toBeGreaterThan(0);
+
+      for (const model of modelsWithDirectGateway) {
+        expect(model.inference_provider).not.toBeNull();
+      }
+    });
+
     test('all Kilo exclusive models should have either no pricing or valid pricing', () => {
       // Verify that all kilo exclusive models have valid pricing structure
       for (const model of kiloExclusiveModels) {

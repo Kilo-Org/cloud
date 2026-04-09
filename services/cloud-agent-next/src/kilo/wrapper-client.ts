@@ -334,6 +334,7 @@ export class WrapperClient {
       `WRAPPER_PORT=${this.port}`,
       `WORKSPACE_PATH=${workspacePath}`,
       `WRAPPER_LOG_PATH=${wrapperLogPath}`,
+      `KILO_SESSION_RETRY_LIMIT=5`,
     ];
     const argParts = [`--user-id ${this.shellQuote(userId)}`];
     if (sessionId) {

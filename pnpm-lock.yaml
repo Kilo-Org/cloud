@@ -91,9 +91,9 @@ patchedDependencies:
   '@storybook/nextjs@9.1.20':
     hash: e1857649664eed8f87877c352d277c90d4af5a58d0ad931105f033c8c08165c1
     path: patches/@storybook__nextjs@9.1.20.patch
-  expo-server-sdk@6.1.0:
-    hash: c585457628f3c0d87f2f8f0a5e7071fd450414800ed307fac6eb26dfe2308d02
-    path: patches/expo-server-sdk@6.1.0.patch
+  expo-server-sdk:
+    hash: 7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b
+    path: patches/expo-server-sdk.patch
   stream-chat-react-native-core:
     hash: 6fa2fe7a3ddb0ab3312ee1adc4e07d3fc9c46f7bc5bb861675bef4078808b8c0
     path: patches/stream-chat-react-native-core.patch
@@ -1746,7 +1746,7 @@ importers:
         version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
       expo-server-sdk:
         specifier: ^6.1.0
-        version: 6.1.0(patch_hash=c585457628f3c0d87f2f8f0a5e7071fd450414800ed307fac6eb26dfe2308d02)
+        version: 6.1.0(patch_hash=7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b)
       hono:
         specifier: ^4.12.7
         version: 4.12.8
@@ -24045,7 +24045,7 @@ snapshots:
     dependencies:
       expo: 55.0.12(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(@expo/metro-runtime@55.0.9)(expo-router@55.0.11)(react-dom@19.2.4(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
 
-  expo-server-sdk@6.1.0(patch_hash=c585457628f3c0d87f2f8f0a5e7071fd450414800ed307fac6eb26dfe2308d02):
+  expo-server-sdk@6.1.0(patch_hash=7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b):
     dependencies:
       promise-limit: 2.7.0
       promise-retry: 2.0.1

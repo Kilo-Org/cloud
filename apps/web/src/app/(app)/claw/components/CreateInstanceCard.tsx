@@ -1,26 +1,117 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
+import { Brain, ChevronRight, MessageSquare, Sun, Wrench, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
-import { useClawLatestVersion, useClawMyPin } from '../hooks/useClawHooks';
 import { useClawContext } from './ClawContext';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { ModelOption } from '@/components/shared/ModelCombobox';
-import { useUser } from '@/hooks/useUser';
-import { KILO_AUTO_FRONTIER_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
-import { isFreeModel } from '@/lib/models';
+import { KILO_AUTO_BALANCED_MODEL } from '@/lib/kilo-auto';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getCreateModelOptions } from './modelSupport';
-import { AutoModelPicker } from './AutoModelPicker';
-import { CreditsNudge } from './CreditsNudge';
+import { Card, CardContent } from '@/components/ui/card';
 
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
+
+type CreateInstanceCardViewProps = {
+  canStartTrial?: boolean;
+  isPending?: boolean;
+  onCreate?: () => void;
+};
+
+const featureCards = [
+  {
+    title: 'Morning briefings',
+    description: 'Calendar, email, news, and weather — every morning',
+    icon: Sun,
+  },
+  {
+    title: 'Chat on Kilo, Telegram or Discord',
+    description: 'Ask questions, get answers, anytime',
+    icon: MessageSquare,
+  },
+  {
+    title: 'Automate tasks',
+    description: 'Draft emails, research topics, manage to-dos',
+    icon: Wrench,
+  },
+  {
+    title: 'Learns your style',
+    description: 'Gets smarter the more you use it',
+    icon: Brain,
+  },
+];
+
+export function CreateInstanceCardView({
+  canStartTrial = false,
+  isPending = false,
+  onCreate,
+}: CreateInstanceCardViewProps) {
+  return (
+    <Card className="mt-6 overflow-hidden">
+      <CardContent className="flex flex-col gap-6 p-6 sm:p-8">
+        <div className="mx-auto flex max-w-xl flex-col items-center text-center">
+          <h2 className="text-foreground text-2xl font-bold">Your AI assistant, always on</h2>
+          <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+            KiloClaw is a personal AI that lives on your phone. It sends you a morning briefing,
+            answers questions, automates busywork, and learns how you like things done.
+          </p>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          {featureCards.map(feature => {
+            const Icon = feature.icon;
+            return (
+              <div key={feature.title} className="rounded-lg border p-4">
+                <Icon className="mb-4 h-5 w-5 text-blue-500" strokeWidth={2.25} />
+                <h3 className="text-sm font-bold">{feature.title}</h3>
+                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                  {feature.description}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-col items-center">
+          <div className="inline-flex items-center rounded-full border border-emerald-700 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-400">
+            {canStartTrial
+              ? 'Try 6 hours for free — no credit card needed'
+              : 'Try 6 hours for free'}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <Button
+            onClick={onCreate}
+            disabled={isPending}
+            className="w-full bg-emerald-600 py-6 text-base text-white hover:bg-emerald-700"
+          >
+            {isPending ? (
+              'Setting up...'
+            ) : (
+              <span className="inline-flex items-center gap-1">
+                Get Started
+                <ChevronRight className="h-5 w-5" />
+              </span>
+            )}
+          </Button>
+          <p className="text-muted-foreground text-center text-xs">
+            Takes about 10 minutes to set up
+          </p>
+        </div>
+
+        <div className="flex flex-col items-center">
+          <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm">
+            <Zap className="h-4 w-4 text-blue-400" />
+            <span className="text-muted-foreground">Powered by</span>
+            <span className="font-semibold">{KILO_AUTO_BALANCED_MODEL.name}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function CreateInstanceCard({
   mutations,
@@ -36,138 +127,17 @@ export function CreateInstanceCard({
   useFeatureFlagVariantKey('button-vs-card');
   const posthog = usePostHog();
   const trpc = useTRPC();
-  const searchParams = useSearchParams();
   const { organizationId } = useClawContext();
   const isOrgContext = !!organizationId;
-  const setupReturnPath = organizationId
-    ? `/organizations/${organizationId}/claw/new`
-    : '/claw/new';
   // Billing status is personal-only; org uses org subscription checks
   const { data: billingStatus } = useQuery({
     ...trpc.kiloclaw.getBillingStatus.queryOptions(),
     enabled: !isOrgContext,
   });
-  const { data: user, isLoading: isLoadingUser } = useUser();
-  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
-  const { data: myPin, isLoading: isLoadingPin, isError: isPinLookupError } = useClawMyPin();
-  const { data: latestVersion, isLoading: isLoadingLatestVersion } = useClawLatestVersion();
-  const [selectedModel, setSelectedModel] = useState('');
-  const hasAppliedDefault = useRef(false);
-  const latestOpenClawVersion = latestVersion?.openclawVersion;
-  const hasPin = myPin != null;
-  const hasUnknownPinnedVersion = hasPin && !myPin?.openclaw_version;
-  const isLoadingProvisionTargetVersion = isLoadingPin || (!hasPin && isLoadingLatestVersion);
-  const hasProvisionTargetError = isPinLookupError || hasUnknownPinnedVersion;
-  const modelLoadError = isPinLookupError
-    ? 'Failed to load version pin state. Refresh and try again.'
-    : hasUnknownPinnedVersion
-      ? 'Pinned image version metadata is unavailable. Remove or update the pin to select a model.'
-      : undefined;
-
+  const selectedModel = KILO_AUTO_BALANCED_MODEL.id;
   const canStartTrial = Boolean(billingStatus?.trialEligible);
-  const provisionSubtitle = canStartTrial ? '7-day free trial, no credit card required' : undefined;
-
-  const modelOptions = useMemo<ModelOption[]>(
-    () =>
-      getCreateModelOptions({
-        models: (modelsData?.data || []).map(model => ({ id: model.id, name: model.name })),
-        hasPin,
-        hasPinLookupError: isPinLookupError,
-        pinnedOpenClawVersion: myPin?.openclaw_version,
-        latestOpenClawVersion,
-        isLoadingPin,
-        isLoadingLatestVersion,
-      }),
-    [
-      hasPin,
-      isLoadingLatestVersion,
-      isLoadingPin,
-      isPinLookupError,
-      latestOpenClawVersion,
-      modelsData,
-      myPin,
-    ]
-  );
-
-  const hasCredits = (user?.total_microdollars_acquired ?? 0) > 0;
-  const isPaymentReturn = searchParams.get('payment') === 'success';
-  const hasAutoProvisioned = useRef(false);
-
-  useEffect(() => {
-    if (hasAppliedDefault.current || selectedModel !== '' || modelOptions.length === 0) return;
-    if (isLoadingUser) return;
-
-    // If returning from a checkout flow, restore the previously-selected model
-    const modelParam = searchParams.get('model');
-    if (modelParam && modelOptions.some(m => m.id === modelParam)) {
-      setSelectedModel(modelParam);
-      hasAppliedDefault.current = true;
-      return;
-    }
-
-    const defaultId = hasCredits ? KILO_AUTO_FRONTIER_MODEL.id : KILO_AUTO_FREE_MODEL.id;
-    if (modelOptions.some(m => m.id === defaultId)) {
-      setSelectedModel(defaultId);
-      hasAppliedDefault.current = true;
-    }
-  }, [modelOptions, hasCredits, selectedModel, isLoadingUser, searchParams]);
-
-  // After returning from a successful credit purchase, show a toast and
-  // auto-start provisioning so the user doesn't have to click again.
-  useEffect(() => {
-    if (!isPaymentReturn || hasAutoProvisioned.current) return;
-    if (!selectedModel || isLoadingModels || isLoadingProvisionTargetVersion) return;
-    if (hasProvisionTargetError) return;
-
-    hasAutoProvisioned.current = true;
-    toast.success('Payment processed — setting up your instance!');
-
-    posthog?.capture('claw_create_instance_clicked', {
-      selected_model: selectedModel,
-      auto_provision_after_payment: true,
-    });
-
-    // Enter the onboarding wizard before the mutation fires so the UI
-    // shows the wizard immediately instead of racing with status polling.
-    onProvisionStart?.();
-
-    mutations.provision.mutate(
-      { kilocodeDefaultModel: `kilocode/${selectedModel}` },
-      {
-        onError: err => {
-          onProvisionFailed?.();
-          toast.error(`Failed to create: ${err.message}`);
-        },
-      }
-    );
-  }, [
-    isPaymentReturn,
-    selectedModel,
-    isLoadingModels,
-    isLoadingProvisionTargetVersion,
-    hasProvisionTargetError,
-    mutations.provision,
-    posthog,
-    onProvisionStart,
-    onProvisionFailed,
-  ]);
 
   function handleCreate() {
-    if (hasProvisionTargetError) {
-      toast.error(modelLoadError || 'Failed to resolve provision target version.');
-      return;
-    }
-
-    if (isLoadingModels || isLoadingProvisionTargetVersion) {
-      toast.error('Models are still loading; try again in a moment.');
-      return;
-    }
-
-    if (!selectedModel) {
-      toast.error('Please select a default model before creating an instance.');
-      return;
-    }
-
     posthog?.capture('claw_create_instance_clicked', {
       selected_model: selectedModel,
     });
@@ -189,55 +159,11 @@ export function CreateInstanceCard({
     );
   }
 
-  const needsCredits = !hasCredits && selectedModel !== '' && !isFreeModel(selectedModel);
-
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-xl">Get Started with KiloClaw</CardTitle>
-        <CardDescription>
-          Choose a default model to provision your first KiloClaw instance.
-          {provisionSubtitle && (
-            <>
-              <br />
-              {provisionSubtitle}
-            </>
-          )}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="mt-4 space-y-6">
-        <AutoModelPicker
-          models={modelOptions}
-          value={selectedModel}
-          onValueChange={setSelectedModel}
-          error={modelLoadError}
-          isLoading={isLoadingModels || isLoadingProvisionTargetVersion}
-          disabled={
-            mutations.provision.isPending ||
-            isLoadingModels ||
-            isLoadingProvisionTargetVersion ||
-            hasProvisionTargetError
-          }
-        />
-
-        {needsCredits ? (
-          <CreditsNudge
-            selectedModel={selectedModel}
-            returnPath={setupReturnPath}
-            onSwitchToFree={() => setSelectedModel(KILO_AUTO_FREE_MODEL.id)}
-          />
-        ) : (
-          <div className="flex">
-            <Button
-              onClick={handleCreate}
-              disabled={mutations.provision.isPending || !selectedModel}
-              className="grow bg-emerald-600 text-white hover:bg-emerald-700"
-            >
-              {mutations.provision.isPending ? 'Setting up...' : 'Get Started'}
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <CreateInstanceCardView
+      canStartTrial={canStartTrial}
+      isPending={mutations.provision.isPending}
+      onCreate={handleCreate}
+    />
   );
 }

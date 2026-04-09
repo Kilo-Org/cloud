@@ -1,8 +1,11 @@
+import React from 'react';
 import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { type Href, router } from 'expo-router';
 import { Platform } from 'react-native';
 import { toast } from 'sonner-native';
+
+import { ChatNotificationToast } from '@/components/chat-notification-toast';
 
 function getProjectId(): string {
   const eas = expoConstants.expoConfig?.extra?.eas as { projectId?: string } | undefined;
@@ -51,15 +54,16 @@ export function setupNotificationHandler() {
         // and suppress the system notification
         const title = notification.request.content.title ?? 'Kilo';
         const body = notification.request.content.body ?? '';
-        toast(title, {
-          description: body,
-          action: {
-            label: 'View',
-            onClick: () => {
-              router.push(`/(app)/chat/${data.instanceId}` as Href);
-            },
-          },
-        });
+        const toastId = Date.now();
+        toast.custom(
+          React.createElement(ChatNotificationToast, {
+            id: toastId,
+            title,
+            body,
+            instanceId: data.instanceId,
+          }),
+          { id: toastId, duration: 4000 }
+        );
         return suppressed;
       }
 
@@ -75,16 +79,45 @@ export function setupNotificationHandler() {
   });
 }
 
+// Pending deep link from a notification tap (cold start or background).
+// Consumed by the root nav after auth/navigation is ready.
+let pendingNotificationLink: string | null = null;
+
+export function getPendingNotificationLink(): string | null {
+  const link = pendingNotificationLink;
+  pendingNotificationLink = null;
+  return link;
+}
+
 export function setupNotificationResponseHandler() {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
     const data = response.notification.request.content.data as NotificationData | undefined;
 
     if (data?.type === 'chat') {
-      router.push(`/(app)/chat/${data.instanceId}` as Href);
+      const path = `/(app)/chat/${data.instanceId}`;
+      // If the router is ready (has segments), navigate immediately.
+      // Otherwise store as pending for consumption after auth completes.
+      try {
+        router.replace(path as Href);
+      } catch {
+        pendingNotificationLink = path;
+      }
     }
   });
 
   return subscription;
+}
+
+// Check for notification that launched the app (cold start)
+export function checkInitialNotification(): void {
+  const response = Notifications.getLastNotificationResponse();
+  if (!response) {
+    return;
+  }
+  const data = response.notification.request.content.data as NotificationData | undefined;
+  if (data?.type === 'chat') {
+    pendingNotificationLink = `/(app)/chat/${data.instanceId}`;
+  }
 }
 
 export async function registerForPushNotifications(): Promise<string | null> {

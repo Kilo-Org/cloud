@@ -55,7 +55,10 @@ export function createHttpProxy(options: ProxyOptions) {
     }
 
     if (options.supervisor && options.supervisor.getState() !== 'running') {
-      return c.json({ error: 'Gateway not ready' }, { status: 503, headers: { 'Retry-After': '5' } });
+      return c.json(
+        { error: 'Gateway not ready' },
+        { status: 503, headers: { 'Retry-After': '5' } }
+      );
     }
 
     const incomingUrl = new URL(c.req.url);

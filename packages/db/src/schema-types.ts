@@ -892,6 +892,20 @@ export const OpenCodeSettingsSchema = z.object({
 
 export type OpenCodeSettings = z.infer<typeof OpenCodeSettingsSchema>;
 
+export const OpenClawApiAdapterSchema = z.enum([
+  'openai-completions',
+  'openai-responses',
+  'anthropic-messages',
+]);
+
+export type OpenClawApiAdapter = z.infer<typeof OpenClawApiAdapterSchema>;
+
+export const OpenClawModelSettingsSchema = z.object({
+  api_adapter: OpenClawApiAdapterSchema.optional(),
+});
+
+export type OpenClawModelSettings = z.infer<typeof OpenClawModelSettingsSchema>;
+
 export const InterleavedFormatSchema = z.enum(['reasoning_content', 'think']);
 
 export type InterleavedFormat = z.infer<typeof InterleavedFormatSchema>;
@@ -931,6 +945,7 @@ export const CustomLlmDefinitionSchema = z
     extra_body: CustomLlmExtraBodySchema.optional(),
     remove_from_body: z.array(z.string()).optional(),
     opencode_settings: OpenCodeSettingsSchema.optional(),
+    openclaw_settings: OpenClawModelSettingsSchema.optional(),
     pricing: CustomLlmPricingSchema.optional(),
   })
   .strict();

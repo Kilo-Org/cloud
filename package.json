@@ -62,7 +62,7 @@
       "@storybook/nextjs@9.1.20": "patches/@storybook__nextjs@9.1.20.patch",
       "@gorhom/bottom-sheet@5.1.8": "patches/@gorhom__bottom-sheet@5.1.8.patch",
       "stream-chat-react-native-core": "patches/stream-chat-react-native-core.patch",
-      "expo-server-sdk@6.1.0": "patches/expo-server-sdk@6.1.0.patch"
+      "expo-server-sdk": "patches/expo-server-sdk.patch"
     },
     "onlyBuiltDependencies": [
       "@swc/core",

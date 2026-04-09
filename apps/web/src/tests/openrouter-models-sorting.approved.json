@@ -265,6 +265,9 @@
       "isFree": true,
       "opencode": {
         "ai_sdk_provider": "openai"
+      },
+      "openclaw": {
+        "api_adapter": "openai-responses"
       }
     },
     {
@@ -519,6 +522,9 @@
             }
           }
         }
+      },
+      "openclaw": {
+        "api_adapter": "openai-responses"
       }
     },
     {

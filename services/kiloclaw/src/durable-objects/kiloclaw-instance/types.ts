@@ -1,6 +1,7 @@
 import type { KiloClawEnv } from '../../types';
 import type { GoogleCredentials, PersistedState, MachineSize } from '../../schemas/instance-config';
 import type { FlyClientConfig } from '../../fly/client';
+import { userIdFromSandboxId } from '../../auth/sandbox-id';
 import {
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,
@@ -135,6 +136,14 @@ export type InstanceMutableState = {
 export function getAppKey(state: { userId: string | null; sandboxId: string | null }): string {
   if (state.sandboxId && isInstanceKeyedSandboxId(state.sandboxId)) {
     return instanceIdFromSandboxId(state.sandboxId);
+  }
+  if (state.sandboxId) {
+    try {
+      return userIdFromSandboxId(state.sandboxId);
+    } catch {
+      // Older tests and malformed legacy state can still carry placeholder
+      // sandboxIds that are not reversible base64url encodings.
+    }
   }
   if (state.userId) return state.userId;
   throw new Error('Cannot derive app key: no sandboxId or userId');

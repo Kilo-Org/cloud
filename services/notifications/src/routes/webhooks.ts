@@ -27,8 +27,8 @@ webhooks.post('/stream-chat', async c => {
 
   const payload = JSON.parse(rawBody) as Event;
 
-  // Only handle new messages
-  if (payload.type !== 'message.new') {
+  // Only handle new and updated messages
+  if (payload.type !== 'message.new' && payload.type !== 'message.updated') {
     return c.json({ ok: true });
   }
 

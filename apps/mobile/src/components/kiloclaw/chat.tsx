@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Pressable, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
@@ -8,6 +8,7 @@ import { Settings } from 'lucide-react-native';
 import { type Channel as StreamChannel, StreamChat } from 'stream-chat';
 import { Channel, Chat, MessageInput, MessageList, OverlayProvider } from 'stream-chat-expo';
 
+import { KiloClawMessageAvatar } from '@/components/kiloclaw/chat-avatar';
 import { useBotOnlineStatus } from '@/components/kiloclaw/chat-hooks';
 import { NotificationPrompt } from '@/components/kiloclaw/notification-prompt';
 import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
@@ -80,8 +81,6 @@ export function KiloClawChat({ instanceId, name, enabled }: Readonly<KiloClawCha
     />
   );
 }
-
-// ─── Internal components ────────────────────────────────────────────────────
 
 function ChatShell({
   instanceId,
@@ -201,8 +200,7 @@ function StreamChatUI({
         await chatClient.connectUser({ id: userId }, tokenProvider);
         const ch = chatClient.channel('messaging', channelId);
         await ch.watch({ presence: true });
-        // cancelled may change across awaits above
-        // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
+        // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- cancelled can change across awaits
         if (!cancelled) {
           setClient(chatClient);
           setChannel(ch);
@@ -222,6 +220,25 @@ function StreamChatUI({
       setChannel(null);
     };
   }, [apiKey, userId, channelId, tokenProvider]);
+
+  // Gracefully close/reopen the websocket on background/foreground.
+  // This preserves the client and channel state (no disconnect/reconnect).
+  const appState = useRef(AppState.currentState);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (client) {
+        if (appState.current === 'active' && /inactive|background/.exec(nextAppState)) {
+          void client.closeConnection();
+        } else if (/inactive|background/.exec(appState.current) && nextAppState === 'active') {
+          void client.openConnection();
+        }
+      }
+      appState.current = nextAppState;
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [client]);
 
   // Bot presence tracking
   const sandboxId = channelId.replace(/^default-/, '');
@@ -259,7 +276,11 @@ function StreamChatUI({
         <OverlayProvider value={{ style: chatTheme }}>
           {/* eslint-disable-next-line typescript-eslint/no-unsafe-assignment -- expo-image is API-compatible with RN Image */}
           <Chat client={client} style={chatTheme} ImageComponent={ExpoImage as never}>
-            <Channel channel={channel} keyboardVerticalOffset={headerHeight}>
+            <Channel
+              channel={channel}
+              keyboardVerticalOffset={headerHeight}
+              MessageAvatar={KiloClawMessageAvatar}
+            >
               <NotificationPrompt enabled={Boolean(channel)} />
               <MessageList />
               <MessageInput />
@@ -270,11 +291,10 @@ function StreamChatUI({
     </View>
   );
 }
-
 function ChatPlaceholder({ message }: { message: string }) {
   return (
     <View className="flex-1 items-center justify-center px-6">
-      <Text className="text-sm text-muted-foreground text-center">{message}</Text>
+      <Text className="text-center text-sm text-muted-foreground">{message}</Text>
     </View>
   );
 }

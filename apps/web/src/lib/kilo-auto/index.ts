@@ -186,8 +186,7 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
 export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   id: 'kilo-auto/balanced',
   name: 'Kilo Auto Balanced',
-  description:
-    'Great balance of price and capability. Uses GPT-5.3-Codex for coding tasks; Qwen3.6 Plus for KiloClaw.',
+  description: 'Great balance of price and capability. Uses GPT-5.3-Codex or Qwen3.6 Plus.',
   context_length: 400_000,
   max_completion_tokens: 65_536,
   prompt_price: '0.00000175',

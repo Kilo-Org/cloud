@@ -49,7 +49,7 @@
       "id": "kilo-auto/balanced",
       "name": "Kilo Auto Balanced",
       "created": 0,
-      "description": "Great balance of price and capability. Uses GPT-5.3-Codex for coding tasks; Qwen3.6 Plus for KiloClaw.",
+      "description": "Great balance of price and capability. Uses GPT-5.3-Codex or Qwen3.6 Plus.",
       "architecture": {
         "input_modalities": [
           "text",

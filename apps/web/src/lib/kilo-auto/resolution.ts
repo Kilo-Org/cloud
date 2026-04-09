@@ -21,6 +21,8 @@ import {
 } from '@/lib/kilo-auto';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 
+const ENABLE_QWEN_KILOCLAW_MODEL = false;
+
 export async function resolveAutoModel(
   model: string,
   modeHeader: string | null,
@@ -43,7 +45,9 @@ export async function resolveAutoModel(
       if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
         return BALANCED_CLAW_SETUP_MODEL;
       }
-      return BALANCED_QWEN_MODEL;
+      if (ENABLE_QWEN_KILOCLAW_MODEL) {
+        return BALANCED_QWEN_MODEL;
+      }
     }
     return BALANCED_CODEX_MODEL;
   }

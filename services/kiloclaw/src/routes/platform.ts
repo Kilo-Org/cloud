@@ -1767,7 +1767,8 @@ platform.get('/volume-snapshots', async c => {
     userId,
     iidResult.instanceId,
     'volumeSnapshots',
-    'volume-snapshots'
+    'volume-snapshots',
+    { failOpen: true }
   );
   if (unsupported) return unsupported;
 
@@ -1800,7 +1801,8 @@ platform.get('/candidate-volumes', async c => {
     userId,
     iidResult.instanceId,
     'candidateVolumes',
-    'candidate-volumes'
+    'candidate-volumes',
+    { failOpen: true }
   );
   if (unsupported) return unsupported;
 
@@ -1837,7 +1839,8 @@ platform.post('/reassociate-volume', async c => {
     result.data.userId,
     iidResult.instanceId,
     'volumeReassociation',
-    'reassociate-volume'
+    'reassociate-volume',
+    { failOpen: true }
   );
   if (unsupported) return unsupported;
 
@@ -1873,7 +1876,8 @@ platform.post('/restore-volume-snapshot', async c => {
     result.data.userId,
     iidResult.instanceId,
     'snapshotRestore',
-    'restore-volume-snapshot'
+    'restore-volume-snapshot',
+    { failOpen: true }
   );
   if (unsupported) return unsupported;
 

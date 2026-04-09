@@ -3657,6 +3657,39 @@ describe('start: 412 insufficient resources recovery', () => {
     expect(flyClient.destroyMachine).toHaveBeenCalledWith(expect.anything(), 'machine-1');
   });
 
+  it('preserves the old machine id if retry creation fails after a transient destroy failure', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'stopped', lastStartedAt: Date.now() - 60_000 });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopped' });
+    (flyClient.updateMachine as Mock).mockRejectedValue(
+      new FlyApiError('insufficient resources', 412, '{"error":"insufficient resources"}')
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.destroyMachine as Mock).mockRejectedValue(
+      new FlyApiError('server error', 500, 'internal')
+    );
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'cdg',
+    });
+    (flyClient.createMachine as Mock).mockRejectedValueOnce(
+      new FlyApiError('still no resources', 500, '{"error":"no capacity"}')
+    );
+
+    await expect(instance.start('user-1')).rejects.toThrow('still no resources');
+
+    expect(storage._store.get('flyMachineId')).toBe('machine-1');
+    expect(storage._store.get('flyVolumeId')).toBe('vol-new');
+    expect(storage._store.get('providerState')).toEqual({
+      provider: 'fly',
+      appName: null,
+      machineId: 'machine-1',
+      volumeId: 'vol-new',
+      region: 'cdg',
+    });
+  });
+
   it('propagates non-412 errors without recovery', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { flyMachineId: null });
@@ -4929,6 +4962,31 @@ describe('provision: auto-start after fresh provision', () => {
       'machine-from-provider'
     );
     expect(storage._store.get('status')).toBe('stopped');
+  });
+
+  it('does not leave the hot DO on an unsupported provider after failed provision', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+
+    await expect(instance.provision('user-1', {}, { provider: 'k8s' })).rejects.toThrow(
+      'Provider k8s is not implemented yet'
+    );
+
+    expect(storage._store.get('userId')).toBeUndefined();
+    expect(storage._store.get('provider')).toBeUndefined();
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', {});
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('provider')).toBe('fly');
+    expect(storage._store.get('status')).toBe('running');
   });
 });
 

@@ -314,18 +314,28 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       ? sandboxIdFromInstanceId(opts.instanceId)
       : sandboxIdFromUserId(userId);
     const isNew = !this.s.status;
-    this.s.userId = userId;
-    this.s.sandboxId = sandboxId;
-    this.s.provider = opts?.provider ?? this.s.provider ?? 'fly';
-    this.s.orgId = opts?.orgId ?? null;
+    const providerId = opts?.provider ?? this.s.provider ?? 'fly';
+    const orgId = opts?.orgId ?? null;
+    const provider = getProviderAdapter(this.env, { provider: providerId });
+    const provisioningState = {
+      ...this.s,
+      userId,
+      sandboxId,
+      provider: providerId,
+      orgId,
+    } satisfies InstanceMutableState;
 
-    const provisioning = await this.provider().ensureProvisioningResources({
+    const provisioning = await provider.ensureProvisioningResources({
       env: this.env,
-      state: this.s,
-      orgId: this.s.orgId,
+      state: provisioningState,
+      orgId,
       machineSize: config.machineSize ?? null,
       region: config.region,
     });
+    this.s.userId = userId;
+    this.s.sandboxId = sandboxId;
+    this.s.provider = providerId;
+    this.s.orgId = orgId;
     await this.persistProviderResult(provisioning);
 
     // Resolve the image version for this provision.

@@ -191,4 +191,17 @@ describe('platform provider capability gates', () => {
     });
     expect(enqueueSnapshotRestore).not.toHaveBeenCalled();
   });
+
+  it('fails open for volume snapshots when provider metadata lookup is unavailable', async () => {
+    const { env, getProviderMetadata, listVolumeSnapshots } = makeEnv();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    getProviderMetadata.mockRejectedValueOnce(new Error('DO unavailable'));
+
+    const response = await platform.request('/volume-snapshots?userId=user-1', undefined, env);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ snapshots: [{ id: 'snap-1' }] });
+    expect(listVolumeSnapshots).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalled();
+  });
 });

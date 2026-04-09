@@ -126,6 +126,7 @@ export async function replaceStrandedVolume(
   const allRegions = await resolveRegions(env.KV_CLAW_CACHE, env.FLY_REGION);
   const regions = deprioritizeRegion(allRegions, oldRegion);
   const compute = guestFromSize(state.machineSize);
+  let machineGone = false;
 
   // Destroy existing machine if any — it's stuck on the constrained host.
   if (state.flyMachineId) {
@@ -135,15 +136,23 @@ export async function replaceStrandedVolume(
         fly_app_name: flyConfig.appName,
         machine_id: state.flyMachineId,
       });
+      machineGone = true;
     } catch (err) {
       if (fly.isFlyNotFound(err)) {
-        // already gone
+        machineGone = true;
       } else {
         doWarn(state, 'Failed to destroy stranded machine', {
           error: toLoggable(err),
         });
       }
     }
+  }
+
+  if (machineGone) {
+    providerState = {
+      ...providerState,
+      machineId: null,
+    };
   }
 
   const capacityErrorCallback = {

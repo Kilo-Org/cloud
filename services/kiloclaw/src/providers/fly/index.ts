@@ -167,10 +167,6 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
         env,
         'start_capacity_recovery'
       );
-      providerState = {
-        ...providerState,
-        machineId: null,
-      };
       await onProviderResult?.({
         providerState,
       });

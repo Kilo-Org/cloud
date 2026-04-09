@@ -37,6 +37,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import type { GastownOutputs } from '@/lib/gastown/trpc';
 import { AdminViewingBanner } from '@/components/gastown/AdminViewingBanner';
 import { DrainStatusBanner } from '@/components/gastown/DrainStatusBanner';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 type Agent = GastownOutputs['gastown']['listAgents'][number];
 
@@ -215,6 +216,7 @@ export function TownOverviewPageClient({
       {/* Top bar — sticky */}
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3">
         <div className="flex items-center gap-3">
+          <SidebarTrigger className="-ml-3" />
           {townQuery.isLoading ? (
             <Skeleton className="h-6 w-40" />
           ) : (

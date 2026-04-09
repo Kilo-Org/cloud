@@ -1,22 +1,13 @@
 import { z } from 'zod';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
-  CLAUDE_OPUS_CURRENT_MODEL_NAME,
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-  CLAUDE_SONNET_CURRENT_MODEL_NAME,
 } from '@/lib/providers/anthropic.constants';
 import { minimax_m25_free_model } from '@/lib/providers/minimax';
 import { qwen36_plus_model } from '@/lib/providers/qwen';
-import { gpt_oss_20b_free_model, GPT_5_NANO_NAME } from '@/lib/providers/openai';
 import type { OpenRouterReasoningConfig } from '@/lib/providers/openrouter/types';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
-
-function stripDisplayName(displayName: string): string {
-  const start = displayName.indexOf(': ');
-  const end = displayName.indexOf(' (');
-  return displayName.substring(start < 0 ? 0 : start + 2, end < 0 ? undefined : end);
-}
 
 type AutoModel = {
   id: string;
@@ -40,26 +31,6 @@ export type ResolvedAutoModel = {
 };
 
 export const GPT_53_CODEX_ID = 'openai/gpt-5.3-codex';
-
-const MODEL_DISPLAY_NAMES: Readonly<Record<string, string>> = {
-  [CLAUDE_OPUS_CURRENT_MODEL_ID]: CLAUDE_OPUS_CURRENT_MODEL_NAME,
-  [CLAUDE_SONNET_CURRENT_MODEL_ID]: CLAUDE_SONNET_CURRENT_MODEL_NAME,
-  [qwen36_plus_model.public_id]: 'Qwen3.6 Plus',
-  [GPT_53_CODEX_ID]: 'GPT-5.3-Codex',
-};
-
-function describeRouting(modeToModel: Record<string, ResolvedAutoModel>): string {
-  const modelToModes: Record<string, string[]> = {};
-  for (const [mode, { model }] of Object.entries(modeToModel)) {
-    const modes = modelToModes[model] ?? [];
-    modes.push(mode);
-    modelToModes[model] = modes;
-  }
-  const parts = Object.entries(modelToModes).map(
-    ([model, modes]) => `${MODEL_DISPLAY_NAMES[model] ?? model} for ${modes.join(', ')}`
-  );
-  return `Uses ${parts.join('; ')}.`;
-}
 
 export const modeSchema = z.enum([
   'KiloClaw',
@@ -150,7 +121,7 @@ export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
 export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
   id: 'kilo-auto/frontier',
   name: 'Kilo Auto Frontier',
-  description: `Highest performance and capability for any task. ${describeRouting(FRONTIER_MODE_TO_MODEL)}`,
+  description: 'Highest performance and capability for any task.',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
   prompt_price: '0.000005',
@@ -168,7 +139,7 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
 export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Kilo Auto Free',
-  description: `Free with limited capability. No credits required. Uses ${stripDisplayName(minimax_m25_free_model.display_name)}.`,
+  description: 'Free with limited capability. No credits required.',
   context_length: minimax_m25_free_model.context_length,
   max_completion_tokens: minimax_m25_free_model.max_completion_tokens,
   prompt_price: '0',
@@ -186,7 +157,7 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
 export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   id: 'kilo-auto/balanced',
   name: 'Kilo Auto Balanced',
-  description: 'Great balance of price and capability. Uses GPT-5.3-Codex or Qwen3.6 Plus.',
+  description: 'Great balance of price and capability.',
   context_length: 400_000,
   max_completion_tokens: 65_536,
   prompt_price: '0.00000175',
@@ -208,7 +179,7 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
 export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   id: 'kilo-auto/small',
   name: 'Kilo Auto Small',
-  description: `Automatically routes your request to a small model. Uses ${GPT_5_NANO_NAME} (default) or ${stripDisplayName(gpt_oss_20b_free_model.display_name)} (free fallback).`,
+  description: 'Automatically routes your request to a small model.',
   context_length: 131072,
   max_completion_tokens: 32768,
   prompt_price: '0.00000005',

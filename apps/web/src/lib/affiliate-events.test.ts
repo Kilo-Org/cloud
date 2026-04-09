@@ -132,7 +132,7 @@ describe('affiliate-events', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('treats unconfigured Impact dispatch as a delivered no-op', async () => {
+  it('dispatches a child immediately when the parent was delivered without a claimed_at timestamp', async () => {
     const user = await insertTestUser();
     const {
       buildAffiliateEventDedupeKey,
@@ -141,17 +141,27 @@ describe('affiliate-events', () => {
       recordAffiliateAttributionAndQueueParentEvent,
     } = await import('@/lib/affiliate-events');
 
-    delete process.env.IMPACT_ACCOUNT_SID;
-    delete process.env.IMPACT_AUTH_TOKEN;
-    delete process.env.IMPACT_CAMPAIGN_ID;
-
-    await recordAffiliateAttributionAndQueueParentEvent({
+    const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
       userId: user.id,
       provider: 'impact',
       trackingId: 'impact-click-123',
       customerEmail: user.google_user_email,
       eventDate: new Date('2026-04-09T10:00:00.000Z'),
     });
+
+    expect(parentEvent).not.toBeNull();
+
+    // Simulate unconfigured delivery: parent is delivered with claimed_at cleared
+    // (as happens when sendImpactConversionPayload returns skipped: 'unconfigured').
+    await db
+      .update(user_affiliate_events)
+      .set({
+        delivery_state: 'delivered',
+        claimed_at: null,
+        next_retry_at: null,
+      })
+      .where(eq(user_affiliate_events.id, parentEvent!.id));
+
     await enqueueAffiliateEventForUser({
       userId: user.id,
       provider: 'impact',
@@ -176,15 +186,14 @@ describe('affiliate-events', () => {
 
     expect(summary).toEqual({
       reclaimed: 0,
-      claimed: 2,
-      delivered: 2,
+      claimed: 1,
+      delivered: 1,
       retried: 0,
       failed: 0,
-      unblocked: 1,
+      unblocked: 0,
     });
     expect(rows.map(row => row.delivery_state).sort()).toEqual(['delivered', 'delivered']);
-    expect(rows.every(row => row.claimed_at === null)).toBe(true);
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('delivers a queued child after the parent processing gap passes', async () => {

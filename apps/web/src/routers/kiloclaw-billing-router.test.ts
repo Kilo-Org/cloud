@@ -1327,7 +1327,19 @@ describe('handleKiloClawSubscriptionCreated', () => {
   });
 
   it('enqueues trial_end from persisted trial history when the paid row is already active', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
+    jest.useFakeTimers({
+      doNotFake: [
+        'setTimeout',
+        'setInterval',
+        'setImmediate',
+        'clearTimeout',
+        'clearInterval',
+        'clearImmediate',
+        'nextTick',
+        'queueMicrotask',
+      ],
+    });
+    jest.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
     await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
 
     const [instance] = await db
@@ -1378,6 +1390,8 @@ describe('handleKiloClawSubscriptionCreated', () => {
         }),
       })
     );
+
+    jest.useRealTimers();
   });
 
   it('sets commit_ends_at for a new commit subscription', async () => {

@@ -232,14 +232,24 @@ async function markAffiliateEventDelivered(
   eventId: string,
   params?: { clearClaimedAt?: boolean }
 ): Promise<void> {
-  await database
-    .update(user_affiliate_events)
-    .set({
-      delivery_state: 'delivered',
-      next_retry_at: null,
-      ...(params?.clearClaimedAt ? { claimed_at: null } : {}),
-    })
-    .where(eq(user_affiliate_events.id, eventId));
+  if (params?.clearClaimedAt) {
+    await database.execute(sql`
+      UPDATE ${user_affiliate_events}
+      SET
+        ${sql.identifier(user_affiliate_events.delivery_state.name)} = 'delivered',
+        ${sql.identifier(user_affiliate_events.next_retry_at.name)} = NULL,
+        ${sql.identifier(user_affiliate_events.claimed_at.name)} = NULL
+      WHERE ${user_affiliate_events.id} = ${eventId}::uuid
+    `);
+  } else {
+    await database
+      .update(user_affiliate_events)
+      .set({
+        delivery_state: 'delivered',
+        next_retry_at: null,
+      })
+      .where(eq(user_affiliate_events.id, eventId));
+  }
 }
 
 async function requeueAffiliateEvent(

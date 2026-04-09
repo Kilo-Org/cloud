@@ -433,6 +433,33 @@ describe('generateBaseConfig', () => {
     ]);
   });
 
+  it('always configures the KiloClaw customizer plugin', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.plugins.entries['kiloclaw-customizer'].enabled).toBe(true);
+    expect(config.plugins.load.paths).toContain(
+      '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer'
+    );
+  });
+
+  it('does not duplicate KiloClaw customizer plugin path on repeated generateBaseConfig calls', () => {
+    const existing = JSON.stringify({
+      plugins: {
+        load: {
+          paths: ['/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer'],
+        },
+        entries: { 'kiloclaw-customizer': { enabled: true } },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    const pluginPath = '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer';
+    const paths = config.plugins.load.paths as string[];
+    expect(paths.filter(p => p === pluginPath)).toHaveLength(1);
+  });
+
   it('configures Telegram channel', () => {
     const { deps } = fakeDeps();
     const env = { ...minimalEnv(), TELEGRAM_BOT_TOKEN: 'tg-token-123' };

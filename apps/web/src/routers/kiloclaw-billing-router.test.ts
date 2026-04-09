@@ -22,6 +22,7 @@ import {
   credit_transactions,
   kilo_pass_subscriptions,
   user_affiliate_attributions,
+  user_affiliate_events,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { sandboxIdFromUserId } from '@/lib/kiloclaw/sandbox-id';
@@ -62,6 +63,11 @@ jest.mock('@/lib/kiloclaw/stripe-price-ids.server', () => ({
   getStripePriceIdForClawPlanIntro: jest.fn((plan: string) =>
     plan === 'standard' ? 'price_standard_intro' : 'price_commit'
   ),
+  getKnownStripePriceIdsForKiloClaw: jest.fn(() => [
+    'price_commit',
+    'price_standard',
+    'price_standard_intro',
+  ]),
   getClawPlanForStripePriceId: jest.fn((priceId: string) => {
     if (priceId === 'price_commit') return 'commit';
     if (priceId === 'price_standard') return 'standard';
@@ -76,6 +82,15 @@ jest.mock('next/headers', () => {
   return {
     cookies: fn().mockResolvedValue({ get: fn() }),
     headers: fn().mockReturnValue(new Map()),
+  };
+});
+
+jest.mock('next/server', () => {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+  const actual = jest.requireActual<typeof import('next/server')>('next/server');
+  return {
+    ...actual,
+    after: jest.fn(async (work: () => Promise<void>) => await work()),
   };
 });
 
@@ -183,11 +198,13 @@ function makeStripeSubscription(params: {
   status: Stripe.Subscription.Status;
   cancel_at_period_end?: boolean;
   priceId?: string;
+  created?: number;
 }): Stripe.Subscription {
   const now = Math.floor(Date.now() / 1000);
   return {
     id: params.id,
     object: 'subscription',
+    created: params.created ?? now,
     metadata: params.metadata,
     status: params.status,
     cancel_at_period_end: params.cancel_at_period_end ?? false,
@@ -229,6 +246,28 @@ async function createKiloclawInstance(userId: string, destroyedAt?: string) {
   }
 
   return instance;
+}
+
+async function seedDeliveredImpactSignupEvent(userId: string, email: string) {
+  const { recordAffiliateAttributionAndQueueParentEvent } = await import('@/lib/affiliate-events');
+  const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
+    userId,
+    provider: 'impact',
+    trackingId: 'impact-click-123',
+    customerEmail: email,
+    eventDate: new Date('2026-04-09T10:00:00.000Z'),
+  });
+
+  expect(parentEvent).not.toBeNull();
+
+  await db
+    .update(user_affiliate_events)
+    .set({
+      delivery_state: 'delivered',
+      claimed_at: null,
+      next_retry_at: null,
+    })
+    .where(eq(user_affiliate_events.id, parentEvent!.id));
 }
 
 async function createCanceledTrialAndPaidSubscriptions(params?: {
@@ -1246,6 +1285,115 @@ describe('handleKiloClawSubscriptionCreated', () => {
     expect(row.status).toBe('active');
   });
 
+  it('enqueues trial_end affiliate events when a Stripe subscription upgrades a delivered trial', async () => {
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({ user_id: user.id, sandbox_id: sandboxIdFromUserId(user.id) })
+      .returning();
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+    });
+
+    const subscription = makeStripeSubscription({
+      id: 'sub_affiliate_trial_upgrade',
+      metadata: { type: 'kiloclaw', plan: 'standard', kiloUserId: user.id },
+      status: 'active',
+      priceId: 'price_standard',
+    });
+
+    await handleKiloClawSubscriptionCreated({
+      eventId: 'evt_affiliate_trial_upgrade',
+      subscription,
+    });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+
+    expect(events.map(event => event.event_type).sort()).toEqual(['signup', 'trial_end']);
+    expect(events.find(event => event.event_type === 'trial_end')).toEqual(
+      expect.objectContaining({
+        delivery_state: 'queued',
+      })
+    );
+  });
+
+  it('enqueues trial_end from persisted trial history when the paid row is already active', async () => {
+    jest.useFakeTimers({
+      doNotFake: [
+        'setTimeout',
+        'setInterval',
+        'setImmediate',
+        'clearTimeout',
+        'clearInterval',
+        'clearImmediate',
+        'nextTick',
+        'queueMicrotask',
+      ],
+    });
+    jest.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({ user_id: user.id, sandbox_id: sandboxIdFromUserId(user.id) })
+      .returning();
+
+    const trialStartedAt = '2026-04-01T00:00:00.000Z';
+    const trialEndsAt = '2026-04-08T00:00:00.000Z';
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      stripe_subscription_id: 'sub_affiliate_trial_upgrade_retry',
+      plan: 'standard',
+      status: 'active',
+      trial_started_at: trialStartedAt,
+      trial_ends_at: trialEndsAt,
+      current_period_start: trialEndsAt,
+      current_period_end: '2026-05-08T00:00:00.000Z',
+    });
+
+    const subscriptionCreatedAt = Math.floor(new Date('2026-04-09T10:15:00.000Z').getTime() / 1000);
+    const subscription = makeStripeSubscription({
+      id: 'sub_affiliate_trial_upgrade_retry',
+      metadata: { type: 'kiloclaw', plan: 'standard', kiloUserId: user.id },
+      status: 'active',
+      priceId: 'price_standard',
+      created: subscriptionCreatedAt,
+    });
+
+    await handleKiloClawSubscriptionCreated({
+      eventId: 'evt_affiliate_trial_upgrade_retry',
+      subscription,
+    });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+
+    expect(events.map(event => event.event_type).sort()).toEqual(['signup', 'trial_end']);
+    expect(events.find(event => event.event_type === 'trial_end')).toEqual(
+      expect.objectContaining({
+        delivery_state: 'queued',
+        payload_json: expect.objectContaining({
+          eventDate: '2026-04-09T10:15:00.000Z',
+          orderId: 'IR_AN_64_TS',
+        }),
+      })
+    );
+
+    jest.useRealTimers();
+  });
+
   it('sets commit_ends_at for a new commit subscription', async () => {
     const subscription = makeStripeSubscription({
       id: 'sub_commit_new',
@@ -1467,6 +1615,101 @@ describe('handleKiloClawSubscriptionCreated', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]!.instance_id).toBeNull();
     expect(rows[0]!.instance_id).not.toBe(orgInstance.id);
+  });
+});
+
+describe('handleKiloClawInvoicePaid affiliate events', () => {
+  let handleKiloClawInvoicePaid: (params: {
+    eventId: string;
+    invoice: Stripe.Invoice;
+  }) => Promise<void>;
+
+  beforeAll(async () => {
+    const mod = await import('@/lib/kiloclaw/stripe-handlers');
+    handleKiloClawInvoicePaid = mod.handleKiloClawInvoicePaid;
+  });
+
+  it('enqueues sale affiliate events for delivered attributed users', async () => {
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({ user_id: user.id, sandbox_id: sandboxIdFromUserId(user.id) })
+      .returning();
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      stripe_subscription_id: 'sub_invoice_paid',
+      payment_source: 'stripe',
+      plan: 'standard',
+      status: 'active',
+      current_period_start: '2026-04-01T00:00:00.000Z',
+      current_period_end: '2026-05-01T00:00:00.000Z',
+      cancel_at_period_end: false,
+    });
+
+    stripeMock.subscriptions.retrieve.mockResolvedValue({
+      metadata: {
+        type: 'kiloclaw',
+        plan: 'standard',
+        kiloUserId: user.id,
+      },
+      schedule: null,
+      items: { data: [{ price: { id: 'price_standard' } }] },
+    });
+
+    await handleKiloClawInvoicePaid({
+      eventId: 'evt_invoice_paid_affiliate',
+      invoice: {
+        id: 'in_affiliate_sale',
+        amount_paid: 900,
+        currency: 'usd',
+        charge: 'ch_affiliate_sale',
+        parent: {
+          subscription_details: {
+            subscription: 'sub_invoice_paid',
+          },
+        },
+        lines: {
+          data: [
+            {
+              pricing: {
+                price_details: {
+                  price: 'price_standard',
+                },
+              },
+              period: {
+                start: Math.floor(new Date('2026-04-01T00:00:00.000Z').getTime() / 1000),
+                end: Math.floor(new Date('2026-05-01T00:00:00.000Z').getTime() / 1000),
+              },
+            },
+          ],
+        },
+        status_transitions: {
+          paid_at: Math.floor(new Date('2026-04-09T10:00:00.000Z').getTime() / 1000),
+        },
+      } as unknown as Stripe.Invoice,
+    });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+
+    expect(events.map(event => event.event_type).sort()).toEqual(['sale', 'signup']);
+    expect(events.find(event => event.event_type === 'sale')).toEqual(
+      expect.objectContaining({
+        delivery_state: 'queued',
+        payload_json: expect.objectContaining({
+          amount: 9,
+          currencyCode: 'usd',
+          itemCategory: 'kiloclaw-standard',
+          itemName: 'KiloClaw Standard Plan',
+          orderId: 'in_affiliate_sale',
+        }),
+      })
+    );
   });
 });
 
@@ -3143,6 +3386,93 @@ describe('enrollWithCredits', () => {
     // Trial dates are preserved for historical visibility
     expect(sub.trial_started_at).not.toBeNull();
     expect(sub.trial_ends_at).not.toBeNull();
+  });
+
+  it('enqueues trial_end and sale affiliate events for attributed trial-to-credit conversion', async () => {
+    const instance = await createInstance(user.id);
+    await giveUserCredits(user.id, 50_000_000);
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await caller.kiloclaw.enrollWithCredits({ plan: 'standard' });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+
+    expect(events.map(event => event.event_type).sort()).toEqual(['sale', 'signup', 'trial_end']);
+    expect(events.find(event => event.event_type === 'trial_end')).toEqual(
+      expect.objectContaining({
+        delivery_state: 'queued',
+      })
+    );
+    expect(events.find(event => event.event_type === 'sale')).toEqual(
+      expect.objectContaining({
+        delivery_state: 'queued',
+        payload_json: expect.objectContaining({
+          amount: 4,
+          currencyCode: 'usd',
+          itemCategory: 'kiloclaw-standard',
+          itemName: 'KiloClaw Standard Plan',
+          itemSku: 'price_standard_intro',
+          orderId: expect.stringContaining(`kiloclaw-subscription:${instance.id}:`),
+        }),
+      })
+    );
+  });
+
+  it('enqueues only sale affiliate events for attributed direct credit enrollment', async () => {
+    const instance = await createInstance(user.id);
+    await giveUserCredits(user.id, 50_000_000);
+    await seedDeliveredImpactSignupEvent(user.id, user.google_user_email);
+
+    const caller = await createCallerForUser(user.id);
+    await caller.kiloclaw.enrollWithCredits({ plan: 'commit' });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+
+    expect(events.map(event => event.event_type).sort()).toEqual(['sale', 'signup']);
+    expect(events.find(event => event.event_type === 'sale')).toEqual(
+      expect.objectContaining({
+        delivery_state: 'queued',
+        payload_json: expect.objectContaining({
+          amount: 48,
+          currencyCode: 'usd',
+          itemCategory: 'kiloclaw-commit',
+          itemName: 'KiloClaw Commit Plan',
+          itemSku: 'price_test_kiloclaw',
+          orderId: expect.stringContaining(`kiloclaw-subscription-commit:${instance.id}:`),
+        }),
+      })
+    );
+  });
+
+  it('does not enqueue affiliate child events for non-attributed credit enrollment', async () => {
+    await createInstance(user.id);
+    await giveUserCredits(user.id, 50_000_000);
+
+    const caller = await createCallerForUser(user.id);
+    await caller.kiloclaw.enrollWithCredits({ plan: 'standard' });
+
+    const events = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+
+    expect(events).toHaveLength(0);
   });
 
   it('applies intro price for canceled-trial subscriber', async () => {

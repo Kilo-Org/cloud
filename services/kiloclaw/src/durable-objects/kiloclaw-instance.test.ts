@@ -67,7 +67,7 @@ vi.mock('../lib/image-version', async () => {
 // -- Mock db --
 vi.mock('../db', () => ({
   getWorkerDb: vi.fn(() => ({})),
-  getActiveInstance: vi.fn().mockResolvedValue(null),
+  getActivePersonalInstance: vi.fn().mockResolvedValue(null),
   findPepperByUserId: vi.fn().mockResolvedValue({
     id: 'user-1',
     api_token_pepper: 'pepper-1',
@@ -5080,7 +5080,7 @@ describe('auto-destroy stale provisioned instances', () => {
 
     const markDestroyed = vi.fn(markImpl);
     (db.getWorkerDb as Mock).mockReturnValue({});
-    (db.getActiveInstance as Mock).mockResolvedValue(null);
+    (db.getActivePersonalInstance as Mock).mockResolvedValue(null);
     (db.markInstanceDestroyed as Mock).mockImplementation(markDestroyed);
 
     const { instance, storage } = createInstance(undefined, env);

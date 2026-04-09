@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim AS runtime
 
 # Install Node.js 24 (required by OpenClaw)
 ENV NODE_VERSION=24.14.1
@@ -132,3 +132,22 @@ EXPOSE 18789
 # All bootstrap logic (env decryption, onboard/doctor, config patching,
 # feature flags) lives in the controller's bootstrap module — no shell wrapper needed.
 CMD ["node", "/usr/local/bin/kiloclaw-controller.js"]
+
+# Build customizer plugin tarball in isolated stage so dev dependencies
+# are not persisted in the runtime image.
+FROM runtime AS customizer-builder
+
+COPY plugins/kiloclaw-customizer/ /tmp/kiloclaw-customizer/
+RUN cd /tmp/kiloclaw-customizer \
+    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
+    && PKG_TGZ="$(npm pack --silent)" \
+    && mv "${PKG_TGZ}" /tmp/kiloclaw-customizer.tgz \
+    && cd / \
+    && rm -rf /tmp/kiloclaw-customizer /root/.npm
+
+FROM runtime AS final
+
+COPY --from=customizer-builder /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-customizer.tgz
+RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz \
+    && rm -f /tmp/kiloclaw-customizer.tgz \
+    && rm -rf /root/.npm

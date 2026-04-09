@@ -168,8 +168,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   try {
     if (path === '/chat/completions') {
       const body: OpenRouterChatCompletionRequest = JSON.parse(requestBodyText);
-      // Inject or merge stream_options.include_usage = true
-      body.stream_options = { ...(body.stream_options || {}), include_usage: true };
+      // Inject or merge stream_options.include_usage = true (only when streaming)
+      if (body.stream) {
+        body.stream_options = { ...(body.stream_options || {}), include_usage: true };
+      }
       requestBodyParsed = { kind: 'chat_completions', body };
     } else if (path === '/messages') {
       const body: GatewayMessagesRequest = JSON.parse(requestBodyText);

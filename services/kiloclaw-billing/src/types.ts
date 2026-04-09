@@ -29,6 +29,9 @@ export type BillingWorkerEnv = {
   LIFECYCLE_QUEUE: Queue<BillingSweepMessage>;
   KILOCLAW: ServiceFetcher;
   KILOCODE_BACKEND_BASE_URL: string;
+  STRIPE_KILOCLAW_COMMIT_PRICE_ID: string;
+  STRIPE_KILOCLAW_STANDARD_PRICE_ID: string;
+  STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: string;
   INTERNAL_API_SECRET?: string;
   KILOCLAW_INTERNAL_API_SECRET?: string;
 };

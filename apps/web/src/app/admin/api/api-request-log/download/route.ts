@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
     await archive.finalize();
   };
 
-  void appendRows();
+  void appendRows().catch(error => passthrough.destroy(error));
 
   const webStream = new ReadableStream({
     start(controller) {

@@ -1,0 +1,30 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+deleted file mode 100644
+index 0332465d53ab851fc1de26cd8624af494c1363f3..0000000000000000000000000000000000000000
+diff --git a/build/ExpoClient.js b/build/ExpoClient.js
+index 0754d32755e3e34ed14cdb2070ac4a1ea18c7535..06c10bf62082f2fe5129363d656d456d0eaa5126 100644
+--- a/build/ExpoClient.js
++++ b/build/ExpoClient.js
+@@ -6,13 +6,11 @@
+  * https://expo.dev
+  */
+ import assert from 'node:assert';
+-import { createRequire } from 'node:module';
+ import { gzipSync } from 'node:zlib';
+ import promiseLimit from 'promise-limit';
+ import promiseRetry from 'promise-retry';
+ import { fetch } from 'undici';
+ import { defaultConcurrentRequestLimit, getReceiptsApiUrl, pushNotificationChunkLimit, pushNotificationReceiptChunkLimit, requestRetryMinTimeout, sendApiUrl, } from "./ExpoClientValues.js";
+-const require = createRequire(import.meta.url);
+ export class Expo {
+     static pushNotificationChunkSizeLimit = pushNotificationChunkLimit;
+     static pushNotificationReceiptChunkSizeLimit = pushNotificationReceiptChunkLimit;
+@@ -162,7 +160,7 @@ export class Expo {
+         // NOTE: This can be replaced with an import with the `{ type: "json" }`
+         // attribute when we drop support for node versions below v20.10.0, when
+         // import attributes were stabilized
+-        const sdkVersion = require('../package.json').version;
++        const sdkVersion = '6.1.0';
+         const requestHeaders = new Headers({
+             Accept: 'application/json',
+             'Accept-Encoding': 'gzip, deflate',

@@ -1,6 +1,7 @@
 import { Container } from '@cloudflare/containers';
 import { Hono } from 'hono';
 import { withCloudflareAccess } from './cf-access.middleware';
+import { verifyKiloToken } from '@kilocode/worker-utils';
 
 export type KiloOpsEnv = {
   Bindings: Env;
@@ -13,7 +14,7 @@ const DEFAULT_COUNTRY = 'US';
 
 export class GrafanaContainer extends Container<Env> {
   defaultPort = 3000;
-  sleepAfter = '1h';
+  sleepAfter = '5m'; // Updated to 5m per requirements
 
   override async fetch(request: Request): Promise<Response> {
     const state = await this.getState();
@@ -68,6 +69,22 @@ app.use('/*', async (c, next) => {
     return next();
   }
 
+  // 1. Try Kilo JWT
+  const authHeader = c.req.header('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const payload = await verifyKiloToken(token, c.env.NEXTAUTH_SECRET);
+      if (payload.isAdmin) {
+        c.set('userIdentity', payload.kiloUserId);
+        return next();
+      }
+    } catch (e) {
+      console.warn('Kilo JWT verification failed', e);
+    }
+  }
+
+  // 2. Try CF Access JWT
   const mw = withCloudflareAccess({
     team: c.env.CF_ACCESS_TEAM,
     audience: c.env.CF_ACCESS_AUD,

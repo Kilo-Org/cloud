@@ -50,7 +50,9 @@ export function withCloudflareAccess({
       });
 
       // User tokens have 'email', service tokens have 'common_name'
-      const identity = (payload.email as string) ?? (payload.common_name as string) ?? 'unknown';
+      const email = typeof payload.email === 'string' ? payload.email : undefined;
+      const commonName = typeof payload.common_name === 'string' ? payload.common_name : undefined;
+      const identity = email ?? commonName ?? 'unknown';
       c.set('userIdentity', identity);
     } catch (e) {
       console.warn(

@@ -68,7 +68,13 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-image',
     'expo-secure-store',
-    'expo-notifications',
+    [
+      'expo-notifications',
+      {
+        icon: './assets/images/android-notification-icon.png',
+        color: '#FAF74F',
+      },
+    ],
     'expo-web-browser',
     [
       '@sentry/react-native/expo',

@@ -179,6 +179,9 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
         dolthubToken: string;
         dolthubOrg: string;
         rigHandle?: string | undefined;
+        doltCredsJwk?: string | undefined;
+        doltUserName?: string | undefined;
+        doltUserEmail?: string | undefined;
       };
       output: {
         user_id: string;
@@ -201,6 +204,30 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       meta: object;
     }>;
     deleteCredential: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        wastelandId: string;
+      };
+      output: {
+        success: boolean;
+      };
+      meta: object;
+    }>;
+    containerStatus: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        wastelandId: string;
+      };
+      output: {
+        joined: boolean;
+        upstream: string | null;
+        dolthubOrg: string | null;
+        hasToken: boolean;
+        wlVersion: string;
+        uptime: number;
+        lastOperation: string | null;
+      };
+      meta: object;
+    }>;
+    containerJoin: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         wastelandId: string;
       };

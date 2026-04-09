@@ -10,6 +10,10 @@ const WC_LOG = '[WastelandContainer.do]';
  *
  * This DO is intentionally thin. It manages container lifecycle and proxies
  * ALL requests directly to the container via the base Container class's fetch().
+ *
+ * On boot, the control server reads WL_UPSTREAM, DOLTHUB_TOKEN, and
+ * DOLTHUB_ORG from its environment (injected via envVars) and runs
+ * `wl join` automatically — no callback to the worker required.
  */
 export class WastelandContainerDO extends Container<Env> {
   defaultPort = 8080;
@@ -24,8 +28,8 @@ export class WastelandContainerDO extends Container<Env> {
 
   constructor(ctx: DurableObjectState<Env>, env: Env) {
     super(ctx, env);
-    // Load persisted env vars (like DOLTHUB_TOKEN) into envVars
-    // so they're available when the container boots.
+    // Load persisted env vars (DOLTHUB_TOKEN, WL_UPSTREAM, DOLTHUB_ORG, etc.)
+    // into envVars so they're available when the container boots.
     void ctx.blockConcurrencyWhile(async () => {
       const stored = await ctx.storage.get<Record<string, string>>('container:envVars');
       if (stored) {
@@ -45,30 +49,6 @@ export class WastelandContainerDO extends Container<Env> {
     await this.ctx.storage.put('container:envVars', stored);
     this.envVars[key] = value;
     console.log(`${WC_LOG} setEnvVar: ${key} stored (${value.length} chars)`);
-  }
-
-  /**
-   * Initialize the wl CLI with the DoltHub upstream. This must be called
-   * after storing the DOLTHUB_TOKEN so the container can authenticate.
-   */
-  async initWl(upstream: string, token: string): Promise<void> {
-    try {
-      const res = await this.fetch(
-        new Request('http://container/wl/init', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ upstream, token }),
-        })
-      );
-      if (!res.ok) {
-        const err = await res.text();
-        console.error(`${WC_LOG} wl init failed: ${err}`);
-      } else {
-        console.log(`${WC_LOG} wl init succeeded for upstream=${upstream}`);
-      }
-    } catch (err) {
-      console.error(`${WC_LOG} wl init fetch failed:`, err);
-    }
   }
 
   async deleteEnvVar(key: string): Promise<void> {

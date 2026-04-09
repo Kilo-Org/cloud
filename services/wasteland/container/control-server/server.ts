@@ -47,19 +47,6 @@ type WantedItem = z.infer<typeof WantedItemSchema>;
 
 const BrowseOutputSchema = z.array(WantedItemSchema);
 
-const ClaimOutputSchema = z
-  .object({
-    success: z.boolean().optional(),
-    claimId: z.string().optional(),
-  })
-  .passthrough();
-
-const PostOutputSchema = z
-  .object({
-    success: z.boolean().optional(),
-    itemId: z.string().optional(),
-  })
-  .passthrough();
 
 // ---------------------------------------------------------------------------
 // Request body schemas
@@ -84,6 +71,7 @@ const DoneBodySchema = z.object({
 const InitBodySchema = z.object({
   upstream: z.string().min(1),
   token: z.string().min(1),
+  dolthubOrg: z.string().min(1),
 });
 
 const PostBodySchema = z.object({
@@ -143,7 +131,8 @@ const mutationMutex = createMutex();
 // CLI execution helper
 // ---------------------------------------------------------------------------
 
-const CLI_TIMEOUT_MS = 60_000;
+const CLI_TIMEOUT_MS = 120_000;
+const CLI_TIMEOUT_LONG_MS = 600_000; // 10 min for slow ops like join/fork
 
 type ExecResult = {
   stdout: string;
@@ -151,7 +140,13 @@ type ExecResult = {
   exitCode: number;
 };
 
-async function execWl(args: string[], env: Record<string, string>): Promise<ExecResult> {
+async function execWl(
+  args: string[],
+  env: Record<string, string>,
+  timeoutMs = CLI_TIMEOUT_MS
+): Promise<ExecResult> {
+  log.info('execWl', { args, envKeys: Object.keys(env), timeoutMs });
+
   const proc = Bun.spawn(['wl', ...args], {
     env: { ...process.env, ...env },
     stdout: 'pipe',
@@ -159,8 +154,9 @@ async function execWl(args: string[], env: Record<string, string>): Promise<Exec
   });
 
   const timeout = setTimeout(() => {
+    log.error('wl command timed out, killing process', { args, timeoutMs });
     proc.kill();
-  }, CLI_TIMEOUT_MS);
+  }, timeoutMs);
 
   const [stdout, stderr] = await Promise.all([
     new Response(proc.stdout).text(),
@@ -170,13 +166,28 @@ async function execWl(args: string[], env: Record<string, string>): Promise<Exec
   const exitCode = await proc.exited;
   clearTimeout(timeout);
 
-  return { stdout, stderr, exitCode };
+  // Strip spinner/backspace noise from terminal output
+  const cleanStderr = stderr.replace(/[\x08]/g, '').replace(/[|/\\-] Uploading\.\.\./g, '').trim();
+  const cleanStdout = stdout.replace(/[\x08]/g, '').trim();
+
+  if (exitCode !== 0) {
+    log.error('wl command failed', {
+      args,
+      exitCode,
+      stdout: cleanStdout.slice(0, 1000),
+      stderr: cleanStderr.slice(0, 1000),
+    });
+  }
+
+  return { stdout: cleanStdout, stderr: cleanStderr, exitCode };
 }
 
 function buildEnv(token: string, upstream: string): Record<string, string> {
+  const dolthubOrg = process.env.DOLTHUB_ORG ?? '';
   return {
     DOLTHUB_TOKEN: token,
     WL_UPSTREAM: upstream,
+    ...(dolthubOrg ? { DOLTHUB_ORG: dolthubOrg } : {}),
   };
 }
 
@@ -187,12 +198,29 @@ function buildEnv(token: string, upstream: string): Record<string, string> {
 const startTime = Date.now();
 let lastOperationTimestamp: string | null = null;
 let cachedWlVersion: string | null = null;
-const joinedUpstreams = new Set<string>();
+let joined = false;
+
+// Init gate: all handlers that need wl await this. Resolves once wl join
+// succeeds. On failure, resets so the next request retries.
+let initPromise: Promise<void> | null = null;
+
+async function ensureInit(): Promise<void> {
+  if (joined) return;
+  if (!initPromise) {
+    initPromise = selfInit();
+  }
+  await initPromise;
+  if (!joined) {
+    // Previous attempt failed — allow retry on next call
+    initPromise = null;
+    throw new Error('Wasteland not initialized — wl join has not succeeded');
+  }
+}
 
 async function getWlVersion(): Promise<string> {
   if (cachedWlVersion) return cachedWlVersion;
   try {
-    const result = await execWl(['--version'], {});
+    const result = await execWl(['version'], {});
     cachedWlVersion = result.stdout.trim() || 'unknown';
   } catch {
     cachedWlVersion = 'unknown';
@@ -200,19 +228,119 @@ async function getWlVersion(): Promise<string> {
   return cachedWlVersion;
 }
 
-async function joinUpstream(token: string, upstream: string): Promise<void> {
-  if (joinedUpstreams.has(upstream)) return;
+async function runDolt(args: string[]): Promise<ExecResult> {
+  const proc = Bun.spawn(['dolt', ...args], {
+    env: process.env as Record<string, string>,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  const exitCode = await proc.exited;
+  return { stdout, stderr, exitCode };
+}
 
-  const env = buildEnv(token, upstream);
-  const result = await execWl(['join', upstream], env);
+async function configureDolt(): Promise<void> {
+  const userName = process.env.DOLT_USER_NAME || process.env.DOLTHUB_ORG || 'wasteland';
+  const userEmail = process.env.DOLT_USER_EMAIL || `${userName}@wasteland.kilo.ai`;
 
-  if (result.exitCode !== 0) {
-    log.error('wl join failed', { upstream, stderr: result.stderr });
-    throw new Error(`wl join failed: ${result.stderr}`);
+  // dolt commit requires user.name and user.email to be set globally
+  for (const [key, value] of [
+    ['user.name', userName],
+    ['user.email', userEmail],
+  ]) {
+    const result = await runDolt(['config', '--global', '--add', key, value]);
+    if (result.exitCode !== 0) {
+      log.warn(`dolt config --add ${key} failed`, { stderr: result.stderr, exitCode: result.exitCode });
+    }
   }
 
-  joinedUpstreams.add(upstream);
+  // dolt push requires a JWK credential keypair associated with the user's
+  // DoltHub account. If a JWK is provided via DOLT_CREDS_JWK env var, write
+  // it to a temp file and import it.
+  const jwk = process.env.DOLT_CREDS_JWK;
+  if (jwk) {
+    const tmpPath = '/tmp/dolt-cred.jwk';
+    await Bun.write(tmpPath, jwk);
+    const result = await runDolt(['creds', 'import', tmpPath]);
+    if (result.exitCode !== 0) {
+      log.warn('dolt creds import failed', { stderr: result.stderr });
+    } else {
+      log.info('dolt creds imported from DOLT_CREDS_JWK');
+      // Use the imported credential
+      const lsResult = await runDolt(['creds', 'ls']);
+      log.info('dolt creds available', { stdout: lsResult.stdout.trim() });
+    }
+  } else {
+    // No JWK provided — create fresh creds. The user will need to add the
+    // public key to their DoltHub account for push to work.
+    const existing = await runDolt(['creds', 'ls']);
+    if (!existing.stdout.includes('*')) {
+      const newResult = await runDolt(['creds', 'new']);
+      log.info('created new dolt credential', { stdout: newResult.stdout.trim() });
+      log.warn(
+        'no DOLT_CREDS_JWK provided — created fresh dolt credential. ' +
+          'Add the public key above to your DoltHub account at https://www.dolthub.com/settings/credentials'
+      );
+    }
+  }
+
+  // Log the dolt credential state for debugging
+  const credsCheck = await runDolt(['creds', 'check']);
+  log.info('dolt creds check', {
+    exitCode: credsCheck.exitCode,
+    stdout: credsCheck.stdout.trim().slice(0, 500),
+    stderr: credsCheck.stderr.trim().slice(0, 500),
+  });
+
+  log.info('dolt config set', { userName, userEmail });
+}
+
+async function joinUpstream(token: string, upstream: string): Promise<void> {
+  if (joined) return;
+
+  await configureDolt();
+
+  const env = buildEnv(token, upstream);
+  const result = await execWl(['join', upstream], env, CLI_TIMEOUT_LONG_MS);
+
+  if (result.exitCode !== 0) {
+    throw new Error(`wl join failed (exit ${result.exitCode}): stdout=${result.stdout.slice(0, 300)} stderr=${result.stderr.slice(0, 300)}`);
+  }
+
+  joined = true;
   log.info('wl join succeeded', { upstream });
+}
+
+// ---------------------------------------------------------------------------
+// Startup self-init
+// ---------------------------------------------------------------------------
+
+async function selfInit(): Promise<void> {
+  const upstream = process.env.WL_UPSTREAM;
+  const token = process.env.DOLTHUB_TOKEN;
+  const dolthubOrg = process.env.DOLTHUB_ORG;
+
+  log.info('selfInit', {
+    hasUpstream: !!upstream,
+    hasToken: !!token,
+    hasDolthubOrg: !!dolthubOrg,
+    upstream: upstream ?? null,
+    dolthubOrg: dolthubOrg ?? null,
+  });
+
+  if (!upstream || !token || !dolthubOrg) {
+    log.warn('selfInit skipped: missing env vars');
+    return;
+  }
+
+  try {
+    await joinUpstream(token, upstream);
+  } catch (err) {
+    log.error('selfInit join failed', { error: err instanceof Error ? err.message : String(err) });
+  }
 }
 
 function uptimeSeconds(): number {
@@ -260,31 +388,6 @@ async function parseBody<T>(
 }
 
 // ---------------------------------------------------------------------------
-// Mutation verification: re-query after mutation to confirm state change
-// ---------------------------------------------------------------------------
-
-async function verifyItemState(
-  token: string,
-  upstream: string,
-  itemId: string,
-  expectedCheck: (item: WantedItem) => boolean
-): Promise<{ verified: boolean; item?: WantedItem }> {
-  const env = buildEnv(token, upstream);
-  const result = await execWl(['status', itemId, '--json'], env);
-  if (result.exitCode !== 0) {
-    log.warn('verification re-query failed', { itemId, stderr: result.stderr });
-    return { verified: false };
-  }
-  try {
-    const item = WantedItemSchema.parse(JSON.parse(result.stdout));
-    return { verified: expectedCheck(item), item };
-  } catch {
-    log.warn('verification parse failed', { itemId, stdout: result.stdout });
-    return { verified: false };
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Route handlers
 // ---------------------------------------------------------------------------
 
@@ -294,6 +397,8 @@ async function handleBrowse(req: Request): Promise<Response> {
 
   const body = await parseBody(req, BrowseBodySchema);
   if ('error' in body) return body.error;
+
+  await ensureInit();
 
   const env = buildEnv(token, body.data.upstream);
   const result = await execWl(['browse', '--json'], env);
@@ -323,10 +428,12 @@ async function handleClaim(req: Request): Promise<Response> {
   const body = await parseBody(req, ClaimBodySchema);
   if ('error' in body) return body.error;
 
+  await ensureInit();
+
   await mutationMutex.acquire();
   try {
     const env = buildEnv(token, body.data.upstream);
-    const result = await execWl(['claim', body.data.itemId, '--json'], env);
+    const result = await execWl(['claim', body.data.itemId], env);
 
     if (result.exitCode !== 0) {
       log.error('wl claim failed', {
@@ -337,29 +444,9 @@ async function handleClaim(req: Request): Promise<Response> {
       return errorResponse(`wl claim failed: ${result.stderr}`, 502);
     }
 
-    let parsed: z.infer<typeof ClaimOutputSchema>;
-    try {
-      parsed = ClaimOutputSchema.parse(JSON.parse(result.stdout));
-    } catch (err) {
-      log.error('failed to parse claim output', { stdout: result.stdout, error: String(err) });
-      return errorResponse('Failed to parse wl claim output', 502);
-    }
-
-    // Verify mutation
-    const verification = await verifyItemState(
-      token,
-      body.data.upstream,
-      body.data.itemId,
-      item => item.claimedBy === body.data.userId
-    );
-    if (!verification.verified) {
-      log.warn('claim verification failed — mutation may be a no-op', { itemId: body.data.itemId });
-      return errorResponse('Claim mutation could not be verified — possible no-op', 409);
-    }
-
     lastOperationTimestamp = new Date().toISOString();
-    log.info('wl claim completed', { itemId: body.data.itemId, claimId: parsed.claimId });
-    return jsonResponse({ success: true, claimId: parsed.claimId });
+    log.info('wl claim completed', { itemId: body.data.itemId });
+    return jsonResponse({ success: true });
   } finally {
     mutationMutex.release();
   }
@@ -372,11 +459,13 @@ async function handleDone(req: Request): Promise<Response> {
   const body = await parseBody(req, DoneBodySchema);
   if ('error' in body) return body.error;
 
+  await ensureInit();
+
   await mutationMutex.acquire();
   try {
     const env = buildEnv(token, body.data.upstream);
     const result = await execWl(
-      ['done', body.data.itemId, '--evidence', body.data.evidence, '--json'],
+      ['done', body.data.itemId, '--evidence', body.data.evidence],
       env
     );
 
@@ -387,18 +476,6 @@ async function handleDone(req: Request): Promise<Response> {
         itemId: body.data.itemId,
       });
       return errorResponse(`wl done failed: ${result.stderr}`, 502);
-    }
-
-    // Verify mutation
-    const verification = await verifyItemState(
-      token,
-      body.data.upstream,
-      body.data.itemId,
-      item => item.status === 'done' || item.status === 'completed'
-    );
-    if (!verification.verified) {
-      log.warn('done verification failed — mutation may be a no-op', { itemId: body.data.itemId });
-      return errorResponse('Done mutation could not be verified — possible no-op', 409);
     }
 
     lastOperationTimestamp = new Date().toISOString();
@@ -416,6 +493,8 @@ async function handlePost(req: Request): Promise<Response> {
   const body = await parseBody(req, PostBodySchema);
   if ('error' in body) return body.error;
 
+  await ensureInit();
+
   await mutationMutex.acquire();
   try {
     const env = buildEnv(token, body.data.upstream);
@@ -432,30 +511,22 @@ async function handlePost(req: Request): Promise<Response> {
     const result = await execWl(args, env);
 
     if (result.exitCode !== 0) {
-      log.error('wl post failed', { stderr: result.stderr, exitCode: result.exitCode });
       return errorResponse(`wl post failed: ${result.stderr}`, 502);
     }
 
-    // wl post outputs the item ID as a plain string (not JSON)
-    const itemId = result.stdout.trim();
+    // Extract item ID from wl post output (e.g. "w-638b24c413")
+    const itemIdMatch = result.stdout.match(/w-[0-9a-f]+/);
+    const itemId = itemIdMatch ? itemIdMatch[0] : null;
 
-    // Verify mutation — check that the new item exists
-    if (itemId) {
-      const verification = await verifyItemState(
-        token,
-        body.data.upstream,
-        itemId,
-        item => item.title === body.data.title
-      );
-      if (!verification.verified) {
-        log.warn('post verification failed — mutation may be a no-op', { itemId });
-        return errorResponse('Post mutation could not be verified — possible no-op', 409);
-      }
+    // Check if upstream push failed (non-fatal — item is saved locally)
+    const pushFailed = result.stdout.includes('Push failed');
+    if (pushFailed) {
+      log.warn('wl post: item created locally but upstream push failed', { itemId });
     }
 
     lastOperationTimestamp = new Date().toISOString();
-    log.info('wl post completed', { itemId });
-    return jsonResponse({ success: true, itemId });
+    log.info('wl post completed', { itemId, pushFailed });
+    return jsonResponse({ success: true, itemId, pushFailed });
   } finally {
     mutationMutex.release();
   }
@@ -467,6 +538,8 @@ async function handleSync(req: Request): Promise<Response> {
 
   const body = await parseBody(req, SyncBodySchema);
   if ('error' in body) return body.error;
+
+  await ensureInit();
 
   const env = buildEnv(token, body.data.upstream);
   const result = await execWl(['sync'], env);
@@ -492,7 +565,6 @@ async function handleJoin(req: Request): Promise<Response> {
   const result = await execWl(['join', body.data.upstream], env);
 
   if (result.exitCode !== 0) {
-    log.error('wl join failed', { stderr: result.stderr, exitCode: result.exitCode });
     return errorResponse(`wl join failed: ${result.stderr}`, 502);
   }
 
@@ -508,8 +580,10 @@ async function handleStatus(req: Request): Promise<Response> {
   const body = await parseBody(req, StatusBodySchema);
   if ('error' in body) return body.error;
 
+  await ensureInit();
+
   const env = buildEnv(token, body.data.upstream);
-  const result = await execWl(['status', body.data.itemId, '--json'], env);
+  const result = await execWl(['status', body.data.itemId], env);
 
   if (result.exitCode !== 0) {
     log.error('wl status failed', {
@@ -520,17 +594,9 @@ async function handleStatus(req: Request): Promise<Response> {
     return errorResponse(`wl status failed: ${result.stderr}`, 502);
   }
 
-  let item: WantedItem;
-  try {
-    item = WantedItemSchema.parse(JSON.parse(result.stdout));
-  } catch (err) {
-    log.error('failed to parse status output', { stdout: result.stdout, error: String(err) });
-    return errorResponse('Failed to parse wl status output', 502);
-  }
-
   lastOperationTimestamp = new Date().toISOString();
   log.info('wl status completed', { itemId: body.data.itemId });
-  return jsonResponse({ item });
+  return jsonResponse({ output: result.stdout });
 }
 
 async function handleHealth(): Promise<Response> {
@@ -539,12 +605,70 @@ async function handleHealth(): Promise<Response> {
     status: 'ok',
     wl_version: wlVersion,
     uptime: uptimeSeconds(),
+    joined,
+  });
+}
+
+async function checkJoined(upstream: string | null): Promise<boolean> {
+  if (!upstream) return false;
+
+  const result = await execWl(['list'], {});
+  if (result.exitCode !== 0) return false;
+
+  // wl list outputs one wasteland per line; check if our upstream is listed
+  return result.stdout.includes(upstream);
+}
+
+async function getDoltCredPubKey(): Promise<string | null> {
+  const result = await runDolt(['creds', 'ls']);
+  if (result.exitCode !== 0) return null;
+  // Active credential is marked with * prefix
+  for (const line of result.stdout.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('*')) {
+      return trimmed.slice(1).trim();
+    }
+  }
+  return null;
+}
+
+async function handleConfig(): Promise<Response> {
+  const upstream = process.env.WL_UPSTREAM ?? null;
+  const dolthubOrg = process.env.DOLTHUB_ORG ?? null;
+  const hasToken = !!process.env.DOLTHUB_TOKEN;
+  const hasJwk = !!process.env.DOLT_CREDS_JWK;
+  const wlVersion = await getWlVersion();
+  const isJoined = await checkJoined(upstream);
+  const doltCredPubKey = await getDoltCredPubKey();
+
+  // Keep the in-memory flag in sync
+  if (isJoined) joined = true;
+
+  return jsonResponse({
+    joined: isJoined,
+    upstream,
+    dolthubOrg,
+    hasToken,
+    hasJwk,
+    doltCredPubKey,
+    wlVersion,
+    uptime: uptimeSeconds(),
+    lastOperation: lastOperationTimestamp,
   });
 }
 
 async function handleInit(req: Request): Promise<Response> {
   const body = await parseBody(req, InitBodySchema);
   if ('error' in body) return body.error;
+
+  // Update process env so buildEnv picks up the org for this and future calls
+  process.env.DOLTHUB_ORG = body.data.dolthubOrg;
+  process.env.WL_UPSTREAM = body.data.upstream;
+  process.env.DOLTHUB_TOKEN = body.data.token;
+
+  // Reset init state so joinUpstream runs fresh
+  joined = false;
+  initPromise = null;
 
   try {
     await joinUpstream(body.data.token, body.data.upstream);
@@ -564,6 +688,7 @@ type RouteHandler = (req: Request) => Promise<Response>;
 const routes: Array<{ method: string; path: string; handler: RouteHandler }> = [
   { method: 'POST', path: '/wl/browse', handler: handleBrowse },
   { method: 'POST', path: '/wl/claim', handler: handleClaim },
+  { method: 'GET', path: '/wl/config', handler: handleConfig },
   { method: 'POST', path: '/wl/done', handler: handleDone },
   { method: 'POST', path: '/wl/init', handler: handleInit },
   { method: 'POST', path: '/wl/post', handler: handlePost },
@@ -613,6 +738,10 @@ const server = Bun.serve({
 
 log.info('wasteland control server started', { port: server.port });
 
+// Kick off self-init (non-blocking — server is already listening).
+// Handlers that need wl will await ensureInit() which shares this promise.
+void ensureInit();
+
 // ---------------------------------------------------------------------------
 // Heartbeat — log status every 60 seconds
 // ---------------------------------------------------------------------------
@@ -624,6 +753,7 @@ setInterval(async () => {
   log.info('heartbeat', {
     wl_version: wlVersion,
     uptime: uptimeSeconds(),
+    joined,
     last_operation: lastOperationTimestamp,
   });
 }, HEARTBEAT_INTERVAL_MS);

@@ -209,27 +209,16 @@ export function SettingsClient({ wastelandId }: Props) {
                 </div>
               </div>
 
-              {wasteland?.dolthub_upstream ? (
-                <FieldGroup label="DoltHub Upstream">
-                  <div className="flex items-center gap-2 rounded-md border border-white/[0.06] bg-white/[0.02] px-3 py-2">
-                    <Database className="size-3.5 text-white/30" />
-                    <span className="font-mono text-xs text-white/60">
-                      {wasteland.dolthub_upstream}
-                    </span>
-                  </div>
-                </FieldGroup>
-              ) : (
-                <FieldGroup label="DoltHub Upstream">
-                  <Input
-                    placeholder="i.e. dolthub/username/repo"
-                    value={dolthubUpstream}
-                    onChange={e => setDolthubUpstream(e.target.value)}
-                  />
-                  <p className="text-[11px] text-white/30">
-                    The DoltHub repository for this wasteland's bounty board.
-                  </p>
-                </FieldGroup>
-              )}
+              <FieldGroup label="DoltHub Upstream">
+                <Input
+                  placeholder="e.g. username/repo"
+                  value={dolthubUpstream}
+                  onChange={e => setDolthubUpstream(e.target.value)}
+                />
+                <p className="text-[11px] text-white/30">
+                  The DoltHub repository for this wasteland's bounty board.
+                </p>
+              </FieldGroup>
             </div>
           </SettingsSection>
 
@@ -326,6 +315,15 @@ export function SettingsClient({ wastelandId }: Props) {
             </div>
           </SettingsSection>
 
+          {/* ── Container Status ──────────────────────────────── */}
+          {credential && wasteland?.dolthub_upstream && (
+            <ContainerStatusSection
+              wastelandId={wastelandId}
+              trpc={trpc}
+              queryClient={queryClient}
+            />
+          )}
+
           {/* ── Connected Towns ────────────────────────────────── */}
           <ConnectedTownsSection
             wastelandId={wastelandId}
@@ -385,6 +383,9 @@ function ConnectDoltHubDialog({
   const [dolthubToken, setDolthubToken] = useState('');
   const [dolthubOrg, setDolthubOrg] = useState('');
   const [rigHandle, setRigHandle] = useState('');
+  const [doltCredsJwk, setDoltCredsJwk] = useState('');
+  const [doltUserName, setDoltUserName] = useState('');
+  const [doltUserEmail, setDoltUserEmail] = useState('');
 
   const storeCredential = useMutation({
     ...trpc.wasteland.storeCredential.mutationOptions(),
@@ -438,12 +439,43 @@ function ConnectDoltHubDialog({
             />
           </FieldGroup>
 
+          <FieldGroup label="Dolt User Name" hint="Used for dolt commits (like git user.name).">
+            <Input
+              value={doltUserName}
+              onChange={e => setDoltUserName(e.target.value)}
+              placeholder="Your Name"
+              className="border-white/[0.08] bg-white/[0.03] text-sm text-white/85 placeholder:text-white/20"
+            />
+          </FieldGroup>
+
+          <FieldGroup label="Dolt User Email" hint="Used for dolt commits (like git user.email).">
+            <Input
+              value={doltUserEmail}
+              onChange={e => setDoltUserEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="border-white/[0.08] bg-white/[0.03] text-sm text-white/85 placeholder:text-white/20"
+            />
+          </FieldGroup>
+
           <FieldGroup label="Rig Handle" hint="Optional identifier for this connection.">
             <Input
               value={rigHandle}
               onChange={e => setRigHandle(e.target.value)}
               placeholder="my-rig"
               className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
+            />
+          </FieldGroup>
+
+          <FieldGroup
+            label="Dolt Credential (JWK)"
+            hint="Contents of your ~/.dolt/creds/*.jwk file. Required for dolt push. Run 'dolt creds ls' to find your active credential."
+          >
+            <textarea
+              value={doltCredsJwk}
+              onChange={e => setDoltCredsJwk(e.target.value)}
+              placeholder='{"kid":"...","kty":"OKP",...}'
+              rows={3}
+              className="w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2 font-mono text-xs text-white/85 placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-white/20"
             />
           </FieldGroup>
         </div>
@@ -463,6 +495,9 @@ function ConnectDoltHubDialog({
                 dolthubToken,
                 dolthubOrg,
                 rigHandle: rigHandle || undefined,
+                doltCredsJwk: doltCredsJwk.trim() || undefined,
+                doltUserName: doltUserName.trim() || undefined,
+                doltUserEmail: doltUserEmail.trim() || undefined,
               })
             }
             disabled={!dolthubToken.trim() || !dolthubOrg.trim() || storeCredential.isPending}
@@ -778,6 +813,147 @@ function ConnectTownDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Container Status ─────────────────────────────────────────────────────
+
+function ContainerStatusSection({
+  wastelandId,
+  trpc,
+  queryClient,
+}: {
+  wastelandId: string;
+  trpc: ReturnType<typeof useWastelandTRPC>;
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const statusQuery = useQuery({
+    ...trpc.wasteland.containerStatus.queryOptions({ wastelandId }),
+    refetchInterval: 10_000,
+  });
+
+  const joinMutation = useMutation({
+    ...trpc.wasteland.containerJoin.mutationOptions(),
+    onSuccess: () => {
+      toast.success('Container join initiated');
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.containerStatus.queryKey({ wastelandId }),
+      });
+    },
+    onError: err => toast.error(`Join failed: ${err.message}`),
+  });
+
+  const status = statusQuery.data;
+  const isLoading = statusQuery.isLoading;
+  const isJoining = joinMutation.isPending;
+
+  return (
+    <SettingsSection
+      title="Wasteland Container"
+      description="Status of the wl CLI container that syncs with DoltHub."
+      icon={Database}
+    >
+      <div className="space-y-3">
+        {isLoading ? (
+          <div className="flex items-center gap-2 py-2">
+            <Loader2 className="size-3.5 animate-spin text-white/30" />
+            <span className="text-xs text-white/40">Checking container status...</span>
+          </div>
+        ) : statusQuery.isError ? (
+          <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+            <XCircle className="size-4 text-white/30" />
+            <div className="flex-1">
+              <p className="text-sm text-white/50">Container not reachable</p>
+              <p className="mt-0.5 text-[11px] text-white/30">
+                The container may still be starting up.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => statusQuery.refetch()}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : status ? (
+          <>
+            <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+              {status.joined ? (
+                <CheckCircle2 className="size-4 text-emerald-400" />
+              ) : (
+                <XCircle className="size-4 text-amber-400" />
+              )}
+              <div className="flex-1">
+                <p className="text-sm text-white/70">
+                  {status.joined ? 'Joined' : 'Not joined'}
+                </p>
+                <div className="mt-1 space-y-0.5 text-[11px] text-white/40">
+                  {status.upstream && (
+                    <p>
+                      Upstream:{' '}
+                      <span className="font-mono text-white/60">{status.upstream}</span>
+                    </p>
+                  )}
+                  {status.dolthubOrg && (
+                    <p>
+                      Org:{' '}
+                      <span className="font-mono text-white/60">{status.dolthubOrg}</span>
+                    </p>
+                  )}
+                  <p>
+                    Token:{' '}
+                    <span className={status.hasToken ? 'text-emerald-400/60' : 'text-red-400/60'}>
+                      {status.hasToken ? 'present' : 'missing'}
+                    </span>
+                  </p>
+                  {status.wlVersion !== 'unknown' && (
+                    <p>
+                      wl version:{' '}
+                      <span className="font-mono text-white/60">{status.wlVersion}</span>
+                    </p>
+                  )}
+                  <p>Uptime: {status.uptime}s</p>
+                </div>
+              </div>
+              <Badge
+                variant="outline"
+                className={
+                  status.joined
+                    ? 'border-emerald-500/20 text-emerald-400'
+                    : 'border-amber-500/20 text-amber-400'
+                }
+              >
+                {status.joined ? 'ready' : 'pending'}
+              </Badge>
+            </div>
+
+            {!status.joined && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                disabled={isJoining}
+                onClick={() => joinMutation.mutate({ wastelandId })}
+              >
+                {isJoining ? (
+                  <>
+                    <Loader2 className="size-3 animate-spin" />
+                    Joining...
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="size-3" />
+                    Join Upstream
+                  </>
+                )}
+              </Button>
+            )}
+          </>
+        ) : null}
+      </div>
+    </SettingsSection>
   );
 }
 

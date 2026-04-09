@@ -198,7 +198,12 @@ export function generateBaseConfig(
     config.models.providers.kilocode.headers = config.models.providers.kilocode.headers ?? {};
     config.models.providers.kilocode.headers['X-KiloCode-OrganizationId'] =
       env.KILOCODE_ORGANIZATION_ID;
-    config.models.providers.kilocode.models = config.models.providers.kilocode.models ?? [];
+    // Clean up any stale `models` array that may have been preserved from previous
+    // config (e.g., from the stale provider migration preserving the entry for org
+    // instances). When `models` is present (even as []), OpenClaw treats it as an
+    // explicit allowlist, restricting visible models. Deleting it lets the built-in
+    // kilocode provider's full catalog be used.
+    delete config.models.providers.kilocode.models;
     console.log('Configured KiloCode organization header from KILOCODE_ORGANIZATION_ID');
   } else {
     // Remove stale org header from previous boots (e.g., instance was transferred

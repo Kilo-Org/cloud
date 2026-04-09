@@ -213,7 +213,8 @@ describe('generateBaseConfig', () => {
       'org_abc123'
     );
     expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
-    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+    // models key is deleted so OpenClaw uses the built-in provider's full catalog
+    expect(config.models.providers.kilocode.models).toBeUndefined();
   });
 
   it('still removes openrouter stale provider for org-scoped instances', () => {
@@ -302,7 +303,8 @@ describe('generateBaseConfig', () => {
     );
     // Explicit provider entries require a baseUrl per OpenClaw's strict schema
     expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
-    expect(config.models.providers.kilocode.models).toEqual([]);
+    // No models key — lets the built-in kilocode provider's full catalog be used
+    expect(config.models.providers.kilocode.models).toBeUndefined();
   });
 
   it('does not set org header when KILOCODE_ORGANIZATION_ID is not set', () => {
@@ -334,7 +336,8 @@ describe('generateBaseConfig', () => {
     );
     expect(config.models.providers.kilocode.headers['X-Custom']).toBe('value');
     expect(config.models.providers.kilocode.baseUrl).toBe('https://tunnel.example.com/');
-    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+    // models key is deleted so OpenClaw uses the built-in provider's full catalog
+    expect(config.models.providers.kilocode.models).toBeUndefined();
   });
 
   it('removes stale org header when KILOCODE_ORGANIZATION_ID is no longer set', () => {

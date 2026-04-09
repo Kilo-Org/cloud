@@ -88,6 +88,7 @@ import type {
   MergeStrategy,
   ConvoyMergeMode,
   UiAction,
+  RigOverrideConfig,
 } from '../types';
 
 const TOWN_LOG = '[Town.do]';
@@ -841,6 +842,11 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async getRigAsync(rigId: string): Promise<rigs.RigRecord | null> {
+    return rigs.getRig(this.sql, rigId);
+  }
+
+  async updateRigConfig(rigId: string, config: RigOverrideConfig): Promise<rigs.RigRecord | null> {
+    rigs.updateRigConfig(this.sql, rigId, config);
     return rigs.getRig(this.sql, rigId);
   }
 

@@ -14,7 +14,7 @@ export function KiloClawMessageAvatar(_props: MessageAvatarProps) {
 
   if (isBotMessage) {
     return (
-      <View className="h-8 w-8">
+      <View className="mr-2 h-8 w-8">
         <Image
           source={logo}
           className="h-8 w-8 rounded-full"

@@ -165,11 +165,9 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
         },
         providerState,
         env,
-        'start_capacity_recovery'
+        'start_capacity_recovery',
+        onProviderResult
       );
-      await onProviderResult?.({
-        providerState,
-      });
 
       const result = await flyMachines.createNewMachine(
         flyConfig,

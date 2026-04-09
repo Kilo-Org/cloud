@@ -3690,6 +3690,41 @@ describe('start: 412 insufficient resources recovery', () => {
     });
   });
 
+  it('persists replacement volume state before deleting the old volume during capacity recovery', async () => {
+    const storage = createFakeStorage();
+    const originalPut = storage.put.bind(storage);
+    storage.put = (entries: Record<string, unknown>) => {
+      if (
+        entries.providerState &&
+        typeof entries.providerState === 'object' &&
+        entries.providerState !== null &&
+        'volumeId' in entries.providerState &&
+        entries.providerState.volumeId === 'vol-new'
+      ) {
+        throw new Error('persist replacement volume failed');
+      }
+      originalPut(entries);
+    };
+
+    const { instance } = createInstance(storage);
+    await seedRunning(storage, { status: 'stopped', lastStartedAt: Date.now() - 60_000 });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopped' });
+    (flyClient.updateMachine as Mock).mockRejectedValue(
+      new FlyApiError('insufficient resources', 412, '{"error":"insufficient resources"}')
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'cdg',
+    });
+
+    await expect(instance.start('user-1')).rejects.toThrow('persist replacement volume failed');
+
+    expect(flyClient.deleteVolume).not.toHaveBeenCalled();
+  });
+
   it('propagates non-412 errors without recovery', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { flyMachineId: null });

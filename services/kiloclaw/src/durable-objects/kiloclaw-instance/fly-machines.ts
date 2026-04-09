@@ -116,7 +116,8 @@ export async function replaceStrandedVolume(
   state: FlyRuntimeState & Pick<InstanceMutableState, 'flyMachineId'>,
   providerState: FlyProviderState,
   env: KiloClawEnv,
-  reason: string
+  reason: string,
+  onProviderResult?: (result: ProviderResult<FlyProviderState>) => Promise<void>
 ): Promise<FlyProviderState> {
   if (!state.sandboxId || !providerState.volumeId) return providerState;
 
@@ -208,6 +209,10 @@ export async function replaceStrandedVolume(
       region: freshVolume.region,
     };
   }
+
+  await onProviderResult?.({
+    providerState,
+  });
 
   // Delete old volume (best-effort cleanup)
   try {

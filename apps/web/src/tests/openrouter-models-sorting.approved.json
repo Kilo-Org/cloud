@@ -590,49 +590,6 @@
       "opencode": {}
     },
     {
-      "id": "corethink:free",
-      "canonical_slug": "corethink:free",
-      "hugging_face_id": "",
-      "name": "CoreThink (free)",
-      "created": 1756238927,
-      "description": "CoreThink - AI that reasons through problems instead of guessing. Available free of charge in Kilo for a limited time.",
-      "context_length": 78000,
-      "architecture": {
-        "modality": "text->text",
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other",
-        "instruct_type": null
-      },
-      "pricing": {
-        "prompt": "0.000000000000",
-        "completion": "0.000000000000",
-        "request": "0",
-        "image": "0",
-        "web_search": "0",
-        "internal_reasoning": "0",
-        "input_cache_read": "0.000000000000"
-      },
-      "top_provider": {
-        "context_length": 78000,
-        "max_completion_tokens": 8192,
-        "is_moderated": false
-      },
-      "per_request_limits": null,
-      "supported_parameters": [
-        "max_tokens",
-        "temperature",
-        "tools"
-      ],
-      "default_parameters": {},
-      "isFree": true,
-      "opencode": {}
-    },
-    {
       "id": "qwen/qwen3.6-plus",
       "canonical_slug": "qwen/qwen3.6-plus",
       "hugging_face_id": "",

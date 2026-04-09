@@ -245,7 +245,7 @@ describe('Disconnect handling & reaper', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Fix 5: Dynamic alarm scheduling — 2-min interval when active, 5-min idle
+  // Fix 5: Dynamic alarm scheduling — 2-min interval when active, 1-hour idle
   // ---------------------------------------------------------------------------
 
   it('alarm schedules 2-minute interval when an active execution exists', async () => {
@@ -298,7 +298,7 @@ describe('Disconnect handling & reaper', () => {
     expect(delta).toBeLessThanOrEqual(125_000);
   });
 
-  it('alarm schedules 5-minute interval when no active execution exists', async () => {
+  it('alarm schedules 1-hour interval when no active execution exists', async () => {
     const userId = 'user_alarm_2';
     const sessionId = 'agent_alarm_2';
     const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
@@ -324,12 +324,12 @@ describe('Disconnect handling & reaper', () => {
       return { nextAlarm, now };
     });
 
-    // 5-minute default interval = 300_000 ms
+    // 1-hour idle interval = 3_600_000 ms
     expect(result.nextAlarm).toBeDefined();
     const delta = (result.nextAlarm as number) - result.now;
     // Allow ± 5s for clock drift
-    expect(delta).toBeGreaterThanOrEqual(295_000);
-    expect(delta).toBeLessThanOrEqual(305_000);
+    expect(delta).toBeGreaterThanOrEqual(3_595_000);
+    expect(delta).toBeLessThanOrEqual(3_605_000);
   });
 
   // ---------------------------------------------------------------------------

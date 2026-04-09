@@ -103,10 +103,6 @@ out
 .nuxt
 dist
 
-# Vendored OpenClaw plugin artifacts are shipped in image
-!plugins/kiloclaw-customizer/dist/
-!plugins/kiloclaw-customizer/dist/**
-
 # Gatsby files
 
 .cache/

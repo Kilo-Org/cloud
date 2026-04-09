@@ -15,4 +15,4 @@ pnpm install
 pnpm build
 ```
 
-Build output is written to `dist/index.js`.
+Build output is written to `dist/index.js` during `pnpm build` and `npm pack` (`prepack`).

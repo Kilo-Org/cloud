@@ -62,6 +62,7 @@ RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#fix/plugin-name-r
 # Install KiloClaw customizer plugin for OpenClaw (vendored in-repo)
 COPY plugins/kiloclaw-customizer/ /tmp/kiloclaw-customizer/
 RUN cd /tmp/kiloclaw-customizer \
+    && npm install --include=dev --no-fund --no-audit \
     && PKG_TGZ="$(npm pack --silent)" \
     && npm install -g "./${PKG_TGZ}" \
     && cd / \

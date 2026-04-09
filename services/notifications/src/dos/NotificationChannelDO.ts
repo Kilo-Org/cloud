@@ -27,12 +27,9 @@ const DEBOUNCE_MS = 10_000; // 10 seconds
 
 export class NotificationChannelDO extends DurableObject<Env> {
   async processWebhook(payload: Event, webhookId: string): Promise<Response> {
-    console.log(`[DEBUG] DO received: type=${payload.type}, webhookId=${webhookId}`);
-
     // Webhook-level dedup (prevents reprocessing the same delivery)
     const existing = await this.ctx.storage.get<number>(`${DEDUP_PREFIX}${webhookId}`);
     if (existing) {
-      console.log(`[DEBUG] Deduplicated webhook ${webhookId}`);
       return Response.json({ ok: true, deduplicated: true });
     }
     await this.markWebhookSeen(webhookId);
@@ -42,12 +39,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
     const messageText = payload.message?.text ?? '';
     const messageUpdatedAt = payload.message?.updated_at ?? payload.created_at ?? '';
 
-    console.log(
-      `[DEBUG] messageId=${messageId}, senderId=${senderId}, updatedAt=${messageUpdatedAt}, text="${messageText.slice(0, 50)}"`
-    );
-
     if (!messageId || !senderId?.startsWith('bot-')) {
-      console.log(`[DEBUG] Skipping: no messageId or not a bot`);
       return Response.json({ ok: true });
     }
 
@@ -55,16 +47,12 @@ export class NotificationChannelDO extends DurableObject<Env> {
     const pendingMessage = await this.ctx.storage.get<PendingMessage>(msgKey);
 
     if (pendingMessage?.notified) {
-      console.log(`[DEBUG] Already notified for message ${messageId}, ignoring`);
       return Response.json({ ok: true });
     }
 
     if (pendingMessage) {
       // Only accept if this event is newer than what we have
       if (messageUpdatedAt <= pendingMessage.updatedAt) {
-        console.log(
-          `[DEBUG] Stale event for message ${messageId}: ${messageUpdatedAt} <= ${pendingMessage.updatedAt}, ignoring`
-        );
         return Response.json({ ok: true });
       }
       if (messageText) {
@@ -73,9 +61,6 @@ export class NotificationChannelDO extends DurableObject<Env> {
       pendingMessage.updatedAt = messageUpdatedAt;
       await this.ctx.storage.put(msgKey, pendingMessage);
       await this.scheduleAlarm(DEBOUNCE_MS);
-      console.log(
-        `[DEBUG] Updated message ${messageId}, text="${pendingMessage.text.slice(0, 50)}", alarm reset to ${DEBOUNCE_MS}ms`
-      );
     } else {
       // First event for this message (could be message.new or a late message.updated)
       const pending: PendingMessage = {
@@ -88,15 +73,12 @@ export class NotificationChannelDO extends DurableObject<Env> {
       };
       await this.ctx.storage.put(msgKey, pending);
       await this.scheduleAlarm(DEBOUNCE_MS);
-      console.log(`[DEBUG] Stored pending message ${messageId}, alarm in ${DEBOUNCE_MS}ms`);
     }
 
     return Response.json({ ok: true });
   }
 
   override async alarm(): Promise<void> {
-    console.log(`[DEBUG] Alarm fired`);
-
     // Prune expired dedup entries
     const dedupEntries = await this.ctx.storage.list<number>({ prefix: DEDUP_PREFIX });
     const now = Date.now();
@@ -123,14 +105,10 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
       if (!msg.text) {
         // No text — nothing to notify about, discard
-        console.log(`[DEBUG] Message ${msg.messageId} has no text, discarding`);
         await this.ctx.storage.delete(key);
         continue;
       }
 
-      console.log(
-        `[DEBUG] Sending notification for message ${msg.messageId}: "${msg.text.slice(0, 50)}"`
-      );
       await this.sendNotification(msg);
       msg.notified = true;
       await this.ctx.storage.put(key, msg);
@@ -153,10 +131,6 @@ export class NotificationChannelDO extends DurableObject<Env> {
       )
       .limit(1);
 
-    console.log(
-      `[DEBUG] Instance lookup: ${instance ? `id=${instance.id}, user_id=${instance.user_id}, name=${instance.name}` : 'NOT FOUND'}`
-    );
-
     if (!instance) {
       return;
     }
@@ -165,10 +139,6 @@ export class NotificationChannelDO extends DurableObject<Env> {
       .select({ token: user_push_tokens.token })
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, instance.user_id));
-
-    console.log(
-      `[DEBUG] Push tokens: ${tokens.length} found${tokens.length > 0 ? ` (${tokens.map(t => t.token).join(', ')})` : ''}`
-    );
 
     if (tokens.length === 0) {
       return;
@@ -187,23 +157,10 @@ export class NotificationChannelDO extends DurableObject<Env> {
     }));
 
     const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
-    console.log(
-      `[DEBUG] Expo token: ${accessToken ? `present (${accessToken.length} chars)` : 'MISSING'}`
-    );
-    console.log(`[DEBUG] Sending:`, JSON.stringify(messages));
-
     const { ticketTokenPairs, staleTokens } = await sendPushNotifications(messages, accessToken);
-
-    console.log(
-      `[DEBUG] Result: ${ticketTokenPairs.length} ticket(s), ${staleTokens.length} stale token(s)`
-    );
-    if (ticketTokenPairs.length > 0) {
-      console.log(`[DEBUG] Tickets:`, JSON.stringify(ticketTokenPairs));
-    }
 
     if (staleTokens.length > 0) {
       await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, staleTokens));
-      console.log(`[DEBUG] Cleaned up ${staleTokens.length} stale token(s)`);
     }
 
     if (ticketTokenPairs.length > 0) {
@@ -219,7 +176,6 @@ export class NotificationChannelDO extends DurableObject<Env> {
   private async scheduleAlarm(delayMs: number): Promise<void> {
     // Always reset the alarm to the new debounce window
     await this.ctx.storage.setAlarm(Date.now() + delayMs);
-    console.log(`[DEBUG] Alarm scheduled for ${delayMs}ms from now`);
   }
 }
 

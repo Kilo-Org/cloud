@@ -37,11 +37,6 @@ webhooks.post('/stream-chat', async c => {
     return c.json({ ok: true });
   }
 
-  // TODO: remove after debugging — only process my channel
-  if (channelId !== 'default-Y2UxMmVmM2QtYWU5NS00ZDc3LWI0ZjAtMjM3MzVmMGEwNTkx') {
-    return c.json({ ok: true });
-  }
-
   // Forward to the channel's Durable Object for dedup + delivery
   const stub = getNotificationChannelDO(c.env, channelId);
   return stub.processWebhook(payload, webhookId);

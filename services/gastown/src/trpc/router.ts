@@ -701,7 +701,7 @@ export const gastownRouter = router({
     .mutation(async ({ ctx, input }) => {
       const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
-      await townStub.resetAgentDispatchAttempts(input.agentId);
+      await townStub.resetAgentDispatchAttempts(input.agentId, rig.id);
     }),
 
   // ── Work Assignment ─────────────────────────────────────────────────

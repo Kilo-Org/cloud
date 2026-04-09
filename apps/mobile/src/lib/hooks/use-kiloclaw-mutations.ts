@@ -155,10 +155,23 @@ export function useKiloClawMutations() {
     ),
     updateModel: useMutation(
       trpc.kiloclaw.updateKiloCodeConfig.mutationOptions({
-        onSuccess: async () => {
+        onMutate: async input => {
+          await queryClient.cancelQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
+          const previous = queryClient.getQueryData(trpc.kiloclaw.getConfig.queryKey());
+          queryClient.setQueryData(trpc.kiloclaw.getConfig.queryKey(), (old: typeof previous) =>
+            old ? { ...old, ...input } : old
+          );
+          return { previous };
+        },
+        onError: (error, _input, context) => {
+          if (context?.previous) {
+            queryClient.setQueryData(trpc.kiloclaw.getConfig.queryKey(), context.previous);
+          }
+          onMutationError(error);
+        },
+        onSettled: async () => {
           await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
         },
-        onError: onMutationError,
       })
     ),
   };

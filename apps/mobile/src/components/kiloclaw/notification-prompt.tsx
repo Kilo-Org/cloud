@@ -19,7 +19,7 @@ import { useTRPC } from '@/lib/trpc';
 const PROMPT_SEEN_KEY = 'notification-prompt-seen';
 
 export function NotificationPrompt({ enabled }: { enabled: boolean }) {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(true); // TODO: revert — testing
   const colors = useThemeColors();
   const trpc = useTRPC();
 

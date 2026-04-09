@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { query } from '../../util/query.util';
+import { RigOverrideConfig, RigOverrideConfigSchema } from '../../types';
 
 const RIG_TABLE_CREATE = /* sql */ `
   CREATE TABLE IF NOT EXISTS "rigs" (
@@ -26,14 +27,14 @@ export const RigRecord = z.object({
   default_branch: z.string(),
   config: z
     .string()
-    .transform((v): Record<string, unknown> => {
+    .transform((v) => {
       try {
-        return JSON.parse(v) as Record<string, unknown>;
+        return JSON.parse(v);
       } catch {
         return {};
       }
     })
-    .pipe(z.record(z.string(), z.unknown())),
+    .pipe(RigOverrideConfigSchema),
   created_at: z.string(),
 });
 
@@ -128,4 +129,8 @@ export function listRigs(sql: SqlStorage): RigRecord[] {
 
 export function removeRig(sql: SqlStorage, rigId: string): void {
   query(sql, /* sql */ `DELETE FROM rigs WHERE id = ?`, [rigId]);
+}
+
+export function updateRigConfig(sql: SqlStorage, rigId: string, config: RigOverrideConfig): void {
+  query(sql, /* sql */ `UPDATE rigs SET config = ? WHERE id = ?`, [JSON.stringify(config), rigId]);
 }

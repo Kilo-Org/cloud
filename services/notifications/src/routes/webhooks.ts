@@ -27,13 +27,18 @@ webhooks.post('/stream-chat', async c => {
 
   const payload = JSON.parse(rawBody) as Event;
 
-  // Only handle new messages
-  if (payload.type !== 'message.new') {
+  // Only handle new and updated messages
+  if (payload.type !== 'message.new' && payload.type !== 'message.updated') {
     return c.json({ ok: true });
   }
 
   const channelId = payload.channel_id;
   if (!channelId || !webhookId) {
+    return c.json({ ok: true });
+  }
+
+  // TODO: remove after debugging — only process my channel
+  if (channelId !== 'default-Y2UxMmVmM2QtYWU5NS00ZDc3LWI0ZjAtMjM3MzVmMGEwNTkx') {
     return c.json({ ok: true });
   }
 

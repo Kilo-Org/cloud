@@ -3,13 +3,14 @@ import { isGemini3Model, isGeminiModel } from '@/lib/providers/google';
 import { isMinimaxModel } from '@/lib/providers/minimax';
 import { isMoonshotModel } from '@/lib/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/providers/openai';
-import { qwen36_plus_free_model } from '@/lib/providers/qwen';
+import { qwen36_plus_model } from '@/lib/providers/qwen';
 import { isXaiModel } from '@/lib/providers/xai';
 import { isXiaomiModel } from '@/lib/providers/xiaomi';
 import { isZaiModel } from '@/lib/providers/zai';
 import type {
   CustomLlmProvider,
   ModelSettings,
+  OpenClawModelSettings,
   OpenCodeSettings,
   VersionedSettings,
 } from '@kilocode/db/schema-types';
@@ -84,7 +85,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
     isMoonshotModel(model) ||
     isZaiModel(model) ||
     isXiaomiModel(model) ||
-    model === qwen36_plus_free_model.public_id
+    model === qwen36_plus_model.public_id
   ) {
     return REASONING_VARIANTS_BINARY;
   }
@@ -114,7 +115,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
 }
 
 function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
-  if (qwen36_plus_free_model.public_id === model) {
+  if (qwen36_plus_model.public_id === model) {
     // with 'openai' prompt caching doesn't seem to work
     return 'openai-compatible';
   }
@@ -134,4 +135,11 @@ export function getOpenCodeSettings(model: string): OpenCodeSettings | undefined
   const ai_sdk_provider = getAiSdkProvider(model);
   const variants = getModelVariants(model);
   return { ai_sdk_provider, variants };
+}
+
+export function getOpenClawSettings(model: string): OpenClawModelSettings | undefined {
+  if (isOpenAiModel(model) || isXaiModel(model)) {
+    return { api_adapter: 'openai-responses' };
+  }
+  return undefined;
 }

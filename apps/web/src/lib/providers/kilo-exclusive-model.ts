@@ -1,7 +1,22 @@
 import type { OpenRouterInferenceProviderId } from '@/lib/providers/openrouter/inference-provider-id';
 import type { ProviderId } from '@/lib/providers/types';
 
-export type KiloExclusiveModelFlag = 'free' | 'reasoning' | 'prompt_cache' | 'vision';
+export type KiloExclusiveModelFlag = 'reasoning' | 'vision';
+
+export type Usage = {
+  uncachedInputTokens: number;
+  totalOutputTokens: number;
+  cacheWriteTokens: number;
+  cacheHitTokens: number;
+};
+
+export type Pricing = {
+  prompt_per_million: number;
+  completion_per_million: number;
+  input_cache_read_per_million: number | null;
+  input_cache_write_per_million: number | null;
+  calculate_mUsd(usage: Usage, basePricing: Pricing): number;
+};
 
 export type KiloExclusiveModel = {
   public_id: string;
@@ -14,7 +29,14 @@ export type KiloExclusiveModel = {
   gateway: ProviderId;
   internal_id: string;
   inference_provider: OpenRouterInferenceProviderId | null;
+  pricing: Pricing | null;
 };
+
+function formatPricePerMillionAsPerToken(price: number): string;
+function formatPricePerMillionAsPerToken(price: number | null | undefined): string | undefined;
+function formatPricePerMillionAsPerToken(price: number | null | undefined): string | undefined {
+  return price === null || price === undefined ? undefined : (price / 1_000_000).toFixed(12);
+}
 
 export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
   return {
@@ -33,13 +55,18 @@ export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
       instruct_type: null,
     },
     pricing: {
-      prompt: '0.0000000',
-      completion: '0.0000000',
+      prompt: formatPricePerMillionAsPerToken(model.pricing?.prompt_per_million ?? 0),
+      completion: formatPricePerMillionAsPerToken(model.pricing?.completion_per_million ?? 0),
       request: '0',
       image: '0',
       web_search: '0',
       internal_reasoning: '0',
-      input_cache_read: model.flags.includes('prompt_cache') ? '0.00000000' : undefined,
+      input_cache_read: formatPricePerMillionAsPerToken(
+        model.pricing?.input_cache_read_per_million ?? model.pricing?.prompt_per_million ?? 0
+      ),
+      input_cache_write: formatPricePerMillionAsPerToken(
+        model.pricing?.input_cache_write_per_million
+      ),
     },
     top_provider: {
       context_length: model.context_length,

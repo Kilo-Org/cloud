@@ -8,8 +8,9 @@ export const corethink_free_model: KiloExclusiveModel = {
   context_length: 78_000,
   max_completion_tokens: 8192,
   status: 'public',
-  flags: ['free'],
+  flags: [],
   gateway: 'corethink',
   internal_id: 'corethink',
   inference_provider: 'corethink',
+  pricing: null,
 };

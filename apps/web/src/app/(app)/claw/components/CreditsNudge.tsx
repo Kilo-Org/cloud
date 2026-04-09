@@ -10,9 +10,11 @@ const AMOUNT_OPTIONS = [10, 20, 50] as const;
 
 export function CreditsNudge({
   selectedModel,
+  returnPath = '/claw/new',
   onSwitchToFree,
 }: {
   selectedModel: string;
+  returnPath?: string;
   onSwitchToFree: () => void;
 }) {
   const [selectedAmount, setSelectedAmount] = useState<number>(10);
@@ -25,7 +27,7 @@ export function CreditsNudge({
 
   async function handlePurchase() {
     setSubmitting(true);
-    await setClawReturnUrl(selectedModel);
+    await setClawReturnUrl(selectedModel, returnPath);
     formRef.current?.submit();
   }
 
@@ -62,7 +64,7 @@ export function CreditsNudge({
       {/* Hidden form for POST to /payments/topup */}
       <form
         ref={formRef}
-        action={`/payments/topup?amount=${selectedAmount}&cancel-path=${encodeURIComponent('/claw')}`}
+        action={`/payments/topup?amount=${selectedAmount}&cancel-path=${encodeURIComponent(returnPath)}`}
         method="post"
         className="hidden"
       />

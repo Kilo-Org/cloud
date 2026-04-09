@@ -947,7 +947,7 @@ describe('createSubscriptionCheckout', () => {
     expect(callArgs.discounts).toBeUndefined();
   });
 
-  it('includes impactClickId in checkout metadata when attribution exists', async () => {
+  it('includes affiliateTrackingId in checkout metadata when attribution exists', async () => {
     await db.insert(user_affiliate_attributions).values({
       user_id: user.id,
       provider: 'impact',
@@ -968,14 +968,14 @@ describe('createSubscriptionCheckout', () => {
             type: 'kiloclaw',
             plan: 'standard',
             kiloUserId: user.id,
-            impactClickId: 'impact-click-123',
+            affiliateTrackingId: 'impact-click-123',
           },
         },
         metadata: {
           type: 'kiloclaw',
           plan: 'standard',
           kiloUserId: user.id,
-          impactClickId: 'impact-click-123',
+          affiliateTrackingId: 'impact-click-123',
         },
       })
     );

@@ -11,7 +11,7 @@ import { subDays } from 'date-fns';
 import { hasReceivedPromotion } from '@/lib/promotionalCredits';
 
 import { fromMicrodollars } from '@/lib/utils';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto-model';
+import { KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
 
 /** Pre-fetched data shared across notification generators to avoid duplicate DB queries. */
 type NotificationContext = {

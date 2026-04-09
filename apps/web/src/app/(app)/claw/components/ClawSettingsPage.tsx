@@ -8,6 +8,7 @@ import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
 import { ClawContextProvider, useClawContext } from './ClawContext';
+import { ClawInstanceOverview } from './ClawInstanceOverview';
 import { SettingsTab } from './SettingsTab';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { SetPageTitle } from '@/components/SetPageTitle';
@@ -87,10 +88,9 @@ function ClawSettingsWithStatus({ organizationId }: { organizationId?: string })
   const orgStatus = useOrgKiloClawStatus(organizationId ?? '');
   const { data: status, isLoading, error } = organizationId ? orgStatus : personalStatus;
 
-  const clawUrl = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
+  const clawUrl = organizationId ? `/organizations/${organizationId}/claw/new` : '/claw/new';
 
-  // Redirect to main KiloClaw page when there is no instance — it has the
-  // onboarding/provisioning flow that guides the user through setup.
+  // Redirect to setup when there is no instance.
   const shouldRedirect = !isLoading && !error && (!status || status.status === null);
   useEffect(() => {
     if (shouldRedirect) {
@@ -122,7 +122,12 @@ function ClawSettingsWithStatus({ organizationId }: { organizationId?: string })
 
   // status is guaranteed non-null with a non-null .status after the checks above
   if (!status || status.status === null) return null;
-  const settingsContent = <ClawSettingsInner status={status} />;
+  const settingsContent = (
+    <div className="flex flex-col gap-6">
+      <ClawInstanceOverview status={status} />
+      <ClawSettingsInner status={status} />
+    </div>
+  );
 
   // Personal context uses BillingWrapper for access-lock dialogs/banners.
   if (!organizationId) {

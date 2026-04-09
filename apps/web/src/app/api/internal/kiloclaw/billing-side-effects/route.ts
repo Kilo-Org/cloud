@@ -14,7 +14,7 @@ import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
 import { ensureAutoIntroSchedule } from '@/lib/kiloclaw/stripe-handlers';
 import { isIntroPriceId } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { client as stripe } from '@/lib/stripe-client';
-import { trackTrialEnd } from '@/lib/impact';
+import { enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
 import { projectPendingKiloPassBonusMicrodollars } from '@/lib/kiloclaw/credit-billing';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 
@@ -110,12 +110,20 @@ const BodySchema = z.discriminatedUnion('action', [
     }),
   }),
   z.object({
-    action: z.literal('track_trial_end'),
+    action: z.literal('enqueue_affiliate_event'),
     input: z.object({
-      clickId: z.string().min(1).optional(),
-      customerId: z.string().min(1),
-      customerEmail: z.email(),
+      userId: z.string().min(1),
+      provider: z.literal('impact'),
+      eventType: z.enum(['trial_start', 'trial_end', 'sale']),
+      dedupeKey: z.string().min(1),
       eventDateIso: z.string().datetime(),
+      orderId: z.string().min(1),
+      amount: z.number().nonnegative().optional(),
+      currencyCode: z.string().min(1).optional(),
+      itemCategory: z.string().min(1).optional(),
+      itemName: z.string().min(1).optional(),
+      itemSku: z.string().min(1).optional(),
+      promoCode: z.string().min(1).optional(),
     }),
   }),
   z.object({
@@ -150,8 +158,8 @@ function getActionLogFields(body: z.infer<typeof BodySchema>): {
         userId: body.input.userId,
         stripeSubscriptionId: body.input.stripeSubscriptionId,
       };
-    case 'track_trial_end':
-      return { userId: body.input.customerId };
+    case 'enqueue_affiliate_event':
+      return { userId: body.input.userId };
     case 'project_pending_kilo_pass_bonus':
       return { userId: body.input.userId };
     case 'issue_kilo_pass_bonus_from_usage_threshold':
@@ -202,7 +210,7 @@ export async function POST(request: NextRequest) {
       | SendEmailResult
       | { ok: true }
       | { repaired: boolean }
-      | { tracked: boolean }
+      | { enqueued: boolean }
       | { projectedBonusMicrodollars: number };
 
     switch (parsed.data.action) {
@@ -231,19 +239,22 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case 'track_trial_end':
-        if (!parsed.data.input.clickId) {
-          payload = { tracked: false };
-          break;
-        }
-
-        await trackTrialEnd({
-          clickId: parsed.data.input.clickId,
-          customerId: parsed.data.input.customerId,
-          customerEmail: parsed.data.input.customerEmail,
+      case 'enqueue_affiliate_event':
+        await enqueueAffiliateEventForUser({
+          userId: parsed.data.input.userId,
+          provider: parsed.data.input.provider,
+          eventType: parsed.data.input.eventType,
+          dedupeKey: parsed.data.input.dedupeKey,
           eventDate: new Date(parsed.data.input.eventDateIso),
+          orderId: parsed.data.input.orderId,
+          amount: parsed.data.input.amount,
+          currencyCode: parsed.data.input.currencyCode,
+          itemCategory: parsed.data.input.itemCategory,
+          itemName: parsed.data.input.itemName,
+          itemSku: parsed.data.input.itemSku,
+          promoCode: parsed.data.input.promoCode,
         });
-        payload = { tracked: true };
+        payload = { enqueued: true };
         break;
 
       case 'project_pending_kilo_pass_bonus':

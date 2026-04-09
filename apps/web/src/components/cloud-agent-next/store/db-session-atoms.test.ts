@@ -6,6 +6,10 @@ import {
 } from './db-session-atoms';
 import { convertToCloudMessages } from '../legacy-session-types';
 import type { DbSession } from './db-session-atoms';
+import {
+  shouldShowSessionStatus,
+  getSessionActivityIndicatorKind,
+} from '@/components/shared/SessionStatusIndicator';
 
 // ============================================================================
 // extractRepoFromGitUrl Tests
@@ -274,6 +278,8 @@ describe('getSessionDisplayTitle', () => {
     last_model: null,
     version: 0,
     organization_id: null,
+    status: null,
+    status_updated_at: null,
   };
 
   test('should return title when present', () => {
@@ -295,6 +301,56 @@ describe('getSessionDisplayTitle', () => {
 
   test('should fall back to session ID prefix', () => {
     expect(getSessionDisplayTitle(baseSession)).toBe('Session 123e4567');
+  });
+});
+
+describe('shouldShowSessionStatus', () => {
+  test('returns true for a visible status', () => {
+    expect(shouldShowSessionStatus('busy', new Date().toISOString())).toBe(true);
+  });
+
+  test('returns false for idle status', () => {
+    expect(shouldShowSessionStatus('idle', new Date().toISOString())).toBe(false);
+  });
+
+  test('returns true when timestamp is missing for a visible status', () => {
+    expect(shouldShowSessionStatus('permission', null)).toBe(true);
+  });
+});
+
+describe('getSessionActivityIndicatorKind', () => {
+  test('returns working for busy status', () => {
+    expect(getSessionActivityIndicatorKind('busy', new Date().toISOString())).toBe('working');
+  });
+
+  test('returns working for retry status', () => {
+    expect(getSessionActivityIndicatorKind('retry', new Date().toISOString())).toBe('working');
+  });
+
+  test('returns attention for question status', () => {
+    expect(getSessionActivityIndicatorKind('question', new Date().toISOString())).toBe('attention');
+  });
+
+  test('returns attention for permission status', () => {
+    expect(getSessionActivityIndicatorKind('permission', new Date().toISOString())).toBe(
+      'attention'
+    );
+  });
+
+  test('returns null for idle status', () => {
+    expect(getSessionActivityIndicatorKind('idle', new Date().toISOString())).toBeNull();
+  });
+
+  test('returns null for null status', () => {
+    expect(getSessionActivityIndicatorKind(null, null)).toBeNull();
+  });
+
+  test('returns working when timestamp is missing for busy', () => {
+    expect(getSessionActivityIndicatorKind('busy', null)).toBe('working');
+  });
+
+  test('returns attention when timestamp is missing for permission', () => {
+    expect(getSessionActivityIndicatorKind('permission', null)).toBe('attention');
   });
 });
 
@@ -632,6 +688,8 @@ describe('New Session Creation Logic', () => {
     updated_at: Date;
     version?: number;
     organization_id?: string | null;
+    status?: string | null;
+    status_updated_at?: Date | null;
   };
 
   // Helper that mirrors the logic in createNewSessionInIndexedDbAtom
@@ -650,6 +708,8 @@ describe('New Session Creation Logic', () => {
       created_on_platform: 'cloud-agent-web',
       created_at: now,
       updated_at: now,
+      status: null,
+      status_updated_at: null,
     };
   }
 
@@ -689,6 +749,8 @@ describe('New Session Creation Logic', () => {
       created_on_platform: 'cloud-agent',
       created_at: new Date('2024-01-01'),
       updated_at: new Date('2024-01-01'),
+      status: null,
+      status_updated_at: null,
     };
 
     const newSession = createDbSessionFromEvent(

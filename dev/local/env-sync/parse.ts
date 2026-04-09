@@ -200,19 +200,23 @@ function toPkcs8IfNeeded(pem: string): string {
 // Annotation-based value resolution
 // ---------------------------------------------------------------------------
 
+type ResolvedValueSource = 'env-local' | 'generated' | 'exec' | 'default' | 'missing';
+
 function resolveAnnotatedValue(
   key: string,
   entry: ExampleEntry,
   envLocal: Map<string, string>,
   lanIp: string | undefined,
   serviceUsesLanIp: boolean
-): { value: string; resolved: boolean } {
+): { value: string; resolved: boolean; source: ResolvedValueSource } {
   switch (entry.annotation.type) {
     case 'from': {
       const val = envLocal.get(entry.annotation.envLocalKey);
-      if (val !== undefined) return { value: val, resolved: true };
-      if (entry.defaultValue) return { value: entry.defaultValue, resolved: true };
-      return { value: '', resolved: false };
+      if (val !== undefined) return { value: val, resolved: true, source: 'env-local' };
+      if (entry.defaultValue) {
+        return { value: entry.defaultValue, resolved: true, source: 'default' };
+      }
+      return { value: '', resolved: false, source: 'missing' };
     }
 
     case 'url': {
@@ -241,18 +245,24 @@ function resolveAnnotatedValue(
       }
 
       if (resolvedParts.length > 0) {
-        return { value: resolvedParts.join(','), resolved: true };
+        return { value: resolvedParts.join(','), resolved: true, source: 'generated' };
       }
       // All services unknown — fall back to default
-      if (entry.defaultValue) return { value: entry.defaultValue, resolved: true };
-      return { value: '', resolved: false };
+      if (entry.defaultValue) {
+        return { value: entry.defaultValue, resolved: true, source: 'default' };
+      }
+      return { value: '', resolved: false, source: 'missing' };
     }
 
     case 'pkcs8': {
       const val = envLocal.get(key);
-      if (val !== undefined) return { value: toPkcs8IfNeeded(val), resolved: true };
-      if (entry.defaultValue) return { value: entry.defaultValue, resolved: true };
-      return { value: '', resolved: false };
+      if (val !== undefined) {
+        return { value: toPkcs8IfNeeded(val), resolved: true, source: 'env-local' };
+      }
+      if (entry.defaultValue) {
+        return { value: entry.defaultValue, resolved: true, source: 'default' };
+      }
+      return { value: '', resolved: false, source: 'missing' };
     }
 
     case 'exec': {
@@ -262,17 +272,21 @@ function resolveAnnotatedValue(
         timeout: 5000,
       });
       if (result.status === 0 && result.stdout.trim()) {
-        return { value: result.stdout.trim(), resolved: true };
+        return { value: result.stdout.trim(), resolved: true, source: 'exec' };
       }
-      if (entry.defaultValue) return { value: entry.defaultValue, resolved: true };
-      return { value: '', resolved: false };
+      if (entry.defaultValue) {
+        return { value: entry.defaultValue, resolved: true, source: 'default' };
+      }
+      return { value: '', resolved: false, source: 'missing' };
     }
 
     case 'passthrough': {
       const val = envLocal.get(key);
-      if (val !== undefined) return { value: val, resolved: true };
-      if (entry.defaultValue) return { value: entry.defaultValue, resolved: true };
-      return { value: '', resolved: false };
+      if (val !== undefined) return { value: val, resolved: true, source: 'env-local' };
+      if (entry.defaultValue) {
+        return { value: entry.defaultValue, resolved: true, source: 'default' };
+      }
+      return { value: '', resolved: false, source: 'missing' };
     }
   }
 }

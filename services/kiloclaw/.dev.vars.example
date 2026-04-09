@@ -3,7 +3,7 @@
 #
 # Most values below are working defaults. The script auto-manages:
 #   NEXTAUTH_SECRET, INTERNAL_API_SECRET  (synced from Vercel)
-#   FLY_API_TOKEN                         (auto-created/refreshed)
+#   FLY_API_TOKEN                         (auto-created once in .env.local)
 #   KILOCODE_API_BASE_URL                 (set from tunnel URL)
 #
 # Values you may need to set manually:
@@ -44,8 +44,9 @@ BACKEND_API_URL=http://localhost:3000
 # KILOCODE_API_BASE_URL=https://<tunnel>.trycloudflare.com/api/gateway/
 
 # Fly.io Machines API
-# Token is auto-created/refreshed by the dev-start script.
-# @exec fly auth token
+# Token is auto-created once in .env.local by `pnpm dev:env` using
+# `fly tokens create org <FLY_ORG_SLUG>`, then synced here.
+# @from FLY_API_TOKEN
 FLY_API_TOKEN=
 # Fly org slug. The dev-start script reads this value for token creation.
 # Use "kilo-dev" for Kilo team members, or "personal" for your own Fly account.

@@ -175,6 +175,9 @@ type CustomTooltipProps = {
 };
 
 function DailyChart({ data }: { data: DailyChartData[] }) {
+  const [showCreated, setShowCreated] = useState(true);
+  const [showDestroyed, setShowDestroyed] = useState(true);
+
   const chartData = data.map(item => ({
     date: format(parseISO(item.date), 'MM/dd'),
     created: item.created,
@@ -190,14 +193,18 @@ function DailyChart({ data }: { data: DailyChartData[] }) {
         <div className="bg-background rounded-lg border p-3 shadow-sm">
           <p className="text-sm font-medium">{label}</p>
           <div className="mt-2 space-y-1">
-            <p className="text-sm">
-              <span className="text-muted-foreground">Created:</span>{' '}
-              <span className="font-medium">{created}</span>
-            </p>
-            <p className="text-sm">
-              <span className="text-muted-foreground">Destroyed:</span>{' '}
-              <span className="font-medium">{destroyed}</span>
-            </p>
+            {showCreated && (
+              <p className="text-sm">
+                <span className="text-muted-foreground">Created:</span>{' '}
+                <span className="font-medium">{created}</span>
+              </p>
+            )}
+            {showDestroyed && (
+              <p className="text-sm">
+                <span className="text-muted-foreground">Destroyed:</span>{' '}
+                <span className="font-medium">{destroyed}</span>
+              </p>
+            )}
           </div>
         </div>
       );
@@ -205,7 +212,15 @@ function DailyChart({ data }: { data: DailyChartData[] }) {
     return null;
   };
 
-  const maxVal = Math.max(...chartData.map(d => Math.max(d.created, d.destroyed)), 1);
+  const maxVal = Math.max(
+    ...chartData.map(d => {
+      const vals: number[] = [];
+      if (showCreated) vals.push(d.created);
+      if (showDestroyed) vals.push(d.destroyed);
+      return vals.length > 0 ? Math.max(...vals) : 0;
+    }),
+    1
+  );
   const yAxisMax = Math.ceil(maxVal * 1.1) || 10;
 
   return (
@@ -229,20 +244,40 @@ function DailyChart({ data }: { data: DailyChartData[] }) {
               />
               <YAxis domain={[0, yAxisMax]} tick={{ fontSize: 10 }} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="created" fill="#22c55e" name="Created" />
-              <Bar dataKey="destroyed" fill="#ef4444" name="Destroyed" />
+              {showCreated && <Bar dataKey="created" fill="#22c55e" name="Created" />}
+              {showDestroyed && <Bar dataKey="destroyed" fill="#ef4444" name="Destroyed" />}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
         <div className="mt-4 flex items-center justify-center gap-6 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-sm bg-green-500" />
-            <span className="text-muted-foreground">Created</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-sm bg-red-500" />
-            <span className="text-muted-foreground">Destroyed</span>
-          </div>
+          <button
+            type="button"
+            className="flex cursor-pointer items-center gap-2"
+            onClick={() => setShowCreated(prev => !prev)}
+          >
+            <div
+              className={`h-3 w-3 rounded-sm bg-green-500 transition-opacity ${showCreated ? 'opacity-100' : 'opacity-30'}`}
+            />
+            <span
+              className={`text-muted-foreground transition-opacity ${showCreated ? 'opacity-100' : 'line-through opacity-50'}`}
+            >
+              Created
+            </span>
+          </button>
+          <button
+            type="button"
+            className="flex cursor-pointer items-center gap-2"
+            onClick={() => setShowDestroyed(prev => !prev)}
+          >
+            <div
+              className={`h-3 w-3 rounded-sm bg-red-500 transition-opacity ${showDestroyed ? 'opacity-100' : 'opacity-30'}`}
+            />
+            <span
+              className={`text-muted-foreground transition-opacity ${showDestroyed ? 'opacity-100' : 'line-through opacity-50'}`}
+            >
+              Destroyed
+            </span>
+          </button>
         </div>
       </CardContent>
     </Card>

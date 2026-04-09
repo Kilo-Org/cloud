@@ -2,11 +2,6 @@ import 'server-only';
 
 import { createHash } from 'crypto';
 import { IMPACT_ACCOUNT_SID, IMPACT_AUTH_TOKEN, IMPACT_CAMPAIGN_ID } from '@/lib/config.server';
-import { sentryLogger } from '@/lib/utils.server';
-
-const logInfo = sentryLogger('impact', 'info');
-const logWarning = sentryLogger('impact', 'warning');
-const logError = sentryLogger('impact', 'error');
 
 const IMPACT_BASE_URL = 'https://api.impact.com';
 export const IMPACT_ORDER_ID_MACRO = 'IR_AN_64_TS';
@@ -19,7 +14,7 @@ export const IMPACT_ACTION_TRACKER_IDS = {
   visit: 71668,
 } as const;
 
-type ImpactConversionPayload = {
+export type ImpactConversionPayload = {
   CampaignId: string;
   ActionTrackerId: number;
   EventDate: string;
@@ -39,9 +34,9 @@ type ImpactConversionPayload = {
 };
 
 type ImpactCustomerFields = {
-  clickId?: string | null;
+  trackingId?: string | null;
   customerId: string;
-  customerEmail: string;
+  customerEmailHash: string;
   customerStatus?: 'NEW';
 };
 
@@ -71,8 +66,8 @@ function toEventDate(eventDate: Date): string {
   return eventDate.toISOString();
 }
 
-function normalizeClickId(clickId?: string | null): string | undefined {
-  const trimmed = clickId?.trim();
+function normalizeTrackingId(trackingId?: string | null): string | undefined {
+  const trimmed = trackingId?.trim();
   return trimmed ? trimmed : undefined;
 }
 
@@ -82,9 +77,11 @@ function formatAmount(amount: number): string {
 
 function buildCustomerFields(fields: ImpactCustomerFields) {
   return {
-    ...(normalizeClickId(fields.clickId) ? { ClickId: normalizeClickId(fields.clickId) } : {}),
+    ...(normalizeTrackingId(fields.trackingId)
+      ? { ClickId: normalizeTrackingId(fields.trackingId) }
+      : {}),
     CustomerId: fields.customerId,
-    CustomerEmail: hashEmailForImpact(fields.customerEmail),
+    CustomerEmail: fields.customerEmailHash,
     ...(fields.customerStatus ? { CustomerStatus: fields.customerStatus } : {}),
   } satisfies Partial<ImpactConversionPayload>;
 }
@@ -108,22 +105,22 @@ export function hashEmailForImpact(email: string): string {
 }
 
 export function buildVisitPayload(params: {
-  clickId: string;
+  trackingId: string;
   eventDate: Date;
 }): ImpactConversionPayload {
   return {
     CampaignId: IMPACT_CAMPAIGN_ID,
     ActionTrackerId: IMPACT_ACTION_TRACKER_IDS.visit,
     EventDate: toEventDate(params.eventDate),
-    ClickId: params.clickId,
+    ClickId: params.trackingId,
     OrderId: IMPACT_ORDER_ID_MACRO,
   };
 }
 
 export function buildSignUpPayload(params: {
-  clickId?: string | null;
+  trackingId?: string | null;
   customerId: string;
-  customerEmail: string;
+  customerEmailHash: string;
   eventDate: Date;
 }): ImpactConversionPayload {
   return {
@@ -132,18 +129,18 @@ export function buildSignUpPayload(params: {
     EventDate: toEventDate(params.eventDate),
     OrderId: IMPACT_ORDER_ID_MACRO,
     ...buildCustomerFields({
-      clickId: params.clickId,
+      trackingId: params.trackingId,
       customerId: params.customerId,
-      customerEmail: params.customerEmail,
+      customerEmailHash: params.customerEmailHash,
       customerStatus: 'NEW',
     }),
   };
 }
 
 export function buildTrialStartPayload(params: {
-  clickId?: string | null;
+  trackingId?: string | null;
   customerId: string;
-  customerEmail: string;
+  customerEmailHash: string;
   eventDate: Date;
 }): ImpactConversionPayload {
   return {
@@ -152,18 +149,18 @@ export function buildTrialStartPayload(params: {
     EventDate: toEventDate(params.eventDate),
     OrderId: IMPACT_ORDER_ID_MACRO,
     ...buildCustomerFields({
-      clickId: params.clickId,
+      trackingId: params.trackingId,
       customerId: params.customerId,
-      customerEmail: params.customerEmail,
+      customerEmailHash: params.customerEmailHash,
       customerStatus: 'NEW',
     }),
   };
 }
 
 export function buildTrialEndPayload(params: {
-  clickId?: string | null;
+  trackingId?: string | null;
   customerId: string;
-  customerEmail: string;
+  customerEmailHash: string;
   eventDate: Date;
 }): ImpactConversionPayload {
   return {
@@ -172,9 +169,9 @@ export function buildTrialEndPayload(params: {
     EventDate: toEventDate(params.eventDate),
     OrderId: IMPACT_ORDER_ID_MACRO,
     ...buildCustomerFields({
-      clickId: params.clickId,
+      trackingId: params.trackingId,
       customerId: params.customerId,
-      customerEmail: params.customerEmail,
+      customerEmailHash: params.customerEmailHash,
       customerStatus: 'NEW',
     }),
   };
@@ -191,102 +188,155 @@ export function buildSalePayload(
   };
 }
 
-async function sleep(ms: number): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, ms));
-}
+export type ImpactDispatchResult =
+  | {
+      ok: true;
+      actionTrackerId: number;
+      skipped?: 'unconfigured';
+    }
+  | {
+      ok: false;
+      actionTrackerId: number;
+      failureKind: 'http_4xx' | 'http_5xx' | 'network';
+      statusCode?: number;
+      responseBody?: string;
+      error?: string;
+    };
 
-async function sendImpactConversion(
-  payload: ImpactConversionPayload,
-  eventName: string
-): Promise<void> {
+export async function sendImpactConversionPayload(
+  payload: ImpactConversionPayload
+): Promise<ImpactDispatchResult> {
   const config = getImpactConfig();
-  if (!config) return;
+  if (!config) {
+    return {
+      ok: true,
+      actionTrackerId: payload.ActionTrackerId,
+      skipped: 'unconfigured',
+    };
+  }
 
   const url = `${IMPACT_BASE_URL}/Advertisers/${config.accountSid}/Conversions`;
   const authorization = Buffer.from(`${config.accountSid}:${config.authToken}`).toString('base64');
 
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${authorization}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${authorization}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-      if (response.ok) {
-        logInfo('Impact conversion sent', {
-          event_name: eventName,
-          action_tracker_id: payload.ActionTrackerId,
-        });
-        return;
-      }
-
-      const responseBody = await response.text();
-      const shouldRetry = response.status >= 500 && attempt < 3;
-      const log = shouldRetry ? logWarning : logError;
-      log('Impact conversion request failed', {
-        event_name: eventName,
-        action_tracker_id: payload.ActionTrackerId,
-        attempt,
-        status: response.status,
-        order_id: payload.OrderId,
-        response_body: responseBody,
-      });
-
-      if (!shouldRetry) return;
-    } catch (error) {
-      const shouldRetry = attempt < 3;
-      const log = shouldRetry ? logWarning : logError;
-      log('Impact conversion request threw', {
-        event_name: eventName,
-        action_tracker_id: payload.ActionTrackerId,
-        attempt,
-        order_id: payload.OrderId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      if (!shouldRetry) return;
+    if (response.ok) {
+      return {
+        ok: true,
+        actionTrackerId: payload.ActionTrackerId,
+      };
     }
 
-    await sleep(250 * attempt);
+    const responseBody = await response.text();
+    return {
+      ok: false,
+      actionTrackerId: payload.ActionTrackerId,
+      failureKind: response.status >= 500 ? 'http_5xx' : 'http_4xx',
+      statusCode: response.status,
+      responseBody,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      actionTrackerId: payload.ActionTrackerId,
+      failureKind: 'network',
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
-export async function trackVisit(params: { clickId: string; eventDate: Date }): Promise<void> {
-  await sendImpactConversion(buildVisitPayload(params), 'visit');
+function throwIfImpactDispatchFailed(eventName: string, result: ImpactDispatchResult): void {
+  if (result.ok) return;
+
+  const details =
+    result.failureKind === 'network'
+      ? (result.error ?? 'unknown network error')
+      : `status ${result.statusCode ?? 'unknown'}${result.responseBody ? `: ${result.responseBody}` : ''}`;
+  throw new Error(`Impact ${eventName} dispatch failed (${result.failureKind}): ${details}`);
+}
+
+export async function trackVisit(params: { trackingId: string; eventDate: Date }): Promise<void> {
+  const result = await sendImpactConversionPayload(buildVisitPayload(params));
+  throwIfImpactDispatchFailed('visit', result);
 }
 
 export async function trackSignUp(params: {
-  clickId?: string | null;
+  trackingId?: string | null;
   customerId: string;
   customerEmail: string;
   eventDate: Date;
 }): Promise<void> {
-  await sendImpactConversion(buildSignUpPayload(params), 'signup');
+  const result = await sendImpactConversionPayload(
+    buildSignUpPayload({
+      trackingId: params.trackingId,
+      customerId: params.customerId,
+      customerEmailHash: hashEmailForImpact(params.customerEmail),
+      eventDate: params.eventDate,
+    })
+  );
+  throwIfImpactDispatchFailed('signup', result);
 }
 
 export async function trackTrialStart(params: {
-  clickId?: string | null;
+  trackingId?: string | null;
   customerId: string;
   customerEmail: string;
   eventDate: Date;
 }): Promise<void> {
-  await sendImpactConversion(buildTrialStartPayload(params), 'trial_start');
+  const result = await sendImpactConversionPayload(
+    buildTrialStartPayload({
+      trackingId: params.trackingId,
+      customerId: params.customerId,
+      customerEmailHash: hashEmailForImpact(params.customerEmail),
+      eventDate: params.eventDate,
+    })
+  );
+  throwIfImpactDispatchFailed('trial_start', result);
 }
 
 export async function trackTrialEnd(params: {
-  clickId?: string | null;
+  trackingId?: string | null;
   customerId: string;
   customerEmail: string;
   eventDate: Date;
 }): Promise<void> {
-  await sendImpactConversion(buildTrialEndPayload(params), 'trial_end');
+  const result = await sendImpactConversionPayload(
+    buildTrialEndPayload({
+      trackingId: params.trackingId,
+      customerId: params.customerId,
+      customerEmailHash: hashEmailForImpact(params.customerEmail),
+      eventDate: params.eventDate,
+    })
+  );
+  throwIfImpactDispatchFailed('trial_end', result);
 }
 
-export async function trackSale(params: ImpactSaleFields & { eventDate: Date }): Promise<void> {
-  await sendImpactConversion(buildSalePayload(params), 'sale');
+export async function trackSale(
+  params: Omit<ImpactSaleFields, 'customerEmailHash'> & { customerEmail: string; eventDate: Date }
+): Promise<void> {
+  const result = await sendImpactConversionPayload(
+    buildSalePayload({
+      trackingId: params.trackingId,
+      customerId: params.customerId,
+      customerEmailHash: hashEmailForImpact(params.customerEmail),
+      orderId: params.orderId,
+      amount: params.amount,
+      currencyCode: params.currencyCode,
+      eventDate: params.eventDate,
+      itemCategory: params.itemCategory,
+      itemName: params.itemName,
+      itemSku: params.itemSku,
+      promoCode: params.promoCode,
+    })
+  );
+  throwIfImpactDispatchFailed('sale', result);
 }

@@ -56,6 +56,7 @@ import {
 import { client as stripe } from '@/lib/stripe-client';
 import { APP_URL } from '@/lib/constants';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
+import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
 import { clawAccessProcedure } from '@/lib/kiloclaw/access-gate';
 import {
   getStripePriceIdForClawPlan,
@@ -83,7 +84,7 @@ import {
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
 import PostHogClient from '@/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
-import { trackTrialStart } from '@/lib/impact';
+import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
 
 /**
  * Error codes whose messages may contain raw internal details (e.g. filesystem
@@ -455,6 +456,40 @@ type KiloCodeConfigPublicResponse = Pick<
   'kilocodeApiKeyExpiresAt' | 'kilocodeDefaultModel'
 >;
 
+function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDashboardStatus {
+  return {
+    userId,
+    sandboxId: null,
+    status: null,
+    provisionedAt: null,
+    lastStartedAt: null,
+    lastStoppedAt: null,
+    envVarCount: 0,
+    secretCount: 0,
+    channelCount: 0,
+    flyAppName: null,
+    flyMachineId: null,
+    flyVolumeId: null,
+    flyRegion: null,
+    machineSize: null,
+    openclawVersion: null,
+    imageVariant: null,
+    trackedImageTag: null,
+    trackedImageDigest: null,
+    googleConnected: false,
+    gmailNotificationsEnabled: false,
+    execSecurity: null,
+    execAsk: null,
+    botName: null,
+    botNature: null,
+    botVibe: null,
+    botEmoji: null,
+    workerUrl,
+    name: null,
+    instanceId: null,
+  } satisfies KiloClawDashboardStatus;
+}
+
 function sanitizeKiloCodeConfigResponse(
   response: KiloCodeConfigResponse
 ): KiloCodeConfigPublicResponse {
@@ -688,17 +723,20 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
       });
 
       void (async () => {
-        const attribution = await getAffiliateAttribution(userId, 'impact');
-        if (!attribution) return;
-
-        await trackTrialStart({
-          clickId: attribution.tracking_id,
-          customerId: userId,
-          customerEmail: userEmail,
+        await enqueueAffiliateEventForUser({
+          userId,
+          provider: 'impact',
+          eventType: 'trial_start',
+          dedupeKey: buildAffiliateEventDedupeKey({
+            provider: 'impact',
+            eventType: 'trial_start',
+            entityId: inserted.id,
+          }),
           eventDate: now,
+          orderId: IMPACT_ORDER_ID_MACRO,
         });
       })().catch(error => {
-        sentryLogger('kiloclaw-impact', 'warning')('Impact trial start tracking failed', {
+        sentryLogger('affiliate-events', 'warning')('Affiliate trial start enqueue failed', {
           user_id: userId,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -1396,18 +1434,23 @@ export const kiloclawRouter = createTRPCRouter({
 
   getStatus: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
+    const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
+
+    if (!instance) {
+      return createNoInstanceStatus(ctx.user.id, workerUrl);
+    }
+
     const client = new KiloClawInternalClient();
     const status = await client.getStatus(ctx.user.id, workerInstanceId(instance));
-    const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
 
     return {
       ...status,
-      name: instance?.name ?? null,
+      name: instance.name ?? null,
       workerUrl,
       // Only expose instanceId for instance-keyed instances (ki_ sandboxId).
       // Legacy instances use userId-keyed DOs — returning their row UUID would
       // cause the frontend/gateway to resolve the wrong DO.
-      instanceId: workerInstanceId(instance) ? (instance?.id ?? null) : null,
+      instanceId: workerInstanceId(instance) ? instance.id : null,
     } satisfies KiloClawDashboardStatus;
   }),
 
@@ -3050,14 +3093,14 @@ export const kiloclawRouter = createTRPCRouter({
             type: 'kiloclaw',
             plan: input.plan,
             kiloUserId: ctx.user.id,
-            impactClickId: attribution?.tracking_id ?? '',
+            affiliateTrackingId: attribution?.tracking_id ?? '',
           },
         },
         metadata: {
           type: 'kiloclaw',
           plan: input.plan,
           kiloUserId: ctx.user.id,
-          impactClickId: attribution?.tracking_id ?? '',
+          affiliateTrackingId: attribution?.tracking_id ?? '',
         },
       });
 

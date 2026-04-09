@@ -141,7 +141,7 @@ export function resolveModel(
   role: string
 ): string {
   const base = rigOverride?.default_model ?? townConfig.default_model;
-  if (role === 'mayor') return townConfig.role_models?.mayor ?? base ?? DEFAULT_MODEL;
+  if (role === 'mayor') return townConfig.role_models?.mayor ?? townConfig.default_model ?? DEFAULT_MODEL;
   if (role === 'polecat')
     return rigOverride?.role_models?.polecat ?? townConfig.role_models?.polecat ?? base ?? DEFAULT_MODEL;
   if (role === 'refinery')

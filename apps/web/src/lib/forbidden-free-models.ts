@@ -1,4 +1,4 @@
-import { claude_sonnet_clawsetup_model } from '@/lib/providers/anthropic';
+import { claude_sonnet_clawsetup_model } from '@/lib/providers/anthropic.constants';
 
 const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'arcee-ai/trinity-large-preview:free',

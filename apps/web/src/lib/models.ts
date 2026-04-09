@@ -13,7 +13,7 @@ import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@/lib/providers/anthropic';
+} from '@/lib/providers/anthropic.constants';
 import { trinity_large_thinking_free_model } from '@/lib/providers/arcee';
 import { seed_20_pro_free_model } from '@/lib/providers/bytedance';
 import { corethink_free_model } from '@/lib/providers/corethink';

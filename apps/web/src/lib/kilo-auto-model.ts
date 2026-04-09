@@ -6,7 +6,7 @@ import {
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_NAME,
-} from '@/lib/providers/anthropic';
+} from '@/lib/providers/anthropic.constants';
 import {
   MINIMAX_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_NAME,
@@ -23,7 +23,6 @@ import { requestContainsImages } from '@/lib/providers/openrouter/request-helper
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 import type OpenAI from 'openai';
 import type { User } from '@kilocode/db';
-import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 
 function stripDisplayName(displayName: string): string {
   const start = displayName.indexOf(': ');
@@ -260,6 +259,8 @@ export async function resolveAutoModel(
   if (model === KILO_AUTO_BALANCED_MODEL.id) {
     if (mode === modeSchema.enum.KiloClaw) {
       const user = await userPromise;
+      const { userIsWithinFirstKiloClawInstanceWindow } =
+        await import('@/lib/kiloclaw/setup-promo');
       if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
         return BALANCED_CLAW_SETUP_MODEL;
       }

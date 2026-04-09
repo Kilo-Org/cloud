@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Pressable, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
@@ -183,51 +183,61 @@ function StreamChatUI({
   const [client, setClient] = useState<StreamChat | null>(null);
   const [channel, setChannel] = useState<StreamChannel | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
+  const cancelledRef = useRef(false);
 
-  useEffect(() => {
+  const connect = useCallback(async () => {
     const chatClient = StreamChat.getInstance(apiKey);
-
-    let cancelled = false;
     setConnectError(null);
 
-    const connect = async () => {
-      try {
-        // Disconnect any stale connection (e.g. after app was backgrounded)
-        // to prevent "can't use channel after disconnect" errors
-        if (chatClient.userID || chatClient.wsConnection) {
-          try {
-            await chatClient.disconnectUser();
-          } catch {
-            // Ignore disconnect errors on a potentially dead connection
-          }
-        }
-        if (cancelled) {
-          return;
-        }
-        await chatClient.connectUser({ id: userId }, tokenProvider);
-        const ch = chatClient.channel('messaging', channelId);
-        await ch.watch({ presence: true });
-        // cancelled may change across awaits above
-        // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
-        if (!cancelled) {
-          setClient(chatClient);
-          setChannel(ch);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setConnectError(error instanceof Error ? error.message : 'Failed to connect to chat.');
+    try {
+      if (chatClient.userID) {
+        try {
+          await chatClient.disconnectUser();
+        } catch {
+          // Ignore disconnect errors on a potentially dead connection
         }
       }
-    };
+      if (cancelledRef.current) {
+        return;
+      }
+      await chatClient.connectUser({ id: userId }, tokenProvider);
+      const ch = chatClient.channel('messaging', channelId);
+      await ch.watch({ presence: true });
+      // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- ref can change across awaits
+      if (!cancelledRef.current) {
+        setClient(chatClient);
+        setChannel(ch);
+      }
+    } catch (error) {
+      if (!cancelledRef.current) {
+        setConnectError(error instanceof Error ? error.message : 'Failed to connect to chat.');
+      }
+    }
+  }, [apiKey, userId, channelId, tokenProvider]);
 
+  useEffect(() => {
+    cancelledRef.current = false;
     void connect();
-
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
       setClient(null);
       setChannel(null);
     };
-  }, [apiKey, userId, channelId, tokenProvider]);
+  }, [connect]);
+
+  // Reconnect when app returns to foreground (websocket may have died while backgrounded)
+  const appState = useRef(AppState.currentState);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (/inactive|background/.exec(appState.current) && nextAppState === 'active') {
+        void connect();
+      }
+      appState.current = nextAppState;
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [connect]);
 
   // Bot presence tracking
   const sandboxId = channelId.replace(/^default-/, '');

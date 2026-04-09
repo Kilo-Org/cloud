@@ -7,8 +7,8 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
-  resolveAutoModel,
 } from '@/lib/kilo-auto-model';
+import { resolveAutoModel } from '@/lib/kilo-auto-model.resolution';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   claude_sonnet_clawsetup_model,

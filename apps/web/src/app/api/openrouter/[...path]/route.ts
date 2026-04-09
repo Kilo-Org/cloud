@@ -75,7 +75,8 @@ import { grokCodeFastOptimizedRequest } from '@/lib/custom-llm/customLlmRequest'
 import { normalizeModelId } from '@/lib/model-utils';
 import { isForbiddenFreeModel } from '@/lib/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
-import { applyResolvedAutoModel, isKiloAutoModel } from '@/lib/kilo-auto-model';
+import { isKiloAutoModel } from '@/lib/kilo-auto-model';
+import { applyResolvedAutoModel } from '@/lib/kilo-auto-model.resolution';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/providers/fixOpenCodeDuplicateReasoning';
 import type { MicrodollarUsageContext, PromptInfo } from '@/lib/processUsage.types';
 import { extractResponsesPromptInfo } from '@/lib/processUsage.responses';

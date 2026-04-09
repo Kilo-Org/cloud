@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { FeatureValue } from '@/lib/feature-detection';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_NAME,
@@ -13,16 +12,9 @@ import {
   minimax_m25_free_model,
 } from '@/lib/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID, KIMI_CURRENT_MODEL_NAME } from '@/lib/providers/moonshotai';
-import { gpt_oss_20b_free_model, GPT_5_NANO_ID, GPT_5_NANO_NAME } from '@/lib/providers/openai';
-import type {
-  GatewayRequest,
-  OpenRouterChatCompletionRequest,
-  OpenRouterReasoningConfig,
-} from '@/lib/providers/openrouter/types';
-import { requestContainsImages } from '@/lib/providers/openrouter/request-helpers';
+import { gpt_oss_20b_free_model, GPT_5_NANO_NAME } from '@/lib/providers/openai';
+import type { OpenRouterReasoningConfig } from '@/lib/providers/openrouter/types';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
-import type OpenAI from 'openai';
-import type { User } from '@kilocode/db';
 
 function stripDisplayName(displayName: string): string {
   const start = displayName.indexOf(': ');
@@ -45,7 +37,7 @@ type AutoModel = {
   opencode_settings: OpenCodeSettings | undefined;
 };
 
-type ResolvedAutoModel = {
+export type ResolvedAutoModel = {
   model: string;
   reasoning?: OpenRouterReasoningConfig;
   verbosity?: Verbosity;
@@ -71,7 +63,7 @@ function describeRouting(modeToModel: Record<string, ResolvedAutoModel>): string
   return `Uses ${parts.join('; ')}.`;
 }
 
-const modeSchema = z.enum([
+export const modeSchema = z.enum([
   'KiloClaw',
   'plan',
   'general',
@@ -86,13 +78,13 @@ const modeSchema = z.enum([
 
 type Mode = z.infer<typeof modeSchema>;
 
-const FRONTIER_CODE_MODEL: ResolvedAutoModel = {
+export const FRONTIER_CODE_MODEL: ResolvedAutoModel = {
   model: CLAUDE_SONNET_CURRENT_MODEL_ID,
   reasoning: { enabled: true },
   verbosity: 'low',
 };
 
-const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
+export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   KiloClaw: {
     model: CLAUDE_OPUS_CURRENT_MODEL_ID,
     reasoning: { enabled: true },
@@ -129,22 +121,22 @@ const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   code: FRONTIER_CODE_MODEL,
 };
 
-const BALANCED_CODE_MODEL: ResolvedAutoModel = {
+export const BALANCED_CODE_MODEL: ResolvedAutoModel = {
   model: MINIMAX_CURRENT_MODEL_ID,
 };
 
-const BALANCED_IMAGE_MODEL: ResolvedAutoModel = {
+export const BALANCED_IMAGE_MODEL: ResolvedAutoModel = {
   model: KIMI_CURRENT_MODEL_ID,
   reasoning: { enabled: true },
 };
 
-const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
+export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
   model: claude_sonnet_clawsetup_model.public_id,
   reasoning: { enabled: true, effort: 'high' },
   verbosity: 'high',
 };
 
-const BALANCED_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
+export const BALANCED_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   KiloClaw: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   plan: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   general: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
@@ -237,79 +229,4 @@ export const AUTO_MODELS = [
 
 export function isKiloAutoModel(model: string) {
   return AUTO_MODELS.some(m => m.id === model);
-}
-
-export async function resolveAutoModel(
-  model: string,
-  modeHeader: string | null,
-  userPromise: Promise<User | null>,
-  balancePromise: Promise<number>,
-  hasImages: boolean
-): Promise<ResolvedAutoModel> {
-  if (model === KILO_AUTO_FREE_MODEL.id) {
-    return { model: minimax_m25_free_model.public_id };
-  }
-  if (model === KILO_AUTO_SMALL_MODEL.id) {
-    return {
-      model: (await balancePromise) > 0 ? GPT_5_NANO_ID : gpt_oss_20b_free_model.public_id,
-    };
-  }
-  const modeResult = modeSchema.safeParse(modeHeader?.trim() ?? '');
-  const mode = modeResult.success ? modeResult.data : null;
-  if (model === KILO_AUTO_BALANCED_MODEL.id) {
-    if (mode === modeSchema.enum.KiloClaw) {
-      const user = await userPromise;
-      const { userIsWithinFirstKiloClawInstanceWindow } =
-        await import('@/lib/kiloclaw/setup-promo');
-      if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
-        return BALANCED_CLAW_SETUP_MODEL;
-      }
-    }
-    if (hasImages) {
-      return BALANCED_IMAGE_MODEL;
-    }
-    return (mode !== null ? BALANCED_MODE_TO_MODEL[mode] : null) ?? BALANCED_CODE_MODEL;
-  }
-  return (mode !== null ? FRONTIER_MODE_TO_MODEL[mode] : null) ?? FRONTIER_CODE_MODEL;
-}
-
-export async function applyResolvedAutoModel(
-  model: string,
-  request: GatewayRequest,
-  modeHeader: string | null,
-  featureHeader: FeatureValue | null,
-  userPromise: Promise<User | null>,
-  balancePromise: Promise<number>
-) {
-  const hasImages = requestContainsImages(request);
-  const resolved = await resolveAutoModel(
-    model,
-    featureHeader === 'kiloclaw' || featureHeader === 'openclaw' ? 'KiloClaw' : modeHeader,
-    userPromise,
-    balancePromise,
-    hasImages
-  );
-  request.body.model = resolved.model;
-  if (resolved.reasoning) {
-    if (request.kind === 'messages') {
-      request.body.thinking = { type: resolved.reasoning.enabled ? 'adaptive' : 'disabled' };
-    } else {
-      request.body.reasoning = resolved.reasoning;
-    }
-  }
-  if (resolved.verbosity) {
-    if (request.kind === 'messages') {
-      request.body.output_config = {
-        ...request.body.output_config,
-        effort: resolved.verbosity,
-      };
-    } else if (request.kind === 'responses') {
-      request.body.text = {
-        ...request.body.text,
-        verbosity: resolved.verbosity as OpenAI.Responses.ResponseTextConfig['verbosity'],
-      };
-    } else {
-      request.body.verbosity = resolved.verbosity as OpenRouterChatCompletionRequest['verbosity'];
-    }
-  }
 }

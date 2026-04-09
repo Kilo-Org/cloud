@@ -208,12 +208,24 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
     <>
       <Card className="lg:col-span-4">
         <CardHeader>
-          <CardTitle>KiloClaw</CardTitle>
-          <CardDescription>
-            {subscriptions.length === 0
-              ? 'No subscriptions'
-              : `${subscriptions.length} subscription${subscriptions.length !== 1 ? 's' : ''}`}
-          </CardDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>KiloClaw</CardTitle>
+              <CardDescription>
+                {subscriptions.length === 0
+                  ? 'No subscriptions'
+                  : `${subscriptions.length} subscription${subscriptions.length !== 1 ? 's' : ''}`}
+              </CardDescription>
+            </div>
+            {data?.activeInstanceId && !subscriptions.some(s => s.instance) && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/admin/kiloclaw/${data.activeInstanceId}`}>
+                  <ExternalLink className="mr-1 h-3 w-3" />
+                  View Instance
+                </Link>
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Access & earlybird summary */}

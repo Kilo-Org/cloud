@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Check, Eye } from 'lucide-react-native';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { FlatList, Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useKiloClawConfig, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { addModelPrefix, stripModelPrefix } from '@/lib/model-id';
 import { useTRPC } from '@/lib/trpc';
 
 type ModelItem = {
@@ -21,24 +22,16 @@ type ModelItem = {
   isPreferred: boolean;
 };
 
-function stripPrefix(modelId: string | null | undefined): string {
-  if (!modelId) {
-    return '';
-  }
-  return modelId.replace(/^kilocode\//, '');
-}
-
 export default function ModelListScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const trpc = useTRPC();
-  const searchRef = useRef('');
   const [searchFilter, setSearchFilter] = useState('');
 
   const { data: config } = useKiloClawConfig();
   const mutations = useKiloClawMutations();
-  const currentModel = stripPrefix(config?.kilocodeDefaultModel);
+  const currentModel = stripModelPrefix(config?.kilocodeDefaultModel);
 
   const {
     data: models,
@@ -61,7 +54,7 @@ export default function ModelListScreen() {
   const handleSelect = useCallback(
     (modelId: string) => {
       mutations.updateModel.mutate(
-        { kilocodeDefaultModel: `kilocode/${modelId}` },
+        { kilocodeDefaultModel: addModelPrefix(modelId) },
         {
           onSuccess: () => {
             toast.success(`Model set to ${modelId}`);
@@ -122,10 +115,7 @@ export default function ModelListScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           defaultValue=""
-          onChangeText={text => {
-            searchRef.current = text;
-            setSearchFilter(text);
-          }}
+          onChangeText={setSearchFilter}
         />
       </View>
       {isLoading && (

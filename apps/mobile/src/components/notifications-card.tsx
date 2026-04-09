@@ -7,6 +7,8 @@ import { toast } from 'sonner-native';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import * as Notifications from 'expo-notifications';
+
 import {
   getDevicePushToken,
   getNotificationPermissionStatus,
@@ -81,8 +83,8 @@ export function NotificationsCard() {
 
   const handleToggleNotifications = useCallback(async (value: boolean) => {
     if (value) {
-      const status = await getNotificationPermissionStatus();
-      if (status === 'denied') {
+      const currentStatus = await getNotificationPermissionStatus();
+      if (currentStatus === 'denied') {
         // Already denied once — OS won't show the prompt again, must go to Settings
         Alert.alert(
           'Notifications Disabled',
@@ -95,10 +97,8 @@ export function NotificationsCard() {
         return;
       }
       // Undetermined — triggers the OS permission prompt
-      const token = await registerForPushNotifications();
-      if (token) {
-        setPermissionGranted(true);
-      }
+      const result = await Notifications.requestPermissionsAsync();
+      setPermissionGranted(result.status === Notifications.PermissionStatus.GRANTED);
     } else {
       // Can't revoke permission programmatically — send user to Settings
       Alert.alert(

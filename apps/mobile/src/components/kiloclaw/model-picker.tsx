@@ -6,6 +6,7 @@ import { toast } from 'sonner-native';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useKiloClawConfig, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw';
+import { addModelPrefix, stripModelPrefix } from '@/lib/model-id';
 
 type AutoModelCard = {
   id: string;
@@ -45,17 +46,6 @@ const AUTO_MODEL_CARDS: AutoModelCard[] = [
 ];
 
 const AUTO_MODEL_IDS = new Set(AUTO_MODEL_CARDS.map(c => c.id));
-
-function stripPrefix(modelId: string | null | undefined): string {
-  if (!modelId) {
-    return '';
-  }
-  return modelId.replace(/^kilocode\//, '');
-}
-
-function addPrefix(modelId: string): string {
-  return `kilocode/${modelId}`;
-}
 
 function CostIndicator({ level }: { level: number }) {
   return (
@@ -97,7 +87,7 @@ export function ModelPicker() {
   const { data: config, isLoading } = useKiloClawConfig();
   const mutations = useKiloClawMutations();
 
-  const currentModel = stripPrefix(config?.kilocodeDefaultModel);
+  const currentModel = stripModelPrefix(config?.kilocodeDefaultModel);
   const isAutoModel = AUTO_MODEL_IDS.has(currentModel);
 
   const handleSelectAutoModel = (modelId: string) => {
@@ -105,7 +95,7 @@ export function ModelPicker() {
       return;
     }
     mutations.updateModel.mutate(
-      { kilocodeDefaultModel: addPrefix(modelId) },
+      { kilocodeDefaultModel: addModelPrefix(modelId) },
       {
         onSuccess: () => {
           toast.success(`Switched to ${modelId.split('/').pop()}`);

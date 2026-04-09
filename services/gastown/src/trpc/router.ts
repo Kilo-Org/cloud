@@ -598,6 +598,31 @@ export const gastownRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
+      const ownership = await resolveTownOwnership(ctx.env, ctx, rig.town_id);
+
+      // Admins cannot modify rig config for towns they do not own
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot modify rig configuration for rigs they do not own',
+        });
+      }
+
+      // For org towns, only owners or the town creator can update rig config
+      if (ownership.type === 'org') {
+        const townStubForCheck = getTownDOStub(ctx.env, rig.town_id);
+        const townConfig = await townStubForCheck.getTownConfig();
+        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
+        const isOrgOwner = membership?.role === 'owner';
+        const isTownCreator = ctx.userId === townConfig.created_by_user_id;
+        if (!isOrgOwner && !isTownCreator) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only town creators and org owners can update rig config',
+          });
+        }
+      }
+
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       await townStub.updateRigConfig(input.rigId, input.config);
       const updatedRig = await townStub.getRigAsync(input.rigId);

@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const DEFAULT_CONFIG_PATH = '/root/.openclaw/openclaw.json';
+const KILOCLAW_WEB_SEARCH_PROVIDER = 'kilo-exa';
 
 export const MAX_CONFIG_BACKUPS = 5;
 
@@ -228,6 +229,14 @@ export function generateBaseConfig(
   config.tools = config.tools ?? {};
   if (env.KILOCLAW_FRESH_INSTALL === 'true' || !config.tools.profile) {
     config.tools.profile = 'full';
+  }
+
+  // Fresh install steering: default web_search to the Kilo-managed Exa provider.
+  // Existing instances keep their current provider selection.
+  if (env.KILOCLAW_FRESH_INSTALL === 'true') {
+    config.tools.web = config.tools.web ?? {};
+    config.tools.web.search = config.tools.web.search ?? {};
+    config.tools.web.search.provider = KILOCLAW_WEB_SEARCH_PROVIDER;
   }
 
   // Exec: KiloClaw machines have no Docker sandbox, so exec must target the

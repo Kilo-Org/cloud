@@ -39,6 +39,9 @@ export function CreateInstanceCard({
   const searchParams = useSearchParams();
   const { organizationId } = useClawContext();
   const isOrgContext = !!organizationId;
+  const setupReturnPath = organizationId
+    ? `/organizations/${organizationId}/claw/new`
+    : '/claw/new';
   // Billing status is personal-only; org uses org subscription checks
   const { data: billingStatus } = useQuery({
     ...trpc.kiloclaw.getBillingStatus.queryOptions(),
@@ -220,6 +223,7 @@ export function CreateInstanceCard({
         {needsCredits ? (
           <CreditsNudge
             selectedModel={selectedModel}
+            returnPath={setupReturnPath}
             onSwitchToFree={() => setSelectedModel(KILO_AUTO_FREE_MODEL.id)}
           />
         ) : (

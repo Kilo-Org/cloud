@@ -12,6 +12,45 @@ import { buildContainerConfig, resolveModel, resolveSmallModel, resolveRigConfig
 
 const TOWN_LOG = '[Town.do]';
 
+// Allowlist of git push flags that are safe to pass from rig config.
+// Flags that bypass hooks (--no-verify), rewrite history (--force,
+// --force-with-lease), or alter remote refs in dangerous ways are
+// explicitly excluded to prevent config-driven bypass of protections.
+const ALLOWED_GIT_PUSH_FLAGS = new Set([
+  '--atomic',
+  '--follow-tags',
+  '--signed',
+  '--no-signed',
+  '--progress',
+  '--no-progress',
+  '--verbose',
+  '--quiet',
+  '--tags',
+  '--porcelain',
+  '--ipv4',
+  '--ipv6',
+  '--recurse-submodules=check',
+  '--recurse-submodules=on-demand',
+  '--recurse-submodules=no',
+]);
+
+/**
+ * Filter git push flags against the allowlist. Returns only the safe subset.
+ * Logs a warning for any rejected flags.
+ */
+function filterGitPushFlags(raw: string): string | undefined {
+  const flags = raw.trim().split(/\s+/).filter(Boolean);
+  const allowed: string[] = [];
+  for (const flag of flags) {
+    if (ALLOWED_GIT_PUSH_FLAGS.has(flag)) {
+      allowed.push(flag);
+    } else {
+      console.warn(`${TOWN_LOG} filterGitPushFlags: rejecting unsafe flag "${flag}"`);
+    }
+  }
+  return allowed.length > 0 ? allowed.join(' ') : undefined;
+}
+
 // Module-level diagnostic: stores the last container start error so
 // callers can surface it via the admin API. Reset on each call.
 let lastStartError: string | null = null;
@@ -453,7 +492,12 @@ export async function startAgentInContainer(
             params.role as keyof typeof effectiveConfig.custom_instructions
           ]
         ),
-        ...(effectiveConfig.git_push_flags ? { gitPushFlags: effectiveConfig.git_push_flags } : {}),
+        ...(effectiveConfig.git_push_flags
+          ? (() => {
+              const safe = filterGitPushFlags(effectiveConfig.git_push_flags);
+              return safe ? { gitPushFlags: safe } : {};
+            })()
+          : {}),
         gitUrl: params.gitUrl,
         branch: params.convoyFeatureBranch
           ? branchForConvoyAgent(params.convoyFeatureBranch, params.agentName, params.beadId)

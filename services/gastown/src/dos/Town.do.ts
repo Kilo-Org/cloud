@@ -3651,7 +3651,7 @@ export class TownDO extends DurableObject<Env> {
       const townConfig = await this.getTownConfig();
       const actions = reconciler.reconcile(this.sql, {
         draining: this._draining,
-        refineryCodeReview: townConfig.refinery?.code_review ?? true,
+        townConfig,
       });
       metrics.actionsEmitted = actions.length;
       for (const a of actions) {
@@ -4567,7 +4567,7 @@ export class TownDO extends DurableObject<Env> {
       // Run reconciler against the resulting state
       const tc = await this.getTownConfig();
       const actions = reconciler.reconcile(this.sql, {
-        refineryCodeReview: tc.refinery?.code_review ?? true,
+        townConfig: tc,
       });
 
       // Capture a state snapshot before rollback
@@ -4649,7 +4649,7 @@ export class TownDO extends DurableObject<Env> {
       // Phase 1: Reconcile against now-current state
       const tc2 = await this.getTownConfig();
       const actions = reconciler.reconcile(this.sql, {
-        refineryCodeReview: tc2.refinery?.code_review ?? true,
+        townConfig: tc2,
       });
       const pendingEventCount = events.pendingEventCount(this.sql);
       const actionsByType: Record<string, number> = {};

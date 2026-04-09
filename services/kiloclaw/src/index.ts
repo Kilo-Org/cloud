@@ -89,12 +89,21 @@ function transformWsMessage(data: string | ArrayBuffer): string | ArrayBuffer {
 /**
  * Safely close a WebSocket, tolerating already-closed sockets and invalid
  * close codes/reasons that the CF Workers runtime rejects.
+ *
+ * CloseEvent.code can be 1005 (no status), 1006 (abnormal), or 1015 (TLS failure)
+ * on abnormal disconnects. These are not valid arguments to WebSocket.close().
+ * We normalize to 1000 (normal) on first failure and retry so the relay still
+ * tears down cleanly.
  */
 function safeClose(ws: WebSocket, code: number, reason: string): void {
   try {
     ws.close(code, reason);
   } catch {
-    // Already closed, invalid code, or reason too long — nothing to do.
+    try {
+      ws.close(1000, reason);
+    } catch {
+      // Already closed — nothing to do.
+    }
   }
 }
 
@@ -667,6 +676,14 @@ app.all('*', async c => {
                 { status: 503, headers: { 'Retry-After': '5' } }
               );
             }
+
+            if (containerResponse.status === 502) {
+              return c.json(
+                { error: 'Instance is starting up' },
+                { status: 503, headers: { 'Retry-After': '5' } }
+              );
+            }
+
             const containerWs = containerResponse.webSocket;
             if (!containerWs) {
               return c.json({ error: 'WebSocket upgrade failed' }, 502);

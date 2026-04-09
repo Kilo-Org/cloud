@@ -306,11 +306,23 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
                     </Badge>
                   </div>
                   <div className="mt-0.5 flex items-center gap-2 text-[10px] text-white/30">
-                    <span className="line-clamp-1 max-w-xs">{item.description}</span>
-                    <span className="text-white/15">|</span>
-                    <span>
-                      {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                    </span>
+                    {item.description && (
+                      <span className="line-clamp-1 max-w-xs">{item.description}</span>
+                    )}
+                    {item.posted_by && (
+                      <>
+                        <span className="text-white/15">|</span>
+                        <span>{item.posted_by}</span>
+                      </>
+                    )}
+                    {item.created_at && (
+                      <>
+                        <span className="text-white/15">|</span>
+                        <span>
+                          {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
                 <span

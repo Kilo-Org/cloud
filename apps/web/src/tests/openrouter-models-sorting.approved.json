@@ -6,8 +6,13 @@
       "created": 0,
       "description": "Highest performance and capability for any task. Uses Claude Opus 4.6 for KiloClaw, plan, general, architect, orchestrator, ask, debug; Claude Sonnet 4.6 for build, explore, code.",
       "architecture": {
-        "input_modalities": ["text", "image"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "Other"
       },
       "top_provider": {
@@ -46,8 +51,13 @@
       "created": 0,
       "description": "Great balance of price and capability. Uses Qwen3.6 Plus for KiloClaw, plan, general, architect, orchestrator, ask, debug, build, explore, code.",
       "architecture": {
-        "input_modalities": ["text", "image"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "Other"
       },
       "top_provider": {
@@ -85,8 +95,12 @@
       "created": 0,
       "description": "Free with limited capability. No credits required. Uses MiniMax M2.5.",
       "architecture": {
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "Other"
       },
       "top_provider": {
@@ -113,8 +127,13 @@
         "include_reasoning"
       ],
       "settings": {
-        "included_tools": ["search_and_replace"],
-        "excluded_tools": ["apply_diff", "edit_file"]
+        "included_tools": [
+          "search_and_replace"
+        ],
+        "excluded_tools": [
+          "apply_diff",
+          "edit_file"
+        ]
       },
       "opencode": {},
       "preferredIndex": 2,
@@ -130,8 +149,13 @@
       "context_length": 256000,
       "architecture": {
         "modality": "text+image->text",
-        "input_modalities": ["text", "image"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "Other",
         "instruct_type": null
       },
@@ -200,8 +224,12 @@
       "context_length": 256000,
       "architecture": {
         "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "Other",
         "instruct_type": null
       },
@@ -243,8 +271,12 @@
       "created": 1714000000,
       "description": "Claude Sonnet 4",
       "architecture": {
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "claude"
       },
       "top_provider": {
@@ -307,8 +339,12 @@
       "created": 1714000000,
       "description": "Claude 3.7 Sonnet model",
       "architecture": {
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "claude"
       },
       "top_provider": {
@@ -371,8 +407,12 @@
       "created": 1713000000,
       "description": "Gemini 2.5 Pro model",
       "architecture": {
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "gemini"
       },
       "top_provider": {
@@ -392,8 +432,13 @@
       "isFree": false,
       "versioned_settings": {
         "4.146.0": {
-          "included_tools": ["write_file", "edit_file"],
-          "excluded_tools": ["apply_diff"]
+          "included_tools": [
+            "write_file",
+            "edit_file"
+          ],
+          "excluded_tools": [
+            "apply_diff"
+          ]
         }
       },
       "opencode": {}
@@ -404,8 +449,12 @@
       "created": 1712000000,
       "description": "GPT-4.1 model",
       "architecture": {
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "openai"
       },
       "top_provider": {
@@ -424,7 +473,9 @@
       "context_length": 128000,
       "isFree": false,
       "settings": {
-        "included_tools": ["apply_patch"],
+        "included_tools": [
+          "apply_patch"
+        ],
         "excluded_tools": [
           "apply_diff",
           "delete_file",
@@ -477,8 +528,12 @@
       "created": 1711000000,
       "description": "Some other model",
       "architecture": {
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "other"
       },
       "top_provider": {
@@ -504,8 +559,12 @@
       "created": 1715000000,
       "description": "Qwen3 Coder model",
       "architecture": {
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "qwen"
       },
       "top_provider": {
@@ -535,8 +594,12 @@
       "context_length": 78000,
       "architecture": {
         "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "Other",
         "instruct_type": null
       },
@@ -555,7 +618,11 @@
         "is_moderated": false
       },
       "per_request_limits": null,
-      "supported_parameters": ["max_tokens", "temperature", "tools"],
+      "supported_parameters": [
+        "max_tokens",
+        "temperature",
+        "tools"
+      ],
       "default_parameters": {},
       "isFree": true,
       "opencode": {}
@@ -570,8 +637,13 @@
       "context_length": 1000000,
       "architecture": {
         "modality": "text+image->text",
-        "input_modalities": ["text", "image"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "Other",
         "instruct_type": null
       },
@@ -628,8 +700,12 @@
       "context_length": 262144,
       "architecture": {
         "modality": "text->text",
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "Other",
         "instruct_type": null
       },
@@ -665,8 +741,12 @@
       "created": 0,
       "description": "Automatically routes your request to a small model. Uses GPT-5 Nano (default) or gpt-oss-20b (free fallback).",
       "architecture": {
-        "input_modalities": ["text"],
-        "output_modalities": ["text"],
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
         "tokenizer": "Other"
       },
       "top_provider": {

@@ -66,6 +66,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { toast } from 'sonner';
 import { AdminFileEditor } from './AdminFileEditor';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { selectCurrentCliRun } from '@/lib/kiloclaw/cli-run-selection';
 import {
   useKiloclawInstanceEvents,
   useKiloclawAllEvents,
@@ -382,18 +383,14 @@ function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: st
   const [showOutput, setShowOutput] = useState(true);
   const [runId, setRunId] = useState<string | null>(null);
 
-  const { data: latestRuns } = useQuery(
+  const { data: latestRuns, refetch: refetchRuns } = useQuery(
     trpc.admin.kiloclawInstances.listKiloCliRuns.queryOptions(
       { userId, limit: 20 },
-      { staleTime: 10_000 }
+      { staleTime: 10_000, refetchInterval: 3000 }
     )
   );
 
-  const selectedRunId =
-    runId ??
-    latestRuns?.runs.find(run => run.instance_id === instanceId && run.initiated_by === 'admin')
-      ?.id ??
-    null;
+  const selectedRunId = runId ?? selectCurrentCliRun(latestRuns?.runs, instanceId)?.id ?? null;
 
   const {
     data: runStatus,
@@ -410,6 +407,7 @@ function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: st
   });
 
   const isRunning = runStatus?.status === 'running';
+  const isUserRun = runStatus?.initiatedBy === 'user';
 
   const { mutateAsync: startRun, isPending: isStarting } = useMutation(
     trpc.admin.kiloclawInstances.startKiloCliRun.mutationOptions({
@@ -417,6 +415,7 @@ function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: st
         toast.success('CLI run started');
         setRunId(result.id);
         setShowOutput(true);
+        void refetchRuns();
         void refetchStatus();
       },
       onError: err => {
@@ -429,6 +428,7 @@ function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: st
     trpc.admin.kiloclawInstances.cancelKiloCliRun.mutationOptions({
       onSuccess: () => {
         toast.success('CLI run cancelled');
+        void refetchRuns();
         void refetchStatus();
       },
       onError: err => {
@@ -456,6 +456,17 @@ function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: st
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* User-initiated run alert */}
+        {isRunning && isUserRun && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              A user-initiated CLI run is currently in progress on this instance. You can monitor or
+              cancel it below.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Prompt input */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Prompt</label>
@@ -522,7 +533,7 @@ function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: st
 
         {runStatus?.hasRun && (
           <div className="space-y-3 rounded border p-3">
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
               <DetailField label="Status">
                 <Badge
                   className={
@@ -538,6 +549,15 @@ function KiloCliRunCard({ userId, instanceId }: { userId: string; instanceId: st
                   }
                 >
                   {runStatus.status ?? 'unknown'}
+                </Badge>
+              </DetailField>
+              <DetailField label="Initiated By">
+                <Badge variant={runStatus.initiatedBy === 'admin' ? 'default' : 'secondary'}>
+                  {runStatus.initiatedBy === 'admin'
+                    ? 'Admin-initiated'
+                    : runStatus.initiatedBy === 'user'
+                      ? 'User-initiated'
+                      : '—'}
                 </Badge>
               </DetailField>
               <DetailField label="Exit Code">

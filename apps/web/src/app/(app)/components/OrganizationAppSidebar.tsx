@@ -142,15 +142,6 @@ export default function OrganizationAppSidebar({
       icon: KiloCrabIcon,
       url: `/organizations/${organizationId}/claw`,
     },
-    ...(hasOwnerLevelAccess
-      ? [
-          {
-            title: 'Subscription',
-            icon: CreditCard,
-            url: `/organizations/${organizationId}/claw/subscription`,
-          },
-        ]
-      : []),
     {
       title: 'Settings',
       icon: Settings,

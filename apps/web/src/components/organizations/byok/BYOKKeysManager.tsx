@@ -35,6 +35,7 @@ import {
   ChevronDown,
   ChevronRight,
   FlaskConical,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -454,6 +455,21 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   </SelectContent>
                 </Select>
               </div>
+
+              {selectedProvider &&
+                DIRECT_BYOK_PROVIDERS_LIST.some(p => p.id === selectedProvider) && (
+                  <Alert className="border-amber-500/50 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <AlertDescription>
+                      <p className="font-medium">Important: use the matching model entry</p>
+                      <p className="mt-1">
+                        In your client, select the model entry with the appropriate suffix (e.g.,{' '}
+                        <strong>Z.ai Coding Plan</strong>) to use this key. After saving, you may
+                        need to restart your client and wait a few minutes for this entry to appear.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                )}
 
               <div className="space-y-2">
                 <Label htmlFor="apiKey">

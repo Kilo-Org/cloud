@@ -357,11 +357,14 @@ async function syncProviders() {
   const missingProviderSlugs = new Set(
     mappedExtraModels
       .map(m => m.provider)
-      .filter((slug): slug is string => slug !== null && !allProviders.some(p => p.slug === slug))
+      .filter(
+        (slug): slug is NonNullable<typeof slug> =>
+          slug !== null && !allProviders.some(p => p.slug === slug)
+      )
   );
 
   for (const providerSlug of missingProviderSlugs) {
-    const displayName = providerSlug.charAt(0).toUpperCase() + providerSlug.slice(1);
+    const displayName = providerSlug.toUpperCase();
     const iconInitials = providerSlug.slice(0, 2).toUpperCase();
     allProviders.push({
       name: displayName,

@@ -24,6 +24,12 @@ import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@/lib/organizations/constants';
 describe('Organizations', () => {
   afterEach(async () => {
     // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organization_user_limits);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organization_invitations);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(organization_memberships);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organizations);
   });
 

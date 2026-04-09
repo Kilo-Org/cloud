@@ -14,6 +14,7 @@ import type {
   SecretStoreBinding,
   SecretStoreWarning,
   ConsistencyWarning,
+  EnvLocalAutoCreate,
 } from './types';
 import {
   parseEnvFile,
@@ -23,6 +24,17 @@ import {
   parseJsonc,
   generateDevVars,
 } from './parse';
+
+// ---------------------------------------------------------------------------
+// Auto-created local secrets
+// ---------------------------------------------------------------------------
+
+const FLY_TOKEN_ENV_KEY = 'FLY_API_TOKEN';
+const FLY_TOKEN_AUTO_CREATE: EnvLocalAutoCreate = {
+  key: FLY_TOKEN_ENV_KEY,
+  command: 'fly',
+  args: ['tokens', 'create', 'org', 'kilo-dev'],
+};
 
 // ---------------------------------------------------------------------------
 // LAN IP detection
@@ -175,6 +187,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
       lanIp: undefined,
       devVarsChanges: [],
       envDevLocalChanges: [],
+      envLocalAutoCreates: [],
       secretStoreWarnings: [],
       secretStoreAutoCreates: [],
       consistencyWarnings: [],
@@ -210,6 +223,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
 
   // --- .dev.vars changes ---
   const devVarsChanges: DevVarsFileChange[] = [];
+  const envLocalAutoCreates: EnvLocalAutoCreate[] = [];
   const execWarnings: ExecWarning[] = [];
   const allResolvedEntries = new Map<
     string,
@@ -223,10 +237,14 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     const serviceUsesLanIp = dirUsesLanIp.get(workerDir) ?? false;
 
     const resolvedVars = new Map<string, string>();
+    const resolvedSources = new Map<
+      string,
+      'env-local' | 'generated' | 'exec' | 'default' | 'missing'
+    >();
     const unresolvedKeys: string[] = [];
 
     for (const entry of entries) {
-      const { value, resolved } = resolveAnnotatedValue(
+      const { value, resolved, source } = resolveAnnotatedValue(
         entry.key,
         entry,
         envLocal,
@@ -234,7 +252,18 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
         serviceUsesLanIp
       );
       resolvedVars.set(entry.key, value);
-      if (!resolved) {
+      resolvedSources.set(entry.key, source);
+
+      const autoCreatesFlyToken =
+        entry.key === FLY_TOKEN_ENV_KEY && !envLocal.get(FLY_TOKEN_ENV_KEY);
+      if (
+        autoCreatesFlyToken &&
+        !envLocalAutoCreates.some(create => create.key === FLY_TOKEN_ENV_KEY)
+      ) {
+        envLocalAutoCreates.push(FLY_TOKEN_AUTO_CREATE);
+      }
+
+      if (!resolved && !autoCreatesFlyToken) {
         unresolvedKeys.push(entry.key);
         if (entry.annotation.type === 'exec') {
           execWarnings.push({
@@ -272,6 +301,8 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
       for (const [key, newVal] of resolvedVars) {
         if (unresolvedSet.has(key)) continue;
         const oldVal = oldVars.get(key);
+        const source = resolvedSources.get(key);
+        if (oldVal && source === 'default') continue;
         if (oldVal !== newVal) {
           keyChanges.push({ key, oldValue: oldVal, newValue: newVal });
         }
@@ -409,6 +440,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     lanIp,
     devVarsChanges,
     envDevLocalChanges,
+    envLocalAutoCreates,
     secretStoreWarnings,
     secretStoreAutoCreates,
     consistencyWarnings,

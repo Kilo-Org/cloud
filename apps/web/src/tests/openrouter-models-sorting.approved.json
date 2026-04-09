@@ -627,6 +627,69 @@
       "opencode": {}
     },
     {
+      "id": "qwen/qwen3.6-plus",
+      "canonical_slug": "qwen/qwen3.6-plus",
+      "hugging_face_id": "",
+      "name": "Qwen: Qwen3.6 Plus",
+      "created": 1756238927,
+      "description": "The Qwen3.6 native vision-language Plus series models demonstrate exceptional performance on par with the current state-of-the-art models, with a significant improvement in overall results compared to the 3.5 series. The models have been markedly enhanced in code-related capabilities such as agentic coding, front-end programming, and Vibe coding, as well as in multi-modal general object recognition, OCR, and object localization.",
+      "context_length": 1000000,
+      "architecture": {
+        "modality": "text+image->text",
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Other",
+        "instruct_type": null
+      },
+      "pricing": {
+        "prompt": "0.000000325000",
+        "completion": "0.000001950000",
+        "request": "0",
+        "image": "0",
+        "web_search": "0",
+        "internal_reasoning": "0",
+        "input_cache_read": "0.000000032500",
+        "input_cache_write": "0.000000406250"
+      },
+      "top_provider": {
+        "context_length": 1000000,
+        "max_completion_tokens": 65536,
+        "is_moderated": false
+      },
+      "per_request_limits": null,
+      "supported_parameters": [
+        "max_tokens",
+        "temperature",
+        "tools",
+        "reasoning",
+        "include_reasoning"
+      ],
+      "default_parameters": {},
+      "isFree": false,
+      "opencode": {
+        "ai_sdk_provider": "openai-compatible",
+        "variants": {
+          "instant": {
+            "reasoning": {
+              "enabled": false,
+              "effort": "none"
+            }
+          },
+          "thinking": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "medium"
+            }
+          }
+        }
+      }
+    },
+    {
       "id": "arcee-ai/trinity-large-thinking:free",
       "canonical_slug": "arcee-ai/trinity-large-thinking:free",
       "hugging_face_id": "",

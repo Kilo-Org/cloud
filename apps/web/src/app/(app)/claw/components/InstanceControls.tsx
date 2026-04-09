@@ -31,7 +31,14 @@ import {
 } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import {
+  useKiloCliRunHistory,
+  useKiloCliRunStatus,
+  type useKiloClawMutations,
+} from '@/hooks/useKiloClaw';
+import { useOrgKiloCliRunHistory, useOrgKiloCliRunStatus } from '@/hooks/useOrgKiloClaw';
+import { selectCurrentCliRun } from '@/lib/kiloclaw/cli-run-selection';
+import { useClawContext } from './ClawContext';
 import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { RunDoctorDialog } from './RunDoctorDialog';
@@ -42,6 +49,116 @@ const VOLUME_SIZE_GB = 10;
 // Default machine spec fallback (matches kiloclaw DEFAULT_MACHINE_GUEST)
 const DEFAULT_CPUS = 2;
 const DEFAULT_MEMORY_MB = 3072;
+
+function useCurrentCliRun(
+  organizationId: string | undefined,
+  instanceId: string | undefined,
+  enabled: boolean
+) {
+  const personalHistory = useKiloCliRunHistory(enabled && organizationId === undefined);
+  const orgHistory = useOrgKiloCliRunHistory(organizationId, enabled && organizationId !== undefined);
+
+  if (!instanceId) {
+    return null;
+  }
+
+  const runs = organizationId === undefined ? personalHistory.data?.runs : orgHistory.data?.runs;
+
+  return selectCurrentCliRun(runs, instanceId);
+}
+
+function formatRunStatus(status: string | null): string {
+  switch (status) {
+    case 'running':
+      return 'in progress';
+    case 'completed':
+      return 'completed';
+    case 'failed':
+      return 'failed';
+    case 'cancelled':
+      return 'cancelled';
+    default:
+      return 'unknown';
+  }
+}
+
+function runBannerColor(status: string | null) {
+  switch (status) {
+    case 'running':
+      return 'blue' as const;
+    case 'completed':
+      return 'emerald' as const;
+    case 'cancelled':
+      return 'amber' as const;
+    case 'failed':
+      return 'red' as const;
+    default:
+      return 'blue' as const;
+  }
+}
+
+function isTerminalCliRun(status: string | null): boolean {
+  return status === 'completed' || status === 'failed' || status === 'cancelled';
+}
+
+function getRunCompletedAt(run: { completed_at?: string | null; started_at?: string | null }): string | null {
+  return run.completed_at ?? run.started_at ?? null;
+}
+
+const CLI_RUN_BANNER_TTL_MS = 24 * 60 * 60 * 1000;
+
+type CliRunBannerDismissal = {
+  expiresAt: number;
+};
+
+function getCliRunBannerExpiry(timestamp: string | null): number | null {
+  if (!timestamp) {
+    return null;
+  }
+
+  const time = Date.parse(timestamp);
+  return Number.isFinite(time) ? time + CLI_RUN_BANNER_TTL_MS : null;
+}
+
+function isCliRunBannerDismissed(key: string | null, expiresAt: number | null): boolean {
+  if (!key || !expiresAt || typeof window === 'undefined') {
+    return false;
+  }
+
+  const raw = localStorage.getItem(key);
+  if (!raw) {
+    return false;
+  }
+
+  if (Date.now() >= expiresAt) {
+    localStorage.removeItem(key);
+    return false;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      'expiresAt' in parsed &&
+      typeof (parsed as CliRunBannerDismissal).expiresAt === 'number' &&
+      Date.now() >= (parsed as CliRunBannerDismissal).expiresAt
+    ) {
+      localStorage.removeItem(key);
+      return false;
+    }
+  } catch {
+    localStorage.removeItem(key);
+    return false;
+  }
+
+  return true;
+}
+
+function dismissCliRunBanner(key: string, expiresAt: number): void {
+  const value = { expiresAt } satisfies CliRunBannerDismissal;
+  localStorage.setItem(key, JSON.stringify(value));
+}
 
 function formatMemory(mb: number): string {
   return mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`;
@@ -63,7 +180,34 @@ export function InstanceControls({
   onUpgradeHandled?: () => void;
 }) {
   const posthog = usePostHog();
+  const { organizationId, currentRunPath } = useClawContext();
   const isRunning = status.status === 'running';
+  const currentRun = useCurrentCliRun(organizationId, status.instanceId ?? undefined, isRunning);
+  const personalRunStatus = useKiloCliRunStatus(
+    organizationId === undefined ? (currentRun?.id ?? null) : null
+  );
+  const orgRunStatus = useOrgKiloCliRunStatus(
+    organizationId ?? '',
+    organizationId !== undefined ? (currentRun?.id ?? null) : null
+  );
+  const liveRunStatus = organizationId === undefined ? personalRunStatus.data : orgRunStatus.data;
+  const currentRunStatus = liveRunStatus?.hasRun ? liveRunStatus.status : currentRun?.status;
+  const currentRunCompletedAt = liveRunStatus?.hasRun
+    ? (liveRunStatus.completedAt ?? currentRun?.completed_at ?? currentRun?.started_at ?? null)
+    : getRunCompletedAt(currentRun ?? {});
+  const activeRun = currentRun && currentRunStatus === 'running' ? currentRun : null;
+  const currentRunHref = currentRun && currentRunPath ? `${currentRunPath}/${currentRun.id}` : null;
+  const [dismissedRunId, setDismissedRunId] = useState<string | null>(null);
+  const runDismissKey = currentRun ? `claw-cli-run-banner-dismissed:${currentRun.id}` : null;
+  const runBannerExpiresAt = getCliRunBannerExpiry(currentRunCompletedAt);
+  const terminalRunVisible =
+    currentRun &&
+    isTerminalCliRun(currentRunStatus ?? null) &&
+    dismissedRunId !== currentRun.id &&
+    runBannerExpiresAt !== null &&
+    Date.now() < runBannerExpiresAt &&
+    !isCliRunBannerDismissed(runDismissKey, runBannerExpiresAt);
+  const showRunBanner = activeRun !== null || terminalRunVisible;
   const isProvisioned = status.status === 'provisioned';
   const isStarting = status.status === 'starting';
   const isRestarting = status.status === 'restarting';
@@ -239,6 +383,42 @@ export function InstanceControls({
           </button>
         </Banner>
       )}
+      {showRunBanner && currentRun && currentRunHref && (
+        <Banner color={runBannerColor(currentRunStatus ?? null)} className="mb-4">
+          <Banner.Icon>
+            <Terminal />
+          </Banner.Icon>
+          <Banner.Content>
+            <Banner.Title className="flex items-center gap-2">
+              Recovery run {formatRunStatus(currentRunStatus ?? null)}
+              {currentRun.initiated_by === 'admin' && (
+                <Badge variant="secondary">Admin-initiated</Badge>
+              )}
+            </Banner.Title>
+            <Banner.Description>
+              {currentRunStatus === 'running'
+                ? 'A Kilo CLI recovery run is already running on this instance. You can open the live output to monitor progress or cancel it.'
+                : 'The most recent Kilo CLI recovery run has stopped. You can view its output or start a new run.'}
+            </Banner.Description>
+          </Banner.Content>
+          <Banner.Button href={currentRunHref} className="text-white">
+            View run
+          </Banner.Button>
+          {isTerminalCliRun(currentRunStatus ?? null) && runDismissKey && runBannerExpiresAt && (
+            <button
+              type="button"
+              onClick={() => {
+                dismissCliRunBanner(runDismissKey, runBannerExpiresAt);
+                setDismissedRunId(currentRun.id);
+              }}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Dismiss recovery run banner"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </Banner>
+      )}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <Button
           size="sm"
@@ -338,7 +518,14 @@ export function InstanceControls({
           size="sm"
           variant="outline"
           className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
-          disabled={!isRunning || isDestroying || isStarting || isRestarting || isRecovering}
+          disabled={
+            !isRunning ||
+            isDestroying ||
+            isStarting ||
+            isRestarting ||
+            isRecovering ||
+            activeRun !== null
+          }
           onClick={() => {
             posthog?.capture('claw_kilo_run_clicked', { instance_status: status.status });
             setKiloRunOpen(true);
@@ -475,6 +662,8 @@ export function InstanceControls({
         open={kiloRunOpen}
         onOpenChange={setKiloRunOpen}
         machineStatus={status.status}
+        organizationId={organizationId}
+        mutations={mutations}
       />
     </div>
   );

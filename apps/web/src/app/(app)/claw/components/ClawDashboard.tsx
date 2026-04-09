@@ -62,7 +62,14 @@ export function ClawDashboard({
   organizationId?: string;
 }) {
   return (
-    <ClawContextProvider organizationId={organizationId}>
+    <ClawContextProvider
+      organizationId={organizationId}
+      currentRunPath={
+        organizationId
+          ? `/organizations/${organizationId}/claw/kilo-cli-run`
+          : '/claw/kilo-cli-run'
+      }
+    >
       <ClawDashboardInner
         status={status}
         isNewSetup={isNewSetup}

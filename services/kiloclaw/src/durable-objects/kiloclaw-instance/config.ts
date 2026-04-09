@@ -33,6 +33,13 @@ export function resolveImageRef(state: InstanceMutableState, env: KiloClawEnv): 
   return `registry.fly.io/${getRegistryApp(env)}:${resolveImageTag(state, env)}`;
 }
 
+export function resolveRuntimeImageRef(state: InstanceMutableState, env: KiloClawEnv): string {
+  if (state.provider === 'docker-local') {
+    return env.DOCKER_LOCAL_IMAGE ?? 'kiloclaw:local';
+  }
+  return resolveImageRef(state, env);
+}
+
 /**
  * Check whether the stored API key has expired.
  */

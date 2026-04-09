@@ -17,6 +17,7 @@ import { HEALTH_PROBE_TIMEOUT_SECONDS, HEALTH_PROBE_INTERVAL_MS } from '../../co
 import type { InstanceMutableState } from './types';
 import { doWarn, toLoggable } from './log';
 import { getProviderAdapter } from '../../providers';
+import { getRuntimeId } from './state';
 import type { ProviderRoutingTarget } from '../../providers/types';
 
 /**
@@ -435,7 +436,7 @@ export async function patchEnvOnMachine(
   env: KiloClawEnv,
   patch: Record<string, string>
 ): Promise<{ ok: boolean; signaled: boolean } | null> {
-  if (state.status !== 'running' || !state.flyMachineId) return null;
+  if (state.status !== 'running' || !getRuntimeId(state)) return null;
   return callGatewayController(
     state,
     env,
@@ -455,7 +456,7 @@ export async function patchConfigOnMachine(
   env: KiloClawEnv,
   patch: Record<string, unknown>
 ): Promise<void> {
-  if (state.status !== 'running' || !state.flyMachineId) return;
+  if (state.status !== 'running' || !getRuntimeId(state)) return;
   try {
     await callGatewayController(
       state,

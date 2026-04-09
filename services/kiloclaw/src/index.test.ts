@@ -115,6 +115,8 @@ describe('proxy recovering state', () => {
         userId: 'user-1',
         sandboxId: 'sandbox-1',
         status: 'recovering',
+        provider: 'fly',
+        runtimeId: 'machine-1',
         flyMachineId: 'machine-1',
         flyAppName: 'test-app',
       }),
@@ -165,6 +167,8 @@ describe('proxy routing target usage', () => {
         userId: 'user-1',
         sandboxId: 'sandbox-1',
         status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
         flyMachineId: 'machine-1',
         flyAppName: 'test-app',
       }),
@@ -224,6 +228,8 @@ describe('proxy routing target usage', () => {
         userId: 'user-1',
         sandboxId: 'sandbox-1',
         status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
         flyMachineId: 'machine-1',
         flyAppName: 'test-app',
       }),
@@ -256,6 +262,43 @@ describe('proxy routing target usage', () => {
     });
   });
 
+  it('proxies to docker-local runtimes using the generic runtime id', async () => {
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'user-1',
+        sandboxId: 'sandbox-1',
+        status: 'running',
+        provider: 'docker-local',
+        runtimeId: 'kiloclaw-sandbox-1',
+        flyMachineId: null,
+        flyAppName: null,
+      }),
+      getRoutingTarget: vi.fn().mockResolvedValue({
+        origin: 'http://127.0.0.1:45001',
+        headers: {},
+      }),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+    fetchMock.mockResolvedValue(new Response('ok', { status: 200 }));
+
+    const response = await worker.fetch(
+      new Request('https://example.com/i/550e8400-e29b-41d4-a716-446655440000/api/foo'),
+      {
+        NEXTAUTH_SECRET: 'nextauth-secret',
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(200);
+    const { input } = getFetchCall(fetchMock);
+    expect(input).toBe('http://127.0.0.1:45001/api/foo');
+  });
+
   it('rebuilds HTTP retry auth with the refreshed authoritative sandbox id after crash recovery', async () => {
     const registryStub = {
       listInstances: vi.fn().mockResolvedValue([
@@ -275,6 +318,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-old',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-old',
           flyMachineId: 'machine-old',
           flyAppName: 'test-app',
         })
@@ -282,6 +327,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-old',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-old',
           flyMachineId: 'machine-old',
           flyAppName: 'test-app',
         })
@@ -289,6 +336,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-new',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-new',
           flyMachineId: 'machine-new',
           flyAppName: 'test-app',
         })
@@ -296,6 +345,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-new',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-new',
           flyMachineId: 'machine-new',
           flyAppName: 'test-app',
         }),
@@ -372,6 +423,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-old',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-old',
           flyMachineId: 'machine-old',
           flyAppName: 'test-app',
         })
@@ -379,6 +432,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-old',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-old',
           flyMachineId: 'machine-old',
           flyAppName: 'test-app',
         })
@@ -386,6 +441,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-new',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-new',
           flyMachineId: 'machine-new',
           flyAppName: 'test-app',
         })
@@ -393,6 +450,8 @@ describe('proxy routing target usage', () => {
           userId: 'user-1',
           sandboxId: 'sandbox-new',
           status: 'running',
+          provider: 'fly',
+          runtimeId: 'machine-new',
           flyMachineId: 'machine-new',
           flyAppName: 'test-app',
         }),

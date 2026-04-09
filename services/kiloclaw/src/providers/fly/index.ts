@@ -255,4 +255,37 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
       },
     };
   },
+
+  async destroyRuntime({ env, state }) {
+    const providerState = getFlyProviderState(state);
+    if (!providerState.machineId) {
+      return { providerState };
+    }
+
+    const flyConfig = getFlyConfig(env, state);
+    await fly.destroyMachine(flyConfig, providerState.machineId);
+    return {
+      providerState: {
+        ...providerState,
+        machineId: null,
+      },
+    };
+  },
+
+  async destroyStorage({ env, state }) {
+    const providerState = getFlyProviderState(state);
+    if (!providerState.volumeId) {
+      return { providerState };
+    }
+
+    const flyConfig = getFlyConfig(env, state);
+    await fly.deleteVolume(flyConfig, providerState.volumeId);
+    return {
+      providerState: {
+        ...providerState,
+        volumeId: null,
+        region: null,
+      },
+    };
+  },
 };

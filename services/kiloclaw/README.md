@@ -1,6 +1,6 @@
 # KiloClaw
 
-Multi-tenant OpenClaw on Fly.io Machines, orchestrated by a Cloudflare Worker.
+Multi-tenant OpenClaw runtimes, orchestrated by a Cloudflare Worker.
 
 ## Architecture
 
@@ -80,6 +80,9 @@ See `.dev.vars.example` for required environment variables. Key ones:
 - `FLY_API_TOKEN` — Bearer token for Fly Machines API
 - `FLY_APP_NAME` — Fly App hosting all user machines
 - `FLY_REGION` — Default region (comma-separated priority list, e.g., `us,eu`)
+- `KILOCLAW_DEFAULT_PROVIDER` — Local default provider (`fly` or `docker-local`)
+- `DOCKER_LOCAL_API_BASE` — Loopback Docker HTTP bridge for `docker-local`
+- `DOCKER_LOCAL_IMAGE` — Local image tag used by `docker-local`
 - `NEXTAUTH_SECRET` — JWT verification (shared with Next.js)
 - `GATEWAY_TOKEN_SECRET` — Per-user gateway token HMAC secret
 

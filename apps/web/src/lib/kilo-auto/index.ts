@@ -189,14 +189,19 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   description:
     'Great balance of price and capability. Uses GPT-5.3-Codex for general tasks; Qwen3.6 Plus for KiloClaw and chat completions.',
   context_length: 400_000,
-  max_completion_tokens: 128_000,
+  max_completion_tokens: 65_536,
   prompt_price: '0.00000175',
   completion_price: '0.000014',
   input_cache_read_price: '0.000000175',
   input_cache_write_price: undefined,
-  supports_images: false,
-  roocode_settings: undefined,
-  opencode_settings: undefined,
+  supports_images: true,
+  roocode_settings: {
+    included_tools: ['apply_patch'],
+    excluded_tools: ['apply_diff', 'edit_file'],
+  },
+  opencode_settings: {
+    ai_sdk_provider: 'openai',
+  },
 };
 
 export const KILO_AUTO_SMALL_MODEL: AutoModel = {

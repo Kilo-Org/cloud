@@ -178,7 +178,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
     const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({
       to: token,
-      title: instance.name ?? 'Kilo',
+      title: instance.name ?? 'KiloClaw',
       body: truncatedMessage,
       // Keep in sync with NotificationData in apps/mobile/src/lib/notifications.ts
       data: { type: 'chat', instanceId: sandboxId },

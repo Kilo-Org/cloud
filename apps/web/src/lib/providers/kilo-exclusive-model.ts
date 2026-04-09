@@ -4,8 +4,8 @@ import type { ProviderId } from '@/lib/providers/types';
 export type KiloExclusiveModelFlag = 'reasoning' | 'vision';
 
 export type Usage = {
-  inputTokens: number;
-  outputTokens: number;
+  uncachedInputTokens: number;
+  totalOutputTokens: number;
   cacheWriteTokens: number;
   cacheHitTokens: number;
 };

@@ -16,7 +16,7 @@ import {
 import { trinity_large_thinking_free_model } from '@/lib/providers/arcee';
 import { seed_20_pro_free_model } from '@/lib/providers/bytedance';
 import { corethink_free_model } from '@/lib/providers/corethink';
-import type { KiloExclusiveModel, Usage } from '@/lib/providers/kilo-exclusive-model';
+import type { KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
 import { MINIMAX_CURRENT_MODEL_ID, minimax_m25_free_model } from '@/lib/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/providers/morph';
@@ -103,9 +103,6 @@ export function isDeadFreeModel(model: string): boolean {
   );
 }
 
-export function calculatKiloExclusiveCost_mUsd(model: string, usage: Usage): number | null {
-  const pricing = kiloExclusiveModels.find(
-    m => m.public_id === model && m.status !== 'disabled'
-  )?.pricing;
-  return pricing ? Math.round(1_000_000 * pricing.calculate(usage, pricing)) : null;
+export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {
+  return kiloExclusiveModels.find(m => m.public_id === model && m.status !== 'disabled') ?? null;
 }

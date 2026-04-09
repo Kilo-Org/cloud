@@ -21,7 +21,7 @@ import { eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from './getRootSpan';
 import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
 import type { ProviderId } from '@/lib/providers/types';
-import { calculatKiloExclusiveCost_mUsd, isFreeModel, isKiloStealthModel } from '@/lib/models';
+import { findKiloExclusiveModel, isFreeModel, isKiloStealthModel } from '@/lib/models';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
@@ -56,6 +56,7 @@ import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/processUsage.constants';
 import { computeOpenRouterCostFields, drainSseStream } from '@/lib/processUsage.shared';
 import { isAnthropicModel } from '@/lib/providers/anthropic';
 import { isMinimaxModel } from '@/lib/providers/minimax';
+import type { KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
 
 const posthogClient = PostHogClient();
 
@@ -774,6 +775,36 @@ export function parseMicrodollarUsageFromString(
   return { ...coreProps, ...costs };
 }
 
+export function calculatKiloExclusiveCost_mUsd(
+  model: KiloExclusiveModel,
+  usage: JustTheCostsUsageStats
+): number {
+  const pricing = model?.pricing;
+  if (!pricing) {
+    return 0;
+  }
+  const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;
+  if (uncachedInputTokens < 0) {
+    captureMessage('SUSPICIOUS: negative uncached input tokens', {
+      level: 'error',
+      tags: { source: 'usage_processing' },
+      extra: { model },
+    });
+  }
+  return Math.round(
+    1_000_000 *
+      pricing.calculate(
+        {
+          uncachedInputTokens: uncachedInputTokens >= 0 ? uncachedInputTokens : usage.inputTokens,
+          totalOutputTokens: usage.outputTokens,
+          cacheHitTokens: usage.cacheHitTokens,
+          cacheWriteTokens: usage.cacheWriteTokens,
+        },
+        pricing
+      )
+  );
+}
+
 async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
@@ -835,9 +866,9 @@ async function processTokenData(
     usageStats.model = usageContext.requested_model;
   }
 
-  const kiloExclusiveCost_mUsd = calculatKiloExclusiveCost_mUsd(usageStats.model, usageStats);
-  if (kiloExclusiveCost_mUsd !== null) {
-    usageStats.cost_mUsd = kiloExclusiveCost_mUsd;
+  const kiloExclusiveModel = findKiloExclusiveModel(usageContext.requested_model);
+  if (kiloExclusiveModel?.pricing) {
+    usageStats.cost_mUsd = calculatKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
   }
 
   // Report upstream cost to abuse service BEFORE zeroing for free/BYOK
@@ -849,7 +880,7 @@ async function processTokenData(
   // Preserve the real cost before zeroing for free/BYOK
   usageStats.market_cost = usageStats.cost_mUsd;
 
-  if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
+  if (!kiloExclusiveModel?.pricing || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }

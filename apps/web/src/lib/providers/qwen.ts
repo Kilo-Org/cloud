@@ -18,27 +18,21 @@ export const qwen36_plus_model: KiloExclusiveModel = {
     input_cache_read: 0.0000000325,
     input_cache_write: 0.00000040625,
     calculate: (usage: Usage, basePricing: Pricing) => {
-      const totalInput = usage.inputTokens + usage.cacheWriteTokens + usage.cacheHitTokens;
+      const totalInput = usage.uncachedInputTokens + usage.cacheWriteTokens + usage.cacheHitTokens;
       if (totalInput > 256 * 1024) {
         return (
-          usage.inputTokens * 0.0000013 +
-          usage.outputTokens * 0.0000039 +
+          usage.uncachedInputTokens * 0.0000013 +
+          usage.totalOutputTokens * 0.0000039 +
           usage.cacheHitTokens * 0.00000013 +
           usage.cacheWriteTokens * 0.000001625
         );
       }
       return (
-        usage.inputTokens * basePricing.prompt +
-        usage.outputTokens * basePricing.completion +
+        usage.uncachedInputTokens * basePricing.prompt +
+        usage.totalOutputTokens * basePricing.completion +
         usage.cacheHitTokens * (basePricing.input_cache_read ?? basePricing.prompt) +
         usage.cacheWriteTokens * (basePricing.input_cache_write ?? basePricing.prompt)
       );
     },
   },
 };
-
-export function calculateQwen36PlusCost(usage: Usage): number {
-  return Math.round(
-    1_000_000 * (qwen36_plus_model.pricing?.calculate(usage, qwen36_plus_model.pricing) ?? 0)
-  );
-}

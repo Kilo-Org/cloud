@@ -1233,6 +1233,13 @@ export async function updateAgentModel(
     }
     hotSwapEnv[key] = value;
   }
+  // Inject live values for LIVE_ENV_KEYS that were absent from startupEnv
+  // (e.g. GASTOWN_ORGANIZATION_ID added after initial dispatch).
+  for (const key of LIVE_ENV_KEYS) {
+    if (key in hotSwapEnv) continue;
+    const live = process.env[key];
+    if (live) hotSwapEnv[key] = live;
+  }
 
   // Re-derive GH_TOKEN from live values using the same priority chain
   // as buildAgentEnv: GITHUB_CLI_PAT > GIT_TOKEN > GITHUB_TOKEN.

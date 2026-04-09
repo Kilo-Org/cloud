@@ -32,6 +32,8 @@ export type KiloExclusiveModel = {
   pricing: Pricing | null;
 };
 
+function formatPricePerMillionAsPerToken(price: number): string;
+function formatPricePerMillionAsPerToken(price: number | null | undefined): string | undefined;
 function formatPricePerMillionAsPerToken(price: number | null | undefined): string | undefined {
   return price === null || price === undefined ? undefined : (price / 1_000_000).toFixed(12);
 }

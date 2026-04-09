@@ -140,8 +140,9 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
   const status = await stub.getStatus();
   const userId = status.userId ?? doKey;
 
+  const flyRegion = c.req.header('fly-region') ?? '';
+
   try {
-    const flyRegion = c.req.header('fly-region') ?? '';
     c.env.KILOCLAW_CONTROLLER_AE.writeDataPoint({
       blobs: [
         data.sandboxId,
@@ -166,6 +167,36 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
     });
   } catch {
     // Best-effort: never fail checkin on AE write errors
+  }
+
+  // Dual-write to Pipeline for R2/Snowflake export.
+  // Changing fields? Update pipelines/controller-telemetry-schema.json (streams are
+  // immutable — use pipelines/recreate-stream.sh to recreate).
+  if (c.env.KILOCLAW_CONTROLLER_TELEMETRY_STREAM) {
+    waitUntil(
+      c.env.KILOCLAW_CONTROLLER_TELEMETRY_STREAM.send([
+        {
+          sandbox_id: data.sandboxId,
+          controller_version: data.controllerVersion,
+          controller_commit: data.controllerCommit,
+          openclaw_version: data.openclawVersion ?? '',
+          openclaw_commit: data.openclawCommit ?? '',
+          supervisor_state: data.supervisorState,
+          fly_region: flyRegion,
+          machine_id: data.machineId ?? '',
+          last_exit_reason: data.lastExitReason ?? '',
+          restarts_since_last_checkin: data.restartsSinceLastCheckin,
+          total_restarts: data.totalRestarts,
+          uptime_seconds: data.uptimeSeconds,
+          load_avg_5m: data.loadAvg5m,
+          bandwidth_bytes_in: data.bandwidthBytesIn,
+          bandwidth_bytes_out: data.bandwidthBytesOut,
+          created_at: Date.now(),
+        },
+      ]).catch(() => {
+        // Best-effort: never fail checkin on pipeline write errors
+      })
+    );
   }
 
   // Forward product telemetry to PostHog (~every 24h). Skip in development.

@@ -73,6 +73,18 @@
     },
   ],
 
+  // Cloudflare Pipelines — dual-write to R2 as Parquet for Snowflake export.
+  // Run pipelines/setup.sh once to create the streams and pipelines, then
+  // replace the placeholder IDs below with the real pipeline UUIDs before deploying.
+  // Schema files: pipelines/events-schema.json, pipelines/controller-telemetry-schema.json
+  "pipelines": [
+    { "pipeline": "eb16de7b9308468c924380d84a6e08a2", "binding": "KILOCLAW_EVENTS_STREAM" },
+    {
+      "pipeline": "bb23d7e31d744d7a8e285a70ef1cf55a",
+      "binding": "KILOCLAW_CONTROLLER_TELEMETRY_STREAM",
+    },
+  ],
+
   // Cloudflare Queue for async snapshot restore orchestration.
   // Queues must be created before first deploy:
   //   npx wrangler queues create kiloclaw-snapshot-restore

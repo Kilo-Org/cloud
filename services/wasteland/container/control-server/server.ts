@@ -415,13 +415,31 @@ async function handleBrowse(req: Request): Promise<Response> {
     return errorResponse(`wl browse failed: ${result.stderr}`, 502);
   }
 
-  let items: WantedItem[];
+  // wl browse --json may prefix the JSON with status lines like "Syncing with upstream..."
+  // Extract the JSON portion starting from the first '{' or '['
+  const jsonStart = result.stdout.search(/[{\[]/);
+  if (jsonStart === -1) {
+    log.error('no JSON found in browse output', { stdout: result.stdout.slice(0, 500) });
+    return errorResponse('No JSON in wl browse output', 502);
+  }
+  const jsonStr = result.stdout.slice(jsonStart);
+
+  let parsed: unknown;
   try {
-    items = BrowseOutputSchema.parse(JSON.parse(result.stdout));
+    parsed = JSON.parse(jsonStr);
   } catch (err) {
-    log.error('failed to parse browse output', { stdout: result.stdout, error: String(err) });
+    log.error('failed to parse browse output', {
+      jsonStr: jsonStr.slice(0, 500),
+      error: String(err),
+    });
     return errorResponse('Failed to parse wl browse output', 502);
   }
+
+  // wl browse --json wraps rows in { "rows": [...] }
+  const rawItems = z.object({ rows: z.array(z.record(z.unknown())) }).safeParse(parsed);
+  const items: WantedItem[] = rawItems.success
+    ? BrowseOutputSchema.parse(rawItems.data.rows)
+    : BrowseOutputSchema.parse(parsed);
 
   lastOperationTimestamp = new Date().toISOString();
   log.info('wl browse completed', { upstream: body.data.upstream, itemCount: items.length });

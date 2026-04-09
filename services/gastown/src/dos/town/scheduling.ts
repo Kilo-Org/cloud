@@ -22,7 +22,7 @@ const LOG = '[scheduling]';
 
 // ── Constants ──────────────────────────────────────────────────────────
 
-export const DISPATCH_COOLDOWN_MS = 2 * 60_000; // 2 min
+export const DISPATCH_COOLDOWN_MS = 30_000; // 30 sec
 export const MAX_DISPATCH_ATTEMPTS = 5;
 
 // ── Context passed by the Town DO ──────────────────────────────────────

@@ -103,6 +103,11 @@ const ClearAgentCheckpoint = z.object({
   agent_id: z.string(),
 });
 
+const ResetAgentDispatchAttempts = z.object({
+  type: z.literal('reset_agent_dispatch_attempts'),
+  agent_id: z.string(),
+});
+
 const DeleteAgent = z.object({
   type: z.literal('delete_agent'),
   agent_id: z.string(),
@@ -192,6 +197,7 @@ export const Action = z.discriminatedUnion('type', [
   SetReviewPrUrl,
   // Agent mutations
   TransitionAgent,
+  ResetAgentDispatchAttempts,
   HookAgent,
   UnhookAgent,
   ClearAgentCheckpoint,
@@ -225,6 +231,7 @@ export type CreateLandingMr = z.infer<typeof CreateLandingMr>;
 export type CloseSiblingMrs = z.infer<typeof CloseSiblingMrs>;
 export type SetReviewPrUrl = z.infer<typeof SetReviewPrUrl>;
 export type TransitionAgent = z.infer<typeof TransitionAgent>;
+export type ResetAgentDispatchAttempts = z.infer<typeof ResetAgentDispatchAttempts>;
 export type HookAgent = z.infer<typeof HookAgent>;
 export type UnhookAgent = z.infer<typeof UnhookAgent>;
 export type ClearAgentCheckpoint = z.infer<typeof ClearAgentCheckpoint>;
@@ -448,6 +455,19 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
           err
         );
       }
+      return null;
+    }
+
+    case 'reset_agent_dispatch_attempts': {
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${agent_metadata}
+          SET ${agent_metadata.columns.dispatch_attempts} = 0
+          WHERE ${agent_metadata.bead_id} = ?
+        `,
+        [action.agent_id]
+      );
       return null;
     }
 

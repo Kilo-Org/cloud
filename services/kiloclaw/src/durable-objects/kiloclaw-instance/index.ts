@@ -70,6 +70,7 @@ import {
   markRestartSuccessful,
 } from './reconcile';
 import { restoreFromPostgres, markDestroyedInPostgresHelper } from './postgres';
+import { legacyDoKeysForIdentity } from '../../lib/instance-routing';
 import {
   beginUnexpectedStopRecovery,
   cleanupPendingRecoveryVolumeIfNeeded,
@@ -1470,22 +1471,23 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
               instanceId: registryInstanceId,
             });
           } else {
-            // Legacy: find active entry by doKey=userId
+            const legacyDoKeys = legacyDoKeysForIdentity(preDestroyUserId, preDestroySandboxId);
             const entries = await registryStub.listInstances(registryKey);
-            const legacyEntry = entries.find(e => e.doKey === preDestroyUserId);
+            const legacyEntry = entries.find(e => legacyDoKeys.includes(e.doKey));
             if (legacyEntry) {
               await registryStub.destroyInstance(registryKey, legacyEntry.instanceId);
               console.log('[DO] Registry entry destroyed on finalization (legacy):', {
                 registryKey,
                 instanceId: legacyEntry.instanceId,
-                doKey: preDestroyUserId,
+                doKeysTried: legacyDoKeys,
+                matchedDoKey: legacyEntry.doKey,
               });
             } else {
               console.log(
                 '[DO] Registry cleanup: no active entry found (already cleaned or never existed):',
                 {
                   registryKey,
-                  doKey: preDestroyUserId,
+                  doKeysTried: legacyDoKeys,
                   activeEntryCount: entries.length,
                 }
               );

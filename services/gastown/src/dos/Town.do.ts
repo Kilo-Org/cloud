@@ -1174,6 +1174,29 @@ export class TownDO extends DurableObject<Env> {
   }
 
   /**
+   * Reset an agent's dispatch_attempts counter to 0 without unhooking.
+   * This makes a stuck agent eligible for dispatch again on the next alarm tick.
+   */
+  async resetAgentDispatchAttempts(agentId: string): Promise<void> {
+    const agent = agents.getAgent(this.sql, agentId);
+    if (!agent) throw new Error(`Agent ${agentId} not found`);
+
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agent_metadata}
+        SET ${agent_metadata.columns.dispatch_attempts} = 0
+        WHERE ${agent_metadata.bead_id} = ?
+      `,
+      [agentId]
+    );
+
+    console.log(
+      `${TOWN_LOG} resetAgentDispatchAttempts: reset agent=${agentId}`
+    );
+  }
+
+  /**
    * Edit convoy_metadata fields (merge_mode, feature_branch).
    * Returns the updated convoy, or null if not found.
    */

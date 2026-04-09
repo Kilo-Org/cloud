@@ -34,7 +34,6 @@ export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
     // eslint-disable-next-line require-await -- expo-notifications requires async callback type but logic is synchronous
     handleNotification: async notification => {
-      console.log('[NOTIF] received:', JSON.stringify(notification.request.content, null, 2));
       const data = notification.request.content.data as NotificationData | undefined;
 
       const suppressed = {

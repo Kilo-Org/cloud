@@ -1,8 +1,6 @@
 import { useRouter } from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import * as WebBrowser from 'expo-web-browser';
 import { Plus, Server } from 'lucide-react-native';
-import { useEffect } from 'react';
 import { Platform, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -20,30 +18,6 @@ import { deriveLockReason } from '@/lib/hooks/use-kiloclaw-billing';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function KiloClawInstanceList() {
-  // TODO: remove — mock notification for styling (repeats every 5s)
-  useEffect(() => {
-    const fire = () => {
-      void Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'KiloClaw',
-          body: 'There are more possible iterations of a game of chess than there are atoms in the observable univ...',
-          data: {
-            type: 'chat',
-            instanceId: 'Y2UxMmVmM2QtYWU5NS00ZDc3LWI0ZjAtMjM3MzVmMGEwNTkx',
-          },
-          sound: 'default',
-        },
-        trigger: null,
-      });
-    };
-    const timer = setTimeout(fire, 2000);
-    const interval = setInterval(fire, 5000);
-    return () => {
-      clearTimeout(timer);
-      clearInterval(interval);
-    };
-  }, []);
-
   const router = useRouter();
   const colors = useThemeColors();
   const { context, clearContext } = useAppContext();

@@ -6,6 +6,7 @@ import { Image } from '@/components/ui/image';
 
 export function KiloClawMessageAvatar(_props: MessageAvatarProps) {
   const { message, lastGroupMessage } = useMessageContext();
+  // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- message can be undefined at runtime in reply swipe context
   const isBotMessage = message?.user?.id?.startsWith('bot-');
 
   if (!lastGroupMessage) {

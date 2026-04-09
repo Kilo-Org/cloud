@@ -260,6 +260,7 @@ const SAFE_ERROR_PREFIXES = [
   'Cannot retry recovery', // force-retry-recovery guard messages
   'Stream Chat sendMessage failed', // sendMessage HTTP errors
   'Stream Chat is not set up', // no Stream Chat on this instance
+  'A kilo CLI run is ', // e.g. "A kilo CLI run is already in progress"
 ];
 
 function sanitizeError(err: unknown, operation: string): { message: string; status: number } {

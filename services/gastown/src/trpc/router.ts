@@ -16,7 +16,7 @@ import { getGastownOrgStub } from '../dos/GastownOrg.do';
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
-import { TownConfigSchema, TownConfigUpdateSchema } from '../types';
+import { TownConfigSchema, TownConfigUpdateSchema, RigOverrideConfigSchema } from '../types';
 import { resolveModel } from '../dos/town/config';
 import type { UserRigRecord } from '../db/tables/user-rigs.table';
 import {
@@ -558,7 +558,8 @@ export const gastownRouter = router({
       // Sequential to avoid "excessively deep" type inference with Rpc.Promisified DO stubs.
       const agentList = await townStub.listAgents({ rig_id: rig.id });
       const beadList = await townStub.listBeads({ rig_id: rig.id, status: 'in_progress' });
-      return { ...rig, agents: agentList, beads: beadList };
+      const townRig = await townStub.getRigAsync(rig.id);
+      return { ...rig, agents: agentList, beads: beadList, config: townRig?.config };
     }),
 
   deleteRig: gastownProcedure
@@ -585,6 +586,22 @@ export const gastownRouter = router({
       await townStub.removeRig(input.rigId);
       const ownerStub = ownership.stub;
       await ownerStub.deleteRig(input.rigId);
+    }),
+
+  updateRigConfig: gastownProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid().optional(),
+        rigId: z.string().uuid(),
+        config: RigOverrideConfigSchema,
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
+      const townStub = getTownDOStub(ctx.env, rig.town_id);
+      await townStub.updateRigConfig(input.rigId, input.config);
+      const updatedRig = await townStub.getRigAsync(input.rigId);
+      return updatedRig;
     }),
 
   // ── Beads ───────────────────────────────────────────────────────────

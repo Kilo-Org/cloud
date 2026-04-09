@@ -230,11 +230,12 @@ async function getWlVersion(): Promise<string> {
   return cachedWlVersion;
 }
 
-async function runDolt(args: string[]): Promise<ExecResult> {
+async function runDolt(args: string[], cwd?: string): Promise<ExecResult> {
   const proc = Bun.spawn(['dolt', ...args], {
     env: process.env as Record<string, string>,
     stdout: 'pipe',
     stderr: 'pipe',
+    ...(cwd ? { cwd } : {}),
   });
   const [stdout, stderr] = await Promise.all([
     new Response(proc.stdout).text(),
@@ -242,6 +243,37 @@ async function runDolt(args: string[]): Promise<ExecResult> {
   ]);
   const exitCode = await proc.exited;
   return { stdout, stderr, exitCode };
+}
+
+function getDoltClonePath(): string | null {
+  const upstream = process.env.WL_UPSTREAM;
+  if (!upstream) return null;
+  return `/root/.local/share/wasteland/${upstream}`;
+}
+
+async function doltSql(
+  query: string
+): Promise<{ rows: Record<string, unknown>[]; error?: string }> {
+  const clonePath = getDoltClonePath();
+  if (!clonePath) return { rows: [], error: 'No upstream configured' };
+
+  const result = await runDolt(['sql', '-q', query, '--result-format', 'json'], clonePath);
+  if (result.exitCode !== 0) {
+    return { rows: [], error: result.stderr || result.stdout };
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(result.stdout);
+    // dolt sql --result-format json returns { rows: [...] }
+    const obj = z.object({ rows: z.array(z.record(z.string(), z.unknown())) }).safeParse(parsed);
+    if (obj.success) return { rows: obj.data.rows };
+    // Some versions return an array directly
+    const arr = z.array(z.record(z.string(), z.unknown())).safeParse(parsed);
+    if (arr.success) return { rows: arr.data };
+    return { rows: [], error: 'Unexpected dolt sql output format' };
+  } catch {
+    return { rows: [], error: `Failed to parse dolt sql output: ${result.stdout.slice(0, 200)}` };
+  }
 }
 
 async function configureDolt(): Promise<void> {
@@ -407,43 +439,28 @@ async function handleBrowse(req: Request): Promise<Response> {
 
   await ensureInit();
 
+  // First sync with upstream to get latest data
   const env = buildEnv(token, body.data.upstream);
-  const result = await execWl(['browse', '--json'], env);
+  await execWl(['sync'], env);
 
-  if (result.exitCode !== 0) {
-    log.error('wl browse failed', { stderr: result.stderr, exitCode: result.exitCode });
-    return errorResponse(`wl browse failed: ${result.stderr}`, 502);
+  // Query dolt directly for full wanted board data
+  const result = await doltSql(
+    `SELECT id, title, description, project, type, priority, tags,
+            posted_by, claimed_by, status, effort_level, evidence_url,
+            sandbox_required, sandbox_scope, sandbox_min_tier,
+            created_at, updated_at
+     FROM wanted
+     ORDER BY priority ASC, created_at DESC`
+  );
+
+  if (result.error) {
+    log.error('dolt sql browse failed', { error: result.error });
+    return errorResponse(`Browse query failed: ${result.error}`, 502);
   }
-
-  // wl browse --json may prefix the JSON with status lines like "Syncing with upstream..."
-  // Extract the JSON portion starting from the first '{' or '['
-  const jsonStart = result.stdout.search(/[{\[]/);
-  if (jsonStart === -1) {
-    log.error('no JSON found in browse output', { stdout: result.stdout.slice(0, 500) });
-    return errorResponse('No JSON in wl browse output', 502);
-  }
-  const jsonStr = result.stdout.slice(jsonStart);
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(jsonStr);
-  } catch (err) {
-    log.error('failed to parse browse output', {
-      jsonStr: jsonStr.slice(0, 500),
-      error: String(err),
-    });
-    return errorResponse('Failed to parse wl browse output', 502);
-  }
-
-  // wl browse --json wraps rows in { "rows": [...] }
-  const rawItems = z.object({ rows: z.array(z.record(z.unknown())) }).safeParse(parsed);
-  const items: WantedItem[] = rawItems.success
-    ? BrowseOutputSchema.parse(rawItems.data.rows)
-    : BrowseOutputSchema.parse(parsed);
 
   lastOperationTimestamp = new Date().toISOString();
-  log.info('wl browse completed', { upstream: body.data.upstream, itemCount: items.length });
-  return jsonResponse({ items });
+  log.info('browse completed via dolt sql', { itemCount: result.rows.length });
+  return jsonResponse({ items: result.rows });
 }
 
 async function handleClaim(req: Request): Promise<Response> {

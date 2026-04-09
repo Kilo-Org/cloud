@@ -25,7 +25,7 @@ import {
   AGENT_GC_RETENTION_MS,
   TRIAGE_LABEL_LIKE,
 } from './patrol';
-import { DISPATCH_COOLDOWN_MS, MAX_DISPATCH_ATTEMPTS } from './scheduling';
+import { MAX_DISPATCH_ATTEMPTS } from './scheduling';
 import * as reviewQueue from './review-queue';
 import * as agents from './agents';
 import * as beadOps from './beads';

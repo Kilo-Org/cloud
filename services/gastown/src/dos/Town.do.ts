@@ -2996,6 +2996,26 @@ export class TownDO extends DurableObject<Env> {
       [convoyId, input.tasks.length, 0, null, featureBranch, mergeMode, stagedValue]
     );
 
+    // Push the convoy feature branch to the remote so polecats can immediately
+    // open PRs targeting it and the refinery can merge into it.
+    const rig = rigs.getRig(this.sql, input.rigId);
+    if (rig) {
+      await scm
+        .createConvoyBranch(
+          { env: this.env, townId: this.townId, getTownConfig: () => this.getTownConfig() },
+          {
+            gitUrl: rig.git_url,
+            defaultBranch: rig.default_branch,
+            featureBranch,
+          }
+        )
+        .catch(err =>
+          console.warn(`${TOWN_LOG} slingConvoy: createConvoyBranch failed (non-fatal)`, {
+            error: err instanceof Error ? err.message : String(err),
+          })
+        );
+    }
+
     // 2. Create all beads and track their IDs (needed for depends_on resolution)
     const beadIds: string[] = [];
     const results: Array<{ bead: Bead; agent: Agent | null }> = [];

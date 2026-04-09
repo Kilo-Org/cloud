@@ -1,8 +1,11 @@
+import React from 'react';
 import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { type Href, router } from 'expo-router';
 import { Platform } from 'react-native';
 import { toast } from 'sonner-native';
+
+import { ChatNotificationToast } from '@/components/chat-notification-toast';
 
 function getProjectId(): string {
   const eas = expoConstants.expoConfig?.extra?.eas as { projectId?: string } | undefined;
@@ -52,15 +55,14 @@ export function setupNotificationHandler() {
         // and suppress the system notification
         const title = notification.request.content.title ?? 'Kilo';
         const body = notification.request.content.body ?? '';
-        toast(title, {
-          description: body,
-          action: {
-            label: 'View',
-            onClick: () => {
-              router.push(`/(app)/chat/${data.instanceId}` as Href);
-            },
-          },
-        });
+        toast.custom(
+          React.createElement(ChatNotificationToast, {
+            title,
+            body,
+            instanceId: data.instanceId,
+          }),
+          { duration: 4000 }
+        );
         return suppressed;
       }
 

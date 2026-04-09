@@ -8,6 +8,7 @@ import { Settings } from 'lucide-react-native';
 import { type Channel as StreamChannel, StreamChat } from 'stream-chat';
 import { Channel, Chat, MessageInput, MessageList, OverlayProvider } from 'stream-chat-expo';
 
+import { KiloClawMessageAvatar } from '@/components/kiloclaw/chat-avatar';
 import { useBotOnlineStatus } from '@/components/kiloclaw/chat-hooks';
 import { NotificationPrompt } from '@/components/kiloclaw/notification-prompt';
 import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
@@ -259,7 +260,11 @@ function StreamChatUI({
         <OverlayProvider value={{ style: chatTheme }}>
           {/* eslint-disable-next-line typescript-eslint/no-unsafe-assignment -- expo-image is API-compatible with RN Image */}
           <Chat client={client} style={chatTheme} ImageComponent={ExpoImage as never}>
-            <Channel channel={channel} keyboardVerticalOffset={headerHeight}>
+            <Channel
+              channel={channel}
+              keyboardVerticalOffset={headerHeight}
+              MessageAvatar={KiloClawMessageAvatar}
+            >
               <NotificationPrompt enabled={Boolean(channel)} />
               <MessageList />
               <MessageInput />

@@ -26,7 +26,7 @@ export const AuditFinding = z.object({
   severity: FindingSeverity,
   title: z.string(),
   detail: z.string(),
-  remediation: z.string().nullable(),
+  remediation: z.string().nullable().optional(),
 });
 export type AuditFinding = z.infer<typeof AuditFinding>;
 

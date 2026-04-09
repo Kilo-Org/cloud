@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
   if (!parseResult.success) {
     return errorResponse(
       'invalid_payload',
-      `Invalid request body: ${z.treeifyError(parseResult.error)}`,
+      `Invalid request body: ${JSON.stringify(z.treeifyError(parseResult.error))}`,
       400
     );
   }

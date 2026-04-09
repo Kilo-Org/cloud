@@ -325,7 +325,11 @@ function sanitizeError(err: unknown, operation: string): { message: string; stat
  */
 function correctLostStatus(message: string, status: number): number {
   if (status === 500 && message === 'Instance not provisioned') return 404;
-  if (status === 500 && message.startsWith('Provider ') && message.endsWith(' is not implemented yet'))
+  if (
+    status === 500 &&
+    message.startsWith('Provider ') &&
+    message.endsWith(' is not implemented yet')
+  )
     return 501;
   return status;
 }

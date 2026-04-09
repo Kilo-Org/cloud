@@ -141,14 +141,14 @@ export default function OrganizationAppSidebar({
       url: `/organizations/${organizationId}/claw/chat`,
     },
     {
-      title: "What's New",
-      icon: Sparkles,
-      url: `/organizations/${organizationId}/claw/changelog`,
-    },
-    {
       title: 'Settings',
       icon: Settings,
       url: `/organizations/${organizationId}/claw/settings`,
+    },
+    {
+      title: "What's New",
+      icon: Sparkles,
+      url: `/organizations/${organizationId}/claw/changelog`,
     },
   ];
 

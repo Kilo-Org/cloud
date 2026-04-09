@@ -4219,7 +4219,15 @@ export class TownDO extends DurableObject<Env> {
 
     try {
       const container = getTownContainerStub(this.env, townId);
-      const headers: Record<string, string> = {};
+      // Always include X-Town-Config so the container populates
+      // lastKnownTownConfig on startup — before any /agents/start arrives.
+      // This ensures org context and credentials are available immediately
+      // after a container restart when the first request is a model update
+      // (PATCH /model) rather than a new agent start.
+      const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+      const headers: Record<string, string> = {
+        'X-Town-Config': JSON.stringify(containerConfig),
+      };
       // When draining AND enough time has passed for the old container
       // to have exited (drainAll waits up to 10 min + exit), pass the
       // nonce so the replacement container can acknowledge readiness.

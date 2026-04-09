@@ -20,7 +20,6 @@ import {
   RpcWastelandConfigOutput,
   RpcWastelandCredentialStatusOutput,
   RpcConnectedTownOutput,
-  RpcWantedItemOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
@@ -748,7 +747,10 @@ export const wastelandRouter = router({
 
       const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
       if (!rawKey) {
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Encryption key unavailable' });
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Encryption key unavailable',
+        });
       }
       const cryptoKey = await deriveEncryptionKey(rawKey);
       const token = await decryptToken(credential.encrypted_token, cryptoKey);

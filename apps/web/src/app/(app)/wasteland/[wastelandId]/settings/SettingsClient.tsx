@@ -886,20 +886,16 @@ function ContainerStatusSection({
                 <XCircle className="size-4 text-amber-400" />
               )}
               <div className="flex-1">
-                <p className="text-sm text-white/70">
-                  {status.joined ? 'Joined' : 'Not joined'}
-                </p>
+                <p className="text-sm text-white/70">{status.joined ? 'Joined' : 'Not joined'}</p>
                 <div className="mt-1 space-y-0.5 text-[11px] text-white/40">
                   {status.upstream && (
                     <p>
-                      Upstream:{' '}
-                      <span className="font-mono text-white/60">{status.upstream}</span>
+                      Upstream: <span className="font-mono text-white/60">{status.upstream}</span>
                     </p>
                   )}
                   {status.dolthubOrg && (
                     <p>
-                      Org:{' '}
-                      <span className="font-mono text-white/60">{status.dolthubOrg}</span>
+                      Org: <span className="font-mono text-white/60">{status.dolthubOrg}</span>
                     </p>
                   )}
                   <p>

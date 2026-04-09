@@ -47,7 +47,6 @@ type WantedItem = z.infer<typeof WantedItemSchema>;
 
 const BrowseOutputSchema = z.array(WantedItemSchema);
 
-
 // ---------------------------------------------------------------------------
 // Request body schemas
 // ---------------------------------------------------------------------------
@@ -167,7 +166,10 @@ async function execWl(
   clearTimeout(timeout);
 
   // Strip spinner/backspace noise from terminal output
-  const cleanStderr = stderr.replace(/[\x08]/g, '').replace(/[|/\\-] Uploading\.\.\./g, '').trim();
+  const cleanStderr = stderr
+    .replace(/[\x08]/g, '')
+    .replace(/[|/\\-] Uploading\.\.\./g, '')
+    .trim();
   const cleanStdout = stdout.replace(/[\x08]/g, '').trim();
 
   if (exitCode !== 0) {
@@ -253,7 +255,10 @@ async function configureDolt(): Promise<void> {
   ]) {
     const result = await runDolt(['config', '--global', '--add', key, value]);
     if (result.exitCode !== 0) {
-      log.warn(`dolt config --add ${key} failed`, { stderr: result.stderr, exitCode: result.exitCode });
+      log.warn(`dolt config --add ${key} failed`, {
+        stderr: result.stderr,
+        exitCode: result.exitCode,
+      });
     }
   }
 
@@ -307,7 +312,9 @@ async function joinUpstream(token: string, upstream: string): Promise<void> {
   const result = await execWl(['join', upstream], env, CLI_TIMEOUT_LONG_MS);
 
   if (result.exitCode !== 0) {
-    throw new Error(`wl join failed (exit ${result.exitCode}): stdout=${result.stdout.slice(0, 300)} stderr=${result.stderr.slice(0, 300)}`);
+    throw new Error(
+      `wl join failed (exit ${result.exitCode}): stdout=${result.stdout.slice(0, 300)} stderr=${result.stderr.slice(0, 300)}`
+    );
   }
 
   joined = true;
@@ -464,10 +471,7 @@ async function handleDone(req: Request): Promise<Response> {
   await mutationMutex.acquire();
   try {
     const env = buildEnv(token, body.data.upstream);
-    const result = await execWl(
-      ['done', body.data.itemId, '--evidence', body.data.evidence],
-      env
-    );
+    const result = await execWl(['done', body.data.itemId, '--evidence', body.data.evidence], env);
 
     if (result.exitCode !== 0) {
       log.error('wl done failed', {

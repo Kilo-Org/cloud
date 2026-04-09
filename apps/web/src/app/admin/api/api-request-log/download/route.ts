@@ -2,9 +2,11 @@ import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
-import { and, gte, lte, eq, asc } from 'drizzle-orm';
+import { and, gte, lte, eq, asc, gt, count } from 'drizzle-orm';
 import archiver from 'archiver';
 import { PassThrough } from 'node:stream';
+
+const BATCH_SIZE = 100;
 
 function formatTimestamp(isoString: string): string {
   return isoString.replaceAll(':', '-').replaceAll(' ', '_');
@@ -54,6 +56,14 @@ function jsonError(message: string, status: number) {
   });
 }
 
+function dateRangeFilter(userId: string, parsedStart: Date, parsedEnd: Date) {
+  return and(
+    eq(api_request_log.kilo_user_id, userId),
+    gte(api_request_log.created_at, parsedStart.toISOString()),
+    lte(api_request_log.created_at, parsedEnd.toISOString())
+  );
+}
+
 export async function GET(request: NextRequest) {
   await connection();
 
@@ -77,19 +87,10 @@ export async function GET(request: NextRequest) {
     return jsonError('Invalid date format. Use YYYY-MM-DD.', 400);
   }
 
-  const rows = await db
-    .select()
-    .from(api_request_log)
-    .where(
-      and(
-        eq(api_request_log.kilo_user_id, userId),
-        gte(api_request_log.created_at, parsedStart.toISOString()),
-        lte(api_request_log.created_at, parsedEnd.toISOString())
-      )
-    )
-    .orderBy(asc(api_request_log.created_at));
+  const filter = dateRangeFilter(userId, parsedStart, parsedEnd);
 
-  if (rows.length === 0) {
+  const [result] = await db.select({ total: count() }).from(api_request_log).where(filter);
+  if (result.total === 0) {
     return jsonError('No records found for the given criteria', 404);
   }
 
@@ -98,24 +99,54 @@ export async function GET(request: NextRequest) {
 
   archive.pipe(passthrough);
 
-  for (const row of rows) {
-    const ts = formatTimestamp(row.created_at);
-    const id = String(row.id);
+  // Fetch and archive rows in batches using cursor-based pagination to
+  // avoid loading the entire result set into memory at once.
+  const appendRows = async () => {
+    let cursor: bigint | null = null;
+    for (;;) {
+      const rows = await db
+        .select()
+        .from(api_request_log)
+        .where(cursor ? and(filter, gt(api_request_log.id, cursor)) : filter)
+        .orderBy(asc(api_request_log.id))
+        .limit(BATCH_SIZE);
 
-    const requestExt = isJson(row.request) ? 'json' : 'txt';
-    const requestContent = tryFormatJson(row.request);
-    if (requestContent) {
-      archive.append(requestContent, { name: `${ts}_${id}_request.${requestExt}` });
+      if (rows.length === 0) break;
+
+      for (const row of rows) {
+        const ts = formatTimestamp(row.created_at);
+        const id = String(row.id);
+
+        const requestExt = isJson(row.request) ? 'json' : 'txt';
+        const requestContent = tryFormatJson(row.request);
+        if (requestContent) {
+          archive.append(requestContent, { name: `${ts}_${id}_request.${requestExt}` });
+        }
+
+        const responseExt = isJson(row.response) ? 'json' : 'txt';
+        const responseContent = tryFormatJson(row.response);
+        if (responseContent) {
+          archive.append(responseContent, { name: `${ts}_${id}_response.${responseExt}` });
+        }
+      }
+
+      cursor = rows[rows.length - 1].id;
+
+      // Wait for the passthrough stream to drain before fetching the next
+      // batch so we don't buffer unbounded data in memory.
+      await new Promise<void>(resolve => {
+        if (passthrough.writableNeedDrain) {
+          passthrough.once('drain', resolve);
+        } else {
+          resolve();
+        }
+      });
     }
 
-    const responseExt = isJson(row.response) ? 'json' : 'txt';
-    const responseContent = tryFormatJson(row.response);
-    if (responseContent) {
-      archive.append(responseContent, { name: `${ts}_${id}_response.${responseExt}` });
-    }
-  }
+    await archive.finalize();
+  };
 
-  void archive.finalize();
+  void appendRows();
 
   const webStream = new ReadableStream({
     start(controller) {

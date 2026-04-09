@@ -45,7 +45,7 @@ BACKEND_API_URL=http://localhost:3000
 
 # Fly.io Machines API
 # Token is auto-created once in .env.local by `pnpm dev:env` using
-# `fly tokens create org kilo-dev`, then synced here.
+# `fly tokens create org <FLY_ORG_SLUG>`, then synced here.
 # @from FLY_API_TOKEN
 FLY_API_TOKEN=
 # Fly org slug. The dev-start script reads this value for token creation.

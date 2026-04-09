@@ -20,9 +20,9 @@ import { deriveLockReason } from '@/lib/hooks/use-kiloclaw-billing';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function KiloClawInstanceList() {
-  // TODO: remove — mock notification for styling
+  // TODO: remove — mock notification for styling (repeats every 5s)
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const fire = () => {
       void Notifications.scheduleNotificationAsync({
         content: {
           title: 'KiloClaw',
@@ -35,9 +35,12 @@ export default function KiloClawInstanceList() {
         },
         trigger: null,
       });
-    }, 3000);
+    };
+    const timer = setTimeout(fire, 2000);
+    const interval = setInterval(fire, 5000);
     return () => {
       clearTimeout(timer);
+      clearInterval(interval);
     };
   }, []);
 

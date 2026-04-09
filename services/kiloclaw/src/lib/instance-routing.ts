@@ -1,4 +1,4 @@
-import { getActiveInstance, getWorkerDb } from '../db';
+import { getActivePersonalInstance, getWorkerDb } from '../db';
 import { userIdFromSandboxId } from '../auth/sandbox-id';
 import {
   instanceIdFromSandboxId,
@@ -36,7 +36,7 @@ export async function resolveDoKeyForUser(
 ): Promise<string | null> {
   if (!connectionString) return null;
 
-  const instance = await getActiveInstance(getWorkerDb(connectionString), userId);
+  const instance = await getActivePersonalInstance(getWorkerDb(connectionString), userId);
   if (!instance) return null;
 
   return doKeyFromActiveInstance(instance);

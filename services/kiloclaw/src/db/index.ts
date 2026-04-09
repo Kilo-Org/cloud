@@ -61,7 +61,7 @@ export async function validateAndRedeemAccessCode(db: WorkerDb, code: string, us
   });
 }
 
-export async function getActiveInstance(db: WorkerDb, userId: string) {
+export async function getActivePersonalInstance(db: WorkerDb, userId: string) {
   const row = await db
     .select({
       id: kiloclaw_instances.id,

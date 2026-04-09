@@ -5,14 +5,18 @@ vi.mock('cloudflare:workers', () => ({
   waitUntil: (promise: Promise<unknown>) => promise,
 }));
 
-vi.mock('../db', () => ({
-  getWorkerDb: vi.fn(() => ({})),
-  getActiveInstance: vi.fn(),
-}));
+vi.mock('../db', async importOriginal => {
+  const actual = await importOriginal<typeof import('../db')>();
+  return {
+    ...actual,
+    getWorkerDb: vi.fn(() => ({})),
+    getActivePersonalInstance: vi.fn(),
+  };
+});
 
 import { platform, resolveInstanceDoKey } from './platform';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
-import { getActiveInstance } from '../db';
+import { getActivePersonalInstance } from '../db';
 
 const currentUserId = '199e2b19-aa40-488d-9442-9a18a620ba68';
 const legacyDoKey = 'oauth/google:117453785559478190551';
@@ -62,7 +66,7 @@ describe('legacy platform DO routing', () => {
   });
 
   it('resolves the original legacy DO key from the active instance row', async () => {
-    vi.mocked(getActiveInstance).mockResolvedValue({
+    vi.mocked(getActivePersonalInstance).mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
       sandboxId: legacySandboxId,
       orgId: null,
@@ -83,7 +87,7 @@ describe('legacy platform DO routing', () => {
   });
 
   it('returns the instanceId for instance-keyed rows when instanceId is omitted', async () => {
-    vi.mocked(getActiveInstance).mockResolvedValue({
+    vi.mocked(getActivePersonalInstance).mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
       sandboxId: 'ki_11111111111141118111111111111111',
       orgId: null,
@@ -100,7 +104,7 @@ describe('legacy platform DO routing', () => {
   });
 
   it('destroys preexisting legacy registry rows keyed by the migrated user id', async () => {
-    vi.mocked(getActiveInstance).mockResolvedValue({
+    vi.mocked(getActivePersonalInstance).mockResolvedValue({
       id: '11111111-1111-4111-8111-111111111111',
       sandboxId: legacySandboxId,
       orgId: null,

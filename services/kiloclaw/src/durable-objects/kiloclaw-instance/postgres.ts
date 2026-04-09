@@ -2,7 +2,7 @@ import type { KiloClawEnv } from '../../types';
 import type { EncryptedEnvelope } from '../../schemas/instance-config';
 import {
   getWorkerDb,
-  getActiveInstance,
+  getActivePersonalInstance,
   getInstanceBySandboxId,
   markInstanceDestroyed,
 } from '../../db';
@@ -35,7 +35,7 @@ export async function fallbackAppNameForRestore(
  *
  * Lookup priority:
  * 1. If opts.sandboxId is provided, look up by sandbox_id (precise, multi-instance safe).
- * 2. Otherwise, fall back to getActiveInstance(db, userId) (legacy single-instance).
+ * 2. Otherwise, fall back to getActivePersonalInstance(db, userId) (legacy personal instance).
  */
 export async function restoreFromPostgres(
   env: KiloClawEnv,
@@ -56,7 +56,7 @@ export async function restoreFromPostgres(
     // Prefer sandboxId lookup (multi-instance safe) over userId lookup (ambiguous).
     const instance = opts?.sandboxId
       ? await getInstanceBySandboxId(db, opts.sandboxId)
-      : await getActiveInstance(db, userId);
+      : await getActivePersonalInstance(db, userId);
 
     if (!instance) {
       doWarn(state, 'No active instance found in Postgres', { userId });

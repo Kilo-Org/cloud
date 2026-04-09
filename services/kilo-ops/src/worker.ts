@@ -72,7 +72,7 @@ app.use('/*', async (c, next) => {
     team: c.env.CF_ACCESS_TEAM,
     audience: c.env.CF_ACCESS_AUD,
   });
-  return mw(c as Parameters<typeof mw>[0], next);
+  return mw(c, next);
 });
 
 app.all('/*', async c => {

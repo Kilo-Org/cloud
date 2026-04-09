@@ -56,6 +56,7 @@
     "CF_ACCESS_AUD": "ff0440ec2c45e7188331f1430ddf35d2b11fa408ca9b3a58068b80816a0e1d80",
     "CF_CLICKHOUSE_URL": "https://api.cloudflare.com/client/v4/accounts/e115e769bcdd4c3d66af59d3332cb394/analytics_engine/sql",
     "CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
+    "GF_SERVER_ROOT_URL": "https://ops.kiloapps.io/",
   },
 
   "secrets_store_secrets": [

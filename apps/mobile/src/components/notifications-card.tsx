@@ -21,10 +21,10 @@ export function NotificationsCard() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
 
-  const { data: pushTokens } = useQuery(trpc.kiloclaw.getMyPushTokens.queryOptions());
+  const { data: pushTokens } = useQuery(trpc.user.getMyPushTokens.queryOptions());
 
   const registerToken = useMutation(
-    trpc.kiloclaw.registerPushToken.mutationOptions({
+    trpc.user.registerPushToken.mutationOptions({
       onSuccess: () => {
         toast.success('Notifications enabled');
       },
@@ -36,7 +36,7 @@ export function NotificationsCard() {
   );
 
   const unregisterToken = useMutation(
-    trpc.kiloclaw.unregisterPushToken.mutationOptions({
+    trpc.user.unregisterPushToken.mutationOptions({
       onSuccess: () => {
         toast.success('Notifications disabled');
         setNotificationsEnabled(false);

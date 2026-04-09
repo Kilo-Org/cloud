@@ -123,7 +123,7 @@ function RootLayoutNav() {
 
   const trpc = useTRPC();
   const { mutate: registerPushToken } = useMutation(
-    trpc.kiloclaw.registerPushToken.mutationOptions({})
+    trpc.user.registerPushToken.mutationOptions({})
   );
 
   useEffect(() => {

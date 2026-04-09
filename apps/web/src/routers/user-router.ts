@@ -19,6 +19,7 @@ import {
   user_auth_provider,
   kiloclaw_instances,
   kiloclaw_subscriptions,
+  user_push_tokens,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, inArray, sql, gte } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -663,5 +664,54 @@ export const userRouter = createTRPCRouter({
       .where(eq(kilocode_users.id, userId));
 
     return successResult();
+  }),
+
+  // ─── Push Notification Tokens ──────────────────────────────────────
+
+  registerPushToken: baseProcedure
+    .input(
+      z.object({
+        token: z.string().min(1),
+        platform: z.enum(['ios', 'android']),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .insert(user_push_tokens)
+        .values({
+          user_id: ctx.user.id,
+          token: input.token,
+          platform: input.platform,
+        })
+        .onConflictDoUpdate({
+          target: [user_push_tokens.token],
+          set: { user_id: ctx.user.id, platform: input.platform, updated_at: sql`now()` },
+        });
+      return { success: true };
+    }),
+
+  unregisterPushToken: baseProcedure
+    .input(
+      z.object({
+        token: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .delete(user_push_tokens)
+        .where(
+          and(eq(user_push_tokens.user_id, ctx.user.id), eq(user_push_tokens.token, input.token))
+        );
+      return { success: true };
+    }),
+
+  getMyPushTokens: baseProcedure.query(async ({ ctx }) => {
+    return db
+      .select({
+        token: user_push_tokens.token,
+        platform: user_push_tokens.platform,
+      })
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, ctx.user.id));
   }),
 });

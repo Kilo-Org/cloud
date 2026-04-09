@@ -24,7 +24,7 @@ export function NotificationPrompt({ enabled }: { enabled: boolean }) {
   const trpc = useTRPC();
 
   const registerToken = useMutation(
-    trpc.kiloclaw.registerPushToken.mutationOptions({
+    trpc.user.registerPushToken.mutationOptions({
       onError: error => {
         toast.error(error.message);
       },

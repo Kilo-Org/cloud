@@ -775,7 +775,7 @@ export function parseMicrodollarUsageFromString(
   return { ...coreProps, ...costs };
 }
 
-export function calculatKiloExclusiveCost_mUsd(
+export function calculateKiloExclusiveCost_mUsd(
   model: KiloExclusiveModel,
   usage: JustTheCostsUsageStats
 ): number {
@@ -867,7 +867,7 @@ async function processTokenData(
 
   const kiloExclusiveModel = findKiloExclusiveModel(usageContext.requested_model);
   if (kiloExclusiveModel?.pricing) {
-    usageStats.cost_mUsd = calculatKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
+    usageStats.cost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
   }
 
   // Report upstream cost to abuse service BEFORE zeroing for free/BYOK

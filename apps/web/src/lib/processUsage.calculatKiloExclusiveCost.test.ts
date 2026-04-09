@@ -1,5 +1,5 @@
 import { test, describe, expect } from '@jest/globals';
-import { calculatKiloExclusiveCost_mUsd } from './processUsage';
+import { calculateKiloExclusiveCost_mUsd } from './processUsage';
 import type { JustTheCostsUsageStats } from './processUsage.types';
 import type { KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
 import { qwen36_plus_model } from '@/lib/providers/qwen';
@@ -30,13 +30,13 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
       ...qwen36_plus_model,
       pricing: null,
     };
-    const result = calculatKiloExclusiveCost_mUsd(model, makeUsage({ inputTokens: 1000 }));
+    const result = calculateKiloExclusiveCost_mUsd(model, makeUsage({ inputTokens: 1000 }));
     expect(result).toBe(0);
   });
 
   test('input-only cost in <=256k tier', () => {
     // 100k uncached input tokens at $0.325/1M = 100_000 * 0.325 = 32_500 mUsd
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({ inputTokens: 100_000 })
     );
@@ -45,7 +45,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
 
   test('output-only cost in <=256k tier', () => {
     // 50k output tokens at $1.95/1M = 50_000 * 1.95 = 97_500 mUsd
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({ outputTokens: 50_000 })
     );
@@ -55,7 +55,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
   test('cache read cost in <=256k tier', () => {
     // 200k input tokens, all cache hits → uncached=0, cacheHit=200k
     // cacheHit: 200_000 * 0.0325 = 6_500 mUsd
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({ inputTokens: 200_000, cacheHitTokens: 200_000 })
     );
@@ -65,7 +65,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
   test('cache write cost in <=256k tier', () => {
     // 200k input tokens, all cache writes → uncached=0, cacheWrite=200k
     // cacheWrite: 200_000 * 0.40625 = 81_250 mUsd
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({ inputTokens: 200_000, cacheWriteTokens: 200_000 })
     );
@@ -80,7 +80,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
     // cacheHit: 20_000 * 0.0325 = 650
     // cacheWrite: 30_000 * 0.40625 = 12_187.5
     // total = 48_587.5 → 48_588
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({
         inputTokens: 100_000,
@@ -95,7 +95,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
   test('input-only cost in >256k tier', () => {
     // 300k uncached input tokens, total input = 300k (>256k)
     // uncached: 300_000 * 1.3 = 390_000 mUsd
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({ inputTokens: 300_000 })
     );
@@ -107,7 +107,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
     // uncached: 300_000 * 1.3 = 390_000
     // output:    50_000 * 3.9 = 195_000
     // total = 585_000
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({ inputTokens: 300_000, outputTokens: 50_000 })
     );
@@ -119,7 +119,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
     // uncached: 200_000 * 1.3  = 260_000
     // cacheHit: 100_000 * 0.13 = 13_000
     // total = 273_000
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({ inputTokens: 300_000, cacheHitTokens: 100_000 })
     );
@@ -131,7 +131,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
     // uncached:    200_000 * 1.3   = 260_000
     // cacheWrite:  100_000 * 1.625 = 162_500
     // total = 422_500
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({ inputTokens: 300_000, cacheWriteTokens: 100_000 })
     );
@@ -146,7 +146,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
     // cacheHit:     50_000 * 0.13  =   6_500
     // cacheWrite:  100_000 * 1.625 = 162_500
     // total = 702_000
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({
         inputTokens: 500_000,
@@ -161,7 +161,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
   test('tier boundary: exactly 256k total input uses <=256k pricing', () => {
     // total input = 256 * 1024 = 262_144 (not > 256k, so <=256k tier)
     // uncached: 262_144 * 0.325 = 85_196.8 → 85_197
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({ inputTokens: 262_144 })
     );
@@ -171,7 +171,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
   test('tier boundary: 256k+1 total input uses >256k pricing', () => {
     // total input = 256 * 1024 + 1 = 262_145 (>256k tier)
     // uncached: 262_145 * 1.3 = 340_788.5 → 340_789
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({ inputTokens: 262_145 })
     );
@@ -179,7 +179,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
   });
 
   test('zero tokens returns 0', () => {
-    const result = calculatKiloExclusiveCost_mUsd(qwen36_plus_model, makeUsage());
+    const result = calculateKiloExclusiveCost_mUsd(qwen36_plus_model, makeUsage());
     expect(result).toBe(0);
   });
 
@@ -189,7 +189,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
     // calculate_mUsd receives uncachedInputTokens=100 (fallback), cacheHit=80, cacheWrite=50
     // totalInput in calculate_mUsd = 100 + 50 + 80 = 230 (<=256k)
     // cost = 100*0.325 + 80*0.0325 + 50*0.40625 = 32.5 + 2.6 + 20.3125 = 55.4125 → 55
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({
         inputTokens: 100,
@@ -203,7 +203,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
   test('1M tokens input cost matches post-discount price', () => {
     // 1M uncached input at >256k tier: 1_000_000 * 1.3 = 1_300_000 mUsd
     // which is $1.3, the 35%-discounted rate from the pre-discount $2/1M
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({ inputTokens: 1_000_000 })
     );
@@ -216,7 +216,7 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
     // uncached: 300_000 * 1.3 = 390_000
     // output: 1_000_000 * 3.9 = 3_900_000
     // total = 4_290_000
-    const result = calculatKiloExclusiveCost_mUsd(
+    const result = calculateKiloExclusiveCost_mUsd(
       qwen36_plus_model,
       makeUsage({ inputTokens: 300_000, outputTokens: 1_000_000 })
     );

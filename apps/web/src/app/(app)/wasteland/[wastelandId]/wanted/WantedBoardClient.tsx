@@ -178,7 +178,7 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
   // Keep selected item in sync with fresh data
   const resolvedSelectedItem = useMemo(() => {
     if (!selectedItem) return null;
-    return items.find(i => i.item_id === selectedItem.item_id) ?? selectedItem;
+    return items.find(i => i.id === selectedItem.id) ?? selectedItem;
   }, [selectedItem, items]);
 
   return (
@@ -276,14 +276,14 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
           <AnimatePresence mode="popLayout">
             {filteredItems.map((item, i) => (
               <motion.div
-                key={item.item_id}
+                key={item.id}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ delay: Math.min(i * 0.02, 0.3), duration: 0.15 }}
                 onClick={() => setSelectedItem(item)}
                 className={`group flex cursor-pointer items-center gap-3 border-b border-white/[0.04] px-6 py-2.5 transition-colors hover:bg-white/[0.02] ${
-                  resolvedSelectedItem?.item_id === item.item_id ? 'bg-white/[0.03]' : ''
+                  resolvedSelectedItem?.id === item.id ? 'bg-white/[0.03]' : ''
                 }`}
               >
                 <span
@@ -494,7 +494,7 @@ function WantedDetailPanel({
 
           {/* ID */}
           <div className="border-t border-white/[0.06] pt-3">
-            <DetailRow label="Item ID" value={item.item_id} mono />
+            <DetailRow label="Item ID" value={item.id} mono />
           </div>
         </div>
       </div>
@@ -566,7 +566,7 @@ function ClaimDialog({
             type="button"
             disabled={claimMutation.isPending || !item}
             onClick={() => {
-              if (item) claimMutation.mutate({ wastelandId, itemId: item.item_id });
+              if (item) claimMutation.mutate({ wastelandId, itemId: item.id });
             }}
             className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
           >
@@ -618,7 +618,7 @@ function MarkDoneDialog({
     (e: React.FormEvent) => {
       e.preventDefault();
       if (item && evidence.trim()) {
-        doneMutation.mutate({ wastelandId, itemId: item.item_id, evidence: evidence.trim() });
+        doneMutation.mutate({ wastelandId, itemId: item.id, evidence: evidence.trim() });
       }
     },
     [doneMutation, wastelandId, item, evidence]

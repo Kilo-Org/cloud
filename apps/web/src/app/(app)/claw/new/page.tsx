@@ -81,10 +81,12 @@ export default function ClawNewPage() {
     );
   }
 
+  const hasActiveInstance =
+    billing?.instance?.exists === true && billing.instance.destroyed === false;
   const mode: ClawOnboardingMode =
-    createFlowStarted || !billing?.instance ? 'create-first' : 'post-provisioning';
+    createFlowStarted || !hasActiveInstance ? 'create-first' : 'post-provisioning';
 
-  if (billing?.instance) {
+  if (hasActiveInstance) {
     return <ClawNewLoader mode={mode} onCreateFlowStarted={onCreateFlowStarted} />;
   }
 

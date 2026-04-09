@@ -3,6 +3,7 @@ import type { FeatureValue } from '@/lib/feature-detection';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_NAME,
+  claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_NAME,
 } from '@/lib/providers/anthropic';
@@ -21,6 +22,8 @@ import type {
 import { requestContainsImages } from '@/lib/providers/openrouter/request-helpers';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 import type OpenAI from 'openai';
+import type { User } from '@kilocode/db';
+import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 
 function stripDisplayName(displayName: string): string {
   const start = displayName.indexOf(': ');
@@ -136,6 +139,12 @@ const BALANCED_IMAGE_MODEL: ResolvedAutoModel = {
   reasoning: { enabled: true },
 };
 
+const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
+  model: claude_sonnet_clawsetup_model.public_id,
+  reasoning: { enabled: true, effort: 'high' },
+  verbosity: 'high',
+};
+
 const BALANCED_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   KiloClaw: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
   plan: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
@@ -234,6 +243,7 @@ export function isKiloAutoModel(model: string) {
 export async function resolveAutoModel(
   model: string,
   modeHeader: string | null,
+  userPromise: Promise<User | null>,
   balancePromise: Promise<number>,
   hasImages: boolean
 ): Promise<ResolvedAutoModel> {
@@ -248,6 +258,12 @@ export async function resolveAutoModel(
   const modeResult = modeSchema.safeParse(modeHeader?.trim() ?? '');
   const mode = modeResult.success ? modeResult.data : null;
   if (model === KILO_AUTO_BALANCED_MODEL.id) {
+    if (mode === modeSchema.enum.KiloClaw) {
+      const user = await userPromise;
+      if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
+        return BALANCED_CLAW_SETUP_MODEL;
+      }
+    }
     if (hasImages) {
       return BALANCED_IMAGE_MODEL;
     }
@@ -261,12 +277,14 @@ export async function applyResolvedAutoModel(
   request: GatewayRequest,
   modeHeader: string | null,
   featureHeader: FeatureValue | null,
+  userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ) {
   const hasImages = requestContainsImages(request);
   const resolved = await resolveAutoModel(
     model,
     featureHeader === 'kiloclaw' || featureHeader === 'openclaw' ? 'KiloClaw' : modeHeader,
+    userPromise,
     balancePromise,
     hasImages
   );

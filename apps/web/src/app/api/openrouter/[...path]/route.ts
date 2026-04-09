@@ -217,6 +217,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestBodyParsed,
       modeHeader,
       feature,
+      authPromise.then(res => res.user),
       balanceAndSettingsPromise.then(res => res.balance)
     );
   }

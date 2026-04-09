@@ -11,6 +11,7 @@ import {
 } from '@/lib/kilo-auto-model';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
+  claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/providers/anthropic';
 import { trinity_large_thinking_free_model } from '@/lib/providers/arcee';
@@ -49,7 +50,10 @@ export async function getMonitoredModels() {
   const set = new Set<string>();
   for (const model of preferredModels) {
     if (isKiloAutoModel(model)) {
-      set.add((await resolveAutoModel(model, null, Promise.resolve(0), false)).model);
+      set.add(
+        (await resolveAutoModel(model, null, Promise.resolve(null), Promise.resolve(0), false))
+          .model
+      );
     } else {
       set.add(model);
     }
@@ -87,6 +91,7 @@ export const kiloExclusiveModels = [
   seed_20_pro_free_model,
   qwen36_plus_model,
   trinity_large_thinking_free_model,
+  claude_sonnet_clawsetup_model,
 ] as KiloExclusiveModel[];
 
 export function isKiloStealthModel(model: string): boolean {

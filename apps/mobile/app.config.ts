@@ -41,6 +41,7 @@ const config: ExpoConfig = {
     backgroundColor: '#FAF74F',
   },
   android: {
+    googleServicesFile: './google-services.json',
     package: 'com.kilocode.kiloapp',
     adaptiveIcon: {
       backgroundColor: '#FAF74F',

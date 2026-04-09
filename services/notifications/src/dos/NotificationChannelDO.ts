@@ -23,8 +23,7 @@ type PendingMessage = {
 const DEDUP_PREFIX = 'dedup:';
 const MSG_PREFIX = 'msg:';
 const DEDUP_TTL_MS = 60 * 60 * 1000; // 1 hour
-const INITIAL_DEBOUNCE_MS = 10_000; // 10 seconds for first event
-const UPDATE_DEBOUNCE_MS = 5_000; // 5 seconds for updates
+const DEBOUNCE_MS = 10_000; // 10 seconds
 
 export class NotificationChannelDO extends DurableObject<Env> {
   async processWebhook(payload: Event, webhookId: string): Promise<Response> {
@@ -73,9 +72,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
       }
       pendingMessage.updatedAt = messageUpdatedAt;
       await this.ctx.storage.put(msgKey, pendingMessage);
-      await this.scheduleAlarm(UPDATE_DEBOUNCE_MS);
+      await this.scheduleAlarm(DEBOUNCE_MS);
       console.log(
-        `[DEBUG] Updated message ${messageId}, text="${pendingMessage.text.slice(0, 50)}", alarm reset to ${UPDATE_DEBOUNCE_MS}ms`
+        `[DEBUG] Updated message ${messageId}, text="${pendingMessage.text.slice(0, 50)}", alarm reset to ${DEBOUNCE_MS}ms`
       );
     } else {
       // First event for this message (could be message.new or a late message.updated)
@@ -88,8 +87,8 @@ export class NotificationChannelDO extends DurableObject<Env> {
         updatedAt: messageUpdatedAt,
       };
       await this.ctx.storage.put(msgKey, pending);
-      await this.scheduleAlarm(INITIAL_DEBOUNCE_MS);
-      console.log(`[DEBUG] Stored pending message ${messageId}, alarm in ${INITIAL_DEBOUNCE_MS}ms`);
+      await this.scheduleAlarm(DEBOUNCE_MS);
+      console.log(`[DEBUG] Stored pending message ${messageId}, alarm in ${DEBOUNCE_MS}ms`);
     }
 
     return Response.json({ ok: true });

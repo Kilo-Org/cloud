@@ -20,7 +20,7 @@ import {
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
-} from '@/lib/kilo-auto-model';
+} from '@/lib/kilo-auto';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 
 export async function resolveAutoModel(

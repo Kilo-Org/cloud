@@ -36,7 +36,7 @@ import type {
   PromptInfo,
 } from '@/lib/processUsage.types';
 import { getMaxTokens } from '@/lib/providers/openrouter/request-helpers';
-import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto-model';
+import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/providers/types';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format

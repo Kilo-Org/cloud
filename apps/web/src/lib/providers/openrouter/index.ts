@@ -14,7 +14,7 @@ import {
   getOpenCodeSettings,
   getVersionedModelSettings,
 } from '@/lib/providers/model-settings';
-import { AUTO_MODELS } from '@/lib/kilo-auto-model';
+import { AUTO_MODELS } from '@/lib/kilo-auto';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/model-utils';

@@ -1,5 +1,5 @@
-import { isKiloAutoModel } from '@/lib/kilo-auto-model';
-import { resolveAutoModel } from '@/lib/kilo-auto-model.resolution';
+import { isKiloAutoModel } from '@/lib/kilo-auto';
+import { resolveAutoModel } from '@/lib/kilo-auto/resolution';
 import { preferredModels } from '@/lib/models';
 
 export async function getMonitoredModels() {

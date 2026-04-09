@@ -5,7 +5,7 @@ import { CheckCircle2, ChevronDown, Scale, Zap } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
-import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FRONTIER_MODEL } from '@/lib/kilo-auto-model';
+import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FRONTIER_MODEL } from '@/lib/kilo-auto';
 
 const AUTO_CARD_MODEL_IDS = new Set([KILO_AUTO_FRONTIER_MODEL.id, KILO_AUTO_BALANCED_MODEL.id]);
 

@@ -12,7 +12,7 @@ import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import { useUser } from '@/hooks/useUser';
-import { KILO_AUTO_FRONTIER_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto-model';
+import { KILO_AUTO_FRONTIER_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
 import { isFreeModel } from '@/lib/models';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

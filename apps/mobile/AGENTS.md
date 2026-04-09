@@ -51,6 +51,7 @@ After installing or upgrading dependencies, run `pnpx expo-doctor` and fix any i
 
 - Every mutation must include an `onError` handler that shows a toast (`toast.error(error.message)` via `sonner-native`). Silent failures are not acceptable — users must always see feedback when something goes wrong.
 - Centralize `onError` in the mutation hook (e.g., `useKiloClawMutations`) rather than in individual components. Components can add their own `onSuccess` callbacks via `mutate(input, { onSuccess })` for UI-specific behavior (e.g., closing a form, clearing fields).
+- **Use optimistic updates where possible** — they make the app feel instant. Use React Query's `onMutate` to optimistically update the cache, return the previous value for rollback, restore it in `onError`, and invalidate in `onSettled` to reconcile with the server. Good candidates: toggles, model selection, renaming, any mutation where the expected result is obvious from the input.
 - For screens with text inputs, use `ScrollView` with `automaticallyAdjustKeyboardInsets` to keep inputs visible above the keyboard. No external keyboard library needed — the native iOS prop works smoothly.
 
 ### TextInput on iOS

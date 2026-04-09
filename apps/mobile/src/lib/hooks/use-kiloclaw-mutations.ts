@@ -83,30 +83,79 @@ export function useKiloClawMutations() {
     ),
     patchExecPreset: useMutation(
       trpc.kiloclaw.patchExecPreset.mutationOptions({
-        onSuccess: invalidateStatus,
-        onError: onMutationError,
+        onMutate: async input => {
+          await queryClient.cancelQueries({ queryKey: trpc.kiloclaw.getStatus.queryKey() });
+          const previous = queryClient.getQueryData(trpc.kiloclaw.getStatus.queryKey());
+          queryClient.setQueryData(trpc.kiloclaw.getStatus.queryKey(), (old: typeof previous) => {
+            if (!old) {
+              return old;
+            }
+            return {
+              ...old,
+              ...(input.security != null && { execSecurity: input.security }),
+              ...(input.ask != null && { execAsk: input.ask }),
+            };
+          });
+          return { previous };
+        },
+        onError: (error, _input, context) => {
+          if (context?.previous) {
+            queryClient.setQueryData(trpc.kiloclaw.getStatus.queryKey(), context.previous);
+          }
+          onMutationError(error);
+        },
+        onSettled: invalidateStatus,
       })
     ),
     setMyPin: useMutation(
       trpc.kiloclaw.setMyPin.mutationOptions({
-        onSuccess: async () => {
+        onMutate: async input => {
+          await queryClient.cancelQueries({ queryKey: trpc.kiloclaw.getMyPin.queryKey() });
+          const previous = queryClient.getQueryData(trpc.kiloclaw.getMyPin.queryKey());
+          if (previous) {
+            queryClient.setQueryData(trpc.kiloclaw.getMyPin.queryKey(), {
+              ...previous,
+              image_tag: input.imageTag,
+              reason: input.reason ?? null,
+              pinnedBySelf: true,
+            });
+          }
+          return { previous };
+        },
+        onError: (error, _input, context) => {
+          if (context?.previous !== undefined) {
+            queryClient.setQueryData(trpc.kiloclaw.getMyPin.queryKey(), context.previous);
+          }
+          onMutationError(error);
+        },
+        onSettled: async () => {
           await invalidateStatus();
           await queryClient.invalidateQueries({
             queryKey: trpc.kiloclaw.getMyPin.queryKey(),
           });
         },
-        onError: onMutationError,
       })
     ),
     removeMyPin: useMutation(
       trpc.kiloclaw.removeMyPin.mutationOptions({
-        onSuccess: async () => {
+        onMutate: async () => {
+          await queryClient.cancelQueries({ queryKey: trpc.kiloclaw.getMyPin.queryKey() });
+          const previous = queryClient.getQueryData(trpc.kiloclaw.getMyPin.queryKey());
+          queryClient.setQueryData(trpc.kiloclaw.getMyPin.queryKey(), null);
+          return { previous };
+        },
+        onError: (error, _input, context) => {
+          if (context?.previous !== undefined) {
+            queryClient.setQueryData(trpc.kiloclaw.getMyPin.queryKey(), context.previous);
+          }
+          onMutationError(error);
+        },
+        onSettled: async () => {
           await invalidateStatus();
           await queryClient.invalidateQueries({
             queryKey: trpc.kiloclaw.getMyPin.queryKey(),
           });
         },
-        onError: onMutationError,
       })
     ),
     approvePairingRequest: useMutation(
@@ -137,14 +186,40 @@ export function useKiloClawMutations() {
     ),
     setGmailNotifications: useMutation(
       trpc.kiloclaw.setGmailNotifications.mutationOptions({
-        onSuccess: invalidateStatus,
-        onError: onMutationError,
+        onMutate: async input => {
+          await queryClient.cancelQueries({ queryKey: trpc.kiloclaw.getStatus.queryKey() });
+          const previous = queryClient.getQueryData(trpc.kiloclaw.getStatus.queryKey());
+          queryClient.setQueryData(trpc.kiloclaw.getStatus.queryKey(), (old: typeof previous) =>
+            old ? { ...old, gmailNotificationsEnabled: input.enabled } : old
+          );
+          return { previous };
+        },
+        onError: (error, _input, context) => {
+          if (context?.previous) {
+            queryClient.setQueryData(trpc.kiloclaw.getStatus.queryKey(), context.previous);
+          }
+          onMutationError(error);
+        },
+        onSettled: invalidateStatus,
       })
     ),
     renameInstance: useMutation(
       trpc.kiloclaw.renameInstance.mutationOptions({
-        onSuccess: invalidateStatus,
-        onError: onMutationError,
+        onMutate: async input => {
+          await queryClient.cancelQueries({ queryKey: trpc.kiloclaw.getStatus.queryKey() });
+          const previous = queryClient.getQueryData(trpc.kiloclaw.getStatus.queryKey());
+          queryClient.setQueryData(trpc.kiloclaw.getStatus.queryKey(), (old: typeof previous) =>
+            old ? { ...old, name: input.name } : old
+          );
+          return { previous };
+        },
+        onError: (error, _input, context) => {
+          if (context?.previous) {
+            queryClient.setQueryData(trpc.kiloclaw.getStatus.queryKey(), context.previous);
+          }
+          onMutationError(error);
+        },
+        onSettled: invalidateStatus,
       })
     ),
     destroy: useMutation(

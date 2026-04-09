@@ -25,7 +25,31 @@ export function NotificationsCard() {
   const [loading, setLoading] = useState(true);
 
   const { data: pushTokens } = useQuery(trpc.user.getMyPushTokens.queryOptions());
-  const hasTokens = (pushTokens?.length ?? 0) > 0;
+  const [deviceToken, setDeviceToken] = useState<string | null>(null);
+  const serverRegistered =
+    deviceToken != null && (pushTokens ?? []).some(t => t.token === deviceToken);
+
+  // Optimistic override — null means "use server state"
+  const [optimistic, setOptimistic] = useState<boolean | null>(null);
+  const thisDeviceRegistered = optimistic ?? serverRegistered;
+
+  // Sync optimistic state back to server state once query catches up
+  useEffect(() => {
+    if (optimistic != null && optimistic === serverRegistered) {
+      setOptimistic(null);
+    }
+  }, [optimistic, serverRegistered]);
+
+  // Fetch current device's token once permission is known
+  useEffect(() => {
+    if (!permissionGranted) {
+      return;
+    }
+    async function fetch() {
+      setDeviceToken(await getDevicePushToken());
+    }
+    void fetch();
+  }, [permissionGranted]);
 
   const invalidateTokens = useCallback(() => {
     void queryClient.invalidateQueries({
@@ -37,9 +61,9 @@ export function NotificationsCard() {
     trpc.user.registerPushToken.mutationOptions({
       onSuccess: () => {
         invalidateTokens();
-        toast.success('Chat notifications enabled');
       },
       onError: error => {
+        setOptimistic(null);
         toast.error(error.message);
       },
     })
@@ -49,9 +73,9 @@ export function NotificationsCard() {
     trpc.user.unregisterPushToken.mutationOptions({
       onSuccess: () => {
         invalidateTokens();
-        toast.success('Chat notifications disabled');
       },
       onError: error => {
+        setOptimistic(null);
         toast.error(error.message);
       },
     })
@@ -114,15 +138,20 @@ export function NotificationsCard() {
 
   const handleToggleChatMessages = useCallback(
     async (value: boolean) => {
+      setOptimistic(value);
       if (value) {
         const token = await registerForPushNotifications();
         if (token) {
           registerToken.mutate({ token, platform: getPlatform() });
+        } else {
+          setOptimistic(null);
         }
       } else {
-        const deviceToken = await getDevicePushToken();
-        if (deviceToken) {
-          unregisterToken.mutate({ token: deviceToken });
+        const token = await getDevicePushToken();
+        if (token) {
+          unregisterToken.mutate({ token });
+        } else {
+          setOptimistic(null);
         }
       }
     },
@@ -159,9 +188,14 @@ export function NotificationsCard() {
           <Skeleton className="h-8 w-12 rounded-full" />
         ) : (
           <Switch
-            value={hasTokens}
-            disabled={!permissionGranted || registerToken.isPending || unregisterToken.isPending}
-            onValueChange={value => void handleToggleChatMessages(value)}
+            value={thisDeviceRegistered}
+            disabled={!permissionGranted}
+            onValueChange={value => {
+              if (registerToken.isPending || unregisterToken.isPending) {
+                return;
+              }
+              void handleToggleChatMessages(value);
+            }}
           />
         )}
       </View>

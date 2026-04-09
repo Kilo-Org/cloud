@@ -128,7 +128,7 @@ describe('addCacheBreakpoints', () => {
           {
             type: 'message',
             role: 'assistant',
-            content: [{ type: 'output_text', text: 'First response' }],
+            content: [{ type: 'output_text', text: 'First response', annotations: [] }],
             status: 'completed',
           },
           {
@@ -145,25 +145,24 @@ describe('addCacheBreakpoints', () => {
 
     addCacheBreakpoints(request);
 
-    const systemMessage = request.kind === 'responses' && request.body.input?.at(0);
+    if (request.kind !== 'responses' || !Array.isArray(request.body.input)) return;
+    const systemMessage = request.body.input.at(0);
     expect(systemMessage).toMatchObject({ type: 'message', role: 'system' });
-    if (!systemMessage || systemMessage === true || systemMessage.type !== 'message') return;
+    if (!systemMessage || systemMessage.type !== 'message') return;
     const systemContent = systemMessage.content;
     expect(Array.isArray(systemContent)).toBe(true);
     if (!Array.isArray(systemContent)) return;
     expect(systemContent.at(-1)).toMatchObject({
       type: 'input_text',
       text: 'You are helpful.',
-      // @ts-expect-error non-standard cache_control extension
       cache_control: { type: 'ephemeral' },
     });
 
-    const lastItem = request.kind === 'responses' && request.body.input?.at(-1);
+    const lastItem = request.body.input.at(-1);
     expect(lastItem).toMatchObject({
       type: 'function_call_output',
       output: [
         { type: 'input_text', text: 'Tool output' },
-        // @ts-expect-error non-standard cache_control extension
         { type: 'input_text', text: 'Tool detail', cache_control: { type: 'ephemeral' } },
       ],
     });

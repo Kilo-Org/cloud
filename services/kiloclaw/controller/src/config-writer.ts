@@ -198,7 +198,6 @@ export function generateBaseConfig(
     config.models.providers.kilocode.headers = config.models.providers.kilocode.headers ?? {};
     config.models.providers.kilocode.headers['X-KiloCode-OrganizationId'] =
       env.KILOCODE_ORGANIZATION_ID;
-    config.models.providers.kilocode.models = config.models.providers.kilocode.models ?? [];
     console.log('Configured KiloCode organization header from KILOCODE_ORGANIZATION_ID');
   } else {
     // Remove stale org header from previous boots (e.g., instance was transferred

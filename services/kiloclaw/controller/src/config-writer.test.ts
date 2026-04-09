@@ -302,7 +302,8 @@ describe('generateBaseConfig', () => {
     );
     // Explicit provider entries require a baseUrl per OpenClaw's strict schema
     expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
-    expect(config.models.providers.kilocode.models).toEqual([]);
+    // models key must be absent so the built-in kilocode provider's full catalog is visible
+    expect(config.models.providers.kilocode.models).toBeUndefined();
   });
 
   it('does not set org header when KILOCODE_ORGANIZATION_ID is not set', () => {

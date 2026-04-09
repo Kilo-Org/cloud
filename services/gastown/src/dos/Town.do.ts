@@ -3000,9 +3000,15 @@ export class TownDO extends DurableObject<Env> {
     // open PRs targeting it and the refinery can merge into it.
     const rig = rigs.getRig(this.sql, input.rigId);
     if (rig) {
+      const rigConfig = await this.getRigConfig(input.rigId);
       await scm
         .createConvoyBranch(
-          { env: this.env, townId: this.townId, getTownConfig: () => this.getTownConfig() },
+          {
+            env: this.env,
+            townId: this.townId,
+            getTownConfig: () => this.getTownConfig(),
+            platformIntegrationId: rigConfig?.platformIntegrationId,
+          },
           {
             gitUrl: rig.git_url,
             defaultBranch: rig.default_branch,

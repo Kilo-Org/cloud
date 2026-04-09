@@ -14,17 +14,24 @@ export type SCMContext = {
   env: Env;
   townId: string;
   getTownConfig: () => Promise<TownConfig>;
+  /**
+   * Rig-level platform integration ID. When provided, it is tried as a
+   * fallback after town-level git_auth so that rigs authenticated solely
+   * through a rig-scoped GitHub App installation can still resolve a token.
+   */
+  platformIntegrationId?: string;
 };
 
 /**
  * Resolve a GitHub API token from the town config.
- * Fallback chain: github_token → github_cli_pat → platform integration (GitHub App).
+ * Fallback chain: github_token → github_cli_pat → town platform integration → rig platform integration.
  */
 export async function resolveGitHubToken(ctx: SCMContext): Promise<string | null> {
   const townConfig = await ctx.getTownConfig();
   let token = townConfig.git_auth?.github_token ?? townConfig.github_cli_pat;
   if (!token) {
-    const integrationId = townConfig.git_auth?.platform_integration_id;
+    const integrationId =
+      townConfig.git_auth?.platform_integration_id ?? ctx.platformIntegrationId;
     if (integrationId && ctx.env.GIT_TOKEN_SERVICE) {
       try {
         token = await ctx.env.GIT_TOKEN_SERVICE.getToken(integrationId);

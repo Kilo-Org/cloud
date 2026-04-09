@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import type * as DbModule from '../db';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class {},
@@ -6,7 +7,7 @@ vi.mock('cloudflare:workers', () => ({
 }));
 
 vi.mock('../db', async importOriginal => {
-  const actual = await importOriginal<typeof import('../db')>();
+  const actual = await importOriginal<typeof DbModule>();
   return {
     ...actual,
     getWorkerDb: vi.fn(() => ({})),

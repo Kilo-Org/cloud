@@ -32,8 +32,8 @@ export type KiloExclusiveModel = {
   pricing: Pricing | null;
 };
 
-function formatPrice(price: number | null | undefined): string {
-  return (price ?? 0).toFixed(12);
+function formatPrice(price: number | null | undefined): string | undefined {
+  return price === null || price === undefined ? undefined : price.toFixed(12);
 }
 
 export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
@@ -53,14 +53,14 @@ export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
       instruct_type: null,
     },
     pricing: {
-      prompt: formatPrice(model.pricing?.prompt),
-      completion: formatPrice(model.pricing?.completion),
+      prompt: formatPrice(model.pricing?.prompt ?? 0),
+      completion: formatPrice(model.pricing?.completion ?? 0),
       request: '0',
       image: '0',
       web_search: '0',
       internal_reasoning: '0',
-      input_cache_read: formatPrice(model.pricing?.input_cache_read),
-      input_cache_write: formatPrice(model.pricing?.input_cache_read),
+      input_cache_read: formatPrice(model.pricing?.input_cache_read ?? model.pricing?.prompt ?? 0),
+      input_cache_write: formatPrice(model.pricing?.input_cache_write),
     },
     top_provider: {
       context_length: model.context_length,

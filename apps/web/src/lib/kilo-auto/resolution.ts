@@ -25,8 +25,7 @@ export async function resolveAutoModel(
   model: string,
   modeHeader: string | null,
   userPromise: Promise<User | null>,
-  balancePromise: Promise<number>,
-  requestKind: GatewayRequest['kind'] | null
+  balancePromise: Promise<number>
 ): Promise<ResolvedAutoModel> {
   if (model === KILO_AUTO_FREE_MODEL.id) {
     return { model: minimax_m25_free_model.public_id };
@@ -46,9 +45,6 @@ export async function resolveAutoModel(
       }
       return BALANCED_QWEN_MODEL;
     }
-    if (requestKind === 'chat_completions') {
-      return BALANCED_QWEN_MODEL;
-    }
     return BALANCED_CODEX_MODEL;
   }
   return (mode !== null ? FRONTIER_MODE_TO_MODEL[mode] : null) ?? FRONTIER_CODE_MODEL;
@@ -66,15 +62,12 @@ export async function applyResolvedAutoModel(
     model,
     featureHeader === 'kiloclaw' || featureHeader === 'openclaw' ? 'KiloClaw' : modeHeader,
     userPromise,
-    balancePromise,
-    request.kind
+    balancePromise
   );
   request.body.model = resolved.model;
   if (resolved.reasoning) {
     if (request.kind === 'messages') {
-      request.body.thinking = {
-        type: resolved.reasoning.enabled ? 'adaptive' : 'disabled',
-      };
+      request.body.thinking = { type: resolved.reasoning.enabled ? 'adaptive' : 'disabled' };
     } else {
       request.body.reasoning = resolved.reasoning;
     }

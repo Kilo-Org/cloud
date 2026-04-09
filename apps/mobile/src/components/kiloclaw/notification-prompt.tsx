@@ -68,13 +68,13 @@ export function NotificationPrompt({ enabled }: { enabled: boolean }) {
       return;
     }
 
-    await SecureStore.setItemAsync(PROMPT_SEEN_KEY, 'true');
-    setVisible(false);
-
     const result = await Notifications.requestPermissionsAsync();
     if (result.status !== Notifications.PermissionStatus.GRANTED) {
       return;
     }
+
+    await SecureStore.setItemAsync(PROMPT_SEEN_KEY, 'true');
+    setVisible(false);
 
     const token = await registerForPushNotifications();
     if (token) {

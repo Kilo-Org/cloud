@@ -17,12 +17,14 @@ type PendingMessage = {
   text: string;
   notified: boolean;
   createdAt: number;
+  updatedAt: string; // ISO timestamp from Stream Chat payload
 };
 
 const DEDUP_PREFIX = 'dedup:';
 const MSG_PREFIX = 'msg:';
 const DEDUP_TTL_MS = 60 * 60 * 1000; // 1 hour
-const DEBOUNCE_MS = 5_000; // 5 seconds
+const INITIAL_DEBOUNCE_MS = 10_000; // 10 seconds for first event
+const UPDATE_DEBOUNCE_MS = 5_000; // 5 seconds for updates
 
 export class NotificationChannelDO extends DurableObject<Env> {
   async processWebhook(payload: Event, webhookId: string): Promise<Response> {
@@ -39,9 +41,10 @@ export class NotificationChannelDO extends DurableObject<Env> {
     const messageId = payload.message?.id;
     const senderId = payload.message?.user?.id;
     const messageText = payload.message?.text ?? '';
+    const messageUpdatedAt = payload.message?.updated_at ?? payload.created_at ?? '';
 
     console.log(
-      `[DEBUG] messageId=${messageId}, senderId=${senderId}, text="${messageText.slice(0, 50)}"`
+      `[DEBUG] messageId=${messageId}, senderId=${senderId}, updatedAt=${messageUpdatedAt}, text="${messageText.slice(0, 50)}"`
     );
 
     if (!messageId || !senderId?.startsWith('bot-')) {
@@ -57,30 +60,36 @@ export class NotificationChannelDO extends DurableObject<Env> {
       return Response.json({ ok: true });
     }
 
-    if (payload.type === 'message.new') {
-      // Store pending message, set debounce alarm
+    if (pendingMessage) {
+      // Only accept if this event is newer than what we have
+      if (messageUpdatedAt <= pendingMessage.updatedAt) {
+        console.log(
+          `[DEBUG] Stale event for message ${messageId}: ${messageUpdatedAt} <= ${pendingMessage.updatedAt}, ignoring`
+        );
+        return Response.json({ ok: true });
+      }
+      if (messageText) {
+        pendingMessage.text = messageText;
+      }
+      pendingMessage.updatedAt = messageUpdatedAt;
+      await this.ctx.storage.put(msgKey, pendingMessage);
+      await this.scheduleAlarm(UPDATE_DEBOUNCE_MS);
+      console.log(
+        `[DEBUG] Updated message ${messageId}, text="${pendingMessage.text.slice(0, 50)}", alarm reset to ${UPDATE_DEBOUNCE_MS}ms`
+      );
+    } else {
+      // First event for this message (could be message.new or a late message.updated)
       const pending: PendingMessage = {
         messageId,
         senderId,
         text: messageText,
         notified: false,
         createdAt: Date.now(),
+        updatedAt: messageUpdatedAt,
       };
       await this.ctx.storage.put(msgKey, pending);
-      await this.scheduleAlarm(DEBOUNCE_MS);
-      console.log(`[DEBUG] Stored pending message ${messageId}, alarm in ${DEBOUNCE_MS}ms`);
-    } else if (payload.type === 'message.updated') {
-      if (!pendingMessage) {
-        console.log(`[DEBUG] message.updated for unknown message ${messageId}, ignoring`);
-        return Response.json({ ok: true });
-      }
-      // Update text, reset debounce
-      pendingMessage.text = messageText;
-      await this.ctx.storage.put(msgKey, pendingMessage);
-      await this.scheduleAlarm(DEBOUNCE_MS);
-      console.log(
-        `[DEBUG] Updated pending message ${messageId}, text="${messageText.slice(0, 50)}", alarm reset`
-      );
+      await this.scheduleAlarm(INITIAL_DEBOUNCE_MS);
+      console.log(`[DEBUG] Stored pending message ${messageId}, alarm in ${INITIAL_DEBOUNCE_MS}ms`);
     }
 
     return Response.json({ ok: true });
@@ -104,8 +113,6 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
     // Process pending messages that have debounced
     const pendingEntries = await this.ctx.storage.list<PendingMessage>({ prefix: MSG_PREFIX });
-    let hasRemainingPending = false;
-
     for (const [key, msg] of pendingEntries) {
       if (msg.notified) {
         // Clean up old notified messages
@@ -116,9 +123,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
       }
 
       if (!msg.text) {
-        // No text yet — keep waiting but schedule another alarm
-        console.log(`[DEBUG] Message ${msg.messageId} still has no text, waiting`);
-        hasRemainingPending = true;
+        // No text — nothing to notify about, discard
+        console.log(`[DEBUG] Message ${msg.messageId} has no text, discarding`);
+        await this.ctx.storage.delete(key);
         continue;
       }
 
@@ -128,11 +135,6 @@ export class NotificationChannelDO extends DurableObject<Env> {
       await this.sendNotification(msg);
       msg.notified = true;
       await this.ctx.storage.put(key, msg);
-    }
-
-    // Re-schedule alarm if we still have pending messages without text
-    if (hasRemainingPending) {
-      await this.scheduleAlarm(DEBOUNCE_MS);
     }
   }
 

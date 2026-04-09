@@ -161,7 +161,7 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
 
       await onCapacityRecovery?.(err);
 
-        providerState = await flyMachines.replaceStrandedVolume(
+      providerState = await flyMachines.replaceStrandedVolume(
         flyConfig,
         {
           ...state,
@@ -169,9 +169,9 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
         },
         providerState,
         env,
-          'start_capacity_recovery',
-          onProviderResult
-        );
+        'start_capacity_recovery',
+        onProviderResult
+      );
 
       const result = await flyMachines.createNewMachine(
         flyConfig,

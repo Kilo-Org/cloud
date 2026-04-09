@@ -456,6 +456,40 @@ type KiloCodeConfigPublicResponse = Pick<
   'kilocodeApiKeyExpiresAt' | 'kilocodeDefaultModel'
 >;
 
+function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDashboardStatus {
+  return {
+    userId,
+    sandboxId: null,
+    status: null,
+    provisionedAt: null,
+    lastStartedAt: null,
+    lastStoppedAt: null,
+    envVarCount: 0,
+    secretCount: 0,
+    channelCount: 0,
+    flyAppName: null,
+    flyMachineId: null,
+    flyVolumeId: null,
+    flyRegion: null,
+    machineSize: null,
+    openclawVersion: null,
+    imageVariant: null,
+    trackedImageTag: null,
+    trackedImageDigest: null,
+    googleConnected: false,
+    gmailNotificationsEnabled: false,
+    execSecurity: null,
+    execAsk: null,
+    botName: null,
+    botNature: null,
+    botVibe: null,
+    botEmoji: null,
+    workerUrl,
+    name: null,
+    instanceId: null,
+  } satisfies KiloClawDashboardStatus;
+}
+
 function sanitizeKiloCodeConfigResponse(
   response: KiloCodeConfigResponse
 ): KiloCodeConfigPublicResponse {
@@ -1400,18 +1434,23 @@ export const kiloclawRouter = createTRPCRouter({
 
   getStatus: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
+    const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
+
+    if (!instance) {
+      return createNoInstanceStatus(ctx.user.id, workerUrl);
+    }
+
     const client = new KiloClawInternalClient();
     const status = await client.getStatus(ctx.user.id, workerInstanceId(instance));
-    const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
 
     return {
       ...status,
-      name: instance?.name ?? null,
+      name: instance.name ?? null,
       workerUrl,
       // Only expose instanceId for instance-keyed instances (ki_ sandboxId).
       // Legacy instances use userId-keyed DOs — returning their row UUID would
       // cause the frontend/gateway to resolve the wrong DO.
-      instanceId: workerInstanceId(instance) ? (instance?.id ?? null) : null,
+      instanceId: workerInstanceId(instance) ? instance.id : null,
     } satisfies KiloClawDashboardStatus;
   }),
 

@@ -39,10 +39,13 @@ export type ResolvedAutoModel = {
   verbosity?: Verbosity;
 };
 
+export const GPT_53_CODEX_ID = 'openai/gpt-5.3-codex';
+
 const MODEL_DISPLAY_NAMES: Readonly<Record<string, string>> = {
   [CLAUDE_OPUS_CURRENT_MODEL_ID]: CLAUDE_OPUS_CURRENT_MODEL_NAME,
   [CLAUDE_SONNET_CURRENT_MODEL_ID]: CLAUDE_SONNET_CURRENT_MODEL_NAME,
   [qwen36_plus_model.public_id]: 'Qwen3.6 Plus',
+  [GPT_53_CODEX_ID]: 'GPT-5.3-Codex',
 };
 
 function describeRouting(modeToModel: Record<string, ResolvedAutoModel>): string {
@@ -128,7 +131,12 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   code: FRONTIER_CODE_MODEL,
 };
 
-export const BALANCED_CODE_MODEL: ResolvedAutoModel = {
+export const BALANCED_CODEX_MODEL: ResolvedAutoModel = {
+  model: GPT_53_CODEX_ID,
+  reasoning: { enabled: true, effort: 'low' },
+};
+
+export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
   model: qwen36_plus_model.public_id,
   reasoning: { enabled: true },
 };
@@ -137,28 +145,6 @@ export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
   model: claude_sonnet_clawsetup_model.public_id,
   reasoning: { enabled: true, effort: 'high' },
   verbosity: 'high',
-};
-
-export const BALANCED_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
-  KiloClaw: {
-    model: qwen36_plus_model.public_id,
-    reasoning: { enabled: true },
-  },
-  plan: { model: qwen36_plus_model.public_id, reasoning: { enabled: true } },
-  general: { model: qwen36_plus_model.public_id, reasoning: { enabled: true } },
-  architect: {
-    model: qwen36_plus_model.public_id,
-    reasoning: { enabled: true },
-  },
-  orchestrator: {
-    model: qwen36_plus_model.public_id,
-    reasoning: { enabled: true },
-  },
-  ask: { model: qwen36_plus_model.public_id, reasoning: { enabled: true } },
-  debug: { model: qwen36_plus_model.public_id, reasoning: { enabled: true } },
-  build: { model: qwen36_plus_model.public_id, reasoning: { enabled: true } },
-  explore: { model: qwen36_plus_model.public_id, reasoning: { enabled: true } },
-  code: BALANCED_CODE_MODEL,
 };
 
 export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
@@ -200,18 +186,17 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
 export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   id: 'kilo-auto/balanced',
   name: 'Kilo Auto Balanced',
-  description: `Great balance of price and capability. ${describeRouting(BALANCED_MODE_TO_MODEL)}`,
-  context_length: qwen36_plus_model.context_length,
-  max_completion_tokens: qwen36_plus_model.max_completion_tokens,
-  prompt_price: '0.000000325',
-  completion_price: '0.00000195',
-  input_cache_read_price: '0.0000000325',
-  input_cache_write_price: '0.00000040625',
-  supports_images: true,
+  description:
+    'Great balance of price and capability. Uses GPT-5.3-Codex for general tasks; Qwen3.6 Plus for KiloClaw and chat completions.',
+  context_length: 400_000,
+  max_completion_tokens: 128_000,
+  prompt_price: '0.00000175',
+  completion_price: '0.000014',
+  input_cache_read_price: '0.000000175',
+  input_cache_write_price: undefined,
+  supports_images: false,
   roocode_settings: undefined,
-  opencode_settings: {
-    ai_sdk_provider: 'openai-compatible',
-  },
+  opencode_settings: undefined,
 };
 
 export const KILO_AUTO_SMALL_MODEL: AutoModel = {

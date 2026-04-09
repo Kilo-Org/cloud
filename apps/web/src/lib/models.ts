@@ -3,12 +3,10 @@
  */
 
 import {
-  isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
 } from '@/lib/kilo-auto-model';
-import { resolveAutoModel } from '@/lib/kilo-auto-model.resolution';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   claude_sonnet_clawsetup_model,
@@ -45,21 +43,6 @@ export const preferredModels = [
   KIMI_CURRENT_MODEL_ID,
   'z-ai/glm-5.1',
 ].filter(m => m !== null);
-
-export async function getMonitoredModels() {
-  const set = new Set<string>();
-  for (const model of preferredModels) {
-    if (isKiloAutoModel(model)) {
-      set.add(
-        (await resolveAutoModel(model, null, Promise.resolve(null), Promise.resolve(0), false))
-          .model
-      );
-    } else {
-      set.add(model);
-    }
-  }
-  return [...set];
-}
 
 export function isFreeModel(model: string): boolean {
   return (

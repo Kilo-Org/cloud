@@ -70,6 +70,7 @@ const RESET = '\x1b[0m';
 const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
 const GREEN = '\x1b[32m';
+const CAPTURE_TIMEOUT_MS = 30_000;
 
 // ---------------------------------------------------------------------------
 // Commands
@@ -158,6 +159,8 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   const captureServiceSet = new Set(['kiloclaw-tunnel', 'kiloclaw-stripe', 'app-builder-tunnel']);
   const captureServices = serviceNames.filter(n => captureServiceSet.has(n));
   const otherServices = serviceNames.filter(n => !captureServiceSet.has(n));
+  const startedServices: string[] = [];
+  let kiloclawTunnelCaptured = true;
 
   if (captureServices.length > 0) {
     const oldValues = new Map<string, string | undefined>();
@@ -180,6 +183,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
 
     for (const name of captureServices) {
       startServiceInTmux(sessionName, name);
+      startedServices.push(name);
       await sleep(300);
     }
 
@@ -192,13 +196,16 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
           path.join(repoRoot, 'services/kiloclaw/.dev.vars'),
           'KILOCODE_API_BASE_URL',
           oldValues.get('tunnel'),
-          30_000,
+          CAPTURE_TIMEOUT_MS,
           oldMtimes.get('tunnel')
         ).then(ready => {
+          kiloclawTunnelCaptured = ready;
           if (ready) {
             console.log('  Tunnel URL captured');
           } else {
-            console.warn('  Tunnel URL not captured after 30s - check kiloclaw-tunnel window');
+            console.warn(
+              '  Tunnel URL not captured after 30s - kiloclaw startup will wait for a retry'
+            );
           }
         })
       );
@@ -210,7 +217,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
           path.join(repoRoot, '.env.development.local'),
           'STRIPE_WEBHOOK_SECRET',
           oldValues.get('stripe'),
-          30_000,
+          CAPTURE_TIMEOUT_MS,
           oldMtimes.get('stripe')
         ).then(ready => {
           if (ready) {
@@ -228,7 +235,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
           path.join(repoRoot, 'services/app-builder/.dev.vars'),
           'BUILDER_HOSTNAME',
           oldValues.get('app-builder-tunnel'),
-          30_000,
+          CAPTURE_TIMEOUT_MS,
           oldMtimes.get('app-builder-tunnel')
         ).then(ready => {
           if (ready) {
@@ -246,17 +253,32 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     console.log();
   }
 
+  const skippedServices: string[] = [];
   for (const name of otherServices) {
+    const dependsOnKiloclaw = getService(name).dependsOn.includes('kiloclaw');
+    if (!kiloclawTunnelCaptured && (name === 'kiloclaw' || dependsOnKiloclaw)) {
+      skippedServices.push(name);
+      continue;
+    }
+
     startServiceInTmux(sessionName, name);
+    startedServices.push(name);
     await sleep(300);
+  }
+
+  if (skippedServices.length > 0) {
+    console.warn(
+      `Skipped startup for ${skippedServices.join(', ')} until KILOCODE_API_BASE_URL is captured.`
+    );
+    console.warn('Start or restart these services after the tunnel URL is ready.');
   }
 
   // --- Set up split layout in window 0: left=sidebar, right=service terminal ---
   // Join the preferred service's pane into window 0 as pane 1 (right column).
   // join-pane moves the pane process — no ghost shells.
   let initialViewedService = '';
-  if (serviceNames.length > 0) {
-    const preferred = serviceNames.includes('nextjs') ? 'nextjs' : serviceNames[0];
+  if (startedServices.length > 0) {
+    const preferred = startedServices.includes('nextjs') ? 'nextjs' : startedServices[0];
     const windows = listWindows(sessionName);
     const preferredWin = windows.find(w => w.name === preferred);
     if (preferredWin) {
@@ -278,9 +300,9 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   }
 
   // --- Start sidebar TUI in left pane (0.0) ---
-  const enabledGroupIds = determineEnabledGroups(serviceNames);
+  const enabledGroupIds = determineEnabledGroups(startedServices);
   const dashboardArgs = [
-    JSON.stringify(serviceNames),
+    JSON.stringify(startedServices),
     initialViewedService,
     JSON.stringify(enabledGroupIds),
   ];
@@ -292,9 +314,11 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   selectWindow(sessionName, 0);
 
   // --- Write manifest for agents ---
-  writeManifest(repoRoot, sessionName, serviceNames);
+  writeManifest(repoRoot, sessionName, startedServices);
 
-  console.log(`${GREEN}Started ${serviceNames.length} services in session ${sessionName}${RESET}`);
+  console.log(
+    `${GREEN}Started ${startedServices.length} services in session ${sessionName}${RESET}`
+  );
   attachSession(sessionName);
 }
 

@@ -292,6 +292,20 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
         ? 'Wrapping up…'
         : 'Ask anything…';
 
+  const sessionActions = (
+    <ChatHeader
+      cloudAgentSessionId={sessionId ?? 'Starting session…'}
+      kiloSessionId={sessionIdFromParams ?? undefined}
+      organizationId={organizationId}
+      repository={sessionConfig?.repository ?? ''}
+      model={sessionConfig?.model}
+      modelDisplayName={modelDisplayName}
+      totalCost={totalCost}
+      soundEnabled={soundEnabled}
+      onToggleSound={handleToggleSound}
+    />
+  );
+
   // -- Render ---------------------------------------------------------------
   return (
     <QuestionContextProvider
@@ -318,28 +332,17 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
             <>
               {showLoadingIndicator && <div className="bg-primary h-0.5 w-full animate-pulse" />}
 
-              <div className="relative min-h-0 flex-1">
-                {/* Mobile sidebar toggle — floating top-left */}
-                <MobileSidebarToggle />
+              <div className="flex shrink-0 items-center justify-between border-b px-3 py-2 lg:hidden">
+                <MobileSidebarToggle variant="inline" label="Sessions" />
+                {sessionActions}
+              </div>
 
-                {/* Session action buttons — floating top-right */}
-                <div className="absolute right-3 top-2 z-10">
-                  <ChatHeader
-                    cloudAgentSessionId={sessionId ?? 'Starting session…'}
-                    kiloSessionId={sessionIdFromParams ?? undefined}
-                    organizationId={organizationId}
-                    repository={sessionConfig?.repository ?? ''}
-                    model={sessionConfig?.model}
-                    modelDisplayName={modelDisplayName}
-                    totalCost={totalCost}
-                    soundEnabled={soundEnabled}
-                    onToggleSound={handleToggleSound}
-                  />
-                </div>
+              <div className="relative min-h-0 flex-1">
+                <div className="absolute right-3 top-2 z-10 hidden lg:block">{sessionActions}</div>
 
                 <div
                   ref={scrollContainerRef}
-                  className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-12 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
+                  className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 lg:pt-12 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
                   onScroll={handleScroll}
                 >
                   <StaticMessages messages={staticMessages} getChildMessages={getChildMessages} />

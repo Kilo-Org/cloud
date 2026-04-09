@@ -201,6 +201,8 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   },
   opencode_settings: {
     ai_sdk_provider: 'openai',
+    family: 'gpt',
+    prompt: 'codex',
   },
 };
 

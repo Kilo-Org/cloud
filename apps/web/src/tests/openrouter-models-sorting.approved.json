@@ -92,7 +92,9 @@
         ]
       },
       "opencode": {
-        "ai_sdk_provider": "openai"
+        "ai_sdk_provider": "openai",
+        "family": "gpt",
+        "prompt": "codex"
       },
       "preferredIndex": 1,
       "isFree": false

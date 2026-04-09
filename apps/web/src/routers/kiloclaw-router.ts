@@ -80,11 +80,7 @@ import {
   KILOCLAW_PLAN_COST_MICRODOLLARS,
   KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS,
 } from '@/lib/kiloclaw/credit-billing';
-import {
-  createCliRun,
-  markCliRunCancelled,
-  shouldPersistCliRunControllerStatus,
-} from '@/lib/kiloclaw/cli-runs';
+import { createCliRun, markCliRunCancelled, shouldPersistCliRunControllerStatus } from '@/lib/kiloclaw/cli-runs';
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
 import PostHogClient from '@/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
@@ -2024,12 +2020,18 @@ export const kiloclawRouter = createTRPCRouter({
         );
       } catch (err) {
         if (err instanceof KiloClawApiError) {
-          const { code } = getKiloClawApiErrorPayload(err);
+          const { code, message } = getKiloClawApiErrorPayload(err);
           if (code === 'controller_route_unavailable') {
             throw new TRPCError({
               code: 'PRECONDITION_FAILED',
               message: 'Instance needs redeploy to support recovery',
               cause: new UpstreamApiError('controller_route_unavailable'),
+            });
+          }
+          if (err.statusCode === 409) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: message ?? 'A kilo CLI run is already in progress',
             });
           }
         }
@@ -2077,6 +2079,7 @@ export const kiloclawRouter = createTRPCRouter({
           startedAt: null,
           completedAt: null,
           prompt: null,
+          initiatedBy: null,
         };
       }
 
@@ -2091,15 +2094,13 @@ export const kiloclawRouter = createTRPCRouter({
           startedAt: row.started_at,
           completedAt: row.completed_at ?? null,
           prompt: row.prompt,
+          initiatedBy: row.initiated_by,
         };
       }
 
       // Run is still active — poll the controller for live output.
       const client = new KiloClawInternalClient();
-      const controllerStatus = await client.getKiloCliRunStatus(
-        ctx.user.id,
-        workerInstanceId(instance)
-      );
+      const controllerStatus = await client.getKiloCliRunStatus(ctx.user.id, workerInstanceId(instance));
 
       // If controller reports the run finished, persist to the DB row.
       if (shouldPersistCliRunControllerStatus(row, controllerStatus)) {
@@ -2124,6 +2125,7 @@ export const kiloclawRouter = createTRPCRouter({
       return {
         ...controllerStatus,
         prompt: row.prompt,
+        initiatedBy: row.initiated_by,
       };
     }),
 
@@ -2131,6 +2133,27 @@ export const kiloclawRouter = createTRPCRouter({
     .input(z.object({ runId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const instance = await getActiveInstance(ctx.user.id);
+      const instanceFilter = instance ? eq(kiloclaw_cli_runs.instance_id, instance.id) : undefined;
+      const [row] = await db
+        .select()
+        .from(kiloclaw_cli_runs)
+        .where(
+          and(
+            eq(kiloclaw_cli_runs.id, input.runId),
+            eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+            instanceFilter
+          )
+        )
+        .limit(1);
+
+      if (!row) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'CLI run not found' });
+      }
+
+      if (row.status !== 'running') {
+        return { ok: true };
+      }
+
       const client = new KiloClawInternalClient();
       const result = await client.cancelKiloCliRun(ctx.user.id, workerInstanceId(instance));
 
@@ -2149,13 +2172,11 @@ export const kiloclawRouter = createTRPCRouter({
   listKiloCliRuns: clawAccessProcedure
     .input(z.object({ limit: z.number().min(1).max(50).default(10) }).optional())
     .query(async ({ ctx, input }) => {
-      const instance = await getActiveInstance(ctx.user.id);
       const limit = input?.limit ?? 10;
-      const instanceFilter = instance ? eq(kiloclaw_cli_runs.instance_id, instance.id) : undefined;
       const runs = await db
         .select()
         .from(kiloclaw_cli_runs)
-        .where(and(eq(kiloclaw_cli_runs.user_id, ctx.user.id), instanceFilter))
+        .where(eq(kiloclaw_cli_runs.user_id, ctx.user.id))
         .orderBy(desc(kiloclaw_cli_runs.started_at))
         .limit(limit);
 

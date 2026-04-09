@@ -1189,13 +1189,22 @@ export async function updateAgentModel(
     `${MANAGER_LOG} updateAgentModel: restarting SDK server for agent ${agentId} with model=${model}`
   );
 
-  // 1. Preserve organizationId from the agent record (most reliable source) or
-  //    fall back to process.env / KILO_CONFIG_CONTENT if the agent has none.
-  const organizationId = extractOrganizationId(agent);
-  // Keep the agent's durable organizationId field in sync with process.env
-  // so future calls have the freshest value even if it was updated via PATCH.
-  if (organizationId && agent.organizationId !== organizationId) {
+  // 1. Resolve the organizationId, preferring the freshly-updated process.env
+  //    value over the cached agent field. The PATCH /model handler sets
+  //    process.env.GASTOWN_ORGANIZATION_ID before calling updateAgentModel, so
+  //    the env var is always at least as current as agent.organizationId and
+  //    may carry a brand-new org context that hasn't been written to the agent
+  //    record yet.
+  const organizationId =
+    process.env.GASTOWN_ORGANIZATION_ID || agent.organizationId || extractOrganizationId();
+
+  // Keep both the agent's durable field and the startupEnv snapshot in sync
+  // so that (a) future hot-swaps see the new value and (b) syncRegistry()
+  // serialises the updated org context, preventing boot hydration from
+  // reviving agents with the stale org after a container restart.
+  if (organizationId) {
     agent.organizationId = organizationId;
+    agent.startupEnv = { ...agent.startupEnv, GASTOWN_ORGANIZATION_ID: organizationId };
   }
 
   // 2. Rebuild KILO_CONFIG_CONTENT with the new model and update process.env

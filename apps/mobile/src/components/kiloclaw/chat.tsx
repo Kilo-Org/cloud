@@ -192,9 +192,14 @@ function StreamChatUI({
 
     const connect = async () => {
       try {
-        // Await disconnect to prevent tokenManager.reset() from racing with the new connection
-        if (chatClient.userID) {
-          await chatClient.disconnectUser();
+        // Disconnect any stale connection (e.g. after app was backgrounded)
+        // to prevent "can't use channel after disconnect" errors
+        if (chatClient.userID || chatClient.wsConnection) {
+          try {
+            await chatClient.disconnectUser();
+          } catch {
+            // Ignore disconnect errors on a potentially dead connection
+          }
         }
         if (cancelled) {
           return;

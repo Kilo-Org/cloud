@@ -67,6 +67,27 @@ describe('kilo-exa web search provider', () => {
     });
   });
 
+  it('accepts boolean contents.summary without throwing', async () => {
+    webSearchSdkStub.setPostHandler(async () => ({ results: [] }));
+    const tool = getTool();
+
+    const response = await tool.execute({
+      query: 'Josh Avant',
+      count: 5,
+      contents: {
+        summary: true,
+      },
+    });
+
+    expect(response).not.toHaveProperty('error');
+    const call = webSearchSdkStub.getPostCalls()[0];
+    expect(call.body).toMatchObject({
+      contents: {
+        summary: true,
+      },
+    });
+  });
+
   it('builds stable cache keys for identical requests', async () => {
     webSearchSdkStub.setPostHandler(async () => ({
       results: [

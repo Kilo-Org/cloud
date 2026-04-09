@@ -91,6 +91,10 @@ function errorPayload(error: string, message: string): ErrorPayload {
   };
 }
 
+function isErrorPayload(value: unknown): value is ErrorPayload {
+  return isRecord(value) && typeof value.error === 'string' && typeof value.message === 'string';
+}
+
 function optionalStringEnum(values: readonly string[], description: string): Record<string, unknown> {
   return {
     type: 'string',
@@ -330,21 +334,21 @@ function parseExaContents(rawContents: unknown): { value?: ExaContentsArgs } | E
 
   if ('text' in rawContents) {
     const parsedText = parseText(rawContents.text);
-    if ('error' in parsedText) {
+    if (isErrorPayload(parsedText)) {
       return parsedText;
     }
     parsed.text = parsedText;
   }
   if ('highlights' in rawContents) {
     const parsedHighlights = parseHighlights(rawContents.highlights);
-    if ('error' in parsedHighlights) {
+    if (isErrorPayload(parsedHighlights)) {
       return parsedHighlights;
     }
     parsed.highlights = parsedHighlights;
   }
   if ('summary' in rawContents) {
     const parsedSummary = parseSummary(rawContents.summary);
-    if ('error' in parsedSummary) {
+    if (isErrorPayload(parsedSummary)) {
       return parsedSummary;
     }
     parsed.summary = parsedSummary;

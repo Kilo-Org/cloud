@@ -21,12 +21,7 @@ import { eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from './getRootSpan';
 import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
 import type { ProviderId } from '@/lib/providers/types';
-import {
-  calculatKiloExclusiveCost_mUsd,
-  isFreeModel,
-  isKiloStealthModel,
-  kiloExclusiveModels,
-} from '@/lib/models';
+import { calculatKiloExclusiveCost_mUsd, isFreeModel, isKiloStealthModel } from '@/lib/models';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';

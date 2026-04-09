@@ -459,6 +459,22 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     }
 
     case 'reset_agent_dispatch_attempts': {
+      const agentRows = z
+        .object({ current_hook_bead_id: z.string().nullable() })
+        .array()
+        .parse([
+          ...query(
+            sql,
+            /* sql */ `
+              SELECT ${agent_metadata.columns.current_hook_bead_id}
+              FROM ${agent_metadata}
+              WHERE ${agent_metadata.columns.bead_id} = ?
+            `,
+            [action.agent_id]
+          ),
+        ]);
+      const hookedBeadId = agentRows[0]?.current_hook_bead_id;
+
       query(
         sql,
         /* sql */ `
@@ -468,6 +484,19 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
         `,
         [action.agent_id]
       );
+
+      if (hookedBeadId) {
+        query(
+          sql,
+          /* sql */ `
+            UPDATE ${beads}
+            SET ${beads.columns.dispatch_attempts} = 0,
+                ${beads.columns.last_dispatch_attempt_at} = NULL
+            WHERE ${beads.bead_id} = ?
+          `,
+          [hookedBeadId]
+        );
+      }
       return null;
     }
 

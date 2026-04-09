@@ -1174,6 +1174,48 @@ export class TownDO extends DurableObject<Env> {
   }
 
   /**
+   * Reset an agent's dispatch_attempts counter to 0 without unhooking.
+   * Also resets the hooked bead's dispatch_attempts/last_dispatch_attempt_at so
+   * the reconciler doesn't skip the bead due to accumulated cooldown state.
+   * Verifies the agent belongs to rigId to prevent cross-rig mutations.
+   */
+  async resetAgentDispatchAttempts(agentId: string, rigId: string): Promise<void> {
+    const agent = agents.getAgent(this.sql, agentId);
+    if (!agent) throw new Error(`Agent ${agentId} not found`);
+    if (agent.rig_id !== rigId) throw new Error(`Agent ${agentId} does not belong to rig ${rigId}`);
+
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agent_metadata}
+        SET ${agent_metadata.columns.dispatch_attempts} = 0
+        WHERE ${agent_metadata.bead_id} = ?
+      `,
+      [agentId]
+    );
+
+    // Also clear the hooked bead's dispatch state so the reconciler won't skip
+    // it due to accumulated cooldown or max-attempt circuit breaker.
+    const hookedBeadId = agent.current_hook_bead_id;
+    if (hookedBeadId) {
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.dispatch_attempts} = 0,
+              ${beads.columns.last_dispatch_attempt_at} = NULL
+          WHERE ${beads.bead_id} = ?
+        `,
+        [hookedBeadId]
+      );
+    }
+
+    console.log(
+      `${TOWN_LOG} resetAgentDispatchAttempts: reset agent=${agentId} hookedBead=${hookedBeadId ?? 'none'}`
+    );
+  }
+
+  /**
    * Edit convoy_metadata fields (merge_mode, feature_branch).
    * Returns the updated convoy, or null if not found.
    */

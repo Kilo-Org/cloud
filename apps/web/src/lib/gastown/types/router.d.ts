@@ -287,6 +287,15 @@ export declare const gastownRouter: import('@trpc/server').TRPCBuiltRouter<
       output: void;
       meta: object;
     }>;
+    resetAgentDispatchAttempts: import('@trpc/server').TRPCMutationProcedure<{
+      input: {
+        rigId: string;
+        agentId: string;
+        townId?: string | undefined;
+      };
+      output: void;
+      meta: object;
+    }>;
     sling: import('@trpc/server').TRPCMutationProcedure<{
       input: {
         rigId: string;
@@ -1611,6 +1620,15 @@ export declare const wrappedGastownRouter: import('@trpc/server').TRPCBuiltRoute
           meta: object;
         }>;
         deleteAgent: import('@trpc/server').TRPCMutationProcedure<{
+          input: {
+            rigId: string;
+            agentId: string;
+            townId?: string | undefined;
+          };
+          output: void;
+          meta: object;
+        }>;
+        resetAgentDispatchAttempts: import('@trpc/server').TRPCMutationProcedure<{
           input: {
             rigId: string;
             agentId: string;

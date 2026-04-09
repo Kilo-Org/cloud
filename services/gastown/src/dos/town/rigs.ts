@@ -5,7 +5,7 @@
 
 import { z } from 'zod';
 import { query } from '../../util/query.util';
-import { RigOverrideConfig, RigOverrideConfigSchema } from '../../types';
+import { type RigOverrideConfig, RigOverrideConfigSchema } from '../../types';
 
 const RIG_TABLE_CREATE = /* sql */ `
   CREATE TABLE IF NOT EXISTS "rigs" (
@@ -27,9 +27,9 @@ export const RigRecord = z.object({
   default_branch: z.string(),
   config: z
     .string()
-    .transform((v) => {
+    .transform((v): unknown => {
       try {
-        return JSON.parse(v);
+        return JSON.parse(v) as unknown;
       } catch {
         return {};
       }

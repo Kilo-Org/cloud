@@ -9,12 +9,10 @@ import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/us
 import { useClawServiceDegraded } from '../hooks/useClawHooks';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { ClawHeader } from './ClawHeader';
 import { InstanceControls } from './InstanceControls';
 import { InstanceTab } from './InstanceTab';
-import { SubscriptionTab } from './SubscriptionTab';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { ClawContextProvider, useClawContext } from './ClawContext';
 
@@ -87,16 +85,6 @@ function ClawDashboardInner({ status }: { status: KiloClawDashboardStatus | unde
     Date.now() - instanceStatus.provisionedAt < SEVEN_DAYS_MS;
   const configServiceNudgeVisible = instanceYoung;
 
-  const VALID_TABS = ['instance', 'subscription'] as const;
-  type TabValue = (typeof VALID_TABS)[number];
-
-  function tabFromHash(): TabValue {
-    if (typeof window === 'undefined') return 'instance';
-    const hash = window.location.hash.slice(1);
-    return VALID_TABS.includes(hash as TabValue) ? (hash as TabValue) : 'instance';
-  }
-
-  const [activeTab, setActiveTab] = useState<TabValue>(tabFromHash);
   const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
   const setupPath = `${basePath}/new`;
 
@@ -106,24 +94,12 @@ function ClawDashboardInner({ status }: { status: KiloClawDashboardStatus | unde
     }
   }, [instanceStatus, router, setupPath]);
 
-  function handleTabChange(value: string) {
-    setActiveTab(value as TabValue);
-    window.history.replaceState(null, '', value === 'instance' ? basePath : `${basePath}#${value}`);
-  }
-
-  useEffect(() => {
-    function onHashChange() {
-      setActiveTab(tabFromHash());
-    }
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
-
   const [upgradeRequested, setUpgradeRequested] = useState(false);
   const onUpgradeHandled = useCallback(() => setUpgradeRequested(false), []);
 
-  const tabTriggerClass =
-    'border-border text-muted-foreground hover:bg-muted hover:text-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground rounded-md border px-4 py-2 text-sm font-medium transition-colors data-[state=active]:shadow-none';
+  // Billing gating (welcome page for new users, loading spinner) is handled
+  // by page.tsx before this component mounts. ClawDashboard always renders
+  // the full dashboard with BillingWrapper handling lock dialogs and banners.
 
   return (
     <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
@@ -197,33 +173,14 @@ function ClawDashboardInner({ status }: { status: KiloClawDashboardStatus | unde
                 onUpgradeHandled={onUpgradeHandled}
               />
             </CardContent>
-            <Tabs value={activeTab} onValueChange={handleTabChange}>
-              <div className="px-5">
-                <TabsList className="mt-4 h-auto w-full justify-start gap-2 overflow-x-auto rounded-none border-b bg-transparent p-0 pb-3">
-                  <TabsTrigger value="instance" className={tabTriggerClass}>
-                    Gateway Process
-                  </TabsTrigger>
-                  {!organizationId && (
-                    <TabsTrigger value="subscription" className={tabTriggerClass}>
-                      Subscription
-                    </TabsTrigger>
-                  )}
-                </TabsList>
-              </div>
-              <CardContent className="p-5">
-                <TabsContent value="instance" className="mt-0">
-                  <InstanceTab
-                    status={instanceStatus}
-                    gatewayStatus={gatewayStatus}
-                    gatewayLoading={gatewayLoading}
-                    gatewayError={gatewayError}
-                  />
-                </TabsContent>
-                <TabsContent value="subscription" className="mt-0">
-                  <SubscriptionTab />
-                </TabsContent>
-              </CardContent>
-            </Tabs>
+            <CardContent className="p-5">
+              <InstanceTab
+                status={instanceStatus}
+                gatewayStatus={gatewayStatus}
+                gatewayLoading={gatewayLoading}
+                gatewayError={gatewayError}
+              />
+            </CardContent>
           </Card>
         )}
       </MaybeBillingWrapper>

@@ -79,14 +79,19 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     className?: string;
   }> = [
     {
+      title: 'Chat',
+      icon: MessageSquare,
+      url: '/claw/chat',
+    },
+    {
       title: 'KiloClaw',
       icon: KiloCrabIcon,
       url: '/claw',
     },
     {
-      title: 'Chat',
-      icon: MessageSquare,
-      url: '/claw/chat',
+      title: 'Subscription',
+      icon: CreditCard,
+      url: '/claw/subscription',
     },
     {
       title: 'Settings',

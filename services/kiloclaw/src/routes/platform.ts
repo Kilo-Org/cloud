@@ -32,6 +32,7 @@ import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
 import { deriveHttpEventName } from '../middleware/analytics';
 import { sendMessage } from '../stream-chat/client';
+import { assertImplementedProvider } from '../providers';
 import type { ProviderCapability } from '../providers/types';
 
 const GmailHistoryIdSchema = z.object({
@@ -294,6 +295,7 @@ const SAFE_ERROR_PREFIXES = [
   'Cannot retry recovery', // force-retry-recovery guard messages
   'Stream Chat sendMessage failed', // sendMessage HTTP errors
   'Stream Chat is not set up', // no Stream Chat on this instance
+  'Provider ', // explicit not-implemented provider errors
 ];
 
 function sanitizeError(err: unknown, operation: string): { message: string; status: number } {
@@ -323,6 +325,8 @@ function sanitizeError(err: unknown, operation: string): { message: string; stat
  */
 function correctLostStatus(message: string, status: number): number {
   if (status === 500 && message === 'Instance not provisioned') return 404;
+  if (status === 500 && message.startsWith('Provider ') && message.endsWith(' is not implemented yet'))
+    return 501;
   return status;
 }
 
@@ -428,6 +432,9 @@ platform.post('/provision', async c => {
 
   let provision;
   try {
+    if (provider) {
+      assertImplementedProvider(provider);
+    }
     provision = await withDORetry(
       instanceStubFactory(c.env, userId, instanceId),
       stub =>

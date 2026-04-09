@@ -681,7 +681,11 @@ app.all('*', async c => {
       if (recovered) {
         // Machine may have been recreated — refresh the instance routing header
         const refreshedInstance = await resolveInstance(c);
-        if (!refreshedInstance.machineId || !refreshedInstance.stub) {
+        if (
+          !refreshedInstance.machineId ||
+          !refreshedInstance.stub ||
+          !refreshedInstance.sandboxId
+        ) {
           return c.json({ error: 'Instance not reachable after restart' }, 503);
         }
         const refreshedRoutingTarget = await refreshedInstance.stub.getRoutingTarget();
@@ -691,7 +695,7 @@ app.all('*', async c => {
         targetUrl = routingTargetUrl(refreshedRoutingTarget, url.pathname, url.search);
         forwardHeaders = await buildForwardHeaders({
           requestHeaders: request.headers,
-          sandboxId,
+          sandboxId: refreshedInstance.sandboxId,
           gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
           providerHeaders: refreshedRoutingTarget.headers,
         });
@@ -823,7 +827,7 @@ app.all('*', async c => {
     if (recovered) {
       // Machine may have been recreated — refresh the instance routing header
       const refreshedInstance = await resolveInstance(c);
-      if (!refreshedInstance.machineId || !refreshedInstance.stub) {
+      if (!refreshedInstance.machineId || !refreshedInstance.stub || !refreshedInstance.sandboxId) {
         return c.json({ error: 'Instance not reachable after restart' }, 503);
       }
       const refreshedRoutingTarget = await refreshedInstance.stub.getRoutingTarget();
@@ -833,7 +837,7 @@ app.all('*', async c => {
       targetUrl = routingTargetUrl(refreshedRoutingTarget, url.pathname, url.search);
       forwardHeaders = await buildForwardHeaders({
         requestHeaders: request.headers,
-        sandboxId,
+        sandboxId: refreshedInstance.sandboxId,
         gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
         providerHeaders: refreshedRoutingTarget.headers,
       });

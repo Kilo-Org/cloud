@@ -41,6 +41,7 @@ vi.mock('./lib/image-version', async () => {
 });
 
 import worker from './index';
+import { deriveGatewayToken } from './auth/gateway-token';
 
 type FetchMock = ReturnType<
   typeof vi.fn<(input: string | URL | Request, init?: RequestInit) => Promise<Response>>
@@ -213,5 +214,201 @@ describe('proxy routing target usage', () => {
     expect(headers.get('fly-force-instance-id')).toBe('machine-1');
     expect(headers.get('x-provider-route')).toBe('provider-hop');
     expect(headers.get('x-kiloclaw-proxy-token')).toBeTruthy();
+  });
+
+  it('rebuilds HTTP retry auth with the refreshed authoritative sandbox id after crash recovery', async () => {
+    const registryStub = {
+      listInstances: vi.fn().mockResolvedValue([
+        {
+          doKey: 'user-1',
+          instanceId: '',
+          assignedUserId: 'user-1',
+          createdAt: new Date().toISOString(),
+          destroyedAt: null,
+        },
+      ]),
+    };
+    const instanceStub = {
+      getStatus: vi
+        .fn()
+        .mockResolvedValueOnce({
+          userId: 'user-1',
+          sandboxId: 'sandbox-old',
+          status: 'running',
+          flyMachineId: 'machine-old',
+          flyAppName: 'test-app',
+        })
+        .mockResolvedValueOnce({
+          userId: 'user-1',
+          sandboxId: 'sandbox-old',
+          status: 'running',
+          flyMachineId: 'machine-old',
+          flyAppName: 'test-app',
+        })
+        .mockResolvedValueOnce({
+          userId: 'user-1',
+          sandboxId: 'sandbox-new',
+          status: 'running',
+          flyMachineId: 'machine-new',
+          flyAppName: 'test-app',
+        })
+        .mockResolvedValueOnce({
+          userId: 'user-1',
+          sandboxId: 'sandbox-new',
+          status: 'running',
+          flyMachineId: 'machine-new',
+          flyAppName: 'test-app',
+        }),
+      start: vi.fn().mockResolvedValue({ started: true }),
+      getRoutingTarget: vi
+        .fn()
+        .mockResolvedValueOnce({
+          origin: 'https://test-app.fly.dev',
+          headers: {
+            'fly-force-instance-id': 'machine-old',
+          },
+        })
+        .mockResolvedValueOnce({
+          origin: 'https://test-app.fly.dev',
+          headers: {
+            'fly-force-instance-id': 'machine-new',
+          },
+        }),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+    fetchMock
+      .mockRejectedValueOnce(new Error('socket hang up'))
+      .mockResolvedValueOnce(new Response('ok', { status: 200 }));
+
+    const response = await worker.fetch(
+      new Request('https://example.com/api/foo?bar=baz'),
+      {
+        NEXTAUTH_SECRET: 'nextauth-secret',
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        FLY_API_TOKEN: 'fly-token',
+        FLY_APP_NAME: 'test-app',
+        KILOCLAW_REGISTRY: {
+          idFromName: vi.fn().mockReturnValue('registry-id'),
+          get: vi.fn().mockReturnValue(registryStub),
+        },
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+        KILOCLAW_AE: { writeDataPoint: vi.fn() },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(200);
+
+    const retryCall = getFetchCall(fetchMock, 1);
+    if (!(retryCall.init?.headers instanceof Headers)) {
+      throw new Error('Expected retry fetch headers to be a Headers instance');
+    }
+
+    expect(retryCall.init.headers.get('fly-force-instance-id')).toBe('machine-new');
+    expect(retryCall.init.headers.get('x-kiloclaw-proxy-token')).toBe(
+      await deriveGatewayToken('sandbox-new', 'gateway-secret')
+    );
+  });
+
+  it('rebuilds WebSocket retry auth with the refreshed authoritative sandbox id after crash recovery', async () => {
+    const registryStub = {
+      listInstances: vi.fn().mockResolvedValue([
+        {
+          doKey: 'user-1',
+          instanceId: '',
+          assignedUserId: 'user-1',
+          createdAt: new Date().toISOString(),
+          destroyedAt: null,
+        },
+      ]),
+    };
+    const instanceStub = {
+      getStatus: vi
+        .fn()
+        .mockResolvedValueOnce({
+          userId: 'user-1',
+          sandboxId: 'sandbox-old',
+          status: 'running',
+          flyMachineId: 'machine-old',
+          flyAppName: 'test-app',
+        })
+        .mockResolvedValueOnce({
+          userId: 'user-1',
+          sandboxId: 'sandbox-old',
+          status: 'running',
+          flyMachineId: 'machine-old',
+          flyAppName: 'test-app',
+        })
+        .mockResolvedValueOnce({
+          userId: 'user-1',
+          sandboxId: 'sandbox-new',
+          status: 'running',
+          flyMachineId: 'machine-new',
+          flyAppName: 'test-app',
+        })
+        .mockResolvedValueOnce({
+          userId: 'user-1',
+          sandboxId: 'sandbox-new',
+          status: 'running',
+          flyMachineId: 'machine-new',
+          flyAppName: 'test-app',
+        }),
+      start: vi.fn().mockResolvedValue({ started: true }),
+      getRoutingTarget: vi
+        .fn()
+        .mockResolvedValueOnce({
+          origin: 'https://test-app.fly.dev',
+          headers: {
+            'fly-force-instance-id': 'machine-old',
+          },
+        })
+        .mockResolvedValueOnce({
+          origin: 'https://test-app.fly.dev',
+          headers: {
+            'fly-force-instance-id': 'machine-new',
+          },
+        }),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+    fetchMock
+      .mockRejectedValueOnce(new Error('socket hang up'))
+      .mockResolvedValueOnce(new Response('ok', { status: 200 }));
+
+    const response = await worker.fetch(
+      new Request('https://example.com/socket', {
+        headers: { Upgrade: 'websocket' },
+      }),
+      {
+        NEXTAUTH_SECRET: 'nextauth-secret',
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        FLY_API_TOKEN: 'fly-token',
+        FLY_APP_NAME: 'test-app',
+        KILOCLAW_REGISTRY: {
+          idFromName: vi.fn().mockReturnValue('registry-id'),
+          get: vi.fn().mockReturnValue(registryStub),
+        },
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+        KILOCLAW_AE: { writeDataPoint: vi.fn() },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(200);
+
+    const retryCall = getFetchCall(fetchMock, 1);
+    if (!(retryCall.init?.headers instanceof Headers)) {
+      throw new Error('Expected retry fetch headers to be a Headers instance');
+    }
+
+    expect(retryCall.init.headers.get('fly-force-instance-id')).toBe('machine-new');
+    expect(retryCall.init.headers.get('x-kiloclaw-proxy-token')).toBe(
+      await deriveGatewayToken('sandbox-new', 'gateway-secret')
+    );
   });
 });

@@ -95,3 +95,42 @@ describe('sanitizeError: Instance-not-* status correction', () => {
     expect(body.error).toBe('status failed');
   });
 });
+
+describe('sanitizeError: explicit provider support errors', () => {
+  it('returns 501 for unsupported providers on provision instead of a generic 500', async () => {
+    const provision = vi.fn();
+    const env = {
+      KILOCLAW_INSTANCE: {
+        idFromName: (id: string) => id,
+        get: () => ({ provision }),
+      },
+      KILOCLAW_AE: { writeDataPoint: vi.fn() },
+      KV_CLAW_CACHE: {
+        get: vi.fn().mockResolvedValue(null),
+        put: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        list: vi.fn().mockResolvedValue({ keys: [], list_complete: true }),
+        getWithMetadata: vi.fn().mockResolvedValue({ value: null, metadata: null }),
+      },
+    } as never;
+
+    const resp = await platform.request(
+      '/provision',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          provider: 'k8s',
+        }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(501);
+    expect(await jsonBody(resp)).toEqual({
+      error: 'Provider k8s is not implemented yet',
+    });
+    expect(provision).not.toHaveBeenCalled();
+  });
+});

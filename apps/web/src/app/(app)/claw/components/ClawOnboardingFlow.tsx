@@ -107,6 +107,7 @@ function ClawOnboardingFlowInner({
   const [botIdentity, setBotIdentity] = useState<BotIdentity | null>(null);
   const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+  const [createProvisioningStarted, setCreateProvisioningStarted] = useState(false);
   const hasPairingStep = selectedChannelId === 'telegram' || selectedChannelId === 'discord';
   const hasCapturedIdentityView = useRef(false);
   const hasCapturedDoneView = useRef(false);
@@ -126,6 +127,7 @@ function ClawOnboardingFlowInner({
   }, [mode, postProvisioningReady, posthog]);
 
   const handleCreateFlowStarted = useCallback(() => {
+    setCreateProvisioningStarted(true);
     setOnboardingStep('identity');
     setSelectedPreset(null);
     setBotIdentity(null);
@@ -133,6 +135,10 @@ function ClawOnboardingFlowInner({
     setSelectedChannelId(null);
     onCreateFlowStarted?.();
   }, [onCreateFlowStarted]);
+
+  const handleCreateFlowFailed = useCallback(() => {
+    setCreateProvisioningStarted(false);
+  }, []);
 
   const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
 
@@ -179,7 +185,15 @@ function ClawOnboardingFlowInner({
             <ProvisioningStepView />
           )
         ) : !instanceStatus ? (
-          <CreateInstanceCard mutations={mutations} onProvisionStart={handleCreateFlowStarted} />
+          createProvisioningStarted ? (
+            <ProvisioningStepView />
+          ) : (
+            <CreateInstanceCard
+              mutations={mutations}
+              onProvisionStart={handleCreateFlowStarted}
+              onProvisionFailed={handleCreateFlowFailed}
+            />
+          )
         ) : onboardingStep === 'identity' ? (
           <BotIdentityStep
             instanceRunning={isRunning && gatewayStatus?.state === 'running'}

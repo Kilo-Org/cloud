@@ -99,6 +99,7 @@ export async function buildUserEnvVars(
   state: InstanceMutableState
 ): Promise<{
   envVars: Record<string, string>;
+  bootstrapEnv: Record<string, string>;
   minSecretsVersion: number;
 }> {
   if (!state.sandboxId || !env.GATEWAY_TOKEN_SECRET) {
@@ -195,5 +196,11 @@ export async function buildUserEnvVars(
     result[`${ENCRYPTED_ENV_PREFIX}${name}`] = encryptEnvValue(envKey, value);
   }
 
-  return { envVars: result, minSecretsVersion: secretsVersion };
+  return {
+    envVars: result,
+    bootstrapEnv: {
+      KILOCLAW_ENV_KEY: envKey,
+    },
+    minSecretsVersion: secretsVersion,
+  };
 }

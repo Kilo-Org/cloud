@@ -393,7 +393,7 @@ export async function runUnexpectedStopRecoveryInBackground(
       await runtime.persist({ pendingRecoveryVolumeId: recoveryVolumeId });
     }
 
-    const { envVars, minSecretsVersion } = await buildUserEnvVars(env, ctx, state);
+    const { envVars, bootstrapEnv, minSecretsVersion } = await buildUserEnvVars(env, ctx, state);
     const identity = {
       userId: state.userId,
       sandboxId: state.sandboxId,
@@ -405,6 +405,7 @@ export async function runUnexpectedStopRecoveryInBackground(
     const runtimeSpec = buildRuntimeSpec(
       resolveRuntimeImageRef(state, env),
       envVars,
+      bootstrapEnv,
       state.machineSize,
       identity
     );

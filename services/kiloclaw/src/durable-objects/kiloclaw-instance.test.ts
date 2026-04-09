@@ -1606,6 +1606,7 @@ describe('buildUserEnvVars API key refresh', () => {
       instance as unknown as {
         buildUserEnvVars: () => Promise<{
           envVars: Record<string, string>;
+          bootstrapEnv: Record<string, string>;
           minSecretsVersion: number;
         }>;
       }

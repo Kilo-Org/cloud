@@ -255,7 +255,10 @@ async function allocateHostPort(
 }
 
 function buildContainerEnv(runtimeSpec: RuntimeSpec): string[] {
-  return Object.entries(runtimeSpec.env).map(([key, value]) => `${key}=${value}`);
+  return Object.entries({
+    ...runtimeSpec.env,
+    ...runtimeSpec.bootstrapEnv,
+  }).map(([key, value]) => `${key}=${value}`);
 }
 
 function requireContainerConfig(providerState: DockerLocalProviderState): {

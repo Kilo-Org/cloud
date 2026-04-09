@@ -1258,7 +1258,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       );
     }
 
-    const { envVars, minSecretsVersion } = await buildUserEnvVars(this.env, this.ctx, this.s);
+    const { envVars, bootstrapEnv, minSecretsVersion } = await buildUserEnvVars(
+      this.env,
+      this.ctx,
+      this.s
+    );
     const imageTag = resolveImageTag(this.s, this.env);
     console.log(
       '[DO] startGateway: deploying with imageTag:',
@@ -1279,6 +1283,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const runtimeSpec = buildRuntimeSpec(
       resolveRuntimeImageRef(this.s, this.env),
       envVars,
+      bootstrapEnv,
       this.s.machineSize,
       identity
     );
@@ -2462,7 +2467,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         }
       }
 
-      const { envVars, minSecretsVersion } = await buildUserEnvVars(this.env, this.ctx, this.s);
+      const { envVars, bootstrapEnv, minSecretsVersion } = await buildUserEnvVars(
+        this.env,
+        this.ctx,
+        this.s
+      );
       const imageTag = resolveImageTag(this.s, this.env);
       doLog(this.s, 'restartMachine: deploying update', {
         imageTag,
@@ -2479,6 +2488,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       const runtimeSpec = buildRuntimeSpec(
         resolveRuntimeImageRef(this.s, this.env),
         envVars,
+        bootstrapEnv,
         this.s.machineSize,
         identity
       );

@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dockerLocalProviderAdapter } from './index';
 
+function getContainerEnv(body: Record<string, unknown> | null): string[] {
+  const env = body?.Env;
+  if (!Array.isArray(env)) return [];
+  return env.filter((entry): entry is string => typeof entry === 'string');
+}
+
 describe('dockerLocalProviderAdapter', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
@@ -33,6 +39,7 @@ describe('dockerLocalProviderAdapter', () => {
     return {
       imageRef: 'kiloclaw:local',
       env: { FOO: 'bar' },
+      bootstrapEnv: {},
       machineSize: null,
       rootMountPath: '/root',
       controllerPort: 18789,
@@ -85,7 +92,8 @@ describe('dockerLocalProviderAdapter', () => {
 
   it('allocates a host port and creates/starts a container on first start', async () => {
     const fetchMock = vi.mocked(fetch);
-    fetchMock.mockImplementation(async input => {
+    let createBody: Record<string, unknown> | null = null;
+    fetchMock.mockImplementation(async (input, init) => {
       const url = String(input);
       if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
         return new Response('', { status: 404 });
@@ -106,6 +114,7 @@ describe('dockerLocalProviderAdapter', () => {
         return new Response('', { status: 404 });
       }
       if (url.includes('/containers/create?name=kiloclaw-sandbox-1')) {
+        createBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
         return new Response(JSON.stringify({ Id: 'container-1' }), {
           status: 201,
           headers: { 'content-type': 'application/json' },
@@ -120,7 +129,12 @@ describe('dockerLocalProviderAdapter', () => {
     const result = await dockerLocalProviderAdapter.startRuntime({
       env: devEnv(),
       state: runtimeState(),
-      runtimeSpec: runtimeSpec(),
+      runtimeSpec: {
+        ...runtimeSpec(),
+        bootstrapEnv: {
+          KILOCLAW_ENV_KEY: 'env-key-1',
+        },
+      },
     });
 
     expect(result.providerState).toEqual({
@@ -130,6 +144,9 @@ describe('dockerLocalProviderAdapter', () => {
       hostPort: 45001,
     });
     expect(result.observation?.runtimeState).toBe('running');
+    expect(getContainerEnv(createBody)).toEqual(
+      expect.arrayContaining(['FOO=bar', 'KILOCLAW_ENV_KEY=env-key-1'])
+    );
   });
 
   it('returns a localhost routing target from the assigned host port', async () => {

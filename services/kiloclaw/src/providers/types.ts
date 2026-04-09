@@ -31,6 +31,7 @@ export type ProviderCapabilities = Record<ProviderCapability, boolean>;
 export type RuntimeSpec = {
   imageRef: string;
   env: Record<string, string>;
+  bootstrapEnv: Record<string, string>;
   machineSize: MachineSize | null;
   rootMountPath: '/root';
   controllerPort: number;

@@ -338,6 +338,7 @@ const SAFE_ERROR_PREFIXES = [
   'Stream Chat sendMessage failed', // sendMessage HTTP errors
   'Stream Chat is not set up', // no Stream Chat on this instance
   'Provider ', // explicit not-implemented provider errors
+  'A kilo CLI run is ', // e.g. "A kilo CLI run is already in progress"
 ];
 
 function sanitizeError(err: unknown, operation: string): { message: string; status: number } {

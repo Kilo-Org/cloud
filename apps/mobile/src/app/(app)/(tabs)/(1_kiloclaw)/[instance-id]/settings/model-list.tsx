@@ -54,7 +54,11 @@ export default function ModelListScreen() {
     (modelId: string) => {
       mutations.updateModel.mutate(
         { kilocodeDefaultModel: addModelPrefix(modelId) },
-        { onSuccess: () => router.back() }
+        {
+          onSuccess: () => {
+            router.back();
+          },
+        }
       );
     },
     [mutations.updateModel, router]

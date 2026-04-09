@@ -1,6 +1,7 @@
 import { Bell } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Alert, Linking, View } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
@@ -19,7 +20,7 @@ import { useTRPC } from '@/lib/trpc';
 const PROMPT_SEEN_KEY = 'notification-prompt-seen';
 
 export function NotificationPrompt({ enabled }: { enabled: boolean }) {
-  const [visible, setVisible] = useState(true); // TODO: revert — testing
+  const [visible, setVisible] = useState(false);
   const colors = useThemeColors();
   const trpc = useTRPC();
 
@@ -53,12 +54,38 @@ export function NotificationPrompt({ enabled }: { enabled: boolean }) {
   }, [enabled]);
 
   const handleEnable = useCallback(async () => {
+    const currentStatus = await getNotificationPermissionStatus();
+
+    if (currentStatus === 'denied') {
+      Alert.alert(
+        'Notifications Disabled',
+        'To enable notifications, turn them on in your device settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+        ]
+      );
+      return;
+    }
+
     await SecureStore.setItemAsync(PROMPT_SEEN_KEY, 'true');
     setVisible(false);
 
+    const result = await Notifications.requestPermissionsAsync();
+    if (result.status !== Notifications.PermissionStatus.GRANTED) {
+      return;
+    }
+
     const token = await registerForPushNotifications();
     if (token) {
-      registerToken.mutate({ token, platform: getPlatform() });
+      registerToken.mutate(
+        { token, platform: getPlatform() },
+        {
+          onSuccess: () => {
+            toast.success('Notifications enabled');
+          },
+        }
+      );
     }
   }, [registerToken]);
 

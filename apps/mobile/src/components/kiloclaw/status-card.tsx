@@ -154,7 +154,7 @@ export function StatusCard({
 
       <View className="mt-2 border-t border-border pt-2 gap-1">
         <Text className="text-xs font-semibold text-muted-foreground pb-1">Active Model</Text>
-        <DetailRow icon={Sparkles} label="Model" value={activeModel || '—'} />
+        <DetailRow icon={Sparkles} label="Model" value={activeModel ?? '—'} />
       </View>
     </View>
   );

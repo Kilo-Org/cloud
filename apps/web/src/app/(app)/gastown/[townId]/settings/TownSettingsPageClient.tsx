@@ -44,6 +44,7 @@ import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { motion } from 'motion/react';
 import { AdminViewingBanner } from '@/components/gastown/AdminViewingBanner';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useRouter } from 'next/navigation';
 import {
   AlertDialog,
@@ -436,6 +437,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
         className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3"
       >
         <div className="flex items-center gap-2.5">
+          <SidebarTrigger className="-ml-3" />
           <Settings className="size-4 text-white/40" />
           <h1 className="text-lg font-semibold tracking-tight text-white/90">Settings</h1>
           <span className="text-sm text-white/30">{townQuery.data?.name}</span>

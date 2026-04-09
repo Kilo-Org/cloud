@@ -13,6 +13,7 @@ import { ConvoyTimeline } from '@/components/gastown/ConvoyTimeline';
 import { SlingDialog } from '@/components/gastown/SlingDialog';
 import { useDrawerStack } from '@/components/gastown/DrawerStack';
 import { Plus, GitBranch, Hexagon, Bot, Layers, ChevronRight, ChevronDown } from 'lucide-react';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 import { motion, AnimatePresence } from 'motion/react';
 
 type RigDetailPageClientProps = {
@@ -111,8 +112,9 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
   return (
     <div className="flex h-full flex-col">
       {/* Top bar */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-3">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3">
         <div className="flex items-center gap-3">
+          <SidebarTrigger className="-ml-3" />
           {rigQuery.isLoading ? (
             <Skeleton className="h-6 w-40" />
           ) : (

@@ -10,7 +10,9 @@ import {
 } from '@/components/ui/breadcrumb';
 
 export function AppTopbar() {
-  const { title, icon, extras } = usePageTitle();
+  const { title, icon, extras, hideTopbar } = usePageTitle();
+
+  if (hideTopbar) return null;
 
   return (
     <header className="bg-background sticky top-0 z-10 h-14 shrink-0 border-b flex items-center">

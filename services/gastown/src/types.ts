@@ -347,7 +347,7 @@ export const RigOverrideConfigSchema = z.object({
   /** false = skip refinery entirely */
   code_review: z.boolean().optional(),
   auto_resolve_pr_feedback: z.boolean().optional(),
-  auto_merge_delay_minutes: z.number().nullable().optional(),
+  auto_merge_delay_minutes: z.number().int().min(0).nullable().optional(),
 
   // Merge strategy
   merge_strategy: z.enum(['direct', 'pr']).optional(),

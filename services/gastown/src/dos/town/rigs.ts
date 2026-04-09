@@ -132,5 +132,6 @@ export function removeRig(sql: SqlStorage, rigId: string): void {
 }
 
 export function updateRigConfig(sql: SqlStorage, rigId: string, config: RigOverrideConfig): void {
-  query(sql, /* sql */ `UPDATE rigs SET config = ? WHERE id = ?`, [JSON.stringify(config), rigId]);
+  const validated = RigOverrideConfigSchema.parse(config);
+  query(sql, /* sql */ `UPDATE rigs SET config = ? WHERE id = ?`, [JSON.stringify(validated), rigId]);
 }

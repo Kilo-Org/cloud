@@ -12,11 +12,7 @@ export default async function OrgRigSettingsPage({
       params={params}
       fullBleed
       render={() => (
-        <RigSettingsPageClient
-          townId={townId}
-          rigId={rigId}
-          organizationId={organizationId}
-        />
+        <RigSettingsPageClient townId={townId} rigId={rigId} organizationId={organizationId} />
       )}
     />
   );

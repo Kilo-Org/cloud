@@ -141,11 +141,19 @@ export function resolveModel(
   role: string
 ): string {
   const base = rigOverride?.default_model ?? townConfig.default_model;
-  if (role === 'mayor') return townConfig.role_models?.mayor ?? townConfig.default_model ?? DEFAULT_MODEL;
+  if (role === 'mayor')
+    return townConfig.role_models?.mayor ?? townConfig.default_model ?? DEFAULT_MODEL;
   if (role === 'polecat')
-    return rigOverride?.role_models?.polecat ?? townConfig.role_models?.polecat ?? base ?? DEFAULT_MODEL;
+    return (
+      rigOverride?.role_models?.polecat ?? townConfig.role_models?.polecat ?? base ?? DEFAULT_MODEL
+    );
   if (role === 'refinery')
-    return rigOverride?.role_models?.refinery ?? townConfig.role_models?.refinery ?? base ?? DEFAULT_MODEL;
+    return (
+      rigOverride?.role_models?.refinery ??
+      townConfig.role_models?.refinery ??
+      base ??
+      DEFAULT_MODEL
+    );
   return base ?? DEFAULT_MODEL;
 }
 
@@ -216,7 +224,9 @@ export function resolveRigConfig(
     review_mode: rigOverride?.review_mode ?? townConfig.refinery?.review_mode ?? 'rework',
     code_review: rigOverride?.code_review ?? townConfig.refinery?.code_review ?? true,
     auto_resolve_pr_feedback:
-      rigOverride?.auto_resolve_pr_feedback ?? townConfig.refinery?.auto_resolve_pr_feedback ?? false,
+      rigOverride?.auto_resolve_pr_feedback ??
+      townConfig.refinery?.auto_resolve_pr_feedback ??
+      false,
     auto_merge_delay_minutes:
       rigOverride?.auto_merge_delay_minutes !== undefined
         ? rigOverride.auto_merge_delay_minutes

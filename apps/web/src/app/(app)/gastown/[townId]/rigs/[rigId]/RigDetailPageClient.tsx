@@ -12,7 +12,16 @@ import { AgentCard } from '@/components/gastown/AgentCard';
 import { ConvoyTimeline } from '@/components/gastown/ConvoyTimeline';
 import { SlingDialog } from '@/components/gastown/SlingDialog';
 import { useDrawerStack } from '@/components/gastown/DrawerStack';
-import { Plus, GitBranch, Hexagon, Bot, Layers, ChevronRight, ChevronDown, Settings } from 'lucide-react';
+import {
+  Plus,
+  GitBranch,
+  Hexagon,
+  Bot,
+  Layers,
+  ChevronRight,
+  ChevronDown,
+  Settings,
+} from 'lucide-react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { motion, AnimatePresence } from 'motion/react';
 import Link from 'next/link';

@@ -449,7 +449,9 @@ export async function startAgentInContainer(
             }),
           params.role,
           params.townConfig,
-          effectiveConfig.custom_instructions[params.role as keyof typeof effectiveConfig.custom_instructions]
+          effectiveConfig.custom_instructions[
+            params.role as keyof typeof effectiveConfig.custom_instructions
+          ]
         ),
         ...(effectiveConfig.git_push_flags ? { gitPushFlags: effectiveConfig.git_push_flags } : {}),
         gitUrl: params.gitUrl,

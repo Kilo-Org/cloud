@@ -17,7 +17,6 @@ import {
   GitPullRequest,
   Bot,
   Shield,
-  Layers,
   MessageSquareText,
   GitBranch,
   X,
@@ -193,9 +192,7 @@ export function RigSettingsPageClient({ townId, rigId, organizationId }: Props) 
         },
         git_push_flags: pushFlags || undefined,
         max_concurrent_polecats: maxPolecats ? parseInt(maxPolecats, 10) : undefined,
-        max_dispatch_attempts: maxDispatchAttempts
-          ? parseInt(maxDispatchAttempts, 10)
-          : undefined,
+        max_dispatch_attempts: maxDispatchAttempts ? parseInt(maxDispatchAttempts, 10) : undefined,
       },
     });
   }
@@ -413,7 +410,7 @@ export function RigSettingsPageClient({ townId, rigId, organizationId }: Props) 
                           </button>
                         )}
                         <Switch
-                          checked={refineryCodeReview ?? (townCfg?.refinery?.code_review ?? true)}
+                          checked={refineryCodeReview ?? townCfg?.refinery?.code_review ?? true}
                           onCheckedChange={v => setRefineryCodeReview(v)}
                           className={refineryCodeReview === undefined ? 'opacity-40' : ''}
                         />
@@ -498,7 +495,8 @@ export function RigSettingsPageClient({ townId, rigId, organizationId }: Props) 
                         <Switch
                           checked={
                             autoResolvePrFeedback ??
-                            (townCfg?.refinery?.auto_resolve_pr_feedback ?? false)
+                            townCfg?.refinery?.auto_resolve_pr_feedback ??
+                            false
                           }
                           onCheckedChange={v => setAutoResolvePrFeedback(v)}
                           className={autoResolvePrFeedback === undefined ? 'opacity-40' : ''}

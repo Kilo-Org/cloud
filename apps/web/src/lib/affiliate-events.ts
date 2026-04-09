@@ -4,12 +4,14 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   IMPACT_ACTION_TRACKER_IDS,
   IMPACT_ORDER_ID_MACRO,
+  type ImpactConversionPayload,
   type ImpactDispatchResult,
   buildSalePayload,
   buildSignUpPayload,
   buildTrialEndPayload,
   buildTrialStartPayload,
   hashEmailForImpact,
+  isImpactConfigured,
   sendImpactConversionPayload,
 } from '@/lib/impact';
 import { sentryLogger } from '@/lib/utils.server';
@@ -397,55 +399,49 @@ async function claimQueuedEvents(
   return result.rows;
 }
 
-async function dispatchAffiliateEvent(event: AffiliateEventRow): Promise<ImpactDispatchResult> {
+function buildImpactConversionPayloadForEvent(
+  event: AffiliateEventRow
+): ImpactConversionPayload {
   const eventDate = new Date(event.payload_json.eventDate);
 
   switch (event.provider) {
     case 'impact': {
       switch (event.event_type) {
         case 'signup':
-          return await sendImpactConversionPayload(
-            buildSignUpPayload({
-              trackingId: event.payload_json.trackingId,
-              customerId: event.payload_json.customerId ?? event.user_id,
-              customerEmailHash: event.payload_json.customerEmailHash ?? '',
-              eventDate,
-            })
-          );
+          return buildSignUpPayload({
+            trackingId: event.payload_json.trackingId,
+            customerId: event.payload_json.customerId ?? event.user_id,
+            customerEmailHash: event.payload_json.customerEmailHash ?? '',
+            eventDate,
+          });
         case 'trial_start':
-          return await sendImpactConversionPayload(
-            buildTrialStartPayload({
-              trackingId: event.payload_json.trackingId,
-              customerId: event.payload_json.customerId ?? event.user_id,
-              customerEmailHash: event.payload_json.customerEmailHash ?? '',
-              eventDate,
-            })
-          );
+          return buildTrialStartPayload({
+            trackingId: event.payload_json.trackingId,
+            customerId: event.payload_json.customerId ?? event.user_id,
+            customerEmailHash: event.payload_json.customerEmailHash ?? '',
+            eventDate,
+          });
         case 'trial_end':
-          return await sendImpactConversionPayload(
-            buildTrialEndPayload({
-              trackingId: event.payload_json.trackingId,
-              customerId: event.payload_json.customerId ?? event.user_id,
-              customerEmailHash: event.payload_json.customerEmailHash ?? '',
-              eventDate,
-            })
-          );
+          return buildTrialEndPayload({
+            trackingId: event.payload_json.trackingId,
+            customerId: event.payload_json.customerId ?? event.user_id,
+            customerEmailHash: event.payload_json.customerEmailHash ?? '',
+            eventDate,
+          });
         case 'sale':
-          return await sendImpactConversionPayload(
-            buildSalePayload({
-              trackingId: event.payload_json.trackingId,
-              customerId: event.payload_json.customerId ?? event.user_id,
-              customerEmailHash: event.payload_json.customerEmailHash ?? '',
-              orderId: event.payload_json.orderId,
-              amount: event.payload_json.amount ?? 0,
-              currencyCode: event.payload_json.currencyCode ?? 'usd',
-              eventDate,
-              itemCategory: event.payload_json.itemCategory ?? '',
-              itemName: event.payload_json.itemName ?? '',
-              itemSku: event.payload_json.itemSku ?? undefined,
-              promoCode: event.payload_json.promoCode ?? undefined,
-            })
-          );
+          return buildSalePayload({
+            trackingId: event.payload_json.trackingId,
+            customerId: event.payload_json.customerId ?? event.user_id,
+            customerEmailHash: event.payload_json.customerEmailHash ?? '',
+            orderId: event.payload_json.orderId,
+            amount: event.payload_json.amount ?? 0,
+            currencyCode: event.payload_json.currencyCode ?? 'usd',
+            eventDate,
+            itemCategory: event.payload_json.itemCategory ?? '',
+            itemName: event.payload_json.itemName ?? '',
+            itemSku: event.payload_json.itemSku ?? undefined,
+            promoCode: event.payload_json.promoCode ?? undefined,
+          });
       }
     }
   }
@@ -632,6 +628,13 @@ export async function dispatchQueuedAffiliateEvents(params?: {
     unblocked: 0,
   };
 
+  if (!isImpactConfigured()) {
+    logInfo('Skipped affiliate event dispatch because Impact credentials are not configured', {
+      dispatch_source: 'cron',
+    });
+    return summary;
+  }
+
   const reclaimed = await reclaimStaleSendingEvents(database);
   summary.reclaimed = reclaimed.length;
   for (const event of reclaimed) {
@@ -666,7 +669,8 @@ export async function dispatchQueuedAffiliateEvents(params?: {
         dispatch_source: 'cron',
       });
 
-      const result = await dispatchAffiliateEvent(event);
+      const impactPayload = buildImpactConversionPayloadForEvent(event);
+      const result: ImpactDispatchResult = await sendImpactConversionPayload(impactPayload);
       if (result.ok) {
         await markAffiliateEventDelivered(database, event.id);
         summary.delivered += 1;

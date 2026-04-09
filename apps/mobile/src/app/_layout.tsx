@@ -4,7 +4,7 @@ import { PortalHost } from '@rn-primitives/portal';
 import * as Sentry from '@sentry/react-native';
 import { QueryClientProvider, useMutation } from '@tanstack/react-query';
 import { isRunningInExpoGo } from 'expo';
-import { Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
+import { type Href, Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
@@ -17,7 +17,9 @@ import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { initAppsFlyer } from '@/lib/appsflyer';
 import { ContextProvider, useAppContext } from '@/lib/context/context-context';
 import {
+  checkInitialNotification,
   getNotificationPermissionStatus,
+  getPendingNotificationLink,
   getPlatform,
   registerForPushNotifications,
   setupNotificationHandler,
@@ -60,6 +62,7 @@ Sentry.init({
 
 void SplashScreen.preventAutoHideAsync();
 setupNotificationHandler();
+checkInitialNotification();
 
 function RootLayoutNav() {
   const { token, isLoading: authLoading } = useAuth();
@@ -109,6 +112,11 @@ function RootLayoutNav() {
       router.replace('/(app)');
     } else {
       void SplashScreen.hideAsync();
+      // Navigate to pending notification deep link (cold start / background tap)
+      const pendingLink = getPendingNotificationLink();
+      if (pendingLink) {
+        router.push(pendingLink as Href);
+      }
     }
   }, [
     token,

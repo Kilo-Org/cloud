@@ -79,16 +79,45 @@ export function setupNotificationHandler() {
   });
 }
 
+// Pending deep link from a notification tap (cold start or background).
+// Consumed by the root nav after auth/navigation is ready.
+let pendingNotificationLink: string | null = null;
+
+export function getPendingNotificationLink(): string | null {
+  const link = pendingNotificationLink;
+  pendingNotificationLink = null;
+  return link;
+}
+
 export function setupNotificationResponseHandler() {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
     const data = response.notification.request.content.data as NotificationData | undefined;
 
     if (data?.type === 'chat') {
-      router.push(`/(app)/chat/${data.instanceId}` as Href);
+      const path = `/(app)/chat/${data.instanceId}`;
+      // If the router is ready (has segments), navigate immediately.
+      // Otherwise store as pending for consumption after auth completes.
+      try {
+        router.replace(path as Href);
+      } catch {
+        pendingNotificationLink = path;
+      }
     }
   });
 
   return subscription;
+}
+
+// Check for notification that launched the app (cold start)
+export function checkInitialNotification(): void {
+  const response = Notifications.getLastNotificationResponse();
+  if (!response) {
+    return;
+  }
+  const data = response.notification.request.content.data as NotificationData | undefined;
+  if (data?.type === 'chat') {
+    pendingNotificationLink = `/(app)/chat/${data.instanceId}`;
+  }
 }
 
 export async function registerForPushNotifications(): Promise<string | null> {

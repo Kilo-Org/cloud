@@ -126,12 +126,6 @@ describe('addCacheBreakpoints', () => {
             content: [{ type: 'input_text', text: 'First prompt' }],
           },
           {
-            type: 'message',
-            role: 'assistant',
-            content: [{ type: 'output_text', text: 'First response', annotations: [] }],
-            status: 'completed',
-          },
-          {
             type: 'function_call_output',
             call_id: 'call_123',
             output: [

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { readDb } from '@/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
-import { microdollar_usage, microdollar_usage_metadata, auto_model } from '@kilocode/db/schema';
+import { microdollar_usage } from '@kilocode/db/schema';
 import { eq, sql, desc, isNull, and, gte } from 'drizzle-orm';
 import { getDateThreshold, type Period } from '@/routers/user-router';
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     ...(groupByModel && {
       model: sql<
         string | null
-      >`COALESCE(${auto_model.auto_model}, ${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
+      >`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
     }),
     total_cost: sql<number>`SUM(${microdollar_usage.cost})::float`,
     request_count: sql<number>`COUNT(*)::float`,
@@ -44,17 +44,13 @@ export async function GET(request: NextRequest) {
   const groupByClause = [
     sql`DATE(${microdollar_usage.created_at})`,
     ...(groupByModel
-      ? [
-          sql`COALESCE(${auto_model.auto_model}, ${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
-        ]
+      ? [sql`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`]
       : []),
   ];
   const orderByClause = [
     desc(sql`DATE(${microdollar_usage.created_at})`),
     ...(groupByModel
-      ? [
-          sql`COALESCE(${auto_model.auto_model}, ${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
-        ]
+      ? [sql`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`]
       : []),
   ];
 
@@ -85,14 +81,6 @@ export async function GET(request: NextRequest) {
       tx
         .select(selectFields)
         .from(microdollar_usage)
-        .leftJoin(
-          microdollar_usage_metadata,
-          eq(microdollar_usage_metadata.id, microdollar_usage.id)
-        )
-        .leftJoin(
-          auto_model,
-          eq(auto_model.auto_model_id, microdollar_usage_metadata.auto_model_id)
-        )
         .where(and(...conditions))
         .groupBy(...groupByClause)
         .orderBy(...orderByClause)

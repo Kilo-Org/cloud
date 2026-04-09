@@ -403,13 +403,15 @@ async function reconcileStarting(
       state.lastStoppedAt = Date.now();
       state.healthCheckFailCount = 0;
       await ctx.storage.put(
-        storageUpdate({
-          flyMachineId: null,
-          status: 'stopped',
-          startingAt: null,
-          lastStoppedAt: state.lastStoppedAt,
-          healthCheckFailCount: 0,
-        })
+        storageUpdate(
+          syncProviderStateForStorage(state, {
+            flyMachineId: null,
+            status: 'stopped',
+            startingAt: null,
+            lastStoppedAt: state.lastStoppedAt,
+            healthCheckFailCount: 0,
+          })
+        )
       );
       emitStartFailedEvent(env, state, 'starting_machine_gone', 'machine gone during start');
     } else if (isTimedOut) {
@@ -560,13 +562,15 @@ async function reconcileRestarting(
       state.lastStoppedAt = Date.now();
       state.healthCheckFailCount = 0;
       await ctx.storage.put(
-        storageUpdate({
-          flyMachineId: null,
-          status: 'stopped',
-          restartingAt: null,
-          lastStoppedAt: state.lastStoppedAt,
-          healthCheckFailCount: 0,
-        })
+        storageUpdate(
+          syncProviderStateForStorage(state, {
+            flyMachineId: null,
+            status: 'stopped',
+            restartingAt: null,
+            lastStoppedAt: state.lastStoppedAt,
+            healthCheckFailCount: 0,
+          })
+        )
       );
       return;
     }
@@ -859,12 +863,14 @@ export async function syncStatusWithFly(
     state.lastStoppedAt = Date.now();
     state.healthCheckFailCount = 0;
     await ctx.storage.put(
-      storageUpdate({
-        flyMachineId: null,
-        status: 'stopped',
-        lastStoppedAt: state.lastStoppedAt,
-        healthCheckFailCount: 0,
-      })
+      storageUpdate(
+        syncProviderStateForStorage(state, {
+          flyMachineId: null,
+          status: 'stopped',
+          lastStoppedAt: state.lastStoppedAt,
+          healthCheckFailCount: 0,
+        })
+      )
     );
     return {};
   }
@@ -1163,12 +1169,14 @@ async function handleMachineGone(
   state.lastStoppedAt = Date.now();
   state.healthCheckFailCount = 0;
   await ctx.storage.put(
-    storageUpdate({
-      flyMachineId: null,
-      status: 'stopped',
-      lastStoppedAt: state.lastStoppedAt,
-      healthCheckFailCount: 0,
-    })
+    storageUpdate(
+      syncProviderStateForStorage(state, {
+        flyMachineId: null,
+        status: 'stopped',
+        lastStoppedAt: state.lastStoppedAt,
+        healthCheckFailCount: 0,
+      })
+    )
   );
 }
 

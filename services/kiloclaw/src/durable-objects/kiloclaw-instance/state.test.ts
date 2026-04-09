@@ -58,6 +58,43 @@ describe('provider state helpers', () => {
     });
   });
 
+  it('mirrors legacy Fly machine-id clears back into providerState for storage', () => {
+    const state = createMutableState();
+
+    applyProviderState(state, {
+      provider: 'fly',
+      appName: 'acct-test',
+      machineId: 'machine-1',
+      volumeId: 'vol-1',
+      region: 'ord',
+    });
+
+    const patch = syncProviderStateForStorage(state, {
+      flyMachineId: null,
+      status: 'stopped',
+    });
+
+    expect(patch).toEqual({
+      flyMachineId: null,
+      status: 'stopped',
+      provider: 'fly',
+      providerState: {
+        provider: 'fly',
+        appName: 'acct-test',
+        machineId: null,
+        volumeId: 'vol-1',
+        region: 'ord',
+      },
+    });
+    expect(state.providerState).toEqual({
+      provider: 'fly',
+      appName: 'acct-test',
+      machineId: null,
+      volumeId: 'vol-1',
+      region: 'ord',
+    });
+  });
+
   it('derives Fly providerState from legacy fields when providerState is absent', () => {
     const state = createMutableState();
     state.flyAppName = 'acct-test';

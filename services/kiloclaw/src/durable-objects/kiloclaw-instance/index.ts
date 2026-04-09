@@ -158,6 +158,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (result.corePatch?.machineSize !== undefined) {
       this.s.machineSize = result.corePatch.machineSize;
     }
+    if (result.corePatch?.restartUpdateSent !== undefined) {
+      this.s.restartUpdateSent = result.corePatch.restartUpdateSent;
+    }
   }
 
   private async persistProviderResult(result: ProviderResult): Promise<void> {
@@ -2370,7 +2373,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       // ran concurrently, storage may have been wiped — writing here would
       // recreate partial state on a destroyed instance.
       const postStatus = await this.ctx.storage.get('status');
-      if (postStatus === 'restarting') {
+      if (postStatus === 'restarting' && !isExpectedTimeout) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         this.s.lastRestartErrorMessage = errorMessage;
         this.s.lastRestartErrorAt = Date.now();

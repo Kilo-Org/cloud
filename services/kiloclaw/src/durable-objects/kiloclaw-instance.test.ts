@@ -6013,6 +6013,43 @@ describe("syncStatusWithFly: 'destroyed' Fly state clears flyMachineId", () => {
     expect(storage._store.get('healthCheckFailCount')).toBe(0);
   });
 
+  it('keeps providerState in sync when the machine id is cleared during reconcile', async () => {
+    const storage = createFakeStorage();
+    await seedRunning(storage, {
+      provider: 'fly',
+      providerState: {
+        provider: 'fly',
+        appName: 'acct-provider-only',
+        machineId: 'machine-1',
+        volumeId: 'vol-1',
+        region: 'iad',
+      },
+    });
+    const { instance: firstInstance } = createInstance(storage);
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'destroyed',
+      config: { mounts: [] },
+    });
+
+    await firstInstance.alarm();
+
+    expect(storage._store.get('flyMachineId')).toBeNull();
+    expect(storage._store.get('providerState')).toEqual({
+      provider: 'fly',
+      appName: 'acct-provider-only',
+      machineId: null,
+      volumeId: 'vol-1',
+      region: 'iad',
+    });
+
+    (flyClient.stopMachineAndWait as Mock).mockClear();
+    const { instance: reloadedInstance } = createInstance(storage);
+    await reloadedInstance.stop();
+
+    expect(flyClient.stopMachineAndWait).not.toHaveBeenCalled();
+  });
+
   it("clears flyMachineId from 'stopped' status when Fly reports destroyed", async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { status: 'stopped', lastStoppedAt: Date.now() - 60_000 });
@@ -6424,6 +6461,34 @@ describe('restartMachine restartingAt guard', () => {
     await Promise.all(waitUntilPromises);
     expect(storage._store.get('lastRestartErrorMessage')).toBe('Fly API error');
     expect(storage._store.get('lastRestartErrorAt')).toBeGreaterThan(0);
+  });
+
+  it('treats waitForState timeout after update as expected when restartUpdateSent was persisted mid-flight', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage);
+
+    (flyClient.updateMachine as Mock).mockResolvedValueOnce({
+      id: 'machine-1',
+      instance_id: 'inst-updated-001',
+    });
+    (flyClient.getMachine as Mock).mockResolvedValueOnce({
+      id: 'machine-1',
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+    (flyClient.waitForState as Mock).mockRejectedValueOnce(
+      new FlyApiError('timeout', 408, 'timed out waiting for start')
+    );
+
+    const result = await instance.restartMachine();
+
+    expect(result.success).toBe(true);
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('status')).toBe('restarting');
+    expect(storage._store.get('restartUpdateSent')).toBe(true);
+    expect(storage._store.get('lastRestartErrorMessage')).toBeNull();
+    expect(storage._store.get('lastRestartErrorAt')).toBeNull();
   });
 
   it('background restart aborts without writing state if instance was destroyed concurrently', async () => {

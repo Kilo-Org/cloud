@@ -12,9 +12,19 @@ import { AgentCard } from '@/components/gastown/AgentCard';
 import { ConvoyTimeline } from '@/components/gastown/ConvoyTimeline';
 import { SlingDialog } from '@/components/gastown/SlingDialog';
 import { useDrawerStack } from '@/components/gastown/DrawerStack';
-import { Plus, GitBranch, Hexagon, Bot, Layers, ChevronRight, ChevronDown } from 'lucide-react';
+import {
+  Plus,
+  GitBranch,
+  Hexagon,
+  Bot,
+  Layers,
+  ChevronRight,
+  ChevronDown,
+  Settings,
+} from 'lucide-react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { motion, AnimatePresence } from 'motion/react';
+import Link from 'next/link';
 
 type RigDetailPageClientProps = {
   townId: string;
@@ -129,15 +139,24 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
             </>
           )}
         </div>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setIsSlingOpen(true)}
-          className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
-        >
-          <Plus className="size-3.5" />
-          Sling Work
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/gastown/${townId}/rigs/${rigId}/settings`}
+            className="flex items-center justify-center rounded-md border border-white/[0.08] bg-white/[0.03] p-1.5 text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white/60"
+            title="Rig settings"
+          >
+            <Settings className="size-4" />
+          </Link>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setIsSlingOpen(true)}
+            className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+          >
+            <Plus className="size-3.5" />
+            Sling Work
+          </Button>
+        </div>
       </div>
 
       {/* Stats strip */}

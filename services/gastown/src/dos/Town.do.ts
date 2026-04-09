@@ -88,6 +88,7 @@ import type {
   MergeStrategy,
   ConvoyMergeMode,
   UiAction,
+  RigOverrideConfig,
 } from '../types';
 
 const TOWN_LOG = '[Town.do]';
@@ -281,6 +282,8 @@ export class TownDO extends DurableObject<Env> {
 
         let systemPromptOverride: string | undefined;
         const townConfig = await this.getTownConfig();
+        const rig = rigs.getRig(this.sql, rigId);
+        const effectiveConfig = config.resolveRigConfig(townConfig, rig?.config ?? null);
 
         // Build refinery-specific system prompt with branch/target info.
         // When the MR bead already has a pr_url (polecat created the PR),
@@ -305,17 +308,16 @@ export class TownDO extends DurableObject<Env> {
               typeof bead.metadata?.source_agent_id === 'string'
                 ? bead.metadata.source_agent_id
                 : 'unknown',
-            mergeStrategy: townConfig.merge_strategy ?? 'direct',
+            mergeStrategy: effectiveConfig.merge_strategy,
             existingPrUrl,
-            reviewMode: townConfig.refinery?.review_mode ?? 'rework',
+            reviewMode: effectiveConfig.review_mode,
           });
         }
 
         // When merge_strategy is 'pr', polecats always create the PR themselves
         // and pass pr_url to gt_done. For review-then-land convoy intermediate
         // beads, the PR targets the convoy feature branch (not main).
-        if (agent.role === 'polecat' && townConfig.merge_strategy === 'pr') {
-          const rig = rigs.getRig(this.sql, rigId);
+        if (agent.role === 'polecat' && effectiveConfig.merge_strategy === 'pr') {
           const convoyId = beadOps.getConvoyForBead(this.sql, beadId);
           const convoyFeatureBranch = convoyId
             ? beadOps.getConvoyFeatureBranch(this.sql, convoyId)
@@ -841,6 +843,11 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async getRigAsync(rigId: string): Promise<rigs.RigRecord | null> {
+    return rigs.getRig(this.sql, rigId);
+  }
+
+  async updateRigConfig(rigId: string, config: RigOverrideConfig): Promise<rigs.RigRecord | null> {
+    rigs.updateRigConfig(this.sql, rigId, config);
     return rigs.getRig(this.sql, rigId);
   }
 
@@ -3670,7 +3677,7 @@ export class TownDO extends DurableObject<Env> {
       const townConfig = await this.getTownConfig();
       const actions = reconciler.reconcile(this.sql, {
         draining: this._draining,
-        refineryCodeReview: townConfig.refinery?.code_review ?? true,
+        townConfig,
       });
       metrics.actionsEmitted = actions.length;
       for (const a of actions) {
@@ -4594,7 +4601,7 @@ export class TownDO extends DurableObject<Env> {
       // Run reconciler against the resulting state
       const tc = await this.getTownConfig();
       const actions = reconciler.reconcile(this.sql, {
-        refineryCodeReview: tc.refinery?.code_review ?? true,
+        townConfig: tc,
       });
 
       // Capture a state snapshot before rollback
@@ -4676,7 +4683,7 @@ export class TownDO extends DurableObject<Env> {
       // Phase 1: Reconcile against now-current state
       const tc2 = await this.getTownConfig();
       const actions = reconciler.reconcile(this.sql, {
-        refineryCodeReview: tc2.refinery?.code_review ?? true,
+        townConfig: tc2,
       });
       const pendingEventCount = events.pendingEventCount(this.sql);
       const actionsByType: Record<string, number> = {};

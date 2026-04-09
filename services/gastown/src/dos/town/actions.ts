@@ -490,7 +490,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
           ...query(
             sql,
             /* sql */ `
-              SELECT ${beads.columns.status}
+              SELECT ${beads.columns.status}, ${beads.columns.type}
               FROM ${beads}
               WHERE ${beads.bead_id} = ?
             `,
@@ -498,6 +498,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
           ),
         ];
         const status = beadRows[0]?.status;
+        const type = beadRows[0]?.type;
 
         query(
           sql,
@@ -512,6 +513,18 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
 
         if (status === 'failed') {
           beadOps.updateBeadStatus(sql, hookedBeadId, 'open', 'system');
+        }
+
+        if (type === 'merge_request') {
+          query(
+            sql,
+            /* sql */ `
+              UPDATE ${review_metadata}
+              SET ${review_metadata.columns.retry_count} = 0
+              WHERE ${review_metadata.bead_id} = ?
+            `,
+            [hookedBeadId]
+          );
         }
       }
       return null;

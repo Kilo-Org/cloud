@@ -99,7 +99,7 @@ function getLockContent(reason: ClawLockReason, billing: ClawBillingStatus) {
       };
     case 'no_access':
       return {
-        title: 'Subscription Required',
+        title: 'KiloClaw Subscription Required',
         description:
           'A KiloClaw subscription is required to continue. Subscribe to keep your instance running.',
         cta: 'Subscribe',

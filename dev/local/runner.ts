@@ -17,6 +17,7 @@ import {
   selectPane,
   setPaneTitle,
   setMainLeftLayout,
+  pipePane,
 } from './tmux';
 
 // ---------------------------------------------------------------------------
@@ -107,7 +108,7 @@ export function buildStartCommand(serviceName: string): string {
 
 export function startServiceInTmux(sessionName: string, serviceName: string): void {
   const svc = getService(serviceName);
-  createWindow(sessionName, serviceName);
+  const winIndex = createWindow(sessionName, serviceName);
   if (svc.type === 'infra') {
     sendKeys(
       sessionName,
@@ -117,6 +118,17 @@ export function startServiceInTmux(sessionName: string, serviceName: string): vo
   } else {
     sendKeys(sessionName, serviceName, buildStartCommand(serviceName));
   }
+  const logPath = path.join(findRepoRoot(), 'dev', 'logs', `${serviceName}.log`);
+  pipePane(sessionName, winIndex, 0, buildLogPipeCommand(logPath));
+}
+
+function buildLogPipeCommand(logPath: string): string {
+  const filterPath = path.join(findRepoRoot(), 'dev', 'local', 'log-filter.ts');
+  return `tsx ${shellQuote(filterPath)} >> ${shellQuote(logPath)}`;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
 export function stopServiceInTmux(sessionName: string, serviceName: string): void {

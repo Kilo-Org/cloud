@@ -551,8 +551,36 @@
     {
       "idx": 78,
       "version": "7",
-      "when": 1775657555198,
-      "tag": "0078_amazing_mentor",
+      "when": 1775670564287,
+      "tag": "0078_light_jocasta",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1775672091143,
+      "tag": "0079_cynical_lady_ursula",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1775675341896,
+      "tag": "0080_burly_maverick",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1775713186462,
+      "tag": "0081_loose_the_executioner",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1775730379116,
+      "tag": "0082_superb_william_stryker",
       "breakpoints": true
     }
   ]

@@ -212,7 +212,9 @@ describe('WebSocket proxy', () => {
     const req = createIncomingMessage({
       'x-kiloclaw-proxy-token': 'token-1',
       host: 'acct-xxxx.fly.dev',
+      forwarded: 'for=1.2.3.4;proto=https',
       'x-forwarded-for': '1.2.3.4',
+      'x-forwarded-proto': 'https',
       'x-real-ip': '1.2.3.4',
       'x-forwarded-host': 'claw.kilo.ai',
     });
@@ -265,7 +267,9 @@ describe('WebSocket proxy', () => {
     expect(forwarded?.['host']).toBe('127.0.0.1:3001');
     // Upstream proxy headers must be stripped so the gateway's
     // isLocalDirectRequest check doesn't treat the request as proxied/remote.
+    expect(forwarded?.['forwarded']).toBeUndefined();
     expect(forwarded?.['x-forwarded-for']).toBeUndefined();
+    expect(forwarded?.['x-forwarded-proto']).toBeUndefined();
     expect(forwarded?.['x-real-ip']).toBeUndefined();
     expect(forwarded?.['x-forwarded-host']).toBeUndefined();
     expect((clientSocket as unknown as FakeSocket).pipe).toHaveBeenCalledWith(backendSocket);

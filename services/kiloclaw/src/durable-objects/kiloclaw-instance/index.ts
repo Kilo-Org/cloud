@@ -574,6 +574,59 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     };
   }
 
+  async updateBotIdentity(patch: {
+    botName?: string | null;
+    botNature?: string | null;
+    botVibe?: string | null;
+    botEmoji?: string | null;
+  }): Promise<{
+    botName: string | null;
+    botNature: string | null;
+    botVibe: string | null;
+    botEmoji: string | null;
+  }> {
+    await this.loadState();
+
+    const pending: Partial<PersistedState> = {};
+
+    if (patch.botName !== undefined) {
+      this.s.botName = patch.botName;
+      pending.botName = patch.botName;
+    }
+    if (patch.botNature !== undefined) {
+      this.s.botNature = patch.botNature;
+      pending.botNature = patch.botNature;
+    }
+    if (patch.botVibe !== undefined) {
+      this.s.botVibe = patch.botVibe;
+      pending.botVibe = patch.botVibe;
+    }
+    if (patch.botEmoji !== undefined) {
+      this.s.botEmoji = patch.botEmoji;
+      pending.botEmoji = patch.botEmoji;
+    }
+
+    if (Object.keys(pending).length > 0) {
+      await this.ctx.storage.put(pending);
+    }
+
+    if (this.s.status === 'running' && Object.keys(pending).length > 0) {
+      await gateway.writeBotIdentity(this.s, this.env, {
+        botName: this.s.botName,
+        botNature: this.s.botNature,
+        botVibe: this.s.botVibe,
+        botEmoji: this.s.botEmoji,
+      });
+    }
+
+    return {
+      botName: this.s.botName,
+      botNature: this.s.botNature,
+      botVibe: this.s.botVibe,
+      botEmoji: this.s.botEmoji,
+    };
+  }
+
   async updateChannels(patch: {
     telegramBotToken?: EncryptedEnvelope | null;
     discordBotToken?: EncryptedEnvelope | null;
@@ -1453,6 +1506,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     gmailNotificationsEnabled: boolean;
     execSecurity: string | null;
     execAsk: string | null;
+    botName: string | null;
+    botNature: string | null;
+    botVibe: string | null;
+    botEmoji: string | null;
   }> {
     await this.loadState();
 
@@ -1492,6 +1549,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       gmailNotificationsEnabled: this.s.gmailNotificationsEnabled,
       execSecurity: this.s.execSecurity,
       execAsk: this.s.execAsk,
+      botName: this.s.botName,
+      botNature: this.s.botNature,
+      botVibe: this.s.botVibe,
+      botEmoji: this.s.botEmoji,
     };
   }
 

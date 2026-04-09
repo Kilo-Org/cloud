@@ -145,6 +145,11 @@ export default function OrganizationAppSidebar({
       icon: Settings,
       url: `/organizations/${organizationId}/claw/settings`,
     },
+    {
+      title: "What's New",
+      icon: Sparkles,
+      url: `/organizations/${organizationId}/claw/changelog`,
+    },
   ];
 
   // Cloud group

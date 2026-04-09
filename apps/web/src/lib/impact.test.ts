@@ -27,7 +27,7 @@ describe('impact', () => {
   it('builds a minimal visit payload', async () => {
     const { IMPACT_ORDER_ID_MACRO, buildVisitPayload } = await import('@/lib/impact');
     const payload = buildVisitPayload({
-      clickId: 'impact-click-123',
+      trackingId: 'impact-click-123',
       eventDate: new Date('2026-04-02T12:00:00.000Z'),
     });
 
@@ -40,25 +40,17 @@ describe('impact', () => {
     });
   });
 
-  it('sends JSON conversions with basic auth and retries once on 5xx', async () => {
-    jest.useFakeTimers();
-    const fetchMock = jest
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        text: async () => 'server error',
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => '',
-      } as Response);
+  it('sends JSON conversions with basic auth and maps trackingId to ClickId', async () => {
+    const fetchMock = jest.fn<typeof fetch>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '',
+    } as Response);
     global.fetch = fetchMock;
 
     const { trackSale } = await import('@/lib/impact');
-    const promise = trackSale({
-      clickId: 'impact-click-123',
+    await trackSale({
+      trackingId: 'impact-click-123',
       customerId: 'user_123',
       customerEmail: 'user@example.com',
       orderId: 'in_123',
@@ -69,10 +61,7 @@ describe('impact', () => {
       itemName: 'KiloClaw Standard Plan',
     });
 
-    await jest.advanceTimersByTimeAsync(250);
-    await promise;
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       'https://api.impact.com/Advertisers/impact-account-sid/Conversions'
     );
@@ -87,5 +76,6 @@ describe('impact', () => {
     });
     expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('"ActionTrackerId":71659');
     expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('"OrderId":"in_123"');
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('"ClickId":"impact-click-123"');
   });
 });

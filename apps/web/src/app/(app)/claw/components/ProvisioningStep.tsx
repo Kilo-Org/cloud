@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useClawGatewayReady } from '../hooks/useClawHooks';
 import {
+  type BotIdentity,
   type ExecPreset,
   type ClawMutations,
   execPresetToConfig,
@@ -34,13 +35,15 @@ function playChime() {
 export function ProvisioningStep({
   preset,
   channelTokens,
+  botIdentity,
   instanceRunning,
   mutations,
-  totalSteps = 4,
+  totalSteps = 5,
   onComplete,
 }: {
   preset: ExecPreset;
   channelTokens: Record<string, string> | null;
+  botIdentity: BotIdentity | null;
   instanceRunning: boolean;
   mutations: ClawMutations;
   totalSteps?: number;
@@ -60,8 +63,12 @@ export function ProvisioningStep({
   patchChannelsRef.current = mutations.patchChannels.mutate;
   const patchExecPresetRef = useRef(mutations.patchExecPreset.mutate);
   patchExecPresetRef.current = mutations.patchExecPreset.mutate;
+  const patchBotIdentityRef = useRef(mutations.patchBotIdentity.mutate);
+  patchBotIdentityRef.current = mutations.patchBotIdentity.mutate;
   const channelTokensRef = useRef(channelTokens);
   channelTokensRef.current = channelTokens;
+  const botIdentityRef = useRef(botIdentity);
+  botIdentityRef.current = botIdentity;
 
   useEffect(() => {
     if (!instanceRunning || completedRef.current) return;
@@ -91,6 +98,15 @@ export function ProvisioningStep({
     if (preset !== 'always-ask') {
       const { security, ask } = execPresetToConfig(preset);
       patchExecPresetRef.current({ security, ask });
+    }
+
+    if (botIdentityRef.current) {
+      patchBotIdentityRef.current({
+        botName: botIdentityRef.current.botName,
+        botNature: botIdentityRef.current.botNature,
+        botVibe: botIdentityRef.current.botVibe,
+        botEmoji: botIdentityRef.current.botEmoji,
+      });
     }
 
     if (Object.keys(configPatch).length === 0) {
@@ -195,10 +211,10 @@ const PROVISIONING_PHRASES = [
 ];
 
 /** Error view shown when the gateway returns a 502 during provisioning. */
-export function ProvisioningErrorView({ totalSteps = 4 }: { totalSteps?: number }) {
+export function ProvisioningErrorView({ totalSteps = 5 }: { totalSteps?: number }) {
   return (
     <OnboardingStepView
-      currentStep={4}
+      currentStep={5}
       totalSteps={totalSteps}
       stepLabel="Provisioning failed"
       contentClassName="items-center gap-8"
@@ -230,7 +246,7 @@ export function ProvisioningErrorView({ totalSteps = 4 }: { totalSteps?: number 
 }
 
 /** Pure visual shell — extracted so Storybook can render it without wiring up mutations. */
-export function ProvisioningStepView({ totalSteps = 4 }: { totalSteps?: number }) {
+export function ProvisioningStepView({ totalSteps = 5 }: { totalSteps?: number }) {
   const [phraseIndex, setPhraseIndex] = useState(() =>
     Math.floor(Math.random() * PROVISIONING_PHRASES.length)
   );
@@ -255,7 +271,7 @@ export function ProvisioningStepView({ totalSteps = 4 }: { totalSteps?: number }
   }, []);
   return (
     <OnboardingStepView
-      currentStep={4}
+      currentStep={5}
       totalSteps={totalSteps}
       stepLabel="Almost there..."
       contentClassName="items-center gap-8"

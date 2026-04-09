@@ -22,9 +22,8 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
   isFreeModel,
-  isDataCollectionRequiredOnKiloCodeOnly,
   isDeadFreeModel,
-  isKiloFreeModel,
+  isKiloExclusiveFreeModel,
   isKiloStealthModel,
 } from '@/lib/models';
 import {
@@ -234,7 +233,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Server-side products (cloud-agent, code-review, app-builder) rate-limit
   // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
   // All other products rate-limit per IP (fast pre-auth path).
-  if (isKiloFreeModel(originalModelIdLowerCased)) {
+  if (isKiloExclusiveFreeModel(originalModelIdLowerCased)) {
     const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
     if (rateLimit instanceof NextResponse) return rateLimit;
 
@@ -324,7 +323,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   // Log to free_model_usage for rate limiting (at request start, before processing)
-  if (isKiloFreeModel(originalModelIdLowerCased)) {
+  if (isKiloExclusiveFreeModel(originalModelIdLowerCased)) {
     await logFreeModelRequest(
       ipAddress,
       originalModelIdLowerCased,
@@ -446,7 +445,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   });
 
   if (
-    isDataCollectionRequiredOnKiloCodeOnly(originalModelIdLowerCased) &&
+    isKiloExclusiveFreeModel(originalModelIdLowerCased) &&
     !isFreePromptTrainingAllowed(requestBodyParsed.body.provider)
   ) {
     return dataCollectionRequiredResponse();
@@ -602,7 +601,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const isFreeModelRequiringCostRemoval =
     (provider.id === 'openrouter' || provider.id === 'vercel') &&
-    isKiloFreeModel(originalModelIdLowerCased);
+    isKiloExclusiveFreeModel(originalModelIdLowerCased);
   const isStealthModelRequiringNameRemoval =
     provider.id !== 'martian' && isKiloStealthModel(originalModelIdLowerCased);
   const isProviderRequiringResponseFixes = provider.id === 'corethink';

@@ -104,7 +104,9 @@ export async function dispatchAgent(
         UPDATE ${agent_metadata}
         SET ${agent_metadata.columns.status} = 'working',
             ${agent_metadata.columns.dispatch_attempts} = ${agent_metadata.columns.dispatch_attempts} + 1,
-            ${agent_metadata.columns.last_activity_at} = ?
+            ${agent_metadata.columns.last_activity_at} = ?,
+            ${agent_metadata.columns.last_event_at} = NULL,
+            ${agent_metadata.columns.last_event_type} = NULL
         WHERE ${agent_metadata.bead_id} = ?
       `,
       [timestamp, agent.id]

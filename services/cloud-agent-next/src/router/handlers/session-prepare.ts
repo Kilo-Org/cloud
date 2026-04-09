@@ -251,6 +251,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           githubRepo: input.githubRepo,
           gitUrl: input.gitUrl,
           platform: input.platform,
+          initialMessageId: input.initialMessageId,
         });
 
         if (!registerResult.success) {
@@ -297,6 +298,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
             gateThreshold: input.gateThreshold,
             kilocodeOrganizationId: input.kilocodeOrganizationId,
             autoInitiate: true,
+            initialMessageId: input.initialMessageId,
           });
         } catch (error) {
           await rollbackCliSession();
@@ -504,6 +506,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
           images: input.images,
           createdOnPlatform: input.createdOnPlatform,
           gateThreshold: input.gateThreshold,
+          initialMessageId: input.initialMessageId,
           // Workspace metadata
           workspacePath,
           sessionHome,

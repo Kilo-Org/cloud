@@ -202,6 +202,7 @@ function generateRandomRecord(
       70
     ),
     market_cost: core.cost,
+    is_free: Math.random() < 0.1,
   };
 
   return { core, metadata };

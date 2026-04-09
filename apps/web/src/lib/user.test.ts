@@ -4,6 +4,7 @@ import {
   payment_methods,
   kilocode_users,
   user_affiliate_attributions,
+  user_affiliate_events,
   user_auth_provider,
   credit_transactions,
   kilo_pass_subscriptions,
@@ -37,6 +38,7 @@ import {
   bot_requests,
   kiloclaw_admin_audit_logs,
   user_push_tokens,
+  security_advisor_scans,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import { softDeleteUser, SoftDeletePreconditionError, findUserById, findUsersByIds } from './user';
@@ -57,6 +59,7 @@ describe('User', () => {
   afterEach(async () => {
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
+    await db.delete(user_affiliate_events);
     await db.delete(payment_methods);
     await db.delete(kilo_pass_issuance_items);
     await db.delete(kilo_pass_issuances);
@@ -170,6 +173,59 @@ describe('User', () => {
           .select({ count: count() })
           .from(user_affiliate_attributions)
           .where(eq(user_affiliate_attributions.user_id, user2.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should delete affiliate events for the user', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      await db.insert(user_affiliate_events).values([
+        {
+          user_id: user1.id,
+          provider: 'impact',
+          event_type: 'signup',
+          dedupe_key: `affiliate:impact:signup:${user1.id}`,
+          delivery_state: 'queued',
+          payload_json: {
+            trackingId: 'impact-user-1',
+            customerId: user1.id,
+            customerEmailHash: 'hash-1',
+            orderId: 'IR_AN_64_TS',
+            eventDate: new Date().toISOString(),
+          },
+        },
+        {
+          user_id: user2.id,
+          provider: 'impact',
+          event_type: 'signup',
+          dedupe_key: `affiliate:impact:signup:${user2.id}`,
+          delivery_state: 'queued',
+          payload_json: {
+            trackingId: 'impact-user-2',
+            customerId: user2.id,
+            customerEmailHash: 'hash-2',
+            orderId: 'IR_AN_64_TS',
+            eventDate: new Date().toISOString(),
+          },
+        },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(user_affiliate_events)
+          .where(eq(user_affiliate_events.user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(user_affiliate_events)
+          .where(eq(user_affiliate_events.user_id, user2.id))
           .then(r => r[0].count)
       ).toBe(1);
     });
@@ -729,6 +785,30 @@ describe('User', () => {
       const usages = await db.select().from(free_model_usage);
       expect(usages).toHaveLength(2);
       expect(usages.every(u => u.kilo_user_id === null)).toBe(true);
+    });
+
+    it('should anonymize security_advisor_scans and null public_ip', async () => {
+      const user = await insertTestUser();
+
+      await db.insert(security_advisor_scans).values({
+        kilo_user_id: user.id,
+        source_platform: 'openclaw',
+        source_method: 'plugin',
+        public_ip: '203.0.113.42',
+        findings_critical: 1,
+        findings_warn: 0,
+        findings_info: 0,
+      });
+
+      await softDeleteUser(user.id);
+
+      const scans = await db.select().from(security_advisor_scans);
+      expect(scans).toHaveLength(1);
+      expect(scans[0].kilo_user_id).toBe('deleted');
+      expect(scans[0].public_ip).toBeNull();
+      // Analytics fields preserved
+      expect(scans[0].source_platform).toBe('openclaw');
+      expect(scans[0].findings_critical).toBe(1);
     });
 
     it('should preserve credit transactions', async () => {

@@ -88,6 +88,7 @@ export const basePrepareSessionNextSchema = z
     upstreamBranch: z.string().optional(),
     autoCommit: z.boolean().optional(),
     autoInitiate: z.boolean().optional(),
+    initialMessageId: z.string().startsWith('msg_').length(30).optional(),
   })
   .refine(
     data => (data.githubRepo || data.gitlabProject) && !(data.githubRepo && data.gitlabProject),
@@ -124,6 +125,7 @@ export const baseSendMessageNextSchema = z.object({
     .regex(/^[a-zA-Z]+$/)
     .optional(),
   autoCommit: z.boolean().optional(),
+  messageId: z.string().startsWith('msg_').length(30).optional(),
 });
 
 // Schema for interrupting a session
@@ -191,6 +193,9 @@ export const baseGetSessionNextOutputSchema = z.object({
 
   // Callback configuration
   callbackTarget: callbackTargetNextSchema.optional(),
+
+  // Initial message ID for correlation
+  initialMessageId: z.string().startsWith('msg_').length(30).optional(),
 
   // Versioning
   timestamp: z.number(),

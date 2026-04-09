@@ -133,6 +133,9 @@ export type CloudAgentSessionState = {
   branchName?: string;
   /** Sandbox ID where the session runs */
   sandboxId?: SandboxId;
+
+  // Initial message ID for correlation
+  initialMessageId?: string;
 };
 
 /**

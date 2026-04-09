@@ -87,10 +87,9 @@ function ClawSettingsWithStatus({ organizationId }: { organizationId?: string })
   const orgStatus = useOrgKiloClawStatus(organizationId ?? '');
   const { data: status, isLoading, error } = organizationId ? orgStatus : personalStatus;
 
-  const clawUrl = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
+  const clawUrl = organizationId ? `/organizations/${organizationId}/claw/new` : '/claw/new';
 
-  // Redirect to main KiloClaw page when there is no instance — it has the
-  // onboarding/provisioning flow that guides the user through setup.
+  // Redirect to setup when there is no instance.
   const shouldRedirect = !isLoading && !error && (!status || status.status === null);
   useEffect(() => {
     if (shouldRedirect) {

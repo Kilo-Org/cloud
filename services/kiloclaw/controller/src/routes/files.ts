@@ -8,6 +8,7 @@ import { timingSafeTokenEqual } from '../auth';
 import { resolveSafePath, verifyCanonicalized, SafePathError } from '../safe-path';
 import { atomicWrite } from '../atomic-write';
 import { backupFile } from '../backup-file';
+import { formatBotIdentityMarkdown } from '../bootstrap';
 
 function computeEtag(content: string): string {
   return crypto.createHash('md5').update(content).digest('hex');
@@ -100,6 +101,16 @@ function resolveAndValidateFile(
   return resolved;
 }
 
+const BotIdentityBodySchema = z.object({
+  botName: z.string().trim().min(1).max(80).nullable().optional(),
+  botNature: z.string().trim().min(1).max(120).nullable().optional(),
+  botVibe: z.string().trim().min(1).max(120).nullable().optional(),
+  botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
+});
+
+const BOT_IDENTITY_RELATIVE_PATH = 'workspace/IDENTITY.md';
+const LEGACY_BOT_IDENTITY_RELATIVE_PATHS = ['workspace/BOOTSTRAP.md'];
+
 export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: string): void {
   app.use('/_kilo/files/*', async (c, next) => {
     const token = getBearerToken(c.req.header('authorization'));
@@ -107,6 +118,68 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
       return c.json({ error: 'Unauthorized' }, 401);
     }
     await next();
+  });
+
+  app.use('/_kilo/bot-identity', async (c, next) => {
+    const token = getBearerToken(c.req.header('authorization'));
+    if (!timingSafeTokenEqual(token, expectedToken)) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    await next();
+  });
+
+  app.post('/_kilo/bot-identity', async c => {
+    let rawBody: unknown;
+    try {
+      rawBody = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+
+    const parsed = BotIdentityBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return c.json({ error: 'Missing or invalid bot identity fields' }, 400);
+    }
+
+    let targetPath: string;
+    try {
+      targetPath = resolveSafePath(BOT_IDENTITY_RELATIVE_PATH, rootDir);
+    } catch (err) {
+      if (err instanceof SafePathError) {
+        return c.json({ error: err.message }, 400);
+      }
+      throw err;
+    }
+
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+
+    try {
+      atomicWrite(
+        targetPath,
+        formatBotIdentityMarkdown({
+          KILOCLAW_BOT_NAME: parsed.data.botName ?? undefined,
+          KILOCLAW_BOT_NATURE: parsed.data.botNature ?? undefined,
+          KILOCLAW_BOT_VIBE: parsed.data.botVibe ?? undefined,
+          KILOCLAW_BOT_EMOJI: parsed.data.botEmoji ?? undefined,
+        })
+      );
+
+      for (const legacyPath of LEGACY_BOT_IDENTITY_RELATIVE_PATHS) {
+        try {
+          const resolvedLegacyPath = resolveSafePath(legacyPath, rootDir);
+          if (fs.existsSync(resolvedLegacyPath)) {
+            fs.unlinkSync(resolvedLegacyPath);
+          }
+        } catch (error) {
+          console.warn('[files] Failed to remove legacy bot identity file:', legacyPath, error);
+        }
+      }
+
+      return c.json({ ok: true, path: BOT_IDENTITY_RELATIVE_PATH });
+    } catch (err) {
+      console.error('[files] Failed to write bot identity:', err);
+      return c.json({ error: 'Failed to write bot identity' }, 500);
+    }
   });
 
   app.get('/_kilo/files/tree', c => {

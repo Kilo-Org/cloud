@@ -71,6 +71,7 @@ export async function getEffectiveKiloClawSubscriptionForUser(
 ): Promise<{
   subscription: KiloClawSubscription | null;
   accessReason: KiloClawAccessReason | null;
+  subscriptionCount: number;
 }> {
   const subscriptions = await db
     .select()
@@ -81,5 +82,6 @@ export async function getEffectiveKiloClawSubscriptionForUser(
   return {
     subscription,
     accessReason: getKiloClawSubscriptionAccessReason(subscription, now),
+    subscriptionCount: subscriptions.length,
   };
 }

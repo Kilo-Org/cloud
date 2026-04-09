@@ -20,6 +20,7 @@ export type GastownEventName =
   | 'escalation.acknowledged'
   | 'nudge.queued'
   | 'nudge.delivered'
+  | 'api.external_request'
   // Controller-level events (HTTP + tRPC) use string to avoid maintaining
   // a massive union — event names are derived from route patterns.
   | (string & {});

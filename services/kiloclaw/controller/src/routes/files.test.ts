@@ -9,6 +9,8 @@ vi.mock('node:fs', () => ({
     existsSync: vi.fn(),
     lstatSync: vi.fn(),
     statSync: vi.fn(),
+    mkdirSync: vi.fn(),
+    unlinkSync: vi.fn(),
     realpathSync: vi.fn((p: string) => p), // identity by default (no symlinks)
   },
 }));
@@ -61,6 +63,39 @@ describe('file routes', () => {
         headers: { Authorization: 'Bearer wrong-token' },
       });
       expect(res.status).toBe(401);
+    });
+
+    it('protects the bot identity route', async () => {
+      const res = await app.request('/_kilo/bot-identity', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer wrong-token', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ botName: 'Milo' }),
+      });
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('POST /_kilo/bot-identity', () => {
+    it('writes workspace/IDENTITY.md', async () => {
+      vi.mocked(fs.existsSync).mockImplementation(
+        (path: any) => typeof path === 'string' && path.endsWith('BOOTSTRAP.md')
+      );
+
+      const res = await app.request('/_kilo/bot-identity', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ botName: 'Milo', botNature: 'Operator' }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(atomicWrite).toHaveBeenCalledWith(
+        `${ROOT}/workspace/IDENTITY.md`,
+        expect.stringContaining('- Name: Milo')
+      );
+
+      const body = (await res.json()) as any;
+      expect(body.path).toBe('workspace/IDENTITY.md');
+      expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(`${ROOT}/workspace/BOOTSTRAP.md`);
     });
   });
 

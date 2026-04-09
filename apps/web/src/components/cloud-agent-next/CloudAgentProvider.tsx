@@ -111,6 +111,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           const mode = payload.mode as 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
           const model = payload.model as string;
           const variant = payload.variant as string | undefined;
+          const messageId = payload.messageId as string | undefined;
           if (organizationId) {
             return trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
               {
@@ -121,12 +122,21 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
                 variant,
                 autoCommit: true,
                 organizationId,
+                messageId,
               },
               { context: { skipBatch: true } }
             );
           }
           return trpcClient.cloudAgentNext.sendMessage.mutate(
-            { cloudAgentSessionId: castSessionId, prompt, mode, model, variant, autoCommit: true },
+            {
+              cloudAgentSessionId: castSessionId,
+              prompt,
+              mode,
+              model,
+              variant,
+              autoCommit: true,
+              messageId,
+            },
             { context: { skipBatch: true } }
           );
         },
@@ -254,6 +264,8 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           isInitiated: Boolean(rs?.initiatedAt),
           needsLegacyPrepare: Boolean(sessionResult.cloud_agent_session_id && !rs),
           isPreparingAsync: Boolean(rs && !rs.preparedAt),
+          prompt: rs?.prompt ?? null,
+          initialMessageId: rs?.initialMessageId ?? null,
         };
       },
 

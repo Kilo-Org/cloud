@@ -162,6 +162,26 @@ export const AffiliateProvider = {
 
 export type AffiliateProvider = (typeof AffiliateProvider)[keyof typeof AffiliateProvider];
 
+export const AffiliateEventType = {
+  Signup: 'signup',
+  TrialStart: 'trial_start',
+  TrialEnd: 'trial_end',
+  Sale: 'sale',
+} as const;
+
+export type AffiliateEventType = (typeof AffiliateEventType)[keyof typeof AffiliateEventType];
+
+export const AffiliateEventDeliveryState = {
+  Queued: 'queued',
+  Blocked: 'blocked',
+  Sending: 'sending',
+  Delivered: 'delivered',
+  Failed: 'failed',
+} as const;
+
+export type AffiliateEventDeliveryState =
+  (typeof AffiliateEventDeliveryState)[keyof typeof AffiliateEventDeliveryState];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.reassociate',
@@ -179,6 +199,7 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.doctor.run',
   'kiloclaw.machine.destroy_fly',
   'kiloclaw.subscription.bulk_trial_grant',
+  'kiloclaw.subscription.admin_cancel',
 ]);
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;

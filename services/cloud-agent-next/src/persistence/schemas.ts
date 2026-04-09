@@ -182,6 +182,9 @@ export const MetadataSchema = z.object({
     )
     .transform(s => s as SandboxId)
     .optional(),
+
+  // Initial message ID for correlation
+  initialMessageId: z.string().startsWith('msg_').length(30).optional(),
 });
 
 /**
@@ -226,6 +229,8 @@ export const PreparationInputSchema = z.object({
   kilocodeOrganizationId: z.string().optional(),
   // Auto-initiate after preparation
   autoInitiate: z.boolean(),
+
+  initialMessageId: z.string().optional(),
 });
 
 export type PreparationInput = z.infer<typeof PreparationInputSchema>;

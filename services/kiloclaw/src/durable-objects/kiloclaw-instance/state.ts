@@ -79,6 +79,10 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.gmailPushOidcEmail = d.gmailPushOidcEmail;
     s.execSecurity = d.execSecurity;
     s.execAsk = d.execAsk;
+    s.botName = d.botName;
+    s.botNature = d.botNature;
+    s.botVibe = d.botVibe;
+    s.botEmoji = d.botEmoji;
     s.previousVolumeId = d.previousVolumeId;
     s.restoreStartedAt = d.restoreStartedAt;
     s.preRestoreStatus = d.preRestoreStatus;
@@ -162,6 +166,10 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.gmailPushOidcEmail = null;
   s.execSecurity = null;
   s.execAsk = null;
+  s.botName = null;
+  s.botNature = null;
+  s.botVibe = null;
+  s.botEmoji = null;
   s.previousVolumeId = null;
   s.restoreStartedAt = null;
   s.preRestoreStatus = null;
@@ -236,6 +244,10 @@ export function createMutableState(): InstanceMutableState {
     gmailPushOidcEmail: null,
     execSecurity: null,
     execAsk: null,
+    botName: null,
+    botNature: null,
+    botVibe: null,
+    botEmoji: null,
     previousVolumeId: null,
     restoreStartedAt: null,
     preRestoreStatus: null,

@@ -16,12 +16,14 @@ import {
   organizations,
   credit_transactions,
   microdollar_usage,
+  exa_usage_log,
   type Organization,
 } from '@kilocode/db/schema';
 import { eq, and, asc, gt } from 'drizzle-orm';
 import { type Result, failureResult, successResult } from '@/lib/maybe-result';
 import { computeExpiration } from '@/lib/creditExpiration';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
+import { mergeSortedByCreatedAt } from '@/lib/recomputeUserBalances';
 
 type OrganizationBalanceUpdates = {
   org: Pick<
@@ -54,7 +56,7 @@ export async function recomputeOrganizationBalances(args: {
   if (!org) return failureResult('Organization not found');
 
   // Fetch all org usage records to recompute microdollars_used
-  const usageRecords = await db
+  const llmUsage = await db
     .select({
       cost: microdollar_usage.cost,
       created_at: microdollar_usage.created_at,
@@ -64,6 +66,25 @@ export async function recomputeOrganizationBalances(args: {
       and(eq(microdollar_usage.organization_id, args.organizationId), gt(microdollar_usage.cost, 0))
     )
     .orderBy(asc(microdollar_usage.created_at));
+
+  // Per-request Exa charges for this org. Using the log instead of the
+  // monthly aggregate so each charge is interleaved chronologically with LLM
+  // usage — required for correct credit-expiration baselines.
+  const exaUsage = await db
+    .select({
+      cost: exa_usage_log.cost_microdollars,
+      created_at: exa_usage_log.created_at,
+    })
+    .from(exa_usage_log)
+    .where(
+      and(
+        eq(exa_usage_log.organization_id, args.organizationId),
+        eq(exa_usage_log.charged_to_balance, true)
+      )
+    )
+    .orderBy(asc(exa_usage_log.created_at));
+
+  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage);
 
   // Fetch all credit transactions for this org
   const creditTransactions = await db
@@ -83,7 +104,9 @@ export async function recomputeOrganizationBalances(args: {
     .where(eq(credit_transactions.organization_id, args.organizationId))
     .orderBy(asc(credit_transactions.created_at));
 
-  // Compute total usage AND original baselines in a single pass
+  // Compute total usage AND original baselines in a single pass.
+  // usageRecords contains both LLM and Exa charged records, merge-sorted
+  // by created_at, so baselines are computed at the correct points in time.
   const computedOriginalBaselines = new Map<string, number>();
   let usageIdx = 0;
   let cumulativeUsage = 0;

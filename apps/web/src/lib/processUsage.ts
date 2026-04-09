@@ -21,7 +21,7 @@ import { eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from './getRootSpan';
 import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
 import type { ProviderId } from '@/lib/providers/types';
-import { isFreeModel, isKiloStealthModel } from '@/lib/models';
+import { findKiloExclusiveModel, isFreeModel, isKiloStealthModel } from '@/lib/models';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
@@ -56,6 +56,7 @@ import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/processUsage.constants';
 import { computeOpenRouterCostFields, drainSseStream } from '@/lib/processUsage.shared';
 import { isAnthropicModel } from '@/lib/providers/anthropic';
 import { isMinimaxModel } from '@/lib/providers/minimax';
+import type { KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
 
 const posthogClient = PostHogClient();
 
@@ -170,6 +171,7 @@ export function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
+    is_free: isFreeModel(usageContextInfo.requested_model),
   };
 
   // Legacy heuristic classification removed - abuse_classification is now handled
@@ -431,6 +433,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               machine_id,
               session_id,
               market_cost,
+              is_free,
 
               http_user_agent_id,
               http_ip_id,
@@ -468,6 +471,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.machine_id},
               ${metadataFields.session_id},
               ${metadataFields.market_cost},
+              ${metadataFields.is_free},
 
               (SELECT http_user_agent_id FROM http_user_agent_cte),
               (SELECT http_ip_id FROM http_ip_cte),
@@ -771,6 +775,35 @@ export function parseMicrodollarUsageFromString(
   return { ...coreProps, ...costs };
 }
 
+export function calculateKiloExclusiveCost_mUsd(
+  model: KiloExclusiveModel,
+  usage: JustTheCostsUsageStats
+): number {
+  const pricing = model?.pricing;
+  if (!pricing) {
+    return 0;
+  }
+  const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;
+  if (uncachedInputTokens < 0) {
+    captureMessage('SUSPICIOUS: negative uncached input tokens', {
+      level: 'error',
+      tags: { source: 'usage_processing' },
+      extra: { model: model.public_id, usage },
+    });
+  }
+  return Math.round(
+    pricing.calculate_mUsd(
+      {
+        uncachedInputTokens: uncachedInputTokens >= 0 ? uncachedInputTokens : usage.inputTokens,
+        totalOutputTokens: usage.outputTokens,
+        cacheHitTokens: usage.cacheHitTokens,
+        cacheWriteTokens: usage.cacheWriteTokens,
+      },
+      pricing
+    )
+  );
+}
+
 async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
@@ -830,6 +863,11 @@ async function processTokenData(
     isKiloStealthModel(usageContext.requested_model) // this can probably be removed once we're sure we only present requested_model to users
   ) {
     usageStats.model = usageContext.requested_model;
+  }
+
+  const kiloExclusiveModel = findKiloExclusiveModel(usageContext.requested_model);
+  if (kiloExclusiveModel?.pricing) {
+    usageStats.cost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
   }
 
   // Report upstream cost to abuse service BEFORE zeroing for free/BYOK

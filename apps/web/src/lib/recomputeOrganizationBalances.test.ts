@@ -2,6 +2,7 @@ import {
   credit_transactions as creditTransactionsTable,
   organizations,
   microdollar_usage,
+  exa_usage_log,
 } from '@kilocode/db/schema';
 import { recomputeOrganizationBalances } from './recomputeOrganizationBalances';
 import { db } from '@/lib/drizzle';
@@ -38,6 +39,7 @@ describe('recomputeOrganizationBalances', () => {
         .delete(creditTransactionsTable)
         .where(eq(creditTransactionsTable.organization_id, orgId));
       await db.delete(microdollar_usage).where(eq(microdollar_usage.organization_id, orgId));
+      await db.delete(exa_usage_log).where(eq(exa_usage_log.organization_id, orgId));
       await db.delete(organizations).where(eq(organizations.id, orgId));
     }
   });
@@ -303,5 +305,64 @@ describe('recomputeOrganizationBalances', () => {
     expect(updatedOrg!.microdollars_balance).toBe(
       updatedOrg!.total_microdollars_acquired - updatedOrg!.microdollars_used
     );
+  });
+
+  it('includes Exa charged usage in recomputed microdollars_used', async () => {
+    const org = await createTestOrg(ownerId, {
+      total_microdollars_acquired: 100_000_000,
+      microdollars_used: 5_000_000, // $2 LLM + $3 Exa
+      microdollars_balance: 95_000_000,
+    });
+    orgId = org.id;
+
+    // Credit: $100
+    await db.insert(creditTransactionsTable).values({
+      kilo_user_id: ownerId,
+      organization_id: orgId,
+      amount_microdollars: 100_000_000,
+      is_free: true,
+      original_baseline_microdollars_used: 0,
+      description: 'Grant',
+      created_at: '2024-01-01T00:00:00Z',
+    });
+
+    // LLM usage: $2
+    await db.insert(microdollar_usage).values({
+      kilo_user_id: ownerId,
+      organization_id: orgId,
+      cost: 2_000_000,
+      input_tokens: 100,
+      output_tokens: 50,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      created_at: '2024-02-01T00:00:00Z',
+    });
+
+    // Exa charged usage: $3 for this org, two requests
+    await db.insert(exa_usage_log).values([
+      {
+        kilo_user_id: ownerId,
+        organization_id: orgId,
+        path: '/search',
+        cost_microdollars: 2_000_000,
+        charged_to_balance: true,
+      },
+      {
+        kilo_user_id: ownerId,
+        organization_id: orgId,
+        path: '/search',
+        cost_microdollars: 1_000_000,
+        charged_to_balance: true,
+      },
+    ]);
+
+    const result = await recomputeOrganizationBalances({ organizationId: orgId });
+    expect(result.success).toBe(true);
+
+    const updatedOrg = await db.query.organizations.findFirst({
+      where: eq(organizations.id, orgId),
+    });
+    // Recomputed microdollars_used should be LLM ($2) + Exa ($3) = $5
+    expect(updatedOrg!.microdollars_used).toBe(5_000_000);
   });
 });

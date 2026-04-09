@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { isFreeModel, kiloFreeModels } from './models';
+import { isFreeModel, kiloExclusiveModels } from './models';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -21,21 +21,43 @@ describe('isFreeModel', () => {
       expect(isFreeModel('openrouter/sonoma-sky-beta')).toBe(true);
     });
 
-    test('should return true for enabled Kilo free models', () => {
-      // Test with known Kilo free models that are enabled
-      const enabledModels = kiloFreeModels.filter(m => m.status === 'public');
+    test('should return true for enabled Kilo exclusive models with no pricing', () => {
+      // Test with known Kilo exclusive models that are enabled and have no pricing (free)
+      const enabledFreeModels = kiloExclusiveModels.filter(
+        m => m.status === 'public' && !m.pricing
+      );
 
-      // Should have at least some enabled models
-      expect(enabledModels.length).toBeGreaterThan(0);
+      // Should have at least some enabled free models
+      expect(enabledFreeModels.length).toBeGreaterThan(0);
 
-      // All enabled models should be detected as free
-      for (const model of enabledModels) {
+      // All enabled free models should be detected as free
+      for (const model of enabledFreeModels) {
         expect(isFreeModel(model.public_id)).toBe(true);
       }
     });
 
-    test('should return false for disabled Kilo free models that do not end with :free', () => {
-      const disabledModels = kiloFreeModels.filter(
+    test('should return false for enabled Kilo exclusive models with pricing', () => {
+      // Models with pricing should NOT be free
+      const pricedModels = kiloExclusiveModels.filter(m => m.status !== 'disabled' && !!m.pricing);
+
+      for (const model of pricedModels) {
+        expect(isFreeModel(model.public_id)).toBe(false);
+      }
+    });
+
+    test('all Kilo exclusive models should have either no pricing or valid pricing', () => {
+      // Verify that all kilo exclusive models have valid pricing structure
+      for (const model of kiloExclusiveModels) {
+        if (model.pricing) {
+          expect(typeof model.pricing.prompt_per_million).toBe('number');
+          expect(typeof model.pricing.completion_per_million).toBe('number');
+          expect(typeof model.pricing.calculate_mUsd).toBe('function');
+        }
+      }
+    });
+
+    test('should return false for disabled Kilo exclusive models that do not end with :free', () => {
+      const disabledModels = kiloExclusiveModels.filter(
         m => m.status === 'disabled' && !m.public_id.endsWith(':free')
       );
 
@@ -45,8 +67,8 @@ describe('isFreeModel', () => {
       }
     });
 
-    test('should return true for disabled Kilo free models that end with :free', () => {
-      const disabledModelsWithFreeSuffix = kiloFreeModels.filter(
+    test('should return true for disabled Kilo exclusive models that end with :free', () => {
+      const disabledModelsWithFreeSuffix = kiloExclusiveModels.filter(
         m => m.status === 'disabled' && m.public_id.endsWith(':free')
       );
 

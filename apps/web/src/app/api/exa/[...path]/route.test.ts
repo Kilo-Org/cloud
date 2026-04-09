@@ -3,6 +3,13 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { failureResult } from '@/lib/maybe-result';
 import type { User } from '@kilocode/db/schema';
+import {
+  getExaMonthlyUsage,
+  getExaFreeAllowanceMicrodollars,
+  recordExaUsage,
+} from '@/lib/exa-usage';
+import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
+import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 
 // Capture promises scheduled via next/server `after` so tests can await them.
 let afterCallbacks: (() => Promise<void>)[] = [];
@@ -28,8 +35,14 @@ jest.mock('@/lib/config.server', () => ({
 }));
 
 jest.mock('@/lib/user.server');
+jest.mock('@/lib/exa-usage');
+jest.mock('@/lib/organizations/organization-usage');
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
+const mockedGetExaMonthlyUsage = jest.mocked(getExaMonthlyUsage);
+const mockedGetExaFreeAllowanceMicrodollars = jest.mocked(getExaFreeAllowanceMicrodollars);
+const mockedRecordExaUsage = jest.mocked(recordExaUsage);
+const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
@@ -41,10 +54,11 @@ function makeRequest(path: string, body: unknown = { query: 'test' }) {
   });
 }
 
-function setUserAuth(id = 'user-123') {
+function setUserAuth(id = 'user-123', organizationId?: string) {
   mockedGetUserFromAuth.mockResolvedValue({
     user: { id } as User,
     authFailedResponse: null,
+    organizationId,
   });
 }
 
@@ -60,6 +74,10 @@ describe('POST /api/exa/[...path]', () => {
     jest.resetAllMocks();
     afterCallbacks = [];
     globalThis.fetch = mockedFetch;
+    // Default: user is within free tier, no existing row
+    mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 0, freeAllowance: null });
+    mockedGetExaFreeAllowanceMicrodollars.mockReturnValue(EXA_MONTHLY_ALLOWANCE_MICRODOLLARS);
+    mockedRecordExaUsage.mockResolvedValue();
   });
 
   afterAll(() => {
@@ -110,6 +128,20 @@ describe('POST /api/exa/[...path]', () => {
     });
   });
 
+  describe('streaming disabled', () => {
+    it('strips the stream property from the request body', async () => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ results: [] }));
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/search', { query: 'test', stream: true }) as never);
+
+      const sentBody = JSON.parse(mockedFetch.mock.calls[0][1]?.body as string);
+      expect(sentBody).toEqual({ query: 'test' });
+      expect(sentBody).not.toHaveProperty('stream');
+    });
+  });
+
   describe('request signal propagation', () => {
     it('passes request.signal to upstream fetch', async () => {
       setUserAuth();
@@ -126,29 +158,6 @@ describe('POST /api/exa/[...path]', () => {
         })
       );
     });
-
-    it('aborts upstream fetch when request signal is already aborted', async () => {
-      setUserAuth();
-      mockedFetch.mockImplementation((_url, init) => {
-        if (init?.signal?.aborted) {
-          throw new DOMException('The operation was aborted.', 'AbortError');
-        }
-        return Promise.resolve(makeUpstreamResponse({ results: [] }));
-      });
-
-      const controller = new AbortController();
-      controller.abort();
-
-      const request = new Request('http://localhost:3000/api/exa/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: 'test' }),
-        signal: controller.signal,
-      });
-
-      const { POST } = await import('./route');
-      await expect(POST(request as never)).rejects.toThrow('aborted');
-    });
   });
 
   describe('response headers', () => {
@@ -162,25 +171,12 @@ describe('POST /api/exa/[...path]', () => {
       expect(response.headers.get('Content-Encoding')).toBe('identity');
     });
 
-    it('forwards content-type from upstream response', async () => {
-      setUserAuth();
-      mockedFetch.mockResolvedValue(
-        makeUpstreamResponse({ results: [] }, { 'content-type': 'application/json; charset=utf-8' })
-      );
-
-      const { POST } = await import('./route');
-      const response = await POST(makeRequest('/search') as never);
-
-      expect(response.headers.get('content-type')).toBe('application/json; charset=utf-8');
-    });
-
     it('does not leak upstream headers beyond the safe set', async () => {
       setUserAuth();
       const upstream = new Response(JSON.stringify({ results: [] }), {
         headers: {
           'content-type': 'application/json',
           'x-api-key': 'should-not-leak',
-          'x-ratelimit-remaining': '99',
           server: 'exa-internal',
         },
       });
@@ -190,7 +186,6 @@ describe('POST /api/exa/[...path]', () => {
       const response = await POST(makeRequest('/search') as never);
 
       expect(response.headers.get('x-api-key')).toBeNull();
-      expect(response.headers.get('x-ratelimit-remaining')).toBeNull();
       expect(response.headers.get('server')).toBeNull();
     });
   });
@@ -215,22 +210,6 @@ describe('POST /api/exa/[...path]', () => {
       );
     });
 
-    it('forwards request body to upstream', async () => {
-      setUserAuth();
-      mockedFetch.mockResolvedValue(makeUpstreamResponse({ results: [] }));
-
-      const body = { query: 'test query', numResults: 5 };
-      const { POST } = await import('./route');
-      await POST(makeRequest('/search', body) as never);
-
-      expect(mockedFetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          body: JSON.stringify(body),
-        })
-      );
-    });
-
     it('preserves upstream status code in response', async () => {
       setUserAuth();
       mockedFetch.mockResolvedValue(
@@ -247,10 +226,72 @@ describe('POST /api/exa/[...path]', () => {
     });
   });
 
-  describe('cost logging', () => {
-    it('logs cost from non-streaming response via after callback', async () => {
+  describe('monthly allowance', () => {
+    it('allows request when under the free tier', async () => {
       setUserAuth();
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 5_000_000, freeAllowance: 10_000_000 });
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ results: [] }));
+
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest('/search') as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    });
+
+    it('checks balance when free tier is exhausted', async () => {
+      setUserAuth();
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 10_000_000, freeAllowance: 10_000_000 });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({ balance: 5.0 });
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ results: [] }));
+
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest('/search') as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ id: 'user-123' }),
+        expect.anything()
+      );
+    });
+
+    it('returns 402 when free tier is exhausted and no balance', async () => {
+      setUserAuth();
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 10_000_000, freeAllowance: 10_000_000 });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({ balance: 0 });
+
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest('/search') as never);
+
+      expect(response.status).toBe(402);
+      const body = await response.json();
+      expect(body.error).toContain('free allowance exhausted');
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('passes organizationId from auth to balance check', async () => {
+      const orgId = 'org-456';
+      setUserAuth('user-123', orgId);
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 10_000_000, freeAllowance: 10_000_000 });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({ balance: 10.0 });
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ results: [] }));
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/search') as never);
+
+      expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledWith(
+        orgId,
+        expect.objectContaining({ id: 'user-123' }),
+        expect.anything()
+      );
+    });
+  });
+
+  describe('cost recording', () => {
+    it('records cost from response via after callback (free tier)', async () => {
+      setUserAuth();
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 0, freeAllowance: null });
       mockedFetch.mockResolvedValue(
         makeUpstreamResponse({ results: [], costDollars: { total: 0.007 } })
       );
@@ -259,23 +300,92 @@ describe('POST /api/exa/[...path]', () => {
       await POST(makeRequest('/search') as never);
       await flushAfterCallbacks();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[exa] user=user-123 path=/search cost=$0.007')
-      );
-      consoleSpy.mockRestore();
+      expect(mockedRecordExaUsage).toHaveBeenCalledWith({
+        userId: 'user-123',
+        organizationId: undefined,
+        path: '/search',
+        costMicrodollars: 7000,
+        chargedToBalance: false,
+        freeAllowanceMicrodollars: EXA_MONTHLY_ALLOWANCE_MICRODOLLARS,
+      });
     });
 
-    it('does not schedule after callback for streaming responses', async () => {
+    it('records cost with chargedToBalance when over free tier', async () => {
       setUserAuth();
-      const streamResponse = new Response('data: {}\n\n', {
-        headers: { 'content-type': 'text/event-stream' },
-      });
-      mockedFetch.mockResolvedValue(streamResponse);
+      mockedGetExaMonthlyUsage.mockResolvedValue({ usage: 10_000_000, freeAllowance: 10_000_000 });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({ balance: 5.0 });
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({ results: [], costDollars: { total: 0.005 } })
+      );
 
       const { POST } = await import('./route');
-      await POST(makeRequest('/answer') as never);
+      await POST(makeRequest('/search') as never);
+      await flushAfterCallbacks();
 
-      expect(afterCallbacks).toHaveLength(0);
+      expect(mockedRecordExaUsage).toHaveBeenCalledWith({
+        userId: 'user-123',
+        organizationId: undefined,
+        path: '/search',
+        costMicrodollars: 5000,
+        chargedToBalance: true,
+        freeAllowanceMicrodollars: 10_000_000,
+      });
+    });
+
+    it('includes organizationId in recorded usage', async () => {
+      const orgId = 'org-456';
+      setUserAuth('user-123', orgId);
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({ results: [], costDollars: { total: 0.003 } })
+      );
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/search') as never);
+      await flushAfterCallbacks();
+
+      expect(mockedRecordExaUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: orgId })
+      );
+    });
+
+    it('does not record cost for upstream error responses', async () => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(
+        new Response(JSON.stringify({ error: 'bad request', costDollars: { total: 0.001 } }), {
+          status: 400,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/search') as never);
+      await flushAfterCallbacks();
+
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+    });
+
+    it('does not record cost when costDollars is missing', async () => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ results: [] }));
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/search') as never);
+      await flushAfterCallbacks();
+
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+    });
+
+    it('does not record cost when costDollars is zero', async () => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(
+        makeUpstreamResponse({ results: [], costDollars: { total: 0 } })
+      );
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/search') as never);
+      await flushAfterCallbacks();
+
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
     });
   });
 });

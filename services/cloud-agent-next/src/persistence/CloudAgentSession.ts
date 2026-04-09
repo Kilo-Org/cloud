@@ -831,6 +831,7 @@ export class CloudAgentSession extends DurableObject {
     images?: Images;
     createdOnPlatform?: string;
     gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+    initialMessageId?: string;
     // Workspace metadata (set during prepareSession)
     workspacePath?: string;
     sessionHome?: string;
@@ -889,6 +890,7 @@ export class CloudAgentSession extends DurableObject {
     githubRepo?: string;
     gitUrl?: string;
     platform?: 'github' | 'gitlab';
+    initialMessageId?: string;
   }): Promise<OperationResult> {
     await this.requireSessionId(input.sessionId as SessionId);
     const existing = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
@@ -910,6 +912,7 @@ export class CloudAgentSession extends DurableObject {
       githubRepo: input.githubRepo,
       gitUrl: input.gitUrl,
       platform: input.platform,
+      initialMessageId: input.initialMessageId,
       version: now,
       timestamp: now,
       // NOTE: preparedAt is NOT set — this is the key difference from prepare()
@@ -1052,6 +1055,7 @@ export class CloudAgentSession extends DurableObject {
         sessionHome: result.sessionHome,
         branchName: result.branchName,
         sandboxId: result.sandboxId,
+        initialMessageId: input.initialMessageId,
       });
 
       if (!prepareResult.success) {
@@ -2089,6 +2093,7 @@ export class CloudAgentSession extends DurableObject {
     variant?: string;
     autoCommit?: boolean;
     condenseOnComplete?: boolean;
+    messageId?: string;
     initContext?: InitializeContext;
     resumeContext?: TokenResumeContext;
     existingMetadata?: CloudAgentSessionState;
@@ -2155,6 +2160,7 @@ export class CloudAgentSession extends DurableObject {
         autoCommit: params.autoCommit,
         condenseOnComplete: params.condenseOnComplete,
       },
+      messageId: params.messageId,
     };
   }
 
@@ -2442,6 +2448,7 @@ export class CloudAgentSession extends DurableObject {
           variant: metadata.variant,
           autoCommit: metadata.autoCommit,
           condenseOnComplete: metadata.condenseOnComplete,
+          messageId: metadata.initialMessageId,
           initContext,
           existingMetadata: metadata,
           kiloSessionId: metadata.kiloSessionId,
@@ -2521,6 +2528,7 @@ export class CloudAgentSession extends DurableObject {
         variant,
         autoCommit: request.autoCommit ?? metadata.autoCommit,
         condenseOnComplete: request.condenseOnComplete ?? metadata.condenseOnComplete,
+        messageId: request.messageId,
         resumeContext,
         existingMetadata: metadata,
         kiloSessionId: metadata.kiloSessionId,

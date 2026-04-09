@@ -98,6 +98,11 @@ function buildAgentEnv(request: StartAgentRequest): Record<string, string> {
     GASTOWN_TOWN_ID: request.townId,
     GASTOWN_AGENT_ROLE: request.role,
     KILOCODE_FEATURE: 'gastown',
+    KILO_TEST_HOME: `/tmp/agent-home-${request.agentId}`,
+    // XDG_DATA_HOME controls where the kilo CLI writes kilo.db (via xdg-basedir).
+    // Must match the path used by hydrateDbFromSnapshot/saveDbSnapshot in
+    // process-manager.ts so snapshots round-trip correctly across evictions.
+    XDG_DATA_HOME: `/tmp/agent-home-${request.agentId}/.local/share`,
 
     GIT_AUTHOR_NAME: authorName,
     GIT_AUTHOR_EMAIL: authorEmail,

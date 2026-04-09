@@ -7,7 +7,12 @@ import {
 } from '@/routers/organizations/utils';
 import { readDb } from '@/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
-import { microdollar_usage, kilocode_users } from '@kilocode/db/schema';
+import {
+  microdollar_usage,
+  kilocode_users,
+  microdollar_usage_metadata,
+  auto_model,
+} from '@kilocode/db/schema';
 import { eq, sum, count, sql, and, gte, lte } from 'drizzle-orm';
 import * as z from 'zod';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
@@ -170,7 +175,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               datetime: timeBucket.as('datetime'),
               userName: kilocode_users.google_user_name,
               userEmail: kilocode_users.google_user_email,
-              model: sql<string>`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
+              model: sql<string>`COALESCE(${auto_model.auto_model}, ${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
               provider: microdollar_usage.provider,
               projectId: microdollar_usage.project_id,
               costMicrodollars: sum(microdollar_usage.cost),
@@ -180,6 +185,14 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
             })
             .from(microdollar_usage)
             .innerJoin(kilocode_users, eq(kilocode_users.id, microdollar_usage.kilo_user_id))
+            .leftJoin(
+              microdollar_usage_metadata,
+              eq(microdollar_usage_metadata.id, microdollar_usage.id)
+            )
+            .leftJoin(
+              auto_model,
+              eq(auto_model.auto_model_id, microdollar_usage_metadata.auto_model_id)
+            )
             .where(
               and(
                 eq(microdollar_usage.organization_id, organizationId),
@@ -191,7 +204,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               timeBucket,
               kilocode_users.google_user_name,
               kilocode_users.google_user_email,
-              sql`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
+              sql`COALESCE(${auto_model.auto_model}, ${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
               microdollar_usage.provider,
               microdollar_usage.project_id
             )
@@ -321,7 +334,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
               ...(groupByModel && {
                 model: sql<
                   string | null
-                >`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
+                >`COALESCE(${auto_model.auto_model}, ${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
               }),
               microdollarCost: sum(microdollar_usage.cost),
               tokenCount: sum(
@@ -333,13 +346,23 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
             })
             .from(microdollar_usage)
             .innerJoin(kilocode_users, eq(kilocode_users.id, microdollar_usage.kilo_user_id))
+            .leftJoin(
+              microdollar_usage_metadata,
+              eq(microdollar_usage_metadata.id, microdollar_usage.id)
+            )
+            .leftJoin(
+              auto_model,
+              eq(auto_model.auto_model_id, microdollar_usage_metadata.auto_model_id)
+            )
             .where(and(...whereConditions))
             .groupBy(
               sql`DATE(${microdollar_usage.created_at})`,
               kilocode_users.google_user_name,
               kilocode_users.google_user_email,
               ...(groupByModel
-                ? [sql`COALESCE(${microdollar_usage.requested_model}, ${microdollar_usage.model})`]
+                ? [
+                    sql`COALESCE(${auto_model.auto_model}, ${microdollar_usage.requested_model}, ${microdollar_usage.model})`,
+                  ]
                 : [])
             )
             .orderBy(sql`DATE(${microdollar_usage.created_at}) DESC`)

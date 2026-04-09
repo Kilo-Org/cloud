@@ -440,6 +440,8 @@ export function createSessionManagementHandlers() {
 
             callbackTarget: metadata.callbackTarget,
 
+            initialMessageId: metadata.initialMessageId,
+
             timestamp: metadata.timestamp,
             version: metadata.version,
           };

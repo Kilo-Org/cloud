@@ -264,6 +264,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
   const [gitlabToken, setGitlabToken] = useState('');
   const [gitlabInstanceUrl, setGitlabInstanceUrl] = useState('');
   const [defaultModel, setDefaultModel] = useState('');
+  const [smallModel, setSmallModel] = useState('');
   const [mayorModel, setMayorModel] = useState('');
   const [refineryModel, setRefineryModel] = useState('');
   const [polecatModel, setPolecatModel] = useState('');
@@ -298,6 +299,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
     setGitlabInstanceUrl(cfg.git_auth?.gitlab_instance_url ?? '');
     setDefaultModel(cfg.default_model ?? '');
     savedModelRef.current = cfg.default_model ?? '';
+    setSmallModel(cfg.small_model ?? '');
     setMayorModel(cfg.role_models?.mayor ?? '');
     setRefineryModel(cfg.role_models?.refinery ?? '');
     setPolecatModel(cfg.role_models?.polecat ?? '');
@@ -352,6 +354,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
           gitlab_instance_url: gitlabInstanceUrl,
         },
         default_model: defaultModel,
+        small_model: smallModel || undefined,
         role_models: {
           mayor: mayorModel || undefined,
           refinery: refineryModel || undefined,
@@ -669,6 +672,43 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
                         className="border-white/[0.08] bg-white/[0.03] text-sm text-white/85"
                       />
                     )}
+                  </FieldGroup>
+
+                  <FieldGroup
+                    label="Small Model"
+                    hint="Lightweight model for titles, summaries, and explore subagent. Defaults to Claude Haiku if not set."
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        {modelsError ? (
+                          <Input
+                            value={smallModel}
+                            onChange={e => setSmallModel(e.target.value)}
+                            placeholder="e.g. anthropic/claude-haiku-4.5"
+                            className="border-white/[0.08] bg-white/[0.03] font-mono text-sm text-white/85 placeholder:text-white/20"
+                          />
+                        ) : (
+                          <ModelCombobox
+                            label=""
+                            models={modelOptions}
+                            value={smallModel}
+                            onValueChange={setSmallModel}
+                            isLoading={isLoadingModels}
+                            placeholder="Default (Claude Haiku)"
+                            className="border-white/[0.08] bg-white/[0.03] text-sm text-white/85"
+                          />
+                        )}
+                      </div>
+                      {smallModel && (
+                        <button
+                          onClick={() => setSmallModel('')}
+                          className="rounded p-1 text-white/25 transition-colors hover:bg-white/[0.06] hover:text-white/50"
+                          title="Reset to default"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </FieldGroup>
 
                   <Accordion type="single" collapsible className="border-none">

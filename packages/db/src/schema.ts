@@ -43,6 +43,8 @@ import {
   KiloClawSubscriptionStatus,
   KiloClawPaymentSource,
   AffiliateProvider,
+  AffiliateEventType,
+  AffiliateEventDeliveryState,
 } from './schema-types';
 import type { CustomLlmDefinition, KiloClawAdminAuditAction } from './schema-types';
 import type {
@@ -110,7 +112,23 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawScheduledBy,
   KiloClawSubscriptionStatus,
   AffiliateProvider,
+  AffiliateEventType,
+  AffiliateEventDeliveryState,
 } as const;
+
+export type AffiliateEventPayloadJson = {
+  trackingId: string | null;
+  customerId: string | null;
+  customerEmailHash: string | null;
+  orderId: string;
+  eventDate: string;
+  amount?: number | null;
+  currencyCode?: string | null;
+  itemCategory?: string | null;
+  itemName?: string | null;
+  itemSku?: string | null;
+  promoCode?: string | null;
+};
 
 export const credit_transactions = pgTable(
   'credit_transactions',
@@ -247,6 +265,62 @@ export const user_affiliate_attributions = pgTable(
 );
 
 export type UserAffiliateAttribution = typeof user_affiliate_attributions.$inferSelect;
+
+export const user_affiliate_events = pgTable(
+  'user_affiliate_events',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    provider: text().notNull().$type<AffiliateProvider>(),
+    event_type: text().notNull().$type<AffiliateEventType>(),
+    dedupe_key: text().notNull(),
+    parent_event_id: uuid(),
+    delivery_state: text()
+      .notNull()
+      .$type<AffiliateEventDeliveryState>()
+      .default(AffiliateEventDeliveryState.Queued),
+    payload_json: jsonb().$type<AffiliateEventPayloadJson>().notNull(),
+    attempt_count: integer().notNull().default(0),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    foreignKey({
+      columns: [table.parent_event_id],
+      foreignColumns: [table.id],
+      name: 'user_affiliate_events_parent_event_id_fk',
+    })
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    unique('UQ_user_affiliate_events_dedupe_key').on(table.dedupe_key),
+    index('IDX_user_affiliate_events_claim_path').on(
+      table.delivery_state,
+      sql`coalesce(${table.next_retry_at}, '-infinity'::timestamptz)`,
+      table.created_at,
+      table.id
+    ),
+    index('IDX_user_affiliate_events_parent_event_id').on(table.parent_event_id),
+    enumCheck('user_affiliate_events_provider_check', table.provider, AffiliateProvider),
+    enumCheck('user_affiliate_events_event_type_check', table.event_type, AffiliateEventType),
+    enumCheck(
+      'user_affiliate_events_delivery_state_check',
+      table.delivery_state,
+      AffiliateEventDeliveryState
+    ),
+    check(
+      'user_affiliate_events_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+  ]
+);
+
+export type UserAffiliateEvent = typeof user_affiliate_events.$inferSelect;
 
 export const kilo_pass_subscriptions = pgTable(
   'kilo_pass_subscriptions',
@@ -716,6 +790,7 @@ export const microdollar_usage_metadata = pgTable(
     mode_id: integer(),
     auto_model_id: integer(),
     market_cost: bigint({ mode: 'number' }),
+    is_free: boolean(),
   },
   table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
 );
@@ -904,6 +979,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   mode: text(),
   auto_model: text(),
   market_cost: bigint({ mode: 'number' }),
+  is_free: boolean(),
 }).as(sql`
   SELECT
     mu.id,
@@ -954,7 +1030,8 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.session_id,
     md.mode,
     am.auto_model,
-    meta.market_cost
+    meta.market_cost,
+    meta.is_free
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
   LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id
@@ -3842,3 +3919,97 @@ export const user_push_tokens = pgTable(
 
 export type UserPushToken = typeof user_push_tokens.$inferSelect;
 export type NewUserPushToken = typeof user_push_tokens.$inferInsert;
+
+// ============ EXA USAGE TRACKING ============
+// Pre-aggregated monthly counter (hot path) + per-request audit log (partitioned)
+
+export const exa_monthly_usage = pgTable(
+  'exa_monthly_usage',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    month: date({ mode: 'string' }).notNull(),
+    total_cost_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    total_charged_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    request_count: integer().notNull().default(0),
+    free_allowance_microdollars: bigint({ mode: 'number' }).notNull().default(10_000_000),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    // Personal usage: one row per user per month (no org)
+    uniqueIndex('idx_exa_monthly_usage_personal')
+      .on(table.kilo_user_id, table.month)
+      .where(isNull(table.organization_id)),
+    // Org usage: one row per user per org per month
+    uniqueIndex('idx_exa_monthly_usage_org')
+      .on(table.kilo_user_id, table.organization_id, table.month)
+      .where(isNotNull(table.organization_id)),
+  ]
+);
+
+export type ExaMonthlyUsage = typeof exa_monthly_usage.$inferSelect;
+
+// Per-request audit log — partitioned by month on created_at.
+// The Drizzle definition is for type inference; the actual table is created
+// as a partitioned table in the migration with hand-written SQL.
+export const exa_usage_log = pgTable(
+  'exa_usage_log',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    path: text().notNull(),
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    charged_to_balance: boolean().notNull().default(false),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.id, table.created_at] }),
+    index('idx_exa_usage_log_user_created').on(table.kilo_user_id, table.created_at),
+  ]
+);
+
+export type ExaUsageLog = typeof exa_usage_log.$inferSelect;
+
+// ============ SECURITY ADVISOR SCANS ============
+// Per-scan usage tracking for the security advisor feature.
+// Serves as both a rate-limiting table (COUNT in 24h window) and a usage/analytics ledger.
+
+export const security_advisor_scans = pgTable(
+  'security_advisor_scans',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    kilo_user_id: text().notNull(),
+    organization_id: text(),
+    source_platform: text().notNull(), // 'openclaw' | 'kiloclaw'
+    source_method: text().notNull(), // 'plugin' | 'api' | 'webhook' | 'cloud-agent'
+    plugin_version: text(),
+    openclaw_version: text(),
+    public_ip: text(), // Client-reported public IP (validated as IP format). Metadata only, not used for rate limiting.
+    // Audit result counts for analytics
+    findings_critical: integer().notNull().default(0),
+    findings_warn: integer().notNull().default(0),
+    findings_info: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    // Primary index for rate-limiting queries (user + time window)
+    index('idx_security_advisor_scans_user_created_at').on(table.kilo_user_id, table.created_at),
+    // Analytics: scans over time
+    index('idx_security_advisor_scans_created_at').on(table.created_at),
+    // Analytics: scans by source platform
+    index('idx_security_advisor_scans_platform').on(table.source_platform),
+  ]
+);
+
+export type SecurityAdvisorScan = typeof security_advisor_scans.$inferSelect;
+export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;

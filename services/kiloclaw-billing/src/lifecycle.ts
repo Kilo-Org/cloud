@@ -15,7 +15,6 @@ import {
   kiloclaw_instances,
   kiloclaw_subscriptions,
   kilocode_users,
-  user_affiliate_attributions,
 } from '@kilocode/db/schema';
 import type {
   KiloClawPlan,
@@ -145,12 +144,14 @@ type SideEffectRequest =
       input: { stripeSubscriptionId: string; userId: string };
     }
   | {
-      action: 'track_trial_end';
+      action: 'enqueue_affiliate_event';
       input: {
-        clickId?: string;
-        customerId: string;
-        customerEmail: string;
+        userId: string;
+        provider: 'impact';
+        eventType: 'trial_end';
+        dedupeKey: string;
         eventDateIso: string;
+        orderId: string;
       };
     }
   | {
@@ -172,8 +173,8 @@ type SideEffectResponse<T extends SideEffectRequest> = T['action'] extends 'send
     ? { ok: true }
     : T['action'] extends 'ensure_auto_intro_schedule'
       ? { repaired: boolean }
-      : T['action'] extends 'track_trial_end'
-        ? { tracked: boolean }
+      : T['action'] extends 'enqueue_affiliate_event'
+        ? { enqueued: boolean }
         : T['action'] extends 'project_pending_kilo_pass_bonus'
           ? { projectedBonusMicrodollars: number }
           : { ok: true };
@@ -405,7 +406,8 @@ async function requestKiloClaw<T>(
   context: SweepExecutionContext,
   path: string,
   init?: RequestInit,
-  entityFields: BillingEntityFields = {}
+  entityFields: BillingEntityFields = {},
+  options: { handledErrorStatuses?: readonly number[] } = {}
 ): Promise<T> {
   if (!env.KILOCLAW_INTERNAL_API_SECRET) {
     throw new Error('KILOCLAW_INTERNAL_API_SECRET is not configured');
@@ -447,15 +449,19 @@ async function requestKiloClaw<T>(
       const durationMs = performance.now() - startedAt;
       if (!response.ok) {
         const responseBody = await response.text();
-        log('error', 'Kiloclaw platform call failed', {
-          event: 'downstream_call',
-          outcome: 'failed',
-          action: init?.method ?? 'GET',
-          path,
-          statusCode: response.status,
-          durationMs,
-          ...entityFields,
-        });
+        const isHandledErrorStatus =
+          options.handledErrorStatuses?.includes(response.status) ?? false;
+        if (!isHandledErrorStatus) {
+          log('error', 'Kiloclaw platform call failed', {
+            event: 'downstream_call',
+            outcome: 'failed',
+            action: init?.method ?? 'GET',
+            path,
+            statusCode: response.status,
+            durationMs,
+            ...entityFields,
+          });
+        }
         throw new KiloClawApiError(response.status, responseBody);
       }
 
@@ -509,16 +515,36 @@ async function destroyInstance(
   instanceId?: string
 ): Promise<void> {
   const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
-  await requestKiloClaw<{ ok: true }>(
-    env,
-    context,
-    `/api/platform/destroy${params}`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ userId }),
-    },
-    { userId, instanceId }
-  );
+  const path = `/api/platform/destroy${params}`;
+  try {
+    await requestKiloClaw<{ ok: true }>(
+      env,
+      context,
+      path,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId, instanceId },
+      { handledErrorStatuses: [404] }
+    );
+  } catch (error) {
+    if (error instanceof KiloClawApiError && error.statusCode === 404) {
+      log('info', 'KiloClaw instance already gone during billing destroy', {
+        event: 'downstream_call',
+        outcome: 'completed',
+        action: 'POST',
+        path,
+        statusCode: 404,
+        idempotent: true,
+        userId,
+        instanceId,
+      });
+      return;
+    }
+
+    throw error;
+  }
 }
 
 async function trySendEmail(
@@ -670,26 +696,26 @@ async function ensureAutoIntroSchedule(
   return result.repaired;
 }
 
-async function trackTrialEnd(
+async function enqueueAffiliateEvent(
   env: BillingWorkerEnv,
   context: SweepExecutionContext,
   params: {
-    clickId?: string;
-    customerId: string;
-    customerEmail: string;
+    userId: string;
+    provider: 'impact';
+    eventType: 'trial_end';
+    dedupeKey: string;
     eventDateIso: string;
+    orderId: string;
   }
 ): Promise<void> {
-  if (!params.clickId) return;
-
   await callBillingSideEffect(
     env,
     context,
     {
-      action: 'track_trial_end',
+      action: 'enqueue_affiliate_event',
       input: params,
     },
-    { userId: params.customerId }
+    { userId: params.userId }
   );
 }
 
@@ -1136,8 +1162,7 @@ async function destroyInstanceForEnforcement(
       workerInstanceId({ id: row.instance_id, sandbox_id: row.sandbox_id })
     );
   } catch (error) {
-    const isExpected =
-      error instanceof KiloClawApiError && (error.statusCode === 404 || error.statusCode === 409);
+    const isExpected = error instanceof KiloClawApiError && error.statusCode === 409;
     log(isExpected ? 'info' : 'error', 'Destroy instance during billing enforcement failed', {
       userId: row.user_id,
       instanceId: row.instance_id,
@@ -1189,24 +1214,15 @@ async function runTrialExpirySweep(
         })
         .where(eq(kiloclaw_subscriptions.id, row.id));
 
-      const [attribution] = await database
-        .select({ tracking_id: user_affiliate_attributions.tracking_id })
-        .from(user_affiliate_attributions)
-        .where(
-          and(
-            eq(user_affiliate_attributions.user_id, row.user_id),
-            eq(user_affiliate_attributions.provider, 'impact')
-          )
-        )
-        .limit(1);
-
-      await trackTrialEnd(env, context, {
-        clickId: attribution?.tracking_id,
-        customerId: row.user_id,
-        customerEmail: row.email,
+      await enqueueAffiliateEvent(env, context, {
+        userId: row.user_id,
+        provider: 'impact',
+        eventType: 'trial_end',
+        dedupeKey: `affiliate:impact:trial_end:${row.id}`,
         eventDateIso: now,
+        orderId: 'IR_AN_64_TS',
       }).catch(error => {
-        log('warn', 'Impact trial end tracking failed during sweep', {
+        log('warn', 'Affiliate trial end enqueue failed during sweep', {
           userId: row.user_id,
           error: error instanceof Error ? error.message : String(error),
         });

@@ -4964,6 +4964,54 @@ describe('provision: auto-start after fresh provision', () => {
     expect(storage._store.get('status')).toBe('stopped');
   });
 
+  it('routes legacy fly-only persisted state without provider fields', async () => {
+    const storage = createFakeStorage();
+    await seedRunning(storage, {
+      flyAppName: 'acct-legacy-only',
+      flyMachineId: 'machine-legacy',
+      flyVolumeId: 'vol-legacy',
+      flyRegion: 'ord',
+    });
+    const { instance } = createInstance(storage);
+
+    const routingTarget = await instance.getRoutingTarget();
+
+    expect(routingTarget).toEqual({
+      origin: 'https://acct-legacy-only.fly.dev',
+      headers: {
+        'fly-force-instance-id': 'machine-legacy',
+      },
+    });
+  });
+
+  it('backfills provider state when a legacy fly-only DO is next persisted', async () => {
+    const storage = createFakeStorage();
+    await seedRunning(storage, {
+      flyAppName: 'acct-legacy-only',
+      flyMachineId: 'machine-legacy',
+      flyVolumeId: 'vol-legacy',
+      flyRegion: 'ord',
+    });
+    const { instance } = createInstance(storage);
+
+    (flyClient.stopMachineAndWait as Mock).mockResolvedValue(undefined);
+
+    await instance.stop();
+
+    expect(flyClient.stopMachineAndWait).toHaveBeenCalledWith(
+      expect.objectContaining({ appName: 'acct-legacy-only' }),
+      'machine-legacy'
+    );
+    expect(storage._store.get('provider')).toBe('fly');
+    expect(storage._store.get('providerState')).toEqual({
+      provider: 'fly',
+      appName: 'acct-legacy-only',
+      machineId: 'machine-legacy',
+      volumeId: 'vol-legacy',
+      region: 'ord',
+    });
+  });
+
   it('does not leave the hot DO on an unsupported provider after failed provision', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
 

@@ -1077,6 +1077,18 @@ export class TownDO extends DurableObject<Env> {
     return beadOps.listBeadEvents(this.sql, options);
   }
 
+  async resetAgentDispatchAttempts(agentId: string): Promise<void> {
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agent_metadata}
+        SET ${agent_metadata.columns.dispatch_attempts} = 0
+        WHERE ${agent_metadata.bead_id} = ?
+      `,
+      [agentId]
+    );
+  }
+
   /**
    * Partially update a bead's editable fields.
    * Only fields explicitly provided are updated (partial update semantics).

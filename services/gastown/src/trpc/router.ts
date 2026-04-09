@@ -690,6 +690,14 @@ export const gastownRouter = router({
       await townStub.deleteAgent(input.agentId);
     }),
 
+  resetAgentDispatchAttempts: gastownProcedure
+    .input(z.object({ townId: z.string().uuid(), agentId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      await townStub.resetAgentDispatchAttempts(input.agentId);
+    }),
+
   // ── Work Assignment ─────────────────────────────────────────────────
 
   sling: gastownProcedure

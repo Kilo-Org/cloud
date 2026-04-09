@@ -73,6 +73,11 @@ export function AgentDetailDrawer({
 
   const relatedBeads = (beadsQuery.data ?? []).filter(b => b.assignee_agent_bead_id === agent?.id);
 
+  const resetMutation = trpc.gastown.resetAgentDispatchAttempts.useMutation();
+  const handleReset = () => {
+    if (!agent) return;
+    resetMutation.mutate({ townId: agent.town_id, agentId: agent.id });
+  };
   const RoleIcon = agent ? (ROLE_ICONS[agent.role] ?? Bot) : Bot;
 
   return (
@@ -168,6 +173,16 @@ export function AgentDetailDrawer({
                       label="Dispatch Attempts"
                       value={String(agent.dispatch_attempts)}
                     />
+                    {agent.dispatch_attempts > 0 && (
+                      <div className="flex items-center justify-center p-2">
+                        <button
+                          onClick={handleReset}
+                          className="rounded bg-amber-500/20 px-2 py-1 text-xs text-amber-300 hover:bg-amber-500/30"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    )}
                     <MetaCell
                       icon={Activity}
                       label="Last Active"

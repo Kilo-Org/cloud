@@ -42,6 +42,7 @@ vi.mock('./lib/image-version', async () => {
 
 import worker from './index';
 import { deriveGatewayToken } from './auth/gateway-token';
+import { KILOCLAW_ACTIVE_INSTANCE_COOKIE } from './config';
 
 type FetchMock = ReturnType<
   typeof vi.fn<(input: string | URL | Request, init?: RequestInit) => Promise<Response>>
@@ -215,6 +216,44 @@ describe('proxy routing target usage', () => {
     expect(headers.get('fly-force-instance-id')).toBe('machine-1');
     expect(headers.get('x-provider-route')).toBe('provider-hop');
     expect(headers.get('x-kiloclaw-proxy-token')).toBeTruthy();
+  });
+
+  it('returns 503 for an owned cookie-routed instance when the routing target is unavailable', async () => {
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'user-1',
+        sandboxId: 'sandbox-1',
+        status: 'running',
+        flyMachineId: 'machine-1',
+        flyAppName: 'test-app',
+      }),
+      getRoutingTarget: vi.fn().mockResolvedValue(null),
+    };
+
+    const response = await worker.fetch(
+      new Request('https://example.com/', {
+        headers: {
+          Cookie: `${KILOCLAW_ACTIVE_INSTANCE_COOKIE}=550e8400-e29b-41d4-a716-446655440000`,
+        },
+      }),
+      {
+        NEXTAUTH_SECRET: 'nextauth-secret',
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        FLY_API_TOKEN: 'fly-token',
+        FLY_APP_NAME: 'test-app',
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('5');
+    await expect(response.json()).resolves.toEqual({
+      error: 'Instance not routable',
+    });
   });
 
   it('rebuilds HTTP retry auth with the refreshed authoritative sandbox id after crash recovery', async () => {

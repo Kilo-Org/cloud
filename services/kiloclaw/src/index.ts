@@ -635,7 +635,13 @@ app.all('*', async c => {
         }
 
         const routingTarget = await stub.getRoutingTarget();
-        if (routingTarget && instanceStatus.sandboxId) {
+        if (!routingTarget) {
+          return c.json(
+            { error: 'Instance not routable' },
+            { status: 503, headers: { 'Retry-After': '5' } }
+          );
+        }
+        if (instanceStatus.sandboxId) {
           console.log(
             '[PROXY] Cookie-routed to instance:',
             activeInstanceId,

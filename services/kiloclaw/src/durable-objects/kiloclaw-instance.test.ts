@@ -1859,6 +1859,50 @@ describe('startExistingMachine: transient vs 404 errors', () => {
     expect(flyClient.createMachine).toHaveBeenCalled();
     expect(storage._store.get('flyMachineId')).toBe('machine-new');
   });
+
+  it('clears the stale machine id before retrying replacement creation after a 404', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'stopped' });
+
+    (flyClient.getMachine as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+    (flyClient.createMachine as Mock).mockRejectedValue(new Error('create failed'));
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await expect(instance.start('user-1')).rejects.toThrow('create failed');
+
+    expect(storage._store.get('flyMachineId')).toBeNull();
+    expect(storage._store.get('providerState')).toEqual(
+      expect.objectContaining({
+        provider: 'fly',
+        appName: null,
+        machineId: null,
+        volumeId: 'vol-1',
+      })
+    );
+  });
+
+  it('persists machine size backfill before start completion for legacy instances', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      status: 'stopped',
+      machineSize: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'stopped',
+      config: { guest: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' } },
+    });
+    (flyClient.updateMachine as Mock).mockRejectedValue(new Error('update failed'));
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await expect(instance.start('user-1')).rejects.toThrow('update failed');
+
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 4,
+      memory_mb: 8192,
+      cpu_kind: 'performance',
+    });
+  });
 });
 
 describe('startExistingMachine: failed Fly machine', () => {
@@ -3723,6 +3767,37 @@ describe('start: 412 insufficient resources recovery', () => {
     await expect(instance.start('user-1')).rejects.toThrow('persist replacement volume failed');
 
     expect(flyClient.deleteVolume).not.toHaveBeenCalled();
+  });
+
+  it('clears the abandoned volume before creating a fresh no-user-data replacement', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      flyMachineId: 'machine-1',
+      flyVolumeId: 'vol-1',
+      flyRegion: 'iad',
+      lastStartedAt: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'stopped' });
+    (flyClient.updateMachine as Mock).mockRejectedValue(
+      new FlyApiError('insufficient resources', 412, '{"error":"insufficient resources"}')
+    );
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.createVolumeWithFallback as Mock).mockRejectedValue(new Error('create failed'));
+
+    await expect(instance.start('user-1')).rejects.toThrow('create failed');
+
+    expect(storage._store.get('flyMachineId')).toBeNull();
+    expect(storage._store.get('flyVolumeId')).toBeNull();
+    expect(storage._store.get('providerState')).toEqual({
+      provider: 'fly',
+      appName: null,
+      machineId: null,
+      volumeId: null,
+      region: null,
+    });
   });
 
   it('propagates non-412 errors without recovery', async () => {

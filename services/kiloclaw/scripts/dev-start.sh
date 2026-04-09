@@ -666,7 +666,10 @@ add_tmux_panes() {
 
 set_api_base_url() {
   local url="$1"
-  echo "    Setting KILOCODE_API_BASE_URL=$url"
+  local quiet="${2:-}"
+  if [ -z "$quiet" ]; then
+    echo "    Setting KILOCODE_API_BASE_URL=$url"
+  fi
   if grep -q '^KILOCODE_API_BASE_URL=' "$KILOCLAW_DIR/.dev.vars"; then
     sed "s|^KILOCODE_API_BASE_URL=.*|KILOCODE_API_BASE_URL=$url|" \
       "$KILOCLAW_DIR/.dev.vars" > "$KILOCLAW_DIR/.dev.vars.tmp"
@@ -719,10 +722,24 @@ else
 
   if [ -z "$TUNNEL_URL" ]; then
     echo ""
-    echo "WARNING: Could not capture tunnel URL after 30 seconds."
-    echo "Check the cloudflared terminal tab and manually update"
-    echo "KILOCODE_API_BASE_URL in .dev.vars, then restart the worker."
+    echo "ERROR: Could not capture tunnel URL after 30 seconds."
+    echo "Clearing KILOCODE_API_BASE_URL in .dev.vars to prevent stale URL usage."
     echo ""
+    echo "Check that cloudflared is authenticated (run 'cloudflared login') and can"
+    echo "reach Cloudflare, then re-run this script."
+    echo ""
+    # Clear the URL so the worker fails loudly instead of using a stale URL
+    set_api_base_url "" quiet
+    # Kill the background tunnel process if it's still running
+    if [ "$QUICK_TUNNEL_STARTED" = true ]; then
+      kill "$TUNNEL_PID" 2>/dev/null || true
+      wait "$TUNNEL_PID" 2>/dev/null || true
+    else
+      echo "NOTE: A cloudflared terminal tab may still be running — close it manually."
+      echo ""
+    fi
+    rm -f "$TUNNEL_LOG"
+    exit 1
   else
     echo "    Tunnel URL: $TUNNEL_URL"
     set_api_base_url "${TUNNEL_URL}/api/gateway/"

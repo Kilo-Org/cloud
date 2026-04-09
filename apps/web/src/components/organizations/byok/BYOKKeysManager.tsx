@@ -469,7 +469,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         <p className="mt-1">
                           In your client, select the{' '}
                           <strong>{directProvider.name}</strong> model entry to use this key. After
-                          saving, you may need to restart your client and wait a few minutes for
+                          saving, you may need to wait a few minutes and restart your client for
                           this entry to appear.
                         </p>
                       </AlertDescription>

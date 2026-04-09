@@ -82,8 +82,6 @@ export function KiloClawChat({ instanceId, name, enabled }: Readonly<KiloClawCha
   );
 }
 
-// ─── Internal components ────────────────────────────────────────────────────
-
 function ChatShell({
   instanceId,
   name,
@@ -183,61 +181,64 @@ function StreamChatUI({
   const [client, setClient] = useState<StreamChat | null>(null);
   const [channel, setChannel] = useState<StreamChannel | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
-  const cancelledRef = useRef(false);
-
-  const connect = useCallback(async () => {
-    const chatClient = StreamChat.getInstance(apiKey);
-    setConnectError(null);
-
-    try {
-      if (chatClient.userID) {
-        try {
-          await chatClient.disconnectUser();
-        } catch {
-          // Ignore disconnect errors on a potentially dead connection
-        }
-      }
-      if (cancelledRef.current) {
-        return;
-      }
-      await chatClient.connectUser({ id: userId }, tokenProvider);
-      const ch = chatClient.channel('messaging', channelId);
-      await ch.watch({ presence: true });
-      // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- ref can change across awaits
-      if (!cancelledRef.current) {
-        setClient(chatClient);
-        setChannel(ch);
-      }
-    } catch (error) {
-      if (!cancelledRef.current) {
-        setConnectError(error instanceof Error ? error.message : 'Failed to connect to chat.');
-      }
-    }
-  }, [apiKey, userId, channelId, tokenProvider]);
 
   useEffect(() => {
-    cancelledRef.current = false;
+    const chatClient = StreamChat.getInstance(apiKey);
+
+    let cancelled = false;
+    setConnectError(null);
+
+    const connect = async () => {
+      try {
+        // Await disconnect to prevent tokenManager.reset() from racing with the new connection
+        if (chatClient.userID) {
+          await chatClient.disconnectUser();
+        }
+        if (cancelled) {
+          return;
+        }
+        await chatClient.connectUser({ id: userId }, tokenProvider);
+        const ch = chatClient.channel('messaging', channelId);
+        await ch.watch({ presence: true });
+        // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- cancelled can change across awaits
+        if (!cancelled) {
+          setClient(chatClient);
+          setChannel(ch);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setConnectError(error instanceof Error ? error.message : 'Failed to connect to chat.');
+        }
+      }
+    };
+
     void connect();
+
     return () => {
-      cancelledRef.current = true;
+      cancelled = true;
       setClient(null);
       setChannel(null);
     };
-  }, [connect]);
+  }, [apiKey, userId, channelId, tokenProvider]);
 
-  // Reconnect when app returns to foreground (websocket may have died while backgrounded)
+  // Gracefully close/reopen the websocket on background/foreground.
+  // This preserves the client and channel state (no disconnect/reconnect).
   const appState = useRef(AppState.currentState);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
-      if (/inactive|background/.exec(appState.current) && nextAppState === 'active') {
-        void connect();
+      if (client) {
+        if (appState.current === 'active' && /inactive|background/.exec(nextAppState)) {
+          void client.closeConnection();
+        } else if (/inactive|background/.exec(appState.current) && nextAppState === 'active') {
+          void client.openConnection();
+        }
       }
       appState.current = nextAppState;
     });
     return () => {
       subscription.remove();
     };
-  }, [connect]);
+  }, [client]);
 
   // Bot presence tracking
   const sandboxId = channelId.replace(/^default-/, '');

@@ -1,0 +1,20 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { defineConfig } from 'vitest/config';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default defineConfig({
+  test: {
+    environment: 'node',
+  },
+  resolve: {
+    alias: {
+      'openclaw/plugin-sdk/provider-web-search': path.resolve(
+        __dirname,
+        'test/stubs/provider-web-search.ts'
+      ),
+      'openclaw/plugin-sdk/text-runtime': path.resolve(__dirname, 'test/stubs/text-runtime.ts'),
+    },
+  },
+});

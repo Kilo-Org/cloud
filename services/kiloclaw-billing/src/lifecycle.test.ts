@@ -534,7 +534,7 @@ describe('credit renewal sweep affiliate tracking', () => {
     mockGetWorkerDb.mockReturnValue(db);
 
     const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body)) as {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
         action: string;
         input: Record<string, unknown>;
       };
@@ -582,9 +582,8 @@ describe('credit renewal sweep affiliate tracking', () => {
     );
     expect(txUpdates).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({
-          microdollars_used: expect.anything(),
-        }),
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        expect.objectContaining({ microdollars_used: expect.anything() }),
         expect.objectContaining({
           current_period_start: renewalAt,
           auto_top_up_triggered_for_period: null,
@@ -593,7 +592,13 @@ describe('credit renewal sweep affiliate tracking', () => {
     );
 
     const saleCall = fetch.mock.calls
-      .map(([, init]) => JSON.parse(String(init?.body)) as { action: string; input: Record<string, unknown> })
+      .map(
+        ([, init]) =>
+          JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+            action: string;
+            input: Record<string, unknown>;
+          }
+      )
       .find(call => call.action === 'enqueue_affiliate_event');
 
     expect(saleCall).toEqual({

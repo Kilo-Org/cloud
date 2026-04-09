@@ -86,6 +86,7 @@ jest.mock('next/headers', () => {
 });
 
 jest.mock('next/server', () => {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   const actual = jest.requireActual<typeof import('next/server')>('next/server');
   return {
     ...actual,

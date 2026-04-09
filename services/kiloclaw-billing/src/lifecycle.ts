@@ -244,10 +244,7 @@ function getKiloClawAffiliateItemName(plan: 'commit' | 'standard'): string {
   return plan === 'commit' ? 'KiloClaw Commit Plan' : 'KiloClaw Standard Plan';
 }
 
-function getKiloClawAffiliateItemSku(
-  env: BillingWorkerEnv,
-  plan: 'commit' | 'standard'
-): string {
+function getKiloClawAffiliateItemSku(env: BillingWorkerEnv, plan: 'commit' | 'standard'): string {
   return plan === 'commit'
     ? env.STRIPE_KILOCLAW_COMMIT_PRICE_ID
     : env.STRIPE_KILOCLAW_STANDARD_PRICE_ID;

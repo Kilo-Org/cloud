@@ -420,9 +420,7 @@ async function claimQueuedEvents(
   return result.rows;
 }
 
-function buildImpactConversionPayloadForEvent(
-  event: AffiliateEventRow
-): ImpactConversionPayload {
+function buildImpactConversionPayloadForEvent(event: AffiliateEventRow): ImpactConversionPayload {
   const eventDate = new Date(event.payload_json.eventDate);
 
   switch (event.provider) {
@@ -651,9 +649,12 @@ export async function dispatchQueuedAffiliateEvents(params?: {
 
   const impactConfigured = isImpactConfigured();
   if (!impactConfigured) {
-    logInfo('Processing affiliate event dispatch as a no-op because Impact credentials are not configured', {
-      dispatch_source: 'cron',
-    });
+    logInfo(
+      'Processing affiliate event dispatch as a no-op because Impact credentials are not configured',
+      {
+        dispatch_source: 'cron',
+      }
+    );
   }
 
   const reclaimed = await reclaimStaleSendingEvents(database);
@@ -702,10 +703,15 @@ export async function dispatchQueuedAffiliateEvents(params?: {
           ...event,
           delivery_state: 'delivered',
         } satisfies AffiliateEventRow;
-        logInfo(result.skipped === 'unconfigured' ? 'Skipped affiliate event delivery because Impact is unconfigured' : 'Delivered affiliate event', {
-          ...buildAffiliateEventLogFields(deliveredEvent),
-          dispatch_source: 'cron',
-        });
+        logInfo(
+          result.skipped === 'unconfigured'
+            ? 'Skipped affiliate event delivery because Impact is unconfigured'
+            : 'Delivered affiliate event',
+          {
+            ...buildAffiliateEventLogFields(deliveredEvent),
+            dispatch_source: 'cron',
+          }
+        );
 
         if (event.event_type === getParentEventType(event.provider)) {
           const unblockedChildren = await promoteBlockedChildren(database, event.id);

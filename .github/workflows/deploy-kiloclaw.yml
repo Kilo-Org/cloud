@@ -179,6 +179,7 @@ jobs:
           workingDirectory: services/kiloclaw
           command: >-
             deploy
+            --env production
             --var FLY_IMAGE_TAG:${{ steps.image-hash.outputs.tag }}
             --var OPENCLAW_VERSION:${{ steps.openclaw-version.outputs.version }}
             --var FLY_IMAGE_DIGEST:${{ steps.image-digest.outputs.digest }}

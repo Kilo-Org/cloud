@@ -73,18 +73,6 @@
     },
   ],
 
-  // Cloudflare Pipelines — dual-write to R2 as Parquet for Snowflake export.
-  // Run pipelines/setup.sh once to create the streams and pipelines, then
-  // replace the placeholder IDs below with the real pipeline UUIDs before deploying.
-  // Schema files: pipelines/events-schema.json, pipelines/controller-telemetry-schema.json
-  "pipelines": [
-    { "pipeline": "eb16de7b9308468c924380d84a6e08a2", "binding": "KILOCLAW_EVENTS_STREAM" },
-    {
-      "pipeline": "bb23d7e31d744d7a8e285a70ef1cf55a",
-      "binding": "KILOCLAW_CONTROLLER_TELEMETRY_STREAM",
-    },
-  ],
-
   // Cloudflare Queue for async snapshot restore orchestration.
   // Queues must be created before first deploy:
   //   npx wrangler queues create kiloclaw-snapshot-restore
@@ -133,4 +121,23 @@
   // FLY_API_TOKEN,
   // NEXTAUTH_SECRET, INTERNAL_API_SECRET, GATEWAY_TOKEN_SECRET,
   // AGENT_ENV_VARS_PRIVATE_KEY
+
+  // Named environments: only "production" is deployed (via CI with --env production).
+  // Pipelines are declared here rather than at the top level so that `wrangler dev`
+  // (which runs without --env) never sees them and never triggers a CF OAuth flow.
+  // The pipeline bindings are optional in KiloClawEnv — absent in dev, present in prod.
+  "env": {
+    "production": {
+      // Cloudflare Pipelines — dual-write to R2 as Parquet for Snowflake export.
+      // Schema files: pipelines/events-schema.json, pipelines/controller-telemetry-schema.json
+      // To recreate a stream after a schema change: pipelines/recreate-stream.sh
+      "pipelines": [
+        { "pipeline": "eb16de7b9308468c924380d84a6e08a2", "binding": "KILOCLAW_EVENTS_STREAM" },
+        {
+          "pipeline": "bb23d7e31d744d7a8e285a70ef1cf55a",
+          "binding": "KILOCLAW_CONTROLLER_TELEMETRY_STREAM",
+        },
+      ],
+    },
+  },
 }

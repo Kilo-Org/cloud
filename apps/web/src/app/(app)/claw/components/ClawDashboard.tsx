@@ -14,7 +14,6 @@ import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { ClawHeader } from './ClawHeader';
 import { InstanceControls } from './InstanceControls';
 import { InstanceTab } from './InstanceTab';
-import { ChangelogTab } from './ChangelogTab';
 import { SubscriptionTab } from './SubscriptionTab';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { ClawContextProvider, useClawContext } from './ClawContext';
@@ -88,7 +87,7 @@ function ClawDashboardInner({ status }: { status: KiloClawDashboardStatus | unde
     Date.now() - instanceStatus.provisionedAt < SEVEN_DAYS_MS;
   const configServiceNudgeVisible = !instanceStatus || instanceYoung;
 
-  const VALID_TABS = ['instance', 'subscription', 'changelog'] as const;
+  const VALID_TABS = ['instance', 'subscription'] as const;
   type TabValue = (typeof VALID_TABS)[number];
 
   function tabFromHash(): TabValue {
@@ -211,9 +210,6 @@ function ClawDashboardInner({ status }: { status: KiloClawDashboardStatus | unde
                       Subscription
                     </TabsTrigger>
                   )}
-                  <TabsTrigger value="changelog" className={tabTriggerClass}>
-                    What&apos;s New <Sparkles className="ml-1 inline h-3 w-3 text-amber-400" />
-                  </TabsTrigger>
                 </TabsList>
               </div>
               <CardContent className="p-5">
@@ -227,9 +223,6 @@ function ClawDashboardInner({ status }: { status: KiloClawDashboardStatus | unde
                 </TabsContent>
                 <TabsContent value="subscription" className="mt-0">
                   <SubscriptionTab />
-                </TabsContent>
-                <TabsContent value="changelog" className="mt-0">
-                  <ChangelogTab />
                 </TabsContent>
               </CardContent>
             </Tabs>

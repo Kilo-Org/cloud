@@ -30,8 +30,8 @@ jest.mock('@/lib/stripe-client', () => ({
   },
 }));
 
-jest.mock('@/lib/impact', () => ({
-  trackTrialEnd: jest.fn(),
+jest.mock('@/lib/affiliate-events', () => ({
+  enqueueAffiliateEventForUser: jest.fn(),
 }));
 
 jest.mock('@/lib/kiloclaw/credit-billing', () => ({

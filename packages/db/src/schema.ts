@@ -43,6 +43,8 @@ import {
   KiloClawSubscriptionStatus,
   KiloClawPaymentSource,
   AffiliateProvider,
+  AffiliateEventType,
+  AffiliateEventDeliveryState,
 } from './schema-types';
 import type { CustomLlmDefinition, KiloClawAdminAuditAction } from './schema-types';
 import type {
@@ -110,7 +112,23 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawScheduledBy,
   KiloClawSubscriptionStatus,
   AffiliateProvider,
+  AffiliateEventType,
+  AffiliateEventDeliveryState,
 } as const;
+
+export type AffiliateEventPayloadJson = {
+  trackingId: string | null;
+  customerId: string | null;
+  customerEmailHash: string | null;
+  orderId: string;
+  eventDate: string;
+  amount?: number | null;
+  currencyCode?: string | null;
+  itemCategory?: string | null;
+  itemName?: string | null;
+  itemSku?: string | null;
+  promoCode?: string | null;
+};
 
 export const credit_transactions = pgTable(
   'credit_transactions',
@@ -247,6 +265,62 @@ export const user_affiliate_attributions = pgTable(
 );
 
 export type UserAffiliateAttribution = typeof user_affiliate_attributions.$inferSelect;
+
+export const user_affiliate_events = pgTable(
+  'user_affiliate_events',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    provider: text().notNull().$type<AffiliateProvider>(),
+    event_type: text().notNull().$type<AffiliateEventType>(),
+    dedupe_key: text().notNull(),
+    parent_event_id: uuid(),
+    delivery_state: text()
+      .notNull()
+      .$type<AffiliateEventDeliveryState>()
+      .default(AffiliateEventDeliveryState.Queued),
+    payload_json: jsonb().$type<AffiliateEventPayloadJson>().notNull(),
+    attempt_count: integer().notNull().default(0),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    foreignKey({
+      columns: [table.parent_event_id],
+      foreignColumns: [table.id],
+      name: 'user_affiliate_events_parent_event_id_fk',
+    })
+      .onDelete('cascade')
+      .onUpdate('cascade'),
+    unique('UQ_user_affiliate_events_dedupe_key').on(table.dedupe_key),
+    index('IDX_user_affiliate_events_claim_path').on(
+      table.delivery_state,
+      sql`coalesce(${table.next_retry_at}, '-infinity'::timestamptz)`,
+      table.created_at,
+      table.id
+    ),
+    index('IDX_user_affiliate_events_parent_event_id').on(table.parent_event_id),
+    enumCheck('user_affiliate_events_provider_check', table.provider, AffiliateProvider),
+    enumCheck('user_affiliate_events_event_type_check', table.event_type, AffiliateEventType),
+    enumCheck(
+      'user_affiliate_events_delivery_state_check',
+      table.delivery_state,
+      AffiliateEventDeliveryState
+    ),
+    check(
+      'user_affiliate_events_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+  ]
+);
+
+export type UserAffiliateEvent = typeof user_affiliate_events.$inferSelect;
 
 export const kilo_pass_subscriptions = pgTable(
   'kilo_pass_subscriptions',

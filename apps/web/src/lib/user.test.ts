@@ -4,6 +4,7 @@ import {
   payment_methods,
   kilocode_users,
   user_affiliate_attributions,
+  user_affiliate_events,
   user_auth_provider,
   credit_transactions,
   kilo_pass_subscriptions,
@@ -57,6 +58,7 @@ describe('User', () => {
   afterEach(async () => {
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
+    await db.delete(user_affiliate_events);
     await db.delete(payment_methods);
     await db.delete(kilo_pass_issuance_items);
     await db.delete(kilo_pass_issuances);
@@ -170,6 +172,59 @@ describe('User', () => {
           .select({ count: count() })
           .from(user_affiliate_attributions)
           .where(eq(user_affiliate_attributions.user_id, user2.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should delete affiliate events for the user', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      await db.insert(user_affiliate_events).values([
+        {
+          user_id: user1.id,
+          provider: 'impact',
+          event_type: 'signup',
+          dedupe_key: `affiliate:impact:signup:${user1.id}`,
+          delivery_state: 'queued',
+          payload_json: {
+            trackingId: 'impact-user-1',
+            customerId: user1.id,
+            customerEmailHash: 'hash-1',
+            orderId: 'IR_AN_64_TS',
+            eventDate: new Date().toISOString(),
+          },
+        },
+        {
+          user_id: user2.id,
+          provider: 'impact',
+          event_type: 'signup',
+          dedupe_key: `affiliate:impact:signup:${user2.id}`,
+          delivery_state: 'queued',
+          payload_json: {
+            trackingId: 'impact-user-2',
+            customerId: user2.id,
+            customerEmailHash: 'hash-2',
+            orderId: 'IR_AN_64_TS',
+            eventDate: new Date().toISOString(),
+          },
+        },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(user_affiliate_events)
+          .where(eq(user_affiliate_events.user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(user_affiliate_events)
+          .where(eq(user_affiliate_events.user_id, user2.id))
           .then(r => r[0].count)
       ).toBe(1);
     });

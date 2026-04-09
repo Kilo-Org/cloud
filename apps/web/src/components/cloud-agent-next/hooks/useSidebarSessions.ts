@@ -48,6 +48,8 @@ function dbSessionToStoredSession(session: DbSession | DbSessionV2): StoredSessi
     messages: [],
     cloudAgentSessionId: session.cloud_agent_session_id,
     createdOnPlatform: v1?.created_on_platform ?? null,
+    sessionStatus: session.status,
+    sessionStatusUpdatedAt: session.status_updated_at?.toISOString() ?? null,
   };
 }
 
@@ -108,7 +110,9 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
   useEffect(() => {
     if (isSearchActive) return;
     if (listData?.cliSessions) {
-      const dataKey = listData.cliSessions.map(s => `${s.session_id}-${s.updated_at}`).join('|');
+      const dataKey = listData.cliSessions
+        .map(s => `${s.session_id}-${s.updated_at}-${s.status ?? ''}-${s.status_updated_at ?? ''}`)
+        .join('|');
 
       if (lastDataKeyRef.current !== dataKey) {
         lastDataKeyRef.current = dataKey;
@@ -139,6 +143,8 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
       messages: [],
       cloudAgentSessionId: row.cloud_agent_session_id,
       createdOnPlatform: row.created_on_platform,
+      sessionStatus: row.status,
+      sessionStatusUpdatedAt: row.status_updated_at,
     }));
   }, [searchData?.results]);
 

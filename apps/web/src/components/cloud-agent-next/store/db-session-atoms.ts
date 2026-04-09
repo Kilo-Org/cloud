@@ -164,6 +164,8 @@ type ApiSession = {
   last_model: string | null;
   version: number;
   organization_id: string | null;
+  status: string | null;
+  status_updated_at: string | null;
 };
 
 /**
@@ -182,6 +184,8 @@ export type DbSession = {
   last_model: string | null;
   version: number;
   organization_id: string | null;
+  status: string | null;
+  status_updated_at: Date | null;
 };
 
 /**
@@ -195,6 +199,8 @@ export type DbSessionV2 = {
   created_at: Date;
   updated_at: Date;
   version: number;
+  status: string | null;
+  status_updated_at: Date | null;
 };
 
 /**
@@ -205,6 +211,7 @@ export function apiSessionToDbSession(apiSession: ApiSession): DbSession {
     ...apiSession,
     created_at: new Date(apiSession.created_at),
     updated_at: new Date(apiSession.updated_at),
+    status_updated_at: apiSession.status_updated_at ? new Date(apiSession.status_updated_at) : null,
   };
 }
 

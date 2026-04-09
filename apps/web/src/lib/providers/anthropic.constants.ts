@@ -9,8 +9,8 @@ export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.6';
 export const CLAUDE_OPUS_CURRENT_MODEL_NAME = 'Claude Opus 4.6';
 
 export const claude_sonnet_clawsetup_model: KiloExclusiveModel = {
-  public_id: CLAUDE_OPUS_CURRENT_MODEL_ID + ':clawsetup',
-  internal_id: CLAUDE_OPUS_CURRENT_MODEL_ID,
+  public_id: CLAUDE_SONNET_CURRENT_MODEL_ID + ':clawsetup',
+  internal_id: CLAUDE_SONNET_CURRENT_MODEL_ID,
   display_name: 'Claude Sonnet KiloClaw Setup Promo',
   description: 'Claude Sonnet KiloClaw Setup Promo',
   status: 'hidden', // only usable through kilo-auto

@@ -309,10 +309,10 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
                     {item.description && (
                       <span className="line-clamp-1 max-w-xs">{item.description}</span>
                     )}
-                    {item.posted_by && (
+                    {'posted_by' in item && (
                       <>
                         <span className="text-white/15">|</span>
-                        <span>{item.posted_by}</span>
+                        <span>{String(item.posted_by)}</span>
                       </>
                     )}
                     {item.created_at && (

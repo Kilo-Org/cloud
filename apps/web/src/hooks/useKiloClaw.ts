@@ -121,6 +121,7 @@ export function useKiloCliRunHistory(enabled: boolean) {
     trpc.kiloclaw.listKiloCliRuns.queryOptions(undefined, {
       enabled,
       staleTime: 30_000,
+      refetchInterval: enabled ? 3_000 : false,
     })
   );
 }

@@ -165,6 +165,34 @@ export function useOrgReadFile(organizationId: string, path: string | null, enab
   );
 }
 
+export function useOrgKiloCliRunStatus(organizationId: string, runId: string | null) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.kiloclaw.getKiloCliRunStatus.queryOptions(
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by `enabled: runId !== null`
+      { organizationId, runId: runId! },
+      {
+        enabled: runId !== null,
+        refetchInterval: runId !== null ? 3_000 : false,
+      }
+    )
+  );
+}
+
+export function useOrgKiloCliRunHistory(organizationId: string | undefined, enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.kiloclaw.listKiloCliRuns.queryOptions(
+      { organizationId: organizationId ?? '', limit: 10 },
+      {
+        enabled: enabled && organizationId !== undefined,
+        staleTime: 30_000,
+        refetchInterval: enabled ? 3_000 : false,
+      }
+    )
+  );
+}
+
 /**
  * Org mutations hook that returns the same type as `useKiloClawMutations`.
  *

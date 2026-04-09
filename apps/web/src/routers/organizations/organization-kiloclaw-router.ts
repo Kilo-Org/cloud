@@ -34,11 +34,7 @@ import {
   restoreDestroyedInstance,
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
-import {
-  createCliRun,
-  markCliRunCancelled,
-  shouldPersistCliRunControllerStatus,
-} from '@/lib/kiloclaw/cli-runs';
+import { createCliRun, markCliRunCancelled, shouldPersistCliRunControllerStatus } from '@/lib/kiloclaw/cli-runs';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
@@ -1101,11 +1097,24 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
       const client = new KiloClawInternalClient();
-      const result = await client.startKiloCliRun(
-        ctx.user.id,
-        input.prompt,
-        workerInstanceId(instance)
-      );
+
+      let result: Awaited<ReturnType<KiloClawInternalClient['startKiloCliRun']>>;
+      try {
+        result = await client.startKiloCliRun(
+          ctx.user.id,
+          input.prompt,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        if (err instanceof KiloClawApiError && err.statusCode === 409) {
+          const { message } = getKiloClawApiErrorPayload(err);
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: message ?? 'A kilo CLI run is already in progress',
+          });
+        }
+        throw err;
+      }
 
       const runId = await createCliRun({
         userId: ctx.user.id,
@@ -1143,6 +1152,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
           startedAt: null,
           completedAt: null,
           prompt: null,
+          initiatedBy: null,
         };
       }
 
@@ -1155,6 +1165,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
           startedAt: row.started_at,
           completedAt: row.completed_at ?? null,
           prompt: row.prompt,
+          initiatedBy: row.initiated_by,
         };
       }
 
@@ -1186,6 +1197,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
       return {
         ...controllerStatus,
         prompt: row.prompt,
+        initiatedBy: row.initiated_by,
       };
     }),
 
@@ -1193,6 +1205,26 @@ export const organizationKiloclawRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.uuid(), runId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const [row] = await db
+        .select()
+        .from(kiloclaw_cli_runs)
+        .where(
+          and(
+            eq(kiloclaw_cli_runs.id, input.runId),
+            eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+            eq(kiloclaw_cli_runs.instance_id, instance.id)
+          )
+        )
+        .limit(1);
+
+      if (!row) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'CLI run not found' });
+      }
+
+      if (row.status !== 'running') {
+        return { ok: true };
+      }
+
       const client = new KiloClawInternalClient();
       const result = await client.cancelKiloCliRun(ctx.user.id, workerInstanceId(instance));
 
@@ -1215,18 +1247,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-      if (!instance) return { runs: [] };
       const limit = input.limit;
       const runs = await db
         .select()
         .from(kiloclaw_cli_runs)
-        .where(
-          and(
-            eq(kiloclaw_cli_runs.user_id, ctx.user.id),
-            eq(kiloclaw_cli_runs.instance_id, instance.id)
-          )
-        )
+        .where(eq(kiloclaw_cli_runs.user_id, ctx.user.id))
         .orderBy(desc(kiloclaw_cli_runs.started_at))
         .limit(limit);
 

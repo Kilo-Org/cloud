@@ -625,6 +625,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             startedAt: null,
             completedAt: null,
             prompt: null,
+            initiatedBy: null,
           };
         }
         const [row] = await db
@@ -634,7 +635,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             and(
               eq(kiloclaw_cli_runs.id, input.runId),
               eq(kiloclaw_cli_runs.user_id, input.userId),
-              eq(kiloclaw_cli_runs.initiated_by, 'admin'),
               eq(kiloclaw_cli_runs.instance_id, instance.id)
             )
           )
@@ -649,6 +649,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             startedAt: null,
             completedAt: null,
             prompt: null,
+            initiatedBy: null,
           };
         }
 
@@ -661,6 +662,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             startedAt: row.started_at,
             completedAt: row.completed_at ?? null,
             prompt: row.prompt,
+            initiatedBy: row.initiated_by,
           };
         }
 
@@ -684,7 +686,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
                 eq(kiloclaw_cli_runs.id, input.runId),
                 eq(kiloclaw_cli_runs.user_id, input.userId),
                 eq(kiloclaw_cli_runs.instance_id, instance.id),
-                eq(kiloclaw_cli_runs.initiated_by, 'admin'),
                 eq(kiloclaw_cli_runs.status, 'running')
               )
             );
@@ -693,6 +694,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         return {
           ...controllerStatus,
           prompt: row.prompt,
+          initiatedBy: row.initiated_by,
         };
       } catch (err) {
         console.error('Failed to get kilo CLI run status for user:', input.userId, err);
@@ -723,7 +725,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             runId: input.runId,
             userId: input.userId,
             instanceId: instance.id,
-            initiatedBy: 'admin',
           });
         }
 

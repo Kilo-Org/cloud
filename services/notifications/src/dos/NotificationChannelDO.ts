@@ -181,7 +181,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
       title: instance.name ?? 'Kilo',
       body: truncatedMessage,
       // Keep in sync with NotificationData in apps/mobile/src/lib/notifications.ts
-      data: { type: 'chat', instanceId: instance.id },
+      data: { type: 'chat', instanceId: sandboxId },
       sound: 'default' as const,
       priority: 'high' as const,
     }));

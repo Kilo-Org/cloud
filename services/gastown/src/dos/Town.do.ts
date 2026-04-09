@@ -61,6 +61,7 @@ import { getTownContainerStub } from './TownContainer.do';
 import { kiloTokenPayload } from '@kilocode/worker-utils';
 import { jwtVerify } from 'jose';
 import { generateKiloApiToken } from '../util/kilo-token.util';
+import { findUserById } from '../util/user-db.util';
 import { resolveSecret } from '../util/secret.util';
 import { writeEvent, type GastownEventData } from '../util/analytics.util';
 import { logger, withLogTags } from '../util/log.util';
@@ -3885,8 +3886,26 @@ export class TownDO extends DurableObject<Env> {
     const userId = payload.kiloUserId;
     if (!userId) return;
 
+    let apiTokenPepper: string | null = payload.apiTokenPepper ?? null;
+
+    // For org towns, perform a live DB lookup to ensure we use the current pepper.
+    if (townConfig.owner_type === 'org') {
+      if (this.env.HYPERDRIVE) {
+        const ownerUser = await findUserById(this.env.HYPERDRIVE.connectionString, userId);
+        if (ownerUser) {
+          apiTokenPepper = ownerUser.api_token_pepper;
+        } else {
+          logger.warn('refreshKilocodeTokenIfExpiring: town owner not found in DB', { userId });
+          return;
+        }
+      } else {
+        logger.warn('refreshKilocodeTokenIfExpiring: HYPERDRIVE not configured');
+        return;
+      }
+    }
+
     const newToken = await generateKiloApiToken(
-      { id: userId, api_token_pepper: payload.apiTokenPepper ?? null },
+      { id: userId, api_token_pepper: apiTokenPepper },
       secret
     );
     await this.updateTownConfig({ kilocode_token: newToken });

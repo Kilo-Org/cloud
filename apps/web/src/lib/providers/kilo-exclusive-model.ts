@@ -11,11 +11,11 @@ export type Usage = {
 };
 
 export type Pricing = {
-  prompt: number;
-  completion: number;
-  input_cache_read: number | null;
-  input_cache_write: number | null;
-  calculate(usage: Usage, basePricing: Pricing): number;
+  prompt_per_million: number;
+  completion_per_million: number;
+  input_cache_read_per_million: number | null;
+  input_cache_write_per_million: number | null;
+  calculate_mUsd(usage: Usage, basePricing: Pricing): number;
 };
 
 export type KiloExclusiveModel = {
@@ -53,14 +53,21 @@ export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
       instruct_type: null,
     },
     pricing: {
-      prompt: formatPrice(model.pricing?.prompt ?? 0),
-      completion: formatPrice(model.pricing?.completion ?? 0),
+      prompt: formatPrice((model.pricing?.prompt_per_million ?? 0) / 1_000_000),
+      completion: formatPrice((model.pricing?.completion_per_million ?? 0) / 1_000_000),
       request: '0',
       image: '0',
       web_search: '0',
       internal_reasoning: '0',
-      input_cache_read: formatPrice(model.pricing?.input_cache_read ?? model.pricing?.prompt ?? 0),
-      input_cache_write: formatPrice(model.pricing?.input_cache_write),
+      input_cache_read: formatPrice(
+        (model.pricing?.input_cache_read_per_million ?? model.pricing?.prompt_per_million ?? 0) /
+          1_000_000
+      ),
+      input_cache_write: formatPrice(
+        model.pricing?.input_cache_write_per_million != null
+          ? model.pricing.input_cache_write_per_million / 1_000_000
+          : model.pricing?.input_cache_write_per_million
+      ),
     },
     top_provider: {
       context_length: model.context_length,

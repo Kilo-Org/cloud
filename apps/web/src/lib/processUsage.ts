@@ -792,16 +792,15 @@ export function calculatKiloExclusiveCost_mUsd(
     });
   }
   return Math.round(
-    1_000_000 *
-      pricing.calculate(
-        {
-          uncachedInputTokens: uncachedInputTokens >= 0 ? uncachedInputTokens : usage.inputTokens,
-          totalOutputTokens: usage.outputTokens,
-          cacheHitTokens: usage.cacheHitTokens,
-          cacheWriteTokens: usage.cacheWriteTokens,
-        },
-        pricing
-      )
+    pricing.calculate_mUsd(
+      {
+        uncachedInputTokens: uncachedInputTokens >= 0 ? uncachedInputTokens : usage.inputTokens,
+        totalOutputTokens: usage.outputTokens,
+        cacheHitTokens: usage.cacheHitTokens,
+        cacheWriteTokens: usage.cacheWriteTokens,
+      },
+      pricing
+    )
   );
 }
 

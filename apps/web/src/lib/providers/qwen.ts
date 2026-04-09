@@ -13,25 +13,27 @@ export const qwen36_plus_model: KiloExclusiveModel = {
   internal_id: 'qwen3.6-plus',
   inference_provider: 'alibaba',
   pricing: {
-    prompt: 0.000000325,
-    completion: 0.00000195,
-    input_cache_read: 0.0000000325,
-    input_cache_write: 0.00000040625,
-    calculate: (usage: Usage, basePricing: Pricing) => {
+    prompt_per_million: 0.325,
+    completion_per_million: 1.95,
+    input_cache_read_per_million: 0.0325,
+    input_cache_write_per_million: 0.40625,
+    calculate_mUsd: (usage: Usage, basePricing: Pricing) => {
       const totalInput = usage.uncachedInputTokens + usage.cacheWriteTokens + usage.cacheHitTokens;
       if (totalInput > 256 * 1024) {
         return (
-          usage.uncachedInputTokens * 0.0000013 +
-          usage.totalOutputTokens * 0.0000039 +
-          usage.cacheHitTokens * 0.00000013 +
-          usage.cacheWriteTokens * 0.000001625
+          usage.uncachedInputTokens * 1.3 +
+          usage.totalOutputTokens * 3.9 +
+          usage.cacheHitTokens * 0.13 +
+          usage.cacheWriteTokens * 1.625
         );
       }
       return (
-        usage.uncachedInputTokens * basePricing.prompt +
-        usage.totalOutputTokens * basePricing.completion +
-        usage.cacheHitTokens * (basePricing.input_cache_read ?? basePricing.prompt) +
-        usage.cacheWriteTokens * (basePricing.input_cache_write ?? basePricing.prompt)
+        usage.uncachedInputTokens * basePricing.prompt_per_million +
+        usage.totalOutputTokens * basePricing.completion_per_million +
+        usage.cacheHitTokens *
+          (basePricing.input_cache_read_per_million ?? basePricing.prompt_per_million) +
+        usage.cacheWriteTokens *
+          (basePricing.input_cache_write_per_million ?? basePricing.prompt_per_million)
       );
     },
   },

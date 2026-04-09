@@ -49,9 +49,9 @@ describe('isFreeModel', () => {
       // Verify that all kilo exclusive models have valid pricing structure
       for (const model of kiloExclusiveModels) {
         if (model.pricing) {
-          expect(typeof model.pricing.prompt).toBe('number');
-          expect(typeof model.pricing.completion).toBe('number');
-          expect(typeof model.pricing.calculate).toBe('function');
+          expect(typeof model.pricing.prompt_per_million).toBe('number');
+          expect(typeof model.pricing.completion_per_million).toBe('number');
+          expect(typeof model.pricing.calculate_mUsd).toBe('function');
         }
       }
     });

@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useClawLatestVersion, useClawMyPin } from '../hooks/useClawHooks';
 import { useClawContext } from './ClawContext';
-import { useOpenRouterModels } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 import { useUser } from '@/hooks/useUser';
@@ -45,7 +45,7 @@ export function CreateInstanceCard({
     enabled: !isOrgContext,
   });
   const { data: user, isLoading: isLoadingUser } = useUser();
-  const { data: modelsData, isLoading: isLoadingModels } = useOpenRouterModels();
+  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
   const { data: myPin, isLoading: isLoadingPin, isError: isPinLookupError } = useClawMyPin();
   const { data: latestVersion, isLoading: isLoadingLatestVersion } = useClawLatestVersion();
   const [selectedModel, setSelectedModel] = useState('');

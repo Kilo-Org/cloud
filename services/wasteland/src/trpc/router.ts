@@ -737,12 +737,12 @@ export const wastelandRouter = router({
       const doStub = getWastelandDOStub(ctx.env, input.wastelandId);
       const config = await doStub.getConfig();
       if (!config?.dolthub_upstream) {
-        return { items: [] };
+        return [];
       }
 
       const credential = await doStub.getCredential(ctx.userId);
       if (!credential) {
-        return { items: [] };
+        return [];
       }
 
       const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
@@ -776,7 +776,11 @@ export const wastelandRouter = router({
       }
 
       const data: unknown = await res.json();
-      return data;
+      // Container returns { items: [...] }
+      const parsed = z
+        .object({ items: z.array(z.record(z.string(), z.unknown())) })
+        .safeParse(data);
+      return parsed.success ? parsed.data.items : [];
     }),
 
   // ── Wanted Board Mutations ────────────────────────────────────────

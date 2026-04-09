@@ -25,7 +25,7 @@ import {
   AGENT_GC_RETENTION_MS,
   TRIAGE_LABEL_LIKE,
 } from './patrol';
-import { DISPATCH_COOLDOWN_MS, MAX_DISPATCH_ATTEMPTS } from './scheduling';
+import { MAX_DISPATCH_ATTEMPTS } from './scheduling';
 import * as reviewQueue from './review-queue';
 import * as agents from './agents';
 import * as beadOps from './beads';
@@ -119,10 +119,11 @@ function staleMs(timestamp: string | null, thresholdMs: number): boolean {
  *   attempt 5+:  30 min
  */
 function getDispatchCooldownMs(dispatchAttempts: number): number {
-  if (dispatchAttempts <= 2) return DISPATCH_COOLDOWN_MS; // 2 min
-  if (dispatchAttempts === 3) return 5 * 60_000; // 5 min
-  if (dispatchAttempts === 4) return 10 * 60_000; // 10 min
-  return 30 * 60_000; // 30 min
+  if (dispatchAttempts <= 1) return 30_000; // 30 sec
+  if (dispatchAttempts === 2) return 60_000; // 1 min
+  if (dispatchAttempts === 3) return 2 * 60_000; // 2 min
+  if (dispatchAttempts === 4) return 5 * 60_000; // 5 min
+  return 10 * 60_000; // 10 min
 }
 
 // ── Row schemas for queries ─────────────────────────────────────────
@@ -547,6 +548,32 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
         reason: 'working agent has no hook (gt_done already completed)',
       });
     }
+  }
+
+  // Auto-reset dispatch_attempts after 30-minute cooldown
+  const staleAgents = AgentRow.array().parse([
+    ...query(
+      sql,
+      /* sql */ `
+        SELECT ${agent_metadata.bead_id}, ${agent_metadata.role},
+               ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
+               ${agent_metadata.dispatch_attempts},
+               ${agent_metadata.last_activity_at},
+               b.${beads.columns.rig_id}
+        FROM ${agent_metadata}
+        LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}
+        WHERE ${agent_metadata.dispatch_attempts} >= ?
+          AND ${agent_metadata.last_activity_at} < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes')
+      `,
+      [MAX_DISPATCH_ATTEMPTS]
+    ),
+  ]);
+
+  for (const agent of staleAgents) {
+    actions.push({
+      type: 'reset_agent_dispatch_attempts',
+      agent_id: agent.bead_id,
+    });
   }
 
   // Idle agents hooked to terminal beads — clean up stale hooks

@@ -486,6 +486,19 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
       );
 
       if (hookedBeadId) {
+        const beadRows = [
+          ...query(
+            sql,
+            /* sql */ `
+              SELECT ${beads.columns.status}
+              FROM ${beads}
+              WHERE ${beads.bead_id} = ?
+            `,
+            [hookedBeadId]
+          ),
+        ];
+        const status = beadRows[0]?.status;
+
         query(
           sql,
           /* sql */ `
@@ -496,6 +509,10 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
           `,
           [hookedBeadId]
         );
+
+        if (status === 'failed') {
+          beadOps.updateBeadStatus(sql, hookedBeadId, 'open', 'system');
+        }
       }
       return null;
     }

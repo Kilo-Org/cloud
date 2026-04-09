@@ -1,6 +1,6 @@
 import type { FlyMachineConfig } from '../fly/types';
 import type { MachineSize } from '../schemas/instance-config';
-import { OPENCLAW_PORT, DEFAULT_MACHINE_GUEST } from '../config';
+import { OPENCLAW_PORT, getDefaultMachineGuest, type MachineGuestOverrideEnv } from '../config';
 
 // ============================================================================
 // Metadata keys set on every Fly Machine for recovery/orphan detection.
@@ -73,8 +73,11 @@ export function buildMachineConfig(
   };
 }
 
-export function guestFromSize(machineSize: MachineSize | null): FlyMachineConfig['guest'] {
-  if (!machineSize) return DEFAULT_MACHINE_GUEST;
+export function guestFromSize(
+  machineSize: MachineSize | null,
+  env?: MachineGuestOverrideEnv
+): FlyMachineConfig['guest'] {
+  if (!machineSize) return getDefaultMachineGuest(env);
   return {
     cpus: machineSize.cpus,
     memory_mb: machineSize.memory_mb,

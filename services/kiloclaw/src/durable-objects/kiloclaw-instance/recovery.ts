@@ -366,7 +366,7 @@ export async function runUnexpectedStopRecoveryInBackground(
         {
           name: volumeNameFromSandboxId(state.sandboxId),
           source_volume_id: oldVolumeId,
-          compute: guestFromSize(state.machineSize),
+          compute: guestFromSize(state.machineSize, env),
         },
         regions,
         {
@@ -395,7 +395,7 @@ export async function runUnexpectedStopRecoveryInBackground(
       getRegistryApp(env),
       imageTag,
       envVars,
-      guestFromSize(state.machineSize),
+      guestFromSize(state.machineSize, env),
       recoveryVolumeId,
       identity
     );

@@ -1,3 +1,5 @@
+import type { FlyMachineGuest } from './fly/types';
+
 export { KILO_TOKEN_VERSION } from '@kilocode/worker-utils';
 
 /**
@@ -40,8 +42,39 @@ export const KILOCODE_API_KEY_EXPIRY_SECONDS = 30 * 24 * 60 * 60;
 export const DEFAULT_MACHINE_GUEST = {
   cpus: 2,
   memory_mb: 3072,
-  cpu_kind: 'shared' as const,
+  cpu_kind: 'shared',
+} satisfies FlyMachineGuest;
+
+export type MachineGuestOverrideEnv = {
+  WORKER_ENV?: string;
+  KILOCLAW_DEV_MACHINE_CPUS?: string;
+  KILOCLAW_DEV_MACHINE_MEMORY_MB?: string;
+  KILOCLAW_DEV_MACHINE_CPU_KIND?: string;
 };
+
+function parseIntegerInRange(value: string | undefined, min: number, max: number): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) return null;
+  return parsed;
+}
+
+function parseCpuKind(value: string | undefined): FlyMachineGuest['cpu_kind'] | null {
+  if (value === 'shared' || value === 'performance') return value;
+  return null;
+}
+
+export function getDefaultMachineGuest(env?: MachineGuestOverrideEnv): FlyMachineGuest {
+  if (env?.WORKER_ENV !== 'development') return DEFAULT_MACHINE_GUEST;
+
+  return {
+    cpus: parseIntegerInRange(env.KILOCLAW_DEV_MACHINE_CPUS, 1, 8) ?? DEFAULT_MACHINE_GUEST.cpus,
+    memory_mb:
+      parseIntegerInRange(env.KILOCLAW_DEV_MACHINE_MEMORY_MB, 256, 16384) ??
+      DEFAULT_MACHINE_GUEST.memory_mb,
+    cpu_kind: parseCpuKind(env.KILOCLAW_DEV_MACHINE_CPU_KIND) ?? DEFAULT_MACHINE_GUEST.cpu_kind,
+  };
+}
 
 /** Default Fly Volume size in GB */
 export const DEFAULT_VOLUME_SIZE_GB = 10;

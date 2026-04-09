@@ -58,6 +58,11 @@ FLY_REGISTRY_APP=kiloclaw-registry-dev
 # Examples: "us,eu" (try US first, then Europe), "lhr,fra" (London first, then Frankfurt)
 # The platform API can override per-user at provision time.
 FLY_REGION=us,eu
+# Development-only default Fly Machine guest spec overrides. These only apply
+# when WORKER_ENV=development and no explicit machineSize is provided.
+# KILOCLAW_DEV_MACHINE_CPUS=4
+# KILOCLAW_DEV_MACHINE_MEMORY_MB=8192
+# KILOCLAW_DEV_MACHINE_CPU_KIND=shared
 # Docker image tag on registry.fly.io/{FLY_REGISTRY_APP}:{tag}.
 # Set automatically by scripts/push-dev.sh, or use "latest" to start.
 FLY_IMAGE_TAG=latest

@@ -271,7 +271,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       const regions = config.region
         ? prepareRegions(parseRegions(config.region))
         : await resolveRegions(this.env.KV_CLAW_CACHE, this.env.FLY_REGION);
-      const guest = guestFromSize(config.machineSize ?? null);
+      const guest = guestFromSize(config.machineSize ?? null, this.env);
       const volume = await fly.createVolumeWithFallback(
         flyConfig,
         {
@@ -1100,7 +1100,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     const { envVars, minSecretsVersion } = await buildUserEnvVars(this.env, this.ctx, this.s);
-    const guest = guestFromSize(this.s.machineSize);
+    const guest = guestFromSize(this.s.machineSize, this.env);
     const imageTag = resolveImageTag(this.s, this.env);
     console.log(
       '[DO] startGateway: deploying with imageTag:',
@@ -2287,7 +2287,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       const flyConfig = getFlyConfig(this.env, this.s);
 
       const { envVars, minSecretsVersion } = await buildUserEnvVars(this.env, this.ctx, this.s);
-      const guest = guestFromSize(this.s.machineSize);
+      const guest = guestFromSize(this.s.machineSize, this.env);
       const imageTag = resolveImageTag(this.s, this.env);
       doLog(this.s, 'restartMachine: deploying update', {
         imageTag,

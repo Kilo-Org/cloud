@@ -45,6 +45,9 @@ export type KiloClawEnv = {
   FLY_IMAGE_TAG?: string;
   FLY_IMAGE_DIGEST?: string;
   OPENCLAW_VERSION?: string;
+  KILOCLAW_DEV_MACHINE_CPUS?: string;
+  KILOCLAW_DEV_MACHINE_MEMORY_MB?: string;
+  KILOCLAW_DEV_MACHINE_CPU_KIND?: string;
 
   // Developer identity (development only, auto-populated by dev-start from `fly auth whoami`)
   DEV_CREATOR?: string;

@@ -39,7 +39,7 @@ export async function ensureVolume(
     {
       name: volumeNameFromSandboxId(state.sandboxId),
       size_gb: DEFAULT_VOLUME_SIZE_GB,
-      compute: guestFromSize(state.machineSize),
+      compute: guestFromSize(state.machineSize, env),
     },
     regions,
     {
@@ -77,7 +77,7 @@ export async function replaceStrandedVolume(
   const hasUserData = state.lastStartedAt !== null;
   const allRegions = await resolveRegions(env.KV_CLAW_CACHE, env.FLY_REGION);
   const regions = deprioritizeRegion(allRegions, oldRegion);
-  const compute = guestFromSize(state.machineSize);
+  const compute = guestFromSize(state.machineSize, env);
 
   // Destroy existing machine if any — it's stuck on the constrained host.
   if (state.flyMachineId) {

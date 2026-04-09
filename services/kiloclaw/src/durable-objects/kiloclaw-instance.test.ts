@@ -4804,6 +4804,38 @@ describe('provision: auto-start after fresh provision', () => {
     expect(storage._store.get('flyMachineId')).toBe('machine-1');
   });
 
+  it('uses development machine size defaults for initial volume and machine creation', async () => {
+    const env = {
+      ...createFakeEnv(),
+      KILOCLAW_DEV_MACHINE_CPUS: '4',
+      KILOCLAW_DEV_MACHINE_MEMORY_MB: '8192',
+      KILOCLAW_DEV_MACHINE_CPU_KIND: 'performance',
+    };
+    const { instance, waitUntilPromises } = createInstance(undefined, env);
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-1',
+      region: 'iad',
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.provision('user-1', {});
+    await Promise.all(waitUntilPromises);
+
+    expect((flyClient.createVolumeWithFallback as Mock).mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        compute: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      })
+    );
+    expect((flyClient.createMachine as Mock).mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        guest: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      })
+    );
+  });
+
   it('wires capacity eviction callback during initial volume provisioning', async () => {
     const env = createFakeEnv();
     const { instance, waitUntilPromises } = createInstance(undefined, env);

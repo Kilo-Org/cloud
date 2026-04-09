@@ -36,7 +36,6 @@ import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
-import KiloCrabIcon from '@/components/KiloCrabIcon';
 
 type OrganizationAppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   organizationId: string;
@@ -136,11 +135,6 @@ export default function OrganizationAppSidebar({
       title: 'Chat',
       icon: MessageSquare,
       url: `/organizations/${organizationId}/claw/chat`,
-    },
-    {
-      title: 'KiloClaw',
-      icon: KiloCrabIcon,
-      url: `/organizations/${organizationId}/claw`,
     },
     {
       title: 'Settings',

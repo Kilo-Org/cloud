@@ -8,6 +8,7 @@ import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
 import { ClawContextProvider, useClawContext } from './ClawContext';
+import { ClawInstanceOverview } from './ClawInstanceOverview';
 import { SettingsTab } from './SettingsTab';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { SetPageTitle } from '@/components/SetPageTitle';
@@ -121,7 +122,12 @@ function ClawSettingsWithStatus({ organizationId }: { organizationId?: string })
 
   // status is guaranteed non-null with a non-null .status after the checks above
   if (!status || status.status === null) return null;
-  const settingsContent = <ClawSettingsInner status={status} />;
+  const settingsContent = (
+    <div className="flex flex-col gap-6">
+      <ClawInstanceOverview status={status} />
+      <ClawSettingsInner status={status} />
+    </div>
+  );
 
   // Personal context uses BillingWrapper for access-lock dialogs/banners.
   if (!organizationId) {

@@ -37,7 +37,6 @@ import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
-import KiloCrabIcon from '@/components/KiloCrabIcon';
 
 export default function PersonalAppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { data: user, isLoading } = useUser();
@@ -82,11 +81,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       title: 'Chat',
       icon: MessageSquare,
       url: '/claw/chat',
-    },
-    {
-      title: 'KiloClaw',
-      icon: KiloCrabIcon,
-      url: '/claw',
     },
     {
       title: 'Subscription',

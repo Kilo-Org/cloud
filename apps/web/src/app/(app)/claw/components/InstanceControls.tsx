@@ -33,10 +33,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
+import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { RunDoctorDialog } from './RunDoctorDialog';
 import { StartKiloCliRunDialog } from './StartKiloCliRunDialog';
 import { AnimatedDots } from './AnimatedDots';
+import { OpenClawButton } from './OpenClawButton';
 
 const VOLUME_SIZE_GB = 10;
 // Default machine spec fallback (matches kiloclaw DEFAULT_MACHINE_GUEST)
@@ -55,14 +57,17 @@ export function InstanceControls({
   onRedeploySuccess,
   upgradeRequested,
   onUpgradeHandled,
+  gatewayReady,
 }: {
   status: KiloClawDashboardStatus;
   mutations: ClawMutations;
   onRedeploySuccess?: () => void;
   upgradeRequested?: boolean;
   onUpgradeHandled?: () => void;
+  gatewayReady?: boolean;
 }) {
   const posthog = usePostHog();
+  const gatewayUrl = useGatewayUrl(status);
   const isRunning = status.status === 'running';
   const isProvisioned = status.status === 'provisioned';
   const isStarting = status.status === 'starting';
@@ -240,6 +245,12 @@ export function InstanceControls({
         </Banner>
       )}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <OpenClawButton
+          canShow={isRunning && !!gatewayReady}
+          gatewayUrl={gatewayUrl}
+          label="Open Control UI"
+          className="h-8 px-3 text-xs"
+        />
         <Button
           size="sm"
           variant="outline"

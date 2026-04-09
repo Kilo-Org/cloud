@@ -1,5 +1,5 @@
 export { OpenClawButton } from './OpenClawButton';
-export { ClawDashboard } from './ClawDashboard';
+export { ClawInstanceOverview } from './ClawInstanceOverview';
 export { ClawOnboardingFlow } from './ClawOnboardingFlow';
 export type { ClawOnboardingMode } from './ClawOnboardingFlow';
 export { ClawHeader } from './ClawHeader';

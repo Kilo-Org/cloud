@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useKiloClawStatus } from '@/hooks/useKiloClaw';
+import { useOrgKiloClawStatus } from '@/hooks/useOrgKiloClaw';
 
 function LoadingState() {
   return (
@@ -16,10 +16,11 @@ function LoadingState() {
   );
 }
 
-export default function ClawPage() {
+export function OrgClawRedirectClient({ organizationId }: { organizationId: string }) {
   const router = useRouter();
-  const { data: status, isLoading, error } = useKiloClawStatus();
-  const redirectPath = status?.status ? '/claw/chat' : '/claw/new';
+  const { data: status, isLoading, error } = useOrgKiloClawStatus(organizationId);
+  const basePath = `/organizations/${organizationId}/claw`;
+  const redirectPath = status?.status ? `${basePath}/chat` : `${basePath}/new`;
 
   useEffect(() => {
     if (!isLoading && !error) {

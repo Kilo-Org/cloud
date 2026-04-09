@@ -57,7 +57,7 @@ import {
 import { client as stripe } from '@/lib/stripe-client';
 import { APP_URL } from '@/lib/constants';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
-import { clawAccessProcedure } from '@/lib/kiloclaw/access-gate';
+import { clawAccessProcedure, requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
 import {
   getStripePriceIdForClawPlan,
   getStripePriceIdForClawPlanIntro,
@@ -1335,8 +1335,11 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
 
-      // Best-effort: propagate the new name to the DO so IDENTITY.md stays in sync
+      // Best-effort: propagate the new name to the DO so IDENTITY.md stays in sync.
+      // Guard with requireKiloClawAccess so users without active access can't
+      // mutate live DO state through the baseProcedure-gated rename endpoint.
       try {
+        await requireKiloClawAccess(ctx.user.id);
         const instance = await getActiveInstance(ctx.user.id);
         const client = new KiloClawInternalClient();
         await client.patchBotIdentity(

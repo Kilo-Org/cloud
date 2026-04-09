@@ -32,8 +32,8 @@ export type KiloExclusiveModel = {
   pricing: Pricing | null;
 };
 
-function formatPrice(price: number | null | undefined): string | undefined {
-  return price === null || price === undefined ? undefined : price.toFixed(12);
+function formatPricePerMillionAsPerToken(price: number | null | undefined): string | undefined {
+  return price === null || price === undefined ? undefined : (price / 1_000_000).toFixed(12);
 }
 
 export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
@@ -53,20 +53,17 @@ export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
       instruct_type: null,
     },
     pricing: {
-      prompt: formatPrice((model.pricing?.prompt_per_million ?? 0) / 1_000_000),
-      completion: formatPrice((model.pricing?.completion_per_million ?? 0) / 1_000_000),
+      prompt: formatPricePerMillionAsPerToken(model.pricing?.prompt_per_million ?? 0),
+      completion: formatPricePerMillionAsPerToken(model.pricing?.completion_per_million ?? 0),
       request: '0',
       image: '0',
       web_search: '0',
       internal_reasoning: '0',
-      input_cache_read: formatPrice(
-        (model.pricing?.input_cache_read_per_million ?? model.pricing?.prompt_per_million ?? 0) /
-          1_000_000
+      input_cache_read: formatPricePerMillionAsPerToken(
+        model.pricing?.input_cache_read_per_million ?? model.pricing?.prompt_per_million ?? 0
       ),
-      input_cache_write: formatPrice(
-        model.pricing?.input_cache_write_per_million != null
-          ? model.pricing.input_cache_write_per_million / 1_000_000
-          : model.pricing?.input_cache_write_per_million
+      input_cache_write: formatPricePerMillionAsPerToken(
+        model.pricing?.input_cache_write_per_million
       ),
     },
     top_provider: {

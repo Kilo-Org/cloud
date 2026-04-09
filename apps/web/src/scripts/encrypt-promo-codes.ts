@@ -6,10 +6,14 @@
  *   vercel env run -e production -- pnpm promo decrypt <encrypted>
  *
  * Requires CREDIT_CATEGORIES_ENCRYPTION_KEY environment variable (injected via `vercel env run`).
+ *
+ * NOTE: This script intentionally avoids importing from promoCreditEncryption or
+ * config.server to prevent top-level env var validation (e.g. NEXTAUTH_SECRET)
+ * from failing in a CLI context.
  */
 
 import { getEnvVariable } from '@/lib/dotenvx';
-import { decryptPromoCode, encryptPromoCode } from '@/lib/promoCreditEncryption';
+import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@kilocode/encryption';
 
 const CREDIT_CATEGORIES_ENCRYPTION_KEY = getEnvVariable('CREDIT_CATEGORIES_ENCRYPTION_KEY');
 
@@ -26,10 +30,10 @@ if (!operation || !value) {
 }
 
 if (operation === 'encrypt') {
-  const encrypted = encryptPromoCode(value);
+  const encrypted = encryptWithSymmetricKey(value, CREDIT_CATEGORIES_ENCRYPTION_KEY);
   console.log(`Encrypted: ${encrypted}`);
 } else if (operation === 'decrypt') {
-  const decrypted = decryptPromoCode(value);
+  const decrypted = decryptWithSymmetricKey(value, CREDIT_CATEGORIES_ENCRYPTION_KEY);
   console.log(`Decrypted: ${decrypted}`);
 } else {
   console.error(`Unknown operation: ${operation}. Use 'encrypt' or 'decrypt'.`);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Check, Sparkles, TriangleAlert, X, Zap } from 'lucide-react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
@@ -16,7 +17,6 @@ import { ClawHeader } from './ClawHeader';
 import { CreateInstanceCard } from './CreateInstanceCard';
 import { InstanceControls } from './InstanceControls';
 import { InstanceTab } from './InstanceTab';
-import { OpenClawButton } from './OpenClawButton';
 import { ChangelogTab } from './ChangelogTab';
 import { SubscriptionTab } from './SubscriptionTab';
 import { ChannelPairingStep } from './ChannelPairingStep';
@@ -326,13 +326,19 @@ function ClawDashboardInner({
                 </div>
               )}
               <div className="flex w-full flex-col gap-3">
-                <OpenClawButton
-                  canShow={gatewayStatus?.state === 'running'}
-                  gatewayUrl={gatewayUrl}
-                  look="hero"
-                  label="Open KiloClaw"
-                  className="w-full py-6 text-base"
-                />
+                {gatewayStatus?.state === 'running' && (
+                  <Button
+                    asChild
+                    variant="primary"
+                    className="w-full min-w-[180px] bg-emerald-600 py-6 text-base text-white hover:bg-emerald-700"
+                  >
+                    <Link
+                      href={`${organizationId ? `/organizations/${organizationId}/claw` : '/claw'}/chat`}
+                    >
+                      Open KiloClaw
+                    </Link>
+                  </Button>
+                )}
                 <Button
                   className="w-full py-6 text-base"
                   variant="outline"

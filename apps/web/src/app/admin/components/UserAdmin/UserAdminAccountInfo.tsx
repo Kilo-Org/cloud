@@ -1,6 +1,6 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { PaymentMethodStatusBadge } from '@/components/admin/PaymentMethodStatusBadge';
 import { UserStatusBadge } from '@/components/admin/UserStatusBadge';
 import { CopyTextButton } from '@/components/admin/CopyEmailButton';
@@ -10,44 +10,52 @@ import ResetAPIKeyButton from './ResetAPIKeyButton';
 import ResetToMagicLinkLoginButton from './ResetToMagicLinkLoginButton';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Webhook } from 'lucide-react';
+import { SquareArrowOutUpRight, Webhook } from 'lucide-react';
+import { createHash } from 'crypto';
+
+function getGravatarUrl(email: string, size: number = 80): string {
+  const hash = createHash('md5').update(email.toLowerCase().trim()).digest('hex');
+  return `https://www.gravatar.com/avatar/${hash}?s=${size}&d=mp`;
+}
 
 type UserAdminAccountInfoProps = UserDetailProps;
 
 export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
+  const gravatarUrl = getGravatarUrl(user.google_user_email);
+  const stripeUrl = `https://dashboard.stripe.com/${process.env.NODE_ENV === 'development' ? 'test/' : ''}customers/${user.stripe_customer_id}`;
+  const hibpUrl = `https://haveibeenpwned.com/account/${encodeURIComponent(user.google_user_email)}`;
+
   return (
     <Card
-      className={`flex-1 ${user.blocked_reason || user.is_blacklisted_by_domain ? 'border-red-500 bg-red-950/50' : ''}`}
+      className={
+        user.blocked_reason || user.is_blacklisted_by_domain ? 'border-red-500 bg-red-950/50' : ''
+      }
     >
-      <CardHeader>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex min-w-max items-center gap-4">
+      <CardContent className="pt-5">
+        {/* Top row: identity + badges/actions */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
             <img
               src={user.google_user_image_url}
               alt={user.google_user_name}
-              className="h-16 w-16 rounded-full"
+              className="h-12 w-12 rounded-full"
               onError={e => {
                 const target = e.target as HTMLImageElement;
                 target.src = '/default-avatar.svg';
               }}
             />
             <div>
-              <CardTitle className="text-2xl">{user.google_user_name}</CardTitle>
-              <div className="flex items-center gap-2">
-                <CardDescription className="text-lg">{user.google_user_email}</CardDescription>
+              <h2 className="text-lg font-semibold leading-tight">{user.google_user_name}</h2>
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground text-sm">{user.google_user_email}</span>
                 <CopyTextButton text={user.google_user_email} />
               </div>
             </div>
           </div>
-          <div className="ml-auto flex min-w-min shrink flex-wrap items-center gap-2">
+
+          <div className="flex flex-wrap items-center gap-2">
             <UserStatusBadge is_detail={true} user={user} />
             <PaymentMethodStatusBadge paymentMethodStatus={user.paymentMethodStatus} />
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-row-reverse flex-wrap justify-between gap-6">
-          <div className="flex grow basis-auto flex-col items-end space-y-2">
             <ResetAPIKeyButton userId={user.id} />
             {!user.is_sso_protected_domain && <ResetToMagicLinkLoginButton userId={user.id} />}
             <Button variant="outline" size="sm" asChild>
@@ -57,75 +65,95 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
             </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href={`/admin/users/${encodeURIComponent(user.id)}/webhooks`}>
-                <Webhook className="mr-2 h-4 w-4" />
-                View webhooks
+                <Webhook className="mr-1 h-3.5 w-3.5" />
+                Webhooks
               </Link>
             </Button>
+            <a
+              href={stripeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md bg-purple-950 px-2.5 py-1.5 text-xs font-medium text-purple-200 transition-colors hover:bg-purple-900"
+            >
+              Stripe
+              <SquareArrowOutUpRight size={12} />
+            </a>
+            <a
+              href={hibpUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md bg-orange-950 px-2.5 py-1.5 text-xs font-medium text-orange-200 transition-colors hover:bg-orange-900"
+              title="Check if this email has been exposed in any data breaches"
+            >
+              HIBP
+              <SquareArrowOutUpRight size={12} />
+            </a>
+            <img
+              src={gravatarUrl}
+              alt={`Gravatar for ${user.google_user_name}`}
+              className="border-border h-7 w-7 rounded-full border"
+              title="Gravatar"
+            />
           </div>
-          <div className="grow basis-auto space-y-4">
-            <div>
-              <h4 className="text-muted-foreground text-sm font-medium">Updated At</h4>
-              <p>{formatDate(user.updated_at)}</p>
-            </div>
-            <div>
-              <h4 className="text-muted-foreground text-sm font-medium">Hosted Domain</h4>
-              <p>
-                {user.hosted_domain || 'N/A'}{' '}
-                {user.hosted_domain && <CopyTextButton text={user.hosted_domain} />}
-              </p>
-            </div>
-          </div>
-          <div className="grow basis-auto space-y-4">
-            <div>
-              <h4 className="text-muted-foreground text-sm font-medium">User ID</h4>
-              <p className="font-mono text-sm break-all">
-                {user.id} <CopyTextButton text={user.id} />
-              </p>
-            </div>
-            <div>
-              <h4 className="text-muted-foreground text-sm font-medium">Email</h4>
-              <div className="flex items-center gap-2">
-                <p className="break-all">{user.google_user_email}</p>
-                <CopyTextButton text={user.google_user_email} />
-              </div>
-            </div>
-            <div>
-              <h4 className="text-muted-foreground text-sm font-medium">Created At</h4>
-              <p>{formatDate(user.created_at)}</p>
-            </div>
-            <div>
-              <h4 className="text-muted-foreground text-sm font-medium">
-                OpenRouter Upstream Safety Identifier
-              </h4>
-              {user.openrouter_upstream_safety_identifier ? (
-                <div className="flex items-center gap-2">
-                  <p className="font-mono text-sm break-all">
-                    {user.openrouter_upstream_safety_identifier}
-                  </p>
-                  <CopyTextButton text={user.openrouter_upstream_safety_identifier} />
-                </div>
-              ) : (
-                <p className="text-muted-foreground">N/A</p>
-              )}
-            </div>
-            <div>
-              <h4 className="text-muted-foreground text-sm font-medium">
-                Vercel Downstream Safety Identifier
-              </h4>
-              {user.vercel_downstream_safety_identifier ? (
-                <div className="flex items-center gap-2">
-                  <p className="font-mono text-sm break-all">
-                    {user.vercel_downstream_safety_identifier}
-                  </p>
-                  <CopyTextButton text={user.vercel_downstream_safety_identifier} />
-                </div>
-              ) : (
-                <p className="text-muted-foreground">N/A</p>
-              )}
-            </div>
-          </div>
+        </div>
+
+        {/* Metadata grid */}
+        <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
+          <Field label="User ID" mono>
+            {user.id} <CopyTextButton text={user.id} />
+          </Field>
+          <Field label="Email">
+            {user.google_user_email} <CopyTextButton text={user.google_user_email} />
+          </Field>
+          <Field label="Hosted Domain">
+            {user.hosted_domain || 'N/A'}
+            {user.hosted_domain ? <CopyTextButton text={user.hosted_domain} /> : null}
+          </Field>
+          <Field label="Created">{formatDate(user.created_at)}</Field>
+          <Field label="Updated">{formatDate(user.updated_at)}</Field>
+          <Field label="OpenRouter Upstream Safety ID" mono>
+            {user.openrouter_upstream_safety_identifier ? (
+              <>
+                {user.openrouter_upstream_safety_identifier}
+                <CopyTextButton text={user.openrouter_upstream_safety_identifier} />
+              </>
+            ) : (
+              <span className="text-muted-foreground">N/A</span>
+            )}
+          </Field>
+          <Field label="Vercel Downstream Safety ID" mono>
+            {user.vercel_downstream_safety_identifier ? (
+              <>
+                {user.vercel_downstream_safety_identifier}
+                <CopyTextButton text={user.vercel_downstream_safety_identifier} />
+              </>
+            ) : (
+              <span className="text-muted-foreground">N/A</span>
+            )}
+          </Field>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function Field({
+  label,
+  mono,
+  children,
+}: {
+  label: string;
+  mono?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <h4 className="text-muted-foreground text-xs font-medium">{label}</h4>
+      <div
+        className={`flex items-center gap-1 text-sm break-all ${mono ? 'font-mono text-xs' : ''}`}
+      >
+        {children}
+      </div>
+    </div>
   );
 }

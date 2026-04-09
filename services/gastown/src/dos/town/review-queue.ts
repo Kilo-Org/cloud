@@ -590,6 +590,19 @@ export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInpu
     return;
   }
 
+  // PR-feedback beads (address review comments, fix CI) skip the review
+  // queue. The polecat pushed commits to the existing PR branch — closing
+  // the feedback bead unblocks the parent MR bead so poll_pr can re-check
+  // CI status or the reconciler can re-dispatch the refinery for re-review.
+  if (hookedBead?.labels.includes('gt:pr-feedback')) {
+    console.log(
+      `[review-queue] agentDone: pr-feedback bead ${agent.current_hook_bead_id} — closing directly (skip review)`
+    );
+    closeBead(sql, agent.current_hook_bead_id, agentId);
+    unhookBead(sql, agentId);
+    return;
+  }
+
   if (agent.role === 'refinery') {
     // The refinery handles merging (direct strategy) or PR creation (pr strategy)
     // itself. When it calls gt_done:

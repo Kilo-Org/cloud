@@ -1,5 +1,10 @@
 import { db } from '@/lib/drizzle';
-import { kilocode_users, credit_transactions, microdollar_usage } from '@kilocode/db/schema';
+import {
+  kilocode_users,
+  credit_transactions,
+  microdollar_usage,
+  exa_usage_log,
+} from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { recomputeUserBalances, computeUserBalanceUpdates } from './recomputeUserBalances';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -10,6 +15,8 @@ describe('recomputeUserBalances', () => {
     await db.delete(credit_transactions);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(microdollar_usage);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(exa_usage_log);
     jest.clearAllMocks();
   });
 
@@ -422,5 +429,136 @@ describe('recomputeUserBalances', () => {
     // The lastExpirationTime is T4, so computeExpiration runs up to T4
     // At T4, both A and B have expired, shifting baselines appropriately
     expect(result.accounting_error_mUsd).toBe(0);
+  });
+
+  test('should include personal Exa charged usage in recomputed microdollars_used', async () => {
+    const user = await insertTestUser();
+    const oldDate = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+
+    // Credit: $100
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: 100_000_000,
+      is_free: false,
+      credit_category: 'purchase',
+      created_at: oldDate,
+      original_baseline_microdollars_used: 0,
+    });
+
+    // LLM usage: $2
+    await db.insert(microdollar_usage).values({
+      kilo_user_id: user.id,
+      cost: 2_000_000,
+      input_tokens: 100,
+      output_tokens: 50,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      created_at: oldDate,
+    });
+
+    // Exa charged usage: $3 personal (no org), two requests
+    await db.insert(exa_usage_log).values([
+      {
+        kilo_user_id: user.id,
+        path: '/search',
+        cost_microdollars: 2_000_000,
+        charged_to_balance: true,
+      },
+      {
+        kilo_user_id: user.id,
+        path: '/search',
+        cost_microdollars: 1_000_000,
+        charged_to_balance: true,
+      },
+    ]);
+
+    // Set user to match the combined usage ($2 LLM + $3 Exa = $5)
+    await db
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: 100_000_000,
+        microdollars_used: 5_000_000,
+      })
+      .where(eq(kilocode_users.id, user.id));
+
+    const result = await recomputeUserBalances({ userId: user.id });
+    expect(result.success).toBe(true);
+
+    // Recomputed microdollars_used should be LLM ($2) + Exa ($3) = $5
+    const updatedUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(updatedUser!.microdollars_used).toBe(5_000_000);
+  });
+
+  test('should exclude org Exa charged usage from personal recompute', async () => {
+    const user = await insertTestUser();
+    const orgId = crypto.randomUUID();
+
+    // Credit: $100
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: 100_000_000,
+      is_free: false,
+      credit_category: 'purchase',
+      original_baseline_microdollars_used: 0,
+    });
+
+    // Exa charged usage: $5 in an org context (should be excluded from personal recompute)
+    await db.insert(exa_usage_log).values({
+      kilo_user_id: user.id,
+      organization_id: orgId,
+      path: '/search',
+      cost_microdollars: 5_000_000,
+      charged_to_balance: true,
+    });
+
+    await db
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: 100_000_000,
+        microdollars_used: 0,
+      })
+      .where(eq(kilocode_users.id, user.id));
+
+    const result = await recomputeUserBalances({ userId: user.id });
+    expect(result.success).toBe(true);
+
+    // Only LLM usage (none) should count — org Exa is excluded
+    const updatedUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(updatedUser!.microdollars_used).toBe(0);
+  });
+
+  test('pure: should include Exa charged usage in microdollars_used', () => {
+    const result = computeUserBalanceUpdates({
+      user: {
+        id: 'test-user',
+        updated_at: new Date().toISOString(),
+        microdollars_used: 5_000_000,
+        total_microdollars_acquired: 100_000_000,
+      },
+      usageRecords: [
+        { cost: 2_000_000, created_at: '2024-01-01T00:00:00Z' }, // LLM
+        { cost: 3_000_000, created_at: '2024-01-02T00:00:00Z' }, // Exa (already merged)
+      ],
+      creditTransactions: [
+        {
+          id: 'tx-1',
+          created_at: '2023-12-01T00:00:00Z',
+          expiry_date: null,
+          amount_microdollars: 100_000_000,
+          original_baseline_microdollars_used: 0,
+          expiration_baseline_microdollars_used: null,
+          description: 'Purchase',
+          is_free: false,
+          original_transaction_id: null,
+        },
+      ],
+    });
+
+    // microdollars_used should be LLM ($2) + Exa ($3) = $5
+    expect(result.user_update.microdollars_used).toBe(5_000_000);
   });
 });

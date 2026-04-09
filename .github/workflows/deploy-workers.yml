@@ -20,7 +20,6 @@ on:
           - services/db-proxy
           - services/deploy-infra/builder
           - services/deploy-infra/dispatcher
-          - services/gastown
           - services/git-token-service
           - services/gmail-push
           - services/images-mcp
@@ -104,7 +103,6 @@ jobs:
             services/db-proxy
             services/deploy-infra/builder
             services/deploy-infra/dispatcher
-            services/gastown
             services/git-token-service
             services/gmail-push
             services/images-mcp

@@ -1520,11 +1520,11 @@ importers:
   services/gastown/container:
     dependencies:
       '@kilocode/plugin':
-        specifier: 7.0.37
-        version: 7.0.37
+        specifier: 7.1.23
+        version: 7.1.23
       '@kilocode/sdk':
-        specifier: 7.0.37
-        version: 7.0.37
+        specifier: 7.1.23
+        version: 7.1.23
       hono:
         specifier: ^4.12.7
         version: 4.12.8
@@ -4008,14 +4008,14 @@ packages:
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
-  '@kilocode/plugin@7.0.37':
-    resolution: {integrity: sha512-bDeLo2FLqFdQZmjezfiJ+Oyk5rb3Tzh9+nKAVp+2kHOhKDkwgOD71OFN+Ii0t3RvyChkLYnghw179FqHByNILQ==}
-
-  '@kilocode/sdk@7.0.37':
-    resolution: {integrity: sha512-t7HEjYpAuW3IdbEp+2VYQPFLhidYFSmWK3nl6vWri0QBNh+spQcotdMYENNmv/HQOAXr84pXgOFtc8YCEOz5wQ==}
+  '@kilocode/plugin@7.1.23':
+    resolution: {integrity: sha512-sFI0rlgQg3mzYP05/gg09IE1mN4QyAXyOlJjM36CFoVKi1bPYz/dqEqr6ddmMNmB577A4gDu0D07hr0pGIFrBA==}
 
   '@kilocode/sdk@7.1.17':
     resolution: {integrity: sha512-OMe11pt8m72rUIOrgUn9OEwSl+KlQzOlGD3zDyFutHqxylqXOr0/9IfYtAP5F5fUWYCtYE7SJbXcEbWvIyVhTg==}
+
+  '@kilocode/sdk@7.1.23':
+    resolution: {integrity: sha512-moSKXqpwE+ozVbNE1aYIUb5Kd7fesOicRUn90WiMlp+8lRhqQc6ZTTIaIB9ZzD7Dak//4bSuo++bb+Jtw3U4Fg==}
 
   '@lottiefiles/dotlottie-react@0.17.15':
     resolution: {integrity: sha512-4wYAjsJhM28eUvJ/gT3KRM6fcyT7EM9n7PDrP71LaBTacc6bSN43qFTSJc1Li3QxUiraz23p0Q8EJBzXo8DsRw==}
@@ -17462,14 +17462,14 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@kilocode/plugin@7.0.37':
+  '@kilocode/plugin@7.1.23':
     dependencies:
-      '@kilocode/sdk': 7.0.37
+      '@kilocode/sdk': 7.1.23
       zod: 4.1.8
 
-  '@kilocode/sdk@7.0.37': {}
-
   '@kilocode/sdk@7.1.17': {}
+
+  '@kilocode/sdk@7.1.23': {}
 
   '@lottiefiles/dotlottie-react@0.17.15(react@19.2.4)':
     dependencies:

@@ -1,6 +1,6 @@
-import type { KiloFreeModel } from '@/lib/providers/kilo-free-model';
+import type { KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
 
-export const morph_warp_grep_free_model: KiloFreeModel = {
+export const morph_warp_grep_free_model: KiloExclusiveModel = {
   public_id: 'morph-warp-grep-v2',
   display_name: 'Morph: WarpGrep V2',
   description:
@@ -8,7 +8,7 @@ export const morph_warp_grep_free_model: KiloFreeModel = {
   context_length: 256000,
   max_completion_tokens: 32000,
   status: 'hidden',
-  flags: [],
+  flags: ['free'],
   gateway: 'morph',
   internal_id: 'morph-warp-grep-v2',
   inference_provider: 'morph',

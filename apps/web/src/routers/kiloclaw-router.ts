@@ -196,6 +196,93 @@ async function getOrCreateInstanceForBilling(userId: string): Promise<ActiveKilo
   return newInstance;
 }
 
+type PersonalBillingInstanceRow = {
+  id: string;
+  destroyed_at: string | null;
+};
+
+async function getLatestPersonalBillingInstance(
+  userId: string
+): Promise<PersonalBillingInstanceRow | null> {
+  const [instance] = await db
+    .select({
+      id: kiloclaw_instances.id,
+      destroyed_at: kiloclaw_instances.destroyed_at,
+    })
+    .from(kiloclaw_instances)
+    .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.organization_id)))
+    .orderBy(desc(kiloclaw_instances.created_at))
+    .limit(1);
+
+  return instance ?? null;
+}
+
+async function getDisplayedPersonalKiloclawSubscription(params: {
+  userId: string;
+  now?: Date;
+}): Promise<{
+  latestPersonalInstance: PersonalBillingInstanceRow | null;
+  subscription: typeof kiloclaw_subscriptions.$inferSelect | null;
+}> {
+  const now = params.now ?? new Date();
+  const latestPersonalInstance = await getLatestPersonalBillingInstance(params.userId);
+
+  if (latestPersonalInstance && !latestPersonalInstance.destroyed_at) {
+    await adoptOrphanedSubscription(params.userId, latestPersonalInstance.id);
+  }
+
+  const subscriptions = await db
+    .select()
+    .from(kiloclaw_subscriptions)
+    .where(eq(kiloclaw_subscriptions.user_id, params.userId));
+
+  const subscription =
+    latestPersonalInstance && !latestPersonalInstance.destroyed_at
+      ? (subscriptions.find(row => row.instance_id === latestPersonalInstance.id) ??
+        getEffectiveKiloClawSubscription(subscriptions, now))
+      : getEffectiveKiloClawSubscription(subscriptions, now);
+
+  if (subscription?.instance_id && latestPersonalInstance?.id !== subscription.instance_id) {
+    const [instance] = await db
+      .select({ organization_id: kiloclaw_instances.organization_id })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, subscription.instance_id))
+      .limit(1);
+
+    if (instance?.organization_id) {
+      return {
+        latestPersonalInstance,
+        subscription: null,
+      };
+    }
+  }
+
+  return {
+    latestPersonalInstance,
+    subscription,
+  };
+}
+
+async function hasBlockingPersonalKiloclawSubscription(userId: string): Promise<boolean> {
+  const [blockingSubscription] = await db
+    .select({ id: kiloclaw_subscriptions.id })
+    .from(kiloclaw_subscriptions)
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, userId),
+        inArray(kiloclaw_subscriptions.status, ['active', 'past_due', 'unpaid']),
+        or(
+          isNull(kiloclaw_subscriptions.instance_id),
+          and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.organization_id))
+        )
+      )
+    )
+    .limit(1);
+
+  return !!blockingSubscription;
+}
+
 /**
  * Map KiloClawApiError responses to TRPCErrors for file operations.
  * Always throws — call as `handleFileOperationError(err, 'read file')`.
@@ -2524,40 +2611,12 @@ export const kiloclawRouter = createTRPCRouter({
   // ── Billing endpoints ────────────────────────────────────────────────
 
   getBillingStatus: baseProcedure.query(async ({ ctx }) => {
-    // Scope to personal instances only (organization_id IS NULL) so an org
-    // instance is never used for personal billing status or orphan adoption.
-    const [activeInstance] = await db
-      .select({
-        id: kiloclaw_instances.id,
-        destroyed_at: kiloclaw_instances.destroyed_at,
-      })
-      .from(kiloclaw_instances)
-      .where(
-        and(eq(kiloclaw_instances.user_id, ctx.user.id), isNull(kiloclaw_instances.organization_id))
-      )
-      .orderBy(desc(kiloclaw_instances.created_at))
-      .limit(1);
-
-    // If an active personal instance exists, adopt any orphaned subscription
-    // before reading billing status.
-    if (activeInstance && !activeInstance.destroyed_at) {
-      await adoptOrphanedSubscription(ctx.user.id, activeInstance.id);
-    }
-
-    // Query subscription scoped to the active instance when possible.
-    // Falls back to the user's effective subscription when no active instance exists
-    // (e.g. user never provisioned — billing status is still useful for
-    // showing trial eligibility).
     const now = new Date();
-    const subscriptions = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id));
-    const sub =
-      activeInstance && !activeInstance.destroyed_at
-        ? (subscriptions.find(subscription => subscription.instance_id === activeInstance.id) ??
-          getEffectiveKiloClawSubscription(subscriptions, now))
-        : getEffectiveKiloClawSubscription(subscriptions, now);
+    const { latestPersonalInstance: activeInstance, subscription: sub } =
+      await getDisplayedPersonalKiloclawSubscription({
+        userId: ctx.user.id,
+        now,
+      });
 
     const [earlybird] = await db
       .select({ id: kiloclaw_earlybird_purchases.id })
@@ -2657,6 +2716,16 @@ export const kiloclawRouter = createTRPCRouter({
       };
     }
 
+    // Trial eligibility must match ensureProvisionAccess (spec Trial Eligibility
+    // rule 2): no subscription of any kind, including org-backed ones.  The
+    // personal-scoped `sub` above intentionally hides org subscriptions for
+    // billing display, so we need a separate user-wide existence check here.
+    const [anySubscription] = await db
+      .select({ id: kiloclaw_subscriptions.id })
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
+      .limit(1);
+
     // First-month credit discount eligibility (spec Credit Enrollment rule 3).
     const creditIntroEligible = !(await hadPriorPaidSubscription(ctx.user.id));
     const creditBalanceMicrodollars =
@@ -2686,7 +2755,7 @@ export const kiloclawRouter = createTRPCRouter({
     return {
       hasAccess,
       accessReason,
-      trialEligible: !activeInstance && !sub && !earlybird,
+      trialEligible: !activeInstance && !anySubscription && !earlybird,
       creditBalanceMicrodollars,
       creditIntroEligible,
       hasActiveKiloPass,
@@ -2926,13 +2995,7 @@ export const kiloclawRouter = createTRPCRouter({
 
       // Reject checkout if any non-ended subscription exists (active, past_due, unpaid).
       // The trialing status is exempted so trial users can convert to paid.
-      const [existing] = await db
-        .select({ status: kiloclaw_subscriptions.status, plan: kiloclaw_subscriptions.plan })
-        .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
-        .limit(1);
-
-      if (existing && existing.status !== 'canceled' && existing.status !== 'trialing') {
+      if (await hasBlockingPersonalKiloclawSubscription(ctx.user.id)) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'You already have an active subscription.',
@@ -3088,7 +3151,8 @@ export const kiloclawRouter = createTRPCRouter({
       // registry row and reassign any existing subscription to it.
       const instance = await getOrCreateInstanceForBilling(ctx.user.id);
 
-      // Reject if this instance already has a non-ended KiloClaw subscription
+      // Reject if this instance already has a non-ended KiloClaw subscription.
+      // Safe with LIMIT 1: kiloclaw_subscriptions has a partial unique index on instance_id.
       const [existing] = await db
         .select({ status: kiloclaw_subscriptions.status })
         .from(kiloclaw_subscriptions)
@@ -3164,11 +3228,9 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   cancelSubscription: baseProcedure.mutation(async ({ ctx }) => {
-    const [sub] = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
-      .limit(1);
+    const { subscription: sub } = await getDisplayedPersonalKiloclawSubscription({
+      userId: ctx.user.id,
+    });
 
     if (!sub || sub.status !== 'active') {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'No active subscription to cancel.' });
@@ -3394,11 +3456,9 @@ export const kiloclawRouter = createTRPCRouter({
   }),
 
   reactivateSubscription: baseProcedure.mutation(async ({ ctx }) => {
-    const [sub] = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
-      .limit(1);
+    const { subscription: sub } = await getDisplayedPersonalKiloclawSubscription({
+      userId: ctx.user.id,
+    });
 
     if (!sub || sub.status !== 'active' || !sub.cancel_at_period_end) {
       throw new TRPCError({
@@ -3446,11 +3506,9 @@ export const kiloclawRouter = createTRPCRouter({
   switchPlan: baseProcedure
     .input(z.object({ toPlan: z.enum(['commit', 'standard']) }))
     .mutation(async ({ ctx, input }) => {
-      const [sub] = await db
-        .select()
-        .from(kiloclaw_subscriptions)
-        .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
-        .limit(1);
+      const { subscription: sub } = await getDisplayedPersonalKiloclawSubscription({
+        userId: ctx.user.id,
+      });
 
       if (!sub || sub.status !== 'active') {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'No active subscription to switch.' });
@@ -3656,11 +3714,9 @@ export const kiloclawRouter = createTRPCRouter({
     }),
 
   cancelPlanSwitch: baseProcedure.mutation(async ({ ctx }) => {
-    const [sub] = await db
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(eq(kiloclaw_subscriptions.user_id, ctx.user.id))
-      .limit(1);
+    const { subscription: sub } = await getDisplayedPersonalKiloclawSubscription({
+      userId: ctx.user.id,
+    });
 
     if (!sub?.scheduled_plan) {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'No pending plan switch to cancel.' });

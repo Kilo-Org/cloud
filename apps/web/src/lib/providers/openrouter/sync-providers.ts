@@ -1,7 +1,7 @@
 import pLimit from 'p-limit';
-import { kiloFreeModels } from '@/lib/models';
+import { kiloExclusiveModels } from '@/lib/models';
 import { normalizeModelId } from '@/lib/providers/openrouter';
-import { convertFromKiloModel } from '@/lib/providers/kilo-free-model';
+import { convertFromKiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
 import type {
   NormalizedOpenRouterResponse,
   NormalizedProvider,
@@ -167,10 +167,10 @@ async function syncProviders() {
     )
   );
 
-  const mappedExtraModels = kiloFreeModels
+  const mappedExtraModels = kiloExclusiveModels
     .filter(model => model.status === 'public' && model.inference_provider)
     .map(kfm => {
-      const model = convertFromKiloModel(kfm);
+      const model = convertFromKiloExclusiveModel(kfm);
       return {
         model: {
           slug: normalizeModelId(model.id),

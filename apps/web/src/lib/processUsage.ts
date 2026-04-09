@@ -170,6 +170,7 @@ export function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
+    is_free: isFreeModel(usageContextInfo.requested_model),
   };
 
   // Legacy heuristic classification removed - abuse_classification is now handled
@@ -431,6 +432,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               machine_id,
               session_id,
               market_cost,
+              is_free,
 
               http_user_agent_id,
               http_ip_id,
@@ -468,6 +470,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.machine_id},
               ${metadataFields.session_id},
               ${metadataFields.market_cost},
+              ${metadataFields.is_free},
 
               (SELECT http_user_agent_id FROM http_user_agent_cte),
               (SELECT http_ip_id FROM http_ip_cte),

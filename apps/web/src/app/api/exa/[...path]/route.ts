@@ -4,6 +4,14 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { EXA_API_KEY } from '@/lib/config.server';
 import { after } from 'next/server';
 import { wrapInSafeNextResponse } from '@/lib/llm-proxy-helpers';
+import {
+  getExaMonthlyUsage,
+  getExaFreeAllowanceMicrodollars,
+  recordExaUsage,
+} from '@/lib/exa-usage';
+import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
+import { readDb } from '@/lib/drizzle';
+import { captureException } from '@sentry/nextjs';
 
 const EXA_BASE_URL = 'https://api.exa.ai';
 
@@ -16,16 +24,15 @@ function extractExaPath(url: URL): string | null {
   return ALLOWED_PATHS.has(path) ? path : null;
 }
 
-function logExaCost(userId: string, path: string, responseBody: unknown) {
+function extractCostDollars(responseBody: unknown): number | undefined {
   const body = responseBody as { costDollars?: { total?: number } } | null;
-  const cost = body?.costDollars?.total;
-  if (cost !== undefined) {
-    console.log(`[exa] user=${userId} path=${path} cost=$${cost}`);
-  }
+  return body?.costDollars?.total;
 }
 
 export async function POST(request: NextRequest) {
-  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+  const { user, authFailedResponse, organizationId } = await getUserFromAuth({
+    adminOnly: false,
+  });
   if (authFailedResponse) return authFailedResponse;
 
   const url = new URL(request.url);
@@ -38,11 +45,40 @@ export async function POST(request: NextRequest) {
   }
 
   if (!EXA_API_KEY) {
-    console.error('[exa] EXA_API_KEY is not configured');
-    return NextResponse.json({ error: 'Exa search is not configured' }, { status: 503 });
+    captureException(new Error('EXA_API_KEY is not configured'));
+
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 
-  const requestBody = await request.text();
+  // Check monthly allowance and balance.
+  // freeAllowance is the stored value from the first request of the month;
+  // null means no row yet, so we compute from the helper.
+  // Use read replica for monthly usage check - this is a read-only operation that can tolerate
+  // slight replication lag, and provides lower latency for US users
+  const { usage: monthlyUsage, freeAllowance: storedAllowance } = await getExaMonthlyUsage(
+    user.id,
+    readDb
+  );
+  const allowance = storedAllowance ?? getExaFreeAllowanceMicrodollars(new Date(), user);
+  const isPaidRequest = monthlyUsage >= allowance;
+
+  if (isPaidRequest) {
+    const { balance } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+    if (balance <= 0) {
+      return NextResponse.json(
+        {
+          error: 'Exa free allowance exhausted and no credit balance available',
+          monthlyAllowance: `$${(allowance / 1_000_000).toFixed(2)}`,
+          used: `$${(monthlyUsage / 1_000_000).toFixed(2)}`,
+        },
+        { status: 402 }
+      );
+    }
+  }
+
+  // Strip `stream` to guarantee JSON responses with costDollars for billing
+  const requestBody: Record<string, unknown> = await request.json();
+  delete requestBody.stream;
 
   const response = await fetch(`${EXA_BASE_URL}${exaPath}`, {
     method: 'POST',
@@ -50,7 +86,7 @@ export async function POST(request: NextRequest) {
       'Content-Type': 'application/json',
       'x-api-key': EXA_API_KEY,
     },
-    body: requestBody,
+    body: JSON.stringify(requestBody),
     signal: request.signal,
   });
 
@@ -60,19 +96,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // For non-streaming responses, extract cost info asynchronously
-  const isStreaming = response.headers.get('content-type')?.includes('text/event-stream');
-  if (!isStreaming) {
-    const cloned = response.clone();
-    after(async () => {
-      try {
-        const body: unknown = await cloned.json();
-        logExaCost(user.id, exaPath, body);
-      } catch {
-        // Response wasn't JSON — nothing to log
-      }
-    });
-  }
+  // Record cost asynchronously after sending the response
+  const cloned = response.clone();
+  after(async () => {
+    const body: unknown = await cloned.json();
+    const costDollars = extractCostDollars(body);
+    if (costDollars !== undefined && costDollars > 0 && response.status < 400) {
+      const costMicrodollars = Math.round(costDollars * 1_000_000);
+      await recordExaUsage({
+        userId: user.id,
+        organizationId,
+        path: exaPath,
+        costMicrodollars,
+        chargedToBalance: isPaidRequest,
+        freeAllowanceMicrodollars: allowance,
+      });
+    }
+  });
 
   return wrapInSafeNextResponse(response);
 }

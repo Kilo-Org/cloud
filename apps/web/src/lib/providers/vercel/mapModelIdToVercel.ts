@@ -1,4 +1,4 @@
-import { kiloFreeModels } from '@/lib/models';
+import { kiloExclusiveModels } from '@/lib/models';
 import { inferVercelFirstPartyInferenceProviderForModel } from '@/lib/providers/openrouter/inference-provider-id';
 
 const vercelModelIdMapping: Record<string, string | undefined> = {
@@ -33,7 +33,7 @@ export function mapModelIdToVercel(modelId: string) {
   }
 
   const internalId =
-    kiloFreeModels.find(
+    kiloExclusiveModels.find(
       m => m.public_id === modelId && m.status !== 'disabled' && m.gateway === 'openrouter'
     )?.internal_id ?? modelId;
 

@@ -716,6 +716,7 @@ export const microdollar_usage_metadata = pgTable(
     mode_id: integer(),
     auto_model_id: integer(),
     market_cost: bigint({ mode: 'number' }),
+    is_free: boolean(),
   },
   table => [index('idx_microdollar_usage_metadata_created_at').on(table.created_at)]
 );
@@ -904,6 +905,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   mode: text(),
   auto_model: text(),
   market_cost: bigint({ mode: 'number' }),
+  is_free: boolean(),
 }).as(sql`
   SELECT
     mu.id,
@@ -954,7 +956,8 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.session_id,
     md.mode,
     am.auto_model,
-    meta.market_cost
+    meta.market_cost,
+    meta.is_free
   FROM ${microdollar_usage} mu
   LEFT JOIN ${microdollar_usage_metadata} meta ON mu.id = meta.id
   LEFT JOIN ${http_ip} ip ON meta.http_ip_id = ip.http_ip_id
@@ -3813,3 +3816,97 @@ export const kiloclaw_cli_runs = pgTable(
 
 export type KiloClawCliRun = typeof kiloclaw_cli_runs.$inferSelect;
 export type NewKiloClawCliRun = typeof kiloclaw_cli_runs.$inferInsert;
+
+// ============ EXA USAGE TRACKING ============
+// Pre-aggregated monthly counter (hot path) + per-request audit log (partitioned)
+
+export const exa_monthly_usage = pgTable(
+  'exa_monthly_usage',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    month: date({ mode: 'string' }).notNull(),
+    total_cost_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    total_charged_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    request_count: integer().notNull().default(0),
+    free_allowance_microdollars: bigint({ mode: 'number' }).notNull().default(10_000_000),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    // Personal usage: one row per user per month (no org)
+    uniqueIndex('idx_exa_monthly_usage_personal')
+      .on(table.kilo_user_id, table.month)
+      .where(isNull(table.organization_id)),
+    // Org usage: one row per user per org per month
+    uniqueIndex('idx_exa_monthly_usage_org')
+      .on(table.kilo_user_id, table.organization_id, table.month)
+      .where(isNotNull(table.organization_id)),
+  ]
+);
+
+export type ExaMonthlyUsage = typeof exa_monthly_usage.$inferSelect;
+
+// Per-request audit log — partitioned by month on created_at.
+// The Drizzle definition is for type inference; the actual table is created
+// as a partitioned table in the migration with hand-written SQL.
+export const exa_usage_log = pgTable(
+  'exa_usage_log',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`),
+    kilo_user_id: text().notNull(),
+    organization_id: uuid(),
+    path: text().notNull(),
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    charged_to_balance: boolean().notNull().default(false),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.id, table.created_at] }),
+    index('idx_exa_usage_log_user_created').on(table.kilo_user_id, table.created_at),
+  ]
+);
+
+export type ExaUsageLog = typeof exa_usage_log.$inferSelect;
+
+// ============ SECURITY ADVISOR SCANS ============
+// Per-scan usage tracking for the security advisor feature.
+// Serves as both a rate-limiting table (COUNT in 24h window) and a usage/analytics ledger.
+
+export const security_advisor_scans = pgTable(
+  'security_advisor_scans',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    kilo_user_id: text().notNull(),
+    organization_id: text(),
+    source_platform: text().notNull(), // 'openclaw' | 'kiloclaw'
+    source_method: text().notNull(), // 'plugin' | 'api' | 'webhook' | 'cloud-agent'
+    plugin_version: text(),
+    openclaw_version: text(),
+    public_ip: text(), // Client-reported public IP (validated as IP format). Metadata only, not used for rate limiting.
+    // Audit result counts for analytics
+    findings_critical: integer().notNull().default(0),
+    findings_warn: integer().notNull().default(0),
+    findings_info: integer().notNull().default(0),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    // Primary index for rate-limiting queries (user + time window)
+    index('idx_security_advisor_scans_user_created_at').on(table.kilo_user_id, table.created_at),
+    // Analytics: scans over time
+    index('idx_security_advisor_scans_created_at').on(table.created_at),
+    // Analytics: scans by source platform
+    index('idx_security_advisor_scans_platform').on(table.source_platform),
+  ]
+);
+
+export type SecurityAdvisorScan = typeof security_advisor_scans.$inferSelect;
+export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;

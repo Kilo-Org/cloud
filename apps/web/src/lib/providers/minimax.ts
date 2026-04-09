@@ -1,6 +1,6 @@
-import { type KiloFreeModel } from '@/lib/providers/kilo-free-model';
+import { type KiloExclusiveModel } from '@/lib/providers/kilo-exclusive-model';
 
-export const minimax_m25_free_model: KiloFreeModel = {
+export const minimax_m25_free_model: KiloExclusiveModel = {
   public_id: 'minimax/minimax-m2.5:free',
   display_name: 'MiniMax: MiniMax M2.5 (free)',
   description:
@@ -8,7 +8,7 @@ export const minimax_m25_free_model: KiloFreeModel = {
   context_length: 204800,
   max_completion_tokens: 131072,
   status: 'hidden', // usable through kilo-auto/free
-  flags: ['reasoning', 'prompt_cache'],
+  flags: ['free', 'reasoning', 'prompt_cache'],
   gateway: 'openrouter',
   internal_id: 'minimax/minimax-m2.5',
   inference_provider: null,

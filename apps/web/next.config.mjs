@@ -45,11 +45,15 @@ const nextConfig = {
     // Uses beforeFiles to ensure the rewrite happens BEFORE filesystem routes are checked
     // See: https://nextjs.org/docs/app/api-reference/config/next-config-js/rewrites
     const globalApiRewrites =
-      process.env.GLOBAL_KILO_BACKEND !== 'true'
+      process.env.VERCEL_ENV === 'production' && process.env.GLOBAL_KILO_BACKEND !== 'true'
         ? [
             {
               source: '/api/fim/completions',
               destination: 'https://global-api.kilo.ai/api/fim/completions',
+            },
+            {
+              source: '/api/exa/:path*',
+              destination: 'https://global-api.kilo.ai/api/exa/:path*',
             },
             {
               source: '/api/marketplace/:path*',

@@ -50,6 +50,7 @@ import {
   app_builder_feedback,
   cloud_agent_feedback,
   free_model_usage,
+  security_advisor_scans,
   kilo_pass_scheduled_changes,
   security_analysis_owner_state,
   kiloclaw_subscriptions,
@@ -735,6 +736,10 @@ export async function softDeleteUser(userId: string) {
       .update(free_model_usage)
       .set({ kilo_user_id: null })
       .where(eq(free_model_usage.kilo_user_id, userId));
+    await tx
+      .update(security_advisor_scans)
+      .set({ kilo_user_id: 'deleted', public_ip: null })
+      .where(eq(security_advisor_scans.kilo_user_id, userId));
   });
 }
 

@@ -85,6 +85,10 @@
 
   "ai": { "binding": "AI" },
 
+  "kv_namespaces": [
+    { "binding": "AGENT_DB_SNAPSHOTS_KV", "id": "5ffb8f362e7b4d869fe2f48293a9f0c2" },
+  ],
+
   "analytics_engine_datasets": [{ "binding": "GASTOWN_AE", "dataset": "gastown_events" }],
 
   "services": [
@@ -149,6 +153,10 @@
         },
       ],
       "ai": { "binding": "AI" },
+
+      "kv_namespaces": [
+        { "binding": "AGENT_DB_SNAPSHOTS_KV", "id": "5ffb8f362e7b4d869fe2f48293a9f0c2" },
+      ],
 
       "analytics_engine_datasets": [{ "binding": "GASTOWN_AE", "dataset": "gastown_events" }],
       "secrets_store_secrets": [

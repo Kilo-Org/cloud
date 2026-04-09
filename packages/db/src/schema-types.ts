@@ -179,6 +179,7 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.doctor.run',
   'kiloclaw.machine.destroy_fly',
   'kiloclaw.subscription.bulk_trial_grant',
+  'kiloclaw.subscription.admin_cancel',
 ]);
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;

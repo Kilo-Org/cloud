@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { isFreeModel, kiloFreeModels } from './models';
+import { isFreeModel, kiloExclusiveModels } from './models';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -21,21 +21,40 @@ describe('isFreeModel', () => {
       expect(isFreeModel('openrouter/sonoma-sky-beta')).toBe(true);
     });
 
-    test('should return true for enabled Kilo free models', () => {
-      // Test with known Kilo free models that are enabled
-      const enabledModels = kiloFreeModels.filter(m => m.status === 'public');
+    test('should return true for enabled Kilo exclusive models with free flag', () => {
+      // Test with known Kilo exclusive models that are enabled and have free flag
+      const enabledFreeModels = kiloExclusiveModels.filter(
+        m => m.status === 'public' && m.flags.includes('free')
+      );
 
-      // Should have at least some enabled models
-      expect(enabledModels.length).toBeGreaterThan(0);
+      // Should have at least some enabled free models
+      expect(enabledFreeModels.length).toBeGreaterThan(0);
 
-      // All enabled models should be detected as free
-      for (const model of enabledModels) {
+      // All enabled free models should be detected as free
+      for (const model of enabledFreeModels) {
         expect(isFreeModel(model.public_id)).toBe(true);
       }
     });
 
-    test('should return false for disabled Kilo free models that do not end with :free', () => {
-      const disabledModels = kiloFreeModels.filter(
+    test('should return true for all Kilo exclusive models', () => {
+      // All kilo exclusive models currently have 'free' in their flags
+      // This test ensures isFreeModel returns true for all of them
+      for (const model of kiloExclusiveModels) {
+        if (model.status !== 'disabled') {
+          expect(isFreeModel(model.public_id)).toBe(true);
+        }
+      }
+    });
+
+    test('all Kilo exclusive models should have free flag', () => {
+      // Verify that all kilo exclusive models have the 'free' flag
+      for (const model of kiloExclusiveModels) {
+        expect(model.flags.includes('free')).toBe(true);
+      }
+    });
+
+    test('should return false for disabled Kilo exclusive models that do not end with :free', () => {
+      const disabledModels = kiloExclusiveModels.filter(
         m => m.status === 'disabled' && !m.public_id.endsWith(':free')
       );
 
@@ -45,8 +64,8 @@ describe('isFreeModel', () => {
       }
     });
 
-    test('should return true for disabled Kilo free models that end with :free', () => {
-      const disabledModelsWithFreeSuffix = kiloFreeModels.filter(
+    test('should return true for disabled Kilo exclusive models that end with :free', () => {
+      const disabledModelsWithFreeSuffix = kiloExclusiveModels.filter(
         m => m.status === 'disabled' && m.public_id.endsWith(':free')
       );
 

@@ -39,6 +39,10 @@
     {
       "path": "/api/cron/db-pool-metrics",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/exa-partition-maintenance",
+      "schedule": "0 0 1 * *"
     }
   ],
   "build": {

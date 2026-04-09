@@ -1224,7 +1224,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.persistProviderResult(startResult);
 
     if (this.s.flyMachineId) {
-      await gateway.waitForHealthy(this.s, this.env);
+      const healthy = await gateway.waitForHealthy(this.s, this.env);
+      if (!healthy) {
+        console.warn('[DO] start: gateway health probe timed out, proceeding with running status');
+      }
     }
 
     // Re-check status directly from storage: if the instance was destroyed while
@@ -2351,7 +2354,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         },
       });
       await this.persistProviderResult(restart);
-      await gateway.waitForHealthy(this.s, this.env);
+      const healthy = await gateway.waitForHealthy(this.s, this.env);
+      if (!healthy) {
+        console.warn(
+          '[DO] restartMachine: gateway health probe timed out, proceeding with running status'
+        );
+      }
 
       // Final ownership check before persisting success.
       const preSuccessStatus = await this.ctx.storage.get('status');

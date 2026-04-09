@@ -495,7 +495,10 @@ export async function patchOpenclawConfig(
  * Poll the gateway status endpoint until the OpenClaw gateway process
  * reports state === 'running'. On timeout, logs a warning but does NOT throw.
  */
-export async function waitForHealthy(state: InstanceMutableState, env: KiloClawEnv): Promise<void> {
+export async function waitForHealthy(
+  state: InstanceMutableState,
+  env: KiloClawEnv
+): Promise<boolean> {
   const routingTarget = await getProviderAdapter(env, state).getRoutingTarget({
     env,
     state,
@@ -531,7 +534,7 @@ export async function waitForHealthy(state: InstanceMutableState, env: KiloClawE
                 rootRes.status,
                 ')'
               );
-              return;
+              return true;
             }
             console.log('[DO] Gateway reports running but root returned 502 — retrying');
           } catch {
@@ -552,4 +555,5 @@ export async function waitForHealthy(state: InstanceMutableState, env: KiloClawE
   doWarn(state, 'Gateway health probe timed out — proceeding anyway', {
     timeoutSeconds: HEALTH_PROBE_TIMEOUT_SECONDS,
   });
+  return false;
 }

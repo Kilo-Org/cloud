@@ -233,7 +233,12 @@ export async function completeUnexpectedStopRecovery(runtime: RecoveryRuntime): 
   const recoveryVolume = await fly.getVolume(flyConfig, recoveryVolumeId);
   const recoveryVolumeRegion = recoveryVolume.region;
 
-  await gateway.waitForHealthy(state, env);
+  const healthy = await gateway.waitForHealthy(state, env);
+  if (!healthy) {
+    console.warn(
+      '[DO] completeUnexpectedStopRecovery: gateway health probe timed out, proceeding with running status'
+    );
+  }
 
   let retainedRecoveryVolumeId: string | null = null;
   let retainedRecoveryVolumeCleanupAfter: number | null = null;

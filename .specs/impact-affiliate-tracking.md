@@ -14,6 +14,7 @@ Draft -- created 2026-03-31.
 Updated 2026-04-01 -- aligned with revised Impact integration document and implementation review.
 Updated 2026-04-06 -- clarify that conversion events require an affiliate attribution record.
 Updated 2026-04-09 -- treat pure-credit KiloClaw periods as sale events and exclude admin/org flows.
+Updated 2026-04-09 -- require a 5-minute delay after SIGNUP delivery before child dispatch.
 
 ## Conventions
 
@@ -129,7 +130,8 @@ eligible for affiliate tracking.
     affiliate attribution.
 
 20. Child conversion events (TRIAL_START, TRIAL_END, SALE) MUST NOT be sent before the parent SIGNUP event has been
-    successfully delivered.
+    successfully delivered. For Impact.com, child conversion events MUST NOT be dispatched until at least 5 minutes
+    after the SIGNUP event has been delivered.
 
 21. Admin-only subscription interventions (for example admin trial resets, admin cancellations, or manual trial-date
     edits) MUST NOT emit affiliate conversion events. These are internal overrides, not customer lifecycle events.
@@ -233,3 +235,8 @@ been successfully delivered.
 Clarified that SALE covers every monetized KiloClaw payment period, including pure-credit funding in addition to Stripe
 invoice settlements. Explicitly excluded organization-scoped KiloClaw instances and admin-only subscription
 interventions from affiliate tracking.
+
+### 2026-04-09 -- Delay child dispatch after SIGNUP delivery
+
+Added a required 5-minute gap between Impact SIGNUP delivery and dispatch of child conversion events. This gives
+Impact.com time to process the parent event before TRIAL_START, TRIAL_END, or SALE requests arrive.

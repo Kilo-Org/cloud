@@ -37,6 +37,7 @@ const DEFAULT_CLAIM_LIMIT = 100;
 const STALE_CLAIM_WINDOW_MS = 15 * 60 * 1000;
 const MAX_RETRY_BACKOFF_MS = 60 * 60 * 1000;
 const INITIAL_RETRY_BACKOFF_MS = 60 * 1000;
+const IMPACT_PARENT_PROCESSING_DELAY_MS = 5 * 60 * 1000;
 
 type DatabaseClient = typeof db | DrizzleTransaction;
 
@@ -228,13 +229,15 @@ async function getEventByDedupeKey(
 
 async function markAffiliateEventDelivered(
   database: DatabaseClient,
-  eventId: string
+  eventId: string,
+  params?: { clearClaimedAt?: boolean }
 ): Promise<void> {
   await database
     .update(user_affiliate_events)
     .set({
       delivery_state: 'delivered',
       next_retry_at: null,
+      ...(params?.clearClaimedAt ? { claimed_at: null } : {}),
     })
     .where(eq(user_affiliate_events.id, eventId));
 }
@@ -367,6 +370,9 @@ async function claimQueuedEvents(
   database: DatabaseClient,
   limit: number
 ): Promise<AffiliateEventRow[]> {
+  const impactParentProcessedBefore = new Date(
+    Date.now() - IMPACT_PARENT_PROCESSING_DELAY_MS
+  ).toISOString();
   const result = await database.execute<AffiliateEventRow>(sql`
     UPDATE ${user_affiliate_events}
     SET
@@ -377,6 +383,21 @@ async function claimQueuedEvents(
       FROM ${user_affiliate_events}
       WHERE ${user_affiliate_events.delivery_state} = 'queued'
         AND coalesce(${user_affiliate_events.next_retry_at}, '-infinity'::timestamptz) <= now()
+        AND (
+          ${user_affiliate_events.parent_event_id} IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM ${user_affiliate_events} AS parent_event
+            WHERE parent_event.id = ${user_affiliate_events.parent_event_id}
+              AND parent_event.delivery_state = 'delivered'
+              AND (
+                parent_event.provider <> 'impact'
+                OR parent_event.event_type <> 'signup'
+                OR parent_event.claimed_at IS NULL
+                OR parent_event.claimed_at <= ${impactParentProcessedBefore}::timestamptz
+              )
+          )
+        )
       ORDER BY ${user_affiliate_events.created_at} ASC, ${user_affiliate_events.id} ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
@@ -628,11 +649,11 @@ export async function dispatchQueuedAffiliateEvents(params?: {
     unblocked: 0,
   };
 
-  if (!isImpactConfigured()) {
-    logInfo('Skipped affiliate event dispatch because Impact credentials are not configured', {
+  const impactConfigured = isImpactConfigured();
+  if (!impactConfigured) {
+    logInfo('Processing affiliate event dispatch as a no-op because Impact credentials are not configured', {
       dispatch_source: 'cron',
     });
-    return summary;
   }
 
   const reclaimed = await reclaimStaleSendingEvents(database);
@@ -672,14 +693,16 @@ export async function dispatchQueuedAffiliateEvents(params?: {
       const impactPayload = buildImpactConversionPayloadForEvent(event);
       const result: ImpactDispatchResult = await sendImpactConversionPayload(impactPayload);
       if (result.ok) {
-        await markAffiliateEventDelivered(database, event.id);
+        await markAffiliateEventDelivered(database, event.id, {
+          clearClaimedAt: result.skipped === 'unconfigured',
+        });
         summary.delivered += 1;
 
         const deliveredEvent = {
           ...event,
           delivery_state: 'delivered',
         } satisfies AffiliateEventRow;
-        logInfo('Delivered affiliate event', {
+        logInfo(result.skipped === 'unconfigured' ? 'Skipped affiliate event delivery because Impact is unconfigured' : 'Delivered affiliate event', {
           ...buildAffiliateEventLogFields(deliveredEvent),
           dispatch_source: 'cron',
         });

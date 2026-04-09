@@ -55,13 +55,15 @@ export function setupNotificationHandler() {
         // and suppress the system notification
         const title = notification.request.content.title ?? 'Kilo';
         const body = notification.request.content.body ?? '';
+        const toastId = Date.now();
         toast.custom(
           React.createElement(ChatNotificationToast, {
+            id: toastId,
             title,
             body,
             instanceId: data.instanceId,
           }),
-          { duration: 4000 }
+          { id: toastId, duration: 4000 }
         );
         return suppressed;
       }

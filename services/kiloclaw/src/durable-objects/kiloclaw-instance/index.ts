@@ -1622,6 +1622,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     userId: string | null;
     sandboxId: string | null;
     orgId: string | null;
+    provider: ProviderId;
     status: InstanceStatus | null;
     provisionedAt: number | null;
     lastStartedAt: number | null;
@@ -1674,6 +1675,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       userId: this.s.userId,
       sandboxId: this.s.sandboxId,
       orgId: this.s.orgId,
+      provider: this.s.provider,
       status: this.s.status,
       provisionedAt: this.s.provisionedAt,
       lastStartedAt: this.s.lastStartedAt,

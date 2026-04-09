@@ -1872,6 +1872,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   <code className="text-xs">{data.workerStatus.orgId ?? '—'}</code>
                 </DetailField>
 
+                <DetailField label="Provider">
+                  <code className="text-xs">{data.workerStatus.provider}</code>
+                </DetailField>
+
                 <div className="flex items-center gap-2">
                   <Server className="text-muted-foreground h-4 w-4 shrink-0" />
                   <DetailField label="Fly Machine ID">

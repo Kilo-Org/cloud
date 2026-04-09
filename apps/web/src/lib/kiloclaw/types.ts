@@ -196,6 +196,7 @@ export type RegistryEntriesResponse = {
 /** Response from GET /api/platform/debug-status (internal/admin only). */
 export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   orgId: string | null;
+  provider: 'fly' | 'northflank' | 'aws' | 'k8s';
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;
   pendingPostgresMarkOnFinalize: boolean;

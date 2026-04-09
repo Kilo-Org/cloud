@@ -4984,6 +4984,24 @@ describe('provision: auto-start after fresh provision', () => {
     });
   });
 
+  it('reports provider in debug state for legacy fly-only persisted state', async () => {
+    const storage = createFakeStorage();
+    Object.assign(storage, { getAlarm: vi.fn().mockResolvedValue(null) });
+    await seedRunning(storage, {
+      flyAppName: 'acct-legacy-only',
+      flyMachineId: 'machine-legacy',
+      flyVolumeId: 'vol-legacy',
+      flyRegion: 'ord',
+    });
+    const { instance } = createInstance(storage);
+
+    const debugState = await instance.getDebugState();
+
+    expect(debugState.provider).toBe('fly');
+    expect(debugState.flyAppName).toBe('acct-legacy-only');
+    expect(debugState.flyMachineId).toBe('machine-legacy');
+  });
+
   it('backfills provider state when a legacy fly-only DO is next persisted', async () => {
     const storage = createFakeStorage();
     await seedRunning(storage, {

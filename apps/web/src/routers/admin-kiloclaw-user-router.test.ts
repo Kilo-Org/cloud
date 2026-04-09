@@ -674,4 +674,97 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
     ).rejects.toThrow('Only active subscriptions can be canceled at period end');
   });
+
+  it('immediately cancels a trialing subscription', async () => {
+    const futureTrialEnd = new Date(Date.now() + 5 * 86_400_000).toISOString();
+    const [sub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        plan: 'trial',
+        status: 'trialing',
+        trial_started_at: new Date().toISOString(),
+        trial_ends_at: futureTrialEnd,
+      })
+      .returning();
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.users.cancelKiloClawSubscription({
+      userId: targetUser.id,
+      subscriptionId: sub.id,
+      mode: 'immediate',
+    });
+
+    expect(result).toEqual({ success: true });
+
+    const updated = await db.query.kiloclaw_subscriptions.findFirst({
+      where: eq(kiloclaw_subscriptions.id, sub.id),
+    });
+    expect(updated?.status).toBe('canceled');
+    expect(updated?.cancel_at_period_end).toBe(false);
+    // trial_ends_at should be set to approximately now, not the future date
+    expect(updated?.trial_ends_at).not.toBeNull();
+    expect(new Date(updated!.trial_ends_at!).getTime()).toBeLessThanOrEqual(Date.now());
+  });
+
+  it('writes an audit log when canceling a trial', async () => {
+    const futureTrialEnd = new Date(Date.now() + 5 * 86_400_000).toISOString();
+    const [sub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        plan: 'trial',
+        status: 'trialing',
+        trial_started_at: new Date().toISOString(),
+        trial_ends_at: futureTrialEnd,
+      })
+      .returning();
+
+    const caller = await createCallerForUser(adminUser.id);
+    await caller.admin.users.cancelKiloClawSubscription({
+      userId: targetUser.id,
+      subscriptionId: sub.id,
+      mode: 'immediate',
+    });
+
+    const [auditLog] = await db
+      .select()
+      .from(kiloclaw_admin_audit_logs)
+      .where(eq(kiloclaw_admin_audit_logs.target_user_id, targetUser.id));
+
+    expect(auditLog).toEqual(
+      expect.objectContaining({
+        action: 'kiloclaw.subscription.admin_cancel',
+        actor_id: adminUser.id,
+        target_user_id: targetUser.id,
+      })
+    );
+    expect(auditLog.metadata?.subscriptionId).toBe(sub.id);
+    expect(auditLog.metadata?.mode).toBe('immediate');
+    expect(auditLog.metadata?.previousStatus).toBe('trialing');
+  });
+
+  it('rejects period-end cancel on a trialing subscription', async () => {
+    const futureTrialEnd = new Date(Date.now() + 5 * 86_400_000).toISOString();
+    const [sub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        plan: 'trial',
+        status: 'trialing',
+        trial_started_at: new Date().toISOString(),
+        trial_ends_at: futureTrialEnd,
+      })
+      .returning();
+
+    const caller = await createCallerForUser(adminUser.id);
+
+    await expect(
+      caller.admin.users.cancelKiloClawSubscription({
+        userId: targetUser.id,
+        subscriptionId: sub.id,
+        mode: 'period_end',
+      })
+    ).rejects.toThrow('Only active subscriptions can be canceled at period end');
+  });
 });

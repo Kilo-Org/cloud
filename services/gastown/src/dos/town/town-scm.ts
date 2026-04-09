@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { TownConfig } from '../../types';
 import type { PRFeedbackCheckResult } from './actions';
-import { GitHubPRStatusSchema, GitLabMRStatusSchema } from '../../util/platform-pr.util';
+import { GitHubPRStatusSchema, GitLabMRStatusSchema, parseGitUrl } from '../../util/platform-pr.util';
 import { writeEvent } from '../../util/analytics.util';
 
 const TOWN_LOG = '[town-scm]';
@@ -476,4 +476,97 @@ export async function mergePR(ctx: SCMContext, prUrl: string): Promise<boolean> 
 
   console.warn(`${TOWN_LOG} mergePR: all merge methods rejected for ${prUrl}`);
   return false;
+}
+
+/**
+ * Create the convoy feature branch on the remote GitHub repository.
+ *
+ * The branch is created pointing at the current tip of the rig's default
+ * branch. If the branch already exists (HTTP 422), the call is treated as a
+ * no-op (idempotent). If no GitHub token is available or the git URL cannot
+ * be parsed as a GitHub URL, the function logs a warning and returns without
+ * throwing so convoy creation is never blocked.
+ */
+export async function createConvoyFeatureBranch(
+  ctx: SCMContext,
+  gitUrl: string,
+  defaultBranch: string,
+  featureBranch: string
+): Promise<void> {
+  const coords = parseGitUrl(gitUrl);
+  if (!coords || coords.platform !== 'github') {
+    console.warn(
+      `${TOWN_LOG} createConvoyFeatureBranch: non-GitHub or unparseable git URL, skipping branch creation: ${gitUrl}`
+    );
+    return;
+  }
+
+  const token = await resolveGitHubToken(ctx);
+  if (!token) {
+    console.warn(
+      `${TOWN_LOG} createConvoyFeatureBranch: no GitHub token available, skipping branch creation for ${featureBranch}`
+    );
+    return;
+  }
+
+  const { owner, repo } = coords;
+  const headers = {
+    Authorization: `token ${token}`,
+    Accept: 'application/vnd.github.v3+json',
+    'Content-Type': 'application/json',
+    'User-Agent': 'Gastown/1.0',
+  };
+
+  // Step 1: resolve the SHA of the default branch tip
+  const refRes = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${defaultBranch}`,
+    { headers }
+  );
+  if (!refRes.ok) {
+    const text = await refRes.text().catch(() => '(unreadable)');
+    console.warn(
+      `${TOWN_LOG} createConvoyFeatureBranch: failed to resolve SHA for ${defaultBranch} (${refRes.status}): ${text.slice(0, 500)}`
+    );
+    return;
+  }
+
+  const refRaw: unknown = await refRes.json().catch(() => null);
+  const refData = z
+    .object({ object: z.object({ sha: z.string() }) })
+    .safeParse(refRaw);
+  if (!refData.success) {
+    console.warn(
+      `${TOWN_LOG} createConvoyFeatureBranch: unexpected ref response shape for ${defaultBranch}`
+    );
+    return;
+  }
+
+  const sha = refData.data.object.sha;
+
+  // Step 2: create the convoy feature branch pointing at that SHA
+  const createRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ ref: `refs/heads/${featureBranch}`, sha }),
+  });
+
+  if (createRes.ok) {
+    console.log(
+      `${TOWN_LOG} createConvoyFeatureBranch: created ${featureBranch} at ${sha} in ${owner}/${repo}`
+    );
+    return;
+  }
+
+  // HTTP 422 means the ref already exists — treat as success (idempotent)
+  if (createRes.status === 422) {
+    console.log(
+      `${TOWN_LOG} createConvoyFeatureBranch: branch ${featureBranch} already exists in ${owner}/${repo}, skipping`
+    );
+    return;
+  }
+
+  const errText = await createRes.text().catch(() => '(unreadable)');
+  console.warn(
+    `${TOWN_LOG} createConvoyFeatureBranch: GitHub API returned ${createRes.status} creating ${featureBranch}: ${errText.slice(0, 500)}`
+  );
 }

@@ -2996,6 +2996,22 @@ export class TownDO extends DurableObject<Env> {
       [convoyId, input.tasks.length, 0, null, featureBranch, mergeMode, stagedValue]
     );
 
+    // Push the convoy feature branch to the remote immediately so polecats and
+    // the refinery can target it. Failures are non-fatal: logged and skipped.
+    {
+      const rig = rigs.getRig(this.sql, input.rigId);
+      if (rig) {
+        await scm.createConvoyFeatureBranch(
+          { env: this.env, townId: this.townId, getTownConfig: () => this.getTownConfig() },
+          rig.git_url,
+          rig.default_branch,
+          featureBranch
+        );
+      } else {
+        console.warn(`[Town.do] slingConvoy: rig ${input.rigId} not found, skipping remote branch creation`);
+      }
+    }
+
     // 2. Create all beads and track their IDs (needed for depends_on resolution)
     const beadIds: string[] = [];
     const results: Array<{ bead: Bead; agent: Agent | null }> = [];

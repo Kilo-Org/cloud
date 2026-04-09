@@ -447,9 +447,8 @@ export async function startAgentInContainer(
           ? branchForConvoyAgent(params.convoyFeatureBranch, params.agentName, params.beadId)
           : branchForAgent(params.agentName, params.beadId),
         // Always use the rig's real default branch for the initial git clone.
-        // The convoy feature branch may not exist on the remote yet (the first
-        // agent's work creates it via the refinery merge). The agent's working
-        // branch is created as a worktree from HEAD after clone.
+        // The convoy feature branch is created on the remote at convoy creation
+        // time, so the agent's worktree can safely start from it.
         defaultBranch: params.defaultBranch,
         envVars,
         platformIntegrationId: params.platformIntegrationId,

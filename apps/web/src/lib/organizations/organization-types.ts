@@ -21,6 +21,7 @@ import type { OrganizationRole, OrganizationPlan } from './organization-base-typ
 import { OrganizationPlanSchema, OrganizationSettingsSchema } from './organization-base-types';
 import {
   ModelSettingsSchema,
+  OpenClawModelSettingsSchema,
   OpenCodeSettingsSchema,
   VersionedSettingsSchema,
 } from '@kilocode/db/schema-types';
@@ -206,6 +207,7 @@ const OpenRouterModelSchema = z.object({
   settings: ModelSettingsSchema.optional(),
   versioned_settings: VersionedSettingsSchema.optional(),
   opencode: OpenCodeSettingsSchema.optional(),
+  openclaw: OpenClawModelSettingsSchema.optional(),
 
   id: z.string(),
   name: z.string(),

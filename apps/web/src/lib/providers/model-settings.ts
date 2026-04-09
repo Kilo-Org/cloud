@@ -10,6 +10,7 @@ import { isZaiModel } from '@/lib/providers/zai';
 import type {
   CustomLlmProvider,
   ModelSettings,
+  OpenClawModelSettings,
   OpenCodeSettings,
   VersionedSettings,
 } from '@kilocode/db/schema-types';
@@ -134,4 +135,11 @@ export function getOpenCodeSettings(model: string): OpenCodeSettings | undefined
   const ai_sdk_provider = getAiSdkProvider(model);
   const variants = getModelVariants(model);
   return { ai_sdk_provider, variants };
+}
+
+export function getOpenClawSettings(model: string): OpenClawModelSettings | undefined {
+  if (isOpenAiModel(model) || isXaiModel(model)) {
+    return { api_adapter: 'openai-responses' };
+  }
+  return undefined;
 }

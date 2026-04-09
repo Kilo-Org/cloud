@@ -7,8 +7,8 @@ import { getTownContainerStub } from '../TownContainer.do';
 import { signAgentJWT, signContainerJWT } from '../../util/jwt.util';
 import { buildPolecatSystemPrompt } from '../../prompts/polecat-system.prompt';
 import { buildMayorSystemPrompt } from '../../prompts/mayor-system.prompt';
-import type { TownConfig } from '../../types';
-import { buildContainerConfig, resolveModel, resolveSmallModel } from './config';
+import type { TownConfig, RigOverrideConfig } from '../../types';
+import { buildContainerConfig, resolveModel, resolveSmallModel, resolveRigConfig } from './config';
 
 const TOWN_LOG = '[Town.do]';
 
@@ -244,16 +244,19 @@ export function systemPromptForRole(params: {
 }
 
 /**
- * Append per-role custom instructions from town config to a system prompt.
- * Returns the prompt unchanged when no custom instructions exist for the role.
+ * Append per-role custom instructions to a system prompt.
+ * Accepts either a TownConfig (falls back to town-level instructions)
+ * or a pre-resolved instructions string. Returns the prompt unchanged
+ * when no custom instructions exist for the role.
  */
 export function appendCustomInstructions(
   systemPrompt: string,
   role: string,
-  townConfig: TownConfig
+  townConfig: TownConfig,
+  resolvedInstructions?: string | null
 ): string {
   const roleKey = role as keyof NonNullable<TownConfig['custom_instructions']>;
-  const instructions = townConfig.custom_instructions?.[roleKey]?.trim();
+  const instructions = (resolvedInstructions ?? townConfig.custom_instructions?.[roleKey])?.trim();
   if (!instructions) return systemPrompt;
   return `${systemPrompt}\n\n## Custom Instructions (from town settings)\n\n${instructions}`;
 }
@@ -320,6 +323,8 @@ export async function startAgentInContainer(
     defaultBranch: string;
     kilocodeToken?: string;
     townConfig: TownConfig;
+    /** Rig-level config overrides. When present, merged on top of townConfig for model, custom_instructions, and git_push_flags. */
+    rigOverride?: RigOverrideConfig | null;
     systemPromptOverride?: string;
     platformIntegrationId?: string;
     /** For convoy beads: the convoy's feature branch to branch from instead of defaultBranch. */
@@ -407,6 +412,9 @@ export async function startAgentInContainer(
     const containerConfig = await buildContainerConfig(storage, env);
     const container = getTownContainerStub(env, params.townId);
 
+    const rigOverride = params.rigOverride ?? null;
+    const effectiveConfig = resolveRigConfig(params.townConfig, rigOverride);
+
     const response = await container.fetch('http://container/agents/start', {
       method: 'POST',
       signal: AbortSignal.timeout(60_000),
@@ -427,7 +435,7 @@ export async function startAgentInContainer(
           checkpoint: params.checkpoint,
           conversationHistory: params.conversationHistory,
         }),
-        model: resolveModel(params.townConfig, params.rigId, params.role),
+        model: resolveModel(params.townConfig, rigOverride, params.role),
         smallModel: resolveSmallModel(params.townConfig),
         systemPrompt: appendCustomInstructions(
           params.systemPromptOverride ??
@@ -440,8 +448,10 @@ export async function startAgentInContainer(
               gates: params.townConfig.refinery?.gates ?? [],
             }),
           params.role,
-          params.townConfig
+          params.townConfig,
+          effectiveConfig.custom_instructions[params.role as keyof typeof effectiveConfig.custom_instructions]
         ),
+        ...(effectiveConfig.git_push_flags ? { gitPushFlags: effectiveConfig.git_push_flags } : {}),
         gitUrl: params.gitUrl,
         branch: params.convoyFeatureBranch
           ? branchForConvoyAgent(params.convoyFeatureBranch, params.agentName, params.beadId)

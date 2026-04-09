@@ -124,6 +124,8 @@ export async function dispatchAgent(
       [timestamp, bead.bead_id]
     );
 
+    const rigRecord = rigs.getRig(ctx.sql, rigId);
+
     const started = await dispatch.startAgentInContainer(ctx.env, ctx.storage, {
       townId: ctx.townId,
       rigId,
@@ -140,6 +142,7 @@ export async function dispatchAgent(
       defaultBranch: rigConfig.defaultBranch,
       kilocodeToken,
       townConfig,
+      rigOverride: rigRecord?.config ?? null,
       platformIntegrationId: rigConfig.platformIntegrationId,
       convoyFeatureBranch: convoyFeatureBranch ?? undefined,
       systemPromptOverride: options?.systemPromptOverride,

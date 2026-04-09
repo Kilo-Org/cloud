@@ -282,6 +282,8 @@ export class TownDO extends DurableObject<Env> {
 
         let systemPromptOverride: string | undefined;
         const townConfig = await this.getTownConfig();
+        const rig = rigs.getRig(this.sql, rigId);
+        const effectiveConfig = config.resolveRigConfig(townConfig, rig?.config ?? null);
 
         // Build refinery-specific system prompt with branch/target info.
         // When the MR bead already has a pr_url (polecat created the PR),
@@ -306,17 +308,16 @@ export class TownDO extends DurableObject<Env> {
               typeof bead.metadata?.source_agent_id === 'string'
                 ? bead.metadata.source_agent_id
                 : 'unknown',
-            mergeStrategy: townConfig.merge_strategy ?? 'direct',
+            mergeStrategy: effectiveConfig.merge_strategy,
             existingPrUrl,
-            reviewMode: townConfig.refinery?.review_mode ?? 'rework',
+            reviewMode: effectiveConfig.review_mode,
           });
         }
 
         // When merge_strategy is 'pr', polecats always create the PR themselves
         // and pass pr_url to gt_done. For review-then-land convoy intermediate
         // beads, the PR targets the convoy feature branch (not main).
-        if (agent.role === 'polecat' && townConfig.merge_strategy === 'pr') {
-          const rig = rigs.getRig(this.sql, rigId);
+        if (agent.role === 'polecat' && effectiveConfig.merge_strategy === 'pr') {
           const convoyId = beadOps.getConvoyForBead(this.sql, beadId);
           const convoyFeatureBranch = convoyId
             ? beadOps.getConvoyFeatureBranch(this.sql, convoyId)

@@ -1070,8 +1070,8 @@ export const gastownRouter = router({
       // auth-relevant config changed. The SDK server is a child process
       // that captures env at spawn time, so it must be restarted to pick
       // up rotated tokens or cleared credentials.
-      const oldMayorModel = resolveModel(existingConfig, '', 'mayor');
-      const newMayorModel = resolveModel(result, '', 'mayor');
+      const oldMayorModel = resolveModel(existingConfig, null, 'mayor');
+      const newMayorModel = resolveModel(result, null, 'mayor');
       const mayorModelChanged =
         newMayorModel !== oldMayorModel || result.small_model !== existingConfig.small_model;
       const authConfigChanged =

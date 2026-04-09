@@ -57,7 +57,7 @@ import {
 import { client as stripe } from '@/lib/stripe-client';
 import { APP_URL } from '@/lib/constants';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
-import { clawAccessProcedure } from '@/lib/kiloclaw/access-gate';
+import { clawAccessProcedure, requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
 import {
   getStripePriceIdForClawPlan,
   getStripePriceIdForClawPlanIntro,
@@ -1334,6 +1334,22 @@ export const kiloclawRouter = createTRPCRouter({
           message: error instanceof Error ? error.message : 'Failed to rename instance',
         });
       }
+
+      // Best-effort: propagate the new name to the DO so IDENTITY.md stays in sync.
+      // Guard with requireKiloClawAccess so users without active access can't
+      // mutate live DO state through the baseProcedure-gated rename endpoint.
+      try {
+        await requireKiloClawAccess(ctx.user.id);
+        const instance = await getActiveInstance(ctx.user.id);
+        const client = new KiloClawInternalClient();
+        await client.patchBotIdentity(
+          ctx.user.id,
+          { botName: input.name },
+          workerInstanceId(instance)
+        );
+      } catch {
+        // Non-critical — the DB is the source of truth for the display name
+      }
     }),
 
   getActiveInstanceId: clawAccessProcedure.query(async ({ ctx }) => {
@@ -1600,7 +1616,19 @@ export const kiloclawRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
-      return client.patchBotIdentity(ctx.user.id, input, workerInstanceId(instance));
+      const result = await client.patchBotIdentity(ctx.user.id, input, workerInstanceId(instance));
+
+      // Sync botName → Postgres so the dashboard display name stays in sync
+      if (input.botName !== undefined) {
+        try {
+          await renameInstance(ctx.user.id, input.botName);
+        } catch {
+          // Best-effort: don't fail the mutation if the DB rename fails
+          // (e.g. botName exceeds 50-char DB limit)
+        }
+      }
+
+      return result;
     }),
 
   /**

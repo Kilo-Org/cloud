@@ -38,6 +38,20 @@ describe('kilo-exa web search provider', () => {
     });
   });
 
+  it('normalizes uppercase freshness values', async () => {
+    webSearchSdkStub.setPostHandler(async () => ({ results: [] }));
+    const tool = getTool();
+
+    const response = await tool.execute({
+      query: 'latest ai research',
+      freshness: ' WEEK ',
+    });
+
+    expect(response).not.toHaveProperty('error');
+    const call = webSearchSdkStub.getPostCalls()[0];
+    expect(typeof call.body.startPublishedDate).toBe('string');
+  });
+
   it('validates contents object shape', async () => {
     const tool = getTool();
 

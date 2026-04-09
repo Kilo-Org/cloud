@@ -14,7 +14,6 @@ export default defineConfig({
         __dirname,
         'test/stubs/provider-web-search.ts'
       ),
-      'openclaw/plugin-sdk/text-runtime': path.resolve(__dirname, 'test/stubs/text-runtime.ts'),
     },
   },
 });

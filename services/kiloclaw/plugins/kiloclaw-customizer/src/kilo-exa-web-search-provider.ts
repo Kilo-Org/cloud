@@ -19,10 +19,6 @@ import {
   wrapWebContent,
   writeCachedSearchPayload,
 } from 'openclaw/plugin-sdk/provider-web-search';
-import {
-  normalizeOptionalLowercaseString,
-  normalizeOptionalString,
-} from 'openclaw/plugin-sdk/text-runtime';
 
 const KILO_EXA_PROVIDER_ID = 'kilo-exa';
 const DEFAULT_KILO_API_ORIGIN = 'https://api.kilo.ai';
@@ -72,6 +68,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function parsePositiveInteger(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const normalized = value.trim();
+  return normalized ? normalized : undefined;
+}
+
+function normalizeOptionalLowercaseString(value: unknown): string | undefined {
+  const normalized = normalizeOptionalString(value);
+  return normalized ? normalized.toLowerCase() : undefined;
 }
 
 function errorPayload(error: string, message: string): ErrorPayload {

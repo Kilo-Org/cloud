@@ -89,14 +89,14 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       url: '/claw/chat',
     },
     {
-      title: "What's New",
-      icon: Sparkles,
-      url: '/claw/changelog',
-    },
-    {
       title: 'Settings',
       icon: Settings,
       url: '/claw/settings',
+    },
+    {
+      title: "What's New",
+      icon: Sparkles,
+      url: '/claw/changelog',
     },
   ];
 

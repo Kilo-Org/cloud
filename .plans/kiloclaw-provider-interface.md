@@ -538,14 +538,30 @@ type ProviderMigrationState = null | {
 
 ## Implementation Sequence
 
-### Phase 1: Fly Parity Extraction
+Current status on this branch:
+
+- Phase 1 completed
+- Phase 2 completed
+- Phase 3 completed
+- Phase 4 completed
+- Phase 5 completed
+- Phase 6 pending
+
+Latest follow-up fixes after the phase work:
+
+- preserve Fly parity across reconcile and restart edge cases
+- backfill and seed `providerState` for legacy Fly-only and Postgres-restore
+  paths
+- expose provider information in debug status for compatibility and inspection
+
+### Phase 1: Fly Parity Extraction `[Completed]`
 
 - Add provider id and provider-state schema
 - Implement `providers/fly` using the current Fly logic
 - Update `KiloClawInstance` to resolve a provider adapter internally
 - Preserve current behavior and current public routes
 
-### Phase 2: Routing Neutralization
+### Phase 2: Routing Neutralization `[Completed]`
 
 Goal:
 
@@ -627,7 +643,7 @@ Known implementation risks:
 - WebSocket paths may have slightly different header handling than normal HTTP
   proxying and should be verified explicitly
 
-### Phase 3: State Ownership Cleanup
+### Phase 3: State Ownership Cleanup `[Completed]`
 
 - Make `providerState` the canonical provider record
 - Keep legacy Fly fields as compatibility mirrors derived from `providerState`
@@ -637,7 +653,7 @@ Known implementation risks:
 - Preserve Fly parity for long-running operations by letting adapters emit
   intermediate provider results back to the DO before long waits or retries
 
-### Phase 4: Contract Neutralization
+### Phase 4: Contract Neutralization `[Completed]`
 
 - Replace Fly-shaped runtime inputs such as `FlyMachineConfig` with a
   provider-neutral runtime spec
@@ -645,7 +661,7 @@ Known implementation risks:
   the Fly adapter / Fly-only helper layer
 - Migrate the Fly adapter to the neutral contract before adding provider 2
 
-### Phase 5: Capability Gating
+### Phase 5: Capability Gating `[Completed]`
 
 - Mark snapshot, reassociation, and other Fly-only flows as optional provider
   capabilities
@@ -657,7 +673,7 @@ Known implementation risks:
 - Enforce the first slice of capability checks at the platform/admin route
   boundary while preserving existing Fly-only DO internals underneath
 
-### Phase 6: First Non-Fly Provider
+### Phase 6: First Non-Fly Provider `[Pending]`
 
 - Add either Northflank, AWS, or Kubernetes after Fly parity is green
 - Reuse the same core lifecycle and controller layers

@@ -28,6 +28,7 @@ import {
   Settings,
   CreditCard,
   MessageSquare,
+  Sparkles,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
@@ -86,6 +87,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       title: 'Chat',
       icon: MessageSquare,
       url: '/claw/chat',
+    },
+    {
+      title: "What's New",
+      icon: Sparkles,
+      url: '/claw/changelog',
     },
     {
       title: 'Settings',

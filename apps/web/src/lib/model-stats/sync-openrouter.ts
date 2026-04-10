@@ -24,6 +24,15 @@ export type SyncOpenRouterResult = {
 };
 
 /**
+ * Custom description overrides for specific models.
+ * These take precedence over descriptions from the OpenRouter API.
+ */
+const modelDescriptionOverrides: Readonly<Record<string, string>> = {
+  'nvidia/nemotron-3-super-120b-a12b:free':
+    'Nemotron 3 Super Free (NVIDIA free endpoints): Provided under the NVIDIA API Trial Terms of Service. Trial use only — not for production or sensitive data. Prompts and outputs are logged by NVIDIA to improve its models and services. Do not submit personal or confidential data. See https://assets.ngc.nvidia.com/products/api-catalog/legal/NVIDIA%20API%20Trial%20Terms%20of%20Service.pdf',
+};
+
+/**
  * Sync OpenRouter model data to the model_stats table
  *
  * This function:
@@ -67,7 +76,7 @@ export async function syncOpenRouterModels(
           isActive: true,
           isRecommended,
           name: model.name,
-          description: model.description,
+          description: modelDescriptionOverrides[model.id] ?? model.description,
           priceInput: toPricePerMillion(model.pricing?.prompt),
           priceOutput: toPricePerMillion(model.pricing?.completion),
           contextLength: model.context_length ?? null,
@@ -85,7 +94,7 @@ export async function syncOpenRouterModels(
         openrouterId: model.id,
         slug: generateSlug(model.id),
         name: model.name,
-        description: model.description,
+        description: modelDescriptionOverrides[model.id] ?? model.description,
         modelCreator: extractCreator(model.id),
         creatorSlug: extractCreatorSlug(model.id),
         priceInput: toPricePerMillion(model.pricing?.prompt),
@@ -115,7 +124,7 @@ export async function syncOpenRouterModels(
           // Note: NOT updating isActive - preserve user's setting
           isRecommended,
           name: updatedModelData.name,
-          description: updatedModelData.description,
+          description: modelDescriptionOverrides[updatedModelData.id] ?? updatedModelData.description,
           priceInput: toPricePerMillion(updatedModelData.pricing?.prompt),
           priceOutput: toPricePerMillion(updatedModelData.pricing?.completion),
           contextLength: updatedModelData.context_length ?? null,

@@ -17,7 +17,13 @@ import { Card, CardContent } from '@/components/ui/card';
  * Standalone settings page content. Sets up the mutation hooks, dirty-secret
  * tracking, and redeploy/upgrade callbacks that SettingsTab needs.
  */
-function ClawSettingsInner({ status }: { status: KiloClawDashboardStatus }) {
+function ClawSettingsInner({
+  status,
+  organizationName,
+}: {
+  status: KiloClawDashboardStatus;
+  organizationName?: string;
+}) {
   const { organizationId } = useClawContext();
 
   const personalMutations = useKiloClawMutations();
@@ -73,6 +79,7 @@ function ClawSettingsInner({ status }: { status: KiloClawDashboardStatus }) {
       onRedeploy={onRedeploy}
       onUpgrade={onUpgrade}
       onRequestUpgrade={onRequestUpgrade}
+      organizationName={organizationName}
     />
   );
 }
@@ -81,7 +88,13 @@ function ClawSettingsInner({ status }: { status: KiloClawDashboardStatus }) {
  * Wrapper that polls status and handles loading/error/no-instance states
  * before rendering the settings content.
  */
-function ClawSettingsWithStatus({ organizationId }: { organizationId?: string }) {
+function ClawSettingsWithStatus({
+  organizationId,
+  organizationName,
+}: {
+  organizationId?: string;
+  organizationName?: string;
+}) {
   const router = useRouter();
   const personalStatus = useKiloClawStatus();
   const orgStatus = useOrgKiloClawStatus(organizationId ?? '');
@@ -122,7 +135,7 @@ function ClawSettingsWithStatus({ organizationId }: { organizationId?: string })
 
   // status is guaranteed non-null with a non-null .status after the checks above
   if (!status || status.status === null) return null;
-  const settingsContent = <ClawSettingsInner status={status} />;
+  const settingsContent = <ClawSettingsInner status={status} organizationName={organizationName} />;
 
   // Personal context uses BillingWrapper for access-lock dialogs/banners.
   if (!organizationId) {
@@ -132,7 +145,13 @@ function ClawSettingsWithStatus({ organizationId }: { organizationId?: string })
   return settingsContent;
 }
 
-export function ClawSettingsPage({ organizationId }: { organizationId?: string }) {
+export function ClawSettingsPage({
+  organizationId,
+  organizationName,
+}: {
+  organizationId?: string;
+  organizationName?: string;
+}) {
   return (
     <ClawContextProvider organizationId={organizationId}>
       <div className="container m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
@@ -140,7 +159,7 @@ export function ClawSettingsPage({ organizationId }: { organizationId?: string }
           title="Settings"
           icon={<Settings className="text-muted-foreground h-4 w-4" />}
         />
-        <ClawSettingsWithStatus organizationId={organizationId} />
+        <ClawSettingsWithStatus organizationId={organizationId} organizationName={organizationName} />
       </div>
     </ClawContextProvider>
   );

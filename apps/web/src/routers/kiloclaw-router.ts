@@ -1408,6 +1408,7 @@ export const kiloclawRouter = createTRPCRouter({
       // Legacy instances use userId-keyed DOs — returning their row UUID would
       // cause the frontend/gateway to resolve the wrong DO.
       instanceId: workerInstanceId(instance) ? (instance?.id ?? null) : null,
+      instanceRecordId: instance?.id ?? null,
     } satisfies KiloClawDashboardStatus;
   }),
 

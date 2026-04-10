@@ -34,6 +34,7 @@ const baseStatus: KiloClawDashboardStatus = {
   botEmoji: null,
   workerUrl: 'https://claw.kilo.ai',
   instanceId: null,
+  instanceRecordId: 'instance-1',
 };
 
 const noop = () => {};

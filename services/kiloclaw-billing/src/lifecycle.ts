@@ -1779,14 +1779,6 @@ async function runEarlybirdWarningSweep(
 
 const COMPLEMENTARY_INFERENCE_WINDOW_MS = 6 * 60 * 60 * 1000;
 const COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_ISO = '2026-04-10T00:00:00.000Z';
-const COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_MS = Date.parse(
-  COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_ISO
-);
-
-function wasInstanceReadyEmailSentAfterComplementaryInferenceCutoff(sentAt: string): boolean {
-  const sentAtMs = Date.parse(sentAt);
-  return Number.isFinite(sentAtMs) && sentAtMs > COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_MS;
-}
 
 async function runComplementaryInferenceEndedSweep(
   database: WorkerDb,
@@ -1809,7 +1801,6 @@ async function runComplementaryInferenceEndedSweep(
       user_id: kilocode_users.id,
       email: kilocode_users.google_user_email,
       sandbox_id: kiloclaw_instances.sandbox_id,
-      instance_ready_sent_at: kiloclaw_email_log.sent_at,
     })
     .from(kiloclaw_email_log)
     .innerJoin(kilocode_users, eq(kiloclaw_email_log.user_id, kilocode_users.id))
@@ -1844,10 +1835,6 @@ async function runComplementaryInferenceEndedSweep(
 
   for (const row of rows) {
     try {
-      if (!wasInstanceReadyEmailSentAfterComplementaryInferenceCutoff(row.instance_ready_sent_at)) {
-        continue;
-      }
-
       const sent = await trySendEmail(
         database,
         env,

@@ -38,6 +38,7 @@ function createMockDb(selectResults: unknown[][], options?: { txInsertRowCounts?
   const txDeletes: unknown[] = [];
   const inserts: Array<Record<string, unknown>> = [];
   const txInserts: Array<Record<string, unknown>> = [];
+  const wheres: unknown[] = [];
   const txInsertRowCounts = [...(options?.txInsertRowCounts ?? [])];
   const nextSelectResult = () => createSelectResult(selectResults.shift() ?? []);
   const createSelectBuilder = (): SelectBuilder => {
@@ -45,7 +46,10 @@ function createMockDb(selectResults: unknown[][], options?: { txInsertRowCounts?
       from: vi.fn(() => builder),
       innerJoin: vi.fn(() => builder),
       leftJoin: vi.fn(() => builder),
-      where: vi.fn(() => nextSelectResult()),
+      where: vi.fn(whereArg => {
+        wheres.push(whereArg);
+        return nextSelectResult();
+      }),
       limit: vi.fn(async () => selectResults.shift() ?? []),
     };
     return builder;
@@ -123,7 +127,17 @@ function createMockDb(selectResults: unknown[][], options?: { txInsertRowCounts?
     txDeletes,
     inserts,
     txInserts,
+    wheres,
   };
+}
+
+function containsValue(value: unknown, expected: string, seen = new WeakSet<object>()): boolean {
+  if (value === expected) return true;
+  if (typeof value !== 'object' || value === null) return false;
+  if (seen.has(value)) return false;
+  seen.add(value);
+  if (Array.isArray(value)) return value.some(item => containsValue(item, expected, seen));
+  return Object.values(value).some(item => containsValue(item, expected, seen));
 }
 
 function createEnv(fetchImpl: BillingWorkerEnv['KILOCLAW']['fetch']): BillingWorkerEnv {
@@ -738,26 +752,13 @@ describe('complementary inference ended sweep', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
-  it('only emails users whose instance-ready email was sent after the rollout cutoff', async () => {
-    const { db, inserts } = createMockDb([
+  it('filters instance-ready email eligibility at the rollout cutoff', async () => {
+    const { db, inserts, wheres } = createMockDb([
       [
-        {
-          user_id: 'user-before',
-          email: 'before@example.com',
-          sandbox_id: 'ki_before',
-          instance_ready_sent_at: '2026-04-09T23:59:59.999Z',
-        },
-        {
-          user_id: 'user-at-cutoff',
-          email: 'at-cutoff@example.com',
-          sandbox_id: 'ki_at_cutoff',
-          instance_ready_sent_at: '2026-04-10T00:00:00.000Z',
-        },
         {
           user_id: 'user-after',
           email: 'after@example.com',
           sandbox_id: 'ki_after',
-          instance_ready_sent_at: '2026-04-10T00:00:00.001Z',
         },
       ],
     ]);
@@ -783,6 +784,7 @@ describe('complementary inference ended sweep', () => {
     expect(summary.complementary_inference_ended_emails).toBe(1);
     expect(summary.emails_sent).toBe(1);
     expect(summary.errors).toBe(0);
+    expect(wheres.some(whereArg => containsValue(whereArg, '2026-04-10T00:00:00.000Z'))).toBe(true);
     expect(inserts).toEqual([
       {
         user_id: 'user-after',

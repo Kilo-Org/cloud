@@ -30,6 +30,7 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const { showActionSheetWithOptions } = useActionSheet();
+  const { bottom } = useSafeAreaInsets();
   const [selectedOrgId, setSelectedOrgId] = useState<string | undefined>(undefined);
 
   const {
@@ -77,19 +78,27 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
     }
     const options = ['Personal', ...orgs.map(o => o.organizationName), 'Cancel'];
     const cancelButtonIndex = options.length - 1;
-    showActionSheetWithOptions({ options, cancelButtonIndex, title: 'Select account' }, index => {
-      if (index === undefined || index === cancelButtonIndex) {
-        return;
-      }
-      if (index === 0) {
-        setSelectedOrgId(undefined);
-      } else {
-        const org = orgs[index - 1];
-        if (org) {
-          setSelectedOrgId(org.organizationId);
+    showActionSheetWithOptions(
+      {
+        options,
+        cancelButtonIndex,
+        title: 'Select account',
+        containerStyle: { paddingBottom: bottom },
+      },
+      index => {
+        if (index === undefined || index === cancelButtonIndex) {
+          return;
+        }
+        if (index === 0) {
+          setSelectedOrgId(undefined);
+        } else {
+          const org = orgs[index - 1];
+          if (org) {
+            setSelectedOrgId(org.organizationId);
+          }
         }
       }
-    });
+    );
   };
 
   return (

@@ -8,8 +8,8 @@
   "type": "module",
   "scripts": {
     "deploy": "wrangler deploy",
-    "start": "wrangler dev",
-    "dev": "wrangler dev",
+    "start": "wrangler dev --env dev",
+    "dev": "wrangler dev --env dev",
     "types": "wrangler types",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/kiloclaw/src",

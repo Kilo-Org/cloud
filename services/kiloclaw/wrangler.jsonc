@@ -133,4 +133,66 @@
   // FLY_API_TOKEN,
   // NEXTAUTH_SECRET, INTERNAL_API_SECRET, GATEWAY_TOKEN_SECRET,
   // AGENT_ENV_VARS_PRIVATE_KEY
+
+  "env": {
+    "dev": {
+      "durable_objects": {
+        "bindings": [
+          { "class_name": "KiloClawInstance", "name": "KILOCLAW_INSTANCE" },
+          { "class_name": "KiloClawApp", "name": "KILOCLAW_APP" },
+          { "class_name": "KiloClawRegistry", "name": "KILOCLAW_REGISTRY" },
+        ],
+      },
+      "kv_namespaces": [
+        {
+          "binding": "KV_CLAW_CACHE",
+          "id": "1f406d747ead4a5896b750c1000973e0",
+        },
+      ],
+      "analytics_engine_datasets": [
+        { "binding": "KILOCLAW_AE", "dataset": "kiloclaw_events" },
+        {
+          "binding": "KILOCLAW_CONTROLLER_AE",
+          "dataset": "kiloclaw_controller_telemetry",
+        },
+      ],
+      "queues": {
+        "producers": [
+          { "queue": "kiloclaw-snapshot-restore", "binding": "SNAPSHOT_RESTORE_QUEUE" },
+        ],
+        "consumers": [
+          {
+            "queue": "kiloclaw-snapshot-restore",
+            "max_batch_size": 1,
+            "max_batch_timeout": 5,
+            "max_retries": 2,
+            "max_concurrency": 2,
+            "dead_letter_queue": "kiloclaw-snapshot-restore-dlq",
+          },
+        ],
+      },
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "624ec80650dd414199349f4e217ddb10",
+          "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+        },
+      ],
+      "vars": {
+        "FLY_APP_NAME": "kiloclaw-machines",
+        "FLY_REGISTRY_APP": "kiloclaw-machines",
+        "FLY_ORG_SLUG": "kilo-679",
+        "FLY_IMAGE_TAG": "latest",
+        "FLY_REGION": "eu,us",
+        "BACKEND_API_URL": "https://app.kilo.ai",
+        "OPENCLAW_ALLOWED_ORIGINS": "https://claw.kilosessions.ai,https://kilo.ai,https://www.kilo.ai",
+        "KILOCLAW_CHECKIN_URL": "https://claw.kilosessions.ai/api/controller/checkin",
+        "REQUIRE_PROXY_TOKEN": "true",
+        "PROACTIVE_REFRESH_THRESHOLD_HOURS": "72",
+        "WORKER_ENV": "development",
+        "NEXT_PUBLIC_POSTHOG_KEY": "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z",
+      },
+
+    },
+  },
 }

@@ -377,13 +377,14 @@ function buildServiceDefs(): ServiceDef[] {
     }
 
     if (name === 'stripe') {
+      const nextjsPort = 3000 + portOffset;
       defs.push({
         name,
         type: 'process',
         dir: '.',
         port: 0,
         dependsOn: meta.dependsOn,
-        command: ['tsx', 'dev/local/scripts/start-stripe.ts'],
+        command: ['tsx', 'dev/local/scripts/start-stripe.ts', String(nextjsPort)],
         group: meta.group,
       });
       continue;

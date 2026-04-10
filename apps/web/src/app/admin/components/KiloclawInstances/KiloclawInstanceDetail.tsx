@@ -2485,6 +2485,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   volumeId={volumeId}
                   userLabel={data.user_email ?? data.user_id}
                   disabled={
+                    data.workerStatus?.status === 'recovering' ||
                     data.workerStatus?.status === 'restoring' ||
                     data.workerStatus?.status === 'destroying'
                   }

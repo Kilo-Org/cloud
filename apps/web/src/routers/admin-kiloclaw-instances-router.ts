@@ -969,6 +969,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       } catch (err) {
         throwKiloclawAdminError(err, 'Failed to verify volume state before extend');
       }
+      const unsafeExtendStates: ReadonlyArray<string> = ['recovering', 'restoring', 'destroying'];
+      if (status.status && unsafeExtendStates.includes(status.status)) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: `Cannot extend volume while instance is ${status.status}`,
+        });
+      }
       if (status.flyAppName !== input.appName || status.flyVolumeId !== input.volumeId) {
         throw new TRPCError({
           code: 'BAD_REQUEST',

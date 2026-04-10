@@ -193,9 +193,11 @@ function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <ActionSheetProvider>
-              <RootLayoutNav />
-              <Toaster />
-              <PortalHost />
+              <>
+                <RootLayoutNav />
+                <Toaster />
+                <PortalHost />
+              </>
             </ActionSheetProvider>
           </AuthProvider>
         </QueryClientProvider>

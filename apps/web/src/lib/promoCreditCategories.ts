@@ -338,6 +338,16 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
  */
 const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCategoryConfig[] = [
   {
+    encrypted_credit_category: 'CobZxuHxiuCy3AhW/ObaOQ==:oVLeCsiu4IDqCXzUqliNUg==:IxCjLOrL8EPkWRNw',
+    description: 'Mid-April temporary promotion',
+    expiry_hours: 7 * 24,
+    amount_usd: 5,
+    is_user_selfservicable: true,
+    total_redemptions_allowed: 5_000,
+    is_idempotent: true,
+    promotion_ends_at: new Date('2026-04-17T23:59:59Z'),
+  },
+  {
     encrypted_credit_category: 'DMAB+J9SP5P7rxN19iajXg==:l+/sU/o65wg/imvGdNPCTg==:SlcbjsV0',
     description: 'GitHub incentive',
     expiry_hours: 30 * 24,

@@ -56,12 +56,16 @@ function jsonError(message: string, status: number) {
   });
 }
 
-function dateRangeFilter(userId: string, parsedStart: Date, parsedEnd: Date) {
-  return and(
+function buildFilter(userId: string, parsedStart: Date, parsedEnd: Date, model: string | null) {
+  const conditions = [
     eq(api_request_log.kilo_user_id, userId),
     gte(api_request_log.created_at, parsedStart.toISOString()),
-    lte(api_request_log.created_at, parsedEnd.toISOString())
-  );
+    lte(api_request_log.created_at, parsedEnd.toISOString()),
+  ];
+  if (model) {
+    conditions.push(eq(api_request_log.model, model));
+  }
+  return and(...conditions);
 }
 
 export async function GET(request: NextRequest) {
@@ -76,6 +80,7 @@ export async function GET(request: NextRequest) {
   const userId = searchParams.get('userId');
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
+  const model = searchParams.get('model');
 
   if (!userId || !startDate || !endDate) {
     return jsonError('userId, startDate, and endDate are required', 400);
@@ -87,7 +92,7 @@ export async function GET(request: NextRequest) {
     return jsonError('Invalid date format. Use YYYY-MM-DD.', 400);
   }
 
-  const filter = dateRangeFilter(userId, parsedStart, parsedEnd);
+  const filter = buildFilter(userId, parsedStart, parsedEnd, model);
 
   const [result] = await db.select({ total: count() }).from(api_request_log).where(filter);
   if (result.total === 0) {

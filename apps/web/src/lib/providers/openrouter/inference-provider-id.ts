@@ -19,12 +19,8 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'seed',
   'streamlake',
   'stealth',
-  'xiaomi',
   'z-ai',
   'together',
-
-  // not real OpenRouter providers
-  'corethink',
 ]);
 
 export const VercelUserByokInferenceProviderIdSchema = z.enum([

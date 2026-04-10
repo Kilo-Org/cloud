@@ -1494,7 +1494,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
       'performance-2x': { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' },
     };
     const machineSize = sizeMap[selectedMachineSize];
-    if (!machineSize || !data) return;
+    if (!machineSize || !data || !userId) return;
 
     try {
       // Step 1: Stop if running — retry up to 3 times since Fly can be slow

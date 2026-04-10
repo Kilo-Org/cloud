@@ -134,6 +134,17 @@ pnpm -w exec oxlint --config apps/mobile/.oxlintrc.json --fix apps/mobile/src
 
 Only hand-fix errors that `--fix` cannot resolve.
 
+## Debugging
+
+When debugging reproducible UI issues (layout shifts, flickers, incorrect state), don't guess at the cause. Instead:
+
+1. Add temporary `console.log` statements that capture the relevant state on each render (loading flags, data values, dimensions, etc.).
+2. Ask the user to reproduce the issue and paste the logs.
+3. Deduce the root cause from the log output, then fix it.
+4. Remove the debug logs before committing.
+
+This is far more effective than speculating about timing or re-render behavior.
+
 ## Change Checklist
 
 Before pushing, run all checks and fix any issues:

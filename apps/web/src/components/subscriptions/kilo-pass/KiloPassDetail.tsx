@@ -3,9 +3,10 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Calendar, Coins, Crown, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Calendar, Coins, Crown, ExternalLink, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +27,7 @@ import {
   KiloPassSubscriptionInfoProvider,
   useKiloPassSubscriptionInfo,
 } from '@/components/profile/kilo-pass/useKiloPassSubscriptionInfo';
+import { useKiloPassChurnkeyCancelFlow } from '@/components/profile/kilo-pass/useKiloPassChurnkeyCancelFlow';
 import type { KiloPassSubscription } from '@/components/profile/kilo-pass/kiloPassSubscription';
 import { KiloPassSubscriptionSettingsModal } from '@/components/profile/kilo-pass/KiloPassSubscriptionSettingsModal';
 import { KiloPassBonusRampDialog } from '@/components/profile/kilo-pass/KiloPassBonusRampDialog';
@@ -44,6 +46,15 @@ import {
   isKiloPassTerminal,
 } from '@/components/subscriptions/helpers';
 import { useCursorPagination } from '@/components/subscriptions/useCursorPagination';
+import {
+  getKiloPassSubscriptionDisplayModel,
+  getKiloPassInlineActionModel,
+  getKiloPassInlineConfirmationDetails,
+} from './KiloPassDetail.logic';
+import type {
+  KiloPassInlineConfirmationAction,
+  KiloPassInlinePrimaryAction,
+} from './KiloPassDetail.logic';
 
 export function KiloPassDetail() {
   const trpc = useTRPC();
@@ -107,6 +118,12 @@ export function KiloPassDetail() {
     await refreshData();
   }
 
+  async function handleResumePaused() {
+    await trpcClient.kiloPass.resumePausedSubscription.mutate();
+    toast.success('Subscription resumed');
+    await refreshData();
+  }
+
   async function handleCancelScheduledChange() {
     await trpcClient.kiloPass.cancelScheduledChange.mutate();
     toast.success('Scheduled change canceled');
@@ -129,6 +146,15 @@ export function KiloPassDetail() {
     );
   }
 
+  const nextBillingDateLabel = formatIsoDateString_UsaDateOnlyFormat(subscription.nextBillingAt);
+  const resumesAtLabel = formatIsoDateString_UsaDateOnlyFormat(subscription.resumesAt);
+  const subscriptionDisplay = getKiloPassSubscriptionDisplayModel({
+    status: subscription.status,
+    cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+    nextBillingLabel: nextBillingDateLabel,
+    resumesAtLabel,
+  });
+
   return (
     <KiloPassSubscriptionInfoProvider subscription={subscription}>
       <div className="space-y-6">
@@ -136,8 +162,18 @@ export function KiloPassDetail() {
           backHref="/subscriptions"
           backLabel="Back to subscriptions"
           title="Kilo Pass"
-          status={subscription.status}
+          status={subscriptionDisplay.status}
         />
+
+        {subscriptionDisplay.detailAlert ? (
+          <Alert variant="warning">
+            <AlertTriangle />
+            <AlertTitle>{subscriptionDisplay.detailAlert.title}</AlertTitle>
+            <AlertDescription>
+              <p>{subscriptionDisplay.detailAlert.description}</p>
+            </AlertDescription>
+          </Alert>
+        ) : null}
 
         <div className="grid items-stretch gap-6 xl:grid-cols-2">
           <Card>
@@ -159,8 +195,8 @@ export function KiloPassDetail() {
                   value={formatKiloPassPrice(subscription.tier, subscription.cadence)}
                 />
                 <DetailRow
-                  label="Next billing"
-                  value={formatIsoDateString_UsaDateOnlyFormat(subscription.nextBillingAt)}
+                  label={subscriptionDisplay.detailDateLabel}
+                  value={subscriptionDisplay.detailDateValue}
                 />
                 <DetailRow
                   label="Started"
@@ -216,6 +252,7 @@ export function KiloPassDetail() {
           <KiloPassInlineActions
             onOpenSettings={() => setSettingsOpen(true)}
             onResume={handleResume}
+            onResumePaused={handleResumePaused}
             hasScheduledChange={Boolean(scheduledChange)}
           />
         )}
@@ -258,50 +295,47 @@ export function KiloPassDetail() {
   );
 }
 
-type KiloPassConfirmationAction = 'cancel' | 'resume';
-
 function KiloPassInlineActions({
   onOpenSettings,
   onResume,
+  onResumePaused,
   hasScheduledChange,
 }: {
   onOpenSettings: () => void;
   onResume: () => Promise<void>;
+  onResumePaused: () => Promise<void>;
   hasScheduledChange: boolean;
 }) {
-  const { view, actions } = useKiloPassSubscriptionInfo();
-  const [confirmationAction, setConfirmationAction] = useState<KiloPassConfirmationAction | null>(
-    null
-  );
-  const [pendingAction, setPendingAction] = useState<KiloPassConfirmationAction | null>(null);
+  const { subscription, view, actions } = useKiloPassSubscriptionInfo();
+  const { openCancelFlow, isOpeningCancelFlow } = useKiloPassChurnkeyCancelFlow({
+    stripeSubscriptionId: subscription.stripeSubscriptionId,
+    fallbackCancelSubscription: actions.cancelSubscription,
+  });
+  const [confirmationAction, setConfirmationAction] =
+    useState<KiloPassInlineConfirmationAction | null>(null);
+  const [pendingAction, setPendingAction] = useState<KiloPassInlineConfirmationAction | null>(null);
 
-  const confirmationDetails =
-    confirmationAction === 'cancel'
-      ? {
-          title: 'Cancel subscription at period end?',
-          description:
-            'Your Kilo Pass subscription stays active through the current billing period, then the subscription ends. You will lose your bonus streak.',
-          confirmLabel: 'Cancel Subscription',
-          pendingLabel: 'Canceling subscription',
-          confirmVariant: 'destructive' as const,
-          action: () =>
-            new Promise<void>(resolve => {
-              actions.cancelSubscription({ onSuccess: resolve });
-            }),
-        }
-      : confirmationAction === 'resume'
-        ? {
-            title: 'Resume subscription?',
-            description:
-              'This removes the pending cancellation so your Kilo Pass subscription keeps renewing automatically.',
-            confirmLabel: 'Resume Subscription',
-            pendingLabel: 'Resuming subscription',
-            confirmVariant: 'default' as const,
-            action: async () => {
-              await onResume();
-            },
-          }
-        : null;
+  const primaryAction: KiloPassInlinePrimaryAction = view.actions.resumePaused
+    ? 'resumePaused'
+    : view.actions.resume
+      ? 'resume'
+      : view.actions.cancel
+        ? 'cancel'
+        : 'none';
+
+  const inlineActionModel = getKiloPassInlineActionModel({
+    hasScheduledChange,
+    primaryAction,
+    isResumingSubscription: actions.isResumingSubscription,
+    isOpeningCancelFlow,
+    isCancelingSubscription: actions.isCancelingSubscription,
+  });
+
+  const confirmationDetails = getKiloPassInlineConfirmationDetails({
+    confirmationAction,
+    onResume,
+    onResumePaused,
+  });
 
   function confirmAction() {
     if (!confirmationAction || !confirmationDetails) return;
@@ -316,20 +350,40 @@ function KiloPassInlineActions({
   return (
     <>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" onClick={onOpenSettings} disabled={hasScheduledChange}>
+        <Button
+          variant="outline"
+          onClick={onOpenSettings}
+          disabled={inlineActionModel.changePlanDisabled}
+        >
           Change Plan
         </Button>
-        {view.actions.resume ? (
-          <Button variant="outline" onClick={() => setConfirmationAction('resume')}>
-            Resume Subscription
-          </Button>
-        ) : view.actions.cancel ? (
+        {inlineActionModel.resumePaused ? (
           <Button
             variant="outline"
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => setConfirmationAction('cancel')}
+            onClick={() => setConfirmationAction('resumePaused')}
+            disabled={inlineActionModel.resumePaused.disabled}
           >
-            Cancel Subscription
+            Resume Subscription
+          </Button>
+        ) : inlineActionModel.resume ? (
+          <Button
+            variant="outline"
+            onClick={() => setConfirmationAction('resume')}
+            disabled={inlineActionModel.resume.disabled}
+          >
+            Resume Subscription
+          </Button>
+        ) : inlineActionModel.cancel ? (
+          <Button
+            variant="outline"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive gap-2"
+            onClick={() => void openCancelFlow()}
+            disabled={inlineActionModel.cancel.disabled}
+          >
+            {inlineActionModel.cancel.isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : null}
+            {inlineActionModel.cancel.label}
           </Button>
         ) : null}
         <Button
@@ -389,10 +443,15 @@ function BonusStreakContent({ subscription }: { subscription: KiloPassSubscripti
   const renewRows = computeRenewInfoRowModel({
     subscription,
     isPendingCancellation: Boolean(view.pendingCancellation),
+    isPaused: subscription.status === 'paused',
+    resumesAtIso: subscription.resumesAt,
     scheduledChange,
   });
 
-  const expiresAt = subscription.refillAt ?? subscription.nextBillingAt;
+  const expiresAt =
+    subscription.status === 'paused'
+      ? subscription.resumesAt
+      : (subscription.refillAt ?? subscription.nextBillingAt);
   const expiresAtLabel = expiresAt ? formatIsoDateString_UsaDateOnlyFormat(expiresAt) : null;
 
   return (
@@ -464,6 +523,22 @@ function BonusStreakContent({ subscription }: { subscription: KiloPassSubscripti
       ) : null}
 
       {renewRows.map(row => {
+        if (row.kind === 'paused_until') {
+          const dateLabel = formatIsoDateString_UsaDateOnlyFormat(row.resumesAtIso);
+          return (
+            <div
+              key={`paused_until:${row.resumesAtIso}`}
+              className="bg-muted/20 border-border/60 flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm"
+            >
+              <div className="flex items-start gap-2">
+                <Calendar className="mt-0.5 h-4 w-4 text-white/40" />
+                <div className="text-muted-foreground">Paused until</div>
+              </div>
+              <span className="text-muted-foreground">{dateLabel}</span>
+            </div>
+          );
+        }
+
         const dateLabel = formatIsoDateString_UsaDateOnlyFormat(row.refillAtIso);
 
         if (row.kind === 'active_until') {
@@ -510,11 +585,18 @@ function BonusStreakContent({ subscription }: { subscription: KiloPassSubscripti
       })}
 
       {subscription.cadence === KiloPassCadence.Monthly ? (
-        <div className="text-muted-foreground text-xs">
-          Unused paid credits never expire and roll over every month into your total. Free bonus
-          credits are earned after using the month&apos;s paid credits. Unused free bonus credits do
-          not roll over{expiresAtLabel ? ` and will expire on ${expiresAtLabel}.` : '.'}
-        </div>
+        subscription.status === 'paused' ? (
+          <div className="text-muted-foreground text-xs">
+            Unused paid credits never expire. Free bonus credits are not renewed while your
+            subscription is paused; monthly credits resume when the subscription resumes.
+          </div>
+        ) : (
+          <div className="text-muted-foreground text-xs">
+            Unused paid credits never expire and roll over every month into your total. Free bonus
+            credits are earned after using the month&apos;s paid credits. Unused free bonus credits
+            do not roll over{expiresAtLabel ? ` and will expire on ${expiresAtLabel}.` : '.'}
+          </div>
+        )
       ) : null}
     </div>
   );

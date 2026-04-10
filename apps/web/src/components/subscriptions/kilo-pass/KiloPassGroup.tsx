@@ -22,6 +22,7 @@ import {
   isKiloPassTerminal,
   isWarningStatus,
 } from '@/components/subscriptions/helpers';
+import { getKiloPassSubscriptionDisplayModel } from './KiloPassDetail.logic';
 
 function getShowKiloPassTwoMonthPromo(showFirstMonthPromo: boolean): boolean {
   return (
@@ -75,6 +76,17 @@ export function KiloPassGroup({
     typeof averageMonthlyUsageUsd === 'number'
       ? recommendKiloPassTierFromAverageMonthlyUsageUsd({ averageMonthlyUsageUsd })
       : null;
+  const subscriptionDisplay = subscription
+    ? getKiloPassSubscriptionDisplayModel({
+        status: subscription.status,
+        cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+        nextBillingLabel: formatDateLabel(
+          subscription.nextBillingAt,
+          isKiloPassTerminal(subscription.status) ? 'Subscription ended' : '—'
+        ),
+        resumesAtLabel: formatDateLabel(subscription.resumesAt),
+      })
+    : null;
 
   return (
     <SubscriptionGroup
@@ -87,24 +99,28 @@ export function KiloPassGroup({
       onRetry={() => void query.refetch()}
       accordionValue={accordionValue}
     >
-      {shouldShowSubscription ? (
+      {shouldShowSubscription && subscriptionDisplay ? (
         <SubscriptionCard
           icon={<Crown className="h-5 w-5" />}
           title={`Kilo Pass ${formatKiloPassTierLabel(subscription.tier)}`}
           subtitle={`${formatKiloPassTierLabel(subscription.tier)} tier • ${formatKiloPassCadenceLabel(subscription.cadence)}`}
-          status={subscription.status}
+          status={subscriptionDisplay.status}
           price={formatKiloPassPrice(subscription.tier, subscription.cadence)}
-          billingDate={formatDateLabel(subscription.nextBillingAt, 'Subscription ended')}
+          billingDate={subscriptionDisplay.cardDateValue}
+          billingDateLabel={subscriptionDisplay.cardDateLabel}
           paymentMethod="Stripe"
           href="/subscriptions/kilo-pass"
           isTerminal={isKiloPassTerminal(subscription.status)}
           warningTone={
+            subscription.status === 'paused' ||
+            subscription.cancelAtPeriodEnd ||
             isWarningStatus(subscription.status)
               ? 'warning'
               : isInfoStatus(subscription.status)
                 ? 'info'
                 : undefined
           }
+          statusNote={subscriptionDisplay.cardNotice}
         />
       ) : (
         <KiloPassSubscribeCard

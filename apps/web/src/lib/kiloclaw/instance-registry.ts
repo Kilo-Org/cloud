@@ -270,6 +270,26 @@ export async function getActiveOrgInstance(
 }
 
 /**
+ * List all active instances for a user across all contexts (personal + orgs).
+ * Used by the mobile "all claws" screen.
+ */
+export async function listAllActiveInstances(userId: string): Promise<ActiveKiloClawInstance[]> {
+  return db
+    .select({
+      id: kiloclaw_instances.id,
+      userId: kiloclaw_instances.user_id,
+      sandboxId: kiloclaw_instances.sandbox_id,
+      organizationId: kiloclaw_instances.organization_id,
+      name: kiloclaw_instances.name,
+    })
+    .from(kiloclaw_instances)
+    .where(
+      and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at))
+    )
+    .orderBy(kiloclaw_instances.created_at);
+}
+
+/**
  * List all active instances for an organization (all users).
  */
 export async function listActiveOrgInstances(orgId: string): Promise<ActiveKiloClawInstance[]> {

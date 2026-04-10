@@ -1201,6 +1201,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
   const sandboxId = data?.sandbox_id;
   const aeDiskUsage = useControllerTelemetryDiskUsage(sandboxId ?? '');
+  const aeRow = aeDiskUsage.data?.data?.[0];
+  const diskUsed = aeRow && aeRow.disk_used_bytes >= 0 ? aeRow.disk_used_bytes : null;
+  const diskTotal = aeRow && aeRow.disk_total_bytes >= 0 ? aeRow.disk_total_bytes : null;
 
   const { mutateAsync: destroyInstance, isPending: isDestroying } = useMutation(
     trpc.admin.kiloclawInstances.destroy.mutationOptions({
@@ -1691,14 +1694,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             <div className="flex items-center gap-2">
               <HardDrive className="text-muted-foreground h-4 w-4 shrink-0" />
               <DetailField label="Volume Usage">
-                {(() => {
-                  const rows = aeDiskUsage.data?.data;
-                  const aeRow = rows?.[0];
-                  if (!aeRow) return formatVolumeUsageLine(null, null);
-                  const diskUsed = aeRow.disk_used_bytes >= 0 ? aeRow.disk_used_bytes : null;
-                  const diskTotal = aeRow.disk_total_bytes >= 0 ? aeRow.disk_total_bytes : null;
-                  return formatVolumeUsageLine(diskUsed, diskTotal);
-                })()}
+                {formatVolumeUsageLine(diskUsed, diskTotal)}
               </DetailField>
             </div>
           </CardContent>

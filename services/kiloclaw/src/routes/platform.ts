@@ -2045,8 +2045,15 @@ platform.post('/destroy-fly-machine', async c => {
 const EXTEND_VOLUME_TARGET_SIZE_GB = 15;
 const ExtendVolumeSchema = z.object({
   userId: z.string().min(1),
-  appName: z.string().min(1),
-  volumeId: z.string().min(1),
+  appName: z
+    .string()
+    .min(1)
+    .max(63)
+    .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Invalid Fly app name'),
+  volumeId: z
+    .string()
+    .min(1)
+    .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
 });
 
 platform.post('/extend-volume', async c => {

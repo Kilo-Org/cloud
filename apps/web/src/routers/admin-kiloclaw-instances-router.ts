@@ -944,18 +944,37 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid().optional(),
-        appName: z.string().min(1),
-        volumeId: z.string().min(1),
+        appName: z
+          .string()
+          .min(1)
+          .max(63)
+          .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Invalid Fly app name'),
+        volumeId: z
+          .string()
+          .min(1)
+          .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
       })
     )
     .mutation(async ({ input, ctx }) => {
       console.log(
         `[admin-kiloclaw] extendVolume triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) app=${input.appName} volume=${input.volumeId} size=15GB`
       );
-      const instance = input.instanceId
-        ? await resolveInstance(input.userId, input.instanceId)
-        : undefined;
+      const instance = await resolveInstance(input.userId, input.instanceId);
       const client = new KiloClawInternalClient();
+      const instanceId = workerInstanceId(instance);
+
+      let status: Awaited<ReturnType<KiloClawInternalClient['getDebugStatus']>>;
+      try {
+        status = await client.getDebugStatus(input.userId, instanceId);
+      } catch (err) {
+        throwKiloclawAdminError(err, 'Failed to verify volume state before extend');
+      }
+      if (status.flyAppName !== input.appName || status.flyVolumeId !== input.volumeId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Fly resource mismatch: expected app=${status.flyAppName} volume=${status.flyVolumeId}, got app=${input.appName} volume=${input.volumeId}`,
+        });
+      }
 
       const fallbackMessage = 'Failed to extend Fly volume';
       try {
@@ -963,7 +982,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           input.userId,
           input.appName,
           input.volumeId,
-          instance ? workerInstanceId(instance) : undefined
+          instanceId
         );
 
         try {

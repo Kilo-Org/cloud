@@ -8,10 +8,8 @@
  * App naming: `acct-{first 20 hex chars of SHA-256(userId)}`
  */
 
-import { FlyApiError } from './client';
+import { FlyApiError, FLY_API_BASE } from './client';
 import type { FlyMachine } from './types';
-
-const FLY_API_BASE = 'https://api.machines.dev';
 
 /**
  * Error thrown when a Fly app name collision is detected.

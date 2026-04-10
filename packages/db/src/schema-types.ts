@@ -204,6 +204,17 @@ export const KiloClawAdminAuditAction = z.enum([
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
 
+// --- ContributorChampion enums ---
+
+export const ContributorChampionTier = {
+  Contributor: 'contributor',
+  Ambassador: 'ambassador',
+  Champion: 'champion',
+} as const;
+
+export type ContributorChampionTier =
+  (typeof ContributorChampionTier)[keyof typeof ContributorChampionTier];
+
 // =============================================================================
 // B. Type-Only Definitions (used in $type<T>())
 // =============================================================================

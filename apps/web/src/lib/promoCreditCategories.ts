@@ -319,6 +319,12 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
     description: 'Custom credit grant for organization',
     is_idempotent: false,
   },
+  {
+    credit_category: 'contributor-champion-credits',
+    description: 'Contributor Champion monthly credits',
+    is_idempotent: false,
+    expiry_hours: 30 * 24,
+  },
 ];
 
 /**

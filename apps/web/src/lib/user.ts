@@ -59,8 +59,11 @@ import {
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
   user_push_tokens,
+  contributor_champion_events,
+  contributor_champion_memberships,
+  contributor_champion_contributors,
 } from '@kilocode/db/schema';
-import { eq, and, inArray, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, inArray, isNotNull, sql, or } from 'drizzle-orm';
 import { allow_fake_login } from './constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { hosted_domain_specials } from '@/lib/auth/constants';
@@ -704,6 +707,45 @@ export async function softDeleteUser(userId: string) {
         http_x_vercel_ja4_digest: null,
       })
       .where(eq(payment_methods.user_id, userId));
+
+    // Contributor champions: anonymize email PII and nullify user link
+    // Clear events linked through membership
+    await tx
+      .update(contributor_champion_events)
+      .set({ github_author_email: null })
+      .where(
+        sql`${contributor_champion_events.contributor_id} IN (
+          SELECT m.contributor_id FROM contributor_champion_memberships m
+          WHERE m.linked_kilo_user_id = ${userId}
+        )`
+      );
+    // Also clear events matched by email directly (covers un-enrolled contributors).
+    // Use originalEmail captured before the user row was anonymized — the subquery
+    // would resolve to the already-overwritten deleted+<id>@deleted.invalid address.
+    await tx
+      .update(contributor_champion_events)
+      .set({ github_author_email: null })
+      .where(
+        sql`lower(${contributor_champion_events.github_author_email}) = lower(${originalEmail})`
+      );
+    await tx
+      .update(contributor_champion_memberships)
+      .set({ linked_kilo_user_id: null })
+      .where(eq(contributor_champion_memberships.linked_kilo_user_id, userId));
+    // Clear manual_email for manually-enrolled contributors linked to this user
+    // (either by exact email match OR via membership link)
+    await tx
+      .update(contributor_champion_contributors)
+      .set({ manual_email: null })
+      .where(
+        or(
+          sql`lower(${contributor_champion_contributors.manual_email}) = lower(${originalEmail})`,
+          sql`${contributor_champion_contributors.id} IN (
+            SELECT m.contributor_id FROM contributor_champion_memberships m
+            WHERE m.linked_kilo_user_id = ${userId}
+          )`
+        )
+      );
 
     // ── 4. Nullify FK references ─────────────────────────────────────────
     await tx

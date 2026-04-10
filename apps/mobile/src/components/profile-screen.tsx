@@ -1,5 +1,5 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { ChevronDown, KeyRound, LogOut, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
@@ -37,7 +37,10 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
     isLoading: balanceLoading,
     isError: balanceError,
     refetch: refetchBalance,
-  } = useQuery(trpc.user.getContextBalance.queryOptions({ organizationId: selectedOrgId }));
+  } = useQuery({
+    ...trpc.user.getContextBalance.queryOptions({ organizationId: selectedOrgId }),
+    placeholderData: keepPreviousData,
+  });
 
   const { data: creditData, isLoading: creditsLoading } = useQuery({
     ...trpc.user.getCreditBlocks.queryOptions({}),

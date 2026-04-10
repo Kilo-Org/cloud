@@ -182,12 +182,9 @@ export default function DashboardScreen() {
                       text: 'Destroy',
                       style: 'destructive',
                       onPress: () => {
-                        mutations.destroy.mutate(undefined, {
-                          onSuccess: () => {
-                            router.dismissAll();
-                            router.replace('/(app)/(tabs)/(1_kiloclaw)');
-                          },
-                        });
+                        mutations.destroy.mutate(undefined);
+                        router.dismissAll();
+                        router.replace('/(app)/(tabs)/(1_kiloclaw)');
                       },
                     },
                   ]

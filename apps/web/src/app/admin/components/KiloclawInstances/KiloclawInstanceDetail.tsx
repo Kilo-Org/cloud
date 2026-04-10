@@ -1178,7 +1178,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [restoreConfigDialogOpen, setRestoreConfigDialogOpen] = useState(false);
   const [destroyMachineDialogOpen, setDestroyMachineDialogOpen] = useState(false);
   const [resizeMachineDialogOpen, setResizeMachineDialogOpen] = useState(false);
-  const [selectedMachineSize, setSelectedMachineSize] = useState<string>('shared-cpu-2x');
+  const [selectedMachineSize, setSelectedMachineSize] = useState<string>('performance-1x');
   const [resizeConfirmText, setResizeConfirmText] = useState('');
   const [resizePhase, setResizePhase] = useState<
     'idle' | 'stopping' | 'resizing' | 'starting' | 'waiting' | 'done' | 'error'
@@ -1520,6 +1520,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               queryKey: trpc.admin.kiloclawInstances.get.queryKey(),
             });
           }
+        }
+        if (!stopped) {
+          throw new Error(
+            'Failed to stop the machine after 3 attempts. Please try again or stop it manually first.'
+          );
         }
         // Final wait to let status propagate
         await new Promise(resolve => setTimeout(resolve, 5000));
@@ -2003,7 +2008,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       </code>
                     ) : (
                       <span className="text-muted-foreground text-sm">
-                        default (shared-cpu-2x, 3072MB)
+                        default (performance-1x, 3072MB)
                       </span>
                     )}
                   </DetailField>
@@ -2322,10 +2327,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   disabled={machineActionPending || isResizingMachine}
                   onClick={() => {
                     const ms = data?.workerStatus?.machineSize;
-                    const key =
-                      ms?.cpu_kind === 'performance'
+                    const key = ms
+                      ? ms.cpu_kind === 'performance'
                         ? `performance-${ms.cpus}x`
-                        : `shared-cpu-${ms?.cpus ?? 2}x`;
+                        : `shared-cpu-${ms.cpus}x`
+                      : 'performance-1x';
                     setSelectedMachineSize(key);
                     setResizeMachineDialogOpen(true);
                   }}
@@ -2543,7 +2549,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   </span>
                 ) : (
                   <span className="text-muted-foreground mt-2 block text-sm">
-                    Current: default (shared-cpu-2x, 3072MB)
+                    Current: default (performance-1x, 3072MB)
                   </span>
                 )}
               </DialogDescription>

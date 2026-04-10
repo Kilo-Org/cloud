@@ -333,6 +333,7 @@ const SAFE_ERROR_PREFIXES = [
   'Volume ', // reassociate: volume not found / bad state
   'Cannot restore: ', // snapshot restore: bad state
   'Cannot destroy: ', // destroy while restoring
+  'Cannot resize: ', // resize during destroying/restoring/recovering
   'Cannot retry recovery', // force-retry-recovery guard messages
   'Stream Chat sendMessage failed', // sendMessage HTTP errors
   'Stream Chat is not set up', // no Stream Chat on this instance

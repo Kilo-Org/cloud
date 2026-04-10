@@ -22,17 +22,18 @@ function orgInput(organizationId?: string | null) {
 
 export function useKiloClawStatus(organizationId?: string | null, enabled = true) {
   const trpc = useTRPC();
+  const isResolved = organizationId !== undefined;
   const isOrg = Boolean(organizationId);
   const personal = useQuery(
     trpc.kiloclaw.getStatus.queryOptions(undefined, {
-      enabled: enabled && !isOrg,
-      refetchInterval: enabled && !isOrg ? 10_000 : false,
+      enabled: enabled && isResolved && !isOrg,
+      refetchInterval: enabled && isResolved && !isOrg ? 10_000 : false,
     })
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.getStatus.queryOptions(orgInput(organizationId), {
-      enabled: enabled && isOrg,
-      refetchInterval: enabled && isOrg ? 10_000 : false,
+      enabled: enabled && isResolved && isOrg,
+      refetchInterval: enabled && isResolved && isOrg ? 10_000 : false,
     })
   );
   return isOrg ? org : personal;
@@ -50,17 +51,18 @@ export function useKiloClawBillingStatus(enabled = true) {
 
 export function useKiloClawGatewayStatus(organizationId?: string | null, enabled = true) {
   const trpc = useTRPC();
+  const isResolved = organizationId !== undefined;
   const isOrg = Boolean(organizationId);
   const personal = useQuery(
     trpc.kiloclaw.gatewayStatus.queryOptions(undefined, {
-      enabled: enabled && !isOrg,
-      refetchInterval: enabled && !isOrg ? 30_000 : false,
+      enabled: enabled && isResolved && !isOrg,
+      refetchInterval: enabled && isResolved && !isOrg ? 30_000 : false,
     })
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.gatewayStatus.queryOptions(orgInput(organizationId), {
-      enabled: enabled && isOrg,
-      refetchInterval: enabled && isOrg ? 30_000 : false,
+      enabled: enabled && isResolved && isOrg,
+      refetchInterval: enabled && isResolved && isOrg ? 30_000 : false,
     })
   );
   return isOrg ? org : personal;
@@ -78,17 +80,18 @@ export function useKiloClawServiceDegraded() {
 
 export function useKiloClawPairing(organizationId?: string | null, enabled = true) {
   const trpc = useTRPC();
+  const isResolved = organizationId !== undefined;
   const isOrg = Boolean(organizationId);
   const personal = useQuery(
     trpc.kiloclaw.listPairingRequests.queryOptions(undefined, {
-      enabled: enabled && !isOrg,
-      refetchInterval: enabled && !isOrg ? 120_000 : false,
+      enabled: enabled && isResolved && !isOrg,
+      refetchInterval: enabled && isResolved && !isOrg ? 120_000 : false,
     })
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.listPairingRequests.queryOptions(orgInput(organizationId), {
-      enabled: enabled && isOrg,
-      refetchInterval: enabled && isOrg ? 120_000 : false,
+      enabled: enabled && isResolved && isOrg,
+      refetchInterval: enabled && isResolved && isOrg ? 120_000 : false,
     })
   );
   return isOrg ? org : personal;
@@ -96,17 +99,18 @@ export function useKiloClawPairing(organizationId?: string | null, enabled = tru
 
 export function useKiloClawDevicePairing(organizationId?: string | null, enabled = true) {
   const trpc = useTRPC();
+  const isResolved = organizationId !== undefined;
   const isOrg = Boolean(organizationId);
   const personal = useQuery(
     trpc.kiloclaw.listDevicePairingRequests.queryOptions(undefined, {
-      enabled: enabled && !isOrg,
-      refetchInterval: enabled && !isOrg ? 120_000 : false,
+      enabled: enabled && isResolved && !isOrg,
+      refetchInterval: enabled && isResolved && !isOrg ? 120_000 : false,
     })
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.listDevicePairingRequests.queryOptions(orgInput(organizationId), {
-      enabled: enabled && isOrg,
-      refetchInterval: enabled && isOrg ? 120_000 : false,
+      enabled: enabled && isResolved && isOrg,
+      refetchInterval: enabled && isResolved && isOrg ? 120_000 : false,
     })
   );
   return isOrg ? org : personal;
@@ -118,17 +122,18 @@ export function useKiloClawAvailableVersions(
   limit = 25
 ) {
   const trpc = useTRPC();
+  const isResolved = organizationId !== undefined;
   const isOrg = Boolean(organizationId);
   const personal = useQuery(
     trpc.kiloclaw.listAvailableVersions.queryOptions(
       { offset, limit },
-      { enabled: !isOrg, staleTime: 5 * 60_000 }
+      { enabled: isResolved && !isOrg, staleTime: 5 * 60_000 }
     )
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.listAvailableVersions.queryOptions(
       { ...orgInput(organizationId), offset, limit },
-      { enabled: isOrg, staleTime: 5 * 60_000 }
+      { enabled: isResolved && isOrg, staleTime: 5 * 60_000 }
     )
   );
   return isOrg ? org : personal;
@@ -136,13 +141,17 @@ export function useKiloClawAvailableVersions(
 
 export function useKiloClawMyPin(organizationId?: string | null) {
   const trpc = useTRPC();
+  const isResolved = organizationId !== undefined;
   const isOrg = Boolean(organizationId);
   const personal = useQuery(
-    trpc.kiloclaw.getMyPin.queryOptions(undefined, { enabled: !isOrg, staleTime: 60_000 })
+    trpc.kiloclaw.getMyPin.queryOptions(undefined, {
+      enabled: isResolved && !isOrg,
+      staleTime: 60_000,
+    })
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.getMyPin.queryOptions(orgInput(organizationId), {
-      enabled: isOrg,
+      enabled: isResolved && isOrg,
       staleTime: 60_000,
     })
   );
@@ -156,16 +165,17 @@ export function useKiloClawLatestVersion() {
 
 export function useKiloClawChangelog(organizationId?: string | null) {
   const trpc = useTRPC();
+  const isResolved = organizationId !== undefined;
   const isOrg = Boolean(organizationId);
   const personal = useQuery(
     trpc.kiloclaw.getChangelog.queryOptions(undefined, {
-      enabled: !isOrg,
+      enabled: isResolved && !isOrg,
       staleTime: 5 * 60_000,
     })
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.getChangelog.queryOptions(orgInput(organizationId), {
-      enabled: isOrg,
+      enabled: isResolved && isOrg,
       staleTime: 5 * 60_000,
     })
   );

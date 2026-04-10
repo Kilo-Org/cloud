@@ -7,7 +7,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useInstanceOrganizationId } from '@/lib/hooks/use-instance-context';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawMutations, useKiloClawStatus } from '@/lib/hooks/use-kiloclaw';
 import { cn } from '@/lib/utils';
 
@@ -59,7 +59,7 @@ function resolvePreset(
 
 export default function ExecPolicyScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const organizationId = useInstanceOrganizationId(instanceId);
+  const { organizationId } = useInstanceContext(instanceId);
   const statusQuery = useKiloClawStatus(organizationId);
   const mutations = useKiloClawMutations(organizationId);
 

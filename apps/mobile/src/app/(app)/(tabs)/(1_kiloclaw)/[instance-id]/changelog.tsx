@@ -9,12 +9,12 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useInstanceOrganizationId } from '@/lib/hooks/use-instance-context';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawChangelog } from '@/lib/hooks/use-kiloclaw';
 
 export default function ChangelogScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const organizationId = useInstanceOrganizationId(instanceId);
+  const { organizationId } = useInstanceContext(instanceId);
   const changelogQuery = useKiloClawChangelog(organizationId);
   const entries = changelogQuery.data;
 

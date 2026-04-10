@@ -21,7 +21,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useInstanceOrganizationId } from '@/lib/hooks/use-instance-context';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import {
   useKiloClawBillingStatus,
   useKiloClawConfig,
@@ -37,10 +37,10 @@ export default function DashboardScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const organizationId = useInstanceOrganizationId(instanceId);
+  const { organizationId, isResolved, isOrg } = useInstanceContext(instanceId);
 
   const statusQuery = useKiloClawStatus(organizationId);
-  const isPersonal = !organizationId;
+  const isPersonal = isResolved && !isOrg;
   const billingQuery = useKiloClawBillingStatus(isPersonal);
   const serviceDegradedQuery = useKiloClawServiceDegraded();
   const mutations = useKiloClawMutations(organizationId);

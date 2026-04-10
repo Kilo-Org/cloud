@@ -8,16 +8,17 @@ function orgInput(organizationId?: string | null) {
 
 export function useKiloClawGoogleSetup(organizationId?: string | null, enabled = true) {
   const trpc = useTRPC();
+  const isResolved = organizationId !== undefined;
   const isOrg = Boolean(organizationId);
   const personal = useQuery(
     trpc.kiloclaw.getGoogleSetupCommand.queryOptions(undefined, {
-      enabled: enabled && !isOrg,
+      enabled: enabled && isResolved && !isOrg,
       staleTime: 50 * 60_000,
     })
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.getGoogleSetupCommand.queryOptions(orgInput(organizationId), {
-      enabled: enabled && isOrg,
+      enabled: enabled && isResolved && isOrg,
       staleTime: 50 * 60_000,
     })
   );
@@ -26,16 +27,17 @@ export function useKiloClawGoogleSetup(organizationId?: string | null, enabled =
 
 export function useKiloClawChannelCatalog(organizationId?: string | null) {
   const trpc = useTRPC();
+  const isResolved = organizationId !== undefined;
   const isOrg = Boolean(organizationId);
   const personal = useQuery(
     trpc.kiloclaw.getChannelCatalog.queryOptions(undefined, {
-      enabled: !isOrg,
+      enabled: isResolved && !isOrg,
       staleTime: 5 * 60_000,
     })
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.getChannelCatalog.queryOptions(orgInput(organizationId), {
-      enabled: isOrg,
+      enabled: isResolved && isOrg,
       staleTime: 5 * 60_000,
     })
   );
@@ -44,16 +46,17 @@ export function useKiloClawChannelCatalog(organizationId?: string | null) {
 
 export function useKiloClawSecretCatalog(organizationId?: string | null) {
   const trpc = useTRPC();
+  const isResolved = organizationId !== undefined;
   const isOrg = Boolean(organizationId);
   const personal = useQuery(
     trpc.kiloclaw.getSecretCatalog.queryOptions(undefined, {
-      enabled: !isOrg,
+      enabled: isResolved && !isOrg,
       staleTime: 5 * 60_000,
     })
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.getSecretCatalog.queryOptions(orgInput(organizationId), {
-      enabled: isOrg,
+      enabled: isResolved && isOrg,
       staleTime: 5 * 60_000,
     })
   );
@@ -62,16 +65,17 @@ export function useKiloClawSecretCatalog(organizationId?: string | null) {
 
 export function useStreamChatCredentials(organizationId?: string | null, enabled = true) {
   const trpc = useTRPC();
+  const isResolved = organizationId !== undefined;
   const isOrg = Boolean(organizationId);
   const personal = useQuery(
     trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
-      enabled: enabled && !isOrg,
+      enabled: enabled && isResolved && !isOrg,
       staleTime: 5 * 60_000,
     })
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.getStreamChatCredentials.queryOptions(orgInput(organizationId), {
-      enabled: enabled && isOrg,
+      enabled: enabled && isResolved && isOrg,
       staleTime: 5 * 60_000,
     })
   );
@@ -80,13 +84,17 @@ export function useStreamChatCredentials(organizationId?: string | null, enabled
 
 export function useKiloClawConfig(organizationId?: string | null) {
   const trpc = useTRPC();
+  const isResolved = organizationId !== undefined;
   const isOrg = Boolean(organizationId);
   const personal = useQuery(
-    trpc.kiloclaw.getConfig.queryOptions(undefined, { enabled: !isOrg, staleTime: 60_000 })
+    trpc.kiloclaw.getConfig.queryOptions(undefined, {
+      enabled: isResolved && !isOrg,
+      staleTime: 60_000,
+    })
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.getConfig.queryOptions(orgInput(organizationId), {
-      enabled: isOrg,
+      enabled: isResolved && isOrg,
       staleTime: 60_000,
     })
   );

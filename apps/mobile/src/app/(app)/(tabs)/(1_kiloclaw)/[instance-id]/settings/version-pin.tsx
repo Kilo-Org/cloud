@@ -9,7 +9,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useInstanceOrganizationId } from '@/lib/hooks/use-instance-context';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import {
   useKiloClawAvailableVersions,
   useKiloClawLatestVersion,
@@ -25,7 +25,7 @@ type VersionItem = NonNullable<
 
 export default function VersionPinScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const organizationId = useInstanceOrganizationId(instanceId);
+  const { organizationId } = useInstanceContext(instanceId);
   const colors = useThemeColors();
   const myPinQuery = useKiloClawMyPin(organizationId);
   const latestVersionQuery = useKiloClawLatestVersion();

@@ -16,6 +16,7 @@ async function noop(..._args: any[]) {
 export function useKiloClawMutations(organizationId?: string | null) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const isResolved = organizationId !== undefined;
   const isOrg = Boolean(organizationId);
   const oi = { organizationId: organizationId ?? '' };
 
@@ -87,15 +88,19 @@ export function useKiloClawMutations(organizationId?: string | null) {
     const o = org.mutationOptions({});
     const pFn = p.mutationFn ?? noop;
     const oFn = o.mutationFn ?? noop;
+
+    let mutationFn: (...args: unknown[]) => Promise<unknown> = noop;
+    if (isResolved && isOrg) {
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      mutationFn = (input: unknown) =>
+        oFn(input && typeof input === 'object' ? { ...input, organizationId } : { organizationId });
+    } else if (isResolved) {
+      mutationFn = pFn;
+    }
+
     return {
       mutationKey: isOrg ? o.mutationKey : p.mutationKey,
-      mutationFn: isOrg
-        ? // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-          (input: unknown) =>
-            oFn(
-              input && typeof input === 'object' ? { ...input, organizationId } : { organizationId }
-            )
-        : pFn,
+      mutationFn,
     };
   }
 

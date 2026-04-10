@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
-import { useInstanceOrganizationId } from '@/lib/hooks/use-instance-context';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawBillingStatus } from '@/lib/hooks/use-kiloclaw';
 import { formatBillingDate } from '@/lib/hooks/use-kiloclaw-billing';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -94,14 +94,13 @@ function PlanDetails({
 
 export default function BillingScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const organizationId = useInstanceOrganizationId(instanceId);
+  const { isResolved, isOrg } = useInstanceContext(instanceId);
   const colors = useThemeColors();
 
-  const isOrgInstance = organizationId != null;
-  const billingQuery = useKiloClawBillingStatus(!isOrgInstance);
+  const billingQuery = useKiloClawBillingStatus(isResolved && !isOrg);
   const billing = billingQuery.data;
 
-  if (isOrgInstance) {
+  if (isOrg) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="Billing" />

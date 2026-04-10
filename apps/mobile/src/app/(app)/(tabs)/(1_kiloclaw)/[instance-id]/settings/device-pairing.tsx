@@ -20,7 +20,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useInstanceOrganizationId } from '@/lib/hooks/use-instance-context';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import {
   useKiloClawDevicePairing,
   useKiloClawMutations,
@@ -37,7 +37,7 @@ const CHANNEL_LABELS: Record<string, string> = {
 
 export default function DevicePairingScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const organizationId = useInstanceOrganizationId(instanceId);
+  const { organizationId } = useInstanceContext(instanceId);
   const colors = useThemeColors();
   const queryClient = useQueryClient();
   const pairingQuery = useKiloClawPairing(organizationId);

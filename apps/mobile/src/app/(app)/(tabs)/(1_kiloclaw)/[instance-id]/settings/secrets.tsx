@@ -8,12 +8,12 @@ import { SettingsCard } from '@/components/kiloclaw/settings-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useInstanceOrganizationId } from '@/lib/hooks/use-instance-context';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawMutations, useKiloClawSecretCatalog } from '@/lib/hooks/use-kiloclaw';
 
 export default function SecretsScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const organizationId = useInstanceOrganizationId(instanceId);
+  const { organizationId } = useInstanceContext(instanceId);
   const mutations = useKiloClawMutations(organizationId);
   const catalogQuery = useKiloClawSecretCatalog(organizationId);
   const isLoading = catalogQuery.isPending;

@@ -9,7 +9,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useInstanceOrganizationId } from '@/lib/hooks/use-instance-context';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawConfig, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { addModelPrefix, stripModelPrefix } from '@/lib/model-id';
@@ -24,7 +24,7 @@ type ModelItem = {
 
 export default function ModelListScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const organizationId = useInstanceOrganizationId(instanceId);
+  const { organizationId } = useInstanceContext(instanceId);
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();

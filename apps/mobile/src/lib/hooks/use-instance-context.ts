@@ -13,17 +13,20 @@ export function useAllKiloClawInstances() {
 }
 
 /**
- * Resolves the `organizationId` for a KiloClaw instance by looking up
- * the cached `listAllInstances` data. Returns:
- * - `string` — the org ID (instance belongs to an organization)
- * - `null`   — personal instance (no organization)
- * - `undefined` — data not yet loaded / instance not found
+ * Resolves instance context (org vs personal) by looking up the cached
+ * `listAllInstances` data.
+ *
+ * - `isResolved: false` — data not yet loaded / instance not found.
+ *    All downstream queries and mutations should stay disabled.
+ * - `isResolved: true, organizationId: null` — personal instance.
+ * - `isResolved: true, organizationId: string` — org instance.
  */
-export function useInstanceOrganizationId(sandboxId: string): string | null | undefined {
+export function useInstanceContext(sandboxId: string) {
   const { data: instances } = useAllKiloClawInstances();
   if (!instances) {
-    return undefined;
+    return { organizationId: undefined, isResolved: false, isOrg: false } as const;
   }
   const match = instances.find(i => i.sandboxId === sandboxId);
-  return match ? match.organizationId : undefined;
+  const organizationId = match?.organizationId ?? null;
+  return { organizationId, isResolved: true, isOrg: Boolean(organizationId) } as const;
 }

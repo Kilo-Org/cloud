@@ -4,12 +4,9 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { eq, isNull, and } from 'drizzle-orm';
 import migrations from '../../drizzle/migrations';
 import { registryInstances } from '../db/sqlite-schema';
-import { getWorkerDb, getActiveInstance } from '../db';
-import {
-  isInstanceKeyedSandboxId,
-  instanceIdFromSandboxId,
-} from '@kilocode/worker-utils/instance-id';
+import { getWorkerDb, getActivePersonalInstance } from '../db';
 import type { KiloClawEnv } from '../types';
+import { doKeyFromActiveInstance } from '../lib/instance-routing';
 
 export type RegistryEntry = {
   instanceId: string;
@@ -206,16 +203,10 @@ export class KiloClawRegistry extends DurableObject<KiloClawEnv> {
 
     try {
       const db = getWorkerDb(connectionString);
-      const instance = await getActiveInstance(db, userId);
+      const instance = await getActivePersonalInstance(db, userId);
 
       if (instance) {
-        // Backfill registry entry from Postgres row.
-        // Derive doKey from the row's sandboxId format:
-        // - ki_ prefix → instance-keyed DO at idFromName(instanceId)
-        // - base64url  → legacy DO at idFromName(userId)
-        const doKey = isInstanceKeyedSandboxId(instance.sandboxId)
-          ? instanceIdFromSandboxId(instance.sandboxId)
-          : userId;
+        const doKey = doKeyFromActiveInstance(instance);
         this.db
           .insert(registryInstances)
           .values({

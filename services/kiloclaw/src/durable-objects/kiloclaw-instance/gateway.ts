@@ -494,7 +494,7 @@ export async function waitForHealthy(
   env: KiloClawEnv,
   appName: string,
   machineId: string
-): Promise<void> {
+): Promise<boolean> {
   const url = `https://${appName}.fly.dev/_kilo/gateway/status`;
   const deadline = Date.now() + HEALTH_PROBE_TIMEOUT_SECONDS * 1000;
 
@@ -526,7 +526,7 @@ export async function waitForHealthy(
                 rootRes.status,
                 ')'
               );
-              return;
+              return true;
             }
             console.log('[DO] Gateway reports running but root returned 502 — retrying');
           } catch {
@@ -547,4 +547,5 @@ export async function waitForHealthy(
   doWarn(state, 'Gateway health probe timed out — proceeding anyway', {
     timeoutSeconds: HEALTH_PROBE_TIMEOUT_SECONDS,
   });
+  return false;
 }

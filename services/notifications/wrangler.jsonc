@@ -1,0 +1,72 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "notifications",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-02-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "dev": { "port": 8804 },
+  "placement": { "mode": "smart" },
+  "observability": { "enabled": true },
+
+  "routes": [
+    {
+      "pattern": "notifications.kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
+
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "NOTIFICATION_CHANNEL_DO",
+        "class_name": "NotificationChannelDO",
+      },
+    ],
+  },
+
+  "queues": {
+    "producers": [
+      {
+        "binding": "RECEIPTS_QUEUE",
+        "queue": "notifications-receipts",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "notifications-receipts",
+        "max_retries": 3,
+        "dead_letter_queue": "notifications-receipts-dlq",
+        "retry_delay": 60,
+      },
+    ],
+  },
+
+  "secrets_store_secrets": [
+    {
+      "binding": "STREAM_CHAT_API_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "STREAM_CHAT_API_SECRET",
+    },
+    {
+      "binding": "EXPO_ACCESS_TOKEN",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "EXPO_ACCESS_TOKEN",
+    },
+  ],
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["NotificationChannelDO"],
+    },
+  ],
+}

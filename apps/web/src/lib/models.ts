@@ -3,16 +3,15 @@
  */
 
 import {
-  isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
-  resolveAutoModel,
-} from '@/lib/kilo-auto-model';
+} from '@/lib/kilo-auto';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
+  claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@/lib/providers/anthropic';
+} from '@/lib/providers/anthropic.constants';
 import { trinity_large_thinking_free_model } from '@/lib/providers/arcee';
 import { seed_20_pro_free_model } from '@/lib/providers/bytedance';
 import { corethink_free_model } from '@/lib/providers/corethink';
@@ -21,7 +20,7 @@ import { MINIMAX_CURRENT_MODEL_ID, minimax_m25_free_model } from '@/lib/provider
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/providers/morph';
 import { gpt_oss_20b_free_model } from '@/lib/providers/openai';
-import { qwen36_plus_free_model } from '@/lib/providers/qwen';
+import { qwen36_plus_model } from '@/lib/providers/qwen';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 import { mimo_v2_omni_free_model, mimo_v2_pro_free_model } from '@/lib/providers/xiaomi';
 
@@ -45,18 +44,6 @@ export const preferredModels = [
   'z-ai/glm-5.1',
 ].filter(m => m !== null);
 
-export async function getMonitoredModels() {
-  const set = new Set<string>();
-  for (const model of preferredModels) {
-    if (isKiloAutoModel(model)) {
-      set.add((await resolveAutoModel(model, null, Promise.resolve(0), false)).model);
-    } else {
-      set.add(model);
-    }
-  }
-  return [...set];
-}
-
 export function isFreeModel(model: string): boolean {
   return (
     isKiloExclusiveFreeModel(model) ||
@@ -69,7 +56,7 @@ export function isFreeModel(model: string): boolean {
 
 export function isKiloExclusiveFreeModel(model: string): boolean {
   return kiloExclusiveModels.some(
-    m => m.public_id === model && m.status !== 'disabled' && m.flags.includes('free')
+    m => m.public_id === model && m.status !== 'disabled' && !m.pricing
   );
 }
 
@@ -85,8 +72,9 @@ export const kiloExclusiveModels = [
   morph_warp_grep_free_model,
   grok_code_fast_1_optimized_free_model,
   seed_20_pro_free_model,
-  qwen36_plus_free_model,
+  qwen36_plus_model,
   trinity_large_thinking_free_model,
+  claude_sonnet_clawsetup_model,
 ] as KiloExclusiveModel[];
 
 export function isKiloStealthModel(model: string): boolean {
@@ -99,6 +87,10 @@ function isOpenRouterStealthModel(model: string): boolean {
 
 export function isDeadFreeModel(model: string): boolean {
   return !!kiloExclusiveModels.find(
-    m => m.public_id === model && m.status === 'disabled' && m.flags.includes('free')
+    m => m.public_id === model && m.status === 'disabled' && !m.pricing
   );
+}
+
+export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {
+  return kiloExclusiveModels.find(m => m.public_id === model && m.status !== 'disabled') ?? null;
 }

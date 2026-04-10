@@ -120,7 +120,7 @@ export function createWrapperKiloClient(
       // Use v2 client — it supports `variant` (thinking effort); v1 SDK omits it.
       await v2Client.session.promptAsync({
         sessionID: opts.sessionId,
-        messageID: opts.messageId,
+        ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
         parts: textParts,
         ...(opts.variant ? { variant: opts.variant } : {}),
         ...(opts.model

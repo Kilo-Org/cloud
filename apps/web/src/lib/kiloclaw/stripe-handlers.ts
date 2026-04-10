@@ -20,8 +20,8 @@ import PostHogClient from '@/lib/posthog';
 import { after } from 'next/server';
 import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
 import { client as stripe } from '@/lib/stripe-client';
-import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
-import { trackSale, trackTrialEnd } from '@/lib/impact';
+import { buildAffiliateEventDedupeKey, enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
+import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
 
 const logInfo = sentryLogger('kiloclaw-stripe', 'info');
 const logWarning = sentryLogger('kiloclaw-stripe', 'warning');
@@ -31,7 +31,7 @@ type KiloClawSubscriptionMetadata = {
   type: 'kiloclaw';
   plan: 'commit' | 'standard';
   kiloUserId: string;
-  impactClickId?: string;
+  affiliateTrackingId?: string;
 };
 
 function getKiloClawMetadata(
@@ -46,24 +46,7 @@ function getKiloClawMetadata(
     type: 'kiloclaw',
     plan,
     kiloUserId,
-    impactClickId: metadata.impactClickId || undefined,
-  };
-}
-
-async function getImpactTrackingContext(userId: string, fallbackClickId?: string) {
-  const [user, attribution] = await Promise.all([
-    db.query.kilocode_users.findFirst({
-      where: eq(kilocode_users.id, userId),
-      columns: { google_user_email: true },
-    }),
-    getAffiliateAttribution(userId, 'impact'),
-  ]);
-
-  if (!user) return null;
-
-  return {
-    customerEmail: user.google_user_email,
-    clickId: attribution?.tracking_id ?? fallbackClickId ?? null,
+    affiliateTrackingId: metadata.affiliateTrackingId || metadata.impactClickId || undefined,
   };
 }
 
@@ -440,6 +423,8 @@ export async function handleKiloClawSubscriptionCreated(params: {
   let didProcess = false;
   let resolvedInstanceId: string | undefined;
   let convertedFromTrial = false;
+  const trialEndEventDate =
+    typeof subscription.created === 'number' ? new Date(subscription.created * 1000) : new Date();
 
   await db.transaction(async tx => {
     // Look up the user's active personal instance to link the subscription.
@@ -472,6 +457,8 @@ export async function handleKiloClawSubscriptionCreated(params: {
               stripe_subscription_id: kiloclaw_subscriptions.stripe_subscription_id,
               status: kiloclaw_subscriptions.status,
               suspended_at: kiloclaw_subscriptions.suspended_at,
+              trial_started_at: kiloclaw_subscriptions.trial_started_at,
+              trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
             })
             .from(kiloclaw_subscriptions)
             .where(eq(kiloclaw_subscriptions.instance_id, activeInstance.id))
@@ -498,7 +485,13 @@ export async function handleKiloClawSubscriptionCreated(params: {
 
     // Captured after the stale guard so stale events don't auto-resume
     wasSuspended = !!existingRow?.suspended_at;
-    convertedFromTrial = existingRow?.status === 'trialing';
+    const retainsTrialHistory =
+      existingRow?.trial_started_at !== null || existingRow?.trial_ends_at !== null;
+    convertedFromTrial =
+      existingRow?.status === 'trialing' ||
+      (existingRow?.status !== 'canceled' &&
+        retainsTrialHistory &&
+        existingRow?.stripe_subscription_id === subscription.id);
     resolvedInstanceId = activeInstance?.id;
 
     // For commit plans, derive commit_ends_at. Pre-launch subscriptions
@@ -619,23 +612,20 @@ export async function handleKiloClawSubscriptionCreated(params: {
   if (didProcess && convertedFromTrial) {
     await runAfterResponse(async () => {
       try {
-        const tracking = await getImpactTrackingContext(kiloUserId, metadata.impactClickId);
-        if (!tracking) {
-          logWarning('KiloClaw trial conversion missing user for Impact trial end', {
-            stripe_event_id: eventId,
-            user_id: kiloUserId,
-          });
-          return;
-        }
-
-        await trackTrialEnd({
-          clickId: tracking.clickId,
-          customerId: kiloUserId,
-          customerEmail: tracking.customerEmail,
-          eventDate: new Date(),
+        await enqueueAffiliateEventForUser({
+          userId: kiloUserId,
+          provider: 'impact',
+          eventType: 'trial_end',
+          dedupeKey: buildAffiliateEventDedupeKey({
+            provider: 'impact',
+            eventType: 'trial_end',
+            entityId: subscription.id,
+          }),
+          eventDate: trialEndEventDate,
+          orderId: IMPACT_ORDER_ID_MACRO,
         });
       } catch (error) {
-        logWarning('Impact trial end tracking failed', {
+        logWarning('Affiliate trial end enqueue failed', {
           stripe_event_id: eventId,
           user_id: kiloUserId,
           error: error instanceof Error ? error.message : String(error),
@@ -1110,34 +1100,29 @@ export async function handleKiloClawInvoicePaid(params: {
 
   await runAfterResponse(async () => {
     try {
-      const tracking = await getImpactTrackingContext(metadata.kiloUserId, metadata.impactClickId);
-      if (!tracking) {
-        logWarning('KiloClaw invoice.paid user not found for Impact tracking', {
-          stripe_event_id: eventId,
-          kilo_user_id: metadata.kiloUserId,
-        });
-        return;
-      }
-
       const eventDate =
         invoice.status_transitions?.paid_at != null
           ? new Date(invoice.status_transitions.paid_at * 1000)
           : new Date();
-      const salePayload = {
-        clickId: tracking.clickId,
-        customerId: metadata.kiloUserId,
-        customerEmail: tracking.customerEmail,
+      await enqueueAffiliateEventForUser({
+        userId: metadata.kiloUserId,
+        provider: 'impact',
+        eventType: 'sale',
+        dedupeKey: buildAffiliateEventDedupeKey({
+          provider: 'impact',
+          eventType: 'sale',
+          entityId: invoice.id,
+        }),
         orderId: invoice.id,
         amount: invoice.amount_paid / 100,
         currencyCode: invoice.currency ?? 'usd',
         eventDate,
         itemCategory: getImpactItemCategory(plan),
         itemName: getImpactItemName(plan),
-      };
-
-      await trackSale(salePayload);
+        itemSku: matchingPriceId,
+      });
     } catch (error) {
-      logWarning('Impact sale tracking failed', {
+      logWarning('Affiliate sale enqueue failed', {
         stripe_event_id: eventId,
         user_id: metadata.kiloUserId,
         error: error instanceof Error ? error.message : String(error),

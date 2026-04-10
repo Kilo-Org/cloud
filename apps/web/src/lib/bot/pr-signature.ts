@@ -34,7 +34,7 @@ export function buildPrSignature(requesterInfo: RequesterInfo): string {
 
 ---
 **PR Signature to include in the PR description:**
-When you create a pull request or merge request, include the following signature at the end of the PR/MR description:
+If you create a pull request or merge request, include the following signature at the end of the PR/MR description:
 
 Built for ${requesterPart} by [${label}](${url})`;
 }

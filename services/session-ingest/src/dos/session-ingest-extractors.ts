@@ -83,3 +83,8 @@ export function extractNormalizedGitBranchFromItem(
     (item.data as { gitBranch?: unknown } | null | undefined)?.gitBranch
   );
 }
+
+export function extractStatusFromItem(item: IngestBatch[number]): string | null | undefined {
+  if (item.type !== 'session_status') return undefined;
+  return normalizeOptionalString((item.data as { status?: unknown } | null | undefined)?.status);
+}

@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 const SAMPLE_MODELS: ModelOption[] = [
   { id: 'kilo-auto/frontier', name: 'Kilo Auto Frontier' },
   { id: 'kilo-auto/balanced', name: 'Kilo Auto Balanced' },
-  { id: 'kilo-auto/free', name: 'Kilo Auto Free' },
   { id: 'anthropic/claude-opus-4.6', name: 'Anthropic: Claude Opus 4.6' },
   { id: 'anthropic/claude-sonnet-4.5', name: 'Anthropic: Claude Sonnet 4.5' },
   { id: 'openai/gpt-5.2', name: 'OpenAI: GPT-5.2' },
@@ -58,12 +57,6 @@ export const FrontierSelected: Story = {
 export const BalancedSelected: Story = {
   args: {
     value: 'kilo-auto/balanced',
-  },
-};
-
-export const FreeSelected: Story = {
-  args: {
-    value: 'kilo-auto/free',
   },
 };
 

@@ -69,6 +69,7 @@ import {
   markRestartSuccessful,
 } from './reconcile';
 import { restoreFromPostgres, markDestroyedInPostgresHelper } from './postgres';
+import { legacyDoKeysForIdentity } from '../../lib/instance-routing';
 import {
   beginUnexpectedStopRecovery,
   cleanupPendingRecoveryVolumeIfNeeded,
@@ -1197,7 +1198,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     if (this.s.flyMachineId) {
-      await gateway.waitForHealthy(this.s, this.env, flyConfig.appName, this.s.flyMachineId);
+      const healthy = await gateway.waitForHealthy(
+        this.s,
+        this.env,
+        flyConfig.appName,
+        this.s.flyMachineId
+      );
+      if (!healthy) {
+        console.warn('[DO] start: gateway health probe timed out, proceeding with running status');
+      }
     }
 
     // Re-check status directly from storage: if the instance was destroyed while
@@ -1440,22 +1449,23 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
               instanceId: registryInstanceId,
             });
           } else {
-            // Legacy: find active entry by doKey=userId
+            const legacyDoKeys = legacyDoKeysForIdentity(preDestroyUserId, preDestroySandboxId);
             const entries = await registryStub.listInstances(registryKey);
-            const legacyEntry = entries.find(e => e.doKey === preDestroyUserId);
+            const legacyEntry = entries.find(e => legacyDoKeys.includes(e.doKey));
             if (legacyEntry) {
               await registryStub.destroyInstance(registryKey, legacyEntry.instanceId);
               console.log('[DO] Registry entry destroyed on finalization (legacy):', {
                 registryKey,
                 instanceId: legacyEntry.instanceId,
-                doKey: preDestroyUserId,
+                doKeysTried: legacyDoKeys,
+                matchedDoKey: legacyEntry.doKey,
               });
             } else {
               console.log(
                 '[DO] Registry cleanup: no active entry found (already cleaned or never existed):',
                 {
                   registryKey,
-                  doKey: preDestroyUserId,
+                  doKeysTried: legacyDoKeys,
                   activeEntryCount: entries.length,
                 }
               );
@@ -2342,7 +2352,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         STARTUP_TIMEOUT_SECONDS,
         updated.instance_id
       );
-      await gateway.waitForHealthy(this.s, this.env, flyConfig.appName, this.s.flyMachineId);
+      const healthy = await gateway.waitForHealthy(
+        this.s,
+        this.env,
+        flyConfig.appName,
+        this.s.flyMachineId
+      );
+      if (!healthy) {
+        console.warn(
+          '[DO] restartMachine: gateway health probe timed out, proceeding with running status'
+        );
+      }
 
       // Final ownership check before persisting success.
       const preSuccessStatus = await this.ctx.storage.get('status');

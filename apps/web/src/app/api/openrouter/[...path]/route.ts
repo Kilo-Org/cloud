@@ -75,7 +75,8 @@ import { grokCodeFastOptimizedRequest } from '@/lib/custom-llm/customLlmRequest'
 import { normalizeModelId } from '@/lib/model-utils';
 import { isForbiddenFreeModel } from '@/lib/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
-import { applyResolvedAutoModel, isKiloAutoModel } from '@/lib/kilo-auto-model';
+import { isKiloAutoModel } from '@/lib/kilo-auto';
+import { applyResolvedAutoModel } from '@/lib/kilo-auto/resolution';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/providers/fixOpenCodeDuplicateReasoning';
 import type { MicrodollarUsageContext, PromptInfo } from '@/lib/processUsage.types';
 import { extractResponsesPromptInfo } from '@/lib/processUsage.responses';
@@ -167,8 +168,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   try {
     if (path === '/chat/completions') {
       const body: OpenRouterChatCompletionRequest = JSON.parse(requestBodyText);
-      // Inject or merge stream_options.include_usage = true
-      body.stream_options = { ...(body.stream_options || {}), include_usage: true };
+      // Inject or merge stream_options.include_usage = true (only when streaming)
+      if (body.stream) {
+        body.stream_options = { ...(body.stream_options || {}), include_usage: true };
+      }
       requestBodyParsed = { kind: 'chat_completions', body };
     } else if (path === '/messages') {
       const body: GatewayMessagesRequest = JSON.parse(requestBodyText);
@@ -217,6 +220,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestBodyParsed,
       modeHeader,
       feature,
+      authPromise.then(res => res.user),
       balanceAndSettingsPromise.then(res => res.balance)
     );
   }

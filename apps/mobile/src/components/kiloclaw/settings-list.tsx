@@ -7,6 +7,7 @@ import {
   Monitor,
   Pin,
   Shield,
+  Sparkles,
 } from 'lucide-react-native';
 import type React from 'react';
 import { Pressable, View } from 'react-native';
@@ -24,6 +25,13 @@ type SettingsItem = {
 };
 
 const SETTINGS_ITEMS: SettingsItem[] = [
+  {
+    icon: Sparkles,
+    iconColor: '#a855f7',
+    label: 'Model',
+    description: 'AI model selection',
+    path: 'settings/model',
+  },
   {
     icon: Lock,
     iconColor: '#f59e0b',

@@ -1,3 +1,5 @@
+import { claude_sonnet_clawsetup_model } from '@/lib/providers/anthropic.constants';
+
 const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'arcee-ai/trinity-large-preview:free',
   'arcee-ai/trinity-mini:free',
@@ -31,9 +33,11 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'qwen/qwen3-coder:free',
   'qwen/qwen3-next-80b-a3b-instruct:free',
   'qwen/qwen3.6-plus-preview:free',
+  'qwen/qwen3.6-plus:free',
   'upstage/solar-pro-3:free',
   'z-ai/glm-4.5-air:free',
   'z-ai/glm-5:free',
+  claude_sonnet_clawsetup_model.public_id, // only usable through kilo-auto
 ]);
 
 export function isForbiddenFreeModel(modelId: string): boolean {

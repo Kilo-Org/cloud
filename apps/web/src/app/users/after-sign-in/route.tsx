@@ -2,19 +2,16 @@ import { getProfileRedirectPath, getUserFromAuth } from '@/lib/user.server';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
 import PostHogClient from '@/lib/posthog';
-import { getAffiliateAttribution, recordAffiliateAttribution } from '@/lib/affiliate-attribution';
+import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
+import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
 import {
+  IMPACT_APP_TRACKED_CLICK_ID_COOKIE,
   IMPACT_CLICK_ID_COOKIE,
-  IMPACT_TRACKED_CLICK_ID_COOKIE,
-  shouldTrackImpactSignupFallback,
+  resolveImpactAffiliateTrackingId,
 } from '@/lib/impact-affiliate-utils';
-import { trackSignUp } from '@/lib/impact';
 import type { NextRequest } from 'next/server';
-import { after, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { APP_URL } from '@/lib/constants';
-import { sentryLogger } from '@/lib/utils.server';
-
-const logImpactWarning = sentryLogger('impact-after-sign-in', 'warning');
 
 /**
  * Resolves a product identifier from the signup entry point. Returns null when
@@ -34,7 +31,7 @@ function resolveSignupProduct(callbackPath: string | null, hasSource: boolean): 
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
-  const { user, isNewUser } = await getUserFromAuth({
+  const { user } = await getUserFromAuth({
     adminOnly: false,
     DANGEROUS_allowBlockedUsers: true,
   });
@@ -93,51 +90,24 @@ export async function GET(request: NextRequest) {
   // Resolve the Impact click ID: prefer the explicit URL param, fall back to
   // the shared parent-domain cookie written by kilo.ai. This is intentionally
   // separate from Impact's native IR_<campaignId> UTT cookie.
-  const imRefParam = url.searchParams.get('im_ref')?.trim();
-  const rawImpactCookie = imRefParam
-    ? null
-    : request.cookies.get(IMPACT_CLICK_ID_COOKIE)?.value?.trim() || null;
-  // Skip the cookie fallback when we've already captured this exact value.
-  // If the cookie changed (e.g. a new affiliate click on a shared device),
-  // allow it through so a different user can still get first-touch attribution.
-  const trackedValue = request.cookies.get(IMPACT_TRACKED_CLICK_ID_COOKIE)?.value;
-  const impactCookieValue =
-    rawImpactCookie && rawImpactCookie !== trackedValue ? rawImpactCookie : null;
-  const impactClickId = imRefParam || impactCookieValue;
+  const { affiliateTrackingId, impactCookieValue } = resolveImpactAffiliateTrackingId({
+    imRefParam: url.searchParams.get('im_ref')?.trim() || null,
+    sharedImpactCookieValue: request.cookies.get(IMPACT_CLICK_ID_COOKIE)?.value?.trim() || null,
+    appTrackedImpactCookieValue:
+      request.cookies.get(IMPACT_APP_TRACKED_CLICK_ID_COOKIE)?.value?.trim() || null,
+  });
 
-  if (user && impactClickId) {
+  if (user && affiliateTrackingId) {
     const existingAttribution = await getAffiliateAttribution(user.id, 'impact');
 
     if (!existingAttribution) {
-      await recordAffiliateAttribution({
+      await recordAffiliateAttributionAndQueueParentEvent({
         userId: user.id,
         provider: 'impact',
-        trackingId: impactClickId,
+        trackingId: affiliateTrackingId,
+        customerEmail: user.google_user_email,
+        eventDate: new Date(),
       });
-
-      if (
-        shouldTrackImpactSignupFallback({
-          isNewUser,
-          hasValidationStytch: user.has_validation_stytch,
-          userCreatedAt: user.created_at,
-        })
-      ) {
-        after(async () => {
-          try {
-            await trackSignUp({
-              clickId: impactClickId,
-              customerId: user.id,
-              customerEmail: user.google_user_email,
-              eventDate: new Date(),
-            });
-          } catch (error) {
-            logImpactWarning('Impact signup fallback tracking failed', {
-              user_id: user.id,
-              error: error instanceof Error ? error.message : String(error),
-            });
-          }
-        });
-      }
     }
   }
 
@@ -149,7 +119,7 @@ export async function GET(request: NextRequest) {
   // hit would burn the marker and suppress the fallback on the next real
   // sign-in.
   if (user && impactCookieValue) {
-    response.cookies.set(IMPACT_TRACKED_CLICK_ID_COOKIE, impactCookieValue, {
+    response.cookies.set(IMPACT_APP_TRACKED_CLICK_ID_COOKIE, impactCookieValue, {
       path: '/',
       httpOnly: true,
       secure: true,

@@ -1,0 +1,20 @@
+{
+  "fields": [
+    { "name": "sandbox_id", "type": "string", "required": true },
+    { "name": "controller_version", "type": "string", "required": false },
+    { "name": "controller_commit", "type": "string", "required": false },
+    { "name": "openclaw_version", "type": "string", "required": false },
+    { "name": "openclaw_commit", "type": "string", "required": false },
+    { "name": "supervisor_state", "type": "string", "required": false },
+    { "name": "fly_region", "type": "string", "required": false },
+    { "name": "machine_id", "type": "string", "required": false },
+    { "name": "last_exit_reason", "type": "string", "required": false },
+    { "name": "restarts_since_last_checkin", "type": "int64", "required": true },
+    { "name": "total_restarts", "type": "int64", "required": true },
+    { "name": "uptime_seconds", "type": "int64", "required": true },
+    { "name": "load_avg_5m", "type": "float64", "required": true },
+    { "name": "bandwidth_bytes_in", "type": "int64", "required": true },
+    { "name": "bandwidth_bytes_out", "type": "int64", "required": true },
+    { "name": "created_at", "type": "int64", "required": true }
+  ]
+}

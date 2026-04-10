@@ -86,6 +86,8 @@ import { executePreparationSteps } from './async-preparation.js';
 const REAPER_INTERVAL_MS_DEFAULT = 5 * 60 * 1000;
 /** Shorter reaper interval while execution is active: 2 minutes */
 const REAPER_ACTIVE_INTERVAL_MS = 2 * 60 * 1000;
+/** Longer reaper interval when idle (no active execution): 1 hour */
+const REAPER_IDLE_INTERVAL_MS = 60 * 60 * 1000;
 const PENDING_START_TIMEOUT_MS_DEFAULT = 5 * 60 * 1000;
 
 /** Event retention period: 90 days (aligns with session TTL) */
@@ -1358,16 +1360,19 @@ export class CloudAgentSession extends DurableObject {
         .error('Error during alarm reaper');
     }
 
-    // Schedule next alarm run — use shorter interval while an execution is active.
+    // Schedule next alarm run — use shorter interval while an execution is active,
+    // longer idle interval otherwise so we don't wake the DO every 5 min for nothing.
     // Wrapped in try/catch so a failure here never prevents rescheduling the alarm.
-    let nextInterval = this.getReaperIntervalMs();
+    let nextInterval = REAPER_IDLE_INTERVAL_MS;
     try {
       const activeExecutionId = await this.executionQueries.getActiveExecutionId();
       if (activeExecutionId) {
         nextInterval = REAPER_ACTIVE_INTERVAL_MS;
       }
     } catch {
-      // Fall through with default interval
+      // Can't determine state — use a conservative short interval so the
+      // reaper retries soon rather than sleeping for an hour.
+      nextInterval = REAPER_INTERVAL_MS_DEFAULT;
     }
     logger
       .withFields({ sessionId: this.sessionId, nextInterval, elapsedMs: Date.now() - now })
@@ -1552,6 +1557,8 @@ export class CloudAgentSession extends DurableObject {
     }
   }
 
+  /** Initial reaper interval used only by {@link ensureAlarmScheduled}.
+   *  Steady-state intervals are {@link REAPER_IDLE_INTERVAL_MS} / {@link REAPER_ACTIVE_INTERVAL_MS}. */
   private getReaperIntervalMs(): number {
     const value = Number((this.env as unknown as WorkerEnv).REAPER_INTERVAL_MS);
     return Number.isFinite(value) && value > 0 ? value : REAPER_INTERVAL_MS_DEFAULT;
@@ -2610,6 +2617,11 @@ export class CloudAgentSession extends DurableObject {
         .error('Failed to set active execution');
       return this.buildStartError('INTERNAL', 'Failed to set active execution');
     }
+
+    // Reschedule the alarm to the active interval — the idle alarm may be up
+    // to an hour away, but we need the reaper checking every 2 min while an
+    // execution is running (stale detection, hung execution, max runtime, etc.).
+    await this.ctx.storage.setAlarm(Date.now() + REAPER_ACTIVE_INTERVAL_MS);
 
     // Execute via orchestrator
     try {

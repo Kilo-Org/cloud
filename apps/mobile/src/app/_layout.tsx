@@ -2,9 +2,9 @@ import '../global.css';
 
 import { PortalHost } from '@rn-primitives/portal';
 import * as Sentry from '@sentry/react-native';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider, useMutation } from '@tanstack/react-query';
 import { isRunningInExpoGo } from 'expo';
-import { Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
+import { type Href, Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { requestTrackingPermissionsAsync } from 'expo-tracking-transparency';
@@ -16,9 +16,18 @@ import { Toaster } from 'sonner-native';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { initAppsFlyer } from '@/lib/appsflyer';
 import { ContextProvider, useAppContext } from '@/lib/context/context-context';
+import {
+  checkInitialNotification,
+  getNotificationPermissionStatus,
+  getPendingNotificationLink,
+  getPlatform,
+  registerForPushNotifications,
+  setupNotificationHandler,
+  setupNotificationResponseHandler,
+} from '@/lib/notifications';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { queryClient } from '@/lib/query-client';
-import { trpcClient, TRPCProvider } from '@/lib/trpc';
+import { trpcClient, TRPCProvider, useTRPC } from '@/lib/trpc';
 
 const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
@@ -52,6 +61,8 @@ Sentry.init({
 });
 
 void SplashScreen.preventAutoHideAsync();
+setupNotificationHandler();
+checkInitialNotification();
 
 function RootLayoutNav() {
   const { token, isLoading: authLoading } = useAuth();
@@ -101,6 +112,11 @@ function RootLayoutNav() {
       router.replace('/(app)');
     } else {
       void SplashScreen.hideAsync();
+      // Navigate to pending notification deep link (cold start / background tap)
+      const pendingLink = getPendingNotificationLink();
+      if (pendingLink) {
+        router.push(pendingLink as Href);
+      }
     }
   }, [
     token,
@@ -112,6 +128,30 @@ function RootLayoutNav() {
     inForceUpdate,
     router,
   ]);
+
+  const trpc = useTRPC();
+  const { mutate: registerPushToken } = useMutation(
+    trpc.user.registerPushToken.mutationOptions({})
+  );
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    async function reregisterToken() {
+      const status = await getNotificationPermissionStatus();
+      if (status !== 'granted') {
+        return;
+      }
+
+      const pushToken = await registerForPushNotifications();
+      if (pushToken) {
+        registerPushToken({ token: pushToken, platform: getPlatform() });
+      }
+    }
+    void reregisterToken();
+  }, [token, registerPushToken]);
 
   const needsForceUpdate = updateRequired && !inForceUpdate;
   const showingForceUpdate = updateRequired && inForceUpdate;
@@ -157,6 +197,13 @@ function RootLayout() {
       initAppsFlyer();
     }
     void startAppsFlyer();
+  }, []);
+
+  useEffect(() => {
+    const subscription = setupNotificationResponseHandler();
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   return (

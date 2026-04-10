@@ -1,26 +1,16 @@
 import { z } from 'zod';
-import type { FeatureValue } from '@/lib/feature-detection';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_OPUS_CURRENT_MODEL_NAME,
+  claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_NAME,
-} from '@/lib/providers/anthropic';
-import {
-  MINIMAX_CURRENT_MODEL_ID,
-  MINIMAX_CURRENT_MODEL_NAME,
-  minimax_m25_free_model,
-} from '@/lib/providers/minimax';
-import { KIMI_CURRENT_MODEL_ID, KIMI_CURRENT_MODEL_NAME } from '@/lib/providers/moonshotai';
-import { gpt_oss_20b_free_model, GPT_5_NANO_ID, GPT_5_NANO_NAME } from '@/lib/providers/openai';
-import type {
-  GatewayRequest,
-  OpenRouterChatCompletionRequest,
-  OpenRouterReasoningConfig,
-} from '@/lib/providers/openrouter/types';
-import { requestContainsImages } from '@/lib/providers/openrouter/request-helpers';
+} from '@/lib/providers/anthropic.constants';
+import { minimax_m25_free_model } from '@/lib/providers/minimax';
+import { qwen36_plus_model } from '@/lib/providers/qwen';
+import { gpt_oss_20b_free_model, GPT_5_NANO_NAME } from '@/lib/providers/openai';
+import type { OpenRouterReasoningConfig } from '@/lib/providers/openrouter/types';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
-import type OpenAI from 'openai';
 
 function stripDisplayName(displayName: string): string {
   const start = displayName.indexOf(': ');
@@ -43,17 +33,19 @@ type AutoModel = {
   opencode_settings: OpenCodeSettings | undefined;
 };
 
-type ResolvedAutoModel = {
+export type ResolvedAutoModel = {
   model: string;
   reasoning?: OpenRouterReasoningConfig;
   verbosity?: Verbosity;
 };
 
+export const GPT_53_CODEX_ID = 'openai/gpt-5.3-codex';
+
 const MODEL_DISPLAY_NAMES: Readonly<Record<string, string>> = {
   [CLAUDE_OPUS_CURRENT_MODEL_ID]: CLAUDE_OPUS_CURRENT_MODEL_NAME,
   [CLAUDE_SONNET_CURRENT_MODEL_ID]: CLAUDE_SONNET_CURRENT_MODEL_NAME,
-  [KIMI_CURRENT_MODEL_ID]: KIMI_CURRENT_MODEL_NAME,
-  [MINIMAX_CURRENT_MODEL_ID]: MINIMAX_CURRENT_MODEL_NAME,
+  [qwen36_plus_model.public_id]: 'Qwen3.6 Plus',
+  [GPT_53_CODEX_ID]: 'GPT-5.3-Codex',
 };
 
 function describeRouting(modeToModel: Record<string, ResolvedAutoModel>): string {
@@ -69,7 +61,7 @@ function describeRouting(modeToModel: Record<string, ResolvedAutoModel>): string
   return `Uses ${parts.join('; ')}.`;
 }
 
-const modeSchema = z.enum([
+export const modeSchema = z.enum([
   'KiloClaw',
   'plan',
   'general',
@@ -84,19 +76,23 @@ const modeSchema = z.enum([
 
 type Mode = z.infer<typeof modeSchema>;
 
-const FRONTIER_CODE_MODEL: ResolvedAutoModel = {
+export const FRONTIER_CODE_MODEL: ResolvedAutoModel = {
   model: CLAUDE_SONNET_CURRENT_MODEL_ID,
   reasoning: { enabled: true },
   verbosity: 'low',
 };
 
-const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
+export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   KiloClaw: {
     model: CLAUDE_OPUS_CURRENT_MODEL_ID,
     reasoning: { enabled: true },
     verbosity: 'high',
   },
-  plan: { model: CLAUDE_OPUS_CURRENT_MODEL_ID, reasoning: { enabled: true }, verbosity: 'high' },
+  plan: {
+    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
+    reasoning: { enabled: true },
+    verbosity: 'high',
+  },
   general: {
     model: CLAUDE_OPUS_CURRENT_MODEL_ID,
     reasoning: { enabled: true },
@@ -112,8 +108,16 @@ const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
     reasoning: { enabled: true },
     verbosity: 'high',
   },
-  ask: { model: CLAUDE_OPUS_CURRENT_MODEL_ID, reasoning: { enabled: true }, verbosity: 'high' },
-  debug: { model: CLAUDE_OPUS_CURRENT_MODEL_ID, reasoning: { enabled: true }, verbosity: 'high' },
+  ask: {
+    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
+    reasoning: { enabled: true },
+    verbosity: 'high',
+  },
+  debug: {
+    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
+    reasoning: { enabled: true },
+    verbosity: 'high',
+  },
   build: {
     model: CLAUDE_SONNET_CURRENT_MODEL_ID,
     reasoning: { enabled: true },
@@ -127,26 +131,20 @@ const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   code: FRONTIER_CODE_MODEL,
 };
 
-const BALANCED_CODE_MODEL: ResolvedAutoModel = {
-  model: MINIMAX_CURRENT_MODEL_ID,
+export const BALANCED_CODEX_MODEL: ResolvedAutoModel = {
+  model: GPT_53_CODEX_ID,
+  reasoning: { enabled: true, effort: 'low' },
 };
 
-const BALANCED_IMAGE_MODEL: ResolvedAutoModel = {
-  model: KIMI_CURRENT_MODEL_ID,
+export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
+  model: qwen36_plus_model.public_id,
   reasoning: { enabled: true },
 };
 
-const BALANCED_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
-  KiloClaw: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
-  plan: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
-  general: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
-  architect: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
-  orchestrator: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
-  ask: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
-  debug: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
-  build: { model: MINIMAX_CURRENT_MODEL_ID },
-  explore: { model: MINIMAX_CURRENT_MODEL_ID },
-  code: BALANCED_CODE_MODEL,
+export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
+  model: claude_sonnet_clawsetup_model.public_id,
+  reasoning: { enabled: true, effort: 'high' },
+  verbosity: 'high',
 };
 
 export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
@@ -188,19 +186,23 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
 export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   id: 'kilo-auto/balanced',
   name: 'Kilo Auto Balanced',
-  description: `Great balance of price and capability. ${describeRouting(BALANCED_MODE_TO_MODEL)}`,
-  context_length: 204800,
-  max_completion_tokens: 131072,
-  prompt_price: '0.0000006',
-  completion_price: '0.000003',
-  input_cache_read_price: '0.000000225',
+  description: 'Great balance of price and capability. Uses GPT-5.3-Codex or Qwen3.6 Plus.',
+  context_length: 400_000,
+  max_completion_tokens: 65_536,
+  prompt_price: '0.00000175',
+  completion_price: '0.000014',
+  input_cache_read_price: '0.000000175',
   input_cache_write_price: undefined,
   supports_images: true,
   roocode_settings: {
-    included_tools: ['edit_file'],
-    excluded_tools: ['apply_diff'],
+    included_tools: ['apply_patch'],
+    excluded_tools: ['apply_diff', 'edit_file'],
   },
-  opencode_settings: undefined,
+  opencode_settings: {
+    ai_sdk_provider: 'openai',
+    family: 'gpt',
+    prompt: 'codex',
+  },
 };
 
 export const KILO_AUTO_SMALL_MODEL: AutoModel = {
@@ -229,68 +231,4 @@ export const AUTO_MODELS = [
 
 export function isKiloAutoModel(model: string) {
   return AUTO_MODELS.some(m => m.id === model);
-}
-
-export async function resolveAutoModel(
-  model: string,
-  modeHeader: string | null,
-  balancePromise: Promise<number>,
-  hasImages: boolean
-): Promise<ResolvedAutoModel> {
-  if (model === KILO_AUTO_FREE_MODEL.id) {
-    return { model: minimax_m25_free_model.public_id };
-  }
-  if (model === KILO_AUTO_SMALL_MODEL.id) {
-    return {
-      model: (await balancePromise) > 0 ? GPT_5_NANO_ID : gpt_oss_20b_free_model.public_id,
-    };
-  }
-  const modeResult = modeSchema.safeParse(modeHeader?.trim() ?? '');
-  const mode = modeResult.success ? modeResult.data : null;
-  if (model === KILO_AUTO_BALANCED_MODEL.id) {
-    if (hasImages) {
-      return BALANCED_IMAGE_MODEL;
-    }
-    return (mode !== null ? BALANCED_MODE_TO_MODEL[mode] : null) ?? BALANCED_CODE_MODEL;
-  }
-  return (mode !== null ? FRONTIER_MODE_TO_MODEL[mode] : null) ?? FRONTIER_CODE_MODEL;
-}
-
-export async function applyResolvedAutoModel(
-  model: string,
-  request: GatewayRequest,
-  modeHeader: string | null,
-  featureHeader: FeatureValue | null,
-  balancePromise: Promise<number>
-) {
-  const hasImages = requestContainsImages(request);
-  const resolved = await resolveAutoModel(
-    model,
-    featureHeader === 'kiloclaw' || featureHeader === 'openclaw' ? 'KiloClaw' : modeHeader,
-    balancePromise,
-    hasImages
-  );
-  request.body.model = resolved.model;
-  if (resolved.reasoning) {
-    if (request.kind === 'messages') {
-      request.body.thinking = { type: resolved.reasoning.enabled ? 'adaptive' : 'disabled' };
-    } else {
-      request.body.reasoning = resolved.reasoning;
-    }
-  }
-  if (resolved.verbosity) {
-    if (request.kind === 'messages') {
-      request.body.output_config = {
-        ...request.body.output_config,
-        effort: resolved.verbosity,
-      };
-    } else if (request.kind === 'responses') {
-      request.body.text = {
-        ...request.body.text,
-        verbosity: resolved.verbosity as OpenAI.Responses.ResponseTextConfig['verbosity'],
-      };
-    } else {
-      request.body.verbosity = resolved.verbosity as OpenRouterChatCompletionRequest['verbosity'];
-    }
-  }
 }

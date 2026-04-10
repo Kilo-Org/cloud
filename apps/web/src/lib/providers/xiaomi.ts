@@ -12,10 +12,11 @@ export const mimo_v2_pro_free_model: KiloExclusiveModel = {
   context_length: 1048576,
   max_completion_tokens: 131072,
   status: 'disabled',
-  flags: ['free', 'reasoning', 'prompt_cache', 'vision'],
+  flags: ['reasoning', 'vision'],
   gateway: 'openrouter',
   internal_id: 'xiaomi/mimo-v2-pro',
   inference_provider: null,
+  pricing: null,
 };
 
 export const mimo_v2_omni_free_model: KiloExclusiveModel = {
@@ -26,8 +27,9 @@ export const mimo_v2_omni_free_model: KiloExclusiveModel = {
   context_length: 262144,
   max_completion_tokens: 65536,
   status: 'disabled',
-  flags: ['free', 'reasoning', 'prompt_cache', 'vision'],
+  flags: ['reasoning', 'vision'],
   gateway: 'openrouter',
   internal_id: 'xiaomi/mimo-v2-omni',
   inference_provider: null,
+  pricing: null,
 };

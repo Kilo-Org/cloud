@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '../../..');
-const envFilePath = path.join(repoRoot, '.env.development.local');
+const envFilePath = path.join(repoRoot, 'apps/web/.env.development.local');
 
 function updateEnvValue(filePath: string, key: string, value: string): void {
   let content = '';
@@ -49,7 +49,7 @@ function handleOutput(data: Buffer) {
   const secret = match[0];
   updateEnvValue(envFilePath, 'STRIPE_WEBHOOK_SECRET', `"${secret}"`);
 
-  console.log('\nSet STRIPE_WEBHOOK_SECRET in .env.development.local');
+  console.log('\nSet STRIPE_WEBHOOK_SECRET in apps/web/.env.development.local');
 
   // Only capture once
   secretPattern = null;

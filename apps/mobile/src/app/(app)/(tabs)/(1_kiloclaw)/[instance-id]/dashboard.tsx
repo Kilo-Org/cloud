@@ -23,11 +23,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
   useKiloClawBillingStatus,
+  useKiloClawConfig,
   useKiloClawGatewayStatus,
   useKiloClawMutations,
   useKiloClawServiceDegraded,
   useKiloClawStatus,
 } from '@/lib/hooks/use-kiloclaw';
+import { formatModelName, stripModelPrefix } from '@/lib/model-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function DashboardScreen() {
@@ -45,6 +47,8 @@ export default function DashboardScreen() {
 
   const gatewayQuery = useKiloClawGatewayStatus(isRunning);
   const gateway = gatewayQuery.data;
+  const configQuery = useKiloClawConfig();
+  const activeModel = formatModelName(stripModelPrefix(configQuery.data?.kilocodeDefaultModel));
 
   const billing = billingQuery.data;
   const isServiceDegraded = serviceDegradedQuery.data === true;
@@ -122,6 +126,7 @@ export default function DashboardScreen() {
             lastExitCode={gateway?.lastExit?.code}
             lastExitSignal={gateway?.lastExit?.signal}
             gatewayLoading={isRunning && gatewayQuery.isPending}
+            activeModel={activeModel}
           />
 
           <InstanceControls status={status?.status} mutations={mutations} />

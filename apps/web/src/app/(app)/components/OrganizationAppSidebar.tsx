@@ -36,7 +36,6 @@ import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
-import KiloCrabIcon from '@/components/KiloCrabIcon';
 
 type OrganizationAppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   organizationId: string;
@@ -123,6 +122,8 @@ export default function OrganizationAppSidebar({
     },
   ];
 
+  const hasOwnerLevelAccess = currentRole === 'owner' || currentRole === 'billing_manager';
+
   // KiloClaw group
   const kiloClawItems: Array<{
     title: string;
@@ -130,11 +131,6 @@ export default function OrganizationAppSidebar({
     url: string;
     className?: string;
   }> = [
-    {
-      title: 'KiloClaw',
-      icon: KiloCrabIcon,
-      url: `/organizations/${organizationId}/claw`,
-    },
     {
       title: 'Chat',
       icon: MessageSquare,
@@ -144,6 +140,11 @@ export default function OrganizationAppSidebar({
       title: 'Settings',
       icon: Settings,
       url: `/organizations/${organizationId}/claw/settings`,
+    },
+    {
+      title: "What's New",
+      icon: Sparkles,
+      url: `/organizations/${organizationId}/claw/changelog`,
     },
   ];
 
@@ -222,7 +223,6 @@ export default function OrganizationAppSidebar({
       : []),
   ];
 
-  const hasOwnerLevelAccess = currentRole === 'owner' || currentRole === 'billing_manager';
   // Account group
   const accountItems: Array<{
     title: string;

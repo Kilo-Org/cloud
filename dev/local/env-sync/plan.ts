@@ -14,6 +14,7 @@ import type {
   SecretStoreBinding,
   SecretStoreWarning,
   ConsistencyWarning,
+  EnvLocalAutoCreate,
 } from './types';
 import {
   parseEnvFile,
@@ -23,6 +24,22 @@ import {
   parseJsonc,
   generateDevVars,
 } from './parse';
+
+// ---------------------------------------------------------------------------
+// Auto-created local secrets
+// ---------------------------------------------------------------------------
+
+const FLY_TOKEN_ENV_KEY = 'FLY_API_TOKEN';
+const FLY_ORG_SLUG_ENV_KEY = 'FLY_ORG_SLUG';
+const DEFAULT_FLY_ORG_SLUG = 'kilo-dev';
+
+function createFlyTokenAutoCreate(flyOrgSlug: string): EnvLocalAutoCreate {
+  return {
+    key: FLY_TOKEN_ENV_KEY,
+    command: 'fly',
+    args: ['tokens', 'create', 'org', flyOrgSlug],
+  };
+}
 
 // ---------------------------------------------------------------------------
 // LAN IP detection
@@ -175,6 +192,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
       lanIp: undefined,
       devVarsChanges: [],
       envDevLocalChanges: [],
+      envLocalAutoCreates: [],
       secretStoreWarnings: [],
       secretStoreAutoCreates: [],
       consistencyWarnings: [],
@@ -210,6 +228,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
 
   // --- .dev.vars changes ---
   const devVarsChanges: DevVarsFileChange[] = [];
+  const envLocalAutoCreates: EnvLocalAutoCreate[] = [];
   const execWarnings: ExecWarning[] = [];
   const allResolvedEntries = new Map<
     string,
@@ -221,12 +240,27 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     const exampleContent = fs.readFileSync(examplePath, 'utf-8');
     const entries = parseExampleFile(exampleContent);
     const serviceUsesLanIp = dirUsesLanIp.get(workerDir) ?? false;
+    const devVarsPath = path.join(repoRoot, workerDir, '.dev.vars');
+
+    let existingContent: string | null = null;
+    try {
+      existingContent = fs.readFileSync(devVarsPath, 'utf-8');
+    } catch {
+      // File doesn't exist yet
+    }
+    const oldVars =
+      existingContent !== null ? parseEnvFile(existingContent) : new Map<string, string>();
 
     const resolvedVars = new Map<string, string>();
+    const resolvedSources = new Map<
+      string,
+      'env-local' | 'generated' | 'exec' | 'default' | 'missing'
+    >();
     const unresolvedKeys: string[] = [];
+    let shouldCreateFlyToken = false;
 
     for (const entry of entries) {
-      const { value, resolved } = resolveAnnotatedValue(
+      const { value, resolved, source } = resolveAnnotatedValue(
         entry.key,
         entry,
         envLocal,
@@ -234,7 +268,15 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
         serviceUsesLanIp
       );
       resolvedVars.set(entry.key, value);
-      if (!resolved) {
+      resolvedSources.set(entry.key, source);
+
+      const autoCreatesFlyToken =
+        entry.key === FLY_TOKEN_ENV_KEY && !envLocal.get(FLY_TOKEN_ENV_KEY);
+      if (autoCreatesFlyToken) {
+        shouldCreateFlyToken = true;
+      }
+
+      if (!resolved && !autoCreatesFlyToken) {
         unresolvedKeys.push(entry.key);
         if (entry.annotation.type === 'exec') {
           execWarnings.push({
@@ -247,23 +289,24 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
       }
     }
 
-    allResolvedEntries.set(workerDir, { vars: resolvedVars, entries });
-
-    const devVarsPath = path.join(repoRoot, workerDir, '.dev.vars');
-
-    let existingContent: string | null = null;
-    try {
-      existingContent = fs.readFileSync(devVarsPath, 'utf-8');
-    } catch {
-      // File doesn't exist yet
+    if (
+      shouldCreateFlyToken &&
+      !envLocalAutoCreates.some(create => create.key === FLY_TOKEN_ENV_KEY)
+    ) {
+      const flyOrgSlug =
+        oldVars.get(FLY_ORG_SLUG_ENV_KEY) ||
+        resolvedVars.get(FLY_ORG_SLUG_ENV_KEY) ||
+        DEFAULT_FLY_ORG_SLUG;
+      envLocalAutoCreates.push(createFlyTokenAutoCreate(flyOrgSlug));
     }
+
+    allResolvedEntries.set(workerDir, { vars: resolvedVars, entries });
 
     const isNew = existingContent === null;
     const keyChanges: KeyChange[] = [];
     let missingValues: string[];
 
     if (existingContent !== null) {
-      const oldVars = parseEnvFile(existingContent);
       // Only report keys as missing if the existing .dev.vars also lacks a value.
       // Keys that couldn't be resolved but already have a value in .dev.vars are
       // kept as-is — skip them from both missing warnings and key change diffs.
@@ -272,6 +315,9 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
       for (const [key, newVal] of resolvedVars) {
         if (unresolvedSet.has(key)) continue;
         const oldVal = oldVars.get(key);
+        const source = resolvedSources.get(key);
+        if (key === FLY_TOKEN_ENV_KEY && shouldCreateFlyToken) continue;
+        if (oldVal && source === 'default') continue;
         if (oldVal !== newVal) {
           keyChanges.push({ key, oldValue: oldVal, newValue: newVal });
         }
@@ -409,6 +455,7 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     lanIp,
     devVarsChanges,
     envDevLocalChanges,
+    envLocalAutoCreates,
     secretStoreWarnings,
     secretStoreAutoCreates,
     consistencyWarnings,

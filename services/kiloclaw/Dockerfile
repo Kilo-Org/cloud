@@ -92,6 +92,19 @@ RUN GOBIN=/usr/local/bin go install github.com/steipete/gogcli/cmd/gog@v0.12.0 \
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh \
     && uv --version
 
+# ── Builder stage: package customizer plugin ───────────────────────────
+# Build the vendored plugin tarball in an isolated stage so dev-time
+# dependencies do not inflate the runtime image layers.
+FROM runtime AS customizer-builder
+
+COPY plugins/kiloclaw-customizer/ /tmp/kiloclaw-customizer/
+RUN cd /tmp/kiloclaw-customizer \
+    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
+    && PKG_TGZ="$(npm pack --silent)" \
+    && mv "${PKG_TGZ}" /tmp/kiloclaw-customizer.tgz \
+    && cd / \
+    && rm -rf /tmp/kiloclaw-customizer /root/.npm
+
 # ── Builder stage: compile the controller with Bun ────────────────────
 # Bun is only needed to bundle the controller TypeScript into a single JS
 # file. By building in a separate stage, Bun (~100MB) stays out of the
@@ -119,6 +132,12 @@ RUN cd /tmp/controller-build \
 
 # ── Final stage: runtime image ────────────────────────────────────────
 FROM runtime AS final
+
+# Install prebuilt customizer plugin package from builder stage.
+COPY --from=customizer-builder /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-customizer.tgz
+RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz \
+    && rm -f /tmp/kiloclaw-customizer.tgz \
+    && rm -rf /root/.npm
 
 # Copy the compiled controller from the builder stage
 COPY --from=controller-builder /usr/local/bin/kiloclaw-controller.js /usr/local/bin/kiloclaw-controller.js

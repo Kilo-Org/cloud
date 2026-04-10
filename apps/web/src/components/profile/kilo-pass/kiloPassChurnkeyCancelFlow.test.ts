@@ -252,6 +252,38 @@ describe('createKiloPassChurnkeyCancelFlow', () => {
     await duplicateOpen;
   });
 
+  test('ignores duplicate opens from separate surfaces sharing one coordinator', async () => {
+    const coordinator = createKiloPassChurnkeyCancelFlow();
+    const deferredAuth = createDeferred<KiloPassChurnkeyAuth>();
+    let authFetches = 0;
+    const firstSurface = buildCancelFlowParams({
+      getChurnkeyAuthHash: () => {
+        authFetches += 1;
+        return deferredAuth.promise;
+      },
+    });
+    const secondSurface = buildCancelFlowParams({
+      getChurnkeyAuthHash: async () => {
+        authFetches += 1;
+        return { hash: 'second_hash', customerId: 'second_customer' };
+      },
+    });
+
+    const firstOpen = coordinator.openCancelFlow(firstSurface.params);
+    const duplicateOpen = coordinator.openCancelFlow(secondSurface.params);
+
+    expect(authFetches).toBe(1);
+    expect(firstSurface.calls.inFlightChanges).toEqual([true]);
+    expect(secondSurface.calls.inFlightChanges).toHaveLength(0);
+
+    deferredAuth.resolve({ hash: 'hash_test', customerId: 'cus_test' });
+    await firstOpen;
+    await duplicateOpen;
+
+    expect(firstSurface.calls.openedFlows).toHaveLength(1);
+    expect(secondSurface.calls.openedFlows).toHaveLength(0);
+  });
+
   test('keeps duplicate opens blocked after Churnkey init until onClose fires', async () => {
     const coordinator = createKiloPassChurnkeyCancelFlow();
     const { params, calls } = buildCancelFlowParams();

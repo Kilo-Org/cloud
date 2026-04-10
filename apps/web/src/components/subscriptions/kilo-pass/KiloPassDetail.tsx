@@ -49,7 +49,10 @@ import {
   getKiloPassInlineActionModel,
   getKiloPassInlineConfirmationDetails,
 } from './KiloPassDetail.logic';
-import type { KiloPassInlineConfirmationAction } from './KiloPassDetail.logic';
+import type {
+  KiloPassInlineConfirmationAction,
+  KiloPassInlinePrimaryAction,
+} from './KiloPassDetail.logic';
 
 export function KiloPassDetail() {
   const trpc = useTRPC();
@@ -282,10 +285,15 @@ function KiloPassInlineActions({
     useState<KiloPassInlineConfirmationAction | null>(null);
   const [pendingAction, setPendingAction] = useState<KiloPassInlineConfirmationAction | null>(null);
 
+  const primaryAction: KiloPassInlinePrimaryAction = view.actions.resume
+    ? 'resume'
+    : view.actions.cancel
+      ? 'cancel'
+      : 'none';
+
   const inlineActionModel = getKiloPassInlineActionModel({
     hasScheduledChange,
-    hasResumeAction: Boolean(view.actions.resume),
-    hasCancelAction: Boolean(view.actions.cancel),
+    primaryAction,
     isResumingSubscription: actions.isResumingSubscription,
     isOpeningCancelFlow,
     isCancelingSubscription: actions.isCancelingSubscription,

@@ -44,4 +44,4 @@ done
 
 export PORT
 export NEXTAUTH_URL="${NEXTAUTH_URL:-${APP_URL_OVERRIDE:-http://localhost:$PORT}}"
-exec npx next dev -p "$PORT" "$@"
+exec next dev -p "$PORT" "$@"

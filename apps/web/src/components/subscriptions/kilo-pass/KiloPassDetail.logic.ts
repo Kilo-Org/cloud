@@ -1,5 +1,7 @@
 export type KiloPassInlineConfirmationAction = 'resume';
 
+export type KiloPassInlinePrimaryAction = 'resume' | 'cancel' | 'none';
+
 export type KiloPassInlineActionModel = {
   changePlanDisabled: boolean;
   resume: {
@@ -16,8 +18,7 @@ export type KiloPassInlineActionModel = {
 
 export function getKiloPassInlineActionModel(params: {
   hasScheduledChange: boolean;
-  hasResumeAction: boolean;
-  hasCancelAction: boolean;
+  primaryAction: KiloPassInlinePrimaryAction;
   isResumingSubscription: boolean;
   isOpeningCancelFlow: boolean;
   isCancelingSubscription: boolean;
@@ -26,14 +27,15 @@ export function getKiloPassInlineActionModel(params: {
 
   return {
     changePlanDisabled: params.hasScheduledChange,
-    resume: params.hasResumeAction
-      ? {
-          nextAction: 'confirm-resume',
-          disabled: params.isResumingSubscription,
-        }
-      : null,
+    resume:
+      params.primaryAction === 'resume'
+        ? {
+            nextAction: 'confirm-resume',
+            disabled: params.isResumingSubscription,
+          }
+        : null,
     cancel:
-      !params.hasResumeAction && params.hasCancelAction
+      params.primaryAction === 'cancel'
         ? {
             nextAction: 'open-cancel-flow',
             disabled: cancelIsLoading,

@@ -9,8 +9,7 @@ describe('KiloPassDetail.logic', () => {
   test('maps cancel to the Churnkey opener action', () => {
     const model = getKiloPassInlineActionModel({
       hasScheduledChange: false,
-      hasResumeAction: false,
-      hasCancelAction: true,
+      primaryAction: 'cancel',
       isResumingSubscription: false,
       isOpeningCancelFlow: false,
       isCancelingSubscription: false,
@@ -29,8 +28,7 @@ describe('KiloPassDetail.logic', () => {
     const resumeCalls: string[] = [];
     const model = getKiloPassInlineActionModel({
       hasScheduledChange: false,
-      hasResumeAction: true,
-      hasCancelAction: true,
+      primaryAction: 'resume',
       isResumingSubscription: false,
       isOpeningCancelFlow: false,
       isCancelingSubscription: false,
@@ -57,8 +55,7 @@ describe('KiloPassDetail.logic', () => {
   test('models Churnkey-opening loading and disabled cancel state', () => {
     const model = getKiloPassInlineActionModel({
       hasScheduledChange: false,
-      hasResumeAction: false,
-      hasCancelAction: true,
+      primaryAction: 'cancel',
       isResumingSubscription: false,
       isOpeningCancelFlow: true,
       isCancelingSubscription: false,
@@ -75,8 +72,7 @@ describe('KiloPassDetail.logic', () => {
   test('models direct-cancel fallback loading and disabled cancel state', () => {
     const model = getKiloPassInlineActionModel({
       hasScheduledChange: false,
-      hasResumeAction: false,
-      hasCancelAction: true,
+      primaryAction: 'cancel',
       isResumingSubscription: false,
       isOpeningCancelFlow: false,
       isCancelingSubscription: true,
@@ -93,8 +89,7 @@ describe('KiloPassDetail.logic', () => {
   test('disables plan changes while a scheduled change exists', () => {
     const model = getKiloPassInlineActionModel({
       hasScheduledChange: true,
-      hasResumeAction: false,
-      hasCancelAction: false,
+      primaryAction: 'none',
       isResumingSubscription: false,
       isOpeningCancelFlow: false,
       isCancelingSubscription: false,

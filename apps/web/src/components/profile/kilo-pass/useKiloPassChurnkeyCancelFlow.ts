@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { createContext, createElement, useCallback, useContext, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -11,11 +12,33 @@ import { createKiloPassChurnkeyCancelFlow } from './kiloPassChurnkeyCancelFlow';
 
 type KiloPassChurnkeyCancelFlowCoordinator = ReturnType<typeof createKiloPassChurnkeyCancelFlow>;
 
+type KiloPassChurnkeyCancelFlowContextValue = {
+  coordinator: KiloPassChurnkeyCancelFlowCoordinator;
+  isOpeningCancelFlow: boolean;
+  setIsOpeningCancelFlow: (isOpeningCancelFlow: boolean) => void;
+};
+
+const KiloPassChurnkeyCancelFlowContext =
+  createContext<KiloPassChurnkeyCancelFlowContextValue | null>(null);
+
 type UseKiloPassChurnkeyCancelFlowParams = {
   stripeSubscriptionId: string;
   fallbackCancelSubscription: () => void;
   onBeforeOpen?: () => void;
 };
+
+export function KiloPassChurnkeyCancelFlowProvider(props: { children: ReactNode }) {
+  const { children } = props;
+  const [isOpeningCancelFlow, setIsOpeningCancelFlow] = useState(false);
+  const [coordinator] = useState(() => createKiloPassChurnkeyCancelFlow());
+
+  const value = useMemo<KiloPassChurnkeyCancelFlowContextValue>(
+    () => ({ coordinator, isOpeningCancelFlow, setIsOpeningCancelFlow }),
+    [coordinator, isOpeningCancelFlow]
+  );
+
+  return createElement(KiloPassChurnkeyCancelFlowContext.Provider, { value }, children);
+}
 
 export function useKiloPassChurnkeyCancelFlow(params: UseKiloPassChurnkeyCancelFlowParams): {
   openCancelFlow: () => Promise<void>;
@@ -25,11 +48,14 @@ export function useKiloPassChurnkeyCancelFlow(params: UseKiloPassChurnkeyCancelF
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
-  const [isOpeningCancelFlow, setIsOpeningCancelFlow] = useState(false);
+  const sharedCancelFlow = useContext(KiloPassChurnkeyCancelFlowContext);
+  const [localIsOpeningCancelFlow, setLocalIsOpeningCancelFlow] = useState(false);
+  const [localCoordinator] = useState(() => createKiloPassChurnkeyCancelFlow());
 
-  const coordinatorRef = useRef<KiloPassChurnkeyCancelFlowCoordinator | null>(null);
-  const coordinator = coordinatorRef.current ?? createKiloPassChurnkeyCancelFlow();
-  coordinatorRef.current = coordinator;
+  const coordinator = sharedCancelFlow?.coordinator ?? localCoordinator;
+  const isOpeningCancelFlow = sharedCancelFlow?.isOpeningCancelFlow ?? localIsOpeningCancelFlow;
+  const setIsOpeningCancelFlow =
+    sharedCancelFlow?.setIsOpeningCancelFlow ?? setLocalIsOpeningCancelFlow;
 
   const openCancelFlow = useCallback(
     () =>
@@ -56,6 +82,7 @@ export function useKiloPassChurnkeyCancelFlow(params: UseKiloPassChurnkeyCancelF
       fallbackCancelSubscription,
       onBeforeOpen,
       queryClient,
+      setIsOpeningCancelFlow,
       stripeSubscriptionId,
       trpc,
       trpcClient,

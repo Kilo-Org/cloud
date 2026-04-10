@@ -2058,7 +2058,7 @@ const ExtendVolumeSchema = z.object({
 });
 
 const FlyExtendVolumeResponseSchema = z.object({
-  needs_restart: z.boolean(),
+  needs_restart: z.boolean().optional(),
 });
 
 platform.post('/extend-volume', async c => {
@@ -2094,16 +2094,17 @@ platform.post('/extend-volume', async c => {
     const extendParsed = FlyExtendVolumeResponseSchema.safeParse(await resp.json());
     if (!extendParsed.success) {
       console.error(
-        `[platform] extend-volume unexpected response volume=${volumeId}:`,
+        `[platform] extend-volume unexpected response shape volume=${volumeId}:`,
         flattenError(extendParsed.error)
       );
       return jsonError('Unexpected Fly extend-volume response', 502);
     }
-    const { needs_restart } = extendParsed.data;
+    // Default to true so the admin always sees the redeploy warning when Fly omits the flag
+    const needsRestart = extendParsed.data.needs_restart ?? true;
     console.log(
-      `[platform] extend-volume ok: volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}GB (target total) needsRestart=${needs_restart}`
+      `[platform] extend-volume ok: volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}GB (target total) needsRestart=${needsRestart}`
     );
-    return c.json({ ok: true as const, needsRestart: needs_restart });
+    return c.json({ ok: true as const, needsRestart });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'extend-volume');
     return jsonError(message, status);

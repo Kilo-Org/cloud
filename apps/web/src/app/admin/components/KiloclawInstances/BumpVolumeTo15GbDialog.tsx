@@ -12,27 +12,52 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
+import { toast } from 'sonner';
 
 type BumpVolumeTo15GbButtonProps = {
+  userId: string;
+  instanceId: string;
   appName: string | null | undefined;
   volumeId: string | null | undefined;
   userLabel: string;
-  isExtending: boolean;
   disabled?: boolean;
-  onConfirm: () => void;
 };
 
 export function BumpVolumeTo15GbButton({
+  userId,
+  instanceId,
   appName,
   volumeId,
   userLabel,
-  isExtending,
   disabled = false,
-  onConfirm,
 }: BumpVolumeTo15GbButtonProps) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const wasExtendingRef = useRef(false);
+
+  const { mutate: extendVolume, isPending: isExtending } = useMutation(
+    trpc.admin.kiloclawInstances.extendVolume.mutationOptions({
+      onSuccess: result => {
+        if (result.needsRestart) {
+          toast.warning(
+            'Volume extended to 15 GB — machine needs a redeploy for the change to take effect'
+          );
+        } else {
+          toast.success('Volume extended to 15 GB');
+        }
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.get.queryKey(),
+        });
+      },
+      onError: err => {
+        toast.error(`Failed to extend volume: ${err.message}`);
+      },
+    })
+  );
 
   useEffect(() => {
     if (!open) setAcknowledged(false);
@@ -46,6 +71,14 @@ export function BumpVolumeTo15GbButton({
   }, [isExtending]);
 
   const buttonDisabled = !volumeId || isExtending || disabled;
+
+  const handleConfirm = () => {
+    if (!appName || !volumeId) {
+      toast.error('Missing app name or volume ID');
+      return;
+    }
+    extendVolume({ userId, instanceId, appName, volumeId });
+  };
 
   return (
     <>
@@ -107,7 +140,7 @@ export function BumpVolumeTo15GbButton({
             <Button
               variant="destructive"
               disabled={isExtending || !acknowledged || !appName || !volumeId}
-              onClick={onConfirm}
+              onClick={handleConfirm}
             >
               {isExtending ? (
                 <>

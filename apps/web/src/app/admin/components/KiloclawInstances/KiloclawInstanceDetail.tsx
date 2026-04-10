@@ -1487,24 +1487,6 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
       })
     );
 
-  const { mutateAsync: extendVolume, isPending: isExtendingVolume } = useMutation(
-    trpc.admin.kiloclawInstances.extendVolume.mutationOptions({
-      onSuccess: result => {
-        if (result.needsRestart) {
-          toast.warning(
-            'Volume extended to 15 GB — machine needs a redeploy for the change to take effect'
-          );
-        } else {
-          toast.success('Volume extended to 15 GB');
-        }
-        invalidateMachineQueries();
-      },
-      onError: err => {
-        toast.error(`Failed to extend volume: ${err.message}`);
-      },
-    })
-  );
-
   const { mutateAsync: gatewayStart, isPending: isGatewayStarting } = useMutation(
     trpc.admin.kiloclawInstances.gatewayStart.mutationOptions({
       onSuccess: () => {
@@ -2497,26 +2479,15 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   </div>
                 </div>
                 <BumpVolumeTo15GbButton
+                  userId={data.user_id}
+                  instanceId={data.id}
                   appName={data.workerStatus?.flyAppName}
                   volumeId={volumeId}
                   userLabel={data.user_email ?? data.user_id}
-                  isExtending={isExtendingVolume}
                   disabled={
                     data.workerStatus?.status === 'restoring' ||
                     data.workerStatus?.status === 'destroying'
                   }
-                  onConfirm={() => {
-                    if (!data.workerStatus?.flyAppName || !volumeId) {
-                      toast.error('Missing app name or volume ID');
-                      return;
-                    }
-                    void extendVolume({
-                      userId: data.user_id,
-                      instanceId: data.id,
-                      appName: data.workerStatus.flyAppName,
-                      volumeId,
-                    });
-                  }}
                 />
               </div>
             </CardHeader>

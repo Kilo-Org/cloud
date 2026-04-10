@@ -729,3 +729,83 @@ describe('credit renewal sweep affiliate tracking', () => {
     ]);
   });
 });
+
+describe('complementary inference ended sweep', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  it('only emails users whose instance-ready email was sent after the rollout cutoff', async () => {
+    const { db, inserts } = createMockDb([
+      [
+        {
+          user_id: 'user-before',
+          email: 'before@example.com',
+          sandbox_id: 'ki_before',
+          instance_ready_sent_at: '2026-04-09T23:59:59.999Z',
+        },
+        {
+          user_id: 'user-at-cutoff',
+          email: 'at-cutoff@example.com',
+          sandbox_id: 'ki_at_cutoff',
+          instance_ready_sent_at: '2026-04-10T00:00:00.000Z',
+        },
+        {
+          user_id: 'user-after',
+          email: 'after@example.com',
+          sandbox_id: 'ki_after',
+          instance_ready_sent_at: '2026-04-10T00:00:00.001Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+    const fetch = vi.fn(
+      async (_request: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ sent: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: 'edededed-eded-4ded-8ded-edededededed',
+        sweep: 'complementary_inference_ended',
+      },
+      1
+    );
+
+    expect(summary.complementary_inference_ended_emails).toBe(1);
+    expect(summary.emails_sent).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(inserts).toEqual([
+      {
+        user_id: 'user-after',
+        email_type: 'claw_complementary_inference_ended:ki_after',
+      },
+    ]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const request = fetch.mock.calls[0]?.[1];
+    const body = JSON.parse(typeof request?.body === 'string' ? request.body : '{}') as {
+      action: string;
+      input: Record<string, unknown>;
+    };
+    expect(body).toEqual({
+      action: 'send_email',
+      input: {
+        to: 'after@example.com',
+        templateName: 'clawComplementaryInferenceEnded',
+        templateVars: {
+          claw_url: 'https://app.kilo.ai/claw',
+          credits_url: 'https://app.kilo.ai/credits',
+          free_model_name: 'Kilo Auto Free',
+        },
+      },
+    });
+  });
+});

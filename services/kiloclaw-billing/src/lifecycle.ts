@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNotNull, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, sql } from 'drizzle-orm';
 import { addMonths, format } from 'date-fns';
 
 import type { WorkerDb } from '@kilocode/db';
@@ -1778,6 +1778,15 @@ async function runEarlybirdWarningSweep(
 }
 
 const COMPLEMENTARY_INFERENCE_WINDOW_MS = 6 * 60 * 60 * 1000;
+const COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_ISO = '2026-04-10T00:00:00.000Z';
+const COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_MS = Date.parse(
+  COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_ISO
+);
+
+function wasInstanceReadyEmailSentAfterComplementaryInferenceCutoff(sentAt: string): boolean {
+  const sentAtMs = Date.parse(sentAt);
+  return Number.isFinite(sentAtMs) && sentAtMs > COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_MS;
+}
 
 async function runComplementaryInferenceEndedSweep(
   database: WorkerDb,
@@ -1789,9 +1798,9 @@ async function runComplementaryInferenceEndedSweep(
   const creditsUrl = `${env.KILOCODE_BACKEND_BASE_URL}/credits`;
   const windowCutoff = new Date(Date.now() - COMPLEMENTARY_INFERENCE_WINDOW_MS).toISOString();
 
-  // Find users whose "instance ready" email was sent more than 6 hours ago,
-  // whose instance is not destroyed, who have never purchased credits,
-  // and who have not already received this notification.
+  // Find users whose "instance ready" email was sent more than 6 hours ago
+  // after the rollout cutoff, whose instance is not destroyed, who have never
+  // purchased credits, and who have not already received this notification.
   //
   // The email_type for the "instance ready" log is `claw_instance_ready:{sandboxId}`.
   // We extract the sandbox_id by joining against kiloclaw_instances.
@@ -1800,6 +1809,7 @@ async function runComplementaryInferenceEndedSweep(
       user_id: kilocode_users.id,
       email: kilocode_users.google_user_email,
       sandbox_id: kiloclaw_instances.sandbox_id,
+      instance_ready_sent_at: kiloclaw_email_log.sent_at,
     })
     .from(kiloclaw_email_log)
     .innerJoin(kilocode_users, eq(kiloclaw_email_log.user_id, kilocode_users.id))
@@ -1813,6 +1823,7 @@ async function runComplementaryInferenceEndedSweep(
     .where(
       and(
         sql`${kiloclaw_email_log.email_type} LIKE 'claw_instance_ready:%'`,
+        gt(kiloclaw_email_log.sent_at, COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_ISO),
         lte(kiloclaw_email_log.sent_at, windowCutoff),
         isNull(kiloclaw_instances.destroyed_at),
         // Not already sent the complementary inference ended email for this instance
@@ -1833,6 +1844,10 @@ async function runComplementaryInferenceEndedSweep(
 
   for (const row of rows) {
     try {
+      if (!wasInstanceReadyEmailSentAfterComplementaryInferenceCutoff(row.instance_ready_sent_at)) {
+        continue;
+      }
+
       const sent = await trySendEmail(
         database,
         env,

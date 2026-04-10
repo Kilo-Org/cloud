@@ -56,13 +56,15 @@ export default function KiloClawInstanceList() {
   const didAutoRedirect = useRef(false);
 
   useEffect(() => {
-    if (didAutoRedirect.current || instances?.length !== 1) {
+    if (didAutoRedirect.current || !instances) {
       return;
     }
     didAutoRedirect.current = true;
-    const instance = instances[0];
-    if (instance) {
-      router.replace(`/(app)/chat/${instance.sandboxId}` as Href);
+    if (instances.length === 1) {
+      const instance = instances[0];
+      if (instance) {
+        router.replace(`/(app)/chat/${instance.sandboxId}` as Href);
+      }
     }
   }, [instances, router]);
 

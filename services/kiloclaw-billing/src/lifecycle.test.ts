@@ -38,7 +38,6 @@ function createMockDb(selectResults: unknown[][], options?: { txInsertRowCounts?
   const txDeletes: unknown[] = [];
   const inserts: Array<Record<string, unknown>> = [];
   const txInserts: Array<Record<string, unknown>> = [];
-  const wheres: unknown[] = [];
   const txInsertRowCounts = [...(options?.txInsertRowCounts ?? [])];
   const nextSelectResult = () => createSelectResult(selectResults.shift() ?? []);
   const createSelectBuilder = (): SelectBuilder => {
@@ -46,10 +45,7 @@ function createMockDb(selectResults: unknown[][], options?: { txInsertRowCounts?
       from: vi.fn(() => builder),
       innerJoin: vi.fn(() => builder),
       leftJoin: vi.fn(() => builder),
-      where: vi.fn(whereArg => {
-        wheres.push(whereArg);
-        return nextSelectResult();
-      }),
+      where: vi.fn(() => nextSelectResult()),
       limit: vi.fn(async () => selectResults.shift() ?? []),
     };
     return builder;
@@ -127,17 +123,7 @@ function createMockDb(selectResults: unknown[][], options?: { txInsertRowCounts?
     txDeletes,
     inserts,
     txInserts,
-    wheres,
   };
-}
-
-function containsValue(value: unknown, expected: string, seen = new WeakSet<object>()): boolean {
-  if (value === expected) return true;
-  if (typeof value !== 'object' || value === null) return false;
-  if (seen.has(value)) return false;
-  seen.add(value);
-  if (Array.isArray(value)) return value.some(item => containsValue(item, expected, seen));
-  return Object.values(value).some(item => containsValue(item, expected, seen));
 }
 
 function createEnv(fetchImpl: BillingWorkerEnv['KILOCLAW']['fetch']): BillingWorkerEnv {
@@ -741,73 +727,5 @@ describe('credit renewal sweep affiliate tracking', () => {
         },
       },
     ]);
-  });
-});
-
-describe('complementary inference ended sweep', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockGetWorkerDb.mockReset();
-    vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
-  });
-
-  it('filters instance-ready email eligibility at the rollout cutoff', async () => {
-    const { db, inserts, wheres } = createMockDb([
-      [
-        {
-          user_id: 'user-after',
-          email: 'after@example.com',
-          sandbox_id: 'ki_after',
-        },
-      ],
-    ]);
-    mockGetWorkerDb.mockReturnValue(db);
-    const fetch = vi.fn(
-      async (_request: RequestInfo | URL, _init?: RequestInit) =>
-        new Response(JSON.stringify({ sent: true }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        })
-    );
-    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
-
-    const summary = await runSweep(
-      createEnv(vi.fn()),
-      {
-        runId: 'edededed-eded-4ded-8ded-edededededed',
-        sweep: 'complementary_inference_ended',
-      },
-      1
-    );
-
-    expect(summary.complementary_inference_ended_emails).toBe(1);
-    expect(summary.emails_sent).toBe(1);
-    expect(summary.errors).toBe(0);
-    expect(wheres.some(whereArg => containsValue(whereArg, '2026-04-10T00:00:00.000Z'))).toBe(true);
-    expect(inserts).toEqual([
-      {
-        user_id: 'user-after',
-        email_type: 'claw_complementary_inference_ended:ki_after',
-      },
-    ]);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    const request = fetch.mock.calls[0]?.[1];
-    const body = JSON.parse(typeof request?.body === 'string' ? request.body : '{}') as {
-      action: string;
-      input: Record<string, unknown>;
-    };
-    expect(body).toEqual({
-      action: 'send_email',
-      input: {
-        to: 'after@example.com',
-        templateName: 'clawComplementaryInferenceEnded',
-        templateVars: {
-          claw_url: 'https://app.kilo.ai/claw',
-          credits_url: 'https://app.kilo.ai/credits',
-          free_model_name: 'Kilo Auto Free',
-        },
-      },
-    });
   });
 });

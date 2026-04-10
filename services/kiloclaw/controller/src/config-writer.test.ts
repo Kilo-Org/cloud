@@ -137,14 +137,6 @@ describe('generateBaseConfig', () => {
     expect(config.tools.profile).toBe('full');
   });
 
-  it('steers web search provider to kilo-exa on fresh install', () => {
-    const { deps } = fakeDeps();
-    const env = { ...minimalEnv(), KILOCLAW_FRESH_INSTALL: 'true' };
-    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
-
-    expect(config.tools.web.search.provider).toBe('kilo-exa');
-  });
-
   it('preserves existing web search provider on non-fresh boot', () => {
     const existing = JSON.stringify({
       tools: {

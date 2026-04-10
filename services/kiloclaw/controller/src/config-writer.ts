@@ -11,7 +11,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const DEFAULT_CONFIG_PATH = '/root/.openclaw/openclaw.json';
-const KILOCLAW_WEB_SEARCH_PROVIDER = 'kilo-exa';
 
 export const MAX_CONFIG_BACKUPS = 5;
 
@@ -230,14 +229,6 @@ export function generateBaseConfig(
   config.tools = config.tools ?? {};
   if (env.KILOCLAW_FRESH_INSTALL === 'true' || !config.tools.profile) {
     config.tools.profile = 'full';
-  }
-
-  // Fresh install steering: default web_search to the Kilo-managed Exa provider.
-  // Existing instances keep their current provider selection.
-  if (env.KILOCLAW_FRESH_INSTALL === 'true') {
-    config.tools.web = config.tools.web ?? {};
-    config.tools.web.search = config.tools.web.search ?? {};
-    config.tools.web.search.provider = KILOCLAW_WEB_SEARCH_PROVIDER;
   }
 
   // Exec: KiloClaw machines have no Docker sandbox, so exec must target the
@@ -575,9 +566,8 @@ export function writeBaseConfig(
 
     // 4. Patch the fresh onboard config with env-var-derived fields.
     const config = generateBaseConfig(env, tmpPath, deps);
-    // Restore flow should still force full tools profile, but it must not
-    // piggyback on KILOCLAW_FRESH_INSTALL because that would also re-steer
-    // web search provider selection for existing instances.
+    // Restore flow should still force full tools profile even when
+    // KILOCLAW_FRESH_INSTALL is not set.
     config.tools = config.tools ?? {};
     config.tools.profile = 'full';
 

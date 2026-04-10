@@ -4075,6 +4075,9 @@ export class TownDO extends DurableObject<Env> {
     const systemPrompt = buildTriageSystemPrompt(pendingRequests);
 
     // Only now create the synthetic bead — preconditions are verified.
+    // Set rig_id so that if Rule 3 resets this bead to 'open' after a
+    // dispatch timeout, Rule 1 of the reconciler can pick it up and
+    // re-dispatch it (with the correct triage system prompt via Option B).
     const triageBead = beadOps.createBead(this.sql, {
       type: 'issue',
       title: `Triage batch: ${pendingCount} request(s)`,
@@ -4082,6 +4085,7 @@ export class TownDO extends DurableObject<Env> {
       priority: 'high',
       labels: [patrol.TRIAGE_BATCH_LABEL],
       created_by: 'patrol',
+      rig_id: rigId,
     });
 
     const triageAgent = agents.getOrCreateAgent(this.sql, 'polecat', rigId, this.townId);

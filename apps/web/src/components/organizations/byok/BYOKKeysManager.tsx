@@ -562,12 +562,14 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400">
                       <AlertTriangle className="h-4 w-4 text-amber-500" />
                       <AlertDescription>
-                        <p className="font-medium">Important: use the matching model entry</p>
+                        <p className="font-medium">
+                          Important: You must use a model from{' '}
+                          <strong>{directProvider.name}</strong> to use this key
+                        </p>
                         <p className="mt-1">
-                          In your client, select a <strong>{directProvider.name}</strong> model
-                          entry (see supported models above) to use this key. After saving, you may
-                          need to wait a few minutes and restart your client for this entry to
-                          appear.
+                          In your client, select a model entry from the list above. After saving,
+                          you may need to wait a few minutes and restart your client for this entry
+                          to appear.
                         </p>
                       </AlertDescription>
                     </Alert>

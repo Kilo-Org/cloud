@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
-import { optimisticCallbacks } from '@/lib/hooks/use-optimistic-mutation';
 import { useTRPC } from '@/lib/trpc';
 
 const onMutationError = (error: { message: string }) => {
@@ -69,8 +68,23 @@ export function useKiloClawMutations(organizationId?: string | null) {
     settle?: () => Promise<void>
   ) {
     return {
-      ...optimisticCallbacks({ queryClient, queryKey: qk, updater, settle }),
-      onError: onMutationError,
+      onMutate: async (input: TInput) => {
+        await queryClient.cancelQueries({ queryKey: qk });
+        const previous = queryClient.getQueryData<TData>(qk);
+        queryClient.setQueryData<TData>(qk, old => (old ? updater(old, input) : old));
+        return { previous };
+      },
+      onError: (error: { message: string }, _input: TInput, context?: { previous?: TData }) => {
+        if (context?.previous) {
+          queryClient.setQueryData(qk, context.previous);
+        }
+        onMutationError(error);
+      },
+      onSettled:
+        settle ??
+        (async () => {
+          await queryClient.invalidateQueries({ queryKey: qk });
+        }),
     };
   }
 

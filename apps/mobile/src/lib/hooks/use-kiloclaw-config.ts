@@ -1,24 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { resolveContext } from '@/lib/hooks/use-context-query';
 import { useTRPC } from '@/lib/trpc';
-
-function orgInput(organizationId?: string | null) {
-  return { organizationId: organizationId ?? '' };
-}
 
 export function useKiloClawGoogleSetup(organizationId?: string | null, enabled = true) {
   const trpc = useTRPC();
-  const isResolved = organizationId !== undefined;
-  const isOrg = Boolean(organizationId);
+  const { isOrg, personalEnabled, orgEnabled, orgInput } = resolveContext(organizationId, enabled);
   const personal = useQuery(
     trpc.kiloclaw.getGoogleSetupCommand.queryOptions(undefined, {
-      enabled: enabled && isResolved && !isOrg,
+      enabled: personalEnabled,
       staleTime: 50 * 60_000,
     })
   );
   const org = useQuery(
-    trpc.organizations.kiloclaw.getGoogleSetupCommand.queryOptions(orgInput(organizationId), {
-      enabled: enabled && isResolved && isOrg,
+    trpc.organizations.kiloclaw.getGoogleSetupCommand.queryOptions(orgInput, {
+      enabled: orgEnabled,
       staleTime: 50 * 60_000,
     })
   );
@@ -27,17 +23,16 @@ export function useKiloClawGoogleSetup(organizationId?: string | null, enabled =
 
 export function useKiloClawChannelCatalog(organizationId?: string | null) {
   const trpc = useTRPC();
-  const isResolved = organizationId !== undefined;
-  const isOrg = Boolean(organizationId);
+  const { isOrg, personalEnabled, orgEnabled, orgInput } = resolveContext(organizationId);
   const personal = useQuery(
     trpc.kiloclaw.getChannelCatalog.queryOptions(undefined, {
-      enabled: isResolved && !isOrg,
+      enabled: personalEnabled,
       staleTime: 5 * 60_000,
     })
   );
   const org = useQuery(
-    trpc.organizations.kiloclaw.getChannelCatalog.queryOptions(orgInput(organizationId), {
-      enabled: isResolved && isOrg,
+    trpc.organizations.kiloclaw.getChannelCatalog.queryOptions(orgInput, {
+      enabled: orgEnabled,
       staleTime: 5 * 60_000,
     })
   );
@@ -46,17 +41,16 @@ export function useKiloClawChannelCatalog(organizationId?: string | null) {
 
 export function useKiloClawSecretCatalog(organizationId?: string | null) {
   const trpc = useTRPC();
-  const isResolved = organizationId !== undefined;
-  const isOrg = Boolean(organizationId);
+  const { isOrg, personalEnabled, orgEnabled, orgInput } = resolveContext(organizationId);
   const personal = useQuery(
     trpc.kiloclaw.getSecretCatalog.queryOptions(undefined, {
-      enabled: isResolved && !isOrg,
+      enabled: personalEnabled,
       staleTime: 5 * 60_000,
     })
   );
   const org = useQuery(
-    trpc.organizations.kiloclaw.getSecretCatalog.queryOptions(orgInput(organizationId), {
-      enabled: isResolved && isOrg,
+    trpc.organizations.kiloclaw.getSecretCatalog.queryOptions(orgInput, {
+      enabled: orgEnabled,
       staleTime: 5 * 60_000,
     })
   );
@@ -65,17 +59,16 @@ export function useKiloClawSecretCatalog(organizationId?: string | null) {
 
 export function useStreamChatCredentials(organizationId?: string | null, enabled = true) {
   const trpc = useTRPC();
-  const isResolved = organizationId !== undefined;
-  const isOrg = Boolean(organizationId);
+  const { isOrg, personalEnabled, orgEnabled, orgInput } = resolveContext(organizationId, enabled);
   const personal = useQuery(
     trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
-      enabled: enabled && isResolved && !isOrg,
+      enabled: personalEnabled,
       staleTime: 5 * 60_000,
     })
   );
   const org = useQuery(
-    trpc.organizations.kiloclaw.getStreamChatCredentials.queryOptions(orgInput(organizationId), {
-      enabled: enabled && isResolved && isOrg,
+    trpc.organizations.kiloclaw.getStreamChatCredentials.queryOptions(orgInput, {
+      enabled: orgEnabled,
       staleTime: 5 * 60_000,
     })
   );
@@ -84,17 +77,16 @@ export function useStreamChatCredentials(organizationId?: string | null, enabled
 
 export function useKiloClawConfig(organizationId?: string | null) {
   const trpc = useTRPC();
-  const isResolved = organizationId !== undefined;
-  const isOrg = Boolean(organizationId);
+  const { isOrg, personalEnabled, orgEnabled, orgInput } = resolveContext(organizationId);
   const personal = useQuery(
     trpc.kiloclaw.getConfig.queryOptions(undefined, {
-      enabled: isResolved && !isOrg,
+      enabled: personalEnabled,
       staleTime: 60_000,
     })
   );
   const org = useQuery(
-    trpc.organizations.kiloclaw.getConfig.queryOptions(orgInput(organizationId), {
-      enabled: isResolved && isOrg,
+    trpc.organizations.kiloclaw.getConfig.queryOptions(orgInput, {
+      enabled: orgEnabled,
       staleTime: 60_000,
     })
   );

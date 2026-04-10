@@ -1,3 +1,11 @@
+/**
+ *
+ * This is a temporary feature to assist Customer Support.
+ * To be deleted after user-facing file deletion is launched. 
+ * 
+ * All changes for this feature are in PR #2302.
+ * 
+ */
 'use client';
 
 import { useEffect, useRef, useState } from 'react';

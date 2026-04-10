@@ -49,6 +49,11 @@ const projectIdFlag = projectIdArg?.substring(projectIdArg.indexOf('=') + 1);
 
 const isMemberMode = !!(clientIdFlag && clientSecretFlag && projectIdFlag);
 
+if (!isMemberMode && (clientIdFlag || clientSecretFlag || projectIdFlag)) {
+  console.error('Member mode requires all three flags: --client-id, --client-secret, and --project-id');
+  process.exit(1);
+}
+
 if (!token) {
   console.error(
     'Usage:\n' +

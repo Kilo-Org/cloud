@@ -559,8 +559,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     p => p.id === selectedProvider
                   );
                   return directProvider ? (
-                    <Alert className="border-amber-400/30 bg-amber-50/50 text-amber-800 dark:border-amber-500/20 dark:bg-amber-950/20 dark:text-amber-300">
-                      <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+                    <Alert className="border-amber-400/60 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-200">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                       <AlertDescription>
                         <p className="font-medium">Important: use the matching model entry</p>
                         <p className="mt-1">

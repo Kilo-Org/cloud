@@ -459,7 +459,7 @@ function AttentionItemRow({
                 openDrawer({
                   type: 'bead',
                   beadId: beadToOpen.bead_id,
-                  rigId: beadToOpen.rig_id ?? rigId,
+                  rigId,
                 });
               }}
               className="min-w-0 truncate text-sm text-white/75 transition-colors hover:text-white/90"
@@ -549,7 +549,7 @@ function AttentionItemRow({
               openDrawer({
                 type: 'bead',
                 beadId: beadToOpen.bead_id,
-                rigId: beadToOpen.rig_id ?? rigId,
+                rigId,
               });
             }}
             className="rounded-md p-1.5 text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/60"

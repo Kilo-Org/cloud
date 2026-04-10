@@ -24,7 +24,7 @@ import {
 } from '../schemas/image-version';
 import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/image-version';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
-import { z } from 'zod';
+import { flattenError, z } from 'zod';
 import { withDORetry } from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import { deriveGatewayToken } from '../auth/gateway-token';
@@ -2057,6 +2057,10 @@ const ExtendVolumeSchema = z.object({
     .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
 });
 
+const FlyExtendVolumeResponseSchema = z.object({
+  needs_restart: z.boolean(),
+});
+
 platform.post('/extend-volume', async c => {
   const result = await parseBody(c, ExtendVolumeSchema);
   if ('error' in result) return result.error;
@@ -2087,7 +2091,15 @@ platform.post('/extend-volume', async c => {
       return jsonError(`Fly API error (${resp.status}): ${body}`, resp.status);
     }
 
-    const { needs_restart } = (await resp.json()) as { needs_restart: boolean };
+    const extendParsed = FlyExtendVolumeResponseSchema.safeParse(await resp.json());
+    if (!extendParsed.success) {
+      console.error(
+        `[platform] extend-volume unexpected response volume=${volumeId}:`,
+        flattenError(extendParsed.error)
+      );
+      return jsonError('Unexpected Fly extend-volume response', 502);
+    }
+    const { needs_restart } = extendParsed.data;
     console.log(
       `[platform] extend-volume ok: volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}GB (target total) needsRestart=${needs_restart}`
     );

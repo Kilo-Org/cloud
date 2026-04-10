@@ -192,7 +192,6 @@
         "WORKER_ENV": "development",
         "NEXT_PUBLIC_POSTHOG_KEY": "phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z",
       },
-
     },
   },
 }

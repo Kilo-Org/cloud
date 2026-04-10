@@ -456,26 +456,6 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                 </Select>
               </div>
 
-              {selectedProvider &&
-                (() => {
-                  const directProvider = DIRECT_BYOK_PROVIDERS_LIST.find(
-                    p => p.id === selectedProvider
-                  );
-                  return directProvider ? (
-                    <Alert className="border-amber-500/50 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200">
-                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                      <AlertDescription>
-                        <p className="font-medium">Important: use the matching model entry</p>
-                        <p className="mt-1">
-                          In your client, select the <strong>{directProvider.name}</strong> model
-                          entry to use this key. After saving, you may need to wait a few minutes
-                          and restart your client for this entry to appear.
-                        </p>
-                      </AlertDescription>
-                    </Alert>
-                  ) : null;
-                })()}
-
               <div className="space-y-2">
                 <Label htmlFor="apiKey">
                   {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock
@@ -572,6 +552,27 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   </div>
                 </div>
               )}
+
+              {selectedProvider &&
+                (() => {
+                  const directProvider = DIRECT_BYOK_PROVIDERS_LIST.find(
+                    p => p.id === selectedProvider
+                  );
+                  return directProvider ? (
+                    <Alert className="border-amber-400/30 bg-amber-50/50 text-amber-800 dark:border-amber-500/20 dark:bg-amber-950/20 dark:text-amber-300">
+                      <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+                      <AlertDescription>
+                        <p className="font-medium">Important: use the matching model entry</p>
+                        <p className="mt-1">
+                          In your client, select a <strong>{directProvider.name}</strong> model
+                          entry (see supported models above) to use this key. After saving, you may
+                          need to wait a few minutes and restart your client for this entry to
+                          appear.
+                        </p>
+                      </AlertDescription>
+                    </Alert>
+                  ) : null;
+                })()}
             </div>
 
             <DialogFooter>

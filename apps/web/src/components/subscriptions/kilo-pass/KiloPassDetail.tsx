@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Calendar, Coins, Crown, ExternalLink } from 'lucide-react';
+import { Calendar, Coins, Crown, ExternalLink, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +26,7 @@ import {
   KiloPassSubscriptionInfoProvider,
   useKiloPassSubscriptionInfo,
 } from '@/components/profile/kilo-pass/useKiloPassSubscriptionInfo';
+import { useKiloPassChurnkeyCancelFlow } from '@/components/profile/kilo-pass/useKiloPassChurnkeyCancelFlow';
 import type { KiloPassSubscription } from '@/components/profile/kilo-pass/kiloPassSubscription';
 import { KiloPassSubscriptionSettingsModal } from '@/components/profile/kilo-pass/KiloPassSubscriptionSettingsModal';
 import { KiloPassBonusRampDialog } from '@/components/profile/kilo-pass/KiloPassBonusRampDialog';
@@ -44,6 +45,11 @@ import {
   isKiloPassTerminal,
 } from '@/components/subscriptions/helpers';
 import { useCursorPagination } from '@/components/subscriptions/useCursorPagination';
+import {
+  getKiloPassInlineActionModel,
+  getKiloPassInlineConfirmationDetails,
+} from './KiloPassDetail.logic';
+import type { KiloPassInlineConfirmationAction } from './KiloPassDetail.logic';
 
 export function KiloPassDetail() {
   const trpc = useTRPC();
@@ -258,8 +264,6 @@ export function KiloPassDetail() {
   );
 }
 
-type KiloPassConfirmationAction = 'cancel' | 'resume';
-
 function KiloPassInlineActions({
   onOpenSettings,
   onResume,
@@ -269,39 +273,28 @@ function KiloPassInlineActions({
   onResume: () => Promise<void>;
   hasScheduledChange: boolean;
 }) {
-  const { view, actions } = useKiloPassSubscriptionInfo();
-  const [confirmationAction, setConfirmationAction] = useState<KiloPassConfirmationAction | null>(
-    null
-  );
-  const [pendingAction, setPendingAction] = useState<KiloPassConfirmationAction | null>(null);
+  const { subscription, view, actions } = useKiloPassSubscriptionInfo();
+  const { openCancelFlow, isOpeningCancelFlow } = useKiloPassChurnkeyCancelFlow({
+    stripeSubscriptionId: subscription.stripeSubscriptionId,
+    fallbackCancelSubscription: actions.cancelSubscription,
+  });
+  const [confirmationAction, setConfirmationAction] =
+    useState<KiloPassInlineConfirmationAction | null>(null);
+  const [pendingAction, setPendingAction] = useState<KiloPassInlineConfirmationAction | null>(null);
 
-  const confirmationDetails =
-    confirmationAction === 'cancel'
-      ? {
-          title: 'Cancel subscription at period end?',
-          description:
-            'Your Kilo Pass subscription stays active through the current billing period, then the subscription ends. You will lose your bonus streak.',
-          confirmLabel: 'Cancel Subscription',
-          pendingLabel: 'Canceling subscription',
-          confirmVariant: 'destructive' as const,
-          action: () =>
-            new Promise<void>(resolve => {
-              actions.cancelSubscription({ onSuccess: resolve });
-            }),
-        }
-      : confirmationAction === 'resume'
-        ? {
-            title: 'Resume subscription?',
-            description:
-              'This removes the pending cancellation so your Kilo Pass subscription keeps renewing automatically.',
-            confirmLabel: 'Resume Subscription',
-            pendingLabel: 'Resuming subscription',
-            confirmVariant: 'default' as const,
-            action: async () => {
-              await onResume();
-            },
-          }
-        : null;
+  const inlineActionModel = getKiloPassInlineActionModel({
+    hasScheduledChange,
+    hasResumeAction: Boolean(view.actions.resume),
+    hasCancelAction: Boolean(view.actions.cancel),
+    isResumingSubscription: actions.isResumingSubscription,
+    isOpeningCancelFlow,
+    isCancelingSubscription: actions.isCancelingSubscription,
+  });
+
+  const confirmationDetails = getKiloPassInlineConfirmationDetails({
+    confirmationAction,
+    onResume,
+  });
 
   function confirmAction() {
     if (!confirmationAction || !confirmationDetails) return;
@@ -316,20 +309,32 @@ function KiloPassInlineActions({
   return (
     <>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" onClick={onOpenSettings} disabled={hasScheduledChange}>
+        <Button
+          variant="outline"
+          onClick={onOpenSettings}
+          disabled={inlineActionModel.changePlanDisabled}
+        >
           Change Plan
         </Button>
-        {view.actions.resume ? (
-          <Button variant="outline" onClick={() => setConfirmationAction('resume')}>
-            Resume Subscription
-          </Button>
-        ) : view.actions.cancel ? (
+        {inlineActionModel.resume ? (
           <Button
             variant="outline"
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => setConfirmationAction('cancel')}
+            onClick={() => setConfirmationAction('resume')}
+            disabled={inlineActionModel.resume.disabled}
           >
-            Cancel Subscription
+            Resume Subscription
+          </Button>
+        ) : inlineActionModel.cancel ? (
+          <Button
+            variant="outline"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive gap-2"
+            onClick={() => void openCancelFlow()}
+            disabled={inlineActionModel.cancel.disabled}
+          >
+            {inlineActionModel.cancel.isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : null}
+            {inlineActionModel.cancel.label}
           </Button>
         ) : null}
         <Button

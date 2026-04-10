@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll, beforeEach, jest } from '@jest/globals';
+import { describe, expect, it, beforeAll, beforeEach, afterEach, jest } from '@jest/globals';
 
 import { db } from '@/lib/drizzle';
 import {
@@ -98,6 +98,7 @@ type KiloPassCaller = {
     creditsAwarded: boolean;
   }>;
   getCustomerPortalUrl: (input: { returnUrl?: string }) => Promise<{ url: string }>;
+  getChurnkeyAuthHash: () => Promise<{ hash: string; customerId: string }>;
   cancelSubscription: () => Promise<{ success: boolean }>;
   resumeCancelledSubscription: () => Promise<{ success: boolean }>;
   resumePausedSubscription: () => Promise<{ success: boolean }>;
@@ -951,6 +952,68 @@ describe('kiloPassRouter', () => {
         customer: user.stripe_customer_id,
         return_url: returnUrl,
       });
+    });
+  });
+
+  describe('getChurnkeyAuthHash', () => {
+    let originalChurnkeyApiSecret: string | undefined;
+
+    beforeEach(() => {
+      originalChurnkeyApiSecret = process.env.CHURNKEY_API_SECRET;
+    });
+
+    afterEach(() => {
+      if (originalChurnkeyApiSecret === undefined) {
+        delete process.env.CHURNKEY_API_SECRET;
+      } else {
+        process.env.CHURNKEY_API_SECRET = originalChurnkeyApiSecret;
+      }
+    });
+
+    it('throws when stripe customer id is missing', async () => {
+      process.env.CHURNKEY_API_SECRET = 'test_churnkey_secret';
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-churnkey-no-stripe@example.com',
+        stripe_customer_id: '',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloPass.getChurnkeyAuthHash()).rejects.toThrow(
+        'Missing Stripe customer for user.'
+      );
+    });
+
+    it('returns the stripe customer id and expected HMAC-SHA256 hash', async () => {
+      process.env.CHURNKEY_API_SECRET = 'test_churnkey_secret';
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-churnkey-hash@example.com',
+        stripe_customer_id: 'cus_churnkey_hash_test',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getChurnkeyAuthHash();
+
+      const expectedHash = crypto
+        .createHmac('sha256', 'test_churnkey_secret')
+        .update('cus_churnkey_hash_test')
+        .digest('hex');
+      expect(result).toEqual({
+        customerId: 'cus_churnkey_hash_test',
+        hash: expectedHash,
+      });
+    });
+
+    it('throws when CHURNKEY_API_SECRET is missing', async () => {
+      delete process.env.CHURNKEY_API_SECRET;
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-churnkey-no-secret@example.com',
+        stripe_customer_id: 'cus_churnkey_no_secret',
+      });
+
+      const caller = await createCallerForUser(user.id);
+      await expect(caller.kiloPass.getChurnkeyAuthHash()).rejects.toThrow(
+        'CHURNKEY_API_SECRET is not configured'
+      );
     });
   });
 

@@ -41,7 +41,6 @@ const config: ExpoConfig = {
     backgroundColor: '#FAF74F',
   },
   android: {
-    googleServicesFile: './google-services.json',
     package: 'com.kilocode.kiloapp',
     adaptiveIcon: {
       backgroundColor: '#FAF74F',
@@ -68,13 +67,7 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-image',
     'expo-secure-store',
-    [
-      'expo-notifications',
-      {
-        icon: './assets/images/android-notification-icon.png',
-        color: '#FAF74F',
-      },
-    ],
+    'expo-notifications',
     'expo-web-browser',
     [
       '@sentry/react-native/expo',

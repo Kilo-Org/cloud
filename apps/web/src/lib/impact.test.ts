@@ -59,7 +59,6 @@ describe('impact', () => {
       eventDate: new Date('2026-04-02T12:00:00.000Z'),
       itemCategory: 'kiloclaw-standard',
       itemName: 'KiloClaw Standard Plan',
-      itemSku: 'price_standard',
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -78,6 +77,5 @@ describe('impact', () => {
     expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('"ActionTrackerId":71659');
     expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('"OrderId":"in_123"');
     expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('"ClickId":"impact-click-123"');
-    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain('"ItemSku1":"price_standard"');
   });
 });

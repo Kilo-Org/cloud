@@ -166,7 +166,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
       });
     });
     return () => cancelAnimationFrame(autoScrollFrameRef.current);
-  }, [staticMessages, dynamicMessages, chatUI.shouldAutoScroll]);
+  }, [dynamicMessages, chatUI.shouldAutoScroll]);
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;

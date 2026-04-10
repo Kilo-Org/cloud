@@ -5,6 +5,7 @@ import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
 } from '@/lib/providers/openrouter/types';
+import { requestContainsImages } from '@/lib/providers/openrouter/request-helpers';
 import type OpenAI from 'openai';
 import type { User } from '@kilocode/db';
 import {
@@ -13,21 +14,21 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   modeSchema,
   BALANCED_CLAW_SETUP_MODEL,
-  BALANCED_CODEX_MODEL,
-  BALANCED_QWEN_MODEL,
+  BALANCED_IMAGE_MODEL,
+  BALANCED_MODE_TO_MODEL,
+  BALANCED_CODE_MODEL,
   FRONTIER_MODE_TO_MODEL,
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
 } from '@/lib/kilo-auto';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 
-const ENABLE_QWEN_KILOCLAW_MODEL = false;
-
 export async function resolveAutoModel(
   model: string,
   modeHeader: string | null,
   userPromise: Promise<User | null>,
-  balancePromise: Promise<number>
+  balancePromise: Promise<number>,
+  hasImages: boolean
 ): Promise<ResolvedAutoModel> {
   if (model === KILO_AUTO_FREE_MODEL.id) {
     return { model: minimax_m25_free_model.public_id };
@@ -45,11 +46,11 @@ export async function resolveAutoModel(
       if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
         return BALANCED_CLAW_SETUP_MODEL;
       }
-      if (ENABLE_QWEN_KILOCLAW_MODEL) {
-        return BALANCED_QWEN_MODEL;
-      }
     }
-    return BALANCED_CODEX_MODEL;
+    if (hasImages) {
+      return BALANCED_IMAGE_MODEL;
+    }
+    return (mode !== null ? BALANCED_MODE_TO_MODEL[mode] : null) ?? BALANCED_CODE_MODEL;
   }
   return (mode !== null ? FRONTIER_MODE_TO_MODEL[mode] : null) ?? FRONTIER_CODE_MODEL;
 }
@@ -62,11 +63,13 @@ export async function applyResolvedAutoModel(
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
 ) {
+  const hasImages = requestContainsImages(request);
   const resolved = await resolveAutoModel(
     model,
     featureHeader === 'kiloclaw' || featureHeader === 'openclaw' ? 'KiloClaw' : modeHeader,
     userPromise,
-    balancePromise
+    balancePromise,
+    hasImages
   );
   request.body.model = resolved.model;
   if (resolved.reasoning) {

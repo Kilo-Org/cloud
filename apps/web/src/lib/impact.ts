@@ -62,10 +62,6 @@ function getImpactConfig() {
   };
 }
 
-export function isImpactConfigured(): boolean {
-  return getImpactConfig() !== null;
-}
-
 function toEventDate(eventDate: Date): string {
   return eventDate.toISOString();
 }
@@ -197,7 +193,6 @@ export type ImpactDispatchResult =
       ok: true;
       actionTrackerId: number;
       skipped?: 'unconfigured';
-      responseBody?: string;
     }
   | {
       ok: false;
@@ -234,16 +229,14 @@ export async function sendImpactConversionPayload(
       body: JSON.stringify(payload),
     });
 
-    const responseBody = await response.text();
-
     if (response.ok) {
       return {
         ok: true,
         actionTrackerId: payload.ActionTrackerId,
-        responseBody,
       };
     }
 
+    const responseBody = await response.text();
     return {
       ok: false,
       actionTrackerId: payload.ActionTrackerId,

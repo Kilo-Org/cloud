@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { FlatList, Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -56,6 +57,7 @@ export default function ModelListScreen() {
         { kilocodeDefaultModel: addModelPrefix(modelId) },
         {
           onSuccess: () => {
+            toast.success(`Model set to ${modelId}`);
             router.back();
           },
         }

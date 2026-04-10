@@ -4,14 +4,12 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   IMPACT_ACTION_TRACKER_IDS,
   IMPACT_ORDER_ID_MACRO,
-  type ImpactConversionPayload,
   type ImpactDispatchResult,
   buildSalePayload,
   buildSignUpPayload,
   buildTrialEndPayload,
   buildTrialStartPayload,
   hashEmailForImpact,
-  isImpactConfigured,
   sendImpactConversionPayload,
 } from '@/lib/impact';
 import { sentryLogger } from '@/lib/utils.server';
@@ -37,7 +35,6 @@ const DEFAULT_CLAIM_LIMIT = 100;
 const STALE_CLAIM_WINDOW_MS = 15 * 60 * 1000;
 const MAX_RETRY_BACKOFF_MS = 60 * 60 * 1000;
 const INITIAL_RETRY_BACKOFF_MS = 60 * 1000;
-const IMPACT_PARENT_PROCESSING_DELAY_MS = 5 * 60 * 1000;
 
 type DatabaseClient = typeof db | DrizzleTransaction;
 
@@ -229,27 +226,15 @@ async function getEventByDedupeKey(
 
 async function markAffiliateEventDelivered(
   database: DatabaseClient,
-  eventId: string,
-  params?: { clearClaimedAt?: boolean }
+  eventId: string
 ): Promise<void> {
-  if (params?.clearClaimedAt) {
-    await database.execute(sql`
-      UPDATE ${user_affiliate_events}
-      SET
-        ${sql.identifier(user_affiliate_events.delivery_state.name)} = 'delivered',
-        ${sql.identifier(user_affiliate_events.next_retry_at.name)} = NULL,
-        ${sql.identifier(user_affiliate_events.claimed_at.name)} = NULL
-      WHERE ${user_affiliate_events.id} = ${eventId}::uuid
-    `);
-  } else {
-    await database
-      .update(user_affiliate_events)
-      .set({
-        delivery_state: 'delivered',
-        next_retry_at: null,
-      })
-      .where(eq(user_affiliate_events.id, eventId));
-  }
+  await database
+    .update(user_affiliate_events)
+    .set({
+      delivery_state: 'delivered',
+      next_retry_at: null,
+    })
+    .where(eq(user_affiliate_events.id, eventId));
 }
 
 async function requeueAffiliateEvent(
@@ -315,40 +300,6 @@ async function promoteBlockedChildren(
   return result.rows;
 }
 
-async function reconcileBlockedChildrenWithDeliveredParents(
-  database: DatabaseClient
-): Promise<AffiliateEventRow[]> {
-  const result = await database.execute<AffiliateEventRow>(sql`
-    UPDATE ${user_affiliate_events}
-    SET
-      ${sql.identifier(user_affiliate_events.delivery_state.name)} = 'queued',
-      ${sql.identifier(user_affiliate_events.next_retry_at.name)} = NULL,
-      ${sql.identifier(user_affiliate_events.claimed_at.name)} = NULL
-    WHERE ${user_affiliate_events.delivery_state} = 'blocked'
-      AND EXISTS (
-        SELECT 1
-        FROM ${user_affiliate_events} AS parent_event
-        WHERE parent_event.id = ${user_affiliate_events.parent_event_id}
-          AND parent_event.delivery_state = 'delivered'
-      )
-    RETURNING
-      ${user_affiliate_events.id},
-      ${user_affiliate_events.user_id},
-      ${user_affiliate_events.provider},
-      ${user_affiliate_events.event_type},
-      ${user_affiliate_events.dedupe_key},
-      ${user_affiliate_events.parent_event_id},
-      ${user_affiliate_events.delivery_state},
-      ${user_affiliate_events.payload_json},
-      ${user_affiliate_events.attempt_count},
-      ${user_affiliate_events.next_retry_at},
-      ${user_affiliate_events.claimed_at},
-      ${user_affiliate_events.created_at}
-  `);
-
-  return result.rows;
-}
-
 async function reclaimStaleSendingEvents(database: DatabaseClient): Promise<AffiliateEventRow[]> {
   const staleBefore = new Date(Date.now() - STALE_CLAIM_WINDOW_MS).toISOString();
   const result = await database.execute<AffiliateEventRow>(sql`
@@ -380,9 +331,6 @@ async function claimQueuedEvents(
   database: DatabaseClient,
   limit: number
 ): Promise<AffiliateEventRow[]> {
-  const impactParentProcessedBefore = new Date(
-    Date.now() - IMPACT_PARENT_PROCESSING_DELAY_MS
-  ).toISOString();
   const result = await database.execute<AffiliateEventRow>(sql`
     UPDATE ${user_affiliate_events}
     SET
@@ -393,21 +341,6 @@ async function claimQueuedEvents(
       FROM ${user_affiliate_events}
       WHERE ${user_affiliate_events.delivery_state} = 'queued'
         AND coalesce(${user_affiliate_events.next_retry_at}, '-infinity'::timestamptz) <= now()
-        AND (
-          ${user_affiliate_events.parent_event_id} IS NULL
-          OR EXISTS (
-            SELECT 1
-            FROM ${user_affiliate_events} AS parent_event
-            WHERE parent_event.id = ${user_affiliate_events.parent_event_id}
-              AND parent_event.delivery_state = 'delivered'
-              AND (
-                parent_event.provider <> 'impact'
-                OR parent_event.event_type <> 'signup'
-                OR parent_event.claimed_at IS NULL
-                OR parent_event.claimed_at <= ${impactParentProcessedBefore}::timestamptz
-              )
-          )
-        )
       ORDER BY ${user_affiliate_events.created_at} ASC, ${user_affiliate_events.id} ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
@@ -430,47 +363,55 @@ async function claimQueuedEvents(
   return result.rows;
 }
 
-function buildImpactConversionPayloadForEvent(event: AffiliateEventRow): ImpactConversionPayload {
+async function dispatchAffiliateEvent(event: AffiliateEventRow): Promise<ImpactDispatchResult> {
   const eventDate = new Date(event.payload_json.eventDate);
 
   switch (event.provider) {
     case 'impact': {
       switch (event.event_type) {
         case 'signup':
-          return buildSignUpPayload({
-            trackingId: event.payload_json.trackingId,
-            customerId: event.payload_json.customerId ?? event.user_id,
-            customerEmailHash: event.payload_json.customerEmailHash ?? '',
-            eventDate,
-          });
+          return await sendImpactConversionPayload(
+            buildSignUpPayload({
+              trackingId: event.payload_json.trackingId,
+              customerId: event.payload_json.customerId ?? event.user_id,
+              customerEmailHash: event.payload_json.customerEmailHash ?? '',
+              eventDate,
+            })
+          );
         case 'trial_start':
-          return buildTrialStartPayload({
-            trackingId: event.payload_json.trackingId,
-            customerId: event.payload_json.customerId ?? event.user_id,
-            customerEmailHash: event.payload_json.customerEmailHash ?? '',
-            eventDate,
-          });
+          return await sendImpactConversionPayload(
+            buildTrialStartPayload({
+              trackingId: event.payload_json.trackingId,
+              customerId: event.payload_json.customerId ?? event.user_id,
+              customerEmailHash: event.payload_json.customerEmailHash ?? '',
+              eventDate,
+            })
+          );
         case 'trial_end':
-          return buildTrialEndPayload({
-            trackingId: event.payload_json.trackingId,
-            customerId: event.payload_json.customerId ?? event.user_id,
-            customerEmailHash: event.payload_json.customerEmailHash ?? '',
-            eventDate,
-          });
+          return await sendImpactConversionPayload(
+            buildTrialEndPayload({
+              trackingId: event.payload_json.trackingId,
+              customerId: event.payload_json.customerId ?? event.user_id,
+              customerEmailHash: event.payload_json.customerEmailHash ?? '',
+              eventDate,
+            })
+          );
         case 'sale':
-          return buildSalePayload({
-            trackingId: event.payload_json.trackingId,
-            customerId: event.payload_json.customerId ?? event.user_id,
-            customerEmailHash: event.payload_json.customerEmailHash ?? '',
-            orderId: event.payload_json.orderId,
-            amount: event.payload_json.amount ?? 0,
-            currencyCode: event.payload_json.currencyCode ?? 'usd',
-            eventDate,
-            itemCategory: event.payload_json.itemCategory ?? '',
-            itemName: event.payload_json.itemName ?? '',
-            itemSku: event.payload_json.itemSku ?? undefined,
-            promoCode: event.payload_json.promoCode ?? undefined,
-          });
+          return await sendImpactConversionPayload(
+            buildSalePayload({
+              trackingId: event.payload_json.trackingId,
+              customerId: event.payload_json.customerId ?? event.user_id,
+              customerEmailHash: event.payload_json.customerEmailHash ?? '',
+              orderId: event.payload_json.orderId,
+              amount: event.payload_json.amount ?? 0,
+              currencyCode: event.payload_json.currencyCode ?? 'usd',
+              eventDate,
+              itemCategory: event.payload_json.itemCategory ?? '',
+              itemName: event.payload_json.itemName ?? '',
+              itemSku: event.payload_json.itemSku ?? undefined,
+              promoCode: event.payload_json.promoCode ?? undefined,
+            })
+          );
       }
     }
   }
@@ -595,6 +536,7 @@ export async function enqueueAffiliateEventForUser(
     customerEmailHash: hashEmailForImpact(userRow.google_user_email),
     eventDate: new Date(attribution.created_at),
   });
+  const deliveryState = parentEvent.delivery_state === 'delivered' ? 'queued' : 'blocked';
 
   const [inserted] = await database
     .insert(user_affiliate_events)
@@ -604,18 +546,7 @@ export async function enqueueAffiliateEventForUser(
       event_type: params.eventType,
       dedupe_key: params.dedupeKey,
       parent_event_id: parentEvent.id,
-      delivery_state: sql<AffiliateEventDeliveryState>`
-        CASE
-          WHEN EXISTS (
-            SELECT 1
-            FROM ${user_affiliate_events}
-            WHERE ${user_affiliate_events.id} = ${parentEvent.id}::uuid
-              AND ${user_affiliate_events.delivery_state} = 'delivered'
-          )
-          THEN 'queued'
-          ELSE 'blocked'
-        END
-      `,
+      delivery_state: deliveryState,
       payload_json: buildAffiliateEventPayload({
         trackingId: attribution.tracking_id,
         customerId: params.userId,
@@ -657,30 +588,11 @@ export async function dispatchQueuedAffiliateEvents(params?: {
     unblocked: 0,
   };
 
-  const impactConfigured = isImpactConfigured();
-  if (!impactConfigured) {
-    logInfo(
-      'Processing affiliate event dispatch as a no-op because Impact credentials are not configured',
-      {
-        dispatch_source: 'cron',
-      }
-    );
-  }
-
   const reclaimed = await reclaimStaleSendingEvents(database);
   summary.reclaimed = reclaimed.length;
   for (const event of reclaimed) {
     logWarning('Reclaimed stale affiliate event claim', {
       ...buildAffiliateEventLogFields(event),
-      dispatch_source: 'cron',
-    });
-  }
-
-  const reconciledChildren = await reconcileBlockedChildrenWithDeliveredParents(database);
-  summary.unblocked += reconciledChildren.length;
-  for (const childEvent of reconciledChildren) {
-    logWarning('Recovered blocked affiliate child event after parent delivery', {
-      ...buildAffiliateEventLogFields(childEvent),
       dispatch_source: 'cron',
     });
   }
@@ -701,27 +613,19 @@ export async function dispatchQueuedAffiliateEvents(params?: {
         dispatch_source: 'cron',
       });
 
-      const impactPayload = buildImpactConversionPayloadForEvent(event);
-      const result: ImpactDispatchResult = await sendImpactConversionPayload(impactPayload);
+      const result = await dispatchAffiliateEvent(event);
       if (result.ok) {
-        await markAffiliateEventDelivered(database, event.id, {
-          clearClaimedAt: result.skipped === 'unconfigured',
-        });
+        await markAffiliateEventDelivered(database, event.id);
         summary.delivered += 1;
 
         const deliveredEvent = {
           ...event,
           delivery_state: 'delivered',
         } satisfies AffiliateEventRow;
-        logInfo(
-          result.skipped === 'unconfigured'
-            ? 'Skipped affiliate event delivery because Impact is unconfigured'
-            : 'Delivered affiliate event',
-          {
-            ...buildAffiliateEventLogFields(deliveredEvent),
-            dispatch_source: 'cron',
-          }
-        );
+        logInfo('Delivered affiliate event', {
+          ...buildAffiliateEventLogFields(deliveredEvent),
+          dispatch_source: 'cron',
+        });
 
         if (event.event_type === getParentEventType(event.provider)) {
           const unblockedChildren = await promoteBlockedChildren(database, event.id);

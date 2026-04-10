@@ -207,6 +207,30 @@ describe('POST /checkin', () => {
     expect(call.doubles[7]).toBe(5368709120);
   });
 
+  it('normalizes null disk usage doubles to zero', async () => {
+    const writeDataPoint = vi.fn<(payload: AnalyticsEngineDataPoint) => void>();
+    const env = makeEnv({ writeDataPoint });
+    const headers = await makeAuthHeaders();
+
+    const response = await controller.request(
+      '/checkin',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(makeBody({ diskUsedBytes: null, diskTotalBytes: null })),
+      },
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(writeDataPoint).toHaveBeenCalledTimes(1);
+
+    const call = firstAnalyticsEvent(writeDataPoint);
+    expect(call.doubles).toHaveLength(8);
+    expect(call.doubles[6]).toBe(0);
+    expect(call.doubles[7]).toBe(0);
+  });
+
   it('clamps negative disk usage doubles to zero', async () => {
     const writeDataPoint = vi.fn<(payload: AnalyticsEngineDataPoint) => void>();
     const env = makeEnv({ writeDataPoint });

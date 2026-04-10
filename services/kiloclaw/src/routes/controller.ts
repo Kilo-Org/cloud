@@ -29,6 +29,13 @@ const ProductTelemetrySchema = z.object({
 
 const INSTANCE_READY_LOAD_THRESHOLD = 0.1;
 
+const DiskBytesSchema = z
+  .number()
+  .int()
+  .nullable()
+  .optional()
+  .transform(value => Math.max(value ?? 0, 0));
+
 const CheckinSchema = z.object({
   sandboxId: z.string().min(1),
   machineId: z.string().optional(),
@@ -44,8 +51,8 @@ const CheckinSchema = z.object({
   bandwidthBytesIn: z.number().min(0),
   bandwidthBytesOut: z.number().min(0),
   lastExitReason: z.string().optional(),
-  diskUsedBytes: z.number().int().transform(v => Math.max(v, 0)).default(0),
-  diskTotalBytes: z.number().int().transform(v => Math.max(v, 0)).default(0),
+  diskUsedBytes: DiskBytesSchema,
+  diskTotalBytes: DiskBytesSchema,
   productTelemetry: ProductTelemetrySchema.optional(),
 });
 

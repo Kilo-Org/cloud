@@ -16,8 +16,8 @@ function stripGitHubIssParam(request: NextRequest): NextRequest {
   return request;
 }
 
-async function handler(request: NextRequest) {
-  return nextAuthHttpHandler(stripGitHubIssParam(request));
+async function handler(request: NextRequest, context: unknown) {
+  return nextAuthHttpHandler(stripGitHubIssParam(request), context);
 }
 
 export { handler as GET, handler as POST };

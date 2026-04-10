@@ -1180,7 +1180,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [resizeMachineDialogOpen, setResizeMachineDialogOpen] = useState(false);
   const [selectedMachineSize, setSelectedMachineSize] = useState<string>('shared-cpu-2x');
   const [resizeConfirmText, setResizeConfirmText] = useState('');
-  const [resizePhase, setResizePhase] = useState<'idle' | 'stopping' | 'resizing' | 'starting' | 'waiting' | 'done' | 'error'>('idle');
+  const [resizePhase, setResizePhase] = useState<
+    'idle' | 'stopping' | 'resizing' | 'starting' | 'waiting' | 'done' | 'error'
+  >('idle');
   const [resizeError, setResizeError] = useState<string | null>(null);
   const [awaitingRestartCompletion, setAwaitingRestartCompletion] = useState(false);
   const [restoreSnapshotDialogOpen, setRestoreSnapshotDialogOpen] = useState(false);
@@ -1460,10 +1462,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     trpc.admin.kiloclawInstances.resizeMachine.mutationOptions()
   );
 
-  const isResizingMachine = resizePhase !== 'idle' && resizePhase !== 'done' && resizePhase !== 'error';
+  const isResizingMachine =
+    resizePhase !== 'idle' && resizePhase !== 'done' && resizePhase !== 'error';
 
   // Poll status during resize phases
-  const resizePolling = resizePhase === 'stopping' || resizePhase === 'starting' || resizePhase === 'waiting';
+  const resizePolling =
+    resizePhase === 'stopping' || resizePhase === 'starting' || resizePhase === 'waiting';
   useQuery({
     queryKey: ['machine-resize-poll', userId, instanceId, resizePolling],
     queryFn: async () => {
@@ -1487,7 +1491,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     setResizeConfirmText('');
     setResizeError(null);
 
-    const sizeMap: Record<string, { cpus: number; memory_mb: number; cpu_kind: 'shared' | 'performance' }> = {
+    const sizeMap: Record<
+      string,
+      { cpus: number; memory_mb: number; cpu_kind: 'shared' | 'performance' }
+    > = {
       'shared-cpu-2x': { cpus: 2, memory_mb: 3072, cpu_kind: 'shared' },
       'shared-cpu-4x': { cpus: 4, memory_mb: 3072, cpu_kind: 'shared' },
       'performance-1x': { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
@@ -1995,7 +2002,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                         {data.workerStatus.machineSize.memory_mb}MB
                       </code>
                     ) : (
-                      <span className="text-muted-foreground text-sm">default (shared-cpu-2x, 3072MB)</span>
+                      <span className="text-muted-foreground text-sm">
+                        default (shared-cpu-2x, 3072MB)
+                      </span>
                     )}
                   </DetailField>
                 </div>
@@ -2313,9 +2322,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   disabled={machineActionPending || isResizingMachine}
                   onClick={() => {
                     const ms = data?.workerStatus?.machineSize;
-                    const key = ms?.cpu_kind === 'performance'
-                      ? `performance-${ms.cpus}x`
-                      : `shared-cpu-${ms?.cpus ?? 2}x`;
+                    const key =
+                      ms?.cpu_kind === 'performance'
+                        ? `performance-${ms.cpus}x`
+                        : `shared-cpu-${ms?.cpus ?? 2}x`;
                     setSelectedMachineSize(key);
                     setResizeMachineDialogOpen(true);
                   }}
@@ -2430,7 +2440,13 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                                 : ''
                           }
                         >
-                          {step === 'stopping' ? 'Stop' : step === 'resizing' ? 'Resize' : step === 'starting' ? 'Start' : 'Health check'}
+                          {step === 'stopping'
+                            ? 'Stop'
+                            : step === 'resizing'
+                              ? 'Resize'
+                              : step === 'starting'
+                                ? 'Start'
+                                : 'Health check'}
                         </span>
                       </span>
                     ))}
@@ -2453,9 +2469,16 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
                 <div>
                   <p className="text-sm font-medium text-green-600">Machine resize complete</p>
-                  <p className="text-muted-foreground text-xs">Machine is running with the new size.</p>
+                  <p className="text-muted-foreground text-xs">
+                    Machine is running with the new size.
+                  </p>
                 </div>
-                <Button variant="outline" size="sm" className="ml-auto" onClick={() => setResizePhase('idle')}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto"
+                  onClick={() => setResizePhase('idle')}
+                >
                   Dismiss
                 </Button>
               </div>
@@ -2472,7 +2495,15 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   <p className="text-sm font-medium text-red-600">Machine resize failed</p>
                   <p className="text-muted-foreground text-xs">{resizeError}</p>
                 </div>
-                <Button variant="outline" size="sm" className="ml-auto" onClick={() => { setResizePhase('idle'); setResizeError(null); }}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto"
+                  onClick={() => {
+                    setResizePhase('idle');
+                    setResizeError(null);
+                  }}
+                >
                   Dismiss
                 </Button>
               </div>
@@ -2496,8 +2527,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 Resize Machine
               </DialogTitle>
               <DialogDescription className="pt-3">
-                This will stop the machine, update its CPU/memory spec, and restart it.
-                The user will be disconnected during the restart.
+                This will stop the machine, update its CPU/memory spec, and restart it. The user
+                will be disconnected during the restart.
                 <span className="text-foreground mt-2 block font-medium">
                   User: {data?.user_email ?? data?.user_id}
                 </span>

@@ -1396,10 +1396,10 @@ export function reconcileReviewQueue(
         : /* sql */ `
             AND EXISTS (
               SELECT 1
-              FROM ${beads} parent
+              FROM ${beads} outer_parent
               JOIN ${convoy_metadata} cm
-                ON cm.${convoy_metadata.columns.bead_id} = parent.${beads.columns.bead_id}
-              WHERE parent.${beads.columns.bead_id} = b.${beads.columns.parent_bead_id}
+                ON cm.${convoy_metadata.columns.bead_id} = outer_parent.${beads.columns.bead_id}
+              WHERE outer_parent.${beads.columns.bead_id} = ${beads.parent_bead_id}
                 AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
             )`;
 
@@ -1456,12 +1456,12 @@ export function reconcileReviewQueue(
             sql,
             /* sql */ `
           SELECT ${beads.bead_id}
-          FROM ${beads} b
-          WHERE b.${beads.columns.type} = 'merge_request'
-            AND b.${beads.columns.status} = 'open'
-            AND b.${beads.columns.rig_id} = ?
+          FROM ${beads}
+          WHERE ${beads.type} = 'merge_request'
+            AND ${beads.status} = 'open'
+            AND ${beads.rig_id} = ?
             ${refineryNeededFilter}
-          ORDER BY b.${beads.columns.created_at} ASC
+          ORDER BY ${beads.created_at} ASC
           LIMIT 1
         `,
             [rig_id]

@@ -29,9 +29,15 @@ import Link from 'next/link';
 type RigDetailPageClientProps = {
   townId: string;
   rigId: string;
+  basePath?: string;
 };
 
-export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps) {
+export function RigDetailPageClient({
+  townId,
+  rigId,
+  basePath: basePathOverride,
+}: RigDetailPageClientProps) {
+  const townBasePath = basePathOverride ?? `/gastown/${townId}`;
   const trpc = useGastownTRPC();
   const [isSlingOpen, setIsSlingOpen] = useState(false);
   const [convoysCollapsed, setConvoysCollapsed] = useState(false);
@@ -141,7 +147,7 @@ export function RigDetailPageClient({ townId, rigId }: RigDetailPageClientProps)
         </div>
         <div className="flex items-center gap-2">
           <Link
-            href={`/gastown/${townId}/rigs/${rigId}/settings`}
+            href={`${townBasePath}/rigs/${rigId}/settings`}
             className="flex items-center justify-center rounded-md border border-white/[0.08] bg-white/[0.03] p-1.5 text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white/60"
             title="Rig settings"
           >

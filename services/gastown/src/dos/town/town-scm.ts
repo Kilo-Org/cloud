@@ -30,8 +30,7 @@ export async function resolveGitHubToken(ctx: SCMContext): Promise<string | null
   const townConfig = await ctx.getTownConfig();
   let token = townConfig.git_auth?.github_token ?? townConfig.github_cli_pat;
   if (!token) {
-    const integrationId =
-      townConfig.git_auth?.platform_integration_id ?? ctx.platformIntegrationId;
+    const integrationId = townConfig.git_auth?.platform_integration_id ?? ctx.platformIntegrationId;
     if (integrationId && ctx.env.GIT_TOKEN_SERVICE) {
       try {
         token = await ctx.env.GIT_TOKEN_SERVICE.getToken(integrationId);
@@ -542,9 +541,7 @@ export async function createConvoyBranch(
   }
 
   const refJson = await refRes.json().catch(() => null);
-  const shaResult = z
-    .object({ object: z.object({ sha: z.string() }) })
-    .safeParse(refJson);
+  const shaResult = z.object({ object: z.object({ sha: z.string() }) }).safeParse(refJson);
   if (!shaResult.success) {
     console.warn(`${TOWN_LOG} createConvoyBranch: unexpected ref response shape`);
     return;

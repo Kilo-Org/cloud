@@ -223,9 +223,10 @@ export function generateBaseConfig(
     delete config.agents.defaults.models;
   }
 
-  // Tool profile: on fresh install (or explicit config restore), override the
-  // onboard default "messaging" with "full" so agents have all tools. On
-  // subsequent boots, leave the user's choice untouched.
+  // Tool profile: on fresh install, override the onboard default "messaging"
+  // with "full" so agents have all tools. Also backfill to "full" when the
+  // profile field is missing. On subsequent boots, leave user's explicit
+  // profile choice untouched.
   config.tools = config.tools ?? {};
   if (env.KILOCLAW_FRESH_INSTALL === 'true' || !config.tools.profile) {
     config.tools.profile = 'full';
@@ -573,16 +574,12 @@ export function writeBaseConfig(
     console.log('Onboard completed, patching config...');
 
     // 4. Patch the fresh onboard config with env-var-derived fields.
-    // writeBaseConfig is called for both fresh installs (bootstrap onboard path)
-    // and config restores (/_kilo/config/restore). In both cases, tools.profile
-    // should be forced to 'full' — the onboard default 'messaging' leaves agents
-    // without shell/file/web tools.
-    const prevFreshInstall = env.KILOCLAW_FRESH_INSTALL;
-    env.KILOCLAW_FRESH_INSTALL = 'true';
     const config = generateBaseConfig(env, tmpPath, deps);
-    // Restore the original value so callers that set it before calling us
-    // (like bootstrap's runOnboardOrDoctor) don't get surprised.
-    env.KILOCLAW_FRESH_INSTALL = prevFreshInstall;
+    // Restore flow should still force full tools profile, but it must not
+    // piggyback on KILOCLAW_FRESH_INSTALL because that would also re-steer
+    // web search provider selection for existing instances.
+    config.tools = config.tools ?? {};
+    config.tools.profile = 'full';
 
     // 5. Serialize and validate roundtrip
     const serialized = JSON.stringify(config, null, 2);

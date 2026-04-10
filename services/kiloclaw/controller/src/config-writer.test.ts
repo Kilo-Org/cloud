@@ -965,6 +965,17 @@ describe('writeBaseConfig', () => {
     expect(config.tools.profile).toBe('full');
   });
 
+  it('does not steer web search provider on config restore path', () => {
+    const { deps, written } = fakeDeps();
+    const env = minimalEnv();
+    delete env.KILOCLAW_FRESH_INSTALL;
+
+    writeBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    const config = JSON.parse(written[0].data);
+    expect(config.tools?.web?.search?.provider).toBeUndefined();
+  });
+
   it('throws if KILOCODE_API_KEY is missing', () => {
     const { deps } = fakeDeps();
     const env = { ...minimalEnv() };

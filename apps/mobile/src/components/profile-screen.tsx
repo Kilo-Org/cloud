@@ -98,24 +98,24 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
         )}
       </View>
 
-      {balanceLoading && <Skeleton className="h-14 w-full rounded-lg" />}
+      {balanceLoading && <Skeleton className="h-16 w-full rounded-lg" />}
       {balanceError && (
         <Pressable
-          className="rounded-lg bg-secondary p-3 active:opacity-70"
+          className="h-16 justify-center rounded-lg bg-secondary px-3 active:opacity-70"
           onPress={() => void refetchBalance()}
         >
           <Text className="text-sm text-destructive">Failed to load balance. Tap to retry.</Text>
         </Pressable>
       )}
       {!balanceLoading && !balanceError && (
-        <View className="rounded-lg bg-secondary p-3">
+        <View className="h-16 justify-center rounded-lg bg-secondary px-3">
           <Text className="text-2xl font-bold">${balanceDollars.toFixed(2)}</Text>
           {creditsLoading ? (
             <Skeleton className="mt-1 h-3 w-48 rounded" />
           ) : (
             expiringTotal > 0 &&
             earliestExpiry != null && (
-              <Text className="mt-1 text-xs text-muted-foreground">
+              <Text className="text-xs text-muted-foreground">
                 ${expiringTotal.toFixed(2)} in bonus credits expiring{' '}
                 {parseTimestamp(earliestExpiry).toLocaleDateString(undefined, {
                   month: 'short',

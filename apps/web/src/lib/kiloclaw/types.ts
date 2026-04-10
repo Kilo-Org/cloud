@@ -373,6 +373,12 @@ export type ReassociateVolumeResponse = {
   newRegion: string;
 };
 
+/** Response from POST /api/platform/resize-machine */
+export type ResizeMachineResponse = {
+  previousSize: { cpus: number; memory_mb: number; cpu_kind?: string } | null;
+  newSize: { cpus: number; memory_mb: number; cpu_kind?: string };
+};
+
 /** Response from GET /api/platform/regions */
 export type RegionsResponse = {
   regions: string[];

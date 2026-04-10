@@ -27,6 +27,7 @@ import type {
   VolumeSnapshot,
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
+  ResizeMachineResponse,
   RestoreVolumeSnapshotResponse,
 } from '@/lib/kiloclaw/types';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
@@ -1129,6 +1130,55 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       } catch (err) {
         console.error('Failed to reassociate volume for user:', input.userId, err);
         throwKiloclawAdminError(err, 'Failed to reassociate volume');
+      }
+    }),
+
+  resizeMachine: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid().optional(),
+        machineSize: z.object({
+          cpus: z.number().int().min(1).max(8),
+          memory_mb: z.number().int().min(256).max(16384),
+          cpu_kind: z.enum(['shared', 'performance']).optional(),
+        }),
+      })
+    )
+    .mutation(async ({ input, ctx }): Promise<ResizeMachineResponse> => {
+      console.log(
+        `[admin-kiloclaw] Machine resize triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) for user ${input.userId}: ${JSON.stringify(input.machineSize)}`
+      );
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        const client = new KiloClawInternalClient();
+        const result = await client.resizeMachine(
+          input.userId,
+          input.machineSize,
+          workerInstanceId(instance)
+        );
+
+        try {
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.machine.resize',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `Machine resized: ${JSON.stringify(result.previousSize)} → ${JSON.stringify(result.newSize)}`,
+            metadata: {
+              previousSize: result.previousSize,
+              newSize: result.newSize,
+            },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for machine resize:', auditErr);
+        }
+
+        return result;
+      } catch (err) {
+        console.error('Failed to resize machine for user:', input.userId, err);
+        throwKiloclawAdminError(err, 'Failed to resize machine');
       }
     }),
 

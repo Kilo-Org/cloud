@@ -29,7 +29,7 @@ import {
   useKiloClawMutations,
   useKiloClawServiceDegraded,
   useKiloClawStatus,
-} from '@/lib/hooks/use-kiloclaw';
+} from '@/lib/hooks/use-kiloclaw-queries';
 import { formatModelName, stripModelPrefix } from '@/lib/model-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 

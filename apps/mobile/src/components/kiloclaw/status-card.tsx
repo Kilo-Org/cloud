@@ -15,7 +15,7 @@ import { Pressable, View } from 'react-native';
 import { StatusBadge } from '@/components/kiloclaw/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { type GatewayState, type InstanceStatus } from '@/lib/hooks/use-kiloclaw';
+import { type GatewayState, type InstanceStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type StatusCardProps = {

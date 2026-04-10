@@ -25,7 +25,7 @@ import {
   useKiloClawDevicePairing,
   useKiloClawMutations,
   useKiloClawPairing,
-} from '@/lib/hooks/use-kiloclaw';
+} from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 const CHANNEL_LABELS: Record<string, string> = {

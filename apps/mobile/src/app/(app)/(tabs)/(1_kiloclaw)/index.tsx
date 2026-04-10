@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
-import { type InstanceStatus } from '@/lib/hooks/use-kiloclaw';
+import { type InstanceStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type ClawInstance = NonNullable<ReturnType<typeof useAllKiloClawInstances>['data']>[number];

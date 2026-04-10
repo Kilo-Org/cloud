@@ -16,7 +16,7 @@ import {
   useKiloClawGoogleSetup,
   useKiloClawMutations,
   useKiloClawStatus,
-} from '@/lib/hooks/use-kiloclaw';
+} from '@/lib/hooks/use-kiloclaw-queries';
 import { cn } from '@/lib/utils';
 
 export default function GoogleScreen() {

@@ -15,7 +15,7 @@ import {
   useKiloClawLatestVersion,
   useKiloClawMutations,
   useKiloClawMyPin,
-} from '@/lib/hooks/use-kiloclaw';
+} from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 

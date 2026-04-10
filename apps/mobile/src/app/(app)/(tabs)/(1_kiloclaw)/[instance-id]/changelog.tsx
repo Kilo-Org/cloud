@@ -10,7 +10,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
-import { useKiloClawChangelog } from '@/lib/hooks/use-kiloclaw';
+import { useKiloClawChangelog } from '@/lib/hooks/use-kiloclaw-queries';
 
 export default function ChangelogScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();

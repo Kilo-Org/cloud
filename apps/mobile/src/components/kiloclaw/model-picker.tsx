@@ -5,7 +5,7 @@ import { Pressable, View } from 'react-native';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
-import { useKiloClawConfig, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw';
+import { useKiloClawConfig, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
 import { addModelPrefix, stripModelPrefix } from '@/lib/model-id';
 
 type AutoModelCard = {

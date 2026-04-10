@@ -1,6 +1,6 @@
 import { parseTimestamp } from '@/lib/utils';
 
-import { type useKiloClawBillingStatus } from './use-kiloclaw';
+import { type useKiloClawBillingStatus } from './use-kiloclaw-queries';
 
 type ClawBillingStatus = NonNullable<ReturnType<typeof useKiloClawBillingStatus>['data']>;
 

@@ -8,7 +8,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
-import { useKiloClawMutations, useKiloClawStatus } from '@/lib/hooks/use-kiloclaw';
+import { useKiloClawMutations, useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { cn } from '@/lib/utils';
 
 type ExecPreset = 'always-ask' | 'never-ask';

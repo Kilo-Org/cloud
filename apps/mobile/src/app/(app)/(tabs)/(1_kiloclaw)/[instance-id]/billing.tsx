@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
-import { useKiloClawBillingStatus } from '@/lib/hooks/use-kiloclaw';
+import { useKiloClawBillingStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { formatBillingDate } from '@/lib/hooks/use-kiloclaw-billing';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';

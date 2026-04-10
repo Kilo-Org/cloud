@@ -13,7 +13,7 @@ import { ChatHeader, ChatShell } from '@/components/kiloclaw/chat-shell';
 import { useBotOnlineStatus } from '@/components/kiloclaw/chat-hooks';
 import { NotificationPrompt } from '@/components/kiloclaw/notification-prompt';
 import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
-import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw';
+import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw-queries';
 import { setActiveChatInstance } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
 

@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { type InstanceStatus, type useKiloClawMutations } from '@/lib/hooks/use-kiloclaw';
+import { type InstanceStatus, type useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type InstanceControlsProps = {

@@ -10,7 +10,7 @@ export {
   useKiloClawGoogleSetup,
   useKiloClawSecretCatalog,
   useStreamChatCredentials,
-} from '@/lib/hooks/use-kiloclaw-config';
+} from '@/lib/hooks/use-kiloclaw-queries';
 
 export type InstanceStatus = NonNullable<ReturnType<typeof useKiloClawStatus>['data']>['status'];
 export type GatewayState = NonNullable<

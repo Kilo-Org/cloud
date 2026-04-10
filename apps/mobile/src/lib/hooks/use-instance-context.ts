@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { useTRPC } from '@/lib/trpc';
 
@@ -22,11 +23,20 @@ export function useAllKiloClawInstances() {
  * - `isResolved: true, organizationId: string` — org instance.
  */
 export function useInstanceContext(sandboxId: string) {
-  const { data: instances } = useAllKiloClawInstances();
-  if (!instances) {
-    return { organizationId: undefined, isResolved: false, isOrg: false } as const;
-  }
-  const match = instances.find(i => i.sandboxId === sandboxId);
-  const organizationId = match?.organizationId ?? null;
-  return { organizationId, isResolved: true, isOrg: Boolean(organizationId) } as const;
+  const trpc = useTRPC();
+  const { data: match } = useQuery({
+    ...trpc.kiloclaw.listAllInstances.queryOptions(undefined, {
+      staleTime: 30_000,
+      refetchInterval: 30_000,
+    }),
+    select: instances => instances.find(i => i.sandboxId === sandboxId),
+  });
+
+  return useMemo(() => {
+    if (match === undefined) {
+      return { organizationId: undefined, isResolved: false, isOrg: false } as const;
+    }
+    const organizationId = match.organizationId ?? null;
+    return { organizationId, isResolved: true, isOrg: Boolean(organizationId) } as const;
+  }, [match]);
 }

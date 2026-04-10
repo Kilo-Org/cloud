@@ -2,15 +2,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { useTRPC } from '@/lib/trpc';
+import { asyncNoop } from '@/lib/utils';
 
 const onMutationError = (error: { message: string }) => {
   toast.error(error.message || 'Something went wrong');
 };
-
-// eslint-disable-next-line typescript-eslint/no-explicit-any -- fallback for undefined mutationFn
-async function noop(..._args: any[]) {
-  await Promise.resolve();
-}
 
 export function useKiloClawMutations(organizationId?: string | null) {
   const trpc = useTRPC();
@@ -100,10 +96,10 @@ export function useKiloClawMutations(organizationId?: string | null) {
   function dispatch(personal: AnyMutPath, org: AnyMutPath) {
     const p = personal.mutationOptions({});
     const o = org.mutationOptions({});
-    const pFn = p.mutationFn ?? noop;
-    const oFn = o.mutationFn ?? noop;
+    const pFn = p.mutationFn ?? asyncNoop;
+    const oFn = o.mutationFn ?? asyncNoop;
 
-    let mutationFn: (...args: unknown[]) => Promise<unknown> = noop;
+    let mutationFn: (...args: unknown[]) => Promise<unknown> = asyncNoop;
     if (isResolved && isOrg) {
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn = (input: unknown) =>

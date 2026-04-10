@@ -399,12 +399,25 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
       user_id: currentUser?.id ?? null,
       organization_id: organizationId ?? cfg?.organization_id ?? null,
 
-      rigs: (rigsQuery.data ?? []).map(r => ({
-        id: r.id,
-        name: r.name,
-        git_url: r.git_url,
-        default_branch: r.default_branch,
-      })),
+      rigs: (rigsQuery.data ?? []).map(r => {
+        let git_url_sanitized: string | null = null;
+        if (r.git_url) {
+          try {
+            const u = new URL(r.git_url);
+            u.username = '';
+            u.password = '';
+            git_url_sanitized = u.toString();
+          } catch {
+            // not a parseable URL — omit entirely to avoid leaking anything
+          }
+        }
+        return {
+          id: r.id,
+          name: r.name,
+          git_url: git_url_sanitized,
+          default_branch: r.default_branch,
+        };
+      }),
 
       settings: cfg
         ? {
@@ -422,8 +435,8 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
             gitlab_token_set: !!(cfg.git_auth?.gitlab_token),
             gitlab_instance_url: cfg.git_auth?.gitlab_instance_url || null,
             github_cli_pat_set: !!(cfg.github_cli_pat),
-            git_author_name: cfg.git_author_name || null,
-            // git_author_email intentionally omitted (PII)
+            git_author_name_set: !!(cfg.git_author_name),
+            // git_author_name and git_author_email intentionally omitted (PII)
             disable_ai_coauthor: cfg.disable_ai_coauthor ?? false,
 
             env_var_keys: Object.keys(cfg.env_vars ?? {}),

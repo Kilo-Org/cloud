@@ -3,7 +3,7 @@ import '../global.css';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { PortalHost } from '@rn-primitives/portal';
 import * as Sentry from '@sentry/react-native';
-import { QueryClientProvider, useMutation } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { isRunningInExpoGo } from 'expo';
 import { type Href, Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -18,16 +18,13 @@ import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { initAppsFlyer } from '@/lib/appsflyer';
 import {
   checkInitialNotification,
-  getNotificationPermissionStatus,
   getPendingNotificationLink,
-  getPlatform,
-  registerForPushNotifications,
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { queryClient } from '@/lib/query-client';
-import { trpcClient, TRPCProvider, useTRPC } from '@/lib/trpc';
+import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
 const navigationIntegration = Sentry.reactNavigationIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
@@ -111,30 +108,6 @@ function RootLayoutNav() {
       }
     }
   }, [token, isLoading, updateRequired, inAuthGroup, inForceUpdate, router]);
-
-  const trpc = useTRPC();
-  const { mutate: registerPushToken } = useMutation(
-    trpc.user.registerPushToken.mutationOptions({})
-  );
-
-  useEffect(() => {
-    if (!token) {
-      return;
-    }
-
-    async function reregisterToken() {
-      const status = await getNotificationPermissionStatus();
-      if (status !== 'granted') {
-        return;
-      }
-
-      const pushToken = await registerForPushNotifications();
-      if (pushToken) {
-        registerPushToken({ token: pushToken, platform: getPlatform() });
-      }
-    }
-    void reregisterToken();
-  }, [token, registerPushToken]);
 
   const needsForceUpdate = updateRequired && !inForceUpdate;
   const showingForceUpdate = updateRequired && inForceUpdate;

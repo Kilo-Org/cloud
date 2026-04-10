@@ -83,7 +83,11 @@ import {
   KILOCLAW_PLAN_COST_MICRODOLLARS,
   KILOCLAW_STANDARD_FIRST_MONTH_MICRODOLLARS,
 } from '@/lib/kiloclaw/credit-billing';
-import { createCliRun, markCliRunCancelled, shouldPersistCliRunControllerStatus } from '@/lib/kiloclaw/cli-runs';
+import {
+  createCliRun,
+  markCliRunCancelled,
+  shouldPersistCliRunControllerStatus,
+} from '@/lib/kiloclaw/cli-runs';
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
 import PostHogClient from '@/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
@@ -2196,7 +2200,10 @@ export const kiloclawRouter = createTRPCRouter({
 
       // Run is still active — poll the controller for live output.
       const client = new KiloClawInternalClient();
-      const controllerStatus = await client.getKiloCliRunStatus(ctx.user.id, workerInstanceId(instance));
+      const controllerStatus = await client.getKiloCliRunStatus(
+        ctx.user.id,
+        workerInstanceId(instance)
+      );
 
       // If controller reports the run finished, persist to the DB row.
       if (shouldPersistCliRunControllerStatus(row, controllerStatus)) {

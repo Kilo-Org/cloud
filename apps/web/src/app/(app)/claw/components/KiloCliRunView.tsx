@@ -177,9 +177,7 @@ export function KiloCliRunView({
         {isError && (
           <div className="flex flex-col items-center justify-center gap-3 py-16">
             <XCircle className="h-8 w-8 text-red-400" />
-            <p className="text-sm text-red-400">
-              {errorMessage ?? 'Failed to load run status'}
-            </p>
+            <p className="text-sm text-red-400">{errorMessage ?? 'Failed to load run status'}</p>
             <Button variant="outline" size="sm" onClick={() => router.push(dashboardPath)}>
               Back to Dashboard
             </Button>

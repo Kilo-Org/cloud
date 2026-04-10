@@ -68,9 +68,7 @@ export function StartKiloCliRunDialog({
       {
         onSuccess: data => {
           onOpenChange(false);
-          const basePath = organizationId
-            ? `/organizations/${organizationId}/claw`
-            : '/claw';
+          const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
           router.push(`${basePath}/kilo-cli-run/${data.id}`);
         },
         onError: err => {

@@ -58,7 +58,10 @@ function useCurrentCliRun(
   enabled: boolean
 ) {
   const personalHistory = useKiloCliRunHistory(enabled && organizationId === undefined);
-  const orgHistory = useOrgKiloCliRunHistory(organizationId, enabled && organizationId !== undefined);
+  const orgHistory = useOrgKiloCliRunHistory(
+    organizationId,
+    enabled && organizationId !== undefined
+  );
 
   if (!instanceId) {
     return null;
@@ -103,7 +106,10 @@ function isTerminalCliRun(status: string | null): boolean {
   return status === 'completed' || status === 'failed' || status === 'cancelled';
 }
 
-function getRunCompletedAt(run: { completed_at?: string | null; started_at?: string | null }): string | null {
+function getRunCompletedAt(run: {
+  completed_at?: string | null;
+  started_at?: string | null;
+}): string | null {
   return run.completed_at ?? run.started_at ?? null;
 }
 

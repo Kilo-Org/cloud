@@ -289,10 +289,22 @@ export function hasActiveWork(sql: SqlStorage): boolean {
       [patrol.TRIAGE_LABEL_LIKE]
     ),
   ];
+  // Open issue beads with a rig (eligible for dispatch by reconcileBeads Rule 1)
+  // but not yet assigned to any agent. Without this check, the alarm drops to
+  // idle cadence after a container restart when agents lose their hooks and
+  // beads revert to open+unassigned, delaying dispatch by up to 5 minutes.
+  const unassignedIssueRows = [
+    ...query(
+      sql,
+      /* sql */ `SELECT COUNT(*) as cnt FROM ${beads} WHERE ${beads.type} = 'issue' AND ${beads.status} = 'open' AND ${beads.rig_id} IS NOT NULL AND ${beads.assignee_agent_bead_id} IS NULL`,
+      []
+    ),
+  ];
   return (
     Number(activeAgentRows[0]?.cnt ?? 0) > 0 ||
     Number(pendingBeadRows[0]?.cnt ?? 0) > 0 ||
     Number(pendingReviewRows[0]?.cnt ?? 0) > 0 ||
-    Number(pendingTriageRows[0]?.cnt ?? 0) > 0
+    Number(pendingTriageRows[0]?.cnt ?? 0) > 0 ||
+    Number(unassignedIssueRows[0]?.cnt ?? 0) > 0
   );
 }

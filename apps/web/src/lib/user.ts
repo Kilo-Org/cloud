@@ -58,10 +58,10 @@ import {
   kiloclaw_email_log,
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
-   user_push_tokens,
-   contributor_champion_events,
-   contributor_champion_memberships,
-   contributor_champion_contributors,
+  user_push_tokens,
+  contributor_champion_events,
+  contributor_champion_memberships,
+  contributor_champion_contributors,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, sql, or } from 'drizzle-orm';
 import { allow_fake_login } from './constants';

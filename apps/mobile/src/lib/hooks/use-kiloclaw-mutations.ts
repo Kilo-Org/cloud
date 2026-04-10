@@ -13,37 +13,37 @@ export function useKiloClawMutations(organizationId?: string | null) {
   const queryClient = useQueryClient();
   const isResolved = organizationId !== undefined;
   const isOrg = Boolean(organizationId);
-  const oi = { organizationId: organizationId ?? '' };
+  const orgInput = { organizationId: organizationId ?? '' };
 
-  const key = (
+  const queryKey = (
     personal: { queryKey: () => unknown[] },
-    org: { queryKey: (input: typeof oi) => unknown[] }
-  ) => (isOrg ? org.queryKey(oi) : personal.queryKey());
+    org: { queryKey: (input: typeof orgInput) => unknown[] }
+  ) => (isOrg ? org.queryKey(orgInput) : personal.queryKey());
 
-  const statusKey = key(trpc.kiloclaw.getStatus, trpc.organizations.kiloclaw.getStatus);
-  const configKey = key(trpc.kiloclaw.getConfig, trpc.organizations.kiloclaw.getConfig);
-  const pinKey = key(trpc.kiloclaw.getMyPin, trpc.organizations.kiloclaw.getMyPin);
-  const controllerVersionKey = key(
+  const statusKey = queryKey(trpc.kiloclaw.getStatus, trpc.organizations.kiloclaw.getStatus);
+  const configKey = queryKey(trpc.kiloclaw.getConfig, trpc.organizations.kiloclaw.getConfig);
+  const pinKey = queryKey(trpc.kiloclaw.getMyPin, trpc.organizations.kiloclaw.getMyPin);
+  const controllerVersionKey = queryKey(
     trpc.kiloclaw.controllerVersion,
     trpc.organizations.kiloclaw.controllerVersion
   );
-  const gatewayStatusKey = key(
+  const gatewayStatusKey = queryKey(
     trpc.kiloclaw.gatewayStatus,
     trpc.organizations.kiloclaw.gatewayStatus
   );
-  const secretCatalogKey = key(
+  const secretCatalogKey = queryKey(
     trpc.kiloclaw.getSecretCatalog,
     trpc.organizations.kiloclaw.getSecretCatalog
   );
-  const channelCatalogKey = key(
+  const channelCatalogKey = queryKey(
     trpc.kiloclaw.getChannelCatalog,
     trpc.organizations.kiloclaw.getChannelCatalog
   );
-  const pairingKey = key(
+  const pairingKey = queryKey(
     trpc.kiloclaw.listPairingRequests,
     trpc.organizations.kiloclaw.listPairingRequests
   );
-  const devicePairingKey = key(
+  const devicePairingKey = queryKey(
     trpc.kiloclaw.listDevicePairingRequests,
     trpc.organizations.kiloclaw.listDevicePairingRequests
   );
@@ -59,27 +59,27 @@ export function useKiloClawMutations(organizationId?: string | null) {
   };
 
   function optimistic<TInput, TData extends Record<string, unknown>>(
-    qk: unknown[],
+    key: unknown[],
     updater: (old: TData, input: TInput) => TData,
     settle?: () => Promise<void>
   ) {
     return {
       onMutate: async (input: TInput) => {
-        await queryClient.cancelQueries({ queryKey: qk });
-        const previous = queryClient.getQueryData<TData>(qk);
-        queryClient.setQueryData<TData>(qk, old => (old ? updater(old, input) : old));
+        await queryClient.cancelQueries({ queryKey: key });
+        const previous = queryClient.getQueryData<TData>(key);
+        queryClient.setQueryData<TData>(key, old => (old ? updater(old, input) : old));
         return { previous };
       },
       onError: (error: { message: string }, _input: TInput, context?: { previous?: TData }) => {
         if (context?.previous) {
-          queryClient.setQueryData(qk, context.previous);
+          queryClient.setQueryData(key, context.previous);
         }
         onMutationError(error);
       },
       onSettled:
         settle ??
         (async () => {
-          await queryClient.invalidateQueries({ queryKey: qk });
+          await queryClient.invalidateQueries({ queryKey: key });
         }),
     };
   }
@@ -94,22 +94,24 @@ export function useKiloClawMutations(organizationId?: string | null) {
   };
 
   function dispatch(personal: AnyMutPath, org: AnyMutPath) {
-    const p = personal.mutationOptions({});
-    const o = org.mutationOptions({});
-    const pFn = p.mutationFn ?? asyncNoop;
-    const oFn = o.mutationFn ?? asyncNoop;
+    const personalOpts = personal.mutationOptions({});
+    const orgOpts = org.mutationOptions({});
+    const personalFn = personalOpts.mutationFn ?? asyncNoop;
+    const orgFn = orgOpts.mutationFn ?? asyncNoop;
 
     let mutationFn: (...args: unknown[]) => Promise<unknown> = asyncNoop;
     if (isResolved && isOrg) {
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       mutationFn = (input: unknown) =>
-        oFn(input && typeof input === 'object' ? { ...input, organizationId } : { organizationId });
+        orgFn(
+          input && typeof input === 'object' ? { ...input, organizationId } : { organizationId }
+        );
     } else if (isResolved) {
-      mutationFn = pFn;
+      mutationFn = personalFn;
     }
 
     return {
-      mutationKey: isOrg ? o.mutationKey : p.mutationKey,
+      mutationKey: isOrg ? orgOpts.mutationKey : personalOpts.mutationKey,
       mutationFn,
     };
   }

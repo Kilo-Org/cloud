@@ -564,6 +564,7 @@ function createKiloExaToolDefinition(
         parsedContents.value && Object.keys(parsedContents.value).length > 0
           ? parsedContents.value
           : undefined;
+      const contentsCacheToken = contents ? JSON.stringify(contents) : undefined;
 
       const normalizedCount = resolveExaSearchCount(count, DEFAULT_SEARCH_COUNT);
       const cacheKey = buildSearchCacheKey([
@@ -574,9 +575,7 @@ function createKiloExaToolDefinition(
         parsedDateRange.dateAfter,
         parsedDateRange.dateBefore,
         freshness,
-        contents?.highlights ? JSON.stringify(contents.highlights) : undefined,
-        contents?.text ? JSON.stringify(contents.text) : undefined,
-        contents?.summary ? JSON.stringify(contents.summary) : undefined,
+        contentsCacheToken,
       ]);
       const cached = readCachedSearchPayload(cacheKey);
       if (cached) {

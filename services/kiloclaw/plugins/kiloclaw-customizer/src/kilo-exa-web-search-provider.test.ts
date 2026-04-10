@@ -109,6 +109,37 @@ describe('kilo-exa web search provider', () => {
     expect(webSearchSdkStub.getPostCalls()).toHaveLength(1);
   });
 
+  it.each(['highlights', 'text', 'summary'] as const)(
+    'does not collide cache key when contents.%s is false',
+    async key => {
+      webSearchSdkStub.setPostHandler(async () => ({
+        results: [
+          {
+            title: 'Result A',
+            url: 'https://example.com/a',
+            highlights: ['first'],
+          },
+        ],
+      }));
+      const tool = getTool();
+
+      await tool.execute({ query: 'cache falsy collision check', type: 'neural', count: 3 });
+      await tool.execute({
+        query: 'cache falsy collision check',
+        type: 'neural',
+        count: 3,
+        contents: {
+          [key]: false,
+        },
+      });
+
+      const keyPartsLog = webSearchSdkStub.getCacheKeyPartsLog();
+      expect(keyPartsLog).toHaveLength(2);
+      expect(keyPartsLog[0]).not.toEqual(keyPartsLog[1]);
+      expect(webSearchSdkStub.getPostCalls()).toHaveLength(2);
+    }
+  );
+
   it('uses KILO_API_URL origin and forwards org header when present', async () => {
     process.env.KILO_API_URL = 'https://claw-api.kilo.ai/api/gateway/';
     process.env.KILOCODE_ORGANIZATION_ID = 'org_123';

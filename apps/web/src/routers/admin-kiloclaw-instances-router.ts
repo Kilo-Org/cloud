@@ -944,18 +944,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid().optional(),
-        appName: z
-          .string()
-          .min(1)
-          .max(63)
-          .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Invalid Fly app name'),
+        appName: z.string().min(1),
         volumeId: z.string().min(1),
-        sizeGb: z.number().int().min(1).max(1000),
       })
     )
     .mutation(async ({ input, ctx }) => {
       console.log(
-        `[admin-kiloclaw] extendVolume triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) app=${input.appName} volume=${input.volumeId} size=${input.sizeGb}GB`
+        `[admin-kiloclaw] extendVolume triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) app=${input.appName} volume=${input.volumeId} size=15GB`
       );
       const instance = input.instanceId
         ? await resolveInstance(input.userId, input.instanceId)
@@ -968,7 +963,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           input.userId,
           input.appName,
           input.volumeId,
-          input.sizeGb,
           instance ? workerInstanceId(instance) : undefined
         );
 
@@ -979,11 +973,11 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_name: ctx.user.google_user_name,
             target_user_id: input.userId,
-            message: `Fly volume extended to ${input.sizeGb}GB: app=${input.appName} volume=${input.volumeId}`,
+            message: `Fly volume extended to 15GB: app=${input.appName} volume=${input.volumeId}`,
             metadata: {
               appName: input.appName,
               volumeId: input.volumeId,
-              sizeGb: input.sizeGb,
+              sizeGb: 15,
             },
           });
         } catch (auditErr) {

@@ -64,6 +64,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { AdminFileEditor } from './AdminFileEditor';
+import { BumpVolumeTo15GbDialog } from './BumpVolumeTo15GbDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useKiloclawInstanceEvents,
@@ -1184,7 +1185,6 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [cleanupRecoveryVolumeDialogOpen, setCleanupRecoveryVolumeDialogOpen] = useState(false);
   const [awaitingRestoreCompletion, setAwaitingRestoreCompletion] = useState(false);
   const [bumpVolumeDialogOpen, setBumpVolumeDialogOpen] = useState(false);
-  const [bumpVolumeAcknowledged, setBumpVolumeAcknowledged] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     ...trpc.admin.kiloclawInstances.get.queryOptions({ id: instanceId }),
@@ -1492,10 +1492,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const { mutateAsync: extendVolume, isPending: isExtendingVolume } = useMutation(
     trpc.admin.kiloclawInstances.extendVolume.mutationOptions({
       onSuccess: () => {
-        toast.success('Volume extended to 15GB');
+        toast.success('Volume extended to 15 GB');
         invalidateMachineQueries();
         setBumpVolumeDialogOpen(false);
-        setBumpVolumeAcknowledged(false);
       },
       onError: err => {
         toast.error(`Failed to extend volume: ${err.message}`);
@@ -2504,10 +2503,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     data?.workerStatus?.status === 'recovering' ||
                     data?.workerStatus?.status === 'destroying'
                   }
-                  onClick={() => {
-                    setBumpVolumeAcknowledged(false);
-                    setBumpVolumeDialogOpen(true);
-                  }}
+                  onClick={() => setBumpVolumeDialogOpen(true)}
                 >
                   {isExtendingVolume ? (
                     <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -2793,89 +2789,26 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
           </DialogContent>
         </Dialog>
 
-        <Dialog
+        <BumpVolumeTo15GbDialog
           open={bumpVolumeDialogOpen}
-          onOpenChange={isExtendingVolume ? () => {} : setBumpVolumeDialogOpen}
-        >
-          <DialogContent className="sm:max-w-[520px]">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-amber-500">
-                <AlertTriangle className="h-5 w-5" />
-                Confirm Volume Bump to 15 GB
-              </DialogTitle>
-              <DialogDescription asChild>
-                <div className="space-y-3 pt-3">
-                  <p>
-                    This is a temporary workaround to re-grant access so the user can export data to
-                    an external backup.
-                  </p>
-                  <p className="text-foreground font-medium">
-                    This operation may cause unexpected behavior for the user.
-                  </p>
-                  <div className="bg-muted rounded border p-3 text-xs">
-                    <div>
-                      App: <code>{data?.workerStatus?.flyAppName ?? '—'}</code>
-                    </div>
-                    <div>
-                      Volume: <code>{volumeId ?? '—'}</code>
-                    </div>
-                    <div>Target size: 15 GB</div>
-                  </div>
-                  <label className="flex items-start gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={bumpVolumeAcknowledged}
-                      onChange={e => setBumpVolumeAcknowledged(e.target.checked)}
-                      className="mt-0.5"
-                    />
-                    <span>
-                      I confirm I have communicated this temporary workaround to the user and told
-                      them to export data to an external backup.
-                    </span>
-                  </label>
-                </div>
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="gap-2 sm:gap-0">
-              <DialogClose asChild>
-                <Button variant="secondary" disabled={isExtendingVolume}>
-                  Cancel
-                </Button>
-              </DialogClose>
-              <Button
-                variant="destructive"
-                disabled={
-                  isExtendingVolume ||
-                  !bumpVolumeAcknowledged ||
-                  !data?.workerStatus?.flyAppName ||
-                  !volumeId
-                }
-                onClick={() => {
-                  if (!data?.workerStatus?.flyAppName || !volumeId) {
-                    toast.error('Missing app name or volume ID');
-                    return;
-                  }
-                  void extendVolume({
-                    userId: data.user_id,
-                    instanceId: data.id,
-                    appName: data.workerStatus.flyAppName,
-                    volumeId,
-                    sizeGb: 15,
-                  });
-                }}
-              >
-                {isExtendingVolume ? (
-                  <>
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                    Extending...
-                  </>
-                ) : (
-                  'Confirm Bump to 15 GB'
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          appName={data.workerStatus?.flyAppName}
+          volumeId={volumeId}
+          userLabel={data.user_email ?? data.user_id}
+          isExtending={isExtendingVolume}
+          onOpenChange={setBumpVolumeDialogOpen}
+          onConfirm={() => {
+            if (!data.workerStatus?.flyAppName || !volumeId) {
+              toast.error('Missing app name or volume ID');
+              return;
+            }
+            void extendVolume({
+              userId: data.user_id,
+              instanceId: data.id,
+              appName: data.workerStatus.flyAppName,
+              volumeId,
+            });
+          }}
+        />
 
         <Dialog
           open={cleanupRecoveryVolumeDialogOpen}

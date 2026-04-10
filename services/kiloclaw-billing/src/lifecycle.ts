@@ -49,7 +49,8 @@ type TemplateName =
   | 'clawTrialExpiresTomorrow'
   | 'clawEarlybirdEndingSoon'
   | 'clawEarlybirdExpiresTomorrow'
-  | 'clawCreditRenewalFailed';
+  | 'clawCreditRenewalFailed'
+  | 'clawComplementaryInferenceEnded';
 
 type SendResult =
   | { sent: true }
@@ -70,6 +71,7 @@ type BillingSummary = {
   sweep3_instance_destruction: number;
   sweep4_past_due_cleanup: number;
   sweep5_intro_schedules_repaired: number;
+  complementary_inference_ended_emails: number;
   emails_sent: number;
   emails_skipped: number;
   errors: number;
@@ -210,6 +212,7 @@ function createSummary(): BillingSummary {
     sweep3_instance_destruction: 0,
     sweep4_past_due_cleanup: 0,
     sweep5_intro_schedules_repaired: 0,
+    complementary_inference_ended_emails: 0,
     emails_sent: 0,
     emails_skipped: 0,
     errors: 0,
@@ -1774,6 +1777,89 @@ async function runEarlybirdWarningSweep(
   }
 }
 
+const COMPLEMENTARY_INFERENCE_WINDOW_MS = 6 * 60 * 60 * 1000;
+
+async function runComplementaryInferenceEndedSweep(
+  database: WorkerDb,
+  env: BillingWorkerEnv,
+  context: SweepExecutionContext,
+  summary: BillingSummary
+): Promise<void> {
+  const clawUrl = buildClawUrl(env);
+  const creditsUrl = `${env.KILOCODE_BACKEND_BASE_URL}/credits`;
+  const windowCutoff = new Date(Date.now() - COMPLEMENTARY_INFERENCE_WINDOW_MS).toISOString();
+
+  // Find users whose "instance ready" email was sent more than 6 hours ago,
+  // whose instance is not destroyed, who have never purchased credits,
+  // and who have not already received this notification.
+  //
+  // The email_type for the "instance ready" log is `claw_instance_ready:{sandboxId}`.
+  // We extract the sandbox_id by joining against kiloclaw_instances.
+  const rows = await database
+    .select({
+      user_id: kilocode_users.id,
+      email: kilocode_users.google_user_email,
+      sandbox_id: kiloclaw_instances.sandbox_id,
+    })
+    .from(kiloclaw_email_log)
+    .innerJoin(kilocode_users, eq(kiloclaw_email_log.user_id, kilocode_users.id))
+    .innerJoin(
+      kiloclaw_instances,
+      and(
+        eq(kiloclaw_instances.user_id, kiloclaw_email_log.user_id),
+        sql`${kiloclaw_email_log.email_type} = 'claw_instance_ready:' || ${kiloclaw_instances.sandbox_id}`
+      )
+    )
+    .where(
+      and(
+        sql`${kiloclaw_email_log.email_type} LIKE 'claw_instance_ready:%'`,
+        lte(kiloclaw_email_log.sent_at, windowCutoff),
+        isNull(kiloclaw_instances.destroyed_at),
+        // Not already sent the complementary inference ended email for this instance
+        sql`NOT EXISTS (
+          SELECT 1 FROM ${kiloclaw_email_log} AS sent_check
+          WHERE sent_check.user_id = ${kiloclaw_email_log.user_id}
+            AND sent_check.email_type = 'claw_complementary_inference_ended:' || ${kiloclaw_instances.sandbox_id}
+        )`,
+        // Never purchased credits (is_free = false, no org_id = personal purchase)
+        sql`NOT EXISTS (
+          SELECT 1 FROM ${credit_transactions}
+          WHERE ${credit_transactions.kilo_user_id} = ${kilocode_users.id}
+            AND ${credit_transactions.is_free} = false
+            AND ${credit_transactions.organization_id} IS NULL
+        )`
+      )
+    );
+
+  for (const row of rows) {
+    try {
+      const sent = await trySendEmail(
+        database,
+        env,
+        context,
+        row.user_id,
+        row.email,
+        `claw_complementary_inference_ended:${row.sandbox_id}`,
+        'clawComplementaryInferenceEnded',
+        {
+          claw_url: clawUrl,
+          credits_url: creditsUrl,
+          free_model_name: 'Kilo Auto Free',
+        },
+        summary
+      );
+
+      if (sent) summary.complementary_inference_ended_emails++;
+    } catch (error) {
+      summary.errors++;
+      log('error', 'Complementary inference ended sweep failed for user', {
+        userId: row.user_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+}
+
 export async function runSweep(
   env: BillingWorkerEnv,
   message: BillingSweepMessage,
@@ -1830,6 +1916,9 @@ export async function runSweep(
             break;
           case 'earlybird_warning':
             await runEarlybirdWarningSweep(database, env, context, summary);
+            break;
+          case 'complementary_inference_ended':
+            await runComplementaryInferenceEndedSweep(database, env, context, summary);
             break;
         }
 

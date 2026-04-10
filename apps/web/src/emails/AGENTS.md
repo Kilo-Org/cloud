@@ -70,5 +70,6 @@ Every template must include this branding footer below the card:
 | `clawDestructionWarning.html`       | `destruction_date`, `claw_url`, `year`                                                                                     | `27`                       |
 | `clawInstanceDestroyed.html`        | `claw_url`, `year`                                                                                                         | `28`                       |
 | `clawEarlybirdEndingSoon.html`      | `days_remaining`, `expiry_date`, `claw_url`, `year`                                                                        | `29`                       |
-| `clawEarlybirdExpiresTomorrow.html` | `expiry_date`, `claw_url`, `year`                                                                                          | `30`                       |
-| `accountDeletionRequest.html`       | `email`, `year`                                                                                                            | —                          |
+| `clawEarlybirdExpiresTomorrow.html`        | `expiry_date`, `claw_url`, `year`                                                                                   | `30`                       |
+| `clawComplementaryInferenceEnded.html`     | `claw_url`, `credits_url`, `free_model_name`, `year`                                                                | —                          |
+| `accountDeletionRequest.html`              | `email`, `year`                                                                                                     | —                          |

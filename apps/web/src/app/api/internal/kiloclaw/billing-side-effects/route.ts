@@ -29,6 +29,7 @@ const billingTemplateNames = [
   'clawEarlybirdEndingSoon',
   'clawEarlybirdExpiresTomorrow',
   'clawCreditRenewalFailed',
+  'clawComplementaryInferenceEnded',
 ] as const;
 
 type BillingSideEffectLogFields = BillingCorrelationContext & {

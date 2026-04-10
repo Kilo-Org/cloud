@@ -77,6 +77,7 @@ describe('kiloclaw billing worker handler', () => {
       sweep3_instance_destruction: 0,
       sweep4_past_due_cleanup: 0,
       sweep5_intro_schedules_repaired: 0,
+      complementary_inference_ended_emails: 0,
       emails_sent: 0,
       emails_skipped: 0,
       errors: 0,
@@ -153,7 +154,7 @@ describe('kiloclaw billing worker handler', () => {
     const message = {
       body: {
         runId: '11111111-1111-4111-8111-111111111111',
-        sweep: 'earlybird_warning',
+        sweep: 'complementary_inference_ended',
       },
       attempts: 1,
       ack: vi.fn(),
@@ -177,7 +178,7 @@ describe('kiloclaw billing worker handler', () => {
         billingFlow: 'kiloclaw_lifecycle',
         billingComponent: 'worker',
         billingRunId: '11111111-1111-4111-8111-111111111111',
-        billingSweep: 'earlybird_warning',
+        billingSweep: 'complementary_inference_ended',
         billingAttempt: 1,
       })
     );

@@ -9,6 +9,7 @@ export const BILLING_SWEEP_ORDER = [
   'destruction_warning',
   'trial_warning',
   'earlybird_warning',
+  'complementary_inference_ended',
 ] as const;
 
 export const BILLING_QUEUE_MAX_RETRIES = 3;

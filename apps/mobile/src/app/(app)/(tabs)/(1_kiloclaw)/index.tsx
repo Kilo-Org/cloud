@@ -1,6 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Plus, Server } from 'lucide-react-native';
+import { useEffect, useRef } from 'react';
 import { SectionList, type SectionListData, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -52,6 +53,18 @@ export default function KiloClawInstanceList() {
   const router = useRouter();
   const colors = useThemeColors();
   const { data: instances, isPending, isError, refetch } = useAllKiloClawInstances();
+  const didAutoRedirect = useRef(false);
+
+  useEffect(() => {
+    if (didAutoRedirect.current || instances?.length !== 1) {
+      return;
+    }
+    didAutoRedirect.current = true;
+    const instance = instances[0];
+    if (instance) {
+      router.replace(`/(app)/chat/${instance.sandboxId}` as Href);
+    }
+  }, [instances, router]);
 
   const sections = instances ? groupByContext(instances) : [];
 

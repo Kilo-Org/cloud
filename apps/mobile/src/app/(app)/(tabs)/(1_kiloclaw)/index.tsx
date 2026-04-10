@@ -63,7 +63,7 @@ export default function KiloClawInstanceList() {
     if (instances.length === 1) {
       const instance = instances[0];
       if (instance) {
-        router.replace(`/(app)/chat/${instance.sandboxId}` as Href);
+        router.push(`/(app)/chat/${instance.sandboxId}` as Href);
       }
     }
   }, [instances, router]);

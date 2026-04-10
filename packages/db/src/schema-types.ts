@@ -184,6 +184,7 @@ export type AffiliateEventDeliveryState =
 
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
+  'kiloclaw.volume.extend',
   'kiloclaw.volume.reassociate',
   'kiloclaw.snapshot.restore',
   'kiloclaw.recovery.cleanup_retained_volume',

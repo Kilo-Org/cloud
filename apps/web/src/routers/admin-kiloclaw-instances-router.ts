@@ -939,6 +939,67 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
     }),
 
+  extendVolume: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid().optional(),
+        appName: z
+          .string()
+          .min(1)
+          .max(63)
+          .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Invalid Fly app name'),
+        volumeId: z.string().min(1),
+        sizeGb: z.number().int().min(1).max(1000),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      console.log(
+        `[admin-kiloclaw] extendVolume triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) app=${input.appName} volume=${input.volumeId} size=${input.sizeGb}GB`
+      );
+      const instance = input.instanceId
+        ? await resolveInstance(input.userId, input.instanceId)
+        : undefined;
+      const client = new KiloClawInternalClient();
+
+      const fallbackMessage = 'Failed to extend Fly volume';
+      try {
+        const result = await client.extendVolume(
+          input.userId,
+          input.appName,
+          input.volumeId,
+          input.sizeGb,
+          instance ? workerInstanceId(instance) : undefined
+        );
+
+        try {
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.volume.extend',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `Fly volume extended to ${input.sizeGb}GB: app=${input.appName} volume=${input.volumeId}`,
+            metadata: {
+              appName: input.appName,
+              volumeId: input.volumeId,
+              sizeGb: input.sizeGb,
+            },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for extendVolume:', auditErr);
+        }
+
+        return result;
+      } catch (err) {
+        console.error(
+          `Failed to extend Fly volume app=${input.appName} volume=${input.volumeId}:`,
+          err
+        );
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
+
   destroy: adminProcedure.input(DestroyInstanceSchema).mutation(async ({ input, ctx }) => {
     const [instance] = await db
       .select({

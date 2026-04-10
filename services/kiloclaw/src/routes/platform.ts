@@ -2040,4 +2040,53 @@ platform.post('/destroy-fly-machine', async c => {
   }
 });
 
+// POST /api/platform/extend-volume
+// Extends a Fly volume by the specified size in GB.
+// REST equivalent: `fly volumes extend <volume id> -a <app id> -s <sizeGb>`
+const ExtendVolumeSchema = z.object({
+  userId: z.string().min(1),
+  appName: z
+    .string()
+    .min(1)
+    .max(63)
+    .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Invalid Fly app name'),
+  volumeId: z.string().min(1),
+  sizeGb: z.number().int().min(1).max(1000),
+});
+
+platform.post('/extend-volume', async c => {
+  const result = await parseBody(c, ExtendVolumeSchema);
+  if ('error' in result) return result.error;
+
+  const { appName, volumeId, sizeGb } = result.data;
+  const apiToken = c.env.FLY_API_TOKEN;
+  if (!apiToken) {
+    return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
+  }
+
+  const url = `https://api.machines.dev/v1/apps/${appName}/volumes/${volumeId}/extend`;
+  try {
+    const resp = await fetch(url, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ size_gb: sizeGb }),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text();
+      console.error(
+        `[platform] extend-volume failed (${resp.status}) volume=${volumeId} size=${sizeGb}:`,
+        body
+      );
+      return jsonError(`Fly API error (${resp.status}): ${body}`, resp.status);
+    }
+
+    console.log(`[platform] extend-volume ok: volume=${volumeId} size=${sizeGb}GB (target total)`);
+    return c.json({ ok: true });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'extend-volume');
+    return jsonError(message, status);
+  }
+});
+
 export { platform };

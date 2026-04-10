@@ -57,6 +57,7 @@ import {
   XCircle,
   ShieldAlert,
   Activity,
+  HardDriveDownload,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -1182,6 +1183,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [restoreReason, setRestoreReason] = useState('');
   const [cleanupRecoveryVolumeDialogOpen, setCleanupRecoveryVolumeDialogOpen] = useState(false);
   const [awaitingRestoreCompletion, setAwaitingRestoreCompletion] = useState(false);
+  const [bumpVolumeDialogOpen, setBumpVolumeDialogOpen] = useState(false);
+  const [bumpVolumeAcknowledged, setBumpVolumeAcknowledged] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     ...trpc.admin.kiloclawInstances.get.queryOptions({ id: instanceId }),
@@ -1485,6 +1488,20 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         },
       })
     );
+
+  const { mutateAsync: extendVolume, isPending: isExtendingVolume } = useMutation(
+    trpc.admin.kiloclawInstances.extendVolume.mutationOptions({
+      onSuccess: () => {
+        toast.success('Volume extended to 15GB');
+        invalidateMachineQueries();
+        setBumpVolumeDialogOpen(false);
+        setBumpVolumeAcknowledged(false);
+      },
+      onError: err => {
+        toast.error(`Failed to extend volume: ${err.message}`);
+      },
+    })
+  );
 
   const { mutateAsync: gatewayStart, isPending: isGatewayStarting } = useMutation(
     trpc.admin.kiloclawInstances.gatewayStart.mutationOptions({
@@ -2223,6 +2240,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   )}
                   {isFlyMachineDestroyed ? 'Machine Destroyed' : 'Destroy Machine'}
                 </Button>
+
               </div>
             </CardContent>
           </Card>
@@ -2454,27 +2472,51 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         {snapshotsEnabled && (
           <Card>
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <Camera className="text-muted-foreground h-5 w-5" />
-                <div>
-                  <CardTitle>Volume Snapshots</CardTitle>
-                  <CardDescription>
-                    Fly automatic backups for volume{' '}
-                    {data.workerStatus?.flyAppName ? (
-                      <a
-                        href={`https://fly.io/apps/${data.workerStatus.flyAppName}/volumes/${volumeId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-blue-600 hover:underline"
-                      >
-                        {volumeId}
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : (
-                      volumeId
-                    )}
-                  </CardDescription>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Camera className="text-muted-foreground h-5 w-5" />
+                  <div>
+                    <CardTitle>Volume Snapshots</CardTitle>
+                    <CardDescription>
+                      Fly automatic backups for volume{' '}
+                      {data.workerStatus?.flyAppName ? (
+                        <a
+                          href={`https://fly.io/apps/${data.workerStatus.flyAppName}/volumes/${volumeId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                        >
+                          {volumeId}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        volumeId
+                      )}
+                    </CardDescription>
+                  </div>
                 </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    !volumeId ||
+                    isExtendingVolume ||
+                    data?.workerStatus?.status === 'restoring' ||
+                    data?.workerStatus?.status === 'recovering' ||
+                    data?.workerStatus?.status === 'destroying'
+                  }
+                  onClick={() => {
+                    setBumpVolumeAcknowledged(false);
+                    setBumpVolumeDialogOpen(true);
+                  }}
+                >
+                  {isExtendingVolume ? (
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                  ) : (
+                    <HardDriveDownload className="mr-1 h-4 w-4" />
+                  )}
+                  Bump Volume to 15 GB
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -2746,6 +2788,90 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   </>
                 ) : (
                   'Restore Snapshot'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={bumpVolumeDialogOpen}
+          onOpenChange={isExtendingVolume ? () => {} : setBumpVolumeDialogOpen}
+        >
+          <DialogContent className="sm:max-w-[520px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-500">
+                <AlertTriangle className="h-5 w-5" />
+                Confirm Volume Bump to 15 GB
+              </DialogTitle>
+              <DialogDescription asChild>
+                <div className="space-y-3 pt-3">
+                  <p>
+                    This is a temporary workaround to re-grant access so the user can export data
+                    to an external backup.
+                  </p>
+                  <p className="text-foreground font-medium">
+                    This operation may cause unexpected behavior for the user.
+                  </p>
+                  <div className="bg-muted rounded border p-3 text-xs">
+                    <div>
+                      App: <code>{data?.workerStatus?.flyAppName ?? '—'}</code>
+                    </div>
+                    <div>
+                      Volume: <code>{volumeId ?? '—'}</code>
+                    </div>
+                    <div>Target size: 15 GB</div>
+                  </div>
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={bumpVolumeAcknowledged}
+                      onChange={e => setBumpVolumeAcknowledged(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      I confirm I have communicated this temporary workaround to the user and told
+                      them to export data to an external backup.
+                    </span>
+                  </label>
+                </div>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <DialogClose asChild>
+                <Button variant="secondary" disabled={isExtendingVolume}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                variant="destructive"
+                disabled={
+                  isExtendingVolume ||
+                  !bumpVolumeAcknowledged ||
+                  !data?.workerStatus?.flyAppName ||
+                  !volumeId
+                }
+                onClick={() => {
+                  if (!data?.workerStatus?.flyAppName || !volumeId) {
+                    toast.error('Missing app name or volume ID');
+                    return;
+                  }
+                  void extendVolume({
+                    userId: data.user_id,
+                    instanceId: data.id,
+                    appName: data.workerStatus.flyAppName,
+                    volumeId,
+                    sizeGb: 15,
+                  });
+                }}
+              >
+                {isExtendingVolume ? (
+                  <>
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    Extending...
+                  </>
+                ) : (
+                  'Confirm Bump to 15 GB'
                 )}
               </Button>
             </DialogFooter>

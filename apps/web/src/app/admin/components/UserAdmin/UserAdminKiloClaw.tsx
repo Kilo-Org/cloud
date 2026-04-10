@@ -217,16 +217,14 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                   : `${subscriptions.length} subscription${subscriptions.length !== 1 ? 's' : ''}`}
               </CardDescription>
             </div>
-            <div className="flex items-center gap-3">
-              {data?.activeInstanceId && (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={`/admin/kiloclaw/${data.activeInstanceId}`}>
-                    <ExternalLink className="mr-1 h-3 w-3" />
-                    View Instance
-                  </Link>
-                </Button>
-              )}
-            </div>
+            {data?.activeInstanceId && !subscriptions.some(s => s.instance) && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/admin/kiloclaw/${data.activeInstanceId}`}>
+                  <ExternalLink className="mr-1 h-3 w-3" />
+                  View Instance
+                </Link>
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -334,7 +332,7 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
                           <Button variant="outline" size="sm" asChild>
                             <Link href={`/admin/kiloclaw/${sub.instance.id}`}>
                               <ExternalLink className="mr-1 h-3 w-3" />
-                              {sub.instance.name ?? 'Instance'}
+                              View Instance
                             </Link>
                           </Button>
                         )}

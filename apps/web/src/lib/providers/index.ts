@@ -39,7 +39,10 @@ import {
   type OpenClawApiAdapter,
   type CustomLlmProvider,
 } from '@kilocode/db';
-import { addCacheBreakpoints } from '@/lib/providers/openrouter/request-helpers';
+import {
+  addCacheBreakpoints,
+  injectReasoningIntoContent,
+} from '@/lib/providers/openrouter/request-helpers';
 
 function inferSupportedChatApis(
   aiSdkProvider: CustomLlmProvider | undefined,
@@ -167,6 +170,9 @@ export async function getProvider(
               context.request.body.reasoning
             ) {
               context.request.body.reasoning.summary = customLlm.reasoning_summary;
+            }
+            if (customLlm.inject_reasoning_into_content) {
+              injectReasoningIntoContent(context.request);
             }
           },
         },

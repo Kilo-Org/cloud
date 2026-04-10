@@ -52,6 +52,7 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
   const { data: orgCreditData, isLoading: orgCreditsLoading } = useQuery({
     ...trpc.organizations.getCreditBlocks.queryOptions({ organizationId: selectedOrgId ?? '' }),
     enabled: Boolean(selectedOrgId),
+    placeholderData: keepPreviousData,
   });
 
   const creditData = selectedOrgId ? orgCreditData : personalCreditData;

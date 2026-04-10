@@ -44,8 +44,8 @@ const CheckinSchema = z.object({
   bandwidthBytesIn: z.number().min(0),
   bandwidthBytesOut: z.number().min(0),
   lastExitReason: z.string().optional(),
-  diskUsedBytes: z.number().int().min(0).nullable().optional(),
-  diskTotalBytes: z.number().int().min(0).nullable().optional(),
+  diskUsedBytes: z.number().int().transform(v => Math.max(v, 0)).default(0),
+  diskTotalBytes: z.number().int().transform(v => Math.max(v, 0)).default(0),
   productTelemetry: ProductTelemetrySchema.optional(),
 });
 
@@ -161,8 +161,8 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
         data.loadAvg5m,
         data.bandwidthBytesIn,
         data.bandwidthBytesOut,
-        data.diskUsedBytes ?? -1,
-        data.diskTotalBytes ?? -1,
+        data.diskUsedBytes,
+        data.diskTotalBytes,
       ],
       indexes: [data.sandboxId],
     });

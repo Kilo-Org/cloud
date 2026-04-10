@@ -1202,8 +1202,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const sandboxId = data?.sandbox_id;
   const aeDiskUsage = useControllerTelemetryDiskUsage(sandboxId ?? '');
   const aeRow = aeDiskUsage.data?.data?.[0];
-  const diskUsed = aeRow && aeRow.disk_used_bytes >= 0 ? aeRow.disk_used_bytes : null;
-  const diskTotal = aeRow && aeRow.disk_total_bytes >= 0 ? aeRow.disk_total_bytes : null;
+  const diskUsed = aeRow && aeRow.disk_used_bytes > 0 ? aeRow.disk_used_bytes : null;
+  const diskTotal = aeRow && aeRow.disk_total_bytes > 0 ? aeRow.disk_total_bytes : null;
 
   const { mutateAsync: destroyInstance, isPending: isDestroying } = useMutation(
     trpc.admin.kiloclawInstances.destroy.mutationOptions({

@@ -179,8 +179,8 @@ describe('POST /checkin', () => {
 
     const call = firstAnalyticsEvent(writeDataPoint);
     expect(call.doubles).toHaveLength(8);
-    expect(call.doubles[6]).toBe(-1);
-    expect(call.doubles[7]).toBe(-1);
+    expect(call.doubles[6]).toBe(0);
+    expect(call.doubles[7]).toBe(0);
   });
 
   it('writes disk usage doubles when disk stats are present', async () => {
@@ -205,6 +205,30 @@ describe('POST /checkin', () => {
     expect(call.doubles).toHaveLength(8);
     expect(call.doubles[6]).toBe(1024000);
     expect(call.doubles[7]).toBe(5368709120);
+  });
+
+  it('clamps negative disk usage doubles to zero', async () => {
+    const writeDataPoint = vi.fn<(payload: AnalyticsEngineDataPoint) => void>();
+    const env = makeEnv({ writeDataPoint });
+    const headers = await makeAuthHeaders();
+
+    const response = await controller.request(
+      '/checkin',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(makeBody({ diskUsedBytes: -1, diskTotalBytes: -1 })),
+      },
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(writeDataPoint).toHaveBeenCalledTimes(1);
+
+    const call = firstAnalyticsEvent(writeDataPoint);
+    expect(call.doubles).toHaveLength(8);
+    expect(call.doubles[6]).toBe(0);
+    expect(call.doubles[7]).toBe(0);
   });
 
   it('still returns 204 when AE write throws', async () => {

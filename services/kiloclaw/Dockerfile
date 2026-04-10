@@ -49,7 +49,21 @@ RUN npm install -g pnpm
 # Patch: bump model discovery timeout from 5s to 60s — shared-cpu machines
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Remove this sed patch once openclaw exposes a configurable timeout.
-RUN npm install -g @buape/carbon@0.14.0
+# Workaround: openclaw@2026.4.5 is missing bundled channel plugin runtime deps
+# that were removed in the "move bundled extension deps to plugin packages" refactor
+# and re-added in openclaw@2026.4.9 via "mirror bundled channel deps at root (#63065)".
+# Install them globally so openclaw can resolve them at runtime.
+# Remove this block when upgrading to openclaw >= 2026.4.9.
+RUN npm install -g \
+    @buape/carbon@0.14.0 \
+    @grammyjs/runner@^2.0.3 \
+    @grammyjs/transformer-throttler@^1.2.1 \
+    @larksuiteoapi/node-sdk@^1.60.0 \
+    @slack/bolt@^4.6.0 \
+    @slack/web-api@^7.15.0 \
+    grammy@^1.42.0 \
+    https-proxy-agent@^9.0.0 \
+    opusscript@^0.1.1
 RUN npm install -g openclaw@2026.4.5 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && PM_FILE=$(find "$OC_DIST" -name 'provider-models-*.js' | head -1) \

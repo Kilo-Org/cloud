@@ -28,8 +28,7 @@ COPY setup.mjs admin-setup.mjs shared.mjs ./
 
 # Route --admin to admin-setup.mjs, everything else to setup.mjs
 ENTRYPOINT ["/bin/sh", "-c", "\
-  if echo \"$@\" | grep -q -- '--admin'; then \
-    exec node admin-setup.mjs \"$@\"; \
-  else \
-    exec node setup.mjs \"$@\"; \
-  fi", "--"]
+  for arg in \"$@\"; do \
+    case \"$arg\" in --admin) exec node admin-setup.mjs \"$@\";; esac; \
+  done; \
+  exec node setup.mjs \"$@\"", "--"]

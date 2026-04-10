@@ -13,7 +13,7 @@
  *     --client-id=<id> --client-secret=<secret> --project-id=<pid>
  */
 
-import { execSync, execFileSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { ask, runCommand, runCommandOutput, GCP_APIS } from './shared.mjs';
 
@@ -452,7 +452,7 @@ if (!isMemberMode) {
   // Step 1: Create Pub/Sub topic (idempotent)
   console.log('Creating Pub/Sub topic gog-gmail-watch...');
   try {
-    execSync('gcloud pubsub topics create gog-gmail-watch --quiet', {
+    execFileSync('gcloud', ['pubsub', 'topics', 'create', 'gog-gmail-watch', '--quiet'], {
       stdio: 'pipe',
     });
     console.log('Topic created.');
@@ -473,12 +473,11 @@ if (!isMemberMode) {
   if (pushSetupOk) {
     console.log('Granting Gmail push publisher role...');
     try {
-      execSync(
-        'gcloud pubsub topics add-iam-policy-binding gog-gmail-watch ' +
-          '--member="serviceAccount:gmail-api-push@system.gserviceaccount.com" ' +
-          '--role="roles/pubsub.publisher" --quiet',
-        { stdio: 'pipe' }
-      );
+      execFileSync('gcloud', [
+        'pubsub', 'topics', 'add-iam-policy-binding', 'gog-gmail-watch',
+        '--member=serviceAccount:gmail-api-push@system.gserviceaccount.com',
+        '--role=roles/pubsub.publisher', '--quiet',
+      ], { stdio: 'pipe' });
       console.log('Publisher role granted.');
     } catch (err) {
       const errOutput = err.stderr?.toString() ?? err.message;
@@ -500,12 +499,11 @@ if (!isMemberMode) {
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
         await ask('Press Enter when done...');
         try {
-          execSync(
-            'gcloud pubsub topics add-iam-policy-binding gog-gmail-watch ' +
-              '--member="serviceAccount:gmail-api-push@system.gserviceaccount.com" ' +
-              '--role="roles/pubsub.publisher" --quiet',
-            { stdio: 'pipe' }
-          );
+          execFileSync('gcloud', [
+            'pubsub', 'topics', 'add-iam-policy-binding', 'gog-gmail-watch',
+            '--member=serviceAccount:gmail-api-push@system.gserviceaccount.com',
+            '--role=roles/pubsub.publisher', '--quiet',
+          ], { stdio: 'pipe' });
           console.log('Publisher role granted.');
         } catch (retryErr) {
           console.error(
@@ -549,7 +547,7 @@ if (isMemberMode) {
 
 if (pushUserId && pushSetupOk) {
   // Get GCP project ID for topic path and SA email
-  const gcpProject = execSync('gcloud config get-value project', { encoding: 'utf8' }).trim();
+  const gcpProject = execFileSync('gcloud', ['config', 'get-value', 'project'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
   if (!gcpProject || gcpProject === '(unset)') {
     console.error('Error: No active GCP project. Run setup again from the beginning.');
     pushSetupOk = false;
@@ -563,11 +561,10 @@ if (pushUserId && pushSetupOk) {
     pushSaEmail = `${pushSaName}@${gcpProject}.iam.gserviceaccount.com`;
     console.log(`Creating push auth service account ${pushSaEmail}...`);
     try {
-      execSync(
-        `gcloud iam service-accounts create ${pushSaName} ` +
-          `--display-name="Gmail push notification auth" --quiet`,
-        { stdio: 'pipe' }
-      );
+      execFileSync('gcloud', [
+        'iam', 'service-accounts', 'create', pushSaName,
+        '--display-name=Gmail push notification auth', '--quiet',
+      ], { stdio: 'pipe' });
       console.log('Service account created.');
     } catch (saErr) {
       const saOutput = saErr.stderr?.toString() ?? saErr.message;
@@ -586,16 +583,14 @@ if (pushUserId && pushSetupOk) {
     if (pushSetupOk) {
       console.log('Granting Pub/Sub token creator role...');
       try {
-        const projectNumber = execSync(
-          `gcloud projects describe ${gcpProject} --format="value(projectNumber)"`,
-          { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
-        ).trim();
-        execSync(
-          `gcloud iam service-accounts add-iam-policy-binding ${pushSaEmail} ` +
-            `--member="serviceAccount:service-${projectNumber}@gcp-sa-pubsub.iam.gserviceaccount.com" ` +
-            `--role="roles/iam.serviceAccountTokenCreator" --quiet`,
-          { stdio: 'pipe' }
-        );
+        const projectNumber = execFileSync('gcloud', [
+          'projects', 'describe', gcpProject, '--format=value(projectNumber)',
+        ], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+        execFileSync('gcloud', [
+          'iam', 'service-accounts', 'add-iam-policy-binding', pushSaEmail,
+          `--member=serviceAccount:service-${projectNumber}@gcp-sa-pubsub.iam.gserviceaccount.com`,
+          '--role=roles/iam.serviceAccountTokenCreator', '--quiet',
+        ], { stdio: 'pipe' });
         console.log('Token creator role granted.');
       } catch (tokenErr) {
         console.error(
@@ -619,29 +614,27 @@ if (pushUserId && pushSetupOk) {
     const pushAudience = `https://kiloclaw-gmail.kiloapps.io/push/user/${encodeURIComponent(pushUserId)}`;
     console.log(`Creating push subscription ${subscriptionName} → ${pushEndpoint}`);
     try {
-      execSync(
-        `gcloud pubsub subscriptions create ${subscriptionName} ` +
-          `--topic=gog-gmail-watch ` +
-          `--push-endpoint="${pushEndpoint}" ` +
-          `--push-auth-service-account="${pushSaEmail}" ` +
-          `--push-auth-token-audience="${pushAudience}" ` +
-          `--ack-deadline=30 --quiet`,
-        { stdio: 'pipe' }
-      );
+      execFileSync('gcloud', [
+        'pubsub', 'subscriptions', 'create', subscriptionName,
+        '--topic=gog-gmail-watch',
+        `--push-endpoint=${pushEndpoint}`,
+        `--push-auth-service-account=${pushSaEmail}`,
+        `--push-auth-token-audience=${pushAudience}`,
+        '--ack-deadline=30', '--quiet',
+      ], { stdio: 'pipe' });
       console.log('Push subscription created.');
     } catch (createErr) {
       const createOutput = createErr.stderr?.toString() ?? createErr.message;
       if (createOutput.includes('ALREADY_EXISTS') || createOutput.includes('already exists')) {
         // Subscription exists — update it
         try {
-          execSync(
-            `gcloud pubsub subscriptions update ${subscriptionName} ` +
-              `--push-endpoint="${pushEndpoint}" ` +
-              `--push-auth-service-account="${pushSaEmail}" ` +
-              `--push-auth-token-audience="${pushAudience}" ` +
-              `--quiet`,
-            { stdio: 'pipe' }
-          );
+          execFileSync('gcloud', [
+            'pubsub', 'subscriptions', 'update', subscriptionName,
+            `--push-endpoint=${pushEndpoint}`,
+            `--push-auth-service-account=${pushSaEmail}`,
+            `--push-auth-token-audience=${pushAudience}`,
+            '--quiet',
+          ], { stdio: 'pipe' });
           console.log('Push subscription updated.');
         } catch (updateErr) {
           console.error(
@@ -672,11 +665,11 @@ if (pushUserId && pushSetupOk) {
   if (pushSetupOk) {
     console.log('Registering Gmail watch...');
     try {
-      execSync(
-        `gog gmail watch start --account="${userEmail}" ` +
-          `--topic="projects/${gcpProject}/topics/gog-gmail-watch"`,
-        { stdio: 'inherit', env: gogEnv }
-      );
+      execFileSync('gog', [
+        'gmail', 'watch', 'start',
+        `--account=${userEmail}`,
+        `--topic=projects/${gcpProject}/topics/gog-gmail-watch`,
+      ], { stdio: 'inherit', env: gogEnv });
       console.log('Gmail watch registered successfully.');
     } catch (err) {
       console.error('Error: Gmail watch registration failed:', err.message);
@@ -698,7 +691,7 @@ if (pushUserId && pushSetupOk) {
 // ---------------------------------------------------------------------------
 
 console.log('\nCreating config tarball...');
-const tarballBuffer = execSync(`tar czf - -C ${gogHome}/.config gogcli`, {
+const tarballBuffer = execFileSync('tar', ['czf', '-', '-C', `${gogHome}/.config`, 'gogcli'], {
   maxBuffer: 1024 * 1024,
 });
 const tarballBase64 = tarballBuffer.toString('base64');

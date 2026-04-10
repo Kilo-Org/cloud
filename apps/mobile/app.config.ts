@@ -26,6 +26,10 @@ const config: ExpoConfig = {
     usesAppleSignIn: true,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      NSAdvertisingAttributionReportEndpoint: 'https://appsflyer-skadnetwork.com/',
+      AdAttributionKit: {
+        PostbackCopyURL: 'https://appsflyer-skadnetwork.com/',
+      },
       NSMicrophoneUsageDescription:
         'Allow $(PRODUCT_NAME) to access your microphone to record audio messages.',
       NSPhotoLibraryUsageDescription:

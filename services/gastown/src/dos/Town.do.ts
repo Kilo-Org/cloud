@@ -343,6 +343,17 @@ export class TownDO extends DurableObject<Env> {
           });
         }
 
+        // Option B (defense-in-depth): If the reconciler re-dispatches an
+        // open triage batch bead (gt:triage, created_by='patrol') — e.g.
+        // because Option A's in_progress transition was somehow bypassed —
+        // inject the triage system prompt so the polecat gets the correct
+        // tools and instructions instead of the generic polecat prompt.
+        if (bead.labels.includes(patrol.TRIAGE_BATCH_LABEL) && bead.created_by === 'patrol') {
+          const pendingRequests = patrol.listPendingTriageRequests(this.sql);
+          const { buildTriageSystemPrompt } = await import('../prompts/triage-system.prompt');
+          systemPromptOverride = buildTriageSystemPrompt(pendingRequests);
+        }
+
         return scheduling.dispatchAgent(schedulingCtx, agent, bead, {
           systemPromptOverride,
         });
@@ -4075,6 +4086,14 @@ export class TownDO extends DurableObject<Env> {
 
     const triageAgent = agents.getOrCreateAgent(this.sql, 'polecat', rigId, this.townId);
     agents.hookBead(this.sql, triageAgent.id, triageBead.bead_id);
+
+    // Option A: Immediately mark the triage batch bead as in_progress so
+    // the reconciler's Rule 2 (idle agent + open hooked bead → dispatch_agent)
+    // does not re-fire on the next tick if the container start fails. Rule 3
+    // (stale in_progress bead + no working agent + 5-min timeout) will reset
+    // it back to open if the dispatch fails, allowing a clean retry via
+    // maybeDispatchTriageAgent with the correct triage system prompt.
+    beadOps.updateBeadStatus(this.sql, triageBead.bead_id, 'in_progress', triageAgent.id);
 
     const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
       townId: this.townId,

@@ -1,0 +1,53 @@
+# Copy to .dev.vars for local development with `wrangler dev`.
+# All values here are REQUIRED secrets for production deployment.
+# Set them with: wrangler secret put <NAME>
+
+# ── Required secrets ─────────────────────────────────────────────────────────
+
+# Kilo gateway token (used by process/run-all.mjs for LLM API calls)
+KILO_API_TOKEN=your-kilo-api-token
+
+# Kilo org ID (passed alongside KILO_API_TOKEN)
+KILO_ORG_ID=your-kilo-org-id
+
+# Slack user token (used by process/fetch-sources.mjs)
+SLACK_USER_TOKEN=xoxp-your-slack-user-token
+
+# R2 credentials (used by process/publish.mjs to upload KB artifacts)
+R2_ACCESS_KEY_ID=your-r2-access-key-id
+R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
+
+# Shared secret between this service and the kilo-context Worker for /_invalidate.
+# Generate with: openssl rand -hex 32
+# Also set as a secret in the kilo-context Worker:
+#   cd ../kilo-context/worker && wrangler secret put PIPELINE_SERVICE_TOKEN
+PIPELINE_SERVICE_TOKEN=your-shared-pipeline-service-token
+
+# ── Optional secrets ──────────────────────────────────────────────────────────
+
+# Google Drive folder ID — omit to skip the transcripts connector entirely
+# GDRIVE_FOLDER_ID=your-google-drive-folder-id
+
+# Base64-encoded Google Drive token.json — required if GDRIVE_FOLDER_ID is set
+# Generate with: base64 < /path/to/token.json | tr -d '\n'
+# GDRIVE_TOKEN_JSON=ewogICJhY2Nlc3NfdG9rZW4iOi....
+
+# ── First-time setup ──────────────────────────────────────────────────────────
+#
+# 1. Set all required secrets:
+#    wrangler secret put KILO_API_TOKEN
+#    wrangler secret put KILO_ORG_ID
+#    wrangler secret put SLACK_USER_TOKEN
+#    wrangler secret put R2_ACCESS_KEY_ID
+#    wrangler secret put R2_SECRET_ACCESS_KEY
+#    wrangler secret put PIPELINE_SERVICE_TOKEN
+#
+# 2. Set PIPELINE_SERVICE_TOKEN in the kilo-context Worker too:
+#    cd services/kilo-context/worker && wrangler secret put PIPELINE_SERVICE_TOKEN
+#
+# 3. Deploy:
+#    pnpm deploy
+#
+# 4. Verify with:
+#    curl https://kilo-context-pipeline.<your-account>.workers.dev/status
+#    curl -X POST https://kilo-context-pipeline.<your-account>.workers.dev/trigger

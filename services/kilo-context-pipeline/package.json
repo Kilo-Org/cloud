@@ -1,0 +1,22 @@
+{
+  "name": "kilo-context-pipeline",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "types": "wrangler types",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "hono": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

@@ -1,0 +1,100 @@
+/**
+ * kilo-context-pipeline — Wrangler configuration
+ *
+ * Builds and deploys:
+ *   - The Container image (from ./Dockerfile)
+ *   - The PipelineContainer Durable Object (wraps the Container)
+ *   - The PipelineOrchestrator Durable Object (SQLite-backed run history)
+ *   - The Cron trigger (daily 06:00 UTC)
+ *
+ * Required secrets (set via: wrangler secret put <NAME>):
+ *   KILO_API_TOKEN          — Kilo gateway token for LLM API calls in the pipeline
+ *   KILO_ORG_ID             — Kilo org ID for gateway auth
+ *   SLACK_USER_TOKEN        — Slack user token for fetch-sources.mjs
+ *   R2_ACCESS_KEY_ID        — R2 access key for publish.mjs
+ *   R2_SECRET_ACCESS_KEY    — R2 secret key for publish.mjs
+ *   PIPELINE_SERVICE_TOKEN  — Shared secret with the kilo-context Worker for /_invalidate
+ *
+ * Optional secrets:
+ *   GDRIVE_FOLDER_ID        — Google Drive folder ID (skips transcripts connector if absent)
+ *   GDRIVE_TOKEN_JSON       — Base64-encoded token.json for Google Drive OAuth
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "name": "kilo-context-pipeline",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "dev": {
+    "port": 8820,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
+
+  "observability": {
+    "enabled": true,
+  },
+
+  // ── Container (Docker image for the pipeline runner) ────────────────────────
+  // The image is built from ./Dockerfile when `wrangler deploy` runs.
+  // Each Container instance corresponds to one PipelineContainer DO instance.
+  "containers": [
+    {
+      "class_name": "PipelineContainer",
+      "image": "./Dockerfile",
+      // standard-1: 1 vCPU, 2 GiB RAM — sufficient for Node.js LLM pipeline
+      "instance_type": "standard-1",
+      // Phase 1: one daily run at a time. Raise if multiple instances share the Worker.
+      "max_instances": 5,
+    },
+  ],
+
+  // ── Durable Objects ──────────────────────────────────────────────────────────
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PIPELINE_ORCHESTRATOR",
+        "class_name": "PipelineOrchestrator",
+      },
+      {
+        "name": "PIPELINE_CONTAINER",
+        "class_name": "PipelineContainer",
+      },
+    ],
+  },
+
+  // ── Durable Object migrations ────────────────────────────────────────────────
+  // new_sqlite_classes is required for both the Orchestrator (uses SQLite) and
+  // the Container DO (Container DOs require sqlite-class migration registration).
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["PipelineOrchestrator", "PipelineContainer"],
+    },
+  ],
+
+  // ── Service binding: kilo-context MCP Worker ─────────────────────────────────
+  // Used by the Orchestrator to call /_invalidate after a successful run.
+  // Requires the kilo-context Worker to be deployed in the same account.
+  "services": [
+    {
+      "binding": "KB_WORKER",
+      "service": "kilo-context",
+    },
+  ],
+
+  // ── Cron trigger ─────────────────────────────────────────────────────────────
+  // Daily at 06:00 UTC. Calls the scheduled() handler in src/index.ts.
+  "triggers": {
+    "crons": ["0 6 * * *"],
+  },
+
+  // ── Vars ─────────────────────────────────────────────────────────────────────
+  "vars": {
+    // Instance ID used as the DO name for PIPELINE_ORCHESTRATOR.
+    // Change this if you run multiple pipeline instances in the same Worker.
+    "PIPELINE_INSTANCE_ID": "kilo-internal",
+  },
+}

@@ -516,34 +516,31 @@ function getDestroyConfirmationContext({
   organizationName?: string;
 }) {
   const instanceName = status.name?.trim() || null;
-  // instanceRecordId is always populated for any provisioned instance (Postgres row ID).
-  // The settings page redirects away if no instance exists, so this is never null here.
-  const instanceIdentifier =
-    status.instanceRecordId ?? status.instanceId ?? status.sandboxId;
+  const sandboxId = status.sandboxId;
   const organizationPrefix = organizationName?.trim() || null;
   const instanceKind = organizationPrefix ? 'Organization Instance' : 'Personal Instance';
 
-  // Accept the instance name or the instance ID as confirmation input.
-  // In org context, prefix each with "orgname/".
-  const confirmationTokens = [instanceName, instanceIdentifier].filter(
+  // Accept either the instance name or sandbox ID as confirmation input.
+  // The prompt shows the name when available (more recognizable); the sandbox
+  // ID is always accepted silently as a fallback. In org context each token
+  // is prefixed with "orgname/".
+  const confirmationTokens = [instanceName, sandboxId].filter(
     (token): token is string => token !== null && token.length > 0
   );
+  const uniqueTokens = [...new Set(confirmationTokens)];
   const confirmationOptions = organizationPrefix
-    ? [...new Set(confirmationTokens)].map(token => `${organizationPrefix}/${token}`)
-    : [...new Set(confirmationTokens)];
+    ? uniqueTokens.map(token => `${organizationPrefix}/${token}`)
+    : uniqueTokens;
 
-  // The primary token shown in the prompt — prefer the name when available
-  // since it's more recognizable, with the ID as a fallback.
+  // Show the name-based token in the prompt when available, fall back to sandbox ID.
   const primaryConfirmation = confirmationOptions[0];
-  const alternateConfirmations = confirmationOptions.slice(1);
 
   return {
     displayName: instanceName || 'Unnamed instance',
-    instanceIdentifier,
+    sandboxId,
     instanceKind,
     confirmationOptions,
     primaryConfirmation,
-    alternateConfirmations,
   };
 }
 
@@ -563,17 +560,11 @@ function DestroyInstanceDialog({
   onConfirm: () => void;
 }) {
   const [confirmation, setConfirmation] = useState('');
-  const {
-    displayName,
-    instanceIdentifier,
-    instanceKind,
-    confirmationOptions,
-    primaryConfirmation,
-    alternateConfirmations,
-  } = useMemo(
-    () => getDestroyConfirmationContext({ status, organizationName }),
-    [status, organizationName]
-  );
+  const { displayName, sandboxId, instanceKind, confirmationOptions, primaryConfirmation } =
+    useMemo(
+      () => getDestroyConfirmationContext({ status, organizationName }),
+      [status, organizationName]
+    );
   const confirmationMatches =
     confirmationOptions.length > 0 && confirmationOptions.includes(confirmation.trim());
 
@@ -617,9 +608,11 @@ function DestroyInstanceDialog({
                 {instanceKind}:{' '}
                 <strong className="text-foreground font-medium">{displayName}</strong>
               </span>
-              <span className="text-muted-foreground break-all">
-                Instance ID: <code>{instanceIdentifier}</code>
-              </span>
+              {sandboxId && (
+                <span className="text-muted-foreground break-all">
+                  Sandbox ID: <code>{sandboxId}</code>
+                </span>
+              )}
               {organizationName && (
                 <span className="text-muted-foreground break-all">
                   Organization: <code>{organizationName}</code>
@@ -633,18 +626,6 @@ function DestroyInstanceDialog({
               Type <code className="bg-muted rounded px-1 py-0.5">{primaryConfirmation}</code> to
               confirm
             </Label>
-            {alternateConfirmations.length > 0 && (
-              <p className="text-muted-foreground text-xs">
-                You can also type{' '}
-                {alternateConfirmations.map((option, index) => (
-                  <span key={option}>
-                    <code className="bg-muted rounded px-1 py-0.5">{option}</code>
-                    {index < alternateConfirmations.length - 1 ? ' or ' : ''}
-                  </span>
-                ))}
-                .
-              </p>
-            )}
             <Input
               id="destroy-instance-confirmation"
               value={confirmation}

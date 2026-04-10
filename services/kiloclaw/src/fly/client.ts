@@ -21,7 +21,7 @@ import type {
   MachineExecResponse,
 } from './types';
 
-export const FLY_API_BASE = 'https://api.machines.dev';
+const FLY_API_BASE = 'https://api.machines.dev';
 
 export type FlyClientConfig = {
   apiToken: string;

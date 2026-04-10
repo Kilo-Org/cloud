@@ -32,7 +32,6 @@ import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
 import { deriveHttpEventName } from '../middleware/analytics';
 import { sendMessage } from '../stream-chat/client';
-import { FLY_API_BASE } from '../fly/client';
 import { assertImplementedProvider } from '../providers';
 import type { ProviderCapability } from '../providers/types';
 import { resolveDoKeyForUser } from '../lib/instance-routing';
@@ -2225,7 +2224,7 @@ platform.post('/destroy-fly-machine', async c => {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
   }
 
-  const url = `${FLY_API_BASE}/v1/apps/${appName}/machines/${machineId}?force=true`;
+  const url = `https://api.machines.dev/v1/apps/${appName}/machines/${machineId}?force=true`;
   try {
     const resp = await fetch(url, {
       method: 'DELETE',
@@ -2299,7 +2298,7 @@ platform.post('/extend-volume', async c => {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
   }
 
-  const url = `${FLY_API_BASE}/v1/apps/${appName}/volumes/${volumeId}/extend`;
+  const url = `https://api.machines.dev/v1/apps/${appName}/volumes/${volumeId}/extend`;
   try {
     const resp = await fetch(url, {
       method: 'PUT',

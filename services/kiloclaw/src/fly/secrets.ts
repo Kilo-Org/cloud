@@ -7,7 +7,9 @@
  * API docs: https://docs.machines.dev/swagger/index.html
  */
 
-import { FlyApiError, FLY_API_BASE } from './client';
+import { FlyApiError } from './client';
+
+const FLY_API_BASE = 'https://api.machines.dev';
 
 type FlySecretsConfig = {
   apiToken: string;

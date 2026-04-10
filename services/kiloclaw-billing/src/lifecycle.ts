@@ -148,10 +148,14 @@ type SideEffectRequest =
       input: {
         userId: string;
         provider: 'impact';
-        eventType: 'trial_end';
+        eventType: 'trial_end' | 'sale';
         dedupeKey: string;
         eventDateIso: string;
         orderId: string;
+        amount?: number;
+        currencyCode?: string;
+        itemCategory?: string;
+        itemName?: string;
       };
     }
   | {
@@ -230,6 +234,20 @@ function getDb(env: BillingWorkerEnv): WorkerDb {
 
 function buildClawUrl(env: BillingWorkerEnv): string {
   return `${env.KILOCODE_BACKEND_BASE_URL}/claw`;
+}
+
+function getKiloClawAffiliateItemCategory(plan: 'commit' | 'standard'): string {
+  return `kiloclaw-${plan}`;
+}
+
+function getKiloClawAffiliateItemName(plan: 'commit' | 'standard'): string {
+  return plan === 'commit' ? 'KiloClaw Commit Plan' : 'KiloClaw Standard Plan';
+}
+
+function getKiloClawAffiliateItemSku(env: BillingWorkerEnv, plan: 'commit' | 'standard'): string {
+  return plan === 'commit'
+    ? env.STRIPE_KILOCLAW_COMMIT_PRICE_ID
+    : env.STRIPE_KILOCLAW_STANDARD_PRICE_ID;
 }
 
 function formatDateForEmail(date: Date): string {
@@ -702,10 +720,15 @@ async function enqueueAffiliateEvent(
   params: {
     userId: string;
     provider: 'impact';
-    eventType: 'trial_end';
+    eventType: 'trial_end' | 'sale';
     dedupeKey: string;
     eventDateIso: string;
     orderId: string;
+    amount?: number;
+    currencyCode?: string;
+    itemCategory?: string;
+    itemName?: string;
+    itemSku?: string;
   }
 ): Promise<void> {
   await callBillingSideEffect(
@@ -929,6 +952,25 @@ async function processCreditRenewalRow(
     });
 
     if (!deductionIsNew) {
+      await enqueueAffiliateEvent(env, context, {
+        userId,
+        provider: 'impact',
+        eventType: 'sale',
+        dedupeKey: `affiliate:impact:sale:${deductionCategory}`,
+        eventDateIso: renewalAt,
+        orderId: deductionCategory,
+        amount: costMicrodollars / 1_000_000,
+        currencyCode: 'usd',
+        itemCategory: getKiloClawAffiliateItemCategory(effectivePlan),
+        itemName: getKiloClawAffiliateItemName(effectivePlan),
+        itemSku: getKiloClawAffiliateItemSku(env, effectivePlan),
+      }).catch(error => {
+        log('warn', 'Affiliate sale enqueue recovery failed during duplicate credit renewal', {
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+
       summary.credit_renewals_skipped_duplicate++;
       return;
     }
@@ -963,6 +1005,25 @@ async function processCreditRenewalRow(
         auto_resume_attempt_count: row.auto_resume_attempt_count,
       });
     }
+
+    await enqueueAffiliateEvent(env, context, {
+      userId,
+      provider: 'impact',
+      eventType: 'sale',
+      dedupeKey: `affiliate:impact:sale:${deductionCategory}`,
+      eventDateIso: renewalAt,
+      orderId: deductionCategory,
+      amount: costMicrodollars / 1_000_000,
+      currencyCode: 'usd',
+      itemCategory: getKiloClawAffiliateItemCategory(effectivePlan),
+      itemName: getKiloClawAffiliateItemName(effectivePlan),
+      itemSku: getKiloClawAffiliateItemSku(env, effectivePlan),
+    }).catch(error => {
+      log('warn', 'Affiliate sale enqueue failed during credit renewal', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
 
     summary.credit_renewals++;
     return;

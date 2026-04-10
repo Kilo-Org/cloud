@@ -252,6 +252,23 @@ export function generateBaseConfig(
   config.browser.headless = true;
   config.browser.noSandbox = true;
 
+  // KiloClaw customizer plugin
+  // Always load/enable this plugin so KiloClaw identity behavior is consistent
+  // across first boot and subsequent restarts.
+  config.plugins = config.plugins ?? {};
+  config.plugins.load = config.plugins.load ?? {};
+  config.plugins.load.paths = Array.isArray(config.plugins.load.paths)
+    ? config.plugins.load.paths
+    : [];
+  const customizerPluginPath = '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer';
+  if (!(config.plugins.load.paths as string[]).includes(customizerPluginPath)) {
+    (config.plugins.load.paths as string[]).push(customizerPluginPath);
+  }
+  config.plugins.entries = config.plugins.entries ?? {};
+  const customizerEntry = 'kiloclaw-customizer';
+  config.plugins.entries[customizerEntry] = config.plugins.entries[customizerEntry] ?? {};
+  config.plugins.entries[customizerEntry].enabled = true;
+
   // Telegram
   if (env.TELEGRAM_BOT_TOKEN) {
     const dmPolicy = env.TELEGRAM_DM_POLICY || 'pairing';

@@ -51,6 +51,7 @@ After installing or upgrading dependencies, run `pnpx expo-doctor` and fix any i
 
 - Every mutation must include an `onError` handler that shows a toast (`toast.error(error.message)` via `sonner-native`). Silent failures are not acceptable — users must always see feedback when something goes wrong.
 - Centralize `onError` in the mutation hook (e.g., `useKiloClawMutations`) rather than in individual components. Components can add their own `onSuccess` callbacks via `mutate(input, { onSuccess })` for UI-specific behavior (e.g., closing a form, clearing fields).
+- **Use optimistic updates where possible** — they make the app feel instant. Use React Query's `onMutate` to optimistically update the cache, return the previous value for rollback, restore it in `onError`, and invalidate in `onSettled` to reconcile with the server. Good candidates: toggles, model selection, renaming, any mutation where the expected result is obvious from the input.
 - For screens with text inputs, use `ScrollView` with `automaticallyAdjustKeyboardInsets` to keep inputs visible above the keyboard. No external keyboard library needed — the native iOS prop works smoothly.
 
 ### TextInput on iOS
@@ -119,6 +120,11 @@ After installing or upgrading dependencies, run `pnpx expo-doctor` and fix any i
 - When using `expo-image` in headers or small UI elements, set `transition={0}` to disable the default fade-in which causes flicker.
 
 ## Fixing Lint Errors
+
+Follow lint rules **in spirit, not literally**. The goal is better code, not just silencing the linter. For example, if a max-lines rule fires:
+
+- **Good**: Refactor the file, break it into smaller files, extract components/hooks.
+- **Bad**: Reformat code (we have a formatter) or delete empty lines to circumvent the limit.
 
 When resolving lint errors, try the autofix first before editing manually:
 

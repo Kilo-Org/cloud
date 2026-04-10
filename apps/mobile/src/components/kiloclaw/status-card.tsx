@@ -8,6 +8,7 @@ import {
   Pencil,
   RotateCcw,
   Server,
+  Sparkles,
 } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
@@ -31,6 +32,7 @@ type StatusCardProps = {
   lastExitCode: number | null | undefined;
   lastExitSignal: string | null | undefined;
   gatewayLoading?: boolean;
+  activeModel?: string;
 };
 
 function formatUptime(seconds: number): string {
@@ -92,6 +94,7 @@ export function StatusCard({
   lastExitCode,
   lastExitSignal,
   gatewayLoading,
+  activeModel,
 }: Readonly<StatusCardProps>) {
   const colors = useThemeColors();
   const memoryLabel = memoryMb ? `${(memoryMb / 1024).toFixed(0)} GB` : '—';
@@ -147,6 +150,11 @@ export function StatusCard({
           loading={gatewayLoading}
         />
         <DetailRow icon={Server} label="Last Exit" value={lastExitLabel ?? '—'} />
+      </View>
+
+      <View className="mt-2 border-t border-border pt-2 gap-1">
+        <Text className="text-xs font-semibold text-muted-foreground pb-1">Active Model</Text>
+        <DetailRow icon={Sparkles} label="Model" value={activeModel ?? '—'} />
       </View>
     </View>
   );

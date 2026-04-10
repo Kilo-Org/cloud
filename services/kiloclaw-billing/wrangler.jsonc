@@ -56,6 +56,9 @@
     },
   ],
   // Secrets:
+  // - STRIPE_KILOCLAW_COMMIT_PRICE_ID: canonical Stripe commit plan price ID for Impact sale SKU reporting
+  // - STRIPE_KILOCLAW_STANDARD_PRICE_ID: canonical Stripe standard plan price ID for Impact sale SKU reporting
+  // - STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: canonical Stripe intro price ID shared with standard-plan reporting
   // - INTERNAL_API_SECRET: auth for the Next.js billing side-effect endpoint
   // - KILOCLAW_INTERNAL_API_SECRET: auth for /api/platform/* on the kiloclaw worker
 }

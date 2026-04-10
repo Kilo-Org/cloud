@@ -26,6 +26,10 @@ const config: ExpoConfig = {
     usesAppleSignIn: true,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      NSAdvertisingAttributionReportEndpoint: 'https://appsflyer-skadnetwork.com/',
+      AdAttributionKit: {
+        PostbackCopyURL: 'https://appsflyer-skadnetwork.com/',
+      },
       NSMicrophoneUsageDescription:
         'Allow $(PRODUCT_NAME) to access your microphone to record audio messages.',
       NSPhotoLibraryUsageDescription:
@@ -41,6 +45,7 @@ const config: ExpoConfig = {
     backgroundColor: '#FAF74F',
   },
   android: {
+    googleServicesFile: './google-services.json',
     package: 'com.kilocode.kiloapp',
     adaptiveIcon: {
       backgroundColor: '#FAF74F',
@@ -67,7 +72,13 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-image',
     'expo-secure-store',
-    'expo-notifications',
+    [
+      'expo-notifications',
+      {
+        icon: './assets/images/android-notification-icon.png',
+        color: '#FAF74F',
+      },
+    ],
     'expo-web-browser',
     [
       '@sentry/react-native/expo',

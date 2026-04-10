@@ -67,6 +67,7 @@ describe('platform route env validation', () => {
     );
 
     expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('5');
     await expect(response.json()).resolves.toEqual({ error: 'Configuration error' });
     expect(console.error).toHaveBeenCalledWith(
       '[CONFIG] Platform route missing bindings:',

@@ -161,7 +161,11 @@ export class ExecutionOrchestrator {
         condenseOnComplete: wrapper.condenseOnComplete,
         execution,
       });
-      logger.withFields({ inflightId: result.messageId }).info('Prompt sent to wrapper');
+      if (result.messageId) {
+        logger.withFields({ messageId: result.messageId }).info('Prompt sent to wrapper');
+      } else {
+        logger.info('Prompt sent to wrapper');
+      }
     } catch (error) {
       throw ExecutionError.wrapperStartFailed(
         `Failed to send prompt: ${error instanceof Error ? error.message : String(error)}`,

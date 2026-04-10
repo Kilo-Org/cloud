@@ -516,12 +516,10 @@ function getDestroyConfirmationContext({
   organizationName?: string;
 }) {
   const instanceName = status.name?.trim() || null;
-  // instanceRecordId is always populated for any real instance (Postgres row ID).
-  // Fall back through instanceId → sandboxId only as a defensive measure.
-  // instanceRecordId is always populated for any real instance (Postgres row ID).
-  // Fall back through instanceId → sandboxId only as a defensive measure.
+  // instanceRecordId is always populated for any provisioned instance (Postgres row ID).
+  // The settings page redirects away if no instance exists, so this is never null here.
   const instanceIdentifier =
-    status.instanceRecordId ?? status.instanceId ?? status.sandboxId ?? null;
+    status.instanceRecordId ?? status.instanceId ?? status.sandboxId;
   const organizationPrefix = organizationName?.trim() || null;
   const instanceKind = organizationPrefix ? 'Organization Instance' : 'Personal Instance';
 
@@ -536,7 +534,7 @@ function getDestroyConfirmationContext({
 
   // The primary token shown in the prompt — prefer the name when available
   // since it's more recognizable, with the ID as a fallback.
-  const primaryConfirmation = confirmationOptions[0] ?? null;
+  const primaryConfirmation = confirmationOptions[0];
   const alternateConfirmations = confirmationOptions.slice(1);
 
   return {
@@ -619,11 +617,9 @@ function DestroyInstanceDialog({
                 {instanceKind}:{' '}
                 <strong className="text-foreground font-medium">{displayName}</strong>
               </span>
-              {instanceIdentifier && (
-                <span className="text-muted-foreground break-all">
-                  Instance ID: <code>{instanceIdentifier}</code>
-                </span>
-              )}
+              <span className="text-muted-foreground break-all">
+                Instance ID: <code>{instanceIdentifier}</code>
+              </span>
               {organizationName && (
                 <span className="text-muted-foreground break-all">
                   Organization: <code>{organizationName}</code>
@@ -632,38 +628,32 @@ function DestroyInstanceDialog({
             </div>
           </div>
 
-          {primaryConfirmation ? (
-            <div className="space-y-2">
-              <Label htmlFor="destroy-instance-confirmation">
-                Type <code className="bg-muted rounded px-1 py-0.5">{primaryConfirmation}</code> to
-                confirm
-              </Label>
-              {alternateConfirmations.length > 0 && (
-                <p className="text-muted-foreground text-xs">
-                  You can also type{' '}
-                  {alternateConfirmations.map((option, index) => (
-                    <span key={option}>
-                      <code className="bg-muted rounded px-1 py-0.5">{option}</code>
-                      {index < alternateConfirmations.length - 1 ? ' or ' : ''}
-                    </span>
-                  ))}
-                  .
-                </p>
-              )}
-              <Input
-                id="destroy-instance-confirmation"
-                value={confirmation}
-                onChange={event => setConfirmation(event.target.value)}
-                disabled={isPending}
-                autoComplete="off"
-                autoFocus
-              />
-            </div>
-          ) : (
-            <p className="text-destructive text-sm">
-              Unable to determine instance identifier. Please reload and try again.
-            </p>
-          )}
+          <div className="space-y-2">
+            <Label htmlFor="destroy-instance-confirmation">
+              Type <code className="bg-muted rounded px-1 py-0.5">{primaryConfirmation}</code> to
+              confirm
+            </Label>
+            {alternateConfirmations.length > 0 && (
+              <p className="text-muted-foreground text-xs">
+                You can also type{' '}
+                {alternateConfirmations.map((option, index) => (
+                  <span key={option}>
+                    <code className="bg-muted rounded px-1 py-0.5">{option}</code>
+                    {index < alternateConfirmations.length - 1 ? ' or ' : ''}
+                  </span>
+                ))}
+                .
+              </p>
+            )}
+            <Input
+              id="destroy-instance-confirmation"
+              value={confirmation}
+              onChange={event => setConfirmation(event.target.value)}
+              disabled={isPending}
+              autoComplete="off"
+              autoFocus
+            />
+          </div>
         </div>
 
         <DialogFooter>

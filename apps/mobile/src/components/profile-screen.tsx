@@ -98,7 +98,7 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
         )}
       </View>
 
-      {balanceLoading && <Skeleton className="h-12 w-32 rounded-lg" />}
+      {balanceLoading && <Skeleton className="h-14 w-full rounded-lg" />}
       {balanceError && (
         <Pressable
           className="rounded-lg bg-secondary p-3 active:opacity-70"

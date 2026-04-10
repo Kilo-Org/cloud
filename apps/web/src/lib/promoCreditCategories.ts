@@ -339,8 +339,8 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
 const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCategoryConfig[] = [
   {
     encrypted_credit_category: 'CobZxuHxiuCy3AhW/ObaOQ==:oVLeCsiu4IDqCXzUqliNUg==:IxCjLOrL8EPkWRNw',
-    description: 'Mid-April temporary promotion',
-    expiry_hours: 7 * 24,
+    description: 'Friday promo',
+    expiry_hours: 60 * 24,
     amount_usd: 5,
     is_user_selfservicable: true,
     total_redemptions_allowed: 5_000,

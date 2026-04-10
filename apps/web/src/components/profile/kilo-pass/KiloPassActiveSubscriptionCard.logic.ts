@@ -39,6 +39,10 @@ export type RenewInfoRowModel =
       changeSuffix: '';
     }
   | {
+      kind: 'paused_until';
+      resumesAtIso: string;
+    }
+  | {
       kind: 'renews_and_adds_bonus';
       refillAtIso: string;
       refillsInDays: number;
@@ -161,11 +165,20 @@ function computeRefillRowModel(params: {
 export function computeRenewInfoRowModel(params: {
   subscription: KiloPassActiveSubscriptionCardLogicSubscription;
   isPendingCancellation: boolean;
+  isPaused?: boolean;
+  resumesAtIso?: string | null;
   scheduledChange: KiloPassScheduledChange;
   nowIso?: string;
 }): RenewInfoRowModel[] {
   const { subscription, scheduledChange } = params;
   const now = params.nowIso ? dayjs(params.nowIso) : dayjs();
+
+  if (params.isPaused) {
+    const resumesAtIso = params.resumesAtIso ?? null;
+    if (!resumesAtIso) return [];
+    const resumesAt = dayjs(resumesAtIso);
+    return resumesAt.utc().isValid() ? [{ kind: 'paused_until', resumesAtIso }] : [];
+  }
 
   const refillAtIso = subscription.refillAt ?? subscription.nextBillingAt ?? null;
   const nextBillingAtIso = subscription.nextBillingAt ?? null;

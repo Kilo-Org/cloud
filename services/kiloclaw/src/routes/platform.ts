@@ -32,6 +32,7 @@ import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
 import { deriveHttpEventName } from '../middleware/analytics';
 import { sendMessage } from '../stream-chat/client';
+import { FLY_API_BASE } from '../fly/client';
 
 const GmailHistoryIdSchema = z.object({
   userId: z.string().min(1),
@@ -2001,7 +2002,7 @@ platform.post('/destroy-fly-machine', async c => {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
   }
 
-  const url = `https://api.machines.dev/v1/apps/${appName}/machines/${machineId}?force=true`;
+  const url = `${FLY_API_BASE}/v1/apps/${appName}/machines/${machineId}?force=true`;
   try {
     const resp = await fetch(url, {
       method: 'DELETE',
@@ -2069,7 +2070,7 @@ platform.post('/extend-volume', async c => {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
   }
 
-  const url = `https://api.machines.dev/v1/apps/${appName}/volumes/${volumeId}/extend`;
+  const url = `${FLY_API_BASE}/v1/apps/${appName}/volumes/${volumeId}/extend`;
   try {
     const resp = await fetch(url, {
       method: 'PUT',
@@ -2086,10 +2087,11 @@ platform.post('/extend-volume', async c => {
       return jsonError(`Fly API error (${resp.status}): ${body}`, resp.status);
     }
 
+    const { needs_restart } = (await resp.json()) as { needs_restart: boolean };
     console.log(
-      `[platform] extend-volume ok: volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}GB (target total)`
+      `[platform] extend-volume ok: volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}GB (target total) needsRestart=${needs_restart}`
     );
-    return c.json({ ok: true });
+    return c.json({ ok: true as const, needsRestart: needs_restart });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'extend-volume');
     return jsonError(message, status);

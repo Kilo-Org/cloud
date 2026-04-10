@@ -1489,8 +1489,14 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
   const { mutateAsync: extendVolume, isPending: isExtendingVolume } = useMutation(
     trpc.admin.kiloclawInstances.extendVolume.mutationOptions({
-      onSuccess: () => {
-        toast.success('Volume extended to 15 GB');
+      onSuccess: result => {
+        if (result.needsRestart) {
+          toast.warning(
+            'Volume extended to 15 GB — machine needs a redeploy for the change to take effect'
+          );
+        } else {
+          toast.success('Volume extended to 15 GB');
+        }
         invalidateMachineQueries();
       },
       onError: err => {

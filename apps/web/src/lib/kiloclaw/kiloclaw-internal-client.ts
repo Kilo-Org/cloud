@@ -746,7 +746,7 @@ export class KiloClawInternalClient {
     appName: string,
     volumeId: string,
     instanceId?: string
-  ): Promise<{ ok: true }> {
+  ): Promise<{ ok: true; needsRestart: boolean }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/extend-volume${params}`,

@@ -22,7 +22,6 @@ import { gpt_oss_20b_free_model } from '@/lib/providers/openai';
 import { qwen36_plus_model } from '@/lib/providers/qwen';
 import { grok_code_fast_1_optimized_free_model } from '@/lib/providers/xai';
 
-
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 export const preferredModels = [

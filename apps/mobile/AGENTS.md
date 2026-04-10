@@ -125,6 +125,7 @@ Follow lint rules **in spirit, not literally**. The goal is better code, not jus
 
 - **Good**: Refactor the file, break it into smaller files, extract components/hooks.
 - **Bad**: Reformat code (we have a formatter), delete empty lines, "compress" or "compact" code, or otherwise mangle formatting to circumvent the limit. Always extract related blocks to separate files instead.
+- If a file has a legitimate reason to exceed 300 lines (e.g., closely related hooks that belong together), disable the rule for that file with `/* eslint-disable max-lines */` rather than forcing an artificial split.
 
 When resolving lint errors, try the autofix first before editing manually:
 

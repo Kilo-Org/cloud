@@ -95,7 +95,10 @@ function isErrorPayload(value: unknown): value is ErrorPayload {
   return isRecord(value) && typeof value.error === 'string' && typeof value.message === 'string';
 }
 
-function optionalStringEnum(values: readonly string[], description: string): Record<string, unknown> {
+function optionalStringEnum(
+  values: readonly string[],
+  description: string
+): Record<string, unknown> {
   return {
     type: 'string',
     enum: [...values],
@@ -268,7 +271,10 @@ function parseExaContents(rawContents: unknown): { value?: ExaContentsArgs } | E
       return value;
     }
     if (!isRecord(value)) {
-      return errorPayload('invalid_contents', 'contents.highlights must be a boolean or an object.');
+      return errorPayload(
+        'invalid_contents',
+        'contents.highlights must be a boolean or an object.'
+      );
     }
     const allowed = new Set(['maxCharacters', 'query', 'numSentences', 'highlightsPerUrl']);
     for (const key of Object.keys(value)) {
@@ -477,9 +483,7 @@ async function runKiloExaSearch(params: {
   }
 
   const organizationId = resolveKiloOrganizationId();
-  const extraHeaders = organizationId
-    ? { 'X-KiloCode-OrganizationId': organizationId }
-    : undefined;
+  const extraHeaders = organizationId ? { 'X-KiloCode-OrganizationId': organizationId } : undefined;
 
   return postTrustedWebToolsJson(
     {
@@ -651,7 +655,8 @@ export function createKiloExaWebSearchProvider(): WebSearchProviderPlugin {
     autoDetectOrder: 55,
     credentialPath: '',
     inactiveSecretPaths: [],
-    getCredentialValue: searchConfig => getScopedCredentialValue(searchConfig, KILO_EXA_PROVIDER_ID),
+    getCredentialValue: searchConfig =>
+      getScopedCredentialValue(searchConfig, KILO_EXA_PROVIDER_ID),
     setCredentialValue: (searchConfigTarget, value) =>
       setScopedCredentialValue(searchConfigTarget, KILO_EXA_PROVIDER_ID, value),
     applySelectionConfig: config => enablePluginInConfig(config, 'kiloclaw-customizer').config,

@@ -47,7 +47,6 @@ function timeAgo(date: Date): string {
 }
 
 // eslint-disable-next-line no-empty-function -- intentional no-op
-// eslint-disable-next-line no-empty-function -- intentional no-op
 async function asyncNoop() {}
 
 export { asyncNoop, cn, parseTimestamp, timeAgo };

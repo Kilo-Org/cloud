@@ -182,29 +182,6 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
     });
   });
 
-  // ── Direct completeReview leaves source bead orphaned (regression) ─
-
-  describe('completeReview bypass (regression guard)', () => {
-    it('should leave source bead stuck in in_review when completeReview is called directly', async () => {
-      const { beadId, mrBeadId } = await setupConvoyWithMR();
-
-      // Call completeReview directly (the OLD broken path) —
-      // this is the raw SQL update that bypasses lifecycle events.
-      // We use this to verify the regression scenario.
-      await town.completeReview(mrBeadId, 'failed');
-
-      // MR bead should be failed
-      const mrBead = await town.getBeadAsync(mrBeadId);
-      expect(mrBead?.status).toBe('failed');
-
-      // Source bead is STILL in_review — this is the bug this PR fixes
-      // in processReviewQueue. The direct completeReview call doesn't
-      // return the source bead to in_progress.
-      const sourceBead = await town.getBeadAsync(beadId);
-      expect(sourceBead?.status).toBe('in_review');
-    });
-  });
-
   // ── Source bead in_review after agentDone ──────────────────────────
 
   describe('agentDone transitions source bead to in_review', () => {

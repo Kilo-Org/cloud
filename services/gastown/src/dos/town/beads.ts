@@ -421,8 +421,8 @@ export function updateConvoyProgress(sql: SqlStorage, beadId: string, timestamp:
 
       if (featureBranch && mergeMode === 'review-then-land') {
         // Mark the convoy as ready to land by storing a flag in metadata.
-        // The alarm loop's processReviewQueue will detect this and create
-        // the final landing MR (feature branch → main).
+        // The reconciler will detect this and create the final landing
+        // MR (feature branch → main).
         query(
           sql,
           /* sql */ `

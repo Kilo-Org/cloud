@@ -539,7 +539,7 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
       // Agent is working with fresh heartbeat but no hook — it's running
       // in the container but has no bead to work on (gt_done already ran,
       // or the hook was cleared by another code path). Set to idle so
-      // processReviewQueue / schedulePendingWork can use it.
+      // the reconciler can dispatch it to new work.
       actions.push({
         type: 'transition_agent',
         agent_id: agent.bead_id,
@@ -810,7 +810,7 @@ export function reconcileBeads(
     });
   }
 
-  // Rule 2: Idle agents with hooks need dispatch (schedulePendingWork equivalent)
+  // Rule 2: Idle agents with hooks need dispatch
   const idleHooked = AgentRow.array().parse([
     ...query(
       sql,

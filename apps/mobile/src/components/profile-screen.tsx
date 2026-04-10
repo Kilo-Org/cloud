@@ -121,23 +121,27 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
       )}
       {!balanceLoading && !balanceError && (
         <View className="h-16 flex-row items-center rounded-lg bg-secondary px-3">
-          <View className="flex-1 justify-center">
+          <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>
             <Text className="text-2xl font-bold">${balanceDollars.toFixed(2)}</Text>
             {creditsLoading ? (
-              <Skeleton className="mt-1 h-3 w-48 rounded" />
+              <Animated.View exiting={FadeOut.duration(150)}>
+                <Skeleton className="mt-1 h-3 w-48 rounded" />
+              </Animated.View>
             ) : (
               expiringTotal > 0 &&
               earliestExpiry != null && (
-                <Text className="text-xs text-muted-foreground">
-                  ${expiringTotal.toFixed(2)} in bonus credits expiring{' '}
-                  {parseTimestamp(earliestExpiry).toLocaleDateString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </Text>
+                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
+                  <Text className="text-xs text-muted-foreground">
+                    ${expiringTotal.toFixed(2)} in bonus credits expiring{' '}
+                    {parseTimestamp(earliestExpiry).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </Text>
+                </Animated.View>
               )
             )}
-          </View>
+          </Animated.View>
           {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         </View>
       )}

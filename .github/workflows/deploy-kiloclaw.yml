@@ -233,6 +233,56 @@ jobs:
               ]
             }
 
+      - name: Notify Slack on Failure
+        if: failure()
+        continue-on-error: true
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "⚠️ KiloClaw Deploy Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*OpenClaw Version:*\n${{ steps.openclaw-version.outputs.version || 'unknown' }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Image:*\n`${{ steps.image-hash.outputs.tag || 'unknown' }}`"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Build:*\n${{ steps.check-image.outputs.exists == 'true' && 'Reused existing' || 'Built new image' }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Triggered by:*\n${{ github.actor }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}> · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Workflow>"
+                    }
+                  ]
+                }
+              ]
+            }
+
   # ── Push prod image to dev registry ───────────────────────────
   # Runs after the production deploy completes. Copies the prod image
   # to the dev Fly registry so dev stays in sync automatically.

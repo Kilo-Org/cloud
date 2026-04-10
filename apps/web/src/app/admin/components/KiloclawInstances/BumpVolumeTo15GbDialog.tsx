@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, HardDriveDownload, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,10 +32,18 @@ export function BumpVolumeTo15GbButton({
 }: BumpVolumeTo15GbButtonProps) {
   const [open, setOpen] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const wasExtendingRef = useRef(false);
 
   useEffect(() => {
     if (!open) setAcknowledged(false);
   }, [open]);
+
+  useEffect(() => {
+    if (wasExtendingRef.current && !isExtending) {
+      setOpen(false);
+    }
+    wasExtendingRef.current = isExtending;
+  }, [isExtending]);
 
   const buttonDisabled = !volumeId || isExtending || disabled;
 

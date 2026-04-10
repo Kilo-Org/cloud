@@ -2053,6 +2053,9 @@ platform.post('/extend-volume', async c => {
   const result = await parseBody(c, ExtendVolumeSchema);
   if ('error' in result) return result.error;
 
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
   const { appName, volumeId } = result.data;
   const apiToken = c.env.FLY_API_TOKEN;
   if (!apiToken) {

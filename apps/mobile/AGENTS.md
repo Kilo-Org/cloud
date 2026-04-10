@@ -136,7 +136,7 @@ Only hand-fix errors that `--fix` cannot resolve.
 
 ## Debugging
 
-When debugging reproducible UI issues (layout shifts, flickers, incorrect state), don't guess at the cause. Instead:
+When debugging reproducible issues, don't guess at the cause. Instead:
 
 1. Add temporary `console.log` statements that capture the relevant state on each render (loading flags, data values, dimensions, etc.).
 2. Ask the user to reproduce the issue and paste the logs.

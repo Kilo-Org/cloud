@@ -50,6 +50,7 @@ import { DetailTile } from './DetailTile';
 
 import { getEntriesByCategory } from '@kilocode/kiloclaw-secret-catalog';
 import { SecretEntrySection } from './SecretEntrySection';
+import { AnimatedDots } from './AnimatedDots';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PairingSection } from './PairingSection';
 import { VersionPinCard } from './VersionPinCard';

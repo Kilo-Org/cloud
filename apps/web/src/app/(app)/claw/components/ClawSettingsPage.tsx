@@ -159,7 +159,10 @@ export function ClawSettingsPage({
           title="Settings"
           icon={<Settings className="text-muted-foreground h-4 w-4" />}
         />
-        <ClawSettingsWithStatus organizationId={organizationId} organizationName={organizationName} />
+        <ClawSettingsWithStatus
+          organizationId={organizationId}
+          organizationName={organizationName}
+        />
       </div>
     </ClawContextProvider>
   );

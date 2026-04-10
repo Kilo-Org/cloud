@@ -218,8 +218,7 @@ export function ProfileScreen() {
           </Text>
 
           {isLoading && (
-            <Animated.View className="gap-3" exiting={FadeOut.duration(150)}>
-              <Skeleton className="h-12 w-full rounded-lg" />
+            <Animated.View exiting={FadeOut.duration(150)}>
               <Skeleton className="h-12 w-full rounded-lg" />
             </Animated.View>
           )}

@@ -2240,7 +2240,6 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   )}
                   {isFlyMachineDestroyed ? 'Machine Destroyed' : 'Destroy Machine'}
                 </Button>
-
               </div>
             </CardContent>
           </Card>
@@ -2807,8 +2806,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               <DialogDescription asChild>
                 <div className="space-y-3 pt-3">
                   <p>
-                    This is a temporary workaround to re-grant access so the user can export data
-                    to an external backup.
+                    This is a temporary workaround to re-grant access so the user can export data to
+                    an external backup.
                   </p>
                   <p className="text-foreground font-medium">
                     This operation may cause unexpected behavior for the user.

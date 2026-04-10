@@ -138,7 +138,7 @@ Only hand-fix errors that `--fix` cannot resolve.
 
 When debugging reproducible issues, don't guess at the cause. Instead:
 
-1. Add temporary `console.log` statements that capture the relevant state on each render (loading flags, data values, dimensions, etc.).
+1. Add temporary `console.log` statements that capture the relevant state at key points (function entry, state changes, branch decisions, etc.).
 2. Ask the user to reproduce the issue and paste the logs.
 3. Deduce the root cause from the log output, then fix it.
 4. Remove the debug logs before committing.

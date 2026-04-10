@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { Brain, ChevronRight, MessageSquare, Sun, Wrench, Zap } from 'lucide-react';
 import { toast } from 'sonner';
@@ -42,6 +43,12 @@ export function CreateInstanceCardView({
   isPending = false,
   onCreate,
 }: CreateInstanceCardViewProps) {
+  const posthog = usePostHog();
+
+  useEffect(() => {
+    posthog?.capture('claw_page_viewed');
+  }, [posthog]);
+
   return (
     <Card className="mt-6 overflow-hidden">
       <CardContent className="flex flex-col gap-6 p-6 sm:p-8">

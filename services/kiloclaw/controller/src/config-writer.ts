@@ -198,7 +198,12 @@ export function generateBaseConfig(
     config.models.providers.kilocode.headers = config.models.providers.kilocode.headers ?? {};
     config.models.providers.kilocode.headers['X-KiloCode-OrganizationId'] =
       env.KILOCODE_ORGANIZATION_ID;
-    config.models.providers.kilocode.models = config.models.providers.kilocode.models ?? [];
+    // Clean up any stale `models` array that may have been preserved from previous
+    // config (e.g., from the stale provider migration preserving the entry for org
+    // instances). When `models` is present (even as []), OpenClaw treats it as an
+    // explicit allowlist, restricting visible models. Deleting it lets the built-in
+    // kilocode provider's full catalog be used.
+    delete config.models.providers.kilocode.models;
     console.log('Configured KiloCode organization header from KILOCODE_ORGANIZATION_ID');
   } else {
     // Remove stale org header from previous boots (e.g., instance was transferred
@@ -251,6 +256,23 @@ export function generateBaseConfig(
   config.browser.enabled = true;
   config.browser.headless = true;
   config.browser.noSandbox = true;
+
+  // KiloClaw customizer plugin
+  // Always load/enable this plugin so KiloClaw identity behavior is consistent
+  // across first boot and subsequent restarts.
+  config.plugins = config.plugins ?? {};
+  config.plugins.load = config.plugins.load ?? {};
+  config.plugins.load.paths = Array.isArray(config.plugins.load.paths)
+    ? config.plugins.load.paths
+    : [];
+  const customizerPluginPath = '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer';
+  if (!(config.plugins.load.paths as string[]).includes(customizerPluginPath)) {
+    (config.plugins.load.paths as string[]).push(customizerPluginPath);
+  }
+  config.plugins.entries = config.plugins.entries ?? {};
+  const customizerEntry = 'kiloclaw-customizer';
+  config.plugins.entries[customizerEntry] = config.plugins.entries[customizerEntry] ?? {};
+  config.plugins.entries[customizerEntry].enabled = true;
 
   // Telegram
   if (env.TELEGRAM_BOT_TOKEN) {

@@ -444,6 +444,22 @@ export function createConnectionManager(
             continue;
           }
 
+          // Auto-approve permission requests so the kilo server never stalls
+          // waiting for a human response that will never come.
+          if (eventType === 'permission.asked') {
+            const permId = typeof properties.id === 'string' ? properties.id : undefined;
+            if (permId) {
+              logToFile(`auto-approving permission ${permId} (${String(properties.permission)})`);
+              config.kiloClient.answerPermission(permId, 'always').catch(err => {
+                logToFile(
+                  `failed to auto-approve permission ${permId}: ${err instanceof Error ? err.message : String(err)}`
+                );
+              });
+            }
+            callbacks.onSseEvent?.();
+            continue;
+          }
+
           // Build and forward ingest event
           const ingestEvent: IngestEvent = {
             streamEventType: 'kilocode',

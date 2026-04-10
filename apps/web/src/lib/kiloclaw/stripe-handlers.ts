@@ -423,6 +423,8 @@ export async function handleKiloClawSubscriptionCreated(params: {
   let didProcess = false;
   let resolvedInstanceId: string | undefined;
   let convertedFromTrial = false;
+  const trialEndEventDate =
+    typeof subscription.created === 'number' ? new Date(subscription.created * 1000) : new Date();
 
   await db.transaction(async tx => {
     // Look up the user's active personal instance to link the subscription.
@@ -455,6 +457,8 @@ export async function handleKiloClawSubscriptionCreated(params: {
               stripe_subscription_id: kiloclaw_subscriptions.stripe_subscription_id,
               status: kiloclaw_subscriptions.status,
               suspended_at: kiloclaw_subscriptions.suspended_at,
+              trial_started_at: kiloclaw_subscriptions.trial_started_at,
+              trial_ends_at: kiloclaw_subscriptions.trial_ends_at,
             })
             .from(kiloclaw_subscriptions)
             .where(eq(kiloclaw_subscriptions.instance_id, activeInstance.id))
@@ -481,7 +485,13 @@ export async function handleKiloClawSubscriptionCreated(params: {
 
     // Captured after the stale guard so stale events don't auto-resume
     wasSuspended = !!existingRow?.suspended_at;
-    convertedFromTrial = existingRow?.status === 'trialing';
+    const retainsTrialHistory =
+      existingRow?.trial_started_at !== null || existingRow?.trial_ends_at !== null;
+    convertedFromTrial =
+      existingRow?.status === 'trialing' ||
+      (existingRow?.status !== 'canceled' &&
+        retainsTrialHistory &&
+        existingRow?.stripe_subscription_id === subscription.id);
     resolvedInstanceId = activeInstance?.id;
 
     // For commit plans, derive commit_ends_at. Pre-launch subscriptions
@@ -611,7 +621,7 @@ export async function handleKiloClawSubscriptionCreated(params: {
             eventType: 'trial_end',
             entityId: subscription.id,
           }),
-          eventDate: new Date(),
+          eventDate: trialEndEventDate,
           orderId: IMPACT_ORDER_ID_MACRO,
         });
       } catch (error) {
@@ -1109,6 +1119,7 @@ export async function handleKiloClawInvoicePaid(params: {
         eventDate,
         itemCategory: getImpactItemCategory(plan),
         itemName: getImpactItemName(plan),
+        itemSku: matchingPriceId,
       });
     } catch (error) {
       logWarning('Affiliate sale enqueue failed', {

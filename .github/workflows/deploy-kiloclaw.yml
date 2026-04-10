@@ -47,6 +47,7 @@ jobs:
       #   - Dockerfile itself (base image, apt packages, npm versions)
       #   - controller/        (COPY controller/ → compiled to controller.js)
       #   - container/         (COPY container/TOOLS.md → /usr/local/share/kiloclaw/)
+      #   - plugins/kiloclaw-customizer/ (COPY plugin package for image install)
       #   - openclaw-pairing-list.js, openclaw-device-pairing-list.js (COPY)
       #   - skills/            (COPY skills/ → /root/clawd/skills/)
       #
@@ -59,7 +60,7 @@ jobs:
         working-directory: services/kiloclaw
         run: |
           # Validate all expected paths exist before hashing
-          for path in Dockerfile controller container skills \
+          for path in Dockerfile controller container plugins/kiloclaw-customizer skills \
                       openclaw-pairing-list.js openclaw-device-pairing-list.js; do
             if [ ! -e "$path" ]; then
               echo "::error::Required path not found: $path"
@@ -68,7 +69,7 @@ jobs:
           done
 
           CONTENT_HASH=$(
-            find Dockerfile controller/ container/ skills/ \
+            find Dockerfile controller/ container/ plugins/kiloclaw-customizer/ skills/ \
               openclaw-pairing-list.js openclaw-device-pairing-list.js \
               -type f \
               | sort \
@@ -183,7 +184,8 @@ jobs:
             --var OPENCLAW_VERSION:${{ steps.openclaw-version.outputs.version }}
             --var FLY_IMAGE_DIGEST:${{ steps.image-digest.outputs.digest }}
 
-      - name: Notify Slack
+      - name: Notify Slack (success)
+        if: success()
         continue-on-error: true
         uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
         with:
@@ -226,6 +228,52 @@ jobs:
                     {
                       "type": "mrkdwn",
                       "text": "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}> · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Workflow>"
+                    }
+                  ]
+                }
+              ]
+            }
+
+      - name: Notify Slack (failure)
+        if: failure()
+        continue-on-error: true
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": ":red_circle: KiloClaw Deploy Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Image:*\n${{ steps.image-hash.outputs.tag && format('`{0}`', steps.image-hash.outputs.tag) || 'unknown (failed before hash)' }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Build:*\n${{ steps.check-image.outcome == 'success' && (steps.check-image.outputs.exists == 'true' && 'Reused existing' || 'Built new image') || 'unknown (failed before registry check)' }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Triggered by:*\n${{ github.actor }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}> · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Workflow run>"
                     }
                   ]
                 }

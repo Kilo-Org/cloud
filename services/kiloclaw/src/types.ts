@@ -4,17 +4,6 @@ import type { KiloClawRegistry } from './durable-objects/kiloclaw-registry';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 
 /**
- * Minimal structural type for a Cloudflare Pipeline binding.
- * Matches the Pipeline<PipelineRecord>.send() interface without requiring
- * the cloudflare:pipelines module to be declared in tsconfig types.
- * After running pipelines/setup.sh and updating wrangler.jsonc, regenerate
- * worker-configuration.d.ts with `pnpm types` to get the exact generated type.
- */
-export type PipelineBinding = {
-  send(records: Record<string, unknown>[]): Promise<void>;
-};
-
-/**
  * Environment bindings for the KiloClaw Worker
  */
 export type KiloClawEnv = {
@@ -23,10 +12,6 @@ export type KiloClawEnv = {
   KILOCLAW_REGISTRY: DurableObjectNamespace<KiloClawRegistry>;
   KILOCLAW_AE?: AnalyticsEngineDataset;
   KILOCLAW_CONTROLLER_AE: AnalyticsEngineDataset;
-  // Pipelines: dual-write to R2/Parquet for Snowflake export.
-  // Optional until pipelines/setup.sh has been run and wrangler.jsonc updated.
-  KILOCLAW_EVENTS_STREAM?: PipelineBinding;
-  KILOCLAW_CONTROLLER_TELEMETRY_STREAM?: PipelineBinding;
   HYPERDRIVE?: Hyperdrive;
   KV_CLAW_CACHE: KVNamespace;
   SNAPSHOT_RESTORE_QUEUE?: Queue<SnapshotRestoreMessage>;

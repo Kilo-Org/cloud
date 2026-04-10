@@ -5,8 +5,9 @@ import PostHogClient from '@/lib/posthog';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
 import {
+  IMPACT_APP_TRACKED_CLICK_ID_COOKIE,
   IMPACT_CLICK_ID_COOKIE,
-  IMPACT_TRACKED_CLICK_ID_COOKIE,
+  resolveImpactAffiliateTrackingId,
 } from '@/lib/impact-affiliate-utils';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -89,17 +90,12 @@ export async function GET(request: NextRequest) {
   // Resolve the Impact click ID: prefer the explicit URL param, fall back to
   // the shared parent-domain cookie written by kilo.ai. This is intentionally
   // separate from Impact's native IR_<campaignId> UTT cookie.
-  const imRefParam = url.searchParams.get('im_ref')?.trim();
-  const rawImpactCookie = imRefParam
-    ? null
-    : request.cookies.get(IMPACT_CLICK_ID_COOKIE)?.value?.trim() || null;
-  // Skip the cookie fallback when we've already captured this exact value.
-  // If the cookie changed (e.g. a new affiliate click on a shared device),
-  // allow it through so a different user can still get first-touch attribution.
-  const trackedValue = request.cookies.get(IMPACT_TRACKED_CLICK_ID_COOKIE)?.value;
-  const impactCookieValue =
-    rawImpactCookie && rawImpactCookie !== trackedValue ? rawImpactCookie : null;
-  const affiliateTrackingId = imRefParam || impactCookieValue;
+  const { affiliateTrackingId, impactCookieValue } = resolveImpactAffiliateTrackingId({
+    imRefParam: url.searchParams.get('im_ref')?.trim() || null,
+    sharedImpactCookieValue: request.cookies.get(IMPACT_CLICK_ID_COOKIE)?.value?.trim() || null,
+    appTrackedImpactCookieValue:
+      request.cookies.get(IMPACT_APP_TRACKED_CLICK_ID_COOKIE)?.value?.trim() || null,
+  });
 
   if (user && affiliateTrackingId) {
     const existingAttribution = await getAffiliateAttribution(user.id, 'impact');
@@ -123,7 +119,7 @@ export async function GET(request: NextRequest) {
   // hit would burn the marker and suppress the fallback on the next real
   // sign-in.
   if (user && impactCookieValue) {
-    response.cookies.set(IMPACT_TRACKED_CLICK_ID_COOKIE, impactCookieValue, {
+    response.cookies.set(IMPACT_APP_TRACKED_CLICK_ID_COOKIE, impactCookieValue, {
       path: '/',
       httpOnly: true,
       secure: true,

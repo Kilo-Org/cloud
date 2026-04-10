@@ -940,6 +940,7 @@ export const CustomLlmDefinitionSchema = z
     organization_ids: z.array(z.string()),
     supports_image_input: z.boolean().optional(),
     add_cache_breakpoints: z.boolean().optional(),
+    inject_reasoning_into_content: z.boolean().optional(),
     reasoning_summary: z.enum(['auto', 'concise', 'detailed']).optional(),
     extra_headers: CustomLlmExtraHeadersSchema.optional(),
     extra_body: CustomLlmExtraBodySchema.optional(),

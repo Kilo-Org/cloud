@@ -104,6 +104,13 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     request.body.messages.length > 1 &&
     !containsCacheControl(request.body.messages)
   ) {
+    const systemMessage = request.body.messages.find(msg => msg.role === 'system');
+    if (systemMessage) {
+      console.debug(
+        '[addCacheBreakpoints] setting cache breakpoint on system chat completions message'
+      );
+      setCacheControlOnChatCompletionsMessage(systemMessage);
+    }
     const lastMessage = request.body.messages.findLast(
       msg => msg.role === 'user' || msg.role === 'tool'
     );
@@ -119,6 +126,13 @@ export function addCacheBreakpoints(request: GatewayRequest) {
     request.body.input.length > 1 &&
     !containsCacheControl(request.body.input)
   ) {
+    const systemMessage = request.body.input.find(
+      msg => msg.type === 'message' && msg.role === 'system'
+    );
+    if (systemMessage) {
+      console.debug('[addCacheBreakpoints] setting cache breakpoint on system responses message');
+      setCacheControlOnResponsesMessage(systemMessage);
+    }
     const lastMessage = request.body.input.findLast(
       msg => (msg.type === 'message' && msg.role === 'user') || msg.type === 'function_call_output'
     );
@@ -173,6 +187,35 @@ export function removeChatCompletionsReasoning(request: OpenRouterChatCompletion
   }
 }
 
+export function injectReasoningIntoContent(request: GatewayRequest) {
+  if (request.kind !== 'chat_completions') {
+    return;
+  }
+  for (const message of request.body.messages) {
+    if (message.role !== 'assistant') {
+      continue;
+    }
+
+    const reasoning =
+      'reasoning' in message && typeof message.reasoning === 'string'
+        ? message.reasoning
+        : 'reasoning_content' in message && typeof message.reasoning_content === 'string'
+          ? message.reasoning_content
+          : '';
+
+    if (reasoning) {
+      if (Array.isArray(message.content)) {
+        message.content.splice(0, 0, { type: 'text', text: `<think>${reasoning}</think>` });
+      } else {
+        message.content = `<think>${reasoning}</think>${message.content}`;
+      }
+      if ('reasoning' in message) delete message.reasoning;
+      if ('reasoning_content' in message) delete message.reasoning_content;
+      if ('reasoning_details' in message) delete message.reasoning_details;
+    }
+  }
+}
+
 export function scrubOpenCodeSpecificProperties(request: OpenRouterChatCompletionRequest) {
   const body = request as OpenCodeSpecificProperties;
   delete body.description;
@@ -191,45 +234,4 @@ export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
     return false;
   }
   return (request.body.reasoning?.effort ?? request.body.reasoning_effort) === 'none';
-}
-
-export function requestContainsImages(request: GatewayRequest): boolean {
-  switch (request.kind) {
-    case 'chat_completions':
-      return request.body.messages.some(
-        msg =>
-          (msg.role === 'user' || msg.role === 'tool') &&
-          Array.isArray(msg.content) &&
-          msg.content.some(part => part.type === 'image_url')
-      );
-    case 'responses': {
-      if (!Array.isArray(request.body.input)) return false;
-      return request.body.input.some(item => {
-        if (typeof item === 'string') return false;
-        if (item.type === 'message') {
-          return (
-            Array.isArray(item.content) && item.content.some(part => part.type === 'input_image')
-          );
-        }
-        if (item.type === 'function_call_output') {
-          return (
-            Array.isArray(item.output) && item.output.some(part => part.type === 'input_image')
-          );
-        }
-        return false;
-      });
-    }
-    case 'messages':
-      return request.body.messages.some(
-        msg =>
-          Array.isArray(msg.content) &&
-          msg.content.some(
-            block =>
-              block.type === 'image' ||
-              (block.type === 'tool_result' &&
-                Array.isArray(block.content) &&
-                block.content.some(inner => inner.type === 'image'))
-          )
-      );
-  }
 }

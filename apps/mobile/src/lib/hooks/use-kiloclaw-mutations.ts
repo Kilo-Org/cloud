@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { useTRPC } from '@/lib/trpc';
@@ -16,6 +16,41 @@ export function useKiloClawMutations() {
     await queryClient.invalidateQueries({
       queryKey: trpc.kiloclaw.controllerVersion.queryKey(),
     });
+  };
+
+  function optimistic<TInput, TData extends Record<string, unknown>>(
+    queryKey: QueryKey,
+    updater: (old: TData, input: TInput) => TData,
+    settle?: () => Promise<void>
+  ) {
+    return {
+      onMutate: async (input: TInput) => {
+        await queryClient.cancelQueries({ queryKey });
+        const previous = queryClient.getQueryData<TData>(queryKey);
+        queryClient.setQueryData<TData>(queryKey, old => (old ? updater(old, input) : old));
+        return { previous };
+      },
+      onError: (error: { message: string }, _input: TInput, context?: { previous?: TData }) => {
+        if (context?.previous) {
+          queryClient.setQueryData(queryKey, context.previous);
+        }
+        onMutationError(error);
+      },
+      onSettled:
+        settle ??
+        (async () => {
+          await queryClient.invalidateQueries({ queryKey });
+        }),
+    };
+  }
+
+  const statusKey = trpc.kiloclaw.getStatus.queryKey();
+  const configKey = trpc.kiloclaw.getConfig.queryKey();
+  const pinKey = trpc.kiloclaw.getMyPin.queryKey();
+
+  const invalidateStatusAndPin = async () => {
+    await invalidateStatus();
+    await queryClient.invalidateQueries({ queryKey: pinKey });
   };
 
   return {
@@ -51,7 +86,7 @@ export function useKiloClawMutations() {
       trpc.kiloclaw.patchSecrets.mutationOptions({
         onSuccess: async () => {
           await invalidateStatus();
-          await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
+          await queryClient.invalidateQueries({ queryKey: configKey });
           // Small delay to let the worker process the secret before refetching catalog
           await new Promise<void>(resolve => {
             setTimeout(resolve, 1000);
@@ -70,7 +105,7 @@ export function useKiloClawMutations() {
       trpc.kiloclaw.patchChannels.mutationOptions({
         onSuccess: async () => {
           await invalidateStatus();
-          await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
+          await queryClient.invalidateQueries({ queryKey: configKey });
           await new Promise<void>(resolve => {
             setTimeout(resolve, 1000);
           });
@@ -82,31 +117,58 @@ export function useKiloClawMutations() {
       })
     ),
     patchExecPreset: useMutation(
-      trpc.kiloclaw.patchExecPreset.mutationOptions({
-        onSuccess: invalidateStatus,
-        onError: onMutationError,
-      })
+      trpc.kiloclaw.patchExecPreset.mutationOptions(
+        optimistic(
+          statusKey,
+          (old, input) => ({
+            ...old,
+            ...(input.security != null && { execSecurity: input.security }),
+            ...(input.ask != null && { execAsk: input.ask }),
+          }),
+          invalidateStatus
+        )
+      )
     ),
     setMyPin: useMutation(
       trpc.kiloclaw.setMyPin.mutationOptions({
-        onSuccess: async () => {
-          await invalidateStatus();
-          await queryClient.invalidateQueries({
-            queryKey: trpc.kiloclaw.getMyPin.queryKey(),
-          });
+        onMutate: async input => {
+          await queryClient.cancelQueries({ queryKey: pinKey });
+          const previous = queryClient.getQueryData(pinKey);
+          if (previous) {
+            queryClient.setQueryData(pinKey, {
+              ...previous,
+              image_tag: input.imageTag,
+              openclaw_version: null,
+              reason: input.reason ?? null,
+              pinnedBySelf: true,
+            });
+          }
+          return { previous };
         },
-        onError: onMutationError,
+        onError: (error, _input, context) => {
+          if (context?.previous !== undefined) {
+            queryClient.setQueryData(pinKey, context.previous);
+          }
+          onMutationError(error);
+        },
+        onSettled: invalidateStatusAndPin,
       })
     ),
     removeMyPin: useMutation(
       trpc.kiloclaw.removeMyPin.mutationOptions({
-        onSuccess: async () => {
-          await invalidateStatus();
-          await queryClient.invalidateQueries({
-            queryKey: trpc.kiloclaw.getMyPin.queryKey(),
-          });
+        onMutate: async () => {
+          await queryClient.cancelQueries({ queryKey: pinKey });
+          const previous = queryClient.getQueryData(pinKey);
+          queryClient.setQueryData(pinKey, null);
+          return { previous };
         },
-        onError: onMutationError,
+        onError: (error, _input, context) => {
+          if (context?.previous !== undefined) {
+            queryClient.setQueryData(pinKey, context.previous);
+          }
+          onMutationError(error);
+        },
+        onSettled: invalidateStatusAndPin,
       })
     ),
     approvePairingRequest: useMutation(
@@ -136,16 +198,18 @@ export function useKiloClawMutations() {
       })
     ),
     setGmailNotifications: useMutation(
-      trpc.kiloclaw.setGmailNotifications.mutationOptions({
-        onSuccess: invalidateStatus,
-        onError: onMutationError,
-      })
+      trpc.kiloclaw.setGmailNotifications.mutationOptions(
+        optimistic(
+          statusKey,
+          (old, input) => ({ ...old, gmailNotificationsEnabled: input.enabled }),
+          invalidateStatus
+        )
+      )
     ),
     renameInstance: useMutation(
-      trpc.kiloclaw.renameInstance.mutationOptions({
-        onSuccess: invalidateStatus,
-        onError: onMutationError,
-      })
+      trpc.kiloclaw.renameInstance.mutationOptions(
+        optimistic(statusKey, (old, input) => ({ ...old, name: input.name }), invalidateStatus)
+      )
     ),
     destroy: useMutation(
       trpc.kiloclaw.destroy.mutationOptions({
@@ -154,12 +218,9 @@ export function useKiloClawMutations() {
       })
     ),
     updateModel: useMutation(
-      trpc.kiloclaw.updateKiloCodeConfig.mutationOptions({
-        onSuccess: async () => {
-          await queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getConfig.queryKey() });
-        },
-        onError: onMutationError,
-      })
+      trpc.kiloclaw.updateKiloCodeConfig.mutationOptions(
+        optimistic(configKey, (old, input) => ({ ...old, ...input }))
+      )
     ),
   };
 }

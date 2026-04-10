@@ -32,6 +32,7 @@ import {
   kiloclaw_cli_runs,
   cloud_agent_webhook_triggers,
   credit_transactions,
+  organizations,
 } from '@kilocode/db/schema';
 import { and, eq, ne, desc, isNotNull, isNull, inArray, sql, like, or } from 'drizzle-orm';
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
@@ -40,6 +41,7 @@ import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kilo
 import {
   ensureActiveInstance,
   getActiveInstance,
+  listAllActiveInstances,
   markActiveInstanceDestroyed,
   markInstanceDestroyedById,
   renameInstance,
@@ -1430,6 +1432,57 @@ export const kiloclawRouter = createTRPCRouter({
   latestVersion: baseProcedure.query(async () => {
     const client = new KiloClawInternalClient();
     return client.getLatestVersion();
+  }),
+
+  /**
+   * List all active KiloClaw instances for the user across all contexts
+   * (personal + every org they belong to). Returns lightweight metadata
+   * with live status for each instance.
+   */
+  listAllInstances: baseProcedure.query(async ({ ctx }) => {
+    const instances = await listAllActiveInstances(ctx.user.id);
+    if (instances.length === 0) return [];
+
+    // Build org name map for instances that belong to organizations
+    const orgIds = [
+      ...new Set(instances.map(i => i.organizationId).filter((id): id is string => id !== null)),
+    ];
+    const orgNameMap = new Map<string, string>();
+    if (orgIds.length > 0) {
+      const orgs = await db
+        .select({ id: organizations.id, name: organizations.name })
+        .from(organizations)
+        .where(inArray(organizations.id, orgIds));
+      for (const org of orgs) {
+        orgNameMap.set(org.id, org.name);
+      }
+    }
+
+    // Fetch live status from each instance's worker in parallel
+    const client = new KiloClawInternalClient();
+    const results = await Promise.all(
+      instances.map(async instance => {
+        let status: string | null = null;
+        try {
+          const workerStatus = await client.getStatus(ctx.user.id, workerInstanceId(instance));
+          status = workerStatus.status;
+        } catch {
+          // Worker unreachable — show as null (unknown)
+        }
+        return {
+          id: instance.id,
+          sandboxId: instance.sandboxId,
+          name: instance.name,
+          organizationId: instance.organizationId,
+          organizationName: instance.organizationId
+            ? (orgNameMap.get(instance.organizationId) ?? null)
+            : null,
+          status,
+        };
+      })
+    );
+
+    return results;
   }),
 
   getStatus: baseProcedure.query(async ({ ctx }) => {

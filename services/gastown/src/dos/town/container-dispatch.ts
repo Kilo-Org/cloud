@@ -7,10 +7,49 @@ import { getTownContainerStub } from '../TownContainer.do';
 import { signAgentJWT, signContainerJWT } from '../../util/jwt.util';
 import { buildPolecatSystemPrompt } from '../../prompts/polecat-system.prompt';
 import { buildMayorSystemPrompt } from '../../prompts/mayor-system.prompt';
-import type { TownConfig } from '../../types';
-import { buildContainerConfig, resolveModel, resolveSmallModel } from './config';
+import type { TownConfig, RigOverrideConfig } from '../../types';
+import { buildContainerConfig, resolveModel, resolveSmallModel, resolveRigConfig } from './config';
 
 const TOWN_LOG = '[Town.do]';
+
+// Allowlist of git push flags that are safe to pass from rig config.
+// Flags that bypass hooks (--no-verify), rewrite history (--force,
+// --force-with-lease), or alter remote refs in dangerous ways are
+// explicitly excluded to prevent config-driven bypass of protections.
+const ALLOWED_GIT_PUSH_FLAGS = new Set([
+  '--atomic',
+  '--follow-tags',
+  '--signed',
+  '--no-signed',
+  '--progress',
+  '--no-progress',
+  '--verbose',
+  '--quiet',
+  '--tags',
+  '--porcelain',
+  '--ipv4',
+  '--ipv6',
+  '--recurse-submodules=check',
+  '--recurse-submodules=on-demand',
+  '--recurse-submodules=no',
+]);
+
+/**
+ * Filter git push flags against the allowlist. Returns only the safe subset.
+ * Logs a warning for any rejected flags.
+ */
+function filterGitPushFlags(raw: string): string | undefined {
+  const flags = raw.trim().split(/\s+/).filter(Boolean);
+  const allowed: string[] = [];
+  for (const flag of flags) {
+    if (ALLOWED_GIT_PUSH_FLAGS.has(flag)) {
+      allowed.push(flag);
+    } else {
+      console.warn(`${TOWN_LOG} filterGitPushFlags: rejecting unsafe flag "${flag}"`);
+    }
+  }
+  return allowed.length > 0 ? allowed.join(' ') : undefined;
+}
 
 // Module-level diagnostic: stores the last container start error so
 // callers can surface it via the admin API. Reset on each call.
@@ -244,16 +283,19 @@ export function systemPromptForRole(params: {
 }
 
 /**
- * Append per-role custom instructions from town config to a system prompt.
- * Returns the prompt unchanged when no custom instructions exist for the role.
+ * Append per-role custom instructions to a system prompt.
+ * Accepts either a TownConfig (falls back to town-level instructions)
+ * or a pre-resolved instructions string. Returns the prompt unchanged
+ * when no custom instructions exist for the role.
  */
 export function appendCustomInstructions(
   systemPrompt: string,
   role: string,
-  townConfig: TownConfig
+  townConfig: TownConfig,
+  resolvedInstructions?: string | null
 ): string {
   const roleKey = role as keyof NonNullable<TownConfig['custom_instructions']>;
-  const instructions = townConfig.custom_instructions?.[roleKey]?.trim();
+  const instructions = (resolvedInstructions ?? townConfig.custom_instructions?.[roleKey])?.trim();
   if (!instructions) return systemPrompt;
   return `${systemPrompt}\n\n## Custom Instructions (from town settings)\n\n${instructions}`;
 }
@@ -320,6 +362,8 @@ export async function startAgentInContainer(
     defaultBranch: string;
     kilocodeToken?: string;
     townConfig: TownConfig;
+    /** Rig-level config overrides. When present, merged on top of townConfig for model, custom_instructions, and git_push_flags. */
+    rigOverride?: RigOverrideConfig | null;
     systemPromptOverride?: string;
     platformIntegrationId?: string;
     /** For convoy beads: the convoy's feature branch to branch from instead of defaultBranch. */
@@ -407,6 +451,9 @@ export async function startAgentInContainer(
     const containerConfig = await buildContainerConfig(storage, env);
     const container = getTownContainerStub(env, params.townId);
 
+    const rigOverride = params.rigOverride ?? null;
+    const effectiveConfig = resolveRigConfig(params.townConfig, rigOverride);
+
     const response = await container.fetch('http://container/agents/start', {
       method: 'POST',
       signal: AbortSignal.timeout(60_000),
@@ -427,7 +474,7 @@ export async function startAgentInContainer(
           checkpoint: params.checkpoint,
           conversationHistory: params.conversationHistory,
         }),
-        model: resolveModel(params.townConfig, params.rigId, params.role),
+        model: resolveModel(params.townConfig, rigOverride, params.role),
         smallModel: resolveSmallModel(params.townConfig),
         systemPrompt: appendCustomInstructions(
           params.systemPromptOverride ??
@@ -440,16 +487,25 @@ export async function startAgentInContainer(
               gates: params.townConfig.refinery?.gates ?? [],
             }),
           params.role,
-          params.townConfig
+          params.townConfig,
+          effectiveConfig.custom_instructions[
+            params.role as keyof typeof effectiveConfig.custom_instructions
+          ]
         ),
+        ...(effectiveConfig.git_push_flags
+          ? (() => {
+              const safe = filterGitPushFlags(effectiveConfig.git_push_flags);
+              return safe ? { gitPushFlags: safe } : {};
+            })()
+          : {}),
         gitUrl: params.gitUrl,
         branch: params.convoyFeatureBranch
           ? branchForConvoyAgent(params.convoyFeatureBranch, params.agentName, params.beadId)
           : branchForAgent(params.agentName, params.beadId),
         // Always use the rig's real default branch for the initial git clone.
-        // The convoy feature branch may not exist on the remote yet (the first
-        // agent's work creates it via the refinery merge). The agent's working
-        // branch is created as a worktree from HEAD after clone.
+        // The agent's working branch is created as a worktree from HEAD after
+        // clone; for convoy agents the startPoint below positions that worktree
+        // at the convoy's feature branch tip.
         defaultBranch: params.defaultBranch,
         envVars,
         platformIntegrationId: params.platformIntegrationId,

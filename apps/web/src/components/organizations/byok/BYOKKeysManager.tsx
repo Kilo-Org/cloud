@@ -35,6 +35,7 @@ import {
   ChevronDown,
   ChevronRight,
   FlaskConical,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -551,6 +552,29 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   </div>
                 </div>
               )}
+
+              {selectedProvider &&
+                (() => {
+                  const directProvider = DIRECT_BYOK_PROVIDERS_LIST.find(
+                    p => p.id === selectedProvider
+                  );
+                  return directProvider ? (
+                    <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      <AlertDescription>
+                        <p className="font-medium">
+                          Important: You must use a model from{' '}
+                          <strong>{directProvider.name}</strong> to use this key
+                        </p>
+                        <p className="mt-1">
+                          In your client, select a model entry from the list above. After saving,
+                          you may need to wait a few minutes and restart your client for this entry
+                          to appear.
+                        </p>
+                      </AlertDescription>
+                    </Alert>
+                  ) : null;
+                })()}
             </div>
 
             <DialogFooter>

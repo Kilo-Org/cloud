@@ -1,7 +1,6 @@
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle2, type LucideIcon, Scale, Zap } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
-import { toast } from 'sonner-native';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -94,14 +93,7 @@ export function ModelPicker() {
     if (currentModel === modelId) {
       return;
     }
-    mutations.updateModel.mutate(
-      { kilocodeDefaultModel: addModelPrefix(modelId) },
-      {
-        onSuccess: () => {
-          toast.success(`Switched to ${modelId.split('/').pop()}`);
-        },
-      }
-    );
+    mutations.updateModel.mutate({ kilocodeDefaultModel: addModelPrefix(modelId) });
   };
 
   if (isLoading) {

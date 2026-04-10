@@ -31,12 +31,14 @@ function createSelectResult<T>(rows: T[]): SelectResult<T> {
   return result;
 }
 
-function createMockDb(selectResults: unknown[][]) {
+function createMockDb(selectResults: unknown[][], options?: { txInsertRowCounts?: number[] }) {
   const updates: Array<Record<string, unknown>> = [];
   const txUpdates: Array<Record<string, unknown>> = [];
   const deletes: unknown[] = [];
   const txDeletes: unknown[] = [];
   const inserts: Array<Record<string, unknown>> = [];
+  const txInserts: Array<Record<string, unknown>> = [];
+  const txInsertRowCounts = [...(options?.txInsertRowCounts ?? [])];
   const nextSelectResult = () => createSelectResult(selectResults.shift() ?? []);
   const createSelectBuilder = (): SelectBuilder => {
     const builder: SelectBuilder = {
@@ -75,6 +77,7 @@ function createMockDb(selectResults: unknown[][]) {
     async (
       callback: (tx: {
         delete: ReturnType<typeof vi.fn>;
+        insert: ReturnType<typeof vi.fn>;
         update: ReturnType<typeof vi.fn>;
       }) => Promise<unknown>
     ) =>
@@ -83,6 +86,16 @@ function createMockDb(selectResults: unknown[][]) {
           where: vi.fn(async whereArg => {
             txDeletes.push(whereArg);
             return undefined;
+          }),
+        })),
+        insert: vi.fn(() => ({
+          values: vi.fn((values: Record<string, unknown>) => {
+            txInserts.push(values);
+            return {
+              onConflictDoNothing: vi.fn(async () => ({
+                rowCount: txInsertRowCounts.shift() ?? 1,
+              })),
+            };
           }),
         })),
         update: vi.fn(() => ({
@@ -109,6 +122,7 @@ function createMockDb(selectResults: unknown[][]) {
     deletes,
     txDeletes,
     inserts,
+    txInserts,
   };
 }
 
@@ -122,6 +136,9 @@ function createEnv(fetchImpl: BillingWorkerEnv['KILOCLAW']['fetch']): BillingWor
       fetch: fetchImpl,
     },
     KILOCODE_BACKEND_BASE_URL: 'https://app.kilo.ai',
+    STRIPE_KILOCLAW_COMMIT_PRICE_ID: 'price_commit',
+    STRIPE_KILOCLAW_STANDARD_PRICE_ID: 'price_standard',
+    STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: 'price_standard_intro',
     INTERNAL_API_SECRET: 'next-secret',
     KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
   };
@@ -478,5 +495,237 @@ describe('instance destruction sweep', () => {
         }),
       ])
     );
+  });
+});
+
+describe('credit renewal sweep affiliate tracking', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  it('enqueues a sale affiliate event for pure-credit renewals', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, txInserts, txUpdates } = createMockDb([
+      [
+        {
+          user_id: 'user-1',
+          email: 'user-1@example.com',
+          instance_id: 'instance-1',
+          plan: 'standard',
+          status: 'active',
+          credit_renewal_at: renewalAt,
+          current_period_end: renewalAt,
+          cancel_at_period_end: false,
+          scheduled_plan: null,
+          commit_ends_at: null,
+          past_due_since: null,
+          suspended_at: null,
+          auto_resume_attempt_count: 0,
+          auto_top_up_triggered_for_period: null,
+          total_microdollars_acquired: 50_000_000,
+          microdollars_used: 0,
+          auto_top_up_enabled: false,
+          kilo_pass_threshold: null,
+          next_credit_expiration_at: null,
+          user_updated_at: '2026-04-09T09:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+        input: Record<string, unknown>;
+      };
+
+      switch (body.action) {
+        case 'project_pending_kilo_pass_bonus':
+          return new Response(JSON.stringify({ projectedBonusMicrodollars: 0 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        case 'issue_kilo_pass_bonus_from_usage_threshold':
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        case 'enqueue_affiliate_event':
+          return new Response(JSON.stringify({ enqueued: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: 'abababab-abab-4bab-8bab-abababababab',
+        sweep: 'credit_renewal',
+      },
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(txInserts).toHaveLength(1);
+    expect(txInserts[0]).toEqual(
+      expect.objectContaining({
+        kilo_user_id: 'user-1',
+        amount_microdollars: -9_000_000,
+        description: 'KiloClaw standard renewal',
+      })
+    );
+    expect(txUpdates).toEqual(
+      expect.arrayContaining([
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        expect.objectContaining({ microdollars_used: expect.anything() }),
+        expect.objectContaining({
+          current_period_start: renewalAt,
+          auto_top_up_triggered_for_period: null,
+        }),
+      ])
+    );
+
+    const saleCall = fetch.mock.calls
+      .map(
+        ([, init]) =>
+          JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+            action: string;
+            input: Record<string, unknown>;
+          }
+      )
+      .find(call => call.action === 'enqueue_affiliate_event');
+
+    expect(saleCall).toEqual({
+      action: 'enqueue_affiliate_event',
+      input: {
+        userId: 'user-1',
+        provider: 'impact',
+        eventType: 'sale',
+        dedupeKey: 'affiliate:impact:sale:kiloclaw-subscription:instance-1:2026-04',
+        eventDateIso: renewalAt,
+        orderId: 'kiloclaw-subscription:instance-1:2026-04',
+        amount: 9,
+        currencyCode: 'usd',
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+        itemSku: 'price_standard',
+      },
+    });
+  });
+
+  it('re-enqueues the existing sale dedupe key when the renewal deduction already committed', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, txInserts, txUpdates } = createMockDb(
+      [
+        [
+          {
+            user_id: 'user-1',
+            email: 'user-1@example.com',
+            instance_id: 'instance-1',
+            plan: 'standard',
+            status: 'active',
+            credit_renewal_at: renewalAt,
+            current_period_end: renewalAt,
+            cancel_at_period_end: false,
+            scheduled_plan: null,
+            commit_ends_at: null,
+            past_due_since: null,
+            suspended_at: null,
+            auto_resume_attempt_count: 0,
+            auto_top_up_triggered_for_period: null,
+            total_microdollars_acquired: 50_000_000,
+            microdollars_used: 0,
+            auto_top_up_enabled: false,
+            kilo_pass_threshold: null,
+            next_credit_expiration_at: null,
+            user_updated_at: '2026-04-09T09:00:00.000Z',
+          },
+        ],
+      ],
+      { txInsertRowCounts: [0] }
+    );
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+        action: string;
+        input: Record<string, unknown>;
+      };
+
+      switch (body.action) {
+        case 'project_pending_kilo_pass_bonus':
+          return new Response(JSON.stringify({ projectedBonusMicrodollars: 0 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        case 'enqueue_affiliate_event':
+          return new Response(JSON.stringify({ enqueued: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        default:
+          throw new Error(`Unexpected side effect action: ${body.action}`);
+      }
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',
+        sweep: 'credit_renewal',
+      },
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.credit_renewals_skipped_duplicate).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(txInserts).toHaveLength(1);
+    expect(txUpdates).toEqual([]);
+
+    const sideEffectCalls = fetch.mock.calls.map(
+      ([, init]) =>
+        JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+          action: string;
+          input: Record<string, unknown>;
+        }
+    );
+
+    expect(sideEffectCalls).toEqual([
+      {
+        action: 'project_pending_kilo_pass_bonus',
+        input: {
+          userId: 'user-1',
+          microdollarsUsed: 9_000_000,
+          kiloPassThreshold: null,
+        },
+      },
+      {
+        action: 'enqueue_affiliate_event',
+        input: {
+          userId: 'user-1',
+          provider: 'impact',
+          eventType: 'sale',
+          dedupeKey: 'affiliate:impact:sale:kiloclaw-subscription:instance-1:2026-04',
+          eventDateIso: renewalAt,
+          orderId: 'kiloclaw-subscription:instance-1:2026-04',
+          amount: 9,
+          currencyCode: 'usd',
+          itemCategory: 'kiloclaw-standard',
+          itemName: 'KiloClaw Standard Plan',
+          itemSku: 'price_standard',
+        },
+      },
+    ]);
   });
 });

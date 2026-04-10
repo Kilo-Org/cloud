@@ -112,6 +112,7 @@ describe('HTTP proxy', () => {
       headers: { 'x-kiloclaw-proxy-token': 'token-1' },
     });
     expect(resp.status).toBe(503);
+    expect(resp.headers.get('Retry-After')).toBe('5');
     expect(await resp.json()).toEqual({ error: 'Gateway not ready' });
   });
 
@@ -191,7 +192,9 @@ describe('WebSocket proxy', () => {
       supervisor: createMockSupervisor('crashed'),
     });
 
-    expect((socket as unknown as FakeSocket).written.join('')).toContain('HTTP/1.1 503');
+    const written = (socket as unknown as FakeSocket).written.join('');
+    expect(written).toContain('HTTP/1.1 503');
+    expect(written).toContain('Retry-After: 5');
     expect((socket as unknown as FakeSocket).destroyed).toBe(true);
   });
 
@@ -287,7 +290,9 @@ describe('WebSocket proxy', () => {
       wsState: { activeConnections: 100 },
     });
 
-    expect((socket as unknown as FakeSocket).written.join('')).toContain('HTTP/1.1 503');
+    const written = (socket as unknown as FakeSocket).written.join('');
+    expect(written).toContain('HTTP/1.1 503');
+    expect(written).toContain('Retry-After: 5');
     expect((socket as unknown as FakeSocket).destroyed).toBe(true);
   });
 

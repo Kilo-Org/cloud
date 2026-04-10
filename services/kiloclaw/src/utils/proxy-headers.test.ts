@@ -11,9 +11,9 @@ describe('buildForwardHeaders', () => {
 
     const result = await buildForwardHeaders({
       requestHeaders: headers,
-      machineId: 'machine-123',
       sandboxId: 'sandbox-abc',
       gatewayTokenSecret: 'secret-123',
+      providerHeaders: { 'fly-force-instance-id': 'machine-123' },
     });
 
     const expectedToken = await deriveGatewayToken('sandbox-abc', 'secret-123');
@@ -31,12 +31,29 @@ describe('buildForwardHeaders', () => {
 
     const result = await buildForwardHeaders({
       requestHeaders: headers,
-      machineId: 'machine-123',
       sandboxId: 'sandbox-abc',
       gatewayTokenSecret: 'secret-123',
+      providerHeaders: { 'fly-force-instance-id': 'machine-123' },
     });
 
     const expectedToken = await deriveGatewayToken('sandbox-abc', 'secret-123');
     expect(result.get('x-kiloclaw-proxy-token')).toBe(expectedToken);
+  });
+
+  it('preserves arbitrary provider transport headers', async () => {
+    const headers = new Headers();
+
+    const result = await buildForwardHeaders({
+      requestHeaders: headers,
+      sandboxId: 'sandbox-abc',
+      gatewayTokenSecret: 'secret-123',
+      providerHeaders: {
+        'x-provider-route': 'runtime-1',
+        'fly-force-instance-id': 'machine-123',
+      },
+    });
+
+    expect(result.get('x-provider-route')).toBe('runtime-1');
+    expect(result.get('fly-force-instance-id')).toBe('machine-123');
   });
 });

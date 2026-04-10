@@ -213,7 +213,8 @@ describe('generateBaseConfig', () => {
       'org_abc123'
     );
     expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
-    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+    // models key is deleted so OpenClaw uses the built-in provider's full catalog
+    expect(config.models.providers.kilocode.models).toBeUndefined();
   });
 
   it('still removes openrouter stale provider for org-scoped instances', () => {
@@ -302,7 +303,8 @@ describe('generateBaseConfig', () => {
     );
     // Explicit provider entries require a baseUrl per OpenClaw's strict schema
     expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
-    expect(config.models.providers.kilocode.models).toEqual([]);
+    // No models key — lets the built-in kilocode provider's full catalog be used
+    expect(config.models.providers.kilocode.models).toBeUndefined();
   });
 
   it('does not set org header when KILOCODE_ORGANIZATION_ID is not set', () => {
@@ -334,7 +336,8 @@ describe('generateBaseConfig', () => {
     );
     expect(config.models.providers.kilocode.headers['X-Custom']).toBe('value');
     expect(config.models.providers.kilocode.baseUrl).toBe('https://tunnel.example.com/');
-    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+    // models key is deleted so OpenClaw uses the built-in provider's full catalog
+    expect(config.models.providers.kilocode.models).toBeUndefined();
   });
 
   it('removes stale org header when KILOCODE_ORGANIZATION_ID is no longer set', () => {
@@ -431,6 +434,33 @@ describe('generateBaseConfig', () => {
       'http://localhost:3000',
       'https://claw.kilo.ai',
     ]);
+  });
+
+  it('always configures the KiloClaw customizer plugin', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.plugins.entries['kiloclaw-customizer'].enabled).toBe(true);
+    expect(config.plugins.load.paths).toContain(
+      '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer'
+    );
+  });
+
+  it('does not duplicate KiloClaw customizer plugin path on repeated generateBaseConfig calls', () => {
+    const existing = JSON.stringify({
+      plugins: {
+        load: {
+          paths: ['/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer'],
+        },
+        entries: { 'kiloclaw-customizer': { enabled: true } },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    const pluginPath = '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer';
+    const paths = config.plugins.load.paths as string[];
+    expect(paths.filter(p => p === pluginPath)).toHaveLength(1);
   });
 
   it('configures Telegram channel', () => {

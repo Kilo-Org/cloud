@@ -80,7 +80,7 @@ describe('affiliate-events', () => {
     expect(rows.find(row => row.event_type === 'trial_start')?.delivery_state).toBe('blocked');
   });
 
-  it('delivers a parent event before its blocked child and unblocks the child in the same cron run', async () => {
+  it('delivers a parent event before its blocked child and leaves the child queued until the processing gap passes', async () => {
     const user = await insertTestUser();
     const {
       buildAffiliateEventDedupeKey,
@@ -120,14 +120,142 @@ describe('affiliate-events', () => {
 
     expect(summary).toEqual({
       reclaimed: 0,
-      claimed: 2,
-      delivered: 2,
+      claimed: 1,
+      delivered: 1,
       retried: 0,
       failed: 0,
       unblocked: 1,
     });
+    expect(rows.map(row => row.delivery_state).sort()).toEqual(['delivered', 'queued']);
+    expect(rows.find(row => row.event_type === 'signup')?.claimed_at).not.toBeNull();
+    expect(rows.find(row => row.event_type === 'trial_start')?.claimed_at).toBeNull();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispatches a child immediately when the parent was delivered without a claimed_at timestamp', async () => {
+    const user = await insertTestUser();
+    const {
+      buildAffiliateEventDedupeKey,
+      dispatchQueuedAffiliateEvents,
+      enqueueAffiliateEventForUser,
+      recordAffiliateAttributionAndQueueParentEvent,
+    } = await import('@/lib/affiliate-events');
+
+    const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
+      userId: user.id,
+      provider: 'impact',
+      trackingId: 'impact-click-123',
+      customerEmail: user.google_user_email,
+      eventDate: new Date('2026-04-09T10:00:00.000Z'),
+    });
+
+    expect(parentEvent).not.toBeNull();
+
+    // Simulate unconfigured delivery: parent is delivered with claimed_at cleared
+    // (as happens when sendImpactConversionPayload returns skipped: 'unconfigured').
+    await db
+      .update(user_affiliate_events)
+      .set({
+        delivery_state: 'delivered',
+        claimed_at: null,
+        next_retry_at: null,
+      })
+      .where(eq(user_affiliate_events.id, parentEvent!.id));
+
+    await enqueueAffiliateEventForUser({
+      userId: user.id,
+      provider: 'impact',
+      eventType: 'trial_start',
+      dedupeKey: buildAffiliateEventDedupeKey({
+        provider: 'impact',
+        eventType: 'trial_start',
+        entityId: 'trial-subscription-unconfigured',
+      }),
+      eventDate: new Date('2026-04-09T10:05:00.000Z'),
+      orderId: 'IR_AN_64_TS',
+    });
+
+    const fetchMock: typeof fetch = jest.fn(async () => new Response('', { status: 200 }));
+    global.fetch = fetchMock;
+
+    const summary = await dispatchQueuedAffiliateEvents();
+    const rows = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+
+    expect(summary).toEqual({
+      reclaimed: 0,
+      claimed: 1,
+      delivered: 1,
+      retried: 0,
+      failed: 0,
+      unblocked: 0,
+    });
     expect(rows.map(row => row.delivery_state).sort()).toEqual(['delivered', 'delivered']);
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('delivers a queued child after the parent processing gap passes', async () => {
+    const user = await insertTestUser();
+    const {
+      buildAffiliateEventDedupeKey,
+      dispatchQueuedAffiliateEvents,
+      enqueueAffiliateEventForUser,
+      recordAffiliateAttributionAndQueueParentEvent,
+    } = await import('@/lib/affiliate-events');
+
+    const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
+      userId: user.id,
+      provider: 'impact',
+      trackingId: 'impact-click-123',
+      customerEmail: user.google_user_email,
+      eventDate: new Date('2026-04-09T10:00:00.000Z'),
+    });
+
+    expect(parentEvent).not.toBeNull();
+
+    await db
+      .update(user_affiliate_events)
+      .set({
+        delivery_state: 'delivered',
+        claimed_at: new Date(Date.now() - 6 * 60 * 1000).toISOString(),
+        next_retry_at: null,
+      })
+      .where(eq(user_affiliate_events.id, parentEvent!.id));
+
+    await enqueueAffiliateEventForUser({
+      userId: user.id,
+      provider: 'impact',
+      eventType: 'trial_start',
+      dedupeKey: buildAffiliateEventDedupeKey({
+        provider: 'impact',
+        eventType: 'trial_start',
+        entityId: 'trial-subscription-older-parent',
+      }),
+      eventDate: new Date('2026-04-09T10:05:00.000Z'),
+      orderId: 'IR_AN_64_TS',
+    });
+
+    const fetchMock: typeof fetch = jest.fn(async () => new Response('', { status: 200 }));
+    global.fetch = fetchMock;
+
+    const summary = await dispatchQueuedAffiliateEvents();
+    const rows = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+
+    expect(summary).toEqual({
+      reclaimed: 0,
+      claimed: 1,
+      delivered: 1,
+      retried: 0,
+      failed: 0,
+      unblocked: 0,
+    });
+    expect(rows.map(row => row.delivery_state).sort()).toEqual(['delivered', 'delivered']);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('requeues 5xx failures with backoff', async () => {
@@ -236,5 +364,68 @@ describe('affiliate-events', () => {
     expect(summary.reclaimed).toBe(1);
     expect(summary.delivered).toBe(1);
     expect(row?.delivery_state).toBe('delivered');
+  });
+
+  it('reconciles blocked children whose parent was already delivered but does not claim them until the processing gap passes', async () => {
+    const user = await insertTestUser();
+    const {
+      buildAffiliateEventDedupeKey,
+      dispatchQueuedAffiliateEvents,
+      enqueueAffiliateEventForUser,
+      recordAffiliateAttributionAndQueueParentEvent,
+    } = await import('@/lib/affiliate-events');
+
+    const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
+      userId: user.id,
+      provider: 'impact',
+      trackingId: 'impact-click-123',
+      customerEmail: user.google_user_email,
+      eventDate: new Date('2026-04-09T10:00:00.000Z'),
+    });
+
+    expect(parentEvent).not.toBeNull();
+
+    await enqueueAffiliateEventForUser({
+      userId: user.id,
+      provider: 'impact',
+      eventType: 'trial_start',
+      dedupeKey: buildAffiliateEventDedupeKey({
+        provider: 'impact',
+        eventType: 'trial_start',
+        entityId: 'trial-subscription-3',
+      }),
+      eventDate: new Date('2026-04-09T10:05:00.000Z'),
+      orderId: 'IR_AN_64_TS',
+    });
+
+    await db
+      .update(user_affiliate_events)
+      .set({
+        delivery_state: 'delivered',
+        claimed_at: new Date().toISOString(),
+        next_retry_at: null,
+      })
+      .where(eq(user_affiliate_events.id, parentEvent!.id));
+
+    const fetchMock: typeof fetch = jest.fn(async () => new Response('', { status: 200 }));
+    global.fetch = fetchMock;
+
+    const summary = await dispatchQueuedAffiliateEvents();
+    const rows = await db
+      .select()
+      .from(user_affiliate_events)
+      .where(eq(user_affiliate_events.user_id, user.id));
+
+    expect(summary).toEqual({
+      reclaimed: 0,
+      claimed: 0,
+      delivered: 0,
+      retried: 0,
+      failed: 0,
+      unblocked: 1,
+    });
+    expect(rows.map(row => row.delivery_state).sort()).toEqual(['delivered', 'queued']);
+    expect(rows.find(row => row.event_type === 'trial_start')?.claimed_at).toBeNull();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });

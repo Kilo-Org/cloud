@@ -1,26 +1,13 @@
 import { z } from 'zod';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
-  CLAUDE_OPUS_CURRENT_MODEL_NAME,
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-  CLAUDE_SONNET_CURRENT_MODEL_NAME,
 } from '@/lib/providers/anthropic.constants';
-import {
-  MINIMAX_CURRENT_MODEL_ID,
-  MINIMAX_CURRENT_MODEL_NAME,
-  minimax_m25_free_model,
-} from '@/lib/providers/minimax';
-import { KIMI_CURRENT_MODEL_ID, KIMI_CURRENT_MODEL_NAME } from '@/lib/providers/moonshotai';
-import { gpt_oss_20b_free_model, GPT_5_NANO_NAME } from '@/lib/providers/openai';
+import { minimax_m25_free_model } from '@/lib/providers/minimax';
+import { qwen36_plus_model } from '@/lib/providers/qwen';
 import type { OpenRouterReasoningConfig } from '@/lib/providers/openrouter/types';
 import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
-
-function stripDisplayName(displayName: string): string {
-  const start = displayName.indexOf(': ');
-  const end = displayName.indexOf(' (');
-  return displayName.substring(start < 0 ? 0 : start + 2, end < 0 ? undefined : end);
-}
 
 type AutoModel = {
   id: string;
@@ -43,25 +30,7 @@ export type ResolvedAutoModel = {
   verbosity?: Verbosity;
 };
 
-const MODEL_DISPLAY_NAMES: Readonly<Record<string, string>> = {
-  [CLAUDE_OPUS_CURRENT_MODEL_ID]: CLAUDE_OPUS_CURRENT_MODEL_NAME,
-  [CLAUDE_SONNET_CURRENT_MODEL_ID]: CLAUDE_SONNET_CURRENT_MODEL_NAME,
-  [KIMI_CURRENT_MODEL_ID]: KIMI_CURRENT_MODEL_NAME,
-  [MINIMAX_CURRENT_MODEL_ID]: MINIMAX_CURRENT_MODEL_NAME,
-};
-
-function describeRouting(modeToModel: Record<string, ResolvedAutoModel>): string {
-  const modelToModes: Record<string, string[]> = {};
-  for (const [mode, { model }] of Object.entries(modeToModel)) {
-    const modes = modelToModes[model] ?? [];
-    modes.push(mode);
-    modelToModes[model] = modes;
-  }
-  const parts = Object.entries(modelToModes).map(
-    ([model, modes]) => `${MODEL_DISPLAY_NAMES[model] ?? model} for ${modes.join(', ')}`
-  );
-  return `Uses ${parts.join('; ')}.`;
-}
+export const GPT_53_CODEX_ID = 'openai/gpt-5.3-codex';
 
 export const modeSchema = z.enum([
   'KiloClaw',
@@ -90,7 +59,11 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
     reasoning: { enabled: true },
     verbosity: 'high',
   },
-  plan: { model: CLAUDE_OPUS_CURRENT_MODEL_ID, reasoning: { enabled: true }, verbosity: 'high' },
+  plan: {
+    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
+    reasoning: { enabled: true },
+    verbosity: 'high',
+  },
   general: {
     model: CLAUDE_OPUS_CURRENT_MODEL_ID,
     reasoning: { enabled: true },
@@ -106,8 +79,16 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
     reasoning: { enabled: true },
     verbosity: 'high',
   },
-  ask: { model: CLAUDE_OPUS_CURRENT_MODEL_ID, reasoning: { enabled: true }, verbosity: 'high' },
-  debug: { model: CLAUDE_OPUS_CURRENT_MODEL_ID, reasoning: { enabled: true }, verbosity: 'high' },
+  ask: {
+    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
+    reasoning: { enabled: true },
+    verbosity: 'high',
+  },
+  debug: {
+    model: CLAUDE_OPUS_CURRENT_MODEL_ID,
+    reasoning: { enabled: true },
+    verbosity: 'high',
+  },
   build: {
     model: CLAUDE_SONNET_CURRENT_MODEL_ID,
     reasoning: { enabled: true },
@@ -121,12 +102,13 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   code: FRONTIER_CODE_MODEL,
 };
 
-export const BALANCED_CODE_MODEL: ResolvedAutoModel = {
-  model: MINIMAX_CURRENT_MODEL_ID,
+export const BALANCED_CODEX_MODEL: ResolvedAutoModel = {
+  model: GPT_53_CODEX_ID,
+  reasoning: { enabled: true, effort: 'low' },
 };
 
-export const BALANCED_IMAGE_MODEL: ResolvedAutoModel = {
-  model: KIMI_CURRENT_MODEL_ID,
+export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
+  model: qwen36_plus_model.public_id,
   reasoning: { enabled: true },
 };
 
@@ -136,23 +118,10 @@ export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
   verbosity: 'high',
 };
 
-export const BALANCED_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
-  KiloClaw: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
-  plan: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
-  general: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
-  architect: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
-  orchestrator: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
-  ask: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
-  debug: { model: KIMI_CURRENT_MODEL_ID, reasoning: { enabled: true } },
-  build: { model: MINIMAX_CURRENT_MODEL_ID },
-  explore: { model: MINIMAX_CURRENT_MODEL_ID },
-  code: BALANCED_CODE_MODEL,
-};
-
 export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
   id: 'kilo-auto/frontier',
   name: 'Kilo Auto Frontier',
-  description: `Highest performance and capability for any task. ${describeRouting(FRONTIER_MODE_TO_MODEL)}`,
+  description: 'Highest performance and capability for any task.',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
   prompt_price: '0.000005',
@@ -170,7 +139,7 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
 export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Kilo Auto Free',
-  description: `Free with limited capability. No credits required. Uses ${stripDisplayName(minimax_m25_free_model.display_name)}.`,
+  description: 'Free with limited capability. No credits required.',
   context_length: minimax_m25_free_model.context_length,
   max_completion_tokens: minimax_m25_free_model.max_completion_tokens,
   prompt_price: '0',
@@ -188,25 +157,29 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
 export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   id: 'kilo-auto/balanced',
   name: 'Kilo Auto Balanced',
-  description: `Great balance of price and capability. ${describeRouting(BALANCED_MODE_TO_MODEL)}`,
-  context_length: 204800,
-  max_completion_tokens: 131072,
-  prompt_price: '0.0000006',
-  completion_price: '0.000003',
-  input_cache_read_price: '0.000000225',
+  description: 'Great balance of price and capability.',
+  context_length: 400_000,
+  max_completion_tokens: 65_536,
+  prompt_price: '0.00000175',
+  completion_price: '0.000014',
+  input_cache_read_price: '0.000000175',
   input_cache_write_price: undefined,
   supports_images: true,
   roocode_settings: {
-    included_tools: ['edit_file'],
-    excluded_tools: ['apply_diff'],
+    included_tools: ['apply_patch'],
+    excluded_tools: ['apply_diff', 'edit_file'],
   },
-  opencode_settings: undefined,
+  opencode_settings: {
+    ai_sdk_provider: 'openai',
+    family: 'gpt',
+    prompt: 'codex',
+  },
 };
 
 export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   id: 'kilo-auto/small',
   name: 'Kilo Auto Small',
-  description: `Automatically routes your request to a small model. Uses ${GPT_5_NANO_NAME} (default) or ${stripDisplayName(gpt_oss_20b_free_model.display_name)} (free fallback).`,
+  description: 'Automatically routes your request to a small model.',
   context_length: 131072,
   max_completion_tokens: 32768,
   prompt_price: '0.00000005',

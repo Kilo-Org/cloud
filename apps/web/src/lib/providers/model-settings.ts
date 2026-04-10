@@ -5,7 +5,6 @@ import { isMoonshotModel } from '@/lib/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/providers/openai';
 import { qwen36_plus_model } from '@/lib/providers/qwen';
 import { isXaiModel } from '@/lib/providers/xai';
-import { isXiaomiModel } from '@/lib/providers/xiaomi';
 import { isZaiModel } from '@/lib/providers/zai';
 import type {
   CustomLlmProvider,
@@ -81,12 +80,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }
-  if (
-    isMoonshotModel(model) ||
-    isZaiModel(model) ||
-    isXiaomiModel(model) ||
-    model === qwen36_plus_model.public_id
-  ) {
+  if (isMoonshotModel(model) || isZaiModel(model) || model === qwen36_plus_model.public_id) {
     return REASONING_VARIANTS_BINARY;
   }
   if (model === seed_20_pro_free_model.public_id) {

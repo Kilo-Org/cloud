@@ -32,6 +32,7 @@ import { KILOCLAW_ACTIVE_INSTANCE_COOKIE } from './config';
 import { timingMiddleware } from './middleware/analytics';
 import { writeEvent } from './utils/analytics';
 import type { RegistryEntry } from './durable-objects/kiloclaw-registry';
+import type { ProviderRoutingTarget } from './providers/types';
 
 // Export DOs (match wrangler.jsonc class_name bindings)
 export { KiloClawInstance } from './durable-objects/kiloclaw-instance';
@@ -50,6 +51,64 @@ function transformErrorMessage(message: string): string {
 }
 
 /**
+ * Sanitize a WebSocket close reason: transform internal error messages and
+ * truncate to the 123-char WebSocket spec limit for close reasons.
+ */
+function sanitizeCloseReason(reason: string): string {
+  let r = transformErrorMessage(reason);
+  if (r.length > 123) r = r.slice(0, 120) + '...';
+  return r;
+}
+
+/**
+ * Transform a WebSocket message from the container before relaying to the client.
+ * Rewrites JSON error payloads that leak internal gateway auth details.
+ */
+function transformWsMessage(data: string | ArrayBuffer): string | ArrayBuffer {
+  if (typeof data !== 'string') return data;
+  try {
+    const parsed: unknown = JSON.parse(data);
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      'error' in parsed &&
+      typeof (parsed as Record<string, unknown>).error === 'object' &&
+      (parsed as Record<string, unknown>).error !== null
+    ) {
+      const error = (parsed as Record<string, Record<string, unknown>>).error;
+      if (typeof error.message === 'string') {
+        error.message = transformErrorMessage(error.message);
+        return JSON.stringify(parsed);
+      }
+    }
+  } catch {
+    // Not JSON — pass through
+  }
+  return data;
+}
+
+/**
+ * Safely close a WebSocket, tolerating already-closed sockets and invalid
+ * close codes/reasons that the CF Workers runtime rejects.
+ *
+ * CloseEvent.code can be 1005 (no status), 1006 (abnormal), or 1015 (TLS failure)
+ * on abnormal disconnects. These are not valid arguments to WebSocket.close().
+ * We normalize to 1000 (normal) on first failure and retry so the relay still
+ * tears down cleanly.
+ */
+function safeClose(ws: WebSocket, code: number, reason: string): void {
+  try {
+    ws.close(code, reason);
+  } catch {
+    try {
+      ws.close(1000, reason);
+    } catch {
+      // Already closed — nothing to do.
+    }
+  }
+}
+
+/**
  * Validate required environment variables.
  * Only checks auth secrets -- AI provider keys are not required at the worker
  * level since users can bring their own keys (BYOK) via encrypted secrets.
@@ -62,11 +121,8 @@ function validateRequiredEnv(env: KiloClawEnv): string[] {
   return missing;
 }
 
-/**
- * Build the Fly Proxy URL for a given request path.
- */
-function flyProxyUrl(appName: string, url: URL): string {
-  return `https://${appName}.fly.dev${url.pathname}${url.search}`;
+function routingTargetUrl(target: ProviderRoutingTarget, pathname: string, search = ''): string {
+  return `${target.origin}${pathname}${search}`;
 }
 
 // =============================================================================
@@ -98,7 +154,10 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
     if (!c.env.FLY_API_TOKEN) missing.push('FLY_API_TOKEN');
     if (missing.length > 0) {
       console.error('[CONFIG] Platform route missing bindings:', missing.join(', '));
-      return c.json({ error: 'Configuration error' }, 503);
+      return c.json(
+        { error: 'Configuration error' },
+        { status: 503, headers: { 'Retry-After': '5' } }
+      );
     }
     return next();
   }
@@ -106,7 +165,10 @@ async function requireEnvVars(c: Context<AppEnv>, next: Next) {
   const missingVars = validateRequiredEnv(c.env);
   if (missingVars.length > 0) {
     console.error('[CONFIG] Missing required environment variables:', missingVars.join(', '));
-    return c.json({ error: 'Configuration error' }, 503);
+    return c.json(
+      { error: 'Configuration error' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
   }
 
   return next();
@@ -197,7 +259,10 @@ app.all('/i/:instanceId/*', async c => {
   const instanceId = parsed.data;
 
   if (!c.env.GATEWAY_TOKEN_SECRET) {
-    return c.json({ error: 'Configuration error' }, 503);
+    return c.json(
+      { error: 'Configuration error' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
   }
 
   const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(instanceId));
@@ -230,22 +295,21 @@ app.all('/i/:instanceId/*', async c => {
     return c.json({ error: 'Instance has no sandboxId' }, 500);
   }
 
-  const appName = status.flyAppName ?? c.env.FLY_APP_NAME;
-  if (!appName) {
-    return c.json({ error: 'No Fly app name for this instance' }, 503);
-  }
-
   // Strip the /i/{instanceId} prefix to get the real path
   const url = new URL(c.req.raw.url);
   const prefix = `/i/${instanceId}`;
   const strippedPath = url.pathname.slice(prefix.length) || '/';
-  const targetUrl = `https://${appName}.fly.dev${strippedPath}${url.search}`;
+  const routingTarget = await stub.getRoutingTarget();
+  if (!routingTarget) {
+    return c.json({ error: 'Instance not routable' }, 503);
+  }
+  const targetUrl = routingTargetUrl(routingTarget, strippedPath, url.search);
 
   const forwardHeaders = await buildForwardHeaders({
     requestHeaders: c.req.raw.headers,
-    machineId: status.flyMachineId,
     sandboxId: status.sandboxId,
     gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+    providerHeaders: routingTarget.headers,
   });
 
   console.log(
@@ -265,11 +329,17 @@ app.all('/i/:instanceId/*', async c => {
       containerResponse = await fetch(targetUrl, { headers: forwardHeaders });
     } catch (err) {
       console.error('[PROXY /i] Fly Proxy fetch failed:', err);
-      return c.json({ error: 'Instance not reachable' }, 503);
+      return c.json(
+        { error: 'Instance not reachable' },
+        { status: 503, headers: { 'Retry-After': '5' } }
+      );
     }
 
     if (containerResponse.status === 502) {
-      return c.json({ error: 'Instance is starting up' }, 503);
+      return c.json(
+        { error: 'Instance is starting up' },
+        { status: 503, headers: { 'Retry-After': '5' } }
+      );
     }
 
     const containerWs = containerResponse.webSocket;
@@ -281,24 +351,64 @@ app.all('/i/:instanceId/*', async c => {
     serverWs.accept();
     containerWs.accept();
 
+    let droppedToContainer = 0;
+    let droppedToClient = 0;
+
     serverWs.addEventListener('message', event => {
       if (containerWs.readyState === WebSocket.OPEN) {
         containerWs.send(event.data as string | ArrayBuffer);
+      } else {
+        droppedToContainer++;
+        if (droppedToContainer === 1) {
+          console.warn(
+            '[WS /i] First dropped client->container message (readyState:',
+            containerWs.readyState,
+            ')'
+          );
+        }
       }
     });
     containerWs.addEventListener('message', event => {
+      const data = transformWsMessage(event.data as string | ArrayBuffer);
       if (serverWs.readyState === WebSocket.OPEN) {
-        serverWs.send(event.data as string | ArrayBuffer);
+        serverWs.send(data);
+      } else {
+        droppedToClient++;
+        if (droppedToClient === 1) {
+          console.warn(
+            '[WS /i] First dropped container->client message (readyState:',
+            serverWs.readyState,
+            ')'
+          );
+        }
       }
     });
+
+    const logDropSummary = () => {
+      const totalDropped = droppedToClient + droppedToContainer;
+      if (totalDropped > 0) {
+        console.warn(
+          '[WS /i] Connection closed with',
+          totalDropped,
+          'dropped messages (toClient:',
+          droppedToClient,
+          'toContainer:',
+          droppedToContainer,
+          ')'
+        );
+      }
+    };
+
     serverWs.addEventListener('close', event => {
-      containerWs.close(event.code, event.reason);
+      logDropSummary();
+      safeClose(containerWs, event.code, event.reason);
     });
     containerWs.addEventListener('close', event => {
-      serverWs.close(event.code, event.reason);
+      logDropSummary();
+      safeClose(serverWs, event.code, sanitizeCloseReason(event.reason));
     });
-    serverWs.addEventListener('error', () => containerWs.close(1011, 'Client error'));
-    containerWs.addEventListener('error', () => serverWs.close(1011, 'Container error'));
+    serverWs.addEventListener('error', () => safeClose(containerWs, 1011, 'Client error'));
+    containerWs.addEventListener('error', () => safeClose(serverWs, 1011, 'Container error'));
 
     return new Response(null, { status: 101, webSocket: clientWs });
   }
@@ -317,7 +427,10 @@ app.all('/i/:instanceId/*', async c => {
     return httpResponse;
   } catch (err) {
     console.error('[PROXY /i] HTTP fetch failed:', err);
-    return c.json({ error: 'Instance not reachable' }, 503);
+    return c.json(
+      { error: 'Instance not reachable' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
   }
 });
 
@@ -434,26 +547,26 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
  * Callers MUST use the returned sandboxId for gateway token derivation.
  */
 async function resolveInstance(c: Context<AppEnv>): Promise<{
+  stub: ReturnType<KiloClawEnv['KILOCLAW_INSTANCE']['get']> | null;
   machineId: string | null;
-  flyAppName: string | null;
   sandboxId: string | null;
   status: string | null;
 }> {
   const resolved = await resolveRegistryEntry(c);
-  if (!resolved) return { machineId: null, flyAppName: null, sandboxId: null, status: null };
+  if (!resolved) return { stub: null, machineId: null, sandboxId: null, status: null };
 
   const s = await resolved.stub.getStatus();
 
   if (s.status === 'destroying')
-    return { machineId: null, flyAppName: null, sandboxId: null, status: 'destroying' };
+    return { stub: resolved.stub, machineId: null, sandboxId: null, status: 'destroying' };
   if (s.status === 'restoring')
-    return { machineId: null, flyAppName: null, sandboxId: null, status: 'restoring' };
+    return { stub: resolved.stub, machineId: null, sandboxId: null, status: 'restoring' };
   if (s.status === 'recovering')
-    return { machineId: null, flyAppName: null, sandboxId: null, status: 'recovering' };
+    return { stub: resolved.stub, machineId: null, sandboxId: null, status: 'recovering' };
 
   return {
+    stub: resolved.stub,
     machineId: s.flyMachineId,
-    flyAppName: s.flyAppName,
     sandboxId: s.sandboxId,
     status: s.status,
   };
@@ -521,8 +634,14 @@ app.all('*', async c => {
           );
         }
 
-        const appName = instanceStatus.flyAppName ?? c.env.FLY_APP_NAME;
-        if (appName && instanceStatus.sandboxId) {
+        const routingTarget = await stub.getRoutingTarget();
+        if (!routingTarget) {
+          return c.json(
+            { error: 'Instance not routable' },
+            { status: 503, headers: { 'Retry-After': '5' } }
+          );
+        }
+        if (instanceStatus.sandboxId) {
           console.log(
             '[PROXY] Cookie-routed to instance:',
             activeInstanceId,
@@ -531,17 +650,20 @@ app.all('*', async c => {
           );
           const request = c.req.raw;
           const url = new URL(request.url);
-          const targetUrl = flyProxyUrl(appName, url);
+          const targetUrl = routingTargetUrl(routingTarget, url.pathname, url.search);
 
           if (!c.env.GATEWAY_TOKEN_SECRET) {
-            return c.json({ error: 'Configuration error' }, 503);
+            return c.json(
+              { error: 'Configuration error' },
+              { status: 503, headers: { 'Retry-After': '5' } }
+            );
           }
 
           const forwardHeaders = await buildForwardHeaders({
             requestHeaders: request.headers,
-            machineId: instanceStatus.flyMachineId,
             sandboxId: instanceStatus.sandboxId,
             gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+            providerHeaders: routingTarget.headers,
           });
 
           const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
@@ -552,8 +674,19 @@ app.all('*', async c => {
               containerResponse = await fetch(targetUrl, { headers: forwardHeaders });
             } catch (err) {
               console.error('[PROXY] Cookie-routed WS fetch failed:', err);
-              return c.json({ error: 'Instance not reachable' }, 503);
+              return c.json(
+                { error: 'Instance not reachable' },
+                { status: 503, headers: { 'Retry-After': '5' } }
+              );
             }
+
+            if (containerResponse.status === 502) {
+              return c.json(
+                { error: 'Instance is starting up' },
+                { status: 503, headers: { 'Retry-After': '5' } }
+              );
+            }
+
             const containerWs = containerResponse.webSocket;
             if (!containerWs) {
               return c.json({ error: 'WebSocket upgrade failed' }, 502);
@@ -561,24 +694,67 @@ app.all('*', async c => {
             containerWs.accept();
             const [clientWs, serverWs] = Object.values(new WebSocketPair());
             serverWs.accept();
+
+            let cookieDroppedToContainer = 0;
+            let cookieDroppedToClient = 0;
+
             serverWs.addEventListener('message', event => {
               if (containerWs.readyState === WebSocket.OPEN) {
                 containerWs.send(event.data as string | ArrayBuffer);
+              } else {
+                cookieDroppedToContainer++;
+                if (cookieDroppedToContainer === 1) {
+                  console.warn(
+                    '[WS cookie] First dropped client->container message (readyState:',
+                    containerWs.readyState,
+                    ')'
+                  );
+                }
               }
             });
             containerWs.addEventListener('message', event => {
+              const data = transformWsMessage(event.data as string | ArrayBuffer);
               if (serverWs.readyState === WebSocket.OPEN) {
-                serverWs.send(event.data as string | ArrayBuffer);
+                serverWs.send(data);
+              } else {
+                cookieDroppedToClient++;
+                if (cookieDroppedToClient === 1) {
+                  console.warn(
+                    '[WS cookie] First dropped container->client message (readyState:',
+                    serverWs.readyState,
+                    ')'
+                  );
+                }
               }
             });
-            serverWs.addEventListener('close', event =>
-              containerWs.close(event.code, event.reason)
+
+            const logCookieDropSummary = () => {
+              const totalDropped = cookieDroppedToClient + cookieDroppedToContainer;
+              if (totalDropped > 0) {
+                console.warn(
+                  '[WS cookie] Connection closed with',
+                  totalDropped,
+                  'dropped messages (toClient:',
+                  cookieDroppedToClient,
+                  'toContainer:',
+                  cookieDroppedToContainer,
+                  ')'
+                );
+              }
+            };
+
+            serverWs.addEventListener('close', event => {
+              logCookieDropSummary();
+              safeClose(containerWs, event.code, event.reason);
+            });
+            containerWs.addEventListener('close', event => {
+              logCookieDropSummary();
+              safeClose(serverWs, event.code, sanitizeCloseReason(event.reason));
+            });
+            serverWs.addEventListener('error', () => safeClose(containerWs, 1011, 'Client error'));
+            containerWs.addEventListener('error', () =>
+              safeClose(serverWs, 1011, 'Container error')
             );
-            containerWs.addEventListener('close', event =>
-              serverWs.close(event.code, event.reason)
-            );
-            serverWs.addEventListener('error', () => containerWs.close(1011, 'Client error'));
-            containerWs.addEventListener('error', () => serverWs.close(1011, 'Container error'));
             return new Response(null, { status: 101, webSocket: clientWs });
           }
 
@@ -596,7 +772,10 @@ app.all('*', async c => {
             return httpResponse;
           } catch (err) {
             console.error('[PROXY] Cookie-routed HTTP fetch failed:', err);
-            return c.json({ error: 'Instance not reachable' }, 503);
+            return c.json(
+              { error: 'Instance not reachable' },
+              { status: 503, headers: { 'Retry-After': '5' } }
+            );
           }
         }
       }
@@ -604,7 +783,7 @@ app.all('*', async c => {
     // Cookie invalid/stale — fall through to default personal resolution
   }
 
-  const { machineId, flyAppName, sandboxId, status } = await resolveInstance(c);
+  const { stub, machineId, sandboxId, status } = await resolveInstance(c);
   if (status === 'destroying') {
     return c.json(
       { error: 'Instance is being destroyed', hint: 'This instance is being torn down.' },
@@ -642,15 +821,20 @@ app.all('*', async c => {
     return c.json({ error: 'Instance has no sandboxId' }, 500);
   }
 
-  // Per-user app name, with legacy fallback for existing instances
-  const appName = flyAppName ?? c.env.FLY_APP_NAME;
-  if (!appName) {
-    return c.json({ error: 'No Fly app name for this instance' }, 503);
+  if (!stub) {
+    return c.json(
+      { error: 'Instance not routable' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
   }
 
   const request = c.req.raw;
   const url = new URL(request.url);
-  const targetUrl = flyProxyUrl(appName, url);
+  const routingTarget = await stub.getRoutingTarget();
+  if (!routingTarget) {
+    return c.json({ error: 'Instance not routable' }, 503);
+  }
+  let targetUrl = routingTargetUrl(routingTarget, url.pathname, url.search);
 
   console.log('[PROXY] Handling request:', url.pathname, 'machine:', machineId);
 
@@ -658,18 +842,21 @@ app.all('*', async c => {
 
   if (!c.env.GATEWAY_TOKEN_SECRET) {
     console.error('[CONFIG] Missing required environment variables: GATEWAY_TOKEN_SECRET');
-    return c.json({ error: 'Configuration error' }, 503);
+    return c.json(
+      { error: 'Configuration error' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
   }
 
   // Use the DO's authoritative sandboxId for gateway token derivation.
   // This is critical: instance-keyed DOs derive sandboxId from instanceId (ki_ prefix),
   // which differs from the middleware-derived value (sandboxIdFromUserId). The gateway
   // token must match what the machine expects.
-  const forwardHeaders = await buildForwardHeaders({
+  let forwardHeaders = await buildForwardHeaders({
     requestHeaders: request.headers,
-    machineId,
     sandboxId,
     gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+    providerHeaders: routingTarget.headers,
   });
 
   // WebSocket proxy
@@ -687,11 +874,31 @@ app.all('*', async c => {
       const recovered = await attemptCrashRecovery(c);
       if (recovered) {
         // Machine may have been recreated — refresh the instance routing header
-        const { machineId: newMachineId } = await resolveInstance(c);
-        if (!newMachineId) {
-          return c.json({ error: 'Instance not reachable after restart' }, 503);
+        const refreshedInstance = await resolveInstance(c);
+        if (
+          !refreshedInstance.machineId ||
+          !refreshedInstance.stub ||
+          !refreshedInstance.sandboxId
+        ) {
+          return c.json(
+            { error: 'Instance not reachable after restart' },
+            { status: 503, headers: { 'Retry-After': '5' } }
+          );
         }
-        forwardHeaders.set('fly-force-instance-id', newMachineId);
+        const refreshedRoutingTarget = await refreshedInstance.stub.getRoutingTarget();
+        if (!refreshedRoutingTarget) {
+          return c.json(
+            { error: 'Instance not reachable after restart' },
+            { status: 503, headers: { 'Retry-After': '5' } }
+          );
+        }
+        targetUrl = routingTargetUrl(refreshedRoutingTarget, url.pathname, url.search);
+        forwardHeaders = await buildForwardHeaders({
+          requestHeaders: request.headers,
+          sandboxId: refreshedInstance.sandboxId,
+          gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+          providerHeaders: refreshedRoutingTarget.headers,
+        });
 
         try {
           containerResponse = await fetch(targetUrl, {
@@ -699,7 +906,10 @@ app.all('*', async c => {
           });
         } catch (retryErr) {
           console.error('[WS] Retry after recovery failed:', retryErr);
-          return c.json({ error: 'Instance not reachable after restart attempt' }, 503);
+          return c.json(
+            { error: 'Instance not reachable after restart attempt' },
+            { status: 503, headers: { 'Retry-After': '5' } }
+          );
         }
       } else {
         return c.json(
@@ -707,7 +917,7 @@ app.all('*', async c => {
             error: 'Instance not reachable',
             hint: 'Your instance may not be running. Start it from the dashboard.',
           },
-          503
+          { status: 503, headers: { 'Retry-After': '5' } }
         );
       }
     }
@@ -720,7 +930,7 @@ app.all('*', async c => {
           error: 'Instance is starting up',
           hint: 'The gateway process is still initializing. Please retry shortly.',
         },
-        503
+        { status: 503, headers: { 'Retry-After': '5' } }
       );
     }
 
@@ -735,65 +945,77 @@ app.all('*', async c => {
     serverWs.accept();
     containerWs.accept();
 
+    let catchAllDroppedToContainer = 0;
+    let catchAllDroppedToClient = 0;
+
     // Client -> Container relay
     serverWs.addEventListener('message', event => {
       if (containerWs.readyState === WebSocket.OPEN) {
         containerWs.send(event.data as string | ArrayBuffer);
+      } else {
+        catchAllDroppedToContainer++;
+        if (catchAllDroppedToContainer === 1) {
+          console.warn(
+            '[WS] First dropped client->container message (readyState:',
+            containerWs.readyState,
+            ')'
+          );
+        }
       }
     });
 
     // Container -> Client relay with error transformation
     containerWs.addEventListener('message', event => {
-      let data = event.data as string | ArrayBuffer;
-
-      if (typeof data === 'string') {
-        try {
-          const parsed: unknown = JSON.parse(data);
-          if (
-            typeof parsed === 'object' &&
-            parsed !== null &&
-            'error' in parsed &&
-            typeof (parsed as Record<string, unknown>).error === 'object' &&
-            (parsed as Record<string, unknown>).error !== null
-          ) {
-            const error = (parsed as Record<string, Record<string, unknown>>).error;
-            if (typeof error.message === 'string') {
-              error.message = transformErrorMessage(error.message);
-              data = JSON.stringify(parsed);
-            }
-          }
-        } catch {
-          // Not JSON -- pass through
-        }
-      }
-
+      const data = transformWsMessage(event.data as string | ArrayBuffer);
       if (serverWs.readyState === WebSocket.OPEN) {
         serverWs.send(data);
+      } else {
+        catchAllDroppedToClient++;
+        if (catchAllDroppedToClient === 1) {
+          console.warn(
+            '[WS] First dropped container->client message (readyState:',
+            serverWs.readyState,
+            ')'
+          );
+        }
       }
     });
+
+    const logCatchAllDropSummary = () => {
+      const totalDropped = catchAllDroppedToClient + catchAllDroppedToContainer;
+      if (totalDropped > 0) {
+        console.warn(
+          '[WS] Connection closed with',
+          totalDropped,
+          'dropped messages (toClient:',
+          catchAllDroppedToClient,
+          'toContainer:',
+          catchAllDroppedToContainer,
+          ')'
+        );
+      }
+    };
 
     // Close relay
     serverWs.addEventListener('close', event => {
-      containerWs.close(event.code, event.reason);
+      logCatchAllDropSummary();
+      safeClose(containerWs, event.code, event.reason);
     });
 
     containerWs.addEventListener('close', event => {
-      let reason = transformErrorMessage(event.reason);
-      if (reason.length > 123) {
-        reason = reason.slice(0, 120) + '...';
-      }
-      serverWs.close(event.code, reason);
+      logCatchAllDropSummary();
+      safeClose(serverWs, event.code, sanitizeCloseReason(event.reason));
     });
 
     // Error relay
     serverWs.addEventListener('error', event => {
       console.error('[WS] Client error:', event);
-      containerWs.close(1011, 'Client error');
+      safeClose(containerWs, 1011, 'Client error');
     });
 
     containerWs.addEventListener('error', event => {
       console.error('[WS] Container error:', event);
-      serverWs.close(1011, 'Container error');
+      safeClose(serverWs, 1011, 'Container error');
     });
 
     return new Response(null, {
@@ -819,11 +1041,27 @@ app.all('*', async c => {
     const recovered = await attemptCrashRecovery(c);
     if (recovered) {
       // Machine may have been recreated — refresh the instance routing header
-      const { machineId: newMachineId } = await resolveInstance(c);
-      if (!newMachineId) {
-        return c.json({ error: 'Instance not reachable after restart' }, 503);
+      const refreshedInstance = await resolveInstance(c);
+      if (!refreshedInstance.machineId || !refreshedInstance.stub || !refreshedInstance.sandboxId) {
+        return c.json(
+          { error: 'Instance not reachable after restart' },
+          { status: 503, headers: { 'Retry-After': '5' } }
+        );
       }
-      forwardHeaders.set('fly-force-instance-id', newMachineId);
+      const refreshedRoutingTarget = await refreshedInstance.stub.getRoutingTarget();
+      if (!refreshedRoutingTarget) {
+        return c.json(
+          { error: 'Instance not reachable after restart' },
+          { status: 503, headers: { 'Retry-After': '5' } }
+        );
+      }
+      targetUrl = routingTargetUrl(refreshedRoutingTarget, url.pathname, url.search);
+      forwardHeaders = await buildForwardHeaders({
+        requestHeaders: request.headers,
+        sandboxId: refreshedInstance.sandboxId,
+        gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+        providerHeaders: refreshedRoutingTarget.headers,
+      });
 
       try {
         httpResponse = await fetch(targetUrl, {
@@ -833,7 +1071,10 @@ app.all('*', async c => {
         });
       } catch (retryErr) {
         console.error('[HTTP] Retry after recovery failed:', retryErr);
-        return c.json({ error: 'Instance not reachable after restart attempt' }, 503);
+        return c.json(
+          { error: 'Instance not reachable after restart attempt' },
+          { status: 503, headers: { 'Retry-After': '5' } }
+        );
       }
     } else {
       return c.json(
@@ -841,7 +1082,7 @@ app.all('*', async c => {
           error: 'Instance not reachable',
           hint: 'Your instance may not be running. Start it from the dashboard.',
         },
-        503
+        { status: 503, headers: { 'Retry-After': '5' } }
       );
     }
   }

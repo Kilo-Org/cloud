@@ -30,7 +30,6 @@ import { isAnonymousContext } from '@/lib/anonymous';
 import { isOpenAiModel, isOpenAiOssModel } from '@/lib/providers/openai';
 import { isZaiModel } from '@/lib/providers/zai';
 import { isMinimaxModel } from '@/lib/providers/minimax';
-import { isXiaomiModel } from '@/lib/providers/xiaomi';
 import type { BYOKResult, GatewayChatApiKind, Provider } from '@/lib/providers/types';
 import PROVIDERS from '@/lib/providers/provider-definitions';
 import { getDirectByokModel } from '@/lib/providers/direct-byok';
@@ -39,7 +38,10 @@ import {
   type OpenClawApiAdapter,
   type CustomLlmProvider,
 } from '@kilocode/db';
-import { addCacheBreakpoints } from '@/lib/providers/openrouter/request-helpers';
+import {
+  addCacheBreakpoints,
+  injectReasoningIntoContent,
+} from '@/lib/providers/openrouter/request-helpers';
 
 function inferSupportedChatApis(
   aiSdkProvider: CustomLlmProvider | undefined,
@@ -168,6 +170,9 @@ export async function getProvider(
             ) {
               context.request.body.reasoning.summary = customLlm.reasoning_summary;
             }
+            if (customLlm.inject_reasoning_into_content) {
+              injectReasoningIntoContent(context.request);
+            }
           },
         },
         userByok: null,
@@ -251,9 +256,6 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
   }
   if (isMoonshotModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.moonshotai];
-  }
-  if (isXiaomiModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum['xiaomi']];
   }
   if (isZaiModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum['z-ai']];

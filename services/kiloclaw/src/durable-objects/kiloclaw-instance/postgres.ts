@@ -9,7 +9,7 @@ import {
 import { appNameFromUserId, appNameFromInstanceId } from '../../fly/apps';
 import type { InstanceMutableState } from './types';
 import { getAppKey, getFlyConfig } from './types';
-import { storageUpdate } from './state';
+import { applyProviderState, storageUpdate } from './state';
 import { attemptMetadataRecovery } from './reconcile';
 import { doError, doWarn, toLoggable, createReconcileContext } from './log';
 import { isInstanceKeyedSandboxId } from '@kilocode/worker-utils/instance-id';
@@ -77,12 +77,21 @@ export async function restoreFromPostgres(
     const prefix = env.WORKER_ENV === 'development' ? 'dev' : undefined;
     const fallbackAppName = await fallbackAppNameForRestore(userId, instance.sandboxId, prefix);
     const recoveredAppName = (await appStub.getAppName()) ?? fallbackAppName;
+    const providerState = {
+      provider: 'fly',
+      appName: recoveredAppName,
+      machineId: null,
+      volumeId: null,
+      region: null,
+    } as const;
 
     await ctx.storage.put(
       storageUpdate({
         userId,
         sandboxId: instance.sandboxId,
         orgId: instance.orgId ?? null,
+        provider: 'fly',
+        providerState,
         status: 'provisioned',
         envVars,
         encryptedSecrets,
@@ -109,6 +118,7 @@ export async function restoreFromPostgres(
     state.userId = userId;
     state.sandboxId = instance.sandboxId;
     state.orgId = instance.orgId ?? null;
+    applyProviderState(state, providerState);
     state.status = 'provisioned';
     state.envVars = envVars;
     state.encryptedSecrets = encryptedSecrets;
@@ -116,10 +126,6 @@ export async function restoreFromPostgres(
     state.provisionedAt = Date.now();
     state.lastStartedAt = null;
     state.lastStoppedAt = null;
-    state.flyAppName = recoveredAppName;
-    state.flyMachineId = null;
-    state.flyVolumeId = null;
-    state.flyRegion = null;
     state.machineSize = null;
     state.healthCheckFailCount = 0;
     state.pendingDestroyMachineId = null;

@@ -182,7 +182,7 @@ pnpm drizzle:verify-bootstrap
 pnpm dev:start
 ```
 
-This launches a tmux dashboard with the Next.js app and related services. The web app will be available at http://localhost:3000.
+This launches a tmux dashboard with the Next.js app, local infrastructure, and the Stripe webhook forwarder. The web app will be available at http://localhost:3000.
 
 To stop all services:
 

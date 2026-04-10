@@ -1670,14 +1670,6 @@ export class TownDO extends DurableObject<Env> {
     await this.escalateToActiveCadence();
   }
 
-  async popReviewQueue(): Promise<ReviewQueueEntry | null> {
-    return reviewQueue.popReviewQueue(this.sql);
-  }
-
-  async completeReview(entryId: string, status: 'merged' | 'failed'): Promise<void> {
-    reviewQueue.completeReview(this.sql, entryId, status);
-  }
-
   async completeReviewWithResult(input: {
     entry_id: string;
     status: 'merged' | 'failed' | 'conflict';
@@ -1712,10 +1704,9 @@ export class TownDO extends DurableObject<Env> {
       });
     }
 
-    // Rework is handled by the normal scheduling path: the failed/conflict
+    // Rework is handled by the reconciler's scheduling path: the failed/conflict
     // path in completeReviewWithResult sets the source bead to 'open' with
-    // assignee cleared. feedStrandedConvoys or rehookOrphanedBeads will
-    // hook a polecat, and schedulePendingWork will dispatch it.
+    // assignee cleared. The reconciler will hook a polecat and dispatch it.
   }
 
   async agentDone(agentId: string, input: AgentDoneInput): Promise<void> {
@@ -3558,9 +3549,9 @@ export class TownDO extends DurableObject<Env> {
     }
 
     // ── Pre-phase: Observe container status for working agents ────────
-    // Replaces witnessPatrol's zombie detection. Poll the container for
-    // each working/stalled agent and emit container_status events. These
-    // are drained in Phase 0 and applied before reconciliation.
+    // Poll the container for each working/stalled agent and emit
+    // container_status events. These are drained in Phase 0 and applied
+    // before reconciliation.
     try {
       const workingAgentRows = z
         .object({ bead_id: z.string() })
@@ -4487,8 +4478,8 @@ export class TownDO extends DurableObject<Env> {
 
     // Only count idle+hooked agents as orphaned if they've been idle for
     // longer than the dispatch cooldown. Agents that were just hooked by
-    // feedStrandedConvoys or restarted with backoff are legitimately
-    // waiting for the next scheduler tick.
+    // the reconciler or restarted with backoff are legitimately waiting
+    // for the next scheduler tick.
     const orphanedHooks = Number(
       [
         ...query(

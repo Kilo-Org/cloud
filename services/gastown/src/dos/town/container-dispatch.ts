@@ -647,12 +647,12 @@ export async function checkAgentContainerStatus(
       signal: AbortSignal.timeout(10_000),
     });
     // 404 means the container is running but has no record of this agent
-    // (e.g. after container eviction). Report as 'not_found' so
-    // witnessPatrol can immediately reset and redispatch the agent
+    // (e.g. after container eviction). Report as 'not_found' so the
+    // reconciler can immediately reset and redispatch the agent
     // instead of waiting for the 2-hour GUPP timeout.
     if (response.status === 404) return { status: 'not_found' };
     // Non-OK but not 404 — container is having issues but may still
-    // have the agent running. Return 'unknown' so witnessPatrol doesn't
+    // have the agent running. Return 'unknown' so the reconciler doesn't
     // falsely reset a working agent.
     if (!response.ok) return { status: 'unknown' };
     const data: unknown = await response.json();
@@ -668,7 +668,7 @@ export async function checkAgentContainerStatus(
     return { status: 'unknown' };
   } catch {
     // Timeout, network error, or container starting up — return
-    // 'unknown' so witnessPatrol doesn't falsely reset working agents.
+    // 'unknown' so the reconciler doesn't falsely reset working agents.
     // True zombies will be caught after repeated 'unknown' results
     // once the GIPP/heartbeat timeout expires.
     return { status: 'unknown' };

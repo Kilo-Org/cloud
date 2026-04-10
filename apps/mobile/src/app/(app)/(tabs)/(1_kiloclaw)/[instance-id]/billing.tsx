@@ -1,6 +1,7 @@
 import { ExternalLink } from 'lucide-react-native';
 import { Linking, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { useLocalSearchParams } from 'expo-router';
 
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
+import { useInstanceOrganizationId } from '@/lib/hooks/use-instance-context';
 import { useKiloClawBillingStatus } from '@/lib/hooks/use-kiloclaw';
 import { formatBillingDate } from '@/lib/hooks/use-kiloclaw-billing';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -91,9 +93,26 @@ function PlanDetails({
 }
 
 export default function BillingScreen() {
+  const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
+  const organizationId = useInstanceOrganizationId(instanceId);
   const colors = useThemeColors();
-  const billingQuery = useKiloClawBillingStatus();
+
+  const isOrgInstance = organizationId != null;
+  const billingQuery = useKiloClawBillingStatus(!isOrgInstance);
   const billing = billingQuery.data;
+
+  if (isOrgInstance) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Billing" />
+        <View className="flex-1 items-center justify-center px-6">
+          <Text className="text-center text-muted-foreground">
+            Billing is managed by your organization admin.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   if (billingQuery.isPending) {
     return (

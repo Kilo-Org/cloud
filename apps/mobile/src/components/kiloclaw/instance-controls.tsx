@@ -25,7 +25,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
       {
         text: 'Start',
         onPress: () => {
-          mutations.start.mutate();
+          mutations.start.mutate(undefined);
         },
       },
     ]);
@@ -38,7 +38,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
         text: 'Stop',
         style: 'destructive',
         onPress: () => {
-          mutations.stop.mutate();
+          mutations.stop.mutate(undefined);
         },
       },
     ]);
@@ -50,7 +50,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
       {
         text: 'Restart',
         onPress: () => {
-          mutations.restartOpenClaw.mutate();
+          mutations.restartOpenClaw.mutate(undefined);
         },
       },
     ]);
@@ -62,7 +62,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
       {
         text: 'Redeploy',
         onPress: () => {
-          mutations.restartMachine.mutate();
+          mutations.restartMachine.mutate(undefined);
         },
       },
     ]);

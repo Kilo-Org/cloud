@@ -3,12 +3,13 @@ import { Check, Eye } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useInstanceOrganizationId } from '@/lib/hooks/use-instance-context';
 import { useKiloClawConfig, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { addModelPrefix, stripModelPrefix } from '@/lib/model-id';
@@ -22,14 +23,16 @@ type ModelItem = {
 };
 
 export default function ModelListScreen() {
+  const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
+  const organizationId = useInstanceOrganizationId(instanceId);
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const trpc = useTRPC();
   const [searchFilter, setSearchFilter] = useState('');
 
-  const { data: config } = useKiloClawConfig();
-  const mutations = useKiloClawMutations();
+  const { data: config } = useKiloClawConfig(organizationId);
+  const mutations = useKiloClawMutations(organizationId);
   const currentModel = stripModelPrefix(config?.kilocodeDefaultModel);
 
   const {

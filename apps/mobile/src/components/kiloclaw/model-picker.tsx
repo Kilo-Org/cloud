@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useInstanceOrganizationId } from '@/lib/hooks/use-instance-context';
 import { useKiloClawConfig, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw';
 import { addModelPrefix, stripModelPrefix } from '@/lib/model-id';
 
@@ -83,8 +84,9 @@ function PerformanceIndicator({ level, dotColor }: { level: number; dotColor: st
 export function ModelPicker() {
   const router = useRouter();
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
-  const { data: config, isLoading } = useKiloClawConfig();
-  const mutations = useKiloClawMutations();
+  const organizationId = useInstanceOrganizationId(instanceId);
+  const { data: config, isLoading } = useKiloClawConfig(organizationId);
+  const mutations = useKiloClawMutations(organizationId);
 
   const currentModel = stripModelPrefix(config?.kilocodeDefaultModel);
   const isAutoModel = AUTO_MODEL_IDS.has(currentModel);

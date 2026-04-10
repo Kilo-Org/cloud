@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
-import { useRouter } from 'expo-router';
-import { ArrowLeftRight, Building2, KeyRound, LogOut, Trash2, User } from 'lucide-react-native';
+import { ChevronDown, KeyRound, LogOut, Trash2 } from 'lucide-react-native';
+import { useState } from 'react';
 import { Alert, Platform, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
-import { useAppContext } from '@/lib/context/context-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
@@ -22,21 +21,26 @@ function providerIcon(_provider: string) {
   return KeyRound;
 }
 
-function CreditsCard() {
+type CreditsCardProps = {
+  orgs: { organizationId: string; organizationName: string }[] | undefined;
+};
+
+function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
-  const { context } = useAppContext();
-  const organizationId = context?.type === 'organization' ? context.organizationId : undefined;
+  const colors = useThemeColors();
+  const [selectedOrgId, setSelectedOrgId] = useState<string | undefined>(undefined);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const {
     data: balance,
     isLoading: balanceLoading,
     isError: balanceError,
     refetch: refetchBalance,
-  } = useQuery(trpc.user.getContextBalance.queryOptions({ organizationId }));
+  } = useQuery(trpc.user.getContextBalance.queryOptions({ organizationId: selectedOrgId }));
 
   const { data: creditData, isLoading: creditsLoading } = useQuery({
     ...trpc.user.getCreditBlocks.queryOptions({}),
-    enabled: !organizationId,
+    enabled: !selectedOrgId,
   });
 
   const balanceDollars = balance?.balance ?? 0;
@@ -48,11 +52,61 @@ function CreditsCard() {
     // eslint-disable-next-line unicorn/no-array-sort -- toSorted() is not available in Hermes
     .sort((a, b) => a.localeCompare(b))[0];
 
+  const selectedLabel = selectedOrgId
+    ? (orgs?.find(o => o.organizationId === selectedOrgId)?.organizationName ?? 'Organization')
+    : 'Personal';
+
+  const hasOrgs = orgs && orgs.length > 0;
+
   return (
     <View className="gap-3">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        Remaining Credits
-      </Text>
+      <View className="flex-row items-center justify-between">
+        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+          Credits
+        </Text>
+        {hasOrgs && (
+          <Pressable
+            className="flex-row items-center gap-1 active:opacity-70"
+            onPress={() => {
+              setPickerOpen(prev => !prev);
+            }}
+            hitSlop={8}
+          >
+            <Text className="text-xs font-medium text-muted-foreground">{selectedLabel}</Text>
+            <ChevronDown size={14} color={colors.mutedForeground} />
+          </Pressable>
+        )}
+      </View>
+
+      {hasOrgs && pickerOpen && (
+        <Animated.View
+          entering={FadeIn.duration(150)}
+          className="rounded-lg bg-secondary p-1 gap-0.5"
+        >
+          <Pressable
+            className={`rounded-md px-3 py-2 active:opacity-70 ${!selectedOrgId ? 'bg-muted' : ''}`}
+            onPress={() => {
+              setSelectedOrgId(undefined);
+              setPickerOpen(false);
+            }}
+          >
+            <Text className="text-sm font-medium">Personal</Text>
+          </Pressable>
+          {orgs.map(org => (
+            <Pressable
+              key={org.organizationId}
+              className={`rounded-md px-3 py-2 active:opacity-70 ${selectedOrgId === org.organizationId ? 'bg-muted' : ''}`}
+              onPress={() => {
+                setSelectedOrgId(org.organizationId);
+                setPickerOpen(false);
+              }}
+            >
+              <Text className="text-sm font-medium">{org.organizationName}</Text>
+            </Pressable>
+          ))}
+        </Animated.View>
+      )}
+
       {balanceLoading && <Skeleton className="h-12 w-32 rounded-lg" />}
       {balanceError && (
         <Pressable
@@ -87,9 +141,8 @@ function CreditsCard() {
 
 export function ProfileScreen() {
   const { signOut } = useAuth();
-  const { context, clearContext } = useAppContext();
-  const router = useRouter();
   const trpc = useTRPC();
+  const colors = useThemeColors();
   const {
     data,
     isLoading,
@@ -97,15 +150,8 @@ export function ProfileScreen() {
     refetch: refetchProviders,
   } = useQuery(trpc.user.getAuthProviders.queryOptions());
   const { data: orgs } = useQuery(trpc.organizations.list.queryOptions());
-  const colors = useThemeColors();
 
   const { bottom } = useSafeAreaInsets();
-
-  const contextLabel =
-    context?.type === 'personal'
-      ? 'Personal'
-      : (orgs?.find(o => o.organizationId === context?.organizationId)?.organizationName ??
-        'Organization');
 
   const deleteAccount = useMutation(
     trpc.user.requestAccountDeletion.mutationOptions({
@@ -152,25 +198,8 @@ export function ProfileScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title="Profile" modal />
       <View className="flex-1 px-6 pt-4">
-        {/* Active context */}
-        <View className="gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            Active Context
-          </Text>
-          <View className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-            {context?.type === 'personal' ? (
-              <User size={18} color={colors.secondaryForeground} />
-            ) : (
-              <Building2 size={18} color={colors.secondaryForeground} />
-            )}
-            <Text className="text-sm font-medium">{contextLabel}</Text>
-          </View>
-        </View>
-
         {/* Credits */}
-        <View className="mt-6">
-          <CreditsCard />
-        </View>
+        <CreditsCard orgs={orgs} />
 
         {/* Linked accounts */}
         <Animated.View className="mt-6 gap-3" layout={LinearTransition}>
@@ -228,19 +257,6 @@ export function ProfileScreen() {
           className="mt-auto gap-3"
           style={{ paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0) }}
         >
-          <Button
-            variant="outline"
-            className="flex-row gap-2"
-            onPress={() => {
-              router.dismiss();
-              void clearContext();
-            }}
-            accessibilityLabel="Switch workspace"
-          >
-            <ArrowLeftRight size={16} color={colors.foreground} />
-            <Text>Switch Context</Text>
-          </Button>
-
           <Button
             variant="ghost"
             className="flex-row gap-2"

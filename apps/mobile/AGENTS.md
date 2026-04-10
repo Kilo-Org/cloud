@@ -124,7 +124,7 @@ After installing or upgrading dependencies, run `pnpx expo-doctor` and fix any i
 Follow lint rules **in spirit, not literally**. The goal is better code, not just silencing the linter. For example, if a max-lines rule fires:
 
 - **Good**: Refactor the file, break it into smaller files, extract components/hooks.
-- **Bad**: Reformat code (we have a formatter) or delete empty lines to circumvent the limit.
+- **Bad**: Reformat code (we have a formatter), delete empty lines, "compress" or "compact" code, or otherwise mangle formatting to circumvent the limit. Always extract related blocks to separate files instead.
 
 When resolving lint errors, try the autofix first before editing manually:
 

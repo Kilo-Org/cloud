@@ -15,7 +15,6 @@ import { Toaster } from 'sonner-native';
 
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { initAppsFlyer } from '@/lib/appsflyer';
-import { ContextProvider, useAppContext } from '@/lib/context/context-context';
 import {
   checkInitialNotification,
   getNotificationPermissionStatus,
@@ -66,14 +65,12 @@ checkInitialNotification();
 
 function RootLayoutNav() {
   const { token, isLoading: authLoading } = useAuth();
-  const { context, isLoading: contextLoading } = useAppContext();
   const { updateRequired, isChecking: updateChecking } = useForceUpdate();
   const segments = useSegments();
   const router = useRouter();
 
-  const isLoading = authLoading || contextLoading || updateChecking;
+  const isLoading = authLoading || updateChecking;
   const inAuthGroup = segments[0] === '(auth)';
-  const inContextGroup = segments[0] === '(context)';
   const inForceUpdate = segments[0] === 'force-update';
 
   useEffect(() => {
@@ -102,13 +99,7 @@ function RootLayoutNav() {
       } else {
         router.replace('/(auth)/login');
       }
-    } else if (!context) {
-      if (inContextGroup) {
-        void SplashScreen.hideAsync();
-      } else {
-        router.replace('/(context)/select');
-      }
-    } else if (inAuthGroup || inContextGroup) {
+    } else if (inAuthGroup) {
       router.replace('/(app)');
     } else {
       void SplashScreen.hideAsync();
@@ -118,16 +109,7 @@ function RootLayoutNav() {
         router.push(pendingLink as Href);
       }
     }
-  }, [
-    token,
-    context,
-    isLoading,
-    updateRequired,
-    inAuthGroup,
-    inContextGroup,
-    inForceUpdate,
-    router,
-  ]);
+  }, [token, isLoading, updateRequired, inAuthGroup, inForceUpdate, router]);
 
   const trpc = useTRPC();
   const { mutate: registerPushToken } = useMutation(
@@ -156,13 +138,10 @@ function RootLayoutNav() {
   const needsForceUpdate = updateRequired && !inForceUpdate;
   const showingForceUpdate = updateRequired && inForceUpdate;
   const needsAuth = !token && !inAuthGroup;
-  const needsContext = token != null && !context && !inContextGroup;
-  const needsAppRedirect =
-    (token != null && context != null && (inAuthGroup || inContextGroup)) || inForceUpdate;
+  const needsAppRedirect = token != null && inAuthGroup;
 
   const needsRedirect =
-    !isLoading &&
-    (needsForceUpdate || (!showingForceUpdate && (needsAuth || needsContext || needsAppRedirect)));
+    !isLoading && (needsForceUpdate || (!showingForceUpdate && (needsAuth || needsAppRedirect)));
 
   // Always keep Slot mounted so Expo Router's navigation tree stays
   // initialised — returning null unmounts it and breaks router.replace.
@@ -212,11 +191,9 @@ function RootLayout() {
       <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <ContextProvider>
-              <RootLayoutNav />
-              <Toaster />
-              <PortalHost />
-            </ContextProvider>
+            <RootLayoutNav />
+            <Toaster />
+            <PortalHost />
           </AuthProvider>
         </QueryClientProvider>
       </TRPCProvider>

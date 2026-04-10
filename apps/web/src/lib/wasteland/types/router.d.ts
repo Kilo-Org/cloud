@@ -221,6 +221,8 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
         upstream: string | null;
         dolthubOrg: string | null;
         hasToken: boolean;
+        hasJwk: boolean;
+        doltCredPubKey: string | null;
         wlVersion: string;
         uptime: number;
         lastOperation: string | null;
@@ -276,34 +278,23 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
         wastelandId: string;
       };
       output: {
-        item_id: string;
+        id: string;
         title: string;
-        description: string;
-        status: 'open' | 'claimed' | 'done';
-        priority: 'low' | 'medium' | 'high' | 'critical';
-        type: 'feature' | 'bug' | 'docs' | 'other';
-        claimed_by: string | null;
-        evidence: string | null;
-        created_at: string;
-        updated_at: string;
-      }[];
-      meta: object;
-    }>;
-    refreshWantedBoard: import('@trpc/server').TRPCMutationProcedure<{
-      input: {
-        wastelandId: string;
-      };
-      output: {
-        item_id: string;
-        title: string;
-        description: string;
-        status: 'open' | 'claimed' | 'done';
-        priority: 'low' | 'medium' | 'high' | 'critical';
-        type: 'feature' | 'bug' | 'docs' | 'other';
-        claimed_by: string | null;
-        evidence: string | null;
-        created_at: string;
-        updated_at: string;
+        description: string | null;
+        project: string;
+        type: string;
+        priority: number;
+        tags: string | null;
+        posted_by: string;
+        claimed_by: string;
+        status: string;
+        effort_level: string;
+        evidence_url: string | null;
+        sandbox_required: number | null;
+        sandbox_scope: string | null;
+        sandbox_min_tier: number | null;
+        created_at: string | null;
+        updated_at: string | null;
       }[];
       meta: object;
     }>;

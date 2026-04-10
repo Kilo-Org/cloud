@@ -464,21 +464,22 @@ export const wastelandRouter = router({
         if (config.dolthub_upstream) {
           await container.setEnvVar('WL_UPSTREAM', config.dolthub_upstream);
 
-          // Tell the (possibly already running) container to init now
-          try {
-            await container.fetch(
-              new Request('http://container/wl/init', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  upstream: config.dolthub_upstream,
-                  token: input.dolthubToken,
-                  dolthubOrg: input.dolthubOrg,
-                }),
-              })
-            );
-          } catch (err) {
-            console.warn('[storeCredential] container init failed, will retry on next boot', err);
+          // Tell the (possibly already running) container to init now.
+          // Surface failures so the user knows init didn't work.
+          const initRes = await container.fetch(
+            new Request('http://container/wl/init', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                upstream: config.dolthub_upstream,
+                token: input.dolthubToken,
+                dolthubOrg: input.dolthubOrg,
+              }),
+            })
+          );
+          if (!initRes.ok) {
+            const body = await initRes.text().catch(() => '');
+            console.warn(`[storeCredential] container init returned ${initRes.status}: ${body}`);
           }
         }
       }

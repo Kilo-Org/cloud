@@ -51,13 +51,6 @@ const PRIORITY_COLORS: Record<string, string> = {
   critical: 'text-red-300',
 };
 
-const PRIORITY_ORDER: Record<string, number> = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-};
-
 const TYPE_COLORS: Record<string, string> = {
   feature: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
   bug: 'bg-red-500/10 text-red-400 border-red-500/20',
@@ -120,14 +113,14 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
     refetchInterval: 30_000,
   });
 
-  const refreshMutation = useMutation({
-    ...trpc.wasteland.refreshWantedBoard.mutationOptions(),
-    onSuccess: () => {
+  const refreshMutation = {
+    isPending: false,
+    mutate: () => {
       void queryClient.invalidateQueries({
         queryKey: trpc.wasteland.browseWantedBoard.queryKey({ wastelandId }),
       });
     },
-  });
+  };
 
   const invalidateBoard = useCallback(() => {
     void queryClient.invalidateQueries({
@@ -159,16 +152,16 @@ export function WantedBoardClient({ wastelandId }: WantedBoardClientProps) {
 
     result = [...result].sort((a, b) => {
       if (sortField === 'priority') {
-        return (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3);
+        return (Number(a.priority) || 3) - (Number(b.priority) || 3);
       }
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
     });
 
     return result;
   }, [items, statusFilter, search, sortField]);
 
   const handleRefresh = useCallback(() => {
-    refreshMutation.mutate({ wastelandId });
+    refreshMutation.mutate();
   }, [refreshMutation, wastelandId]);
 
   const toggleSort = useCallback(() => {
@@ -446,18 +439,18 @@ function WantedDetailPanel({
           )}
 
           {/* Evidence (if done) */}
-          {item.evidence && (
+          {item.evidence_url && (
             <div>
               <label className="mb-1 block text-[10px] font-semibold tracking-[0.08em] text-white/30 uppercase">
                 Evidence
               </label>
               <a
-                href={item.evidence}
+                href={item.evidence_url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-sky-400 underline underline-offset-2 hover:text-sky-300"
               >
-                {item.evidence}
+                {item.evidence_url}
               </a>
             </div>
           )}
@@ -869,7 +862,8 @@ function DetailRow({ label, value, mono }: { label: string; value: string; mono?
   );
 }
 
-function formatTimestamp(iso: string): string {
+function formatTimestamp(iso: string | null): string {
+  if (!iso) return '—';
   try {
     return formatDistanceToNow(new Date(iso), { addSuffix: true });
   } catch {

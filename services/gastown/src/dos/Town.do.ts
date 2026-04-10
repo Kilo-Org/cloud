@@ -314,6 +314,26 @@ export class TownDO extends DurableObject<Env> {
           });
         }
 
+        // Defense-in-depth: if a triage batch bead (gt:triage, created_by=patrol)
+        // is re-dispatched via the reconciler (Rule 2), inject the correct triage
+        // system prompt so the polecat gets the right tools and instructions.
+        // The primary prevention is Option A (bead goes in_progress immediately
+        // after hookBead in maybeDispatchTriageAgent), but this guard ensures
+        // correctness even if Rule 2 somehow fires on a triage batch bead.
+        if (
+          agent.role === 'polecat' &&
+          bead.labels.includes(patrol.TRIAGE_BATCH_LABEL) &&
+          bead.created_by === 'patrol'
+        ) {
+          const pendingRequests = patrol.listPendingTriageRequests(this.sql);
+          const { buildTriageSystemPrompt } = await import('../prompts/triage-system.prompt');
+          systemPromptOverride = buildTriageSystemPrompt(pendingRequests);
+          return scheduling.dispatchAgent(schedulingCtx, agent, bead, {
+            systemPromptOverride,
+            lightweight: true,
+          });
+        }
+
         // When merge_strategy is 'pr', polecats always create the PR themselves
         // and pass pr_url to gt_done. For review-then-land convoy intermediate
         // beads, the PR targets the convoy feature branch (not main).
@@ -4075,6 +4095,15 @@ export class TownDO extends DurableObject<Env> {
 
     const triageAgent = agents.getOrCreateAgent(this.sql, 'polecat', rigId, this.townId);
     agents.hookBead(this.sql, triageAgent.id, triageBead.bead_id);
+
+    // Transition the triage batch bead to 'in_progress' immediately after
+    // hooking. This prevents reconciler Rule 2 (idle agent + open hooked bead
+    // → dispatch_agent) from re-dispatching the polecat with the wrong (standard)
+    // system prompt if the container start fails or is slow. Rule 3 (stale
+    // in_progress bead + no working agent, 5-min timeout) resets it back to
+    // 'open' on failure, at which point maybeDispatchTriageAgent picks it up
+    // again with the correct triage system prompt.
+    beadOps.updateBeadStatus(this.sql, triageBead.bead_id, 'in_progress', triageAgent.id);
 
     const started = await dispatch.startAgentInContainer(this.env, this.ctx.storage, {
       townId: this.townId,

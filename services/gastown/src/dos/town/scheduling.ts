@@ -65,7 +65,7 @@ export async function dispatchAgent(
   ctx: SchedulingContext,
   agent: Agent,
   bead: Bead,
-  options?: { systemPromptOverride?: string }
+  options?: { systemPromptOverride?: string; lightweight?: boolean }
 ): Promise<boolean> {
   try {
     const rigId = agent.rig_id ?? rigs.listRigs(ctx.sql)[0]?.id ?? '';
@@ -146,6 +146,7 @@ export async function dispatchAgent(
       platformIntegrationId: rigConfig.platformIntegrationId,
       convoyFeatureBranch: convoyFeatureBranch ?? undefined,
       systemPromptOverride: options?.systemPromptOverride,
+      lightweight: options?.lightweight,
     });
 
     if (started) {

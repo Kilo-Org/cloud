@@ -3,7 +3,7 @@ import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { ChevronDown, KeyRound, LogOut, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Alert, Platform, Pressable, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -35,6 +35,7 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
   const {
     data: balance,
     isLoading: balanceLoading,
+    isFetching: balanceFetching,
     isError: balanceError,
     refetch: refetchBalance,
   } = useQuery({
@@ -42,10 +43,18 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
     placeholderData: keepPreviousData,
   });
 
-  const { data: creditData, isLoading: creditsLoading } = useQuery({
+  const { data: personalCreditData, isLoading: personalCreditsLoading } = useQuery({
     ...trpc.user.getCreditBlocks.queryOptions({}),
     enabled: !selectedOrgId,
   });
+
+  const { data: orgCreditData, isLoading: orgCreditsLoading } = useQuery({
+    ...trpc.organizations.getCreditBlocks.queryOptions({ organizationId: selectedOrgId ?? '' }),
+    enabled: Boolean(selectedOrgId),
+  });
+
+  const creditData = selectedOrgId ? orgCreditData : personalCreditData;
+  const creditsLoading = selectedOrgId ? orgCreditsLoading : personalCreditsLoading;
 
   const balanceDollars = balance?.balance ?? 0;
   const expiringBlocks = creditData?.creditBlocks.filter(b => b.expiry_date !== null) ?? [];
@@ -111,22 +120,25 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
         </Pressable>
       )}
       {!balanceLoading && !balanceError && (
-        <View className="h-16 justify-center rounded-lg bg-secondary px-3">
-          <Text className="text-2xl font-bold">${balanceDollars.toFixed(2)}</Text>
-          {creditsLoading ? (
-            <Skeleton className="mt-1 h-3 w-48 rounded" />
-          ) : (
-            expiringTotal > 0 &&
-            earliestExpiry != null && (
-              <Text className="text-xs text-muted-foreground">
-                ${expiringTotal.toFixed(2)} in bonus credits expiring{' '}
-                {parseTimestamp(earliestExpiry).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </Text>
-            )
-          )}
+        <View className="h-16 flex-row items-center rounded-lg bg-secondary px-3">
+          <View className="flex-1 justify-center">
+            <Text className="text-2xl font-bold">${balanceDollars.toFixed(2)}</Text>
+            {creditsLoading ? (
+              <Skeleton className="mt-1 h-3 w-48 rounded" />
+            ) : (
+              expiringTotal > 0 &&
+              earliestExpiry != null && (
+                <Text className="text-xs text-muted-foreground">
+                  ${expiringTotal.toFixed(2)} in bonus credits expiring{' '}
+                  {parseTimestamp(earliestExpiry).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </Text>
+              )
+            )}
+          </View>
+          {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         </View>
       )}
     </View>

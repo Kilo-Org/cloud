@@ -1461,7 +1461,7 @@ export const kiloclawRouter = createTRPCRouter({
     // Fetch live status from each instance's worker in parallel
     const client = new KiloClawInternalClient();
     const results = await Promise.all(
-      instances.map(async (instance) => {
+      instances.map(async instance => {
         let status: string | null = null;
         try {
           const workerStatus = await client.getStatus(ctx.user.id, workerInstanceId(instance));

@@ -283,9 +283,7 @@ export async function listAllActiveInstances(userId: string): Promise<ActiveKilo
       name: kiloclaw_instances.name,
     })
     .from(kiloclaw_instances)
-    .where(
-      and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at))
-    )
+    .where(and(eq(kiloclaw_instances.user_id, userId), isNull(kiloclaw_instances.destroyed_at)))
     .orderBy(kiloclaw_instances.created_at);
 }
 

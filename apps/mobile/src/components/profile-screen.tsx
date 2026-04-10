@@ -130,7 +130,7 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
       )}
       {!balanceLoading && !balanceError && (
         <View className="h-16 flex-row items-center rounded-lg bg-secondary px-3">
-          <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>
+          <View className="flex-1 justify-center">
             <Text className="text-2xl font-bold">${balanceDollars.toFixed(2)}</Text>
             {creditsLoading ? (
               <Animated.View exiting={FadeOut.duration(150)}>
@@ -150,7 +150,7 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
                 </Animated.View>
               )
             )}
-          </Animated.View>
+          </View>
           {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         </View>
       )}

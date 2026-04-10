@@ -7,6 +7,7 @@ import {
   type TownConfig,
   type TownConfigUpdate,
   type MergeStrategy,
+  type RigOverrideConfig,
 } from '../../types';
 
 const CONFIG_KEY = 'town:config';
@@ -128,13 +129,32 @@ export async function updateTownConfig(
   return validated;
 }
 
+const DEFAULT_MODEL = 'anthropic/claude-sonnet-4.6';
+
 /**
- * Resolve the primary model from town config.
- * Priority: rig override → role-specific → town default → hardcoded default.
+ * Resolve the primary model from town config, optionally applying a rig override.
+ * Priority: rig override (role-specific) → rig override (default) → town role-specific → town default → hardcoded default.
  */
-export function resolveModel(townConfig: TownConfig, _rigId: string, role: string): string {
-  const roleModels: Record<string, string | undefined> | undefined = townConfig.role_models;
-  return roleModels?.[role] ?? townConfig.default_model ?? 'anthropic/claude-sonnet-4.6';
+export function resolveModel(
+  townConfig: TownConfig,
+  rigOverride: RigOverrideConfig | null | undefined,
+  role: string
+): string {
+  const base = rigOverride?.default_model ?? townConfig.default_model;
+  if (role === 'mayor')
+    return townConfig.role_models?.mayor ?? townConfig.default_model ?? DEFAULT_MODEL;
+  if (role === 'polecat')
+    return (
+      rigOverride?.role_models?.polecat ?? townConfig.role_models?.polecat ?? base ?? DEFAULT_MODEL
+    );
+  if (role === 'refinery')
+    return (
+      rigOverride?.role_models?.refinery ??
+      townConfig.role_models?.refinery ??
+      base ??
+      DEFAULT_MODEL
+    );
+  return base ?? DEFAULT_MODEL;
 }
 
 /**
@@ -157,6 +177,78 @@ export function resolveMergeStrategy(
 }
 
 /**
+ * The fully-resolved configuration for a rig dispatch.
+ * All fields have concrete values (no optional/undefined) except where
+ * a null value is meaningful (e.g. auto_merge_delay_minutes: null = disabled).
+ */
+export type EffectiveConfig = {
+  default_model: string | undefined;
+  role_models: {
+    polecat: string | undefined;
+    refinery: string | undefined;
+    mayor: string | undefined;
+  };
+  review_mode: 'rework' | 'comments';
+  code_review: boolean;
+  auto_resolve_pr_feedback: boolean;
+  auto_merge_delay_minutes: number | null;
+  merge_strategy: MergeStrategy;
+  convoy_merge_mode: 'review-then-land' | 'review-and-merge';
+  custom_instructions: {
+    polecat: string | undefined;
+    refinery: string | undefined;
+    mayor: string | undefined;
+  };
+  git_push_flags: string | undefined;
+  max_concurrent_polecats: number | undefined;
+  max_dispatch_attempts: number | undefined;
+};
+
+/**
+ * Merge a rig's override config on top of town config, returning a fully
+ * resolved EffectiveConfig for dispatch. When rigOverride is null/undefined,
+ * all values fall back to town-level defaults (behavior identical to today).
+ */
+export function resolveRigConfig(
+  townConfig: TownConfig,
+  rigOverride: RigOverrideConfig | null | undefined
+): EffectiveConfig {
+  return {
+    default_model: rigOverride?.default_model ?? townConfig.default_model,
+    role_models: {
+      polecat: rigOverride?.role_models?.polecat ?? townConfig.role_models?.polecat,
+      refinery: rigOverride?.role_models?.refinery ?? townConfig.role_models?.refinery,
+      // mayor is always town-level — rigs cannot override mayor model
+      mayor: townConfig.role_models?.mayor,
+    },
+    review_mode: rigOverride?.review_mode ?? townConfig.refinery?.review_mode ?? 'rework',
+    code_review: rigOverride?.code_review ?? townConfig.refinery?.code_review ?? true,
+    auto_resolve_pr_feedback:
+      rigOverride?.auto_resolve_pr_feedback ??
+      townConfig.refinery?.auto_resolve_pr_feedback ??
+      false,
+    auto_merge_delay_minutes:
+      rigOverride?.auto_merge_delay_minutes !== undefined
+        ? rigOverride.auto_merge_delay_minutes
+        : (townConfig.refinery?.auto_merge_delay_minutes ?? null),
+    merge_strategy: rigOverride?.merge_strategy ?? townConfig.merge_strategy ?? 'direct',
+    convoy_merge_mode:
+      rigOverride?.convoy_merge_mode ?? townConfig.convoy_merge_mode ?? 'review-then-land',
+    custom_instructions: {
+      polecat: rigOverride?.custom_instructions?.polecat ?? townConfig.custom_instructions?.polecat,
+      refinery:
+        rigOverride?.custom_instructions?.refinery ?? townConfig.custom_instructions?.refinery,
+      // mayor is always town-level
+      mayor: townConfig.custom_instructions?.mayor,
+    },
+    git_push_flags: rigOverride?.git_push_flags,
+    max_concurrent_polecats:
+      rigOverride?.max_concurrent_polecats ?? townConfig.max_polecats_per_rig,
+    max_dispatch_attempts: rigOverride?.max_dispatch_attempts,
+  };
+}
+
+/**
  * Build the ContainerConfig payload for X-Town-Config header.
  * Sent with every fetch() to the container.
  */
@@ -167,7 +259,7 @@ export async function buildContainerConfig(
   const config = await getTownConfig(storage);
   return {
     env_vars: config.env_vars,
-    default_model: resolveModel(config, '', ''),
+    default_model: resolveModel(config, null, ''),
     small_model: resolveSmallModel(config),
     git_auth: config.git_auth,
     kilocode_token: config.kilocode_token,

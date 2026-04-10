@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import * as readline from 'node:readline';
 import { resolveTargets } from '../services';
 import { computePlan, findDevVarsExamples } from './plan';
-import { planHasChanges, displayPlan, applyPlan } from './output';
+import { planHasChanges, displayPlan, applyEnvLocalAutoCreates, applyPlan } from './output';
 import type { SyncResult, CheckResult } from './types';
 
 // ---------------------------------------------------------------------------
@@ -57,20 +57,31 @@ async function syncEnvVars(options: {
   displayPlan(plan);
 
   if (check) {
-    return { ok: !hasChanges, changed: plan.devVarsChanges.length, missing: totalMissing };
+    return {
+      ok: !hasChanges,
+      changed: plan.devVarsChanges.length + plan.envLocalAutoCreates.length,
+      missing: totalMissing,
+    };
   }
 
   if (hasChanges) {
     const shouldApply = yes || (await confirm(`\nApply changes? [y/N] `));
     if (shouldApply) {
-      applyPlan(plan, repoRoot);
+      applyEnvLocalAutoCreates(plan.envLocalAutoCreates, repoRoot);
+      const applyReadyPlan =
+        plan.envLocalAutoCreates.length > 0 ? computePlan(repoRoot, serviceFilter) : plan;
+      applyPlan(applyReadyPlan, repoRoot);
       console.log(`\n${GREEN}✓ Applied${RESET}`);
     } else {
       console.log('Skipped.');
     }
   }
 
-  return { ok: true, changed: plan.devVarsChanges.length, missing: totalMissing };
+  return {
+    ok: true,
+    changed: plan.devVarsChanges.length + plan.envLocalAutoCreates.length,
+    missing: totalMissing,
+  };
 }
 
 async function checkEnvVars(repoRoot: string, targets?: string[]): Promise<CheckResult> {
@@ -87,7 +98,8 @@ async function checkEnvVars(repoRoot: string, targets?: string[]): Promise<Check
   return {
     ok:
       !plan.devVarsChanges.some(c => c.isNew || c.keyChanges.length > 0) &&
-      plan.envDevLocalChanges.length === 0,
+      plan.envDevLocalChanges.length === 0 &&
+      plan.envLocalAutoCreates.length === 0,
     envLocalExists: true,
     missing: totalMissing,
     workerCount,

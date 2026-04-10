@@ -3,11 +3,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type {
   DevVarsFileChange,
+  EnvLocalAutoCreate,
   EnvSyncPlan,
   SecretStoreAutoCreate,
   SecretStoreWarning,
 } from './types';
-import { formatValue } from './parse';
+import { formatValue, readEnvFile } from './parse';
 
 // ---------------------------------------------------------------------------
 // ANSI color constants
@@ -27,7 +28,10 @@ const CYAN = '\x1b[36m';
 function planHasChanges(plan: EnvSyncPlan): boolean {
   const hasDevVarsDrift = plan.devVarsChanges.some(c => c.isNew || c.keyChanges.length > 0);
   return (
-    hasDevVarsDrift || plan.envDevLocalChanges.length > 0 || plan.secretStoreAutoCreates.length > 0
+    hasDevVarsDrift ||
+    plan.envDevLocalChanges.length > 0 ||
+    plan.envLocalAutoCreates.length > 0 ||
+    plan.secretStoreAutoCreates.length > 0
   );
 }
 
@@ -111,6 +115,18 @@ function displayPlan(plan: EnvSyncPlan): void {
     hasOutput = true;
   }
 
+  // ── .env.local auto-created values ───────────────────────────────────
+
+  if (plan.envLocalAutoCreates.length > 0) {
+    if (hasOutput) console.log();
+    console.log(`${CYAN}✎ .env.local${RESET}`);
+    for (const create of plan.envLocalAutoCreates) {
+      const cmd = [create.command, ...create.args].join(' ');
+      console.log(`    ${GREEN}⊕ ${create.key}${RESET} ${DIM}from \`${cmd}\`${RESET}`);
+    }
+    hasOutput = true;
+  }
+
   // ── .env.development.local (not per-service) ─────────────────────────
 
   if (plan.envDevLocalChanges.length > 0) {
@@ -175,6 +191,66 @@ function displayPlan(plan: EnvSyncPlan): void {
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function upsertEnvValue(filePath: string, key: string, value: string): void {
+  let content = '';
+  try {
+    content = fs.readFileSync(filePath, 'utf-8');
+  } catch {
+    // File doesn't exist yet
+  }
+
+  const line = `${key}=${formatValue(value)}`;
+  if (!content) {
+    fs.writeFileSync(filePath, `${line}\n`, 'utf-8');
+    return;
+  }
+
+  const regex = new RegExp(`^${escapeRegex(key)}=.*$`, 'm');
+  if (regex.test(content)) {
+    fs.writeFileSync(filePath, content.replace(regex, line), 'utf-8');
+    return;
+  }
+
+  fs.writeFileSync(filePath, `${content.trimEnd()}\n${line}\n`, 'utf-8');
+}
+
+// ---------------------------------------------------------------------------
+// .env.local auto-created values
+// ---------------------------------------------------------------------------
+
+function applyEnvLocalAutoCreates(creates: EnvLocalAutoCreate[], repoRoot: string): void {
+  if (creates.length === 0) return;
+
+  const envLocalPath = path.join(repoRoot, '.env.local');
+  console.log('\nCreating .env.local values...');
+
+  for (const create of creates) {
+    const currentValue = readEnvFile(envLocalPath).get(create.key);
+    if (currentValue) {
+      console.log(`  ✓ ${create.key} already exists`);
+      continue;
+    }
+
+    const result = spawnSync(create.command, create.args, {
+      cwd: repoRoot,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 30000,
+    });
+
+    const value = result.stdout.trim();
+    if (result.status !== 0 || !value) {
+      const cmd = [create.command, ...create.args].join(' ');
+      const errorOutput = result.stderr.trim();
+      const suffix = errorOutput ? `: ${errorOutput}` : '';
+      throw new Error(`Failed to create ${create.key} with \`${cmd}\`${suffix}`);
+    }
+
+    upsertEnvValue(envLocalPath, create.key, value);
+    console.log(`  ✓ ${create.key}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -289,4 +365,4 @@ function applyPlan(plan: EnvSyncPlan, repoRoot: string): void {
   }
 }
 
-export { planHasChanges, displayPlan, applyPlan };
+export { planHasChanges, displayPlan, applyEnvLocalAutoCreates, applyPlan };

@@ -9,6 +9,7 @@ export const BILLING_SWEEP_ORDER = [
   'destruction_warning',
   'trial_warning',
   'earlybird_warning',
+  'complementary_inference_ended',
 ] as const;
 
 export const BILLING_QUEUE_MAX_RETRIES = 3;
@@ -29,6 +30,9 @@ export type BillingWorkerEnv = {
   LIFECYCLE_QUEUE: Queue<BillingSweepMessage>;
   KILOCLAW: ServiceFetcher;
   KILOCODE_BACKEND_BASE_URL: string;
+  STRIPE_KILOCLAW_COMMIT_PRICE_ID: string;
+  STRIPE_KILOCLAW_STANDARD_PRICE_ID: string;
+  STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID: string;
   INTERNAL_API_SECRET?: string;
   KILOCLAW_INTERNAL_API_SECRET?: string;
 };

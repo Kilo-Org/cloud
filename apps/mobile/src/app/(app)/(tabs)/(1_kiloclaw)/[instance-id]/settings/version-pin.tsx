@@ -2,18 +2,20 @@ import { Check } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Alert, FlatList, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { useLocalSearchParams } from 'expo-router';
 
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import {
   useKiloClawAvailableVersions,
   useKiloClawLatestVersion,
   useKiloClawMutations,
   useKiloClawMyPin,
-} from '@/lib/hooks/use-kiloclaw';
+} from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -22,11 +24,13 @@ type VersionItem = NonNullable<
 >['items'][number];
 
 export default function VersionPinScreen() {
+  const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
+  const { organizationId } = useInstanceContext(instanceId);
   const colors = useThemeColors();
-  const myPinQuery = useKiloClawMyPin();
+  const myPinQuery = useKiloClawMyPin(organizationId);
   const latestVersionQuery = useKiloClawLatestVersion();
-  const availableVersionsQuery = useKiloClawAvailableVersions();
-  const mutations = useKiloClawMutations();
+  const availableVersionsQuery = useKiloClawAvailableVersions(organizationId);
+  const mutations = useKiloClawMutations(organizationId);
   const pendingReasonRef = useRef('');
   const [pendingItem, setPendingItem] = useState<VersionItem>();
   const flatListRef = useRef<FlatList<VersionItem>>(null);
@@ -80,7 +84,7 @@ export default function VersionPinScreen() {
         text: 'Unpin',
         style: 'destructive',
         onPress: () => {
-          mutations.removeMyPin.mutate();
+          mutations.removeMyPin.mutate(undefined);
         },
       },
     ]);

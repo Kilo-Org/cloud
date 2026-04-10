@@ -8,3 +8,10 @@ KILOCLAW_INTERNAL_API_SECRET=your-kiloclaw-internal-api-secret-here
 # Backend app origin for local internal API calls.
 # @url nextjs
 KILOCODE_BACKEND_BASE_URL=http://localhost:3000
+
+# Worker secrets for local dev. In deployed environments, set these with
+# wrangler secrets instead of committing them in wrangler.jsonc.
+# Canonical KiloClaw Stripe price IDs used for affiliate sale SKU reporting.
+STRIPE_KILOCLAW_COMMIT_PRICE_ID=price_commit
+STRIPE_KILOCLAW_STANDARD_PRICE_ID=price_standard
+STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID=price_standard_intro

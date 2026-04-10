@@ -11,6 +11,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { useLocalSearchParams } from 'expo-router';
 
 import { EmptyState } from '@/components/empty-state';
 import { CATALOG_ICONS } from '@/components/icons';
@@ -19,13 +20,13 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import {
   useKiloClawDevicePairing,
   useKiloClawMutations,
   useKiloClawPairing,
-} from '@/lib/hooks/use-kiloclaw';
+} from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useTRPC } from '@/lib/trpc';
 
 const CHANNEL_LABELS: Record<string, string> = {
   telegram: 'Telegram',
@@ -35,12 +36,13 @@ const CHANNEL_LABELS: Record<string, string> = {
 };
 
 export default function DevicePairingScreen() {
+  const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
+  const { organizationId } = useInstanceContext(instanceId);
   const colors = useThemeColors();
-  const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const pairingQuery = useKiloClawPairing();
-  const devicePairingQuery = useKiloClawDevicePairing();
-  const mutations = useKiloClawMutations();
+  const pairingQuery = useKiloClawPairing(organizationId);
+  const devicePairingQuery = useKiloClawDevicePairing(organizationId);
+  const mutations = useKiloClawMutations(organizationId);
 
   const isLoading = pairingQuery.isPending || devicePairingQuery.isPending;
 
@@ -56,12 +58,10 @@ export default function DevicePairingScreen() {
       easing: Easing.inOut(Easing.cubic),
     });
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.listPairingRequests.queryKey() }),
-      queryClient.invalidateQueries({
-        queryKey: trpc.kiloclaw.listDevicePairingRequests.queryKey(),
-      }),
+      queryClient.invalidateQueries({ queryKey: mutations.queryKeys.pairingKey }),
+      queryClient.invalidateQueries({ queryKey: mutations.queryKeys.devicePairingKey }),
     ]);
-  }, [queryClient, rotation, trpc]);
+  }, [queryClient, rotation, mutations.queryKeys]);
 
   const refreshButton = (
     <Pressable

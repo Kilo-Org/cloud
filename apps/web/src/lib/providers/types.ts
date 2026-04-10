@@ -6,7 +6,6 @@ export type ProviderId =
   | 'alibaba'
   | 'bytedance'
   | 'direct-byok'
-  | 'corethink'
   | 'inception'
   | 'martian'
   | 'mistral'

@@ -59,9 +59,6 @@ export class WrapperState {
   private lastActivityAt = Date.now();
   private _lastError: LastError | null = null;
 
-  // Message counter for ID generation
-  private messageCounter = 0;
-
   // Last root-session assistant message ID (tracked from message.updated kilocode events)
   private _lastAssistantMessageId: string | null = null;
 
@@ -111,7 +108,6 @@ export class WrapperState {
     // Start new job
     this.job = context;
     this._lastError = null;
-    this.messageCounter = 0;
     this.updateActivity();
   }
 
@@ -123,7 +119,6 @@ export class WrapperState {
     this._logUploader = null;
     this.job = null;
     this._isActive = false;
-    this.messageCounter = 0;
     this._lastAssistantMessageId = null;
   }
 
@@ -268,24 +263,6 @@ export class WrapperState {
    */
   setLastAssistantMessageId(messageId: string): void {
     this._lastAssistantMessageId = messageId;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Message ID Generation
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Generate the next messageId for this job.
-   * Format: msg_<base-executionId>_<counter>
-   */
-  nextMessageId(): string {
-    if (!this.job) {
-      throw new Error('No job context - call startJob() first');
-    }
-    this.messageCounter++;
-    // Strip known prefixes if present
-    const base = this.job.executionId.replace(/^(exc_|exec_|execution_|msg_)/, '');
-    return `msg_${base}_${this.messageCounter}`;
   }
 
   // ---------------------------------------------------------------------------

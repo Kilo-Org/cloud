@@ -1,6 +1,13 @@
 import type { KiloClawEnv } from '../../types';
-import type { GoogleCredentials, PersistedState, MachineSize } from '../../schemas/instance-config';
+import type {
+  GoogleCredentials,
+  PersistedState,
+  MachineSize,
+  ProviderId,
+  ProviderState,
+} from '../../schemas/instance-config';
 import type { FlyClientConfig } from '../../fly/client';
+import { userIdFromSandboxId } from '../../auth/sandbox-id';
 import {
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,
@@ -46,6 +53,8 @@ export type InstanceMutableState = {
   userId: string | null;
   sandboxId: string | null;
   orgId: string | null;
+  provider: ProviderId;
+  providerState: ProviderState | null;
   status: InstanceStatus | null;
   envVars: PersistedState['envVars'];
   encryptedSecrets: PersistedState['encryptedSecrets'];
@@ -61,6 +70,9 @@ export type InstanceMutableState = {
   restartUpdateSent: boolean;
   lastStartedAt: number | null;
   lastStoppedAt: number | null;
+  // Legacy Fly compatibility mirrors. `providerState` is the canonical
+  // provider record; direct writes here must be followed by `persist()` so the
+  // storage sync helper can keep both representations aligned.
   flyAppName: string | null;
   flyMachineId: string | null;
   flyVolumeId: string | null;
@@ -136,6 +148,14 @@ export function getAppKey(state: { userId: string | null; sandboxId: string | nu
   if (state.sandboxId && isInstanceKeyedSandboxId(state.sandboxId)) {
     return instanceIdFromSandboxId(state.sandboxId);
   }
+  if (state.sandboxId) {
+    try {
+      return userIdFromSandboxId(state.sandboxId);
+    } catch {
+      // Older tests and malformed legacy state can still carry placeholder
+      // sandboxIds that are not reversible base64url encodings.
+    }
+  }
   if (state.userId) return state.userId;
   throw new Error('Cannot derive app key: no sandboxId or userId');
 }
@@ -144,7 +164,10 @@ export function getFlyConfig(env: KiloClawEnv, state: InstanceMutableState): Fly
   if (!env.FLY_API_TOKEN) {
     throw new Error('FLY_API_TOKEN is not configured');
   }
-  const appName = state.flyAppName ?? env.FLY_APP_NAME;
+  const appName =
+    (state.providerState?.provider === 'fly' ? state.providerState.appName : null) ??
+    state.flyAppName ??
+    env.FLY_APP_NAME;
   if (!appName) {
     throw new Error('No Fly app name: flyAppName not set and FLY_APP_NAME not configured');
   }

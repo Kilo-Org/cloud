@@ -5,6 +5,7 @@ import { useQuery, useQueries } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { useDrawerStack } from '@/components/gastown/DrawerStack';
 import { Hexagon, Search } from 'lucide-react';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 import type { GastownOutputs } from '@/lib/gastown/trpc';
@@ -82,8 +83,9 @@ export function BeadsPageClient({ townId }: BeadsPageClientProps) {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-3">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3">
         <div className="flex items-center gap-2">
+          <SidebarTrigger className="-ml-3" />
           <Hexagon className="size-4 text-[color:oklch(95%_0.15_108_/_0.6)]" />
           <h1 className="text-lg font-semibold tracking-tight text-white/90">Beads</h1>
           <span className="ml-1 font-mono text-xs text-white/30">{allBeads.length}</span>

@@ -33,6 +33,9 @@ import { writeEvent } from '../utils/analytics';
 import { deriveHttpEventName } from '../middleware/analytics';
 import { sendMessage } from '../stream-chat/client';
 import { FLY_API_BASE } from '../fly/client';
+import { assertImplementedProvider } from '../providers';
+import type { ProviderCapability } from '../providers/types';
+import { resolveDoKeyForUser } from '../lib/instance-routing';
 
 const GmailHistoryIdSchema = z.object({
   userId: z.string().min(1),
@@ -54,6 +57,7 @@ const KiloCodeConfigPatchSchema = z.object({
 });
 
 const platform = new Hono<AppEnv>();
+type KiloClawInstanceStub = ReturnType<AppEnv['Bindings']['KILOCLAW_INSTANCE']['get']>;
 
 type BillingPlatformLogFields = {
   billingFlow?: string;
@@ -191,15 +195,51 @@ function setValidatedQueryUserId(c: Context<AppEnv>): string | null {
 }
 
 /**
+ * Resolve the DO key for a platform request.
+ *
+ * When instanceId is provided, it is always authoritative. Otherwise the
+ * active Postgres row is the source of truth so legacy sandboxes continue to
+ * route to the original userId-keyed DO after kilocode_users.id migrations.
+ */
+export async function resolveInstanceDoKey(
+  env: AppEnv['Bindings'],
+  userId: string,
+  instanceId?: string
+): Promise<string> {
+  if (instanceId) return instanceId;
+
+  try {
+    return (await resolveDoKeyForUser(env.HYPERDRIVE?.connectionString, userId)) ?? userId;
+  } catch (err) {
+    console.warn('[platform] Failed to resolve DO key from Postgres, falling back to userId', {
+      userId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return userId;
+  }
+}
+
+/**
  * Create a fresh KiloClawInstance DO stub.
  * Returns a factory (not the stub itself) so withDORetry can get a fresh stub per attempt.
- *
- * When instanceId is provided, uses it as the DO key (multi-instance).
- * When absent, uses userId as the DO key (legacy single-instance).
  */
-function instanceStubFactory(env: AppEnv['Bindings'], userId: string, instanceId?: string) {
-  const doKey = instanceId ?? userId;
+async function instanceStubFactory(
+  env: AppEnv['Bindings'],
+  userId: string,
+  instanceId?: string
+): Promise<() => KiloClawInstanceStub> {
+  const doKey = await resolveInstanceDoKey(env, userId, instanceId);
   return () => env.KILOCLAW_INSTANCE.get(env.KILOCLAW_INSTANCE.idFromName(doKey));
+}
+
+async function withResolvedDORetry<TResult>(
+  env: AppEnv['Bindings'],
+  userId: string,
+  instanceId: string | undefined,
+  operation: (stub: KiloClawInstanceStub) => Promise<TResult>,
+  operationName: string
+): Promise<TResult> {
+  return withDORetry(await instanceStubFactory(env, userId, instanceId), operation, operationName);
 }
 
 /** Parse and validate optional ?instanceId= query param. Returns 400 on invalid format. */
@@ -218,6 +258,41 @@ function parseInstanceIdQuery(
     };
   }
   return { instanceId: result.data };
+}
+
+async function requireProviderCapability(
+  c: Context<AppEnv>,
+  userId: string,
+  instanceId: string | undefined,
+  capability: ProviderCapability,
+  operation: string,
+  options?: { failOpen?: boolean }
+): Promise<Response | null> {
+  let metadata: {
+    provider: string;
+    capabilities: Record<ProviderCapability, boolean>;
+  };
+  try {
+    metadata = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
+      stub => stub.getProviderMetadata(),
+      'getProviderMetadata'
+    );
+  } catch (error) {
+    if (options?.failOpen) {
+      console.warn(`[platform] ${operation}: provider capability lookup failed, proceeding`, error);
+      return null;
+    }
+    throw error;
+  }
+
+  if (metadata.capabilities[capability]) {
+    return null;
+  }
+
+  return jsonError(`${operation} is not supported for provider ${metadata.provider}`, 400);
 }
 
 function statusCodeFromError(err: unknown): number {
@@ -261,6 +336,7 @@ const SAFE_ERROR_PREFIXES = [
   'Cannot retry recovery', // force-retry-recovery guard messages
   'Stream Chat sendMessage failed', // sendMessage HTTP errors
   'Stream Chat is not set up', // no Stream Chat on this instance
+  'Provider ', // explicit not-implemented provider errors
 ];
 
 function sanitizeError(err: unknown, operation: string): { message: string; status: number } {
@@ -290,6 +366,12 @@ function sanitizeError(err: unknown, operation: string): { message: string; stat
  */
 function correctLostStatus(message: string, status: number): number {
   if (status === 500 && message === 'Instance not provisioned') return 404;
+  if (
+    status === 500 &&
+    message.startsWith('Provider ') &&
+    message.endsWith(' is not implemented yet')
+  )
+    return 501;
   return status;
 }
 
@@ -381,6 +463,7 @@ platform.post('/provision', async c => {
     userId,
     instanceId,
     orgId,
+    provider,
     envVars,
     encryptedSecrets,
     channels,
@@ -394,8 +477,13 @@ platform.post('/provision', async c => {
 
   let provision;
   try {
-    provision = await withDORetry(
-      instanceStubFactory(c.env, userId, instanceId),
+    if (provider) {
+      assertImplementedProvider(provider);
+    }
+    provision = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
       stub =>
         stub.provision(
           userId,
@@ -410,7 +498,7 @@ platform.post('/provision', async c => {
             region,
             pinnedImageTag,
           },
-          instanceId || orgId ? { instanceId, orgId } : undefined
+          instanceId || orgId || provider ? { instanceId, orgId, provider } : undefined
         ),
       'provision'
     );
@@ -459,8 +547,10 @@ platform.patch('/kilocode-config', async c => {
   const { userId, kilocodeApiKey, kilocodeApiKeyExpiresAt, kilocodeDefaultModel } = result.data;
 
   try {
-    const updated = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub =>
         stub.updateKiloCodeConfig({
           kilocodeApiKey,
@@ -487,8 +577,10 @@ platform.patch('/channels', async c => {
   const { userId, channels } = result.data;
 
   try {
-    const updated = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.updateChannels(channels),
       'updateChannels'
     );
@@ -524,8 +616,10 @@ platform.patch('/exec-preset', async c => {
   const { userId, security, ask } = result.data;
 
   try {
-    const updated = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.updateExecPreset({ security, ask }),
       'updateExecPreset'
     );
@@ -546,8 +640,10 @@ platform.patch('/bot-identity', async c => {
   const { userId, botName, botNature, botVibe, botEmoji } = result.data;
 
   try {
-    const updated = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.updateBotIdentity({ botName, botNature, botVibe, botEmoji }),
       'updateBotIdentity'
     );
@@ -574,8 +670,10 @@ platform.post('/google-credentials', async c => {
   const { userId, googleCredentials } = result.data;
 
   try {
-    const updated = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.updateGoogleCredentials(googleCredentials),
       'updateGoogleCredentials'
     );
@@ -595,8 +693,10 @@ platform.delete('/google-credentials', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const updated = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.clearGoogleCredentials(),
       'clearGoogleCredentials'
     );
@@ -618,8 +718,10 @@ platform.post('/gmail-notifications', async c => {
   const { userId } = result.data;
 
   try {
-    const updated = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.updateGmailNotifications(true),
       'enableGmailNotifications'
     );
@@ -639,8 +741,10 @@ platform.delete('/gmail-notifications', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const updated = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.updateGmailNotifications(false),
       'disableGmailNotifications'
     );
@@ -662,8 +766,10 @@ platform.post('/gmail-history-id', async c => {
   const { userId, historyId } = result.data;
 
   try {
-    await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.updateGmailHistoryId(historyId),
       'updateGmailHistoryId'
     );
@@ -684,8 +790,10 @@ platform.get('/gmail-oidc-email', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const result = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const result = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.getGmailOidcEmail(),
       'getGmailOidcEmail'
     );
@@ -707,8 +815,10 @@ platform.patch('/secrets', async c => {
   const { userId, secrets, meta } = result.data;
 
   try {
-    const updated = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.updateSecrets(secrets, meta),
       'updateSecrets'
     );
@@ -730,8 +840,10 @@ platform.get('/pairing', async c => {
   const forceRefresh = c.req.query('refresh') === 'true';
 
   try {
-    const pairing = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const pairing = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.listPairingRequests(forceRefresh),
       'listPairingRequests'
     );
@@ -759,8 +871,10 @@ platform.post('/pairing/approve', async c => {
   const { userId, channel, code } = result.data;
 
   try {
-    const approved = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const approved = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.approvePairingRequest(channel, code),
       'approvePairingRequest'
     );
@@ -782,8 +896,10 @@ platform.get('/device-pairing', async c => {
   const forceRefresh = c.req.query('refresh') === 'true';
 
   try {
-    const pairing = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const pairing = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.listDevicePairingRequests(forceRefresh),
       'listDevicePairingRequests'
     );
@@ -810,8 +926,10 @@ platform.post('/device-pairing/approve', async c => {
   const { userId, requestId } = result.data;
 
   try {
-    const approved = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const approved = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.approveDevicePairingRequest(requestId),
       'approveDevicePairingRequest'
     );
@@ -833,8 +951,10 @@ platform.get('/gateway/status', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const gatewayStatus = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const gatewayStatus = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.getGatewayProcessStatus(),
       'getGatewayProcessStatus'
     );
@@ -858,8 +978,10 @@ platform.get('/gateway/ready', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const result = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const result = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.getGatewayReady(),
       'getGatewayReady'
     );
@@ -881,8 +1003,10 @@ platform.get('/controller-version', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const result = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const result = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.getControllerVersion(),
       'getControllerVersion'
     );
@@ -905,8 +1029,10 @@ platform.post('/gateway/start', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
       stub => stub.startGatewayProcess(),
       'startGatewayProcess'
     );
@@ -926,8 +1052,10 @@ platform.post('/gateway/stop', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
       stub => stub.stopGatewayProcess(),
       'stopGatewayProcess'
     );
@@ -947,8 +1075,10 @@ platform.post('/gateway/restart', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
       stub => stub.restartGatewayProcess(),
       'restartGatewayProcess'
     );
@@ -975,8 +1105,10 @@ platform.post('/config/restore', async c => {
   const { userId, version } = result.data;
 
   try {
-    const response = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.restoreConfig(version),
       'restoreConfig'
     );
@@ -1001,8 +1133,10 @@ platform.get('/openclaw-config', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const config = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const config = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.getOpenclawConfig(),
       'getOpenclawConfig'
     );
@@ -1034,8 +1168,10 @@ platform.post('/openclaw-config', async c => {
   const { userId, config, etag } = result.data;
 
   try {
-    const response = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.replaceConfigOnMachine(config, etag),
       'replaceConfigOnMachine'
     );
@@ -1066,8 +1202,10 @@ platform.patch('/openclaw-config', async c => {
   const { userId, patch } = result.data;
 
   try {
-    const response = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.patchOpenclawConfig(patch),
       'patchOpenclawConfig'
     );
@@ -1089,8 +1227,10 @@ platform.get('/files/tree', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const result = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const result = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.getFileTree(),
       'getFileTree'
     );
@@ -1123,8 +1263,10 @@ platform.get('/files/read', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const result = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const result = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.readFile(filePath),
       'readFile'
     );
@@ -1159,8 +1301,10 @@ platform.post('/files/write', async c => {
 
   const { userId, path: filePath, content, etag } = result.data;
   try {
-    const response = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.writeFile(filePath, content, etag),
       'writeFile'
     );
@@ -1187,8 +1331,10 @@ platform.post('/doctor', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const doctor = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
+    const doctor = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
       stub => stub.runDoctor(),
       'runDoctor'
     );
@@ -1214,8 +1360,10 @@ platform.post('/kilo-cli-run/start', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
       stub => stub.startKiloCliRun(result.data.prompt),
       'startKiloCliRun'
     );
@@ -1241,8 +1389,10 @@ platform.get('/kilo-cli-run/status', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const response = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.getKiloCliRunStatus(),
       'getKiloCliRunStatus'
     );
@@ -1261,8 +1411,10 @@ platform.post('/kilo-cli-run/cancel', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
       stub => stub.cancelKiloCliRun(),
       'cancelKiloCliRun'
     );
@@ -1294,14 +1446,18 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
     const options = result.data.skipCooldown ? { skipCooldown: true } : undefined;
 
     if (mode === 'async') {
-      await withDORetry(
-        instanceStubFactory(c.env, result.data.userId, instanceId),
+      await withResolvedDORetry(
+        c.env,
+        result.data.userId,
+        instanceId,
         stub => stub.startAsync(result.data.userId),
         'startAsync'
       );
     } else {
-      const { started } = await withDORetry(
-        instanceStubFactory(c.env, result.data.userId, instanceId),
+      const { started } = await withResolvedDORetry(
+        c.env,
+        result.data.userId,
+        instanceId,
         stub => stub.start(result.data.userId, options),
         'start'
       );
@@ -1352,8 +1508,10 @@ platform.post('/force-retry-recovery', async c => {
   const startedAt = performance.now();
 
   try {
-    const { ok } = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
+    const { ok } = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
       stub => stub.forceRetryRecovery(),
       'forceRetryRecovery'
     );
@@ -1388,8 +1546,10 @@ platform.post('/cleanup-recovery-previous-volume', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
       stub => stub.cleanupRecoveryPreviousVolume(),
       'cleanupRecoveryPreviousVolume'
     );
@@ -1410,11 +1570,7 @@ platform.post('/stop', async c => {
   const { instanceId } = iidResult;
 
   try {
-    await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, instanceId),
-      stub => stub.stop(),
-      'stop'
-    );
+    await withResolvedDORetry(c.env, result.data.userId, instanceId, stub => stub.stop(), 'stop');
     return c.json({ ok: true });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'stop');
@@ -1432,12 +1588,13 @@ platform.post('/destroy', async c => {
   const { instanceId } = iidResult;
 
   const { userId } = result.data;
+  const doKey = await resolveInstanceDoKey(c.env, userId, instanceId);
 
   // Read the instance's orgId before destroying so we can update the correct registry.
   let orgId: string | null = null;
   if (instanceId) {
     try {
-      const statusStub = instanceStubFactory(c.env, userId, instanceId)();
+      const statusStub = (await instanceStubFactory(c.env, userId, instanceId))();
       const status = await statusStub.getStatus();
       orgId = status.orgId;
     } catch {
@@ -1451,11 +1608,7 @@ platform.post('/destroy', async c => {
   }
 
   try {
-    await withDORetry(
-      instanceStubFactory(c.env, userId, instanceId),
-      stub => stub.destroy(),
-      'destroy'
-    );
+    await withResolvedDORetry(c.env, userId, instanceId, stub => stub.destroy(), 'destroy');
 
     // Remove the instance from the registry (best-effort).
     // When instanceId is provided, destroy by instanceId directly.
@@ -1473,21 +1626,23 @@ platform.post('/destroy', async c => {
           await registryStub.destroyInstance(registryKey, instanceId);
           console.log('[platform] Registry entry destroyed:', { registryKey, instanceId });
         } else {
-          // Legacy destroy (no instanceId): the DO was keyed by userId,
-          // so find the registry entry with doKey=userId.
+          // Legacy destroy (no instanceId): find the registry entry by the
+          // original legacy DO key recovered from sandboxId/Postgres state.
           const entries = await registryStub.listInstances(registryKey);
-          const legacyEntry = entries.find(e => e.doKey === userId);
+          const doKeysToMatch = doKey === userId ? [userId] : [userId, doKey];
+          const legacyEntry = entries.find(e => doKeysToMatch.includes(e.doKey));
           if (legacyEntry) {
             await registryStub.destroyInstance(registryKey, legacyEntry.instanceId);
             console.log('[platform] Registry entry destroyed (legacy):', {
               registryKey,
               instanceId: legacyEntry.instanceId,
-              doKey: userId,
+              doKeysTried: doKeysToMatch,
+              matchedDoKey: legacyEntry.doKey,
             });
           } else {
             console.log('[platform] No registry entry found for legacy destroy:', {
               registryKey,
-              doKey: userId,
+              doKeysTried: doKeysToMatch,
               entriesCount: entries.length,
             });
           }
@@ -1515,8 +1670,10 @@ platform.get('/status', async c => {
   const { instanceId } = iidResult;
 
   try {
-    const status = await withDORetry(
-      instanceStubFactory(c.env, userId, instanceId),
+    const status = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
       stub => stub.getStatus(),
       'getStatus'
     );
@@ -1538,8 +1695,10 @@ platform.get('/stream-chat-credentials', async c => {
   const { instanceId } = iidResult;
 
   try {
-    const creds = await withDORetry(
-      instanceStubFactory(c.env, userId, instanceId),
+    const creds = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
       stub => stub.getStreamChatCredentials(),
       'getStreamChatCredentials'
     );
@@ -1578,8 +1737,10 @@ platform.post('/send-chat-message', async c => {
   try {
     // Use instanceId as the DO key when available (matches how other endpoints resolve DOs).
     // Falls back to userId for backward compatibility with triggers that predate instanceId.
-    const creds = await withDORetry(
-      instanceStubFactory(c.env, userId, instanceId),
+    const creds = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
       stub => stub.getStreamChatCredentials(),
       'getStreamChatCredentials'
     );
@@ -1628,8 +1789,10 @@ platform.get('/debug-status', async c => {
   const { instanceId } = iidResult;
 
   try {
-    const status = await withDORetry(
-      instanceStubFactory(c.env, userId, instanceId),
+    const status = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
       stub => stub.getDebugState(),
       'getDebugState'
     );
@@ -1699,8 +1862,10 @@ platform.get('/gateway-token', async c => {
   }
 
   try {
-    const status = await withDORetry(
-      instanceStubFactory(c.env, userId, instanceId),
+    const status = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
       stub => stub.getStatus(),
       'getStatus'
     );
@@ -1728,9 +1893,21 @@ platform.get('/volume-snapshots', async c => {
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
 
+  const unsupported = await requireProviderCapability(
+    c,
+    userId,
+    iidResult.instanceId,
+    'volumeSnapshots',
+    'volume-snapshots',
+    { failOpen: true }
+  );
+  if (unsupported) return unsupported;
+
   try {
-    const snapshots = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const snapshots = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.listVolumeSnapshots(),
       'listVolumeSnapshots'
     );
@@ -1752,9 +1929,21 @@ platform.get('/candidate-volumes', async c => {
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
 
+  const unsupported = await requireProviderCapability(
+    c,
+    userId,
+    iidResult.instanceId,
+    'candidateVolumes',
+    'candidate-volumes',
+    { failOpen: true }
+  );
+  if (unsupported) return unsupported;
+
   try {
-    const result = await withDORetry(
-      instanceStubFactory(c.env, userId, iidResult.instanceId),
+    const result = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
       stub => stub.listCandidateVolumes(),
       'listCandidateVolumes'
     );
@@ -1780,9 +1969,21 @@ platform.post('/reassociate-volume', async c => {
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
 
+  const unsupported = await requireProviderCapability(
+    c,
+    result.data.userId,
+    iidResult.instanceId,
+    'volumeReassociation',
+    'reassociate-volume',
+    { failOpen: true }
+  );
+  if (unsupported) return unsupported;
+
   try {
-    const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
       stub => stub.reassociateVolume(result.data.newVolumeId, result.data.reason),
       'reassociateVolume'
     );
@@ -1807,9 +2008,21 @@ platform.post('/restore-volume-snapshot', async c => {
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
 
+  const unsupported = await requireProviderCapability(
+    c,
+    result.data.userId,
+    iidResult.instanceId,
+    'snapshotRestore',
+    'restore-volume-snapshot',
+    { failOpen: true }
+  );
+  if (unsupported) return unsupported;
+
   try {
-    const response = await withDORetry(
-      instanceStubFactory(c.env, result.data.userId, iidResult.instanceId),
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
       stub => stub.enqueueSnapshotRestore(result.data.snapshotId),
       'enqueueSnapshotRestore'
     );
@@ -1997,6 +2210,16 @@ platform.post('/destroy-fly-machine', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   const { userId, appName, machineId } = result.data;
+  const unsupported = await requireProviderCapability(
+    c,
+    userId,
+    iidResult.instanceId,
+    'directMachineDestroy',
+    'destroy-fly-machine',
+    { failOpen: true }
+  );
+  if (unsupported) return unsupported;
+
   const apiToken = c.env.FLY_API_TOKEN;
   if (!apiToken) {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
@@ -2022,8 +2245,10 @@ platform.post('/destroy-fly-machine', async c => {
 
     // Trigger immediate reconcile so the DO discovers the machine is gone.
     try {
-      await withDORetry(
-        instanceStubFactory(c.env, userId, iidResult.instanceId),
+      await withResolvedDORetry(
+        c.env,
+        userId,
+        iidResult.instanceId,
         stub => stub.forceRetryRecovery(),
         'forceRetryRecovery'
       );

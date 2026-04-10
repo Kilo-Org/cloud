@@ -4,7 +4,7 @@
       "id": "kilo-auto/frontier",
       "name": "Kilo Auto Frontier",
       "created": 0,
-      "description": "Highest performance and capability for any task. Uses Claude Opus 4.6 for KiloClaw, plan, general, architect, orchestrator, ask, debug; Claude Sonnet 4.6 for build, explore, code.",
+      "description": "Highest performance and capability for any task.",
       "architecture": {
         "input_modalities": [
           "text",
@@ -49,7 +49,7 @@
       "id": "kilo-auto/balanced",
       "name": "Kilo Auto Balanced",
       "created": 0,
-      "description": "Great balance of price and capability. Uses Kimi K2.5 for KiloClaw, plan, general, architect, orchestrator, ask, debug; MiniMax M2.7 for build, explore, code.",
+      "description": "Great balance of price and capability.",
       "architecture": {
         "input_modalities": [
           "text",
@@ -62,19 +62,19 @@
       },
       "top_provider": {
         "is_moderated": false,
-        "context_length": 204800,
-        "max_completion_tokens": 131072
+        "context_length": 400000,
+        "max_completion_tokens": 65536
       },
       "pricing": {
-        "prompt": "0.0000006",
-        "completion": "0.000003",
-        "input_cache_read": "0.000000225",
+        "prompt": "0.00000175",
+        "completion": "0.000014",
+        "input_cache_read": "0.000000175",
         "request": "0",
         "image": "0",
         "web_search": "0",
         "internal_reasoning": "0"
       },
-      "context_length": 204800,
+      "context_length": 400000,
       "supported_parameters": [
         "max_tokens",
         "temperature",
@@ -84,13 +84,18 @@
       ],
       "settings": {
         "included_tools": [
-          "edit_file"
+          "apply_patch"
         ],
         "excluded_tools": [
-          "apply_diff"
+          "apply_diff",
+          "edit_file"
         ]
       },
-      "opencode": {},
+      "opencode": {
+        "ai_sdk_provider": "openai",
+        "family": "gpt",
+        "prompt": "codex"
+      },
       "preferredIndex": 1,
       "isFree": false
     },
@@ -98,7 +103,7 @@
       "id": "kilo-auto/free",
       "name": "Kilo Auto Free",
       "created": 0,
-      "description": "Free with limited capability. No credits required. Uses MiniMax M2.5.",
+      "description": "Free with limited capability. No credits required.",
       "architecture": {
         "input_modalities": [
           "text"
@@ -265,6 +270,9 @@
       "isFree": true,
       "opencode": {
         "ai_sdk_provider": "openai"
+      },
+      "openclaw": {
+        "api_adapter": "openai-responses"
       }
     },
     {
@@ -519,6 +527,9 @@
             }
           }
         }
+      },
+      "openclaw": {
+        "api_adapter": "openai-responses"
       }
     },
     {
@@ -584,17 +595,18 @@
       "opencode": {}
     },
     {
-      "id": "corethink:free",
-      "canonical_slug": "corethink:free",
+      "id": "qwen/qwen3.6-plus",
+      "canonical_slug": "qwen/qwen3.6-plus",
       "hugging_face_id": "",
-      "name": "CoreThink (free)",
+      "name": "Qwen: Qwen3.6 Plus",
       "created": 1756238927,
-      "description": "CoreThink - AI that reasons through problems instead of guessing. Available free of charge in Kilo for a limited time.",
-      "context_length": 78000,
+      "description": "The Qwen3.6 native vision-language Plus series models demonstrate exceptional performance on par with the current state-of-the-art models, with a significant improvement in overall results compared to the 3.5 series. The models have been markedly enhanced in code-related capabilities such as agentic coding, front-end programming, and Vibe coding, as well as in multi-modal general object recognition, OCR, and object localization.",
+      "context_length": 1000000,
       "architecture": {
-        "modality": "text->text",
+        "modality": "text+image->text",
         "input_modalities": [
-          "text"
+          "text",
+          "image"
         ],
         "output_modalities": [
           "text"
@@ -603,28 +615,47 @@
         "instruct_type": null
       },
       "pricing": {
-        "prompt": "0.000000000000",
-        "completion": "0.000000000000",
+        "prompt": "0.000000325000",
+        "completion": "0.000001950000",
         "request": "0",
         "image": "0",
         "web_search": "0",
         "internal_reasoning": "0",
-        "input_cache_read": "0.000000000000"
+        "input_cache_read": "0.000000032500",
+        "input_cache_write": "0.000000406250"
       },
       "top_provider": {
-        "context_length": 78000,
-        "max_completion_tokens": 8192,
+        "context_length": 1000000,
+        "max_completion_tokens": 65536,
         "is_moderated": false
       },
       "per_request_limits": null,
       "supported_parameters": [
         "max_tokens",
         "temperature",
-        "tools"
+        "tools",
+        "reasoning",
+        "include_reasoning"
       ],
       "default_parameters": {},
-      "isFree": true,
-      "opencode": {}
+      "isFree": false,
+      "opencode": {
+        "ai_sdk_provider": "openai-compatible",
+        "variants": {
+          "instant": {
+            "reasoning": {
+              "enabled": false,
+              "effort": "none"
+            }
+          },
+          "thinking": {
+            "reasoning": {
+              "enabled": true,
+              "effort": "medium"
+            }
+          }
+        }
+      }
     },
     {
       "id": "arcee-ai/trinity-large-thinking:free",
@@ -675,7 +706,7 @@
       "id": "kilo-auto/small",
       "name": "Kilo Auto Small",
       "created": 0,
-      "description": "Automatically routes your request to a small model. Uses GPT-5 Nano (default) or gpt-oss-20b (free fallback).",
+      "description": "Automatically routes your request to a small model.",
       "architecture": {
         "input_modalities": [
           "text"

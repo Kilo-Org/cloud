@@ -51,6 +51,7 @@ After installing or upgrading dependencies, run `pnpx expo-doctor` and fix any i
 
 - Every mutation must include an `onError` handler that shows a toast (`toast.error(error.message)` via `sonner-native`). Silent failures are not acceptable — users must always see feedback when something goes wrong.
 - Centralize `onError` in the mutation hook (e.g., `useKiloClawMutations`) rather than in individual components. Components can add their own `onSuccess` callbacks via `mutate(input, { onSuccess })` for UI-specific behavior (e.g., closing a form, clearing fields).
+- **Use optimistic updates where possible** — they make the app feel instant. Use React Query's `onMutate` to optimistically update the cache, return the previous value for rollback, restore it in `onError`, and invalidate in `onSettled` to reconcile with the server. Good candidates: toggles, model selection, renaming, any mutation where the expected result is obvious from the input.
 - For screens with text inputs, use `ScrollView` with `automaticallyAdjustKeyboardInsets` to keep inputs visible above the keyboard. No external keyboard library needed — the native iOS prop works smoothly.
 
 ### TextInput on iOS
@@ -120,6 +121,12 @@ After installing or upgrading dependencies, run `pnpx expo-doctor` and fix any i
 
 ## Fixing Lint Errors
 
+Follow lint rules **in spirit, not literally**. The goal is better code, not just silencing the linter. For example, if a max-lines rule fires:
+
+- **Good**: Refactor the file, break it into smaller files, extract components/hooks.
+- **Bad**: Reformat code (we have a formatter), delete empty lines, "compress" or "compact" code, or otherwise mangle formatting to circumvent the limit. Always extract related blocks to separate files instead.
+- If a file has a legitimate reason to exceed 300 lines (e.g., closely related hooks that belong together), disable the rule for that file with `/* eslint-disable max-lines */` rather than forcing an artificial split.
+
 When resolving lint errors, try the autofix first before editing manually:
 
 ```bash
@@ -127,6 +134,17 @@ pnpm -w exec oxlint --config apps/mobile/.oxlintrc.json --fix apps/mobile/src
 ```
 
 Only hand-fix errors that `--fix` cannot resolve.
+
+## Debugging
+
+When debugging reproducible issues, don't guess at the cause. Instead:
+
+1. Add temporary `console.log` statements that capture the relevant state at key points (function entry, state changes, branch decisions, etc.).
+2. Ask the user to reproduce the issue and paste the logs.
+3. Deduce the root cause from the log output, then fix it.
+4. Remove the debug logs before committing.
+
+This is far more effective than speculating about the cause.
 
 ## Change Checklist
 

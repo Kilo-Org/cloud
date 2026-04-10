@@ -2,8 +2,6 @@ import { getEnvVariable } from '@/lib/dotenvx';
 import {
   addCacheBreakpoints,
   isReasoningExplicitlyDisabled,
-  removeChatCompletionsReasoning,
-  scrubOpenCodeSpecificProperties,
 } from '@/lib/providers/openrouter/request-helpers';
 import type { Provider } from '@/lib/providers/types';
 import { applyVercelSettings } from '@/lib/providers/vercel';
@@ -41,22 +39,6 @@ export default {
         delete context.request.body.user;
         delete context.request.body.provider;
       }
-    },
-  },
-  CORETHINK: {
-    id: 'corethink',
-    apiUrl: 'https://api.corethink.ai/v1/code',
-    apiKey: getEnvVariable('CORETHINK_API_KEY'),
-    supportedChatApis: ['chat_completions'],
-    transformRequest(context) {
-      if (context.request.kind !== 'chat_completions') {
-        return;
-      }
-      delete context.request.body.transforms;
-      delete context.request.body.prompt_cache_key;
-      delete context.request.body.safety_identifier;
-      scrubOpenCodeSpecificProperties(context.request.body);
-      removeChatCompletionsReasoning(context.request.body);
     },
   },
   MARTIAN: {

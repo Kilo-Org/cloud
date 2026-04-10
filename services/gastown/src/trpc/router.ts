@@ -16,7 +16,7 @@ import { getGastownOrgStub } from '../dos/GastownOrg.do';
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
-import { TownConfigSchema, TownConfigUpdateSchema } from '../types';
+import { TownConfigSchema, TownConfigUpdateSchema, RigOverrideConfigSchema } from '../types';
 import { resolveModel } from '../dos/town/config';
 import type { UserRigRecord } from '../db/tables/user-rigs.table';
 import {
@@ -558,7 +558,8 @@ export const gastownRouter = router({
       // Sequential to avoid "excessively deep" type inference with Rpc.Promisified DO stubs.
       const agentList = await townStub.listAgents({ rig_id: rig.id });
       const beadList = await townStub.listBeads({ rig_id: rig.id, status: 'in_progress' });
-      return { ...rig, agents: agentList, beads: beadList };
+      const townRig = await townStub.getRigAsync(rig.id);
+      return { ...rig, agents: agentList, beads: beadList, config: townRig?.config };
     }),
 
   deleteRig: gastownProcedure
@@ -585,6 +586,47 @@ export const gastownRouter = router({
       await townStub.removeRig(input.rigId);
       const ownerStub = ownership.stub;
       await ownerStub.deleteRig(input.rigId);
+    }),
+
+  updateRigConfig: gastownProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid().optional(),
+        rigId: z.string().uuid(),
+        config: RigOverrideConfigSchema,
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
+      const ownership = await resolveTownOwnership(ctx.env, ctx, rig.town_id);
+
+      // Admins cannot modify rig config for towns they do not own
+      if (ownership.type === 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admins cannot modify rig configuration for rigs they do not own',
+        });
+      }
+
+      // For org towns, only owners or the town creator can update rig config
+      if (ownership.type === 'org') {
+        const townStubForCheck = getTownDOStub(ctx.env, rig.town_id);
+        const townConfig = await townStubForCheck.getTownConfig();
+        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
+        const isOrgOwner = membership?.role === 'owner';
+        const isTownCreator = ctx.userId === townConfig.created_by_user_id;
+        if (!isOrgOwner && !isTownCreator) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only town creators and org owners can update rig config',
+          });
+        }
+      }
+
+      const townStub = getTownDOStub(ctx.env, rig.town_id);
+      await townStub.updateRigConfig(input.rigId, input.config);
+      const updatedRig = await townStub.getRigAsync(input.rigId);
+      return updatedRig;
     }),
 
   // ── Beads ───────────────────────────────────────────────────────────
@@ -688,6 +730,20 @@ export const gastownRouter = router({
       const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       await townStub.deleteAgent(input.agentId);
+    }),
+
+  resetAgentDispatchAttempts: gastownProcedure
+    .input(
+      z.object({
+        rigId: z.string().uuid(),
+        agentId: z.string().uuid(),
+        townId: z.string().uuid().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
+      const townStub = getTownDOStub(ctx.env, rig.town_id);
+      await townStub.resetAgentDispatchAttempts(input.agentId, rig.id);
     }),
 
   // ── Work Assignment ─────────────────────────────────────────────────
@@ -1014,8 +1070,8 @@ export const gastownRouter = router({
       // auth-relevant config changed. The SDK server is a child process
       // that captures env at spawn time, so it must be restarted to pick
       // up rotated tokens or cleared credentials.
-      const oldMayorModel = resolveModel(existingConfig, '', 'mayor');
-      const newMayorModel = resolveModel(result, '', 'mayor');
+      const oldMayorModel = resolveModel(existingConfig, null, 'mayor');
+      const newMayorModel = resolveModel(result, null, 'mayor');
       const mayorModelChanged =
         newMayorModel !== oldMayorModel || result.small_model !== existingConfig.small_model;
       const authConfigChanged =

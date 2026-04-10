@@ -103,6 +103,11 @@ const ClearAgentCheckpoint = z.object({
   agent_id: z.string(),
 });
 
+const ResetAgentDispatchAttempts = z.object({
+  type: z.literal('reset_agent_dispatch_attempts'),
+  agent_id: z.string(),
+});
+
 const DeleteAgent = z.object({
   type: z.literal('delete_agent'),
   agent_id: z.string(),
@@ -192,6 +197,7 @@ export const Action = z.discriminatedUnion('type', [
   SetReviewPrUrl,
   // Agent mutations
   TransitionAgent,
+  ResetAgentDispatchAttempts,
   HookAgent,
   UnhookAgent,
   ClearAgentCheckpoint,
@@ -225,6 +231,7 @@ export type CreateLandingMr = z.infer<typeof CreateLandingMr>;
 export type CloseSiblingMrs = z.infer<typeof CloseSiblingMrs>;
 export type SetReviewPrUrl = z.infer<typeof SetReviewPrUrl>;
 export type TransitionAgent = z.infer<typeof TransitionAgent>;
+export type ResetAgentDispatchAttempts = z.infer<typeof ResetAgentDispatchAttempts>;
 export type HookAgent = z.infer<typeof HookAgent>;
 export type UnhookAgent = z.infer<typeof UnhookAgent>;
 export type ClearAgentCheckpoint = z.infer<typeof ClearAgentCheckpoint>;
@@ -447,6 +454,78 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
           `${LOG} transition_agent failed: agent=${action.agent_id} to=${action.to}`,
           err
         );
+      }
+      return null;
+    }
+
+    case 'reset_agent_dispatch_attempts': {
+      const agentRows = z
+        .object({ current_hook_bead_id: z.string().nullable() })
+        .array()
+        .parse([
+          ...query(
+            sql,
+            /* sql */ `
+              SELECT ${agent_metadata.columns.current_hook_bead_id}
+              FROM ${agent_metadata}
+              WHERE ${agent_metadata.columns.bead_id} = ?
+            `,
+            [action.agent_id]
+          ),
+        ]);
+      const hookedBeadId = agentRows[0]?.current_hook_bead_id;
+
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${agent_metadata}
+          SET ${agent_metadata.columns.dispatch_attempts} = 0
+          WHERE ${agent_metadata.bead_id} = ?
+        `,
+        [action.agent_id]
+      );
+
+      if (hookedBeadId) {
+        const beadRows = [
+          ...query(
+            sql,
+            /* sql */ `
+              SELECT ${beads.columns.status}, ${beads.columns.type}
+              FROM ${beads}
+              WHERE ${beads.bead_id} = ?
+            `,
+            [hookedBeadId]
+          ),
+        ];
+        const status = beadRows[0]?.status;
+        const type = beadRows[0]?.type;
+
+        query(
+          sql,
+          /* sql */ `
+            UPDATE ${beads}
+            SET ${beads.columns.dispatch_attempts} = 0,
+                ${beads.columns.last_dispatch_attempt_at} = NULL
+            WHERE ${beads.bead_id} = ?
+          `,
+          [hookedBeadId]
+        );
+
+        if (status === 'failed') {
+          beadOps.updateBeadStatus(sql, hookedBeadId, 'open', 'system');
+        }
+
+        if (type === 'merge_request') {
+          query(
+            sql,
+            /* sql */ `
+              UPDATE ${review_metadata}
+              SET ${review_metadata.columns.retry_count} = 0
+              WHERE ${review_metadata.bead_id} = ?
+            `,
+            [hookedBeadId]
+          );
+        }
       }
       return null;
     }

@@ -5,11 +5,11 @@ import { isMoonshotModel } from '@/lib/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/providers/openai';
 import { qwen36_plus_model } from '@/lib/providers/qwen';
 import { isXaiModel } from '@/lib/providers/xai';
-import { isXiaomiModel } from '@/lib/providers/xiaomi';
 import { isZaiModel } from '@/lib/providers/zai';
 import type {
   CustomLlmProvider,
   ModelSettings,
+  OpenClawModelSettings,
   OpenCodeSettings,
   VersionedSettings,
 } from '@kilocode/db/schema-types';
@@ -80,12 +80,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }
-  if (
-    isMoonshotModel(model) ||
-    isZaiModel(model) ||
-    isXiaomiModel(model) ||
-    model === qwen36_plus_model.public_id
-  ) {
+  if (isMoonshotModel(model) || isZaiModel(model) || model === qwen36_plus_model.public_id) {
     return REASONING_VARIANTS_BINARY;
   }
   if (model === seed_20_pro_free_model.public_id) {
@@ -134,4 +129,11 @@ export function getOpenCodeSettings(model: string): OpenCodeSettings | undefined
   const ai_sdk_provider = getAiSdkProvider(model);
   const variants = getModelVariants(model);
   return { ai_sdk_provider, variants };
+}
+
+export function getOpenClawSettings(model: string): OpenClawModelSettings | undefined {
+  if (isOpenAiModel(model) || isXaiModel(model)) {
+    return { api_adapter: 'openai-responses' };
+  }
+  return undefined;
 }

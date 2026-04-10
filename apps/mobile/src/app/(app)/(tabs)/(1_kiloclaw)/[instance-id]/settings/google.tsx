@@ -3,6 +3,7 @@ import { Unplug } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { useLocalSearchParams } from 'expo-router';
 
 import { GmailIcon, GoogleIcon } from '@/components/icons';
 import { QueryError } from '@/components/query-error';
@@ -10,22 +11,26 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import {
   useKiloClawGoogleSetup,
   useKiloClawMutations,
   useKiloClawStatus,
-} from '@/lib/hooks/use-kiloclaw';
+} from '@/lib/hooks/use-kiloclaw-queries';
 import { cn } from '@/lib/utils';
+
 export default function GoogleScreen() {
-  const statusQuery = useKiloClawStatus();
-  const mutations = useKiloClawMutations();
+  const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
+  const { organizationId } = useInstanceContext(instanceId);
+  const statusQuery = useKiloClawStatus(organizationId);
+  const mutations = useKiloClawMutations(organizationId);
 
   const [copied, setCopied] = useState(false);
 
   const isConnected = statusQuery.data?.googleConnected ?? false;
   const gmailEnabled = statusQuery.data?.gmailNotificationsEnabled ?? false;
 
-  const setupQuery = useKiloClawGoogleSetup(!statusQuery.isPending && !isConnected);
+  const setupQuery = useKiloClawGoogleSetup(organizationId, !statusQuery.isPending && !isConnected);
 
   if (statusQuery.isPending) {
     return (
@@ -82,7 +87,7 @@ export default function GoogleScreen() {
           text: 'Disconnect',
           style: 'destructive',
           onPress: () => {
-            mutations.disconnectGoogle.mutate();
+            mutations.disconnectGoogle.mutate(undefined);
           },
         },
       ]

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { send as sendEmail } from '@/lib/email';
 import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
+import { enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
 
 jest.mock('@/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'internal-secret',
@@ -46,6 +47,7 @@ import { POST } from './route';
 
 const mockSendEmail = jest.mocked(sendEmail);
 const mockMaybePerformAutoTopUp = jest.mocked(maybePerformAutoTopUp);
+const mockEnqueueAffiliateEventForUser = jest.mocked(enqueueAffiliateEventForUser);
 
 type ConsoleSpy = jest.SpiedFunction<typeof console.log> | jest.SpiedFunction<typeof console.error>;
 
@@ -179,5 +181,42 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
         error: 'auto top-up unavailable',
       })
     );
+  });
+
+  it('forwards sale affiliate enqueue requests with monetized fields', async () => {
+    const response = await POST(
+      createRequest({
+        action: 'enqueue_affiliate_event',
+        input: {
+          userId: 'user-123',
+          provider: 'impact',
+          eventType: 'sale',
+          dedupeKey: 'affiliate:impact:sale:period-123',
+          eventDateIso: '2026-04-09T10:00:00.000Z',
+          orderId: 'period-123',
+          amount: 9,
+          currencyCode: 'usd',
+          itemCategory: 'kiloclaw-standard',
+          itemName: 'KiloClaw Standard Plan',
+          itemSku: 'price_standard',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockEnqueueAffiliateEventForUser).toHaveBeenCalledWith({
+      userId: 'user-123',
+      provider: 'impact',
+      eventType: 'sale',
+      dedupeKey: 'affiliate:impact:sale:period-123',
+      eventDate: new Date('2026-04-09T10:00:00.000Z'),
+      orderId: 'period-123',
+      amount: 9,
+      currencyCode: 'usd',
+      itemCategory: 'kiloclaw-standard',
+      itemName: 'KiloClaw Standard Plan',
+      itemSku: 'price_standard',
+      promoCode: undefined,
+    });
   });
 });

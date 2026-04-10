@@ -29,6 +29,10 @@ export function getRegistryApp(env: KiloClawEnv): string {
   return env.FLY_REGISTRY_APP ?? env.FLY_APP_NAME ?? 'kiloclaw-machines';
 }
 
+export function resolveImageRef(state: InstanceMutableState, env: KiloClawEnv): string {
+  return `registry.fly.io/${getRegistryApp(env)}:${resolveImageTag(state, env)}`;
+}
+
 /**
  * Check whether the stored API key has expired.
  */

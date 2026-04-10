@@ -38,16 +38,20 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DetailTile } from './DetailTile';
 
 import { getEntriesByCategory } from '@kilocode/kiloclaw-secret-catalog';
 import { SecretEntrySection } from './SecretEntrySection';
+import { AnimatedDots } from './AnimatedDots';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PairingSection } from './PairingSection';
 import { VersionPinCard } from './VersionPinCard';
@@ -506,6 +510,159 @@ function PermissionPresetSection({
   );
 }
 
+function getDestroyConfirmationContext({
+  status,
+  organizationName,
+}: {
+  status: KiloClawDashboardStatus;
+  organizationName?: string;
+}) {
+  const instanceName = status.name?.trim() || null;
+  const sandboxId = status.sandboxId;
+  const organizationPrefix = organizationName?.trim() || null;
+  const instanceKind = organizationPrefix ? 'Organization Instance' : 'Personal Instance';
+
+  // Accept either the instance name or sandbox ID as confirmation input.
+  // The prompt shows the name when available (more recognizable); the sandbox
+  // ID is always accepted silently as a fallback. In org context each token
+  // is prefixed with "orgname/".
+  const confirmationTokens = [instanceName, sandboxId].filter(
+    (token): token is string => token !== null && token.length > 0
+  );
+  const uniqueTokens = [...new Set(confirmationTokens)];
+  const confirmationOptions = organizationPrefix
+    ? uniqueTokens.map(token => `${organizationPrefix}/${token}`)
+    : uniqueTokens;
+
+  // Show the name-based token in the prompt when available, fall back to sandbox ID.
+  const primaryConfirmation = confirmationOptions[0];
+
+  return {
+    displayName: instanceName || 'Unnamed instance',
+    sandboxId,
+    instanceKind,
+    confirmationOptions,
+    primaryConfirmation,
+  };
+}
+
+function DestroyInstanceDialog({
+  open,
+  onOpenChange,
+  status,
+  organizationName,
+  isPending,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  status: KiloClawDashboardStatus;
+  organizationName?: string;
+  isPending: boolean;
+  onConfirm: () => void;
+}) {
+  const [confirmation, setConfirmation] = useState('');
+  const { displayName, sandboxId, instanceKind, confirmationOptions, primaryConfirmation } =
+    useMemo(
+      () => getDestroyConfirmationContext({ status, organizationName }),
+      [status, organizationName]
+    );
+  const confirmationMatches =
+    confirmationOptions.length > 0 && confirmationOptions.includes(confirmation.trim());
+
+  useEffect(() => {
+    if (!open) {
+      setConfirmation('');
+    }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={isPending ? () => {} : onOpenChange}>
+      <DialogContent
+        className="max-w-lg"
+        onInteractOutside={e => {
+          if (isPending) e.preventDefault();
+        }}
+        onEscapeKeyDown={e => {
+          if (isPending) e.preventDefault();
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>Destroy {instanceKind}</DialogTitle>
+          <DialogDescription>
+            Confirm that you are destroying the correct {instanceKind.toLowerCase()} before
+            continuing.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3">
+            <p className="text-sm font-medium text-red-300">This action is irreversible.</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Destroying this {instanceKind.toLowerCase()} permanently deletes its associated data.
+              Deleted instance data is unrecoverable.
+            </p>
+          </div>
+
+          <div className="rounded-md border p-3 text-sm">
+            <div className="flex flex-col gap-1">
+              <span>
+                {instanceKind}:{' '}
+                <strong className="text-foreground font-medium">{displayName}</strong>
+              </span>
+              {sandboxId && (
+                <span className="text-muted-foreground break-all">
+                  Sandbox ID: <code>{sandboxId}</code>
+                </span>
+              )}
+              {organizationName && (
+                <span className="text-muted-foreground break-all">
+                  Organization: <code>{organizationName}</code>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="destroy-instance-confirmation">
+              Type <code className="bg-muted rounded px-1 py-0.5">{primaryConfirmation}</code> to
+              confirm
+            </Label>
+            <Input
+              id="destroy-instance-confirmation"
+              value={confirmation}
+              onChange={event => setConfirmation(event.target.value)}
+              disabled={isPending}
+              autoComplete="off"
+              autoFocus
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={!confirmationMatches || isPending}
+          >
+            {isPending ? (
+              <>
+                Destroying
+                <AnimatedDots />
+              </>
+            ) : (
+              'Destroy Instance'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // SettingsTab
 // ---------------------------------------------------------------------------
@@ -518,6 +675,7 @@ export function SettingsTab({
   onRedeploy,
   onUpgrade,
   onRequestUpgrade,
+  organizationName,
 }: {
   status: KiloClawDashboardStatus;
   mutations: ClawMutations;
@@ -528,6 +686,8 @@ export function SettingsTab({
   onUpgrade?: () => void;
   /** Callback that requests an upgrade via the InstanceControls dialog. */
   onRequestUpgrade?: () => void;
+  /** Present in organization context; required in the destroy confirmation phrase. */
+  organizationName?: string;
 }) {
   const posthog = usePostHog();
   const { data: config } = useClawConfig();
@@ -967,7 +1127,8 @@ export function SettingsTab({
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-medium text-red-400">Danger Zone</h3>
             <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-              Stop or destroy this instance. Destroy permanently removes associated data.
+              Stop or destroy this instance. Destroying is irreversible and permanently deletes
+              unrecoverable instance data.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Tooltip>
@@ -1037,53 +1198,19 @@ export function SettingsTab({
                 Stop Instance
               </Button>
 
-              {!confirmDestroy ? (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  disabled={isDestroying || mutations.destroy.isPending}
-                  onClick={() => {
-                    posthog?.capture('claw_destroy_instance_clicked', {
-                      instance_status: status.status,
-                    });
-                    setConfirmDestroy(true);
-                  }}
-                >
-                  {isDestroying ? 'Destroying...' : 'Destroy Instance'}
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={isDestroying || mutations.destroy.isPending}
-                    onClick={() => {
-                      posthog?.capture('claw_destroy_instance_confirmed', {
-                        instance_status: status.status,
-                      });
-                      mutations.destroy.mutate(undefined, {
-                        onSuccess: () => {
-                          toast.success('Instance destroyed');
-                          setConfirmDestroy(false);
-                        },
-                        onError: err => toast.error(err.message),
-                      });
-                    }}
-                  >
-                    {isDestroying ? 'Destroying...' : 'Yes, destroy'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      posthog?.capture('claw_destroy_instance_cancelled');
-                      setConfirmDestroy(false);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </>
-              )}
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={isDestroying || mutations.destroy.isPending}
+                onClick={() => {
+                  posthog?.capture('claw_destroy_instance_clicked', {
+                    instance_status: status.status,
+                  });
+                  setConfirmDestroy(true);
+                }}
+              >
+                {isDestroying ? 'Destroying...' : 'Destroy Instance'}
+              </Button>
             </div>
 
             {editConfigOpen && (
@@ -1098,6 +1225,31 @@ export function SettingsTab({
           </div>
         </div>
       </div>
+
+      <DestroyInstanceDialog
+        open={confirmDestroy}
+        onOpenChange={open => {
+          if (!open) {
+            posthog?.capture('claw_destroy_instance_cancelled');
+          }
+          setConfirmDestroy(open);
+        }}
+        status={status}
+        organizationName={organizationName}
+        isPending={isDestroying || mutations.destroy.isPending}
+        onConfirm={() => {
+          posthog?.capture('claw_destroy_instance_confirmed', {
+            instance_status: status.status,
+          });
+          mutations.destroy.mutate(undefined, {
+            onSuccess: () => {
+              toast.success('Instance destroyed');
+              setConfirmDestroy(false);
+            },
+            onError: err => toast.error(err.message),
+          });
+        }}
+      />
 
       {supportsConfigRestore && (
         <ConfirmActionDialog

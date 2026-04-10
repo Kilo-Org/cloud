@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { Activity, Clock, Hexagon, Bot, GitMerge, AlertTriangle, Mail } from 'lucide-react';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 import { formatDistanceToNow, format, subHours, differenceInMinutes } from 'date-fns';
 import {
   AreaChart,
@@ -87,8 +88,9 @@ export function ObservabilityPageClient({ townId }: { townId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-3">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3">
         <div className="flex items-center gap-2">
+          <SidebarTrigger className="-ml-3" />
           <Activity className="size-4 text-[color:oklch(95%_0.15_108_/_0.6)]" />
           <h1 className="text-lg font-semibold tracking-tight text-white/90">Observability</h1>
           <span className="ml-1 font-mono text-xs text-white/30">{events.length} events</span>

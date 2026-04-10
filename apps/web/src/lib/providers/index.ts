@@ -30,19 +30,39 @@ import { isAnonymousContext } from '@/lib/anonymous';
 import { isOpenAiModel, isOpenAiOssModel } from '@/lib/providers/openai';
 import { isZaiModel } from '@/lib/providers/zai';
 import { isMinimaxModel } from '@/lib/providers/minimax';
-import { isXiaomiModel } from '@/lib/providers/xiaomi';
-import type { BYOKResult, Provider } from '@/lib/providers/types';
+import type { BYOKResult, GatewayChatApiKind, Provider } from '@/lib/providers/types';
 import PROVIDERS from '@/lib/providers/provider-definitions';
 import { getDirectByokModel } from '@/lib/providers/direct-byok';
-import { CustomLlmDefinitionSchema, type CustomLlmProvider } from '@kilocode/db';
-import { addCacheBreakpoints } from '@/lib/providers/openrouter/request-helpers';
+import {
+  CustomLlmDefinitionSchema,
+  type OpenClawApiAdapter,
+  type CustomLlmProvider,
+} from '@kilocode/db';
+import {
+  addCacheBreakpoints,
+  injectReasoningIntoContent,
+} from '@/lib/providers/openrouter/request-helpers';
 
-function inferSupportedChatApis(aiSdkProvider: CustomLlmProvider) {
-  return aiSdkProvider === 'anthropic'
-    ? (['messages'] as const)
-    : aiSdkProvider === 'openai'
-      ? (['responses'] as const)
-      : (['chat_completions'] as const);
+function inferSupportedChatApis(
+  aiSdkProvider: CustomLlmProvider | undefined,
+  openClawApiAdapter: OpenClawApiAdapter | undefined
+): ReadonlyArray<GatewayChatApiKind> {
+  const result = new Array<GatewayChatApiKind>();
+  if (aiSdkProvider === 'openai' || openClawApiAdapter === 'openai-responses') {
+    result.push('responses');
+  }
+  if (aiSdkProvider === 'anthropic' || openClawApiAdapter === 'anthropic-messages') {
+    result.push('messages');
+  }
+  if (
+    aiSdkProvider === 'openai-compatible' ||
+    aiSdkProvider === 'openrouter' ||
+    openClawApiAdapter === 'openai-completions' ||
+    result.length === 0
+  ) {
+    result.push('chat_completions');
+  }
+  return result;
 }
 
 async function checkDirectBYOK(
@@ -65,7 +85,7 @@ async function checkDirectBYOK(
       id: 'direct-byok',
       apiUrl: directByok.base_url,
       apiKey: userByok[0].decryptedAPIKey,
-      supportedChatApis: inferSupportedChatApis(directByok.ai_sdk_provider),
+      supportedChatApis: inferSupportedChatApis(directByok.ai_sdk_provider, undefined),
       transformRequest(context) {
         context.request.body.model = directByokModel.id;
         directByok.transformRequest(context);
@@ -127,7 +147,8 @@ export async function getProvider(
           apiUrl: customLlm.base_url,
           apiKey: customLlm.api_key,
           supportedChatApis: inferSupportedChatApis(
-            customLlm.opencode_settings?.ai_sdk_provider ?? 'openrouter'
+            customLlm.opencode_settings?.ai_sdk_provider,
+            customLlm.openclaw_settings?.api_adapter
           ),
           transformRequest(context) {
             if (customLlm.remove_from_body) {
@@ -148,6 +169,9 @@ export async function getProvider(
               context.request.body.reasoning
             ) {
               context.request.body.reasoning.summary = customLlm.reasoning_summary;
+            }
+            if (customLlm.inject_reasoning_into_content) {
+              injectReasoningIntoContent(context.request);
             }
           },
         },
@@ -232,9 +256,6 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
   }
   if (isMoonshotModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.moonshotai];
-  }
-  if (isXiaomiModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum['xiaomi']];
   }
   if (isZaiModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum['z-ai']];

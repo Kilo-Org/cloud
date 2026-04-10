@@ -88,6 +88,7 @@ import type {
   MergeStrategy,
   ConvoyMergeMode,
   UiAction,
+  RigOverrideConfig,
 } from '../types';
 
 const TOWN_LOG = '[Town.do]';
@@ -281,6 +282,8 @@ export class TownDO extends DurableObject<Env> {
 
         let systemPromptOverride: string | undefined;
         const townConfig = await this.getTownConfig();
+        const rig = rigs.getRig(this.sql, rigId);
+        const effectiveConfig = config.resolveRigConfig(townConfig, rig?.config ?? null);
 
         // Build refinery-specific system prompt with branch/target info.
         // When the MR bead already has a pr_url (polecat created the PR),
@@ -305,17 +308,16 @@ export class TownDO extends DurableObject<Env> {
               typeof bead.metadata?.source_agent_id === 'string'
                 ? bead.metadata.source_agent_id
                 : 'unknown',
-            mergeStrategy: townConfig.merge_strategy ?? 'direct',
+            mergeStrategy: effectiveConfig.merge_strategy,
             existingPrUrl,
-            reviewMode: townConfig.refinery?.review_mode ?? 'rework',
+            reviewMode: effectiveConfig.review_mode,
           });
         }
 
         // When merge_strategy is 'pr', polecats always create the PR themselves
         // and pass pr_url to gt_done. For review-then-land convoy intermediate
         // beads, the PR targets the convoy feature branch (not main).
-        if (agent.role === 'polecat' && townConfig.merge_strategy === 'pr') {
-          const rig = rigs.getRig(this.sql, rigId);
+        if (agent.role === 'polecat' && effectiveConfig.merge_strategy === 'pr') {
           const convoyId = beadOps.getConvoyForBead(this.sql, beadId);
           const convoyFeatureBranch = convoyId
             ? beadOps.getConvoyFeatureBranch(this.sql, convoyId)
@@ -844,6 +846,11 @@ export class TownDO extends DurableObject<Env> {
     return rigs.getRig(this.sql, rigId);
   }
 
+  async updateRigConfig(rigId: string, config: RigOverrideConfig): Promise<rigs.RigRecord | null> {
+    rigs.updateRigConfig(this.sql, rigId, config);
+    return rigs.getRig(this.sql, rigId);
+  }
+
   // ── Rig Config (KV, per-rig — configuration needed for container dispatch) ──
 
   async configureRig(rigConfig: RigConfig): Promise<void> {
@@ -1170,6 +1177,48 @@ export class TownDO extends DurableObject<Env> {
 
     console.log(
       `${TOWN_LOG} resetAgent: reset agent=${agentId} hookedBead=${hookedBeadId ?? 'none'}`
+    );
+  }
+
+  /**
+   * Reset an agent's dispatch_attempts counter to 0 without unhooking.
+   * Also resets the hooked bead's dispatch_attempts/last_dispatch_attempt_at so
+   * the reconciler doesn't skip the bead due to accumulated cooldown state.
+   * Verifies the agent belongs to rigId to prevent cross-rig mutations.
+   */
+  async resetAgentDispatchAttempts(agentId: string, rigId: string): Promise<void> {
+    const agent = agents.getAgent(this.sql, agentId);
+    if (!agent) throw new Error(`Agent ${agentId} not found`);
+    if (agent.rig_id !== rigId) throw new Error(`Agent ${agentId} does not belong to rig ${rigId}`);
+
+    query(
+      this.sql,
+      /* sql */ `
+        UPDATE ${agent_metadata}
+        SET ${agent_metadata.columns.dispatch_attempts} = 0
+        WHERE ${agent_metadata.bead_id} = ?
+      `,
+      [agentId]
+    );
+
+    // Also clear the hooked bead's dispatch state so the reconciler won't skip
+    // it due to accumulated cooldown or max-attempt circuit breaker.
+    const hookedBeadId = agent.current_hook_bead_id;
+    if (hookedBeadId) {
+      query(
+        this.sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.dispatch_attempts} = 0,
+              ${beads.columns.last_dispatch_attempt_at} = NULL
+          WHERE ${beads.bead_id} = ?
+        `,
+        [hookedBeadId]
+      );
+    }
+
+    console.log(
+      `${TOWN_LOG} resetAgentDispatchAttempts: reset agent=${agentId} hookedBead=${hookedBeadId ?? 'none'}`
     );
   }
 
@@ -2954,6 +3003,32 @@ export class TownDO extends DurableObject<Env> {
       [convoyId, input.tasks.length, 0, null, featureBranch, mergeMode, stagedValue]
     );
 
+    // Push the convoy feature branch to the remote so polecats can immediately
+    // open PRs targeting it and the refinery can merge into it.
+    const rig = rigs.getRig(this.sql, input.rigId);
+    if (rig) {
+      const rigConfig = await this.getRigConfig(input.rigId);
+      await scm
+        .createConvoyBranch(
+          {
+            env: this.env,
+            townId: this.townId,
+            getTownConfig: () => this.getTownConfig(),
+            platformIntegrationId: rigConfig?.platformIntegrationId,
+          },
+          {
+            gitUrl: rig.git_url,
+            defaultBranch: rig.default_branch,
+            featureBranch,
+          }
+        )
+        .catch(err =>
+          console.warn(`${TOWN_LOG} slingConvoy: createConvoyBranch failed (non-fatal)`, {
+            error: err instanceof Error ? err.message : String(err),
+          })
+        );
+    }
+
     // 2. Create all beads and track their IDs (needed for depends_on resolution)
     const beadIds: string[] = [];
     const results: Array<{ bead: Bead; agent: Agent | null }> = [];
@@ -3602,7 +3677,7 @@ export class TownDO extends DurableObject<Env> {
       const townConfig = await this.getTownConfig();
       const actions = reconciler.reconcile(this.sql, {
         draining: this._draining,
-        refineryCodeReview: townConfig.refinery?.code_review ?? true,
+        townConfig,
       });
       metrics.actionsEmitted = actions.length;
       for (const a of actions) {
@@ -4177,7 +4252,15 @@ export class TownDO extends DurableObject<Env> {
 
     try {
       const container = getTownContainerStub(this.env, townId);
-      const headers: Record<string, string> = {};
+      // Always include X-Town-Config so the container populates
+      // lastKnownTownConfig on startup — before any /agents/start arrives.
+      // This ensures org context and credentials are available immediately
+      // after a container restart when the first request is a model update
+      // (PATCH /model) rather than a new agent start.
+      const containerConfig = await config.buildContainerConfig(this.ctx.storage, this.env);
+      const headers: Record<string, string> = {
+        'X-Town-Config': JSON.stringify(containerConfig),
+      };
       // When draining AND enough time has passed for the old container
       // to have exited (drainAll waits up to 10 min + exit), pass the
       // nonce so the replacement container can acknowledge readiness.
@@ -4349,7 +4432,7 @@ export class TownDO extends DurableObject<Env> {
       agentCounts.total += c;
     }
 
-    // Bead counts
+    // Bead counts (live)
     const beadRows = [
       ...query(
         this.sql,
@@ -4518,7 +4601,7 @@ export class TownDO extends DurableObject<Env> {
       // Run reconciler against the resulting state
       const tc = await this.getTownConfig();
       const actions = reconciler.reconcile(this.sql, {
-        refineryCodeReview: tc.refinery?.code_review ?? true,
+        townConfig: tc,
       });
 
       // Capture a state snapshot before rollback
@@ -4600,7 +4683,7 @@ export class TownDO extends DurableObject<Env> {
       // Phase 1: Reconcile against now-current state
       const tc2 = await this.getTownConfig();
       const actions = reconciler.reconcile(this.sql, {
-        refineryCodeReview: tc2.refinery?.code_review ?? true,
+        townConfig: tc2,
       });
       const pendingEventCount = events.pendingEventCount(this.sql);
       const actionsByType: Record<string, number> = {};

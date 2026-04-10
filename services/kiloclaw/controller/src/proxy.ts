@@ -55,7 +55,10 @@ export function createHttpProxy(options: ProxyOptions) {
     }
 
     if (options.supervisor && options.supervisor.getState() !== 'running') {
-      return c.json({ error: 'Gateway not ready' }, 503);
+      return c.json(
+        { error: 'Gateway not ready' },
+        { status: 503, headers: { 'Retry-After': '5' } }
+      );
     }
 
     const incomingUrl = new URL(c.req.url);
@@ -101,7 +104,7 @@ function socketWriteBadGateway(socket: Duplex): void {
 }
 
 function socketWriteServiceUnavailable(socket: Duplex): void {
-  socket.write('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n');
+  socket.write('HTTP/1.1 503 Service Unavailable\r\nRetry-After: 5\r\nConnection: close\r\n\r\n');
   socket.destroy();
 }
 

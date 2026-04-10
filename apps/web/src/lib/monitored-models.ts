@@ -7,8 +7,7 @@ export async function getMonitoredModels() {
   for (const model of preferredModels) {
     if (isKiloAutoModel(model)) {
       set.add(
-        (await resolveAutoModel(model, null, Promise.resolve(null), Promise.resolve(0), false))
-          .model
+        (await resolveAutoModel(model, null, Promise.resolve(null), Promise.resolve(0))).model
       );
     } else {
       set.add(model);

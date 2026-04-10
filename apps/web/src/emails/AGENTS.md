@@ -48,27 +48,28 @@ Every template must include this branding footer below the card:
 
 ## Template Variables
 
-| Template file                       | Variables                                                                                                                  | Customer.io ID (crosswalk) |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| `orgSubscription.html`              | `seats`, `organization_url`, `invoices_url`, `year`                                                                        | `10`                       |
-| `orgRenewed.html`                   | `seats`, `invoices_url`, `year`                                                                                            | `11`                       |
-| `orgCancelled.html`                 | `invoices_url`, `year`                                                                                                     | `12`                       |
-| `orgSSOUserJoined.html`             | `new_user_email`, `organization_url`, `year`                                                                               | `13`                       |
-| `orgInvitation.html`                | `organization_name`, `inviter_name`, `accept_invite_url`, `year`                                                           | `6`                        |
-| `magicLink.html`                    | `magic_link_url`, `email`, `expires_in`, `year`                                                                            | `14`                       |
-| `balanceAlert.html`                 | `minimum_balance`, `organization_url`, `year`                                                                              | `16`                       |
-| `autoTopUpFailed.html`              | `reason`, `credits_url`, `year`                                                                                            | `17`                       |
-| `ossInviteNewUser.html`             | `tier_name`, `seats`, `seat_value`, `credits_section`, `accept_invite_url`, `integrations_url`, `code_reviews_url`, `year` | `18`                       |
-| `ossInviteExistingUser.html`        | `tier_name`, `seats`, `seat_value`, `credits_section`, `organization_url`, `integrations_url`, `code_reviews_url`, `year`  | `19`                       |
-| `ossExistingOrgProvisioned.html`    | `tier_name`, `seats`, `seat_value`, `credits_section`, `organization_url`, `integrations_url`, `code_reviews_url`, `year`  | `20`                       |
-| `deployFailed.html`                 | `deployment_name`, `deployment_url`, `repository`, `year`                                                                  | `21`                       |
-| `clawTrialEndingSoon.html`          | `days_remaining`, `claw_url`, `year`                                                                                       | `22`                       |
-| `clawTrialExpiresTomorrow.html`     | `claw_url`, `year`                                                                                                         | `23`                       |
-| `clawSuspendedTrial.html`           | `destruction_date`, `claw_url`, `year`                                                                                     | `24`                       |
-| `clawSuspendedSubscription.html`    | `destruction_date`, `claw_url`, `year`                                                                                     | `25`                       |
-| `clawSuspendedPayment.html`         | `destruction_date`, `claw_url`, `year`                                                                                     | `26`                       |
-| `clawDestructionWarning.html`       | `destruction_date`, `claw_url`, `year`                                                                                     | `27`                       |
-| `clawInstanceDestroyed.html`        | `claw_url`, `year`                                                                                                         | `28`                       |
-| `clawEarlybirdEndingSoon.html`      | `days_remaining`, `expiry_date`, `claw_url`, `year`                                                                        | `29`                       |
-| `clawEarlybirdExpiresTomorrow.html` | `expiry_date`, `claw_url`, `year`                                                                                          | `30`                       |
-| `accountDeletionRequest.html`       | `email`, `year`                                                                                                            | —                          |
+| Template file                          | Variables                                                                                                                  | Customer.io ID (crosswalk) |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `orgSubscription.html`                 | `seats`, `organization_url`, `invoices_url`, `year`                                                                        | `10`                       |
+| `orgRenewed.html`                      | `seats`, `invoices_url`, `year`                                                                                            | `11`                       |
+| `orgCancelled.html`                    | `invoices_url`, `year`                                                                                                     | `12`                       |
+| `orgSSOUserJoined.html`                | `new_user_email`, `organization_url`, `year`                                                                               | `13`                       |
+| `orgInvitation.html`                   | `organization_name`, `inviter_name`, `accept_invite_url`, `year`                                                           | `6`                        |
+| `magicLink.html`                       | `magic_link_url`, `email`, `expires_in`, `year`                                                                            | `14`                       |
+| `balanceAlert.html`                    | `minimum_balance`, `organization_url`, `year`                                                                              | `16`                       |
+| `autoTopUpFailed.html`                 | `reason`, `credits_url`, `year`                                                                                            | `17`                       |
+| `ossInviteNewUser.html`                | `tier_name`, `seats`, `seat_value`, `credits_section`, `accept_invite_url`, `integrations_url`, `code_reviews_url`, `year` | `18`                       |
+| `ossInviteExistingUser.html`           | `tier_name`, `seats`, `seat_value`, `credits_section`, `organization_url`, `integrations_url`, `code_reviews_url`, `year`  | `19`                       |
+| `ossExistingOrgProvisioned.html`       | `tier_name`, `seats`, `seat_value`, `credits_section`, `organization_url`, `integrations_url`, `code_reviews_url`, `year`  | `20`                       |
+| `deployFailed.html`                    | `deployment_name`, `deployment_url`, `repository`, `year`                                                                  | `21`                       |
+| `clawTrialEndingSoon.html`             | `days_remaining`, `claw_url`, `year`                                                                                       | `22`                       |
+| `clawTrialExpiresTomorrow.html`        | `claw_url`, `year`                                                                                                         | `23`                       |
+| `clawSuspendedTrial.html`              | `destruction_date`, `claw_url`, `year`                                                                                     | `24`                       |
+| `clawSuspendedSubscription.html`       | `destruction_date`, `claw_url`, `year`                                                                                     | `25`                       |
+| `clawSuspendedPayment.html`            | `destruction_date`, `claw_url`, `year`                                                                                     | `26`                       |
+| `clawDestructionWarning.html`          | `destruction_date`, `claw_url`, `year`                                                                                     | `27`                       |
+| `clawInstanceDestroyed.html`           | `claw_url`, `year`                                                                                                         | `28`                       |
+| `clawEarlybirdEndingSoon.html`         | `days_remaining`, `expiry_date`, `claw_url`, `year`                                                                        | `29`                       |
+| `clawEarlybirdExpiresTomorrow.html`    | `expiry_date`, `claw_url`, `year`                                                                                          | `30`                       |
+| `clawComplementaryInferenceEnded.html` | `claw_url`, `credits_url`, `free_model_name`, `year`                                                                       | —                          |
+| `accountDeletionRequest.html`          | `email`, `year`                                                                                                            | —                          |

@@ -352,11 +352,24 @@ async function syncProviders() {
   });
 
   const allProviders = [...normalizedProviders];
-  if (!allProviders.some(provider => provider.name.toLowerCase() === 'stealth')) {
+
+  // Auto-detect providers referenced by extra models that aren't already present
+  const missingProviderSlugs = new Set(
+    mappedExtraModels
+      .map(m => m.provider)
+      .filter(
+        (slug): slug is NonNullable<typeof slug> =>
+          slug !== null && !allProviders.some(p => p.slug === slug)
+      )
+  );
+
+  for (const providerSlug of missingProviderSlugs) {
+    const displayName = providerSlug.toUpperCase();
+    const iconInitials = providerSlug.slice(0, 2).toUpperCase();
     allProviders.push({
-      name: 'Stealth',
-      displayName: 'Stealth',
-      slug: 'stealth',
+      name: displayName,
+      displayName,
+      slug: providerSlug,
       dataPolicy: {
         training: true,
         retainsPrompts: true,
@@ -365,29 +378,10 @@ async function syncProviders() {
       headquarters: 'Unknown',
       datacenters: ['Global'],
       icon: {
-        url: 'https://placehold.co/100?text=St&font=roboto',
+        url: `https://placehold.co/100?text=${iconInitials}&font=roboto`,
         className: 'rounded-sm',
       },
-      models: mappedExtraModels.filter(m => m.provider === 'stealth').map(m => m.model),
-    });
-  }
-  if (!allProviders.some(provider => provider.name.toLowerCase() === 'corethink')) {
-    allProviders.push({
-      name: 'CoreThink',
-      displayName: 'CoreThink',
-      slug: 'corethink',
-      dataPolicy: {
-        training: true,
-        retainsPrompts: true,
-        canPublish: false,
-      },
-      headquarters: 'Unknown',
-      datacenters: ['Global'],
-      icon: {
-        url: 'https://placehold.co/100?text=CT&font=roboto',
-        className: 'rounded-sm',
-      },
-      models: mappedExtraModels.filter(m => m.provider === 'corethink').map(m => m.model),
+      models: mappedExtraModels.filter(m => m.provider === providerSlug).map(m => m.model),
     });
   }
 

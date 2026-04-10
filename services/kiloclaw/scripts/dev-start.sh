@@ -406,7 +406,7 @@ if ! docker info &>/dev/null; then
   echo "Start Docker Desktop (or 'dockerd') and retry."
   exit 1
 fi
-if ! (cd "$MONOREPO_ROOT" && docker compose -f apps/web/dev/docker-compose.yml up -d --wait); then
+if ! (cd "$MONOREPO_ROOT" && docker compose -f dev/docker-compose.yml up -d --wait); then
   echo ""
   echo "ERROR: 'docker compose up' failed."
   echo "Check 'docker compose -f dev/docker-compose.yml logs' for details."
@@ -416,13 +416,13 @@ fi
 # Extra safety: wait for Postgres to accept connections (handles first-run init)
 echo "==> Waiting for Postgres to accept connections..."
 for i in $(seq 1 30); do
-  if docker exec "$(docker compose -f "$MONOREPO_ROOT/apps/web/dev/docker-compose.yml" ps -q postgres)" \
+  if docker exec "$(docker compose -f "$MONOREPO_ROOT/dev/docker-compose.yml" ps -q postgres)" \
     pg_isready -U postgres -q 2>/dev/null; then
     break
   fi
   if [ "$i" -eq 30 ]; then
     echo "ERROR: Postgres did not become ready within 30 seconds."
-    echo "Check: docker compose -f apps/web/dev/docker-compose.yml logs postgres"
+    echo "Check: docker compose -f dev/docker-compose.yml logs postgres"
     exit 1
   fi
   sleep 1
@@ -434,8 +434,8 @@ if ! (cd "$MONOREPO_ROOT" && pnpm drizzle migrate); then
   echo ""
   echo "ERROR: Database migrations failed."
   echo "The database container may not be ready yet. Check:"
-  echo "  docker compose -f apps/web/dev/docker-compose.yml ps"
-  echo "  docker compose -f apps/web/dev/docker-compose.yml logs"
+  echo "  docker compose -f dev/docker-compose.yml ps"
+  echo "  docker compose -f dev/docker-compose.yml logs"
   exit 1
 fi
 
@@ -666,7 +666,10 @@ add_tmux_panes() {
 
 set_api_base_url() {
   local url="$1"
-  echo "    Setting KILOCODE_API_BASE_URL=$url"
+  local quiet="${2:-}"
+  if [ -z "$quiet" ]; then
+    echo "    Setting KILOCODE_API_BASE_URL=$url"
+  fi
   if grep -q '^KILOCODE_API_BASE_URL=' "$KILOCLAW_DIR/.dev.vars"; then
     sed "s|^KILOCODE_API_BASE_URL=.*|KILOCODE_API_BASE_URL=$url|" \
       "$KILOCLAW_DIR/.dev.vars" > "$KILOCLAW_DIR/.dev.vars.tmp"
@@ -719,10 +722,24 @@ else
 
   if [ -z "$TUNNEL_URL" ]; then
     echo ""
-    echo "WARNING: Could not capture tunnel URL after 30 seconds."
-    echo "Check the cloudflared terminal tab and manually update"
-    echo "KILOCODE_API_BASE_URL in .dev.vars, then restart the worker."
+    echo "ERROR: Could not capture tunnel URL after 30 seconds."
+    echo "Clearing KILOCODE_API_BASE_URL in .dev.vars to prevent stale URL usage."
     echo ""
+    echo "Check that cloudflared is authenticated (run 'cloudflared login') and can"
+    echo "reach Cloudflare, then re-run this script."
+    echo ""
+    # Clear the URL so the worker fails loudly instead of using a stale URL
+    set_api_base_url "" quiet
+    # Kill the background tunnel process if it's still running
+    if [ "$QUICK_TUNNEL_STARTED" = true ]; then
+      kill "$TUNNEL_PID" 2>/dev/null || true
+      wait "$TUNNEL_PID" 2>/dev/null || true
+    else
+      echo "NOTE: A cloudflared terminal tab may still be running — close it manually."
+      echo ""
+    fi
+    rm -f "$TUNNEL_LOG"
+    exit 1
   else
     echo "    Tunnel URL: $TUNNEL_URL"
     set_api_base_url "${TUNNEL_URL}/api/gateway/"

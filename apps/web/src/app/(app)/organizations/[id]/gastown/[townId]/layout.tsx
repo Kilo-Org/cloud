@@ -2,6 +2,7 @@ import { TerminalBarProvider } from '@/components/gastown/TerminalBarContext';
 import { DrawerStackProvider } from '@/components/gastown/DrawerStack';
 import { renderDrawerContent } from '@/components/gastown/DrawerStackContent';
 import { TerminalBarPadding } from '@/components/gastown/TerminalBarPadding';
+import { HideAppTopbar } from '@/components/gastown/HideAppTopbar';
 import { MayorTerminalBar } from '@/app/(app)/gastown/[townId]/MayorTerminalBar';
 import { OnboardingTooltips } from '@/components/gastown/OnboardingTooltips';
 
@@ -18,6 +19,7 @@ export default async function OrgTownLayout({
   return (
     <TerminalBarProvider>
       <DrawerStackProvider renderContent={renderDrawerContent}>
+        <HideAppTopbar />
         <TerminalBarPadding>{children}</TerminalBarPadding>
         <MayorTerminalBar params={params} basePath={basePath} />
         <OnboardingTooltips townId={townId} />

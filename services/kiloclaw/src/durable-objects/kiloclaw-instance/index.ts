@@ -189,7 +189,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         env: this.env,
         state: this.s,
       });
-    } catch {
+    } catch (err) {
+      doWarn(this.s, 'getRoutingTarget failed, returning null', {
+        provider: this.s.provider,
+        error: toLoggable(err),
+      });
       return null;
     }
   }

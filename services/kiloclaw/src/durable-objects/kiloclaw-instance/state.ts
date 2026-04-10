@@ -84,6 +84,10 @@ export function syncProviderStateForStorage(
   >,
   patch: Partial<PersistedState>
 ): Partial<PersistedState> {
+  // Intentionally mutates `s` as well as returning a storage patch.
+  // Callers must use both effects together: the in-memory state stays aligned
+  // with legacy/provider field mirroring, and the returned patch is what gets
+  // persisted to storage.
   // Temporary compatibility bridge while legacy Fly fields still exist in the
   // persisted schema. New provider-aware code should prefer writing
   // `providerState`; writes to legacy Fly fields should only happen alongside a

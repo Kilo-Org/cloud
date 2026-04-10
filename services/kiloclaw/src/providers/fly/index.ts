@@ -210,6 +210,10 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
   },
 
   async restartRuntime({ env, state, runtimeSpec, minSecretsVersion, onProviderResult }) {
+    if (!onProviderResult) {
+      throw new Error('Fly restartRuntime requires onProviderResult persistence callback');
+    }
+
     const providerState = getFlyProviderState(state);
     if (!providerState.machineId) {
       throw new Error('No machine exists');
@@ -224,7 +228,7 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
         minSecretsVersion,
       }
     );
-    await onProviderResult?.({
+    await onProviderResult({
       providerState,
       corePatch: {
         restartUpdateSent: true,

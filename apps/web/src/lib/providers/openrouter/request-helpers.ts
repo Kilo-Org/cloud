@@ -204,7 +204,11 @@ export function injectReasoningIntoContent(request: GatewayRequest) {
           : '';
 
     if (reasoning) {
-      message.content = `<think>${reasoning}</think>${message.content}`;
+      if (Array.isArray(message.content)) {
+        message.content.splice(0, 0, { type: 'text', text: `<think>${reasoning}</think>` });
+      } else {
+        message.content = `<think>${reasoning}</think>${message.content}`;
+      }
       if ('reasoning' in message) delete message.reasoning;
       if ('reasoning_content' in message) delete message.reasoning_content;
       if ('reasoning_details' in message) delete message.reasoning_details;

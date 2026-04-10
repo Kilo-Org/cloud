@@ -143,7 +143,7 @@ When debugging reproducible issues, don't guess at the cause. Instead:
 3. Deduce the root cause from the log output, then fix it.
 4. Remove the debug logs before committing.
 
-This is far more effective than speculating about timing or re-render behavior.
+This is far more effective than speculating about the cause.
 
 ## Change Checklist
 

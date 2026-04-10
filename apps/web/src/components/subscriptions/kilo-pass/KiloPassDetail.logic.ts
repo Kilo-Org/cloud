@@ -23,6 +23,26 @@ export function getKiloPassSubscriptionDisplayModel(params: {
   nextBillingLabel: string;
   resumesAtLabel: string;
 }): KiloPassSubscriptionDisplayModel {
+  if (params.cancelAtPeriodEnd) {
+    const activeUntilPhrase = getDatePhrase({
+      prefix: 'until',
+      dateLabel: params.nextBillingLabel,
+    });
+
+    return {
+      status: 'pending_cancellation',
+      detailDateLabel: 'Active until',
+      detailDateValue: params.nextBillingLabel,
+      cardDateLabel: 'Active until',
+      cardDateValue: params.nextBillingLabel,
+      cardNotice: `Cancellation scheduled. Access stays active${activeUntilPhrase}.`,
+      detailAlert: {
+        title: 'Cancellation scheduled',
+        description: `Your Kilo Pass stays active${activeUntilPhrase} and will not renew unless you resume the subscription.`,
+      },
+    };
+  }
+
   if (params.status === 'paused') {
     const resumesOnPhrase = getDatePhrase({ prefix: 'on', dateLabel: params.resumesAtLabel });
     const hasResumeDate = resumesOnPhrase !== '';
@@ -44,31 +64,14 @@ export function getKiloPassSubscriptionDisplayModel(params: {
     };
   }
 
-  if (!params.cancelAtPeriodEnd) {
-    return {
-      status: params.status,
-      detailDateLabel: 'Next billing',
-      detailDateValue: params.nextBillingLabel,
-      cardDateLabel: 'Renews at',
-      cardDateValue: params.nextBillingLabel,
-      cardNotice: null,
-      detailAlert: null,
-    };
-  }
-
-  const activeUntilPhrase = getDatePhrase({ prefix: 'until', dateLabel: params.nextBillingLabel });
-
   return {
-    status: 'pending_cancellation',
-    detailDateLabel: 'Active until',
+    status: params.status,
+    detailDateLabel: 'Next billing',
     detailDateValue: params.nextBillingLabel,
-    cardDateLabel: 'Active until',
+    cardDateLabel: 'Renews at',
     cardDateValue: params.nextBillingLabel,
-    cardNotice: `Cancellation scheduled. Access stays active${activeUntilPhrase}.`,
-    detailAlert: {
-      title: 'Cancellation scheduled',
-      description: `Your Kilo Pass stays active${activeUntilPhrase} and will not renew unless you resume the subscription.`,
-    },
+    cardNotice: null,
+    detailAlert: null,
   };
 }
 

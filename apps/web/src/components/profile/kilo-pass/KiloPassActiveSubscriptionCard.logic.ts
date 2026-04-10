@@ -172,20 +172,21 @@ export function computeRenewInfoRowModel(params: {
 }): RenewInfoRowModel[] {
   const { subscription, scheduledChange } = params;
   const now = params.nowIso ? dayjs(params.nowIso) : dayjs();
-
-  if (params.isPaused) {
-    const resumesAtIso = params.resumesAtIso ?? null;
-    if (!resumesAtIso) return [];
-    const resumesAt = dayjs(resumesAtIso);
-    return resumesAt.utc().isValid() ? [{ kind: 'paused_until', resumesAtIso }] : [];
-  }
-
   const refillAtIso = subscription.refillAt ?? subscription.nextBillingAt ?? null;
   const nextBillingAtIso = subscription.nextBillingAt ?? null;
 
   const activeUntilRow = params.isPendingCancellation
     ? computeActiveUntilRowModel({ subscription, now })
     : null;
+
+  if (params.isPaused) {
+    if (activeUntilRow) return [activeUntilRow];
+
+    const resumesAtIso = params.resumesAtIso ?? null;
+    if (!resumesAtIso) return [];
+    const resumesAt = dayjs(resumesAtIso);
+    return resumesAt.utc().isValid() ? [{ kind: 'paused_until', resumesAtIso }] : [];
+  }
 
   const shouldShowRefillRow =
     !params.isPendingCancellation ||

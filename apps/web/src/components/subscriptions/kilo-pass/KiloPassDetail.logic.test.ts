@@ -30,6 +30,29 @@ describe('KiloPassDetail.logic', () => {
     });
   });
 
+  test('models pending cancellation before paused display copy', () => {
+    const model = getKiloPassSubscriptionDisplayModel({
+      status: 'paused',
+      cancelAtPeriodEnd: true,
+      nextBillingLabel: 'May 10, 2026',
+      resumesAtLabel: 'Jun 10, 2026',
+    });
+
+    expect(model).toEqual({
+      status: 'pending_cancellation',
+      detailDateLabel: 'Active until',
+      detailDateValue: 'May 10, 2026',
+      cardDateLabel: 'Active until',
+      cardDateValue: 'May 10, 2026',
+      cardNotice: 'Cancellation scheduled. Access stays active until May 10, 2026.',
+      detailAlert: {
+        title: 'Cancellation scheduled',
+        description:
+          'Your Kilo Pass stays active until May 10, 2026 and will not renew unless you resume the subscription.',
+      },
+    });
+  });
+
   test('models paused display copy', () => {
     const model = getKiloPassSubscriptionDisplayModel({
       status: 'paused',

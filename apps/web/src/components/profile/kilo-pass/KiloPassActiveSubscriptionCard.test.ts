@@ -132,6 +132,31 @@ describe('KiloPassActiveSubscriptionCard.logic', () => {
       expect(rows).toEqual([{ kind: 'paused_until', resumesAtIso: '2026-06-10T00:00:00Z' }]);
     });
 
+    test('returns active_until when paused and pending cancellation', () => {
+      const rows = computeRenewInfoRowModel({
+        subscription: buildSubscription({
+          cadence: KiloPassCadence.Monthly,
+          tier: KiloPassTier.Tier19,
+          refillAt: '2026-05-10T00:00:00Z',
+          nextBillingAt: '2026-05-10T00:00:00Z',
+        }),
+        isPendingCancellation: true,
+        isPaused: true,
+        resumesAtIso: '2026-06-10T00:00:00Z',
+        scheduledChange: null,
+        nowIso: '2026-04-10T00:00:00Z',
+      });
+
+      expect(rows).toEqual([
+        {
+          kind: 'active_until',
+          refillAtIso: '2026-05-10T00:00:00Z',
+          refillsInDays: 30,
+          changeSuffix: '',
+        },
+      ]);
+    });
+
     test('applies scheduled change to next renew when yearly and effectiveAt matches refillAt', () => {
       const rows = computeRenewInfoRowModel({
         subscription: buildSubscription({

@@ -1168,7 +1168,8 @@ export async function updateAgentModel(
   agentId: string,
   model: string,
   smallModel?: string,
-  conversationHistory?: string
+  conversationHistory?: string,
+  customEnvVars?: Record<string, string>
 ): Promise<void> {
   const agent = agents.get(agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);
@@ -1262,6 +1263,20 @@ export async function updateAgentModel(
     if (key in hotSwapEnv) continue;
     const live = process.env[key];
     if (live) hotSwapEnv[key] = live;
+  }
+
+  // Overlay fresh custom env vars (user-defined town settings) on top of the
+  // stale startupEnv snapshot. After Gap 1 is applied, these are already in
+  // process.env, but we read from the caller-supplied map to avoid having to
+  // know the full set of custom keys here. Infra LIVE_ENV_KEYS set above take
+  // precedence because they were applied after this overlay position in the
+  // original code — we insert before GH_TOKEN derivation so infra keys win.
+  if (customEnvVars) {
+    for (const [key, value] of Object.entries(customEnvVars)) {
+      if (!LIVE_ENV_KEYS.has(key) && key !== 'KILO_CONFIG_CONTENT' && key !== 'OPENCODE_CONFIG_CONTENT') {
+        hotSwapEnv[key] = value;
+      }
+    }
   }
 
   // Re-derive GH_TOKEN from live values using the same priority chain

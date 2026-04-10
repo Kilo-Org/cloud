@@ -43,6 +43,10 @@ const TownConfigHeader = z.record(z.string(), z.unknown());
 // Used as a fallback by code that runs outside a request context (e.g. background tasks).
 let lastKnownTownConfig: Record<string, unknown> | null = null;
 
+// Tracks the set of custom env var keys applied during the last syncTownConfigToProcessEnv()
+// call. Used to delete keys that were removed from town config since the last sync.
+let lastAppliedEnvVarKeys = new Set<string>();
+
 /** Get the latest town config delivered via X-Town-Config header. */
 export function getCurrentTownConfig(): Record<string, unknown> | null {
   return lastKnownTownConfig;
@@ -102,6 +106,41 @@ function syncTownConfigToProcessEnv(): void {
   } else {
     delete process.env.GASTOWN_ORGANIZATION_ID;
   }
+
+  // Apply custom env_vars from town config. Infra keys set above take
+  // precedence — skip any custom key that collides with a protected infra key.
+  const INFRA_ENV_KEYS = new Set([
+    'GIT_TOKEN',
+    'GITLAB_TOKEN',
+    'GITLAB_INSTANCE_URL',
+    'GITHUB_CLI_PAT',
+    'GASTOWN_GIT_AUTHOR_NAME',
+    'GASTOWN_GIT_AUTHOR_EMAIL',
+    'GASTOWN_DISABLE_AI_COAUTHOR',
+    'KILOCODE_TOKEN',
+    'GASTOWN_ORGANIZATION_ID',
+    'GASTOWN_CONTAINER_TOKEN',
+  ]);
+  const rawEnvVars = cfg.env_vars;
+  const envVars =
+    typeof rawEnvVars === 'object' && rawEnvVars !== null
+      ? (rawEnvVars as Record<string, unknown>)
+      : {};
+  const newEnvVarKeys = new Set(Object.keys(envVars));
+  // Remove keys that were present in the last sync but are no longer in config.
+  for (const key of lastAppliedEnvVarKeys) {
+    if (!newEnvVarKeys.has(key)) {
+      delete process.env[key];
+    }
+  }
+  // Apply current custom env vars, skipping infra-protected keys.
+  for (const [key, value] of Object.entries(envVars)) {
+    if (INFRA_ENV_KEYS.has(key)) continue;
+    if (value !== undefined && value !== null) {
+      process.env[key] = String(value);
+    }
+  }
+  lastAppliedEnvVarKeys = newEnvVarKeys;
 }
 
 export const app = new Hono();
@@ -309,11 +348,25 @@ app.patch('/agents/:agentId/model', async c => {
   // The middleware already parsed the header into lastKnownTownConfig.
   syncTownConfigToProcessEnv();
 
+  // Extract current custom env vars from the latest town config so the
+  // hot-swap env builder can overlay them over the stale startupEnv snapshot.
+  const cfg = getCurrentTownConfig();
+  const rawCustom = cfg?.env_vars;
+  const customEnvVars: Record<string, string> | undefined =
+    typeof rawCustom === 'object' && rawCustom !== null
+      ? Object.fromEntries(
+          Object.entries(rawCustom as Record<string, unknown>)
+            .filter(([, v]) => v !== undefined && v !== null)
+            .map(([k, v]) => [k, String(v)])
+        )
+      : undefined;
+
   await updateAgentModel(
     agentId,
     parsed.data.model,
     parsed.data.smallModel,
-    parsed.data.conversationHistory
+    parsed.data.conversationHistory,
+    customEnvVars
   );
   return c.json({ updated: true });
 });

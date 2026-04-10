@@ -161,8 +161,10 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const safeUserId = userId.replaceAll('/', '-').replaceAll(':', '-');
-  const filename = `api-request-log_${safeUserId}_${startDate}_${endDate}.zip`;
+  const sanitize = (s: string) => s.replaceAll('/', '-').replaceAll(':', '-');
+  const safeUserId = sanitize(userId);
+  const safeModel = model ? `_${sanitize(model)}` : '';
+  const filename = `api-request-log_${safeUserId}_${startDate}_${endDate}${safeModel}.zip`;
 
   return new Response(webStream, {
     headers: {

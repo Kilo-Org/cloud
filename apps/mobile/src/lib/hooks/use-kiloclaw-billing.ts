@@ -1,6 +1,6 @@
 import { parseTimestamp } from '@/lib/utils';
 
-import { type useKiloClawBillingStatus } from './use-kiloclaw';
+import { type useKiloClawBillingStatus } from './use-kiloclaw-queries';
 
 type ClawBillingStatus = NonNullable<ReturnType<typeof useKiloClawBillingStatus>['data']>;
 
@@ -15,16 +15,6 @@ type ClawBannerState =
   | 'subscription_past_due'
   | 'subscribed'
   | 'none';
-
-type ClawLockReason =
-  | 'trial_expired_instance_alive'
-  | 'trial_expired_instance_destroyed'
-  | 'earlybird_expired'
-  | 'subscription_expired_instance_alive'
-  | 'subscription_expired_instance_destroyed'
-  | 'past_due_grace_exceeded'
-  | 'no_access'
-  | undefined;
 
 export type { ClawBillingStatus };
 
@@ -91,43 +81,6 @@ export function deriveBannerState(billing: ClawBillingStatus): ClawBannerState {
     return deriveEarlybirdBannerState(billing.earlybird);
   }
   return 'none';
-}
-
-function deriveSubscriptionLockReason(billing: ClawBillingStatus): ClawLockReason {
-  const sub = billing.subscription;
-  if (sub?.status === 'canceled') {
-    return billing.instance?.destroyed
-      ? 'subscription_expired_instance_destroyed'
-      : 'subscription_expired_instance_alive';
-  }
-  if (sub?.status === 'past_due' || sub?.status === 'unpaid') {
-    return 'past_due_grace_exceeded';
-  }
-  return undefined;
-}
-
-export function deriveLockReason(billing: ClawBillingStatus): ClawLockReason {
-  if (billing.hasAccess) {
-    return undefined;
-  }
-
-  const subReason = deriveSubscriptionLockReason(billing);
-  if (subReason) {
-    return subReason;
-  }
-
-  if (billing.trial?.expired) {
-    return billing.instance?.destroyed
-      ? 'trial_expired_instance_destroyed'
-      : 'trial_expired_instance_alive';
-  }
-  if (billing.earlybird && billing.earlybird.daysRemaining <= 0) {
-    return 'earlybird_expired';
-  }
-  if (billing.instance) {
-    return 'no_access';
-  }
-  return undefined;
 }
 
 export function formatBillingDate(iso: string): string {

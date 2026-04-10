@@ -32,6 +32,8 @@ import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
 import { deriveHttpEventName } from '../middleware/analytics';
 import { sendMessage } from '../stream-chat/client';
+import { assertImplementedProvider } from '../providers';
+import type { ProviderCapability } from '../providers/types';
 import { resolveDoKeyForUser } from '../lib/instance-routing';
 
 const GmailHistoryIdSchema = z.object({
@@ -257,6 +259,41 @@ function parseInstanceIdQuery(
   return { instanceId: result.data };
 }
 
+async function requireProviderCapability(
+  c: Context<AppEnv>,
+  userId: string,
+  instanceId: string | undefined,
+  capability: ProviderCapability,
+  operation: string,
+  options?: { failOpen?: boolean }
+): Promise<Response | null> {
+  let metadata: {
+    provider: string;
+    capabilities: Record<ProviderCapability, boolean>;
+  };
+  try {
+    metadata = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
+      stub => stub.getProviderMetadata(),
+      'getProviderMetadata'
+    );
+  } catch (error) {
+    if (options?.failOpen) {
+      console.warn(`[platform] ${operation}: provider capability lookup failed, proceeding`, error);
+      return null;
+    }
+    throw error;
+  }
+
+  if (metadata.capabilities[capability]) {
+    return null;
+  }
+
+  return jsonError(`${operation} is not supported for provider ${metadata.provider}`, 400);
+}
+
 function statusCodeFromError(err: unknown): number {
   if (
     typeof err === 'object' &&
@@ -298,6 +335,7 @@ const SAFE_ERROR_PREFIXES = [
   'Cannot retry recovery', // force-retry-recovery guard messages
   'Stream Chat sendMessage failed', // sendMessage HTTP errors
   'Stream Chat is not set up', // no Stream Chat on this instance
+  'Provider ', // explicit not-implemented provider errors
 ];
 
 function sanitizeError(err: unknown, operation: string): { message: string; status: number } {
@@ -327,6 +365,12 @@ function sanitizeError(err: unknown, operation: string): { message: string; stat
  */
 function correctLostStatus(message: string, status: number): number {
   if (status === 500 && message === 'Instance not provisioned') return 404;
+  if (
+    status === 500 &&
+    message.startsWith('Provider ') &&
+    message.endsWith(' is not implemented yet')
+  )
+    return 501;
   return status;
 }
 
@@ -418,6 +462,7 @@ platform.post('/provision', async c => {
     userId,
     instanceId,
     orgId,
+    provider,
     envVars,
     encryptedSecrets,
     channels,
@@ -431,6 +476,9 @@ platform.post('/provision', async c => {
 
   let provision;
   try {
+    if (provider) {
+      assertImplementedProvider(provider);
+    }
     provision = await withResolvedDORetry(
       c.env,
       userId,
@@ -449,7 +497,7 @@ platform.post('/provision', async c => {
             region,
             pinnedImageTag,
           },
-          instanceId || orgId ? { instanceId, orgId } : undefined
+          instanceId || orgId || provider ? { instanceId, orgId, provider } : undefined
         ),
       'provision'
     );
@@ -1844,6 +1892,16 @@ platform.get('/volume-snapshots', async c => {
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
 
+  const unsupported = await requireProviderCapability(
+    c,
+    userId,
+    iidResult.instanceId,
+    'volumeSnapshots',
+    'volume-snapshots',
+    { failOpen: true }
+  );
+  if (unsupported) return unsupported;
+
   try {
     const snapshots = await withResolvedDORetry(
       c.env,
@@ -1869,6 +1927,16 @@ platform.get('/candidate-volumes', async c => {
 
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
+
+  const unsupported = await requireProviderCapability(
+    c,
+    userId,
+    iidResult.instanceId,
+    'candidateVolumes',
+    'candidate-volumes',
+    { failOpen: true }
+  );
+  if (unsupported) return unsupported;
 
   try {
     const result = await withResolvedDORetry(
@@ -1900,6 +1968,16 @@ platform.post('/reassociate-volume', async c => {
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
 
+  const unsupported = await requireProviderCapability(
+    c,
+    result.data.userId,
+    iidResult.instanceId,
+    'volumeReassociation',
+    'reassociate-volume',
+    { failOpen: true }
+  );
+  if (unsupported) return unsupported;
+
   try {
     const response = await withResolvedDORetry(
       c.env,
@@ -1928,6 +2006,16 @@ platform.post('/restore-volume-snapshot', async c => {
 
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
+
+  const unsupported = await requireProviderCapability(
+    c,
+    result.data.userId,
+    iidResult.instanceId,
+    'snapshotRestore',
+    'restore-volume-snapshot',
+    { failOpen: true }
+  );
+  if (unsupported) return unsupported;
 
   try {
     const response = await withResolvedDORetry(
@@ -2121,6 +2209,16 @@ platform.post('/destroy-fly-machine', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   const { userId, appName, machineId } = result.data;
+  const unsupported = await requireProviderCapability(
+    c,
+    userId,
+    iidResult.instanceId,
+    'directMachineDestroy',
+    'destroy-fly-machine',
+    { failOpen: true }
+  );
+  if (unsupported) return unsupported;
+
   const apiToken = c.env.FLY_API_TOKEN;
   if (!apiToken) {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);

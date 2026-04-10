@@ -12,12 +12,22 @@ const testMachineId = 'd890abc123';
 
 function makeEnv(overrides: Record<string, unknown> = {}) {
   const forceRetryRecovery = vi.fn().mockResolvedValue(undefined);
+  const getProviderMetadata = vi.fn().mockResolvedValue({
+    provider: 'fly',
+    capabilities: {
+      volumeSnapshots: true,
+      candidateVolumes: true,
+      volumeReassociation: true,
+      snapshotRestore: true,
+      directMachineDestroy: true,
+    },
+  });
   return {
     env: {
       FLY_API_TOKEN: 'fly-test-token',
       KILOCLAW_INSTANCE: {
         idFromName: (id: string) => id,
-        get: () => ({ forceRetryRecovery }),
+        get: () => ({ forceRetryRecovery, getProviderMetadata }),
       },
       KILOCLAW_AE: { writeDataPoint: vi.fn() },
       KV_CLAW_CACHE: {
@@ -30,6 +40,7 @@ function makeEnv(overrides: Record<string, unknown> = {}) {
       ...overrides,
     } as never,
     forceRetryRecovery,
+    getProviderMetadata,
   };
 }
 
@@ -212,6 +223,57 @@ describe('POST /destroy-fly-machine', () => {
     expect(json.error).toContain('FLY_API_TOKEN');
   });
 
+  it('returns 400 when direct machine destroy is unsupported for the active provider', async () => {
+    const { env, getProviderMetadata } = makeEnv();
+    getProviderMetadata.mockResolvedValueOnce({
+      provider: 'k8s',
+      capabilities: {
+        volumeSnapshots: false,
+        candidateVolumes: false,
+        volumeReassociation: false,
+        snapshotRestore: false,
+        directMachineDestroy: false,
+      },
+    });
+    const { path, init } = postJson('/destroy-fly-machine', {
+      userId: testUserId,
+      appName: testAppName,
+      machineId: testMachineId,
+    });
+
+    const resp = await platform.request(path, init, env);
+
+    expect(resp.status).toBe(400);
+    expect(await jsonBody(resp)).toEqual({
+      error: 'destroy-fly-machine is not supported for provider k8s',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('still calls the Fly API when provider metadata lookup fails', async () => {
+    const { env, getProviderMetadata } = makeEnv();
+    getProviderMetadata.mockRejectedValueOnce(new Error('DO unavailable'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { path, init } = postJson('/destroy-fly-machine', {
+      userId: testUserId,
+      appName: testAppName,
+      machineId: testMachineId,
+    });
+
+    const resp = await platform.request(path, init, env);
+
+    expect(resp.status).toBe(200);
+    expect(await jsonBody(resp)).toEqual({ ok: true });
+    expect(fetchSpy).toHaveBeenCalledWith(
+      `https://api.machines.dev/v1/apps/${testAppName}/machines/${testMachineId}?force=true`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer fly-test-token' },
+      }
+    );
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
   it('wraps Fly API error status and body in error message', async () => {
     fetchSpy.mockResolvedValueOnce(new Response('machine not found', { status: 404 }));
     const { env } = makeEnv();
@@ -268,10 +330,20 @@ describe('POST /destroy-fly-machine', () => {
 
   it('still returns ok when forceRetryRecovery fails', async () => {
     const forceRetryRecovery = vi.fn().mockRejectedValue(new Error('DO unavailable'));
+    const getProviderMetadata = vi.fn().mockResolvedValue({
+      provider: 'fly',
+      capabilities: {
+        volumeSnapshots: true,
+        candidateVolumes: true,
+        volumeReassociation: true,
+        snapshotRestore: true,
+        directMachineDestroy: true,
+      },
+    });
     const { env } = makeEnv({
       KILOCLAW_INSTANCE: {
         idFromName: (id: string) => id,
-        get: () => ({ forceRetryRecovery }),
+        get: () => ({ forceRetryRecovery, getProviderMetadata }),
       },
     });
     const { path, init } = postJson('/destroy-fly-machine', {

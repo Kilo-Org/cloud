@@ -3,12 +3,19 @@ import type { KiloClawEnv } from '../../types';
 import * as fly from '../../fly/client';
 import { PREVIOUS_VOLUME_RETENTION_MS } from '../../config';
 import * as regionHelpers from '../regions';
-import { buildMachineConfig, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
+import { buildRuntimeSpec, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
 import type { InstanceMutableState } from './types';
 import { getFlyConfig } from './types';
-import { resolveImageTag, getRegistryApp, buildUserEnvVars } from './config';
+import {
+  applyProviderState,
+  getFlyProviderState,
+  storageUpdate,
+  syncProviderStateForStorage,
+} from './state';
+import { buildUserEnvVars, resolveImageRef } from './config';
 import * as gateway from './gateway';
 import * as flyMachines from './fly-machines';
+import { buildFlyMachineConfig } from './fly-machines';
 import { doError, doWarn, toLoggable } from './log';
 import type { KiloClawEventData, KiloClawEventName } from '../../utils/analytics';
 
@@ -226,7 +233,7 @@ export async function completeUnexpectedStopRecovery(runtime: RecoveryRuntime): 
   const recoveryVolume = await fly.getVolume(flyConfig, recoveryVolumeId);
   const recoveryVolumeRegion = recoveryVolume.region;
 
-  const healthy = await gateway.waitForHealthy(state, env, flyConfig.appName, state.flyMachineId);
+  const healthy = await gateway.waitForHealthy(state, env);
   if (!healthy) {
     console.warn(
       '[DO] completeUnexpectedStopRecovery: gateway health probe timed out, proceeding with running status'
@@ -387,7 +394,6 @@ export async function runUnexpectedStopRecoveryInBackground(
     }
 
     const { envVars, minSecretsVersion } = await buildUserEnvVars(env, ctx, state);
-    const imageTag = resolveImageTag(state, env);
     const identity = {
       userId: state.userId,
       sandboxId: state.sandboxId,
@@ -396,25 +402,47 @@ export async function runUnexpectedStopRecoveryInBackground(
       imageVariant: state.imageVariant,
       devCreator: env.WORKER_ENV === 'development' ? (env.DEV_CREATOR ?? null) : null,
     };
-    const machineConfig = buildMachineConfig(
-      getRegistryApp(env),
-      imageTag,
+    const runtimeSpec = buildRuntimeSpec(
+      resolveImageRef(state, env),
       envVars,
-      guestFromSize(state.machineSize),
-      recoveryVolumeId,
+      state.machineSize,
       identity
     );
 
     const previousRegion = state.flyRegion;
     state.flyRegion = recoveryVolumeRegion ?? oldVolumeRegion ?? previousRegion;
     try {
-      await flyMachines.createNewMachine(
+      const result = await flyMachines.createNewMachine(
         flyConfig,
-        ctx,
         state,
-        machineConfig,
+        {
+          ...getFlyProviderState(state),
+          region: state.flyRegion,
+        },
+        buildFlyMachineConfig(runtimeSpec, recoveryVolumeId),
         minSecretsVersion,
-        env.FLY_REGION
+        env.FLY_REGION,
+        async providerResult => {
+          applyProviderState(state, providerResult.providerState);
+          await ctx.storage.put(
+            storageUpdate(
+              syncProviderStateForStorage(state, {
+                provider: providerResult.providerState.provider,
+                providerState: providerResult.providerState,
+                ...(providerResult.corePatch ?? {}),
+              })
+            )
+          );
+        }
+      );
+      applyProviderState(state, result.providerState);
+      await ctx.storage.put(
+        storageUpdate(
+          syncProviderStateForStorage(state, {
+            provider: result.providerState.provider,
+            providerState: result.providerState,
+          })
+        )
       );
     } catch (err) {
       const isStartupTimeout = err instanceof fly.FlyApiError && err.status === 408;

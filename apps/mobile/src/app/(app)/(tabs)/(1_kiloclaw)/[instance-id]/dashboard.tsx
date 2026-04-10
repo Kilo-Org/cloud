@@ -21,6 +21,7 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import {
   useKiloClawBillingStatus,
   useKiloClawConfig,
@@ -28,7 +29,7 @@ import {
   useKiloClawMutations,
   useKiloClawServiceDegraded,
   useKiloClawStatus,
-} from '@/lib/hooks/use-kiloclaw';
+} from '@/lib/hooks/use-kiloclaw-queries';
 import { formatModelName, stripModelPrefix } from '@/lib/model-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -36,23 +37,25 @@ export default function DashboardScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
+  const { organizationId, isResolved, isOrg } = useInstanceContext(instanceId);
 
-  const statusQuery = useKiloClawStatus();
-  const billingQuery = useKiloClawBillingStatus();
+  const statusQuery = useKiloClawStatus(organizationId);
+  const isPersonal = isResolved && !isOrg;
+  const billingQuery = useKiloClawBillingStatus(isPersonal);
   const serviceDegradedQuery = useKiloClawServiceDegraded();
-  const mutations = useKiloClawMutations();
+  const mutations = useKiloClawMutations(organizationId);
 
   const status = statusQuery.data;
   const isRunning = status?.status === 'running';
 
-  const gatewayQuery = useKiloClawGatewayStatus(isRunning);
+  const gatewayQuery = useKiloClawGatewayStatus(organizationId, isRunning);
   const gateway = gatewayQuery.data;
-  const configQuery = useKiloClawConfig();
+  const configQuery = useKiloClawConfig(organizationId);
   const activeModel = formatModelName(stripModelPrefix(configQuery.data?.kilocodeDefaultModel));
 
   const billing = billingQuery.data;
   const isServiceDegraded = serviceDegradedQuery.data === true;
-  const isLoading = statusQuery.isPending || billingQuery.isPending;
+  const isLoading = statusQuery.isPending || (isPersonal && billingQuery.isPending);
 
   const [renameVisible, setRenameVisible] = useState(false);
 
@@ -108,7 +111,7 @@ export default function DashboardScreen() {
             </Pressable>
           )}
 
-          {billing && Platform.OS !== 'ios' && <BillingBanner billing={billing} />}
+          {isPersonal && billing && Platform.OS !== 'ios' && <BillingBanner billing={billing} />}
 
           <StatusCard
             status={status?.status}
@@ -137,7 +140,7 @@ export default function DashboardScreen() {
             <Text className="px-4 pt-3 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               More
             </Text>
-            {Platform.OS !== 'ios' && (
+            {isPersonal && Platform.OS !== 'ios' && (
               <>
                 <Pressable
                   className="flex-row items-center gap-3 px-4 py-3 active:opacity-70"
@@ -179,12 +182,9 @@ export default function DashboardScreen() {
                       text: 'Destroy',
                       style: 'destructive',
                       onPress: () => {
-                        mutations.destroy.mutate(undefined, {
-                          onSuccess: () => {
-                            router.dismissAll();
-                            router.replace('/(app)/(tabs)/(1_kiloclaw)');
-                          },
-                        });
+                        mutations.destroy.mutate(undefined);
+                        router.dismissAll();
+                        router.replace('/(app)/(tabs)/(1_kiloclaw)');
                       },
                     },
                   ]

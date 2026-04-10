@@ -2,6 +2,7 @@ import { claude_sonnet_clawsetup_model } from '@/lib/providers/anthropic.constan
 
 const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'arcee-ai/trinity-large-preview:free',
+  'corethink:free',
   'arcee-ai/trinity-mini:free',
   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
   'deepseek/deepseek-r1-0528:free',
@@ -35,6 +36,8 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'qwen/qwen3.6-plus-preview:free',
   'qwen/qwen3.6-plus:free',
   'upstage/solar-pro-3:free',
+  'xiaomi/mimo-v2-omni:free',
+  'xiaomi/mimo-v2-pro:free',
   'z-ai/glm-4.5-air:free',
   'z-ai/glm-5:free',
   claude_sonnet_clawsetup_model.public_id, // only usable through kilo-auto

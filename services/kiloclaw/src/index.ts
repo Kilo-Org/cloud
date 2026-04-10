@@ -32,6 +32,7 @@ import { KILOCLAW_ACTIVE_INSTANCE_COOKIE } from './config';
 import { timingMiddleware } from './middleware/analytics';
 import { writeEvent } from './utils/analytics';
 import type { RegistryEntry } from './durable-objects/kiloclaw-registry';
+import type { ProviderRoutingTarget } from './providers/types';
 
 // Export DOs (match wrangler.jsonc class_name bindings)
 export { KiloClawInstance } from './durable-objects/kiloclaw-instance';
@@ -120,11 +121,8 @@ function validateRequiredEnv(env: KiloClawEnv): string[] {
   return missing;
 }
 
-/**
- * Build the Fly Proxy URL for a given request path.
- */
-function flyProxyUrl(appName: string, url: URL): string {
-  return `https://${appName}.fly.dev${url.pathname}${url.search}`;
+function routingTargetUrl(target: ProviderRoutingTarget, pathname: string, search = ''): string {
+  return `${target.origin}${pathname}${search}`;
 }
 
 // =============================================================================
@@ -297,22 +295,21 @@ app.all('/i/:instanceId/*', async c => {
     return c.json({ error: 'Instance has no sandboxId' }, 500);
   }
 
-  const appName = status.flyAppName ?? c.env.FLY_APP_NAME;
-  if (!appName) {
-    return c.json({ error: 'No Fly app name for this instance' }, 503);
-  }
-
   // Strip the /i/{instanceId} prefix to get the real path
   const url = new URL(c.req.raw.url);
   const prefix = `/i/${instanceId}`;
   const strippedPath = url.pathname.slice(prefix.length) || '/';
-  const targetUrl = `https://${appName}.fly.dev${strippedPath}${url.search}`;
+  const routingTarget = await stub.getRoutingTarget();
+  if (!routingTarget) {
+    return c.json({ error: 'Instance not routable' }, 503);
+  }
+  const targetUrl = routingTargetUrl(routingTarget, strippedPath, url.search);
 
   const forwardHeaders = await buildForwardHeaders({
     requestHeaders: c.req.raw.headers,
-    machineId: status.flyMachineId,
     sandboxId: status.sandboxId,
     gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+    providerHeaders: routingTarget.headers,
   });
 
   console.log(
@@ -550,26 +547,26 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
  * Callers MUST use the returned sandboxId for gateway token derivation.
  */
 async function resolveInstance(c: Context<AppEnv>): Promise<{
+  stub: ReturnType<KiloClawEnv['KILOCLAW_INSTANCE']['get']> | null;
   machineId: string | null;
-  flyAppName: string | null;
   sandboxId: string | null;
   status: string | null;
 }> {
   const resolved = await resolveRegistryEntry(c);
-  if (!resolved) return { machineId: null, flyAppName: null, sandboxId: null, status: null };
+  if (!resolved) return { stub: null, machineId: null, sandboxId: null, status: null };
 
   const s = await resolved.stub.getStatus();
 
   if (s.status === 'destroying')
-    return { machineId: null, flyAppName: null, sandboxId: null, status: 'destroying' };
+    return { stub: resolved.stub, machineId: null, sandboxId: null, status: 'destroying' };
   if (s.status === 'restoring')
-    return { machineId: null, flyAppName: null, sandboxId: null, status: 'restoring' };
+    return { stub: resolved.stub, machineId: null, sandboxId: null, status: 'restoring' };
   if (s.status === 'recovering')
-    return { machineId: null, flyAppName: null, sandboxId: null, status: 'recovering' };
+    return { stub: resolved.stub, machineId: null, sandboxId: null, status: 'recovering' };
 
   return {
+    stub: resolved.stub,
     machineId: s.flyMachineId,
-    flyAppName: s.flyAppName,
     sandboxId: s.sandboxId,
     status: s.status,
   };
@@ -637,8 +634,14 @@ app.all('*', async c => {
           );
         }
 
-        const appName = instanceStatus.flyAppName ?? c.env.FLY_APP_NAME;
-        if (appName && instanceStatus.sandboxId) {
+        const routingTarget = await stub.getRoutingTarget();
+        if (!routingTarget) {
+          return c.json(
+            { error: 'Instance not routable' },
+            { status: 503, headers: { 'Retry-After': '5' } }
+          );
+        }
+        if (instanceStatus.sandboxId) {
           console.log(
             '[PROXY] Cookie-routed to instance:',
             activeInstanceId,
@@ -647,7 +650,7 @@ app.all('*', async c => {
           );
           const request = c.req.raw;
           const url = new URL(request.url);
-          const targetUrl = flyProxyUrl(appName, url);
+          const targetUrl = routingTargetUrl(routingTarget, url.pathname, url.search);
 
           if (!c.env.GATEWAY_TOKEN_SECRET) {
             return c.json(
@@ -658,9 +661,9 @@ app.all('*', async c => {
 
           const forwardHeaders = await buildForwardHeaders({
             requestHeaders: request.headers,
-            machineId: instanceStatus.flyMachineId,
             sandboxId: instanceStatus.sandboxId,
             gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+            providerHeaders: routingTarget.headers,
           });
 
           const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
@@ -780,7 +783,7 @@ app.all('*', async c => {
     // Cookie invalid/stale — fall through to default personal resolution
   }
 
-  const { machineId, flyAppName, sandboxId, status } = await resolveInstance(c);
+  const { stub, machineId, sandboxId, status } = await resolveInstance(c);
   if (status === 'destroying') {
     return c.json(
       { error: 'Instance is being destroyed', hint: 'This instance is being torn down.' },
@@ -818,18 +821,20 @@ app.all('*', async c => {
     return c.json({ error: 'Instance has no sandboxId' }, 500);
   }
 
-  // Per-user app name, with legacy fallback for existing instances
-  const appName = flyAppName ?? c.env.FLY_APP_NAME;
-  if (!appName) {
+  if (!stub) {
     return c.json(
-      { error: 'No Fly app name for this instance' },
+      { error: 'Instance not routable' },
       { status: 503, headers: { 'Retry-After': '5' } }
     );
   }
 
   const request = c.req.raw;
   const url = new URL(request.url);
-  const targetUrl = flyProxyUrl(appName, url);
+  const routingTarget = await stub.getRoutingTarget();
+  if (!routingTarget) {
+    return c.json({ error: 'Instance not routable' }, 503);
+  }
+  let targetUrl = routingTargetUrl(routingTarget, url.pathname, url.search);
 
   console.log('[PROXY] Handling request:', url.pathname, 'machine:', machineId);
 
@@ -847,11 +852,11 @@ app.all('*', async c => {
   // This is critical: instance-keyed DOs derive sandboxId from instanceId (ki_ prefix),
   // which differs from the middleware-derived value (sandboxIdFromUserId). The gateway
   // token must match what the machine expects.
-  const forwardHeaders = await buildForwardHeaders({
+  let forwardHeaders = await buildForwardHeaders({
     requestHeaders: request.headers,
-    machineId,
     sandboxId,
     gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+    providerHeaders: routingTarget.headers,
   });
 
   // WebSocket proxy
@@ -869,14 +874,31 @@ app.all('*', async c => {
       const recovered = await attemptCrashRecovery(c);
       if (recovered) {
         // Machine may have been recreated — refresh the instance routing header
-        const { machineId: newMachineId } = await resolveInstance(c);
-        if (!newMachineId) {
+        const refreshedInstance = await resolveInstance(c);
+        if (
+          !refreshedInstance.machineId ||
+          !refreshedInstance.stub ||
+          !refreshedInstance.sandboxId
+        ) {
           return c.json(
             { error: 'Instance not reachable after restart' },
             { status: 503, headers: { 'Retry-After': '5' } }
           );
         }
-        forwardHeaders.set('fly-force-instance-id', newMachineId);
+        const refreshedRoutingTarget = await refreshedInstance.stub.getRoutingTarget();
+        if (!refreshedRoutingTarget) {
+          return c.json(
+            { error: 'Instance not reachable after restart' },
+            { status: 503, headers: { 'Retry-After': '5' } }
+          );
+        }
+        targetUrl = routingTargetUrl(refreshedRoutingTarget, url.pathname, url.search);
+        forwardHeaders = await buildForwardHeaders({
+          requestHeaders: request.headers,
+          sandboxId: refreshedInstance.sandboxId,
+          gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+          providerHeaders: refreshedRoutingTarget.headers,
+        });
 
         try {
           containerResponse = await fetch(targetUrl, {
@@ -1019,14 +1041,27 @@ app.all('*', async c => {
     const recovered = await attemptCrashRecovery(c);
     if (recovered) {
       // Machine may have been recreated — refresh the instance routing header
-      const { machineId: newMachineId } = await resolveInstance(c);
-      if (!newMachineId) {
+      const refreshedInstance = await resolveInstance(c);
+      if (!refreshedInstance.machineId || !refreshedInstance.stub || !refreshedInstance.sandboxId) {
         return c.json(
           { error: 'Instance not reachable after restart' },
           { status: 503, headers: { 'Retry-After': '5' } }
         );
       }
-      forwardHeaders.set('fly-force-instance-id', newMachineId);
+      const refreshedRoutingTarget = await refreshedInstance.stub.getRoutingTarget();
+      if (!refreshedRoutingTarget) {
+        return c.json(
+          { error: 'Instance not reachable after restart' },
+          { status: 503, headers: { 'Retry-After': '5' } }
+        );
+      }
+      targetUrl = routingTargetUrl(refreshedRoutingTarget, url.pathname, url.search);
+      forwardHeaders = await buildForwardHeaders({
+        requestHeaders: request.headers,
+        sandboxId: refreshedInstance.sandboxId,
+        gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+        providerHeaders: refreshedRoutingTarget.headers,
+      });
 
       try {
         httpResponse = await fetch(targetUrl, {

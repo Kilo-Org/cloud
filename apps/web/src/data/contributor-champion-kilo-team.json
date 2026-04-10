@@ -1,0 +1,43 @@
+{
+  "kilo": [
+    "brianturcotte",
+    "olearycrew",
+    "catrielmuller",
+    "lambertjosh",
+    "marius-kilocode",
+    "LigiaZ",
+    "St0rmz1",
+    "RSO",
+    "Sureshkumars",
+    "alex-alecu",
+    "chrarnoldus",
+    "darkogj",
+    "emilieschario",
+    "kilo-code-bot[bot]",
+    "imanolmzd-svg",
+    "eshurakov",
+    "iscekic",
+    "jeanduplessis",
+    "jfcsantos",
+    "johnnyeric",
+    "jrf0110",
+    "kevinvandijk",
+    "markijbema",
+    "pandemicsyn",
+    "pedroheyerdahl",
+    "kilo-org",
+    "kilocode"
+  ],
+  "opencode": [
+    "thdxr",
+    "adamdotdevin",
+    "brendonovich",
+    "fwang",
+    "iamdavidhill",
+    "jayair",
+    "kitlangton",
+    "opencode-ai",
+    "rekram1-node"
+  ],
+  "other": ["github-actions[bot]"]
+}

@@ -608,13 +608,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     isKiloExclusiveFreeModel(originalModelIdLowerCased);
   const isStealthModelRequiringNameRemoval =
     provider.id !== 'martian' && isKiloStealthModel(originalModelIdLowerCased);
-  const isProviderRequiringResponseFixes = provider.id === 'corethink';
 
-  if (
-    isFreeModelRequiringCostRemoval ||
-    isStealthModelRequiringNameRemoval ||
-    isProviderRequiringResponseFixes
-  ) {
+  if (isFreeModelRequiringCostRemoval || isStealthModelRequiringNameRemoval) {
     if (requestBodyParsed.kind === 'chat_completions') {
       return rewriteFreeModelResponse_ChatCompletions(response, originalModelIdLowerCased);
     }

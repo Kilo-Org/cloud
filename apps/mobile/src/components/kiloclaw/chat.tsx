@@ -1,32 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, View } from 'react-native';
+import { ActivityIndicator, AppState, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { type Href, useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image'; // eslint-disable-line no-restricted-imports -- raw expo-image needed for Stream Chat SDK ImageComponent prop
-import { Settings } from 'lucide-react-native';
 import { type Channel as StreamChannel, StreamChat } from 'stream-chat';
 import { Channel, Chat, MessageInput, MessageList, OverlayProvider } from 'stream-chat-expo';
 
 import { KiloClawMessageAvatar } from '@/components/kiloclaw/chat-avatar';
+import { ChatPlaceholder } from '@/components/kiloclaw/chat-placeholder';
+import { ChatHeader, ChatShell } from '@/components/kiloclaw/chat-shell';
 import { useBotOnlineStatus } from '@/components/kiloclaw/chat-hooks';
 import { NotificationPrompt } from '@/components/kiloclaw/notification-prompt';
 import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
-import { ScreenHeader } from '@/components/screen-header';
-import { Text } from '@/components/ui/text';
-import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw';
+import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw-queries';
 import { setActiveChatInstance } from '@/lib/notifications';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 
 type KiloClawChatProps = {
   instanceId: string;
   name: string;
   enabled: boolean;
+  organizationId?: string | null;
 };
 
-export function KiloClawChat({ instanceId, name, enabled }: Readonly<KiloClawChatProps>) {
-  const { data: creds, isLoading, error } = useStreamChatCredentials(enabled);
+export function KiloClawChat({
+  instanceId,
+  name,
+  enabled,
+  organizationId,
+}: Readonly<KiloClawChatProps>) {
+  const { data: creds, isLoading, error } = useStreamChatCredentials(organizationId, enabled);
 
   useFocusEffect(
     useCallback(() => {
@@ -78,71 +82,8 @@ export function KiloClawChat({ instanceId, name, enabled }: Readonly<KiloClawCha
       apiKey={creds.apiKey}
       userId={creds.userId}
       channelId={creds.channelId}
+      organizationId={organizationId}
     />
-  );
-}
-
-function ChatShell({
-  instanceId,
-  name,
-  children,
-}: {
-  instanceId: string;
-  name: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <View className="flex-1 bg-background">
-      <ChatHeader instanceId={instanceId} title={name} />
-      {children}
-    </View>
-  );
-}
-
-function ChatHeader({
-  instanceId,
-  title,
-  botOnline,
-}: {
-  instanceId: string;
-  title: string;
-  botOnline?: boolean;
-}) {
-  const router = useRouter();
-  const colors = useThemeColors();
-
-  const settingsButton = (
-    <Pressable
-      onPress={() => {
-        router.push(`/(app)/(tabs)/(1_kiloclaw)/${instanceId}/dashboard` as Href);
-      }}
-      hitSlop={12}
-      accessibilityLabel="Settings"
-      className="active:opacity-70"
-    >
-      <Settings size={20} color={colors.foreground} />
-    </Pressable>
-  );
-
-  return (
-    <ScreenHeader
-      title={title}
-      headerRight={
-        <View className="flex-row items-center gap-3">
-          {botOnline !== undefined && <BotStatusIndicator online={botOnline} />}
-          {settingsButton}
-        </View>
-      }
-    />
-  );
-}
-
-function BotStatusIndicator({ online }: { online: boolean }) {
-  return (
-    <View className="flex-row items-center gap-1.5">
-      <View className={`h-2 w-2 rounded-full ${online ? 'bg-emerald-400' : 'bg-neutral-500'}`} />
-      <Text className="text-xs text-muted-foreground">{online ? 'Online' : 'Offline'}</Text>
-    </View>
   );
 }
 
@@ -152,12 +93,14 @@ function StreamChatUI({
   apiKey,
   userId,
   channelId,
+  organizationId,
 }: {
   instanceId: string;
   name: string;
   apiKey: string;
   userId: string;
   channelId: string;
+  organizationId?: string | null;
 }) {
   const { bottom } = useSafeAreaInsets();
   const [headerHeight, setHeaderHeight] = useState(0);
@@ -165,18 +108,19 @@ function StreamChatUI({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  // Stable token provider — stream-chat calls this when the current token expires.
   const tokenProvider = useCallback(async () => {
-    const creds = await queryClient.fetchQuery(
-      trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
-        staleTime: 0,
-      })
-    );
+    const opts = organizationId
+      ? trpc.organizations.kiloclaw.getStreamChatCredentials.queryOptions(
+          { organizationId },
+          { staleTime: 0 }
+        )
+      : trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, { staleTime: 0 });
+    const creds = await queryClient.fetchQuery(opts);
     if (!creds?.userToken) {
       throw new Error('Failed to fetch Stream Chat credentials');
     }
     return creds.userToken;
-  }, [queryClient, trpc]);
+  }, [queryClient, trpc, organizationId]);
 
   const [client, setClient] = useState<StreamChat | null>(null);
   const [channel, setChannel] = useState<StreamChannel | null>(null);
@@ -288,13 +232,6 @@ function StreamChatUI({
           </Chat>
         </OverlayProvider>
       </View>
-    </View>
-  );
-}
-function ChatPlaceholder({ message }: { message: string }) {
-  return (
-    <View className="flex-1 items-center justify-center px-6">
-      <Text className="text-center text-sm text-muted-foreground">{message}</Text>
     </View>
   );
 }

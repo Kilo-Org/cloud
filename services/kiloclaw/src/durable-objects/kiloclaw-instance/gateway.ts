@@ -16,34 +16,40 @@ import {
 import { HEALTH_PROBE_TIMEOUT_SECONDS, HEALTH_PROBE_INTERVAL_MS } from '../../config';
 import type { InstanceMutableState } from './types';
 import { doWarn, toLoggable } from './log';
+import { getProviderAdapter } from '../../providers';
+import type { ProviderRoutingTarget } from '../../providers/types';
 
 /**
  * Validate that the instance has all context needed for gateway controller RPCs.
  */
-function requireGatewayControllerContext(
+async function requireGatewayControllerContext(
   state: InstanceMutableState,
   env: KiloClawEnv
-): {
-  appName: string;
-  machineId: string;
+): Promise<{
+  routingTarget: ProviderRoutingTarget;
   sandboxId: string;
-} {
+}> {
   if (!state.sandboxId) {
     throw new GatewayControllerError(409, 'Instance not provisioned');
   }
-  if (!state.flyMachineId) {
-    throw new GatewayControllerError(409, 'Instance has no machine ID');
-  }
 
-  const appName = state.flyAppName ?? env.FLY_APP_NAME;
-  if (!appName) {
-    throw new GatewayControllerError(503, 'No Fly app name for this instance');
+  let routingTarget: ProviderRoutingTarget;
+  try {
+    routingTarget = await getProviderAdapter(env, state).getRoutingTarget({
+      env,
+      state,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('machine ID')) {
+      throw new GatewayControllerError(409, 'Instance has no machine ID');
+    }
+    throw new GatewayControllerError(503, message);
   }
 
   return {
-    appName,
-    machineId: state.flyMachineId,
     sandboxId: state.sandboxId,
+    routingTarget,
   };
 }
 
@@ -58,19 +64,19 @@ export async function callGatewayController<T>(
   responseSchema: ZodType<T>,
   jsonBody?: unknown
 ): Promise<T> {
-  const { appName, machineId, sandboxId } = requireGatewayControllerContext(state, env);
+  const { routingTarget, sandboxId } = await requireGatewayControllerContext(state, env);
 
   if (!env.GATEWAY_TOKEN_SECRET) {
     throw new GatewayControllerError(503, 'GATEWAY_TOKEN_SECRET is not configured');
   }
 
   const gatewayToken = await deriveGatewayToken(sandboxId, env.GATEWAY_TOKEN_SECRET);
-  const url = `https://${appName}.fly.dev${path}`;
+  const url = `${routingTarget.origin}${path}`;
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${gatewayToken}`,
     Accept: 'application/json',
-    'fly-force-instance-id': machineId,
+    ...routingTarget.headers,
   };
   if (jsonBody !== undefined) {
     headers['Content-Type'] = 'application/json';
@@ -491,11 +497,13 @@ export async function patchOpenclawConfig(
  */
 export async function waitForHealthy(
   state: InstanceMutableState,
-  env: KiloClawEnv,
-  appName: string,
-  machineId: string
+  env: KiloClawEnv
 ): Promise<boolean> {
-  const url = `https://${appName}.fly.dev/_kilo/gateway/status`;
+  const routingTarget = await getProviderAdapter(env, state).getRoutingTarget({
+    env,
+    state,
+  });
+  const url = `${routingTarget.origin}/_kilo/gateway/status`;
   const deadline = Date.now() + HEALTH_PROBE_TIMEOUT_SECONDS * 1000;
 
   let gatewayToken: string | undefined;
@@ -507,18 +515,18 @@ export async function waitForHealthy(
     try {
       const res = await fetch(url, {
         headers: {
-          'fly-force-instance-id': machineId,
           ...(gatewayToken && { Authorization: `Bearer ${gatewayToken}` }),
           Accept: 'application/json',
+          ...routingTarget.headers,
         },
       });
       if (res.ok) {
         const body: { state?: string } = await res.json();
         if (body.state === 'running') {
-          const rootUrl = `https://${appName}.fly.dev/`;
+          const rootUrl = `${routingTarget.origin}/`;
           try {
             const rootRes = await fetch(rootUrl, {
-              headers: { 'fly-force-instance-id': machineId },
+              headers: routingTarget.headers,
             });
             if (rootRes.status !== 502) {
               console.log(

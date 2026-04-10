@@ -1,12 +1,14 @@
 import { type LucideIcon, ShieldCheck, Zap } from 'lucide-react-native';
 import { Pressable, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { useLocalSearchParams } from 'expo-router';
 
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useKiloClawMutations, useKiloClawStatus } from '@/lib/hooks/use-kiloclaw';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { useKiloClawMutations, useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { cn } from '@/lib/utils';
 
 type ExecPreset = 'always-ask' | 'never-ask';
@@ -56,8 +58,10 @@ function resolvePreset(
 }
 
 export default function ExecPolicyScreen() {
-  const statusQuery = useKiloClawStatus();
-  const mutations = useKiloClawMutations();
+  const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
+  const { organizationId } = useInstanceContext(instanceId);
+  const statusQuery = useKiloClawStatus(organizationId);
+  const mutations = useKiloClawMutations(organizationId);
 
   const currentPreset = resolvePreset(statusQuery.data?.execSecurity, statusQuery.data?.execAsk);
 

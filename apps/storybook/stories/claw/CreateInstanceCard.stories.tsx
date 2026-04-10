@@ -11,7 +11,6 @@ const meta = {
     },
   },
   args: {
-    canStartTrial: true,
     isPending: false,
     onCreate: () => undefined,
   },

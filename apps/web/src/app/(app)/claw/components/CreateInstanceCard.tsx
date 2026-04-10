@@ -1,12 +1,9 @@
 'use client';
 
 import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
-import { useQuery } from '@tanstack/react-query';
 import { Brain, ChevronRight, MessageSquare, Sun, Wrench, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
-import { useClawContext } from './ClawContext';
-import { useTRPC } from '@/lib/trpc/utils';
 import { KILO_AUTO_BALANCED_MODEL } from '@/lib/kilo-auto';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,7 +11,6 @@ import { Card, CardContent } from '@/components/ui/card';
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
 type CreateInstanceCardViewProps = {
-  canStartTrial?: boolean;
   isPending?: boolean;
   onCreate?: () => void;
 };
@@ -43,7 +39,6 @@ const featureCards = [
 ];
 
 export function CreateInstanceCardView({
-  canStartTrial = false,
   isPending = false,
   onCreate,
 }: CreateInstanceCardViewProps) {
@@ -53,8 +48,8 @@ export function CreateInstanceCardView({
         <div className="mx-auto flex max-w-xl flex-col items-center text-center">
           <h2 className="text-foreground text-2xl font-bold">Your AI assistant, always on</h2>
           <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
-            KiloClaw is a personal AI that lives on your phone. It sends you a morning briefing,
-            answers questions, automates busywork, and learns how you like things done.
+            KiloClaw is an AI agent that connects to the apps you already use — email, chat,
+            calendar, and many more — and handles tasks for you, 24/7.
           </p>
         </div>
 
@@ -73,14 +68,6 @@ export function CreateInstanceCardView({
           })}
         </div>
 
-        <div className="flex flex-col items-center">
-          <div className="inline-flex items-center rounded-full border border-emerald-700 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-400">
-            {canStartTrial
-              ? 'Try 6 hours for free — no credit card needed'
-              : 'Try 6 hours for free'}
-          </div>
-        </div>
-
         <div className="space-y-3">
           <Button
             onClick={onCreate}
@@ -91,7 +78,7 @@ export function CreateInstanceCardView({
               'Setting up...'
             ) : (
               <span className="inline-flex items-center gap-1">
-                Get Started
+                Try For Free
                 <ChevronRight className="h-5 w-5" />
               </span>
             )}
@@ -126,17 +113,7 @@ export function CreateInstanceCard({
   // $feature/button-vs-card to events fired in this component.
   useFeatureFlagVariantKey('button-vs-card');
   const posthog = usePostHog();
-  const trpc = useTRPC();
-  const { organizationId } = useClawContext();
-  const isOrgContext = !!organizationId;
-  // Billing status is personal-only; org uses org subscription checks
-  const { data: billingStatus } = useQuery({
-    ...trpc.kiloclaw.getBillingStatus.queryOptions(),
-    enabled: !isOrgContext,
-  });
   const selectedModel = KILO_AUTO_BALANCED_MODEL.id;
-  const canStartTrial = Boolean(billingStatus?.trialEligible);
-
   function handleCreate() {
     posthog?.capture('claw_create_instance_clicked', {
       selected_model: selectedModel,
@@ -160,10 +137,6 @@ export function CreateInstanceCard({
   }
 
   return (
-    <CreateInstanceCardView
-      canStartTrial={canStartTrial}
-      isPending={mutations.provision.isPending}
-      onCreate={handleCreate}
-    />
+    <CreateInstanceCardView isPending={mutations.provision.isPending} onCreate={handleCreate} />
   );
 }

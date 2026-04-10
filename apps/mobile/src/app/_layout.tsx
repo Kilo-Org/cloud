@@ -1,5 +1,6 @@
 import '../global.css';
 
+import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { PortalHost } from '@rn-primitives/portal';
 import * as Sentry from '@sentry/react-native';
 import { QueryClientProvider, useMutation } from '@tanstack/react-query';
@@ -191,9 +192,11 @@ function RootLayout() {
       <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <RootLayoutNav />
-            <Toaster />
-            <PortalHost />
+            <ActionSheetProvider>
+              <RootLayoutNav />
+              <Toaster />
+              <PortalHost />
+            </ActionSheetProvider>
           </AuthProvider>
         </QueryClientProvider>
       </TRPCProvider>

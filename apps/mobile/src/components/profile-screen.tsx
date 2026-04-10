@@ -1,3 +1,4 @@
+import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { ChevronDown, KeyRound, LogOut, Trash2 } from 'lucide-react-native';
@@ -28,8 +29,8 @@ type CreditsCardProps = {
 function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
+  const { showActionSheetWithOptions } = useActionSheet();
   const [selectedOrgId, setSelectedOrgId] = useState<string | undefined>(undefined);
-  const [pickerOpen, setPickerOpen] = useState(false);
 
   const {
     data: balance,
@@ -58,6 +59,27 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
 
   const hasOrgs = orgs && orgs.length > 0;
 
+  const openPicker = () => {
+    if (!orgs || orgs.length === 0) {
+      return;
+    }
+    const options = ['Personal', ...orgs.map(o => o.organizationName), 'Cancel'];
+    const cancelButtonIndex = options.length - 1;
+    showActionSheetWithOptions({ options, cancelButtonIndex, title: 'Select account' }, index => {
+      if (index === undefined || index === cancelButtonIndex) {
+        return;
+      }
+      if (index === 0) {
+        setSelectedOrgId(undefined);
+      } else {
+        const org = orgs[index - 1];
+        if (org) {
+          setSelectedOrgId(org.organizationId);
+        }
+      }
+    });
+  };
+
   return (
     <View className="gap-3">
       <View className="flex-row items-center justify-between">
@@ -67,9 +89,7 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
         {hasOrgs && (
           <Pressable
             className="flex-row items-center gap-1 active:opacity-70"
-            onPress={() => {
-              setPickerOpen(prev => !prev);
-            }}
+            onPress={openPicker}
             hitSlop={8}
           >
             <Text className="text-xs font-medium text-muted-foreground">{selectedLabel}</Text>
@@ -77,35 +97,6 @@ function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
           </Pressable>
         )}
       </View>
-
-      {hasOrgs && pickerOpen && (
-        <Animated.View
-          entering={FadeIn.duration(150)}
-          className="rounded-lg bg-secondary p-1 gap-0.5"
-        >
-          <Pressable
-            className={`rounded-md px-3 py-2 active:opacity-70 ${!selectedOrgId ? 'bg-muted' : ''}`}
-            onPress={() => {
-              setSelectedOrgId(undefined);
-              setPickerOpen(false);
-            }}
-          >
-            <Text className="text-sm font-medium">Personal</Text>
-          </Pressable>
-          {orgs.map(org => (
-            <Pressable
-              key={org.organizationId}
-              className={`rounded-md px-3 py-2 active:opacity-70 ${selectedOrgId === org.organizationId ? 'bg-muted' : ''}`}
-              onPress={() => {
-                setSelectedOrgId(org.organizationId);
-                setPickerOpen(false);
-              }}
-            >
-              <Text className="text-sm font-medium">{org.organizationName}</Text>
-            </Pressable>
-          ))}
-        </Animated.View>
-      )}
 
       {balanceLoading && <Skeleton className="h-12 w-32 rounded-lg" />}
       {balanceError && (

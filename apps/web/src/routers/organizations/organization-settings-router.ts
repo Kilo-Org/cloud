@@ -13,6 +13,7 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
+import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 
 /**

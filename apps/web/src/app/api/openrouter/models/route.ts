@@ -14,16 +14,19 @@ const getDirectByokModelsForUser_cached = unstable_cache(
   { revalidate: 60 }
 );
 
-async function getDirectByokModels() {
+async function getAuthContext() {
   try {
-    const { user } = await getUserFromAuth({ adminOnly: false });
-    if (user) {
-      console.debug('[getDirectByokModels] authenticated request, fetching direct byok models');
-      return await getDirectByokModelsForUser_cached(user.id);
-    } else {
-      console.debug('[getDirectByokModels] anonymous request, no direct byok models');
-      return [];
-    }
+    return await getUserFromAuth({ adminOnly: false });
+  } catch (e) {
+    console.debug('[openrouter/models] error getting auth context, database unavailable?', e);
+    return null;
+  }
+}
+
+async function getDirectByokModels(userId: string) {
+  try {
+    console.debug('[getDirectByokModels] authenticated request, fetching direct byok models');
+    return await getDirectByokModelsForUser_cached(userId);
   } catch (e) {
     console.debug('[getDirectByokModels] error, database unavailable?', e);
     return [];
@@ -37,9 +40,10 @@ async function getDirectByokModels() {
 export async function GET(
   request: NextRequest
 ): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
-  const { organizationId } = await getUserFromAuth({ adminOnly: false });
+  const auth = await getAuthContext();
 
-  if (organizationId) {
+  if (auth?.organizationId) {
+    const { organizationId } = auth;
     return handleTRPCRequest<OpenRouterModelsResponse>(request, async caller => {
       return caller.organizations.settings.listAvailableModels({ organizationId });
     });
@@ -47,9 +51,11 @@ export async function GET(
 
   try {
     const data = await getEnhancedOpenRouterModels();
-    return NextResponse.json(
-      Array.isArray(data.data) ? { data: data.data.concat(await getDirectByokModels()) } : data
-    );
+    if (!Array.isArray(data.data)) {
+      return NextResponse.json(data);
+    }
+    const byokModels = auth?.user ? await getDirectByokModels(auth.user.id) : [];
+    return NextResponse.json({ data: data.data.concat(byokModels) });
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'openrouter/models' },

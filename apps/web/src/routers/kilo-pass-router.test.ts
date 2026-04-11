@@ -295,7 +295,8 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getState();
 
-      expect(result).toEqual({ subscription: null, isEligibleForFirstMonthPromo: true });
+      const promoActive = new Date() < KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toDate();
+      expect(result).toEqual({ subscription: null, isEligibleForFirstMonthPromo: promoActive });
     });
 
     it('throws BAD_REQUEST when subscription exists but user has no stripe customer', async () => {
@@ -732,7 +733,7 @@ describe('kiloPassRouter', () => {
   });
 
   describe('isEligibleForFirstMonthPromo in getState', () => {
-    it('returns isEligibleForFirstMonthPromo=true when user has no subscriptions', async () => {
+    it('returns isEligibleForFirstMonthPromo matching promo active state when user has no subscriptions', async () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-promo-eligible-no-sub@example.com',
       });
@@ -740,7 +741,8 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getState();
 
-      expect(result.isEligibleForFirstMonthPromo).toBe(true);
+      const promoActive = new Date() < KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toDate();
+      expect(result.isEligibleForFirstMonthPromo).toBe(promoActive);
       expect(result.subscription).toBeNull();
     });
 

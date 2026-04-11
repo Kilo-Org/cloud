@@ -19,6 +19,9 @@ export function normalizeToolCallIds(
   filter: (toolCallId: string) => boolean,
   maxIdLength: number | undefined
 ) {
+  if (!Array.isArray(requestToMutate.messages)) {
+    return;
+  }
   for (const msg of requestToMutate.messages) {
     if (msg.role === 'assistant') {
       for (const toolCall of msg.tool_calls ?? []) {

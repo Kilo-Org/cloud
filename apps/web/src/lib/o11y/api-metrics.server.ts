@@ -124,6 +124,7 @@ export function getToolsUsed(request: GatewayRequest): string[] {
   }
 
   if (request.kind === 'messages') {
+    if (!Array.isArray(request.body.messages)) return [];
     const used = new Array<string>();
     for (const message of request.body.messages) {
       if (message.role !== 'assistant') continue;

@@ -106,7 +106,8 @@ function extractFullPromptFromMessages(body: GatewayMessagesRequest) {
       : Array.isArray(systemContent)
         ? systemContent.map(b => b.text).join('\n')
         : null;
-  const lastUserMessage = body.messages.filter(m => m.role === 'user').at(-1);
+  const messages = Array.isArray(body.messages) ? body.messages : [];
+  const lastUserMessage = messages.filter(m => m.role === 'user').at(-1);
   let userPrompt: string | null = null;
   if (lastUserMessage) {
     const content = lastUserMessage.content;

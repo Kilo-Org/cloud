@@ -196,6 +196,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return modelDoesNotExistResponse();
   }
 
+  // Validate that messages is a non-empty array for request kinds that require it
+  if (
+    (requestBodyParsed.kind === 'chat_completions' || requestBodyParsed.kind === 'messages') &&
+    !Array.isArray(requestBodyParsed.body.messages)
+  ) {
+    return invalidRequestResponse();
+  }
+
   const requestedModel = requestBodyParsed.body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
   const isLegacyOpenRouterPath = url.pathname.includes('/openrouter');

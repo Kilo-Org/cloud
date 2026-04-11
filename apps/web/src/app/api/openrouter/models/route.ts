@@ -6,6 +6,7 @@ import { getEnhancedOpenRouterModels } from '@/lib/providers/openrouter';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getDirectByokModelsForUser } from '@/lib/providers/direct-byok';
 import { unstable_cache } from 'next/cache';
+import { handleTRPCRequest } from '@/lib/trpc-route-handler';
 
 const getDirectByokModelsForUser_cached = unstable_cache(
   (userId: string) => getDirectByokModelsForUser(userId),
@@ -34,8 +35,16 @@ async function getDirectByokModels() {
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
  */
 export async function GET(
-  _request: NextRequest
+  request: NextRequest
 ): Promise<NextResponse<{ error: string; message: string } | OpenRouterModelsResponse>> {
+  const { organizationId } = await getUserFromAuth({ adminOnly: false });
+
+  if (organizationId) {
+    return handleTRPCRequest<OpenRouterModelsResponse>(request, async caller => {
+      return caller.organizations.settings.listAvailableModels({ organizationId });
+    });
+  }
+
   try {
     const data = await getEnhancedOpenRouterModels();
     return NextResponse.json(

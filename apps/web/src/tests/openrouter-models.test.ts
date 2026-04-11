@@ -10,6 +10,11 @@ jest.mock('@/lib/user.server', () => ({
     user: { id: 'test-user-id' },
     authFailedResponse: null,
   })),
+  getUserFromAuth: jest.fn().mockImplementation(async () => ({
+    user: null,
+    authFailedResponse: null,
+    organizationId: undefined,
+  })),
 }));
 
 function createTestRequest(path: string) {

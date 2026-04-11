@@ -5,7 +5,7 @@ import { NextRequest } from 'next/server';
 import { verifyApproval } from './helpers/approval.helper';
 import { join } from 'node:path';
 
-const mockGetUserFromAuth = jest.fn();
+const mockGetUserFromAuth = jest.fn<Promise<{ user: null; authFailedResponse: null; organizationId?: undefined }>, []>();
 jest.mock('@/lib/user.server', () => ({
   getUserByAuthorizationHeader: jest.fn().mockImplementation(async () => ({
     user: { id: 'test-user-id' },

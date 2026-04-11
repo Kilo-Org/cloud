@@ -36,7 +36,7 @@ async function getDirectByokModels() {
  */
 export async function GET(
   request: NextRequest
-): Promise<NextResponse<{ error: string; message: string } | OpenRouterModelsResponse>> {
+): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
   const { organizationId } = await getUserFromAuth({ adminOnly: false });
 
   if (organizationId) {

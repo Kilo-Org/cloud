@@ -5,13 +5,13 @@ import { NextRequest } from 'next/server';
 import { verifyApproval } from './helpers/approval.helper';
 import { join } from 'node:path';
 
-const mockGetUserFromAuth = jest.fn<Promise<{ user: null; authFailedResponse: null; organizationId?: undefined }>, []>();
+const mockGetUserFromAuth = jest.fn();
 jest.mock('@/lib/user.server', () => ({
   getUserByAuthorizationHeader: jest.fn().mockImplementation(async () => ({
     user: { id: 'test-user-id' },
     authFailedResponse: null,
   })),
-  getUserFromAuth: (...args: unknown[]) => mockGetUserFromAuth(...args),
+  getUserFromAuth: () => mockGetUserFromAuth(),
 }));
 
 function createTestRequest(path: string) {
@@ -25,7 +25,9 @@ describe('GET /api/openrouter/models', () => {
     // Reset all mocks before each test
     jest.resetAllMocks();
     // Restore getUserFromAuth to return unauthenticated (no org) after reset
-    mockGetUserFromAuth.mockResolvedValue({ user: null, authFailedResponse: null });
+    mockGetUserFromAuth.mockImplementation(() =>
+      Promise.resolve({ user: null, authFailedResponse: null })
+    );
   });
 
   test('should handle OpenRouter API errors', async () => {

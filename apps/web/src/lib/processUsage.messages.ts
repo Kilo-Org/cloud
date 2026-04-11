@@ -230,8 +230,7 @@ export function extractMessagesPromptInfo(body: GatewayMessagesRequest): PromptI
         ? body.system.map(b => b.text).join('\n')
         : '';
 
-  const messages = Array.isArray(body.messages) ? body.messages : [];
-  const lastUserMessage = messages.filter(m => m.role === 'user').at(-1);
+  const lastUserMessage = body.messages.filter(m => m.role === 'user').at(-1);
 
   let userPrompt = '';
   if (lastUserMessage) {

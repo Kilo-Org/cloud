@@ -15,9 +15,6 @@ export function fixOpenCodeDuplicateReasoning(
   console.debug(
     `[fixOpenCodeDuplicateReasoning] start, model: ${requestedModel}, session: ${sessionId || 'unknown'}`
   );
-  if (!Array.isArray(request.messages)) {
-    return;
-  }
   for (const msg of request.messages) {
     const msgWithReasoning = msg as MessageWithReasoning;
     if (!msgWithReasoning.reasoning_details) {

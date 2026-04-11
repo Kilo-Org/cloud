@@ -174,9 +174,6 @@ export function fixResponsesRequest(request: GatewayResponsesRequest) {
 }
 
 export function removeChatCompletionsReasoning(request: OpenRouterChatCompletionRequest) {
-  if (!Array.isArray(request.messages)) {
-    return;
-  }
   for (const message of request.messages) {
     if ('reasoning' in message) {
       delete message.reasoning;
@@ -192,9 +189,6 @@ export function removeChatCompletionsReasoning(request: OpenRouterChatCompletion
 
 export function injectReasoningIntoContent(request: GatewayRequest) {
   if (request.kind !== 'chat_completions') {
-    return;
-  }
-  if (!Array.isArray(request.body.messages)) {
     return;
   }
   for (const message of request.body.messages) {

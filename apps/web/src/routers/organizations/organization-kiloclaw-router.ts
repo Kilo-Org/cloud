@@ -645,6 +645,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
       })),
       helpText: entry.helpText,
       helpUrl: entry.helpUrl,
+      guideText: entry.guideText,
+      guideUrl: entry.guideUrl,
       allFieldsRequired: entry.allFieldsRequired ?? false,
     }));
   }),
@@ -672,6 +674,8 @@ export const organizationKiloclawRouter = createTRPCRouter({
       })),
       helpText: entry.helpText,
       helpUrl: entry.helpUrl,
+      guideText: entry.guideText,
+      guideUrl: entry.guideUrl,
       allFieldsRequired: entry.allFieldsRequired ?? false,
     }));
   }),

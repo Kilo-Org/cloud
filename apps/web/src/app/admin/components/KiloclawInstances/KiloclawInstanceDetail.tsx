@@ -67,6 +67,7 @@ import { toast } from 'sonner';
 import { AdminFileEditor } from './AdminFileEditor';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { selectCurrentCliRun } from '@/lib/kiloclaw/cli-run-selection';
+import { stripAnsi } from '@/lib/stripAnsi';
 import {
   useKiloclawInstanceEvents,
   useKiloclawAllEvents,
@@ -1397,12 +1398,6 @@ function InstanceEventsCard({
       </CardContent>
     </Card>
   );
-}
-
-/** Strip ANSI escape codes so raw terminal output can render in a browser &lt;pre&gt;. */
-function stripAnsi(raw: string): string {
-  // eslint-disable-next-line no-control-regex
-  return raw.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '');
 }
 
 export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {

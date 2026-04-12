@@ -4137,4 +4137,29 @@ export const security_advisor_scans = pgTable(
 );
 
 export type SecurityAdvisorScan = typeof security_advisor_scans.$inferSelect;
+
+// ============ INSTANCE BADGE COUNTS ============
+// Per-user per-instance unread notification counts for mobile app badge display.
+// (user_id, instance_id) is the composite PK — one row per user per chat instance.
+// The notification service increments badge_count on each push and sums across all
+// instances to get the total badge count to include in the push payload.
+// The mobile client resets an instance's count (to 0) when the user views that chat.
+
+export const instance_badge_counts = pgTable(
+  'instance_badge_counts',
+  {
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    instance_id: text().notNull(),
+    badge_count: integer().notNull().default(0),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [primaryKey({ columns: [table.user_id, table.instance_id] })]
+);
+
+export type InstanceBadgeCount = typeof instance_badge_counts.$inferSelect;
 export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;

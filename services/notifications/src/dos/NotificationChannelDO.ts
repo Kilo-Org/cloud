@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
-import { kiloclaw_instances, user_push_tokens } from '@kilocode/db/schema';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { instance_badge_counts, kiloclaw_instances, user_push_tokens } from '@kilocode/db/schema';
+import { and, eq, inArray, isNull, sql, sum } from 'drizzle-orm';
 import type { Event } from 'stream-chat';
 
 import type { ExpoPushMessage, TicketTokenPair } from '../lib/expo-push';
@@ -144,6 +144,23 @@ export class NotificationChannelDO extends DurableObject<Env> {
       return;
     }
 
+    // Increment the badge count for this instance and return the new total across all instances.
+    // Uses UPSERT so the row is created on first notification for this instance.
+    await db
+      .insert(instance_badge_counts)
+      .values({ user_id: instance.user_id, instance_id: sandboxId, badge_count: 1 })
+      .onConflictDoUpdate({
+        target: [instance_badge_counts.user_id, instance_badge_counts.instance_id],
+        set: { badge_count: sql`${instance_badge_counts.badge_count} + 1` },
+      });
+
+    const [totals] = await db
+      .select({ total: sum(instance_badge_counts.badge_count) })
+      .from(instance_badge_counts)
+      .where(eq(instance_badge_counts.user_id, instance.user_id));
+
+    const badgeCount = Number(totals?.total ?? 0);
+
     const truncatedMessage = msg.text.length > 100 ? msg.text.slice(0, 97) + '...' : msg.text;
 
     const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({
@@ -152,6 +169,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
       body: truncatedMessage,
       // Keep in sync with NotificationData in apps/mobile/src/lib/notifications.ts
       data: { type: 'chat', instanceId: sandboxId },
+      badge: badgeCount,
       sound: 'default' as const,
       priority: 'high' as const,
     }));

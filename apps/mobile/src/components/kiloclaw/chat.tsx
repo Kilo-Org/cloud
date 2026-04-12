@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, View } from 'react-native';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image'; // eslint-disable-line no-restricted-imports -- raw expo-image needed for Stream Chat SDK ImageComponent prop
+import * as Notifications from 'expo-notifications';
 import { type Channel as StreamChannel, StreamChat } from 'stream-chat';
 import { Channel, Chat, MessageInput, MessageList, OverlayProvider } from 'stream-chat-expo';
+import { toast } from 'sonner-native';
 
 import { KiloClawMessageAvatar } from '@/components/kiloclaw/chat-avatar';
 import { ChatPlaceholder } from '@/components/kiloclaw/chat-placeholder';
@@ -31,14 +33,27 @@ export function KiloClawChat({
   organizationId,
 }: Readonly<KiloClawChatProps>) {
   const { data: creds, isLoading, error } = useStreamChatCredentials(organizationId, enabled);
+  const trpc = useTRPC();
+
+  const { mutate: markChatRead } = useMutation(
+    trpc.user.markChatRead.mutationOptions({
+      onSuccess: ({ badgeCount }) => {
+        void Notifications.setBadgeCountAsync(badgeCount);
+      },
+      onError: (err: { message: string }) => {
+        toast.error(err.message || 'Failed to update badge count');
+      },
+    })
+  );
 
   useFocusEffect(
     useCallback(() => {
       setActiveChatInstance(instanceId);
+      markChatRead({ instanceId });
       return () => {
         setActiveChatInstance(null);
       };
-    }, [instanceId])
+    }, [instanceId, markChatRead])
   );
 
   if (!enabled) {

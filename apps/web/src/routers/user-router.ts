@@ -20,8 +20,9 @@ import {
   kiloclaw_instances,
   kiloclaw_subscriptions,
   user_push_tokens,
+  instance_badge_counts,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, inArray, sql, gte } from 'drizzle-orm';
+import { eq, and, isNull, inArray, sql, gte, sum } from 'drizzle-orm';
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
@@ -714,4 +715,30 @@ export const userRouter = createTRPCRouter({
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, ctx.user.id));
   }),
+
+  // ─── Badge Counts ──────────────────────────────────────────────────
+
+  // Called by the mobile app when the user opens a chat. Resets the badge
+  // count for that instance to 0 and returns the new total across all
+  // instances, which the app applies as the OS badge count.
+  markChatRead: baseProcedure
+    .input(z.object({ instanceId: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .update(instance_badge_counts)
+        .set({ badge_count: 0 })
+        .where(
+          and(
+            eq(instance_badge_counts.user_id, ctx.user.id),
+            eq(instance_badge_counts.instance_id, input.instanceId)
+          )
+        );
+
+      const [totals] = await db
+        .select({ total: sum(instance_badge_counts.badge_count) })
+        .from(instance_badge_counts)
+        .where(eq(instance_badge_counts.user_id, ctx.user.id));
+
+      return { badgeCount: Number(totals?.total ?? 0) };
+    }),
 });

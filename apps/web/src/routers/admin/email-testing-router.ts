@@ -110,6 +110,8 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       return { claw_url: `${NEXTAUTH_URL}/claw` };
     case 'clawComplementaryInferenceEnded':
       return { claw_url: `${NEXTAUTH_URL}/claw` };
+    case 'accountDeletionRequest':
+      return { email: 'user@example.com' };
   }
   throw new Error(`Unknown template: ${template}`);
 }

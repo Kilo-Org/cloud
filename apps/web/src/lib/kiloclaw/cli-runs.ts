@@ -1,16 +1,16 @@
 import { db } from '@/lib/drizzle';
-import { and, eq, type SQL } from 'drizzle-orm';
+import { and, eq, isNull, type SQL } from 'drizzle-orm';
 import { kiloclaw_cli_runs } from '@kilocode/db/schema';
 import type { KiloClawCliRunInitiatedBy } from '@kilocode/db/schema';
 import type { KiloCliRunStatusResponse } from '@/lib/kiloclaw/types';
 
-export interface CreateCliRunParams {
+export type CreateCliRunParams = {
   userId: string;
   instanceId: string | null;
   prompt: string;
   startedAt: string;
   initiatedBy: KiloClawCliRunInitiatedBy;
-}
+};
 
 export async function createCliRun(params: CreateCliRunParams): Promise<string> {
   const [row] = await db
@@ -28,12 +28,12 @@ export async function createCliRun(params: CreateCliRunParams): Promise<string> 
   return row.id;
 }
 
-export interface CancelCliRunParams {
+export type CancelCliRunParams = {
   runId: string;
   userId: string;
   instanceId?: string | null;
   initiatedBy?: KiloClawCliRunInitiatedBy;
-}
+};
 
 export async function markCliRunCancelled(params: CancelCliRunParams): Promise<void> {
   const conditions: SQL[] = [
@@ -42,8 +42,12 @@ export async function markCliRunCancelled(params: CancelCliRunParams): Promise<v
     eq(kiloclaw_cli_runs.status, 'running'),
   ];
 
-  if (params.instanceId) {
-    conditions.push(eq(kiloclaw_cli_runs.instance_id, params.instanceId));
+  if (params.instanceId !== undefined) {
+    conditions.push(
+      params.instanceId === null
+        ? isNull(kiloclaw_cli_runs.instance_id)
+        : eq(kiloclaw_cli_runs.instance_id, params.instanceId)
+    );
   }
 
   if (params.initiatedBy) {

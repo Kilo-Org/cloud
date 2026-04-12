@@ -295,8 +295,10 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getState();
 
-      const promoActive = new Date() < KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toDate();
-      expect(result).toEqual({ subscription: null, isEligibleForFirstMonthPromo: promoActive });
+      expect(result).toEqual({
+        subscription: null,
+        isEligibleForFirstMonthPromo: new Date() < KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toDate(),
+      });
     });
 
     it('throws BAD_REQUEST when subscription exists but user has no stripe customer', async () => {
@@ -741,8 +743,9 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getState();
 
-      const promoActive = new Date() < KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toDate();
-      expect(result.isEligibleForFirstMonthPromo).toBe(promoActive);
+      expect(result.isEligibleForFirstMonthPromo).toBe(
+        new Date() < KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toDate()
+      );
       expect(result.subscription).toBeNull();
     });
 

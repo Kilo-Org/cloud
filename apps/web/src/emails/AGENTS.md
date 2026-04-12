@@ -21,6 +21,15 @@ All templates use the Kilo brand design system:
 | Footer / secondary text | `#6b7280`                                             |
 | Section divider         | `1px solid #3a3a3a`                                   |
 
+## Content Guidelines
+
+All templates in this directory are **transactional** emails sent via `app.kilocode.ai`. Keep content factual and account-status focused:
+
+- State what changed and what the user needs to know.
+- A single CTA linking to the relevant page in the app is appropriate.
+- Do **not** include sales copy, upsell blocks, pricing language, or secondary CTAs promoting features or plans.
+- The footer company name is **Kilo Code, Inc** — never "LLC".
+
 ## Footer
 
 Every template must include this branding footer below the card:
@@ -38,7 +47,7 @@ Every template must include this branding footer below the card:
           font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;
         "
       >
-        © {{ year }} Kilo Code, LLC<br />455 Market St, Ste 1940 PMB 993504<br />San Francisco, CA
+        © {{ year }} Kilo Code, Inc<br />455 Market St, Ste 1940 PMB 993504<br />San Francisco, CA
         94105, USA
       </p>
     </td>
@@ -71,5 +80,5 @@ Every template must include this branding footer below the card:
 | `clawInstanceDestroyed.html`           | `claw_url`, `year`                                                                                                         | `28`                       |
 | `clawEarlybirdEndingSoon.html`         | `days_remaining`, `expiry_date`, `claw_url`, `year`                                                                        | `29`                       |
 | `clawEarlybirdExpiresTomorrow.html`    | `expiry_date`, `claw_url`, `year`                                                                                          | `30`                       |
-| `clawComplementaryInferenceEnded.html` | `claw_url`, `credits_url`, `free_model_name`, `year`                                                                       | —                          |
+| `clawComplementaryInferenceEnded.html` | `claw_url`, `year`                                                                                                         | —                          |
 | `accountDeletionRequest.html`          | `email`, `year`                                                                                                            | —                          |

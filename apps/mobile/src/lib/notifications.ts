@@ -48,11 +48,9 @@ export function setupNotificationHandler() {
     handleNotification: async notification => {
       const data = notification.request.content.data as NotificationData | undefined;
 
-      if (data?.type === 'chat') {
-        // Suppress only if the user is already viewing this exact chat
-        if (data.instanceId === activeChatInstanceId) {
-          return suppressed;
-        }
+      // Suppress only if the user is already viewing this exact chat
+      if (data?.type === 'chat' && data.instanceId === activeChatInstanceId) {
+        return suppressed;
       }
 
       return shown;

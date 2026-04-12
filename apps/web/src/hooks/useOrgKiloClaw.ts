@@ -167,13 +167,13 @@ export function useOrgReadFile(organizationId: string, path: string | null, enab
 
 export function useOrgKiloCliRunStatus(organizationId: string, runId: string | null) {
   const trpc = useTRPC();
+  const enabled = runId !== null;
   return useQuery(
     trpc.organizations.kiloclaw.getKiloCliRunStatus.queryOptions(
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by `enabled: runId !== null`
-      { organizationId, runId: runId! },
+      { organizationId, runId: runId ?? '' },
       {
-        enabled: runId !== null,
-        refetchInterval: runId !== null ? 3_000 : false,
+        enabled,
+        refetchInterval: enabled ? 3_000 : false,
       }
     )
   );

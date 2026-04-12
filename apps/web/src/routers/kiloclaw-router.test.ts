@@ -3,10 +3,11 @@ process.env.STRIPE_KILOCLAW_STANDARD_PRICE_ID ||= 'price_standard';
 process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { cleanupDbForTest } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { createCallerFactory } from '@/lib/trpc/init';
 import { kiloclawRouter } from '@/routers/kiloclaw-router';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { kiloclaw_cli_runs, kiloclaw_instances } from '@kilocode/db/schema';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMock = jest.Mock<(...args: any[]) => any>;
@@ -78,6 +79,10 @@ const kiloclawClientMock = jest.requireMock<KiloClawClientMock>(
   '@/lib/kiloclaw/kiloclaw-internal-client'
 );
 
+function sandboxId(): string {
+  return `ki_${crypto.randomUUID().replace(/-/g, '')}`;
+}
+
 describe('kiloclawRouter getStatus', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
@@ -126,5 +131,111 @@ describe('kiloclawRouter getStatus', () => {
       name: null,
       instanceId: null,
     });
+  });
+});
+
+describe('kiloclawRouter listKiloCliRuns', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+  });
+
+  it('returns only runs for the active personal instance when one exists', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-cli-runs-${Math.random()}@example.com`,
+    });
+
+    const [destroyedInstance, activeInstance] = await db
+      .insert(kiloclaw_instances)
+      .values([
+        {
+          user_id: user.id,
+          sandbox_id: sandboxId(),
+          destroyed_at: '2026-04-01T00:00:00.000Z',
+        },
+        {
+          user_id: user.id,
+          sandbox_id: sandboxId(),
+        },
+      ])
+      .returning({ id: kiloclaw_instances.id });
+
+    if (!destroyedInstance || !activeInstance) {
+      throw new Error('Failed to create KiloClaw test instances');
+    }
+
+    await db.insert(kiloclaw_cli_runs).values([
+      {
+        user_id: user.id,
+        instance_id: destroyedInstance.id,
+        prompt: 'destroyed instance run',
+        status: 'completed',
+        started_at: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        user_id: user.id,
+        instance_id: activeInstance.id,
+        prompt: 'active instance run',
+        status: 'completed',
+        started_at: '2026-04-03T00:00:00.000Z',
+      },
+      {
+        user_id: user.id,
+        instance_id: null,
+        prompt: 'legacy null instance run',
+        status: 'completed',
+        started_at: '2026-04-05T00:00:00.000Z',
+      },
+    ]);
+
+    const caller = createCaller({ user });
+    const result = await caller.listKiloCliRuns();
+
+    expect(result.runs).toHaveLength(1);
+    expect(result.runs[0]?.prompt).toBe('active instance run');
+    expect(result.runs[0]?.instance_id).toBe(activeInstance.id);
+  });
+
+  it('preserves user-scoped listing when no active personal instance exists', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-cli-runs-legacy-${Math.random()}@example.com`,
+    });
+
+    const [destroyedInstance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: user.id,
+        sandbox_id: sandboxId(),
+        destroyed_at: '2026-04-01T00:00:00.000Z',
+      })
+      .returning({ id: kiloclaw_instances.id });
+
+    if (!destroyedInstance) {
+      throw new Error('Failed to create KiloClaw test instance');
+    }
+
+    await db.insert(kiloclaw_cli_runs).values([
+      {
+        user_id: user.id,
+        instance_id: destroyedInstance.id,
+        prompt: 'destroyed instance run',
+        status: 'completed',
+        started_at: '2026-04-01T00:00:00.000Z',
+      },
+      {
+        user_id: user.id,
+        instance_id: null,
+        prompt: 'legacy null instance run',
+        status: 'completed',
+        started_at: '2026-04-02T00:00:00.000Z',
+      },
+    ]);
+
+    const caller = createCaller({ user });
+    const result = await caller.listKiloCliRuns();
+
+    expect(result.runs.map(run => run.prompt)).toEqual([
+      'legacy null instance run',
+      'destroyed instance run',
+    ]);
   });
 });

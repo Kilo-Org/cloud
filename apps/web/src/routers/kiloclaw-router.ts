@@ -2275,11 +2275,13 @@ export const kiloclawRouter = createTRPCRouter({
   listKiloCliRuns: clawAccessProcedure
     .input(z.object({ limit: z.number().min(1).max(50).default(10) }).optional())
     .query(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
       const limit = input?.limit ?? 10;
+      const instanceFilter = instance ? eq(kiloclaw_cli_runs.instance_id, instance.id) : undefined;
       const runs = await db
         .select()
         .from(kiloclaw_cli_runs)
-        .where(eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+        .where(and(eq(kiloclaw_cli_runs.user_id, ctx.user.id), instanceFilter))
         .orderBy(desc(kiloclaw_cli_runs.started_at))
         .limit(limit);
 

@@ -14,7 +14,7 @@ import { useBotOnlineStatus } from '@/components/kiloclaw/chat-hooks';
 import { NotificationPrompt } from '@/components/kiloclaw/notification-prompt';
 import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
 import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw-queries';
-import { setActiveChatInstance } from '@/lib/notifications';
+import { clearBadgeForChat, setActiveChatInstance } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
 
 type KiloClawChatProps = {
@@ -35,6 +35,7 @@ export function KiloClawChat({
   useFocusEffect(
     useCallback(() => {
       setActiveChatInstance(instanceId);
+      clearBadgeForChat(instanceId);
       return () => {
         setActiveChatInstance(null);
       };

@@ -20,6 +20,7 @@ import {
   checkInitialNotification,
   getPendingNotificationLink,
   setupNotificationHandler,
+  setupNotificationReceivedListener,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
@@ -154,6 +155,13 @@ function RootLayout() {
 
   useEffect(() => {
     const subscription = setupNotificationResponseHandler();
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    const subscription = setupNotificationReceivedListener();
     return () => {
       subscription.remove();
     };

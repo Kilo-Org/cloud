@@ -26,10 +26,32 @@ export function setActiveChatInstance(instanceId: string | null) {
 // Keep in sync with data field in services/notifications/src/dos/NotificationChannelDO.ts
 type NotificationData = { type: 'chat'; instanceId: string };
 
+// Per-instance unread notification counts. Keyed by instanceId.
+// Module-level so it persists across re-renders and is readable from anywhere.
+const unreadCounts = new Map<string, number>();
+
+function totalUnread(): number {
+  let total = 0;
+  for (const count of unreadCounts.values()) {
+    total += count;
+  }
+  return total;
+}
+
+function incrementBadgeForChat(instanceId: string): void {
+  unreadCounts.set(instanceId, (unreadCounts.get(instanceId) ?? 0) + 1);
+  void Notifications.setBadgeCountAsync(totalUnread());
+}
+
+export function clearBadgeForChat(instanceId: string): void {
+  unreadCounts.delete(instanceId);
+  void Notifications.setBadgeCountAsync(totalUnread());
+}
+
 const shown = {
   shouldShowAlert: true,
   shouldPlaySound: true,
-  shouldSetBadge: true,
+  shouldSetBadge: false,
   shouldShowBanner: true,
   shouldShowList: true,
 } as const;
@@ -55,6 +77,15 @@ export function setupNotificationHandler() {
 
       return shown;
     },
+  });
+}
+
+export function setupNotificationReceivedListener(): Notifications.EventSubscription {
+  return Notifications.addNotificationReceivedListener(notification => {
+    const data = notification.request.content.data as NotificationData | undefined;
+    if (data?.type === 'chat' && data.instanceId !== activeChatInstanceId) {
+      incrementBadgeForChat(data.instanceId);
+    }
   });
 }
 

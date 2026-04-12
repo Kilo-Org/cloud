@@ -471,9 +471,9 @@ app.post('/repos/setup', async c => {
 
 // POST /git/merge
 // Deterministic merge of a polecat branch into the target branch.
-// Called by the Rig DO's processReviewQueue → startMergeInContainer.
-// Runs the merge synchronously and reports the result back to the Rig DO
-// via a callback to the completeReview endpoint.
+// Called by the TownDO's startMergeInContainer.
+// Runs the merge synchronously and reports the result back via a callback
+// to the completeReview endpoint.
 app.post('/git/merge', async c => {
   const body: unknown = await c.req.json().catch(() => null);
   const parsed = MergeRequest.safeParse(body);
@@ -539,7 +539,7 @@ app.post('/git/merge', async c => {
     }
   };
 
-  // Fire and forget — the Rig DO will time out stuck entries via recoverStuckReviews
+  // Fire and forget — the TownDO will time out stuck entries via its alarm loop
   doMerge().catch(err => {
     console.error(`Merge failed for entry ${req.entryId}:`, err);
   });

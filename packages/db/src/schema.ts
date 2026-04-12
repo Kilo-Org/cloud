@@ -4139,11 +4139,12 @@ export const security_advisor_scans = pgTable(
 export type SecurityAdvisorScan = typeof security_advisor_scans.$inferSelect;
 
 // ============ INSTANCE BADGE COUNTS ============
-// Per-user per-instance unread notification counts for mobile app badge display.
-// (user_id, instance_id) is the composite PK — one row per user per chat instance.
-// The notification service increments badge_count on each push and sums across all
-// instances to get the total badge count to include in the push payload.
-// The mobile client resets an instance's count (to 0) when the user views that chat.
+// Per-user per-channel unread notification counts for mobile app badge display.
+// (user_id, channel_id) is the composite PK — one row per user per chat channel.
+// Using channel_id (rather than instance_id) future-proofs the table for multiple
+// channels per instance. The notification service increments badge_count on each push
+// and sums across all channels to get the total badge count to include in the push payload.
+// The mobile client resets a channel's count (to 0) when the user views that chat.
 
 export const instance_badge_counts = pgTable(
   'instance_badge_counts',
@@ -4151,14 +4152,14 @@ export const instance_badge_counts = pgTable(
     user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
-    instance_id: text().notNull(),
+    channel_id: text().notNull(),
     badge_count: integer().notNull().default(0),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => sql`now()`),
   },
-  table => [primaryKey({ columns: [table.user_id, table.instance_id] })]
+  table => [primaryKey({ columns: [table.user_id, table.channel_id] })]
 );
 
 export type InstanceBadgeCount = typeof instance_badge_counts.$inferSelect;

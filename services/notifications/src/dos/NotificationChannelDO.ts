@@ -141,9 +141,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
     // Uses UPSERT so the row is created on first notification for this instance.
     await db
       .insert(instance_badge_counts)
-      .values({ user_id: instance.user_id, instance_id: sandboxId, badge_count: 1 })
+      .values({ user_id: instance.user_id, channel_id: sandboxId, badge_count: 1 })
       .onConflictDoUpdate({
-        target: [instance_badge_counts.user_id, instance_badge_counts.instance_id],
+        target: [instance_badge_counts.user_id, instance_badge_counts.channel_id],
         set: { badge_count: sql`${instance_badge_counts.badge_count} + 1` },
       });
 

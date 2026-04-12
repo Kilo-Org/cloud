@@ -717,6 +717,26 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         if (!instance) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
         }
+        const [row] = await db
+          .select()
+          .from(kiloclaw_cli_runs)
+          .where(
+            and(
+              eq(kiloclaw_cli_runs.id, input.runId),
+              eq(kiloclaw_cli_runs.user_id, input.userId),
+              eq(kiloclaw_cli_runs.instance_id, instance.id)
+            )
+          )
+          .limit(1);
+
+        if (!row) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'CLI run not found' });
+        }
+
+        if (row.status !== 'running') {
+          return { ok: true };
+        }
+
         const client = new KiloClawInternalClient();
         const result = await client.cancelKiloCliRun(input.userId, workerInstanceId(instance));
 
@@ -735,9 +755,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_name: ctx.user.google_user_name,
             target_user_id: input.userId,
-            message: `CLI run cancelled on instance ${instance?.id}`,
+            message: `CLI run cancelled on instance ${instance.id}`,
             metadata: {
-              instanceId: instance?.id,
+              instanceId: instance.id,
+              runId: input.runId,
             },
           });
         } catch (auditErr) {

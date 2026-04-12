@@ -1,11 +1,7 @@
-import React from 'react';
 import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { type Href, router } from 'expo-router';
 import { Platform } from 'react-native';
-import { toast } from 'sonner-native';
-
-import { ChatNotificationToast } from '@/components/chat-notification-toast';
 
 function getProjectId(): string {
   const eas = expoConstants.expoConfig?.extra?.eas as { projectId?: string } | undefined;
@@ -30,51 +26,34 @@ export function setActiveChatInstance(instanceId: string | null) {
 // Keep in sync with data field in services/notifications/src/dos/NotificationChannelDO.ts
 type NotificationData = { type: 'chat'; instanceId: string };
 
+const shown = {
+  shouldShowAlert: true,
+  shouldPlaySound: true,
+  shouldSetBadge: true,
+  shouldShowBanner: true,
+  shouldShowList: true,
+} as const;
+
+const suppressed = {
+  shouldShowAlert: false,
+  shouldPlaySound: false,
+  shouldSetBadge: false,
+  shouldShowBanner: false,
+  shouldShowList: false,
+} as const;
+
 export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
     // eslint-disable-next-line require-await -- expo-notifications requires async callback type but logic is synchronous
     handleNotification: async notification => {
       const data = notification.request.content.data as NotificationData | undefined;
 
-      const suppressed = {
-        shouldShowAlert: false,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-        shouldShowBanner: false,
-        shouldShowList: false,
-      } as const;
-
-      if (data?.type === 'chat') {
-        // If the user is viewing the exact chat this notification is for, suppress it
-        if (data.instanceId === activeChatInstanceId) {
-          return suppressed;
-        }
-
-        // User is in the app but not in this chat — show in-app banner via toast
-        // and suppress the system notification
-        const title = notification.request.content.title ?? 'Kilo';
-        const body = notification.request.content.body ?? '';
-        const toastId = Date.now();
-        toast.custom(
-          React.createElement(ChatNotificationToast, {
-            id: toastId,
-            title,
-            body,
-            instanceId: data.instanceId,
-          }),
-          { id: toastId, duration: 4000 }
-        );
+      // Suppress only if the user is already viewing this exact chat
+      if (data?.type === 'chat' && data.instanceId === activeChatInstanceId) {
         return suppressed;
       }
 
-      // Non-chat notification — show normally
-      return {
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      };
+      return shown;
     },
   });
 }

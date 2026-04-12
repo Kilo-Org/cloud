@@ -1251,13 +1251,22 @@ export const organizationKiloclawRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
-      const limit = input.limit;
+      const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+      if (!instance) {
+        return { runs: [] };
+      }
+
       const runs = await db
         .select()
         .from(kiloclaw_cli_runs)
-        .where(eq(kiloclaw_cli_runs.user_id, ctx.user.id))
+        .where(
+          and(
+            eq(kiloclaw_cli_runs.user_id, ctx.user.id),
+            eq(kiloclaw_cli_runs.instance_id, instance.id)
+          )
+        )
         .orderBy(desc(kiloclaw_cli_runs.started_at))
-        .limit(limit);
+        .limit(input.limit);
 
       return { runs };
     }),

@@ -1890,6 +1890,40 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     };
   }
 
+  // ── Machine resize (admin) ─────────────────────────────────────────
+
+  async resizeMachine(newSize: MachineSize): Promise<{
+    previousSize: MachineSize | null;
+    newSize: MachineSize;
+  }> {
+    await this.loadState();
+
+    if (!this.s.userId) {
+      throw new Error('Instance is not provisioned');
+    }
+    if (this.s.status === 'destroying') {
+      throw new Error('Cannot resize: instance is being destroyed');
+    }
+    if (this.s.status === 'restoring') {
+      throw new Error('Cannot resize: instance is restoring from snapshot');
+    }
+    if (this.s.status === 'recovering') {
+      throw new Error('Cannot resize: instance is recovering from an unexpected stop');
+    }
+
+    const previousSize = this.s.machineSize;
+
+    this.s.machineSize = newSize;
+    await this.persist({ machineSize: newSize });
+
+    console.log(
+      `[admin-machine-resize] userId=${this.s.userId} ` +
+        `previous=${JSON.stringify(previousSize)} new=${JSON.stringify(newSize)}`
+    );
+
+    return { previousSize, newSize };
+  }
+
   // ── Snapshot restore (admin) ───────────────────────────────────────
 
   /**

@@ -68,6 +68,7 @@ import type {
   StripeSubscriptionStatus,
   StoredModel,
   GatewayApiKind,
+  ContributorChampionTier,
 } from './schema-types';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 
@@ -2204,6 +2205,128 @@ export type ModelStats = typeof modelStats.$inferSelect;
 export type NewModelStats = typeof modelStats.$inferInsert;
 
 export const MODELS_BY_PROVIDER_ADMIN_URL = '/admin/sync-providers';
+
+export const contributor_champion_contributors = pgTable(
+  'contributor_champion_contributors',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    github_login: text().notNull(),
+    github_profile_url: text().notNull(),
+    github_user_id: bigint({ mode: 'number' }),
+    first_contribution_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_contribution_at: timestamp({ withTimezone: true, mode: 'string' }),
+    all_time_contributions: integer().notNull().default(0),
+    manual_email: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_contributor_champion_contributors_github_login').on(table.github_login),
+    index('IDX_contributor_champion_contributors_last_contribution_at').on(
+      table.last_contribution_at
+    ),
+    index('IDX_contributor_champion_contributors_manual_email').on(table.manual_email),
+  ]
+);
+
+export type ContributorChampionContributor = typeof contributor_champion_contributors.$inferSelect;
+
+export const contributor_champion_events = pgTable(
+  'contributor_champion_events',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    contributor_id: uuid()
+      .notNull()
+      .references(() => contributor_champion_contributors.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    repo_full_name: text().notNull(),
+    github_pr_number: integer().notNull(),
+    github_pr_url: text().notNull(),
+    github_pr_title: text().notNull(),
+    github_author_login: text().notNull(),
+    github_author_email: text(),
+    merged_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_contributor_champion_events_repo_pr').on(
+      table.repo_full_name,
+      table.github_pr_number
+    ),
+    index('IDX_contributor_champion_events_contributor_id').on(table.contributor_id),
+    index('IDX_contributor_champion_events_merged_at').on(table.merged_at),
+    index('IDX_contributor_champion_events_author_email').on(table.github_author_email),
+  ]
+);
+
+export type ContributorChampionEvent = typeof contributor_champion_events.$inferSelect;
+
+export const contributor_champion_memberships = pgTable(
+  'contributor_champion_memberships',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    contributor_id: uuid()
+      .notNull()
+      .references(() => contributor_champion_contributors.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    selected_tier: text().$type<ContributorChampionTier>(),
+    enrolled_tier: text().$type<ContributorChampionTier>(),
+    enrolled_at: timestamp({ withTimezone: true, mode: 'string' }),
+    credit_amount_microdollars: bigint({ mode: 'number' }).default(0).notNull(),
+    credits_last_granted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    linked_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_contributor_champion_memberships_contributor_id').on(table.contributor_id),
+    check(
+      'contributor_champion_memberships_selected_tier_check',
+      sql`${table.selected_tier} IS NULL OR ${table.selected_tier} IN ('contributor', 'ambassador', 'champion')`
+    ),
+    check(
+      'contributor_champion_memberships_enrolled_tier_check',
+      sql`${table.enrolled_tier} IS NULL OR ${table.enrolled_tier} IN ('contributor', 'ambassador', 'champion')`
+    ),
+    index('IDX_contributor_champion_memberships_credits_due')
+      .on(table.credits_last_granted_at)
+      .where(sql`${table.enrolled_tier} IS NOT NULL AND ${table.credit_amount_microdollars} > 0`),
+    index('IDX_contributor_champion_memberships_linked_kilo_user_id').on(table.linked_kilo_user_id),
+  ]
+);
+
+export type ContributorChampionMembership = typeof contributor_champion_memberships.$inferSelect;
+
+export const contributor_champion_sync_state = pgTable('contributor_champion_sync_state', {
+  repo_full_name: text().primaryKey().notNull(),
+  last_merged_at: timestamp({ withTimezone: true, mode: 'string' }),
+  last_synced_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => sql`now()`),
+});
+
+export type ContributorChampionSyncState = typeof contributor_champion_sync_state.$inferSelect;
 
 export const modelsByProvider = pgTable('models_by_provider', {
   id: serial().notNull().primaryKey(),

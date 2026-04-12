@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell, MessageSquare } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Alert, AppState, Linking, Switch, View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -17,145 +17,144 @@ import {
 } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
 
+const permissionQueryKey = ['notificationPermission'];
+const deviceTokenQueryKey = ['devicePushToken'];
+
 export function NotificationsCard() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
-  const [permissionGranted, setPermissionGranted] = useState(false);
-  const [loading, setLoading] = useState(true);
 
-  const { data: pushTokens } = useQuery(trpc.user.getMyPushTokens.queryOptions());
-  const [deviceToken, setDeviceToken] = useState<string | null>(null);
+  const { data: permissionGranted = false, isLoading: permissionLoading } = useQuery({
+    queryKey: permissionQueryKey,
+    queryFn: async () => {
+      const status = await getNotificationPermissionStatus();
+      return status === 'granted';
+    },
+  });
+
+  const { data: deviceToken, isLoading: deviceTokenLoading } = useQuery({
+    queryKey: deviceTokenQueryKey,
+    queryFn: getDevicePushToken,
+    enabled: permissionGranted,
+  });
+
+  const { data: pushTokens, isLoading: tokensLoading } = useQuery(
+    trpc.user.getMyPushTokens.queryOptions()
+  );
+
+  const pushTokensQueryKey = trpc.user.getMyPushTokens.queryOptions().queryKey;
   const serverRegistered =
     deviceToken != null && (pushTokens ?? []).some(t => t.token === deviceToken);
 
-  // Optimistic override — null means "use server state"
-  const [optimistic, setOptimistic] = useState<boolean | null>(null);
-  const thisDeviceRegistered = optimistic ?? serverRegistered;
-
-  // Sync optimistic state back to server state once query catches up
-  useEffect(() => {
-    if (optimistic != null && optimistic === serverRegistered) {
-      setOptimistic(null);
-    }
-  }, [optimistic, serverRegistered]);
-
-  // Fetch current device's token once permission is known
-  useEffect(() => {
-    if (!permissionGranted) {
-      return;
-    }
-    async function fetch() {
-      setDeviceToken(await getDevicePushToken());
-    }
-    void fetch();
-  }, [permissionGranted]);
-
-  const invalidateTokens = useCallback(() => {
-    void queryClient.invalidateQueries({
-      queryKey: trpc.user.getMyPushTokens.queryOptions().queryKey,
-    });
-  }, [queryClient, trpc]);
+  const invalidateAll = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: pushTokensQueryKey });
+  }, [queryClient, pushTokensQueryKey]);
 
   const registerToken = useMutation(
     trpc.user.registerPushToken.mutationOptions({
-      onSuccess: () => {
-        invalidateTokens();
+      onMutate: async () => {
+        await queryClient.cancelQueries({ queryKey: pushTokensQueryKey });
+        const previous = queryClient.getQueryData(pushTokensQueryKey);
+        // Optimistically add the device token to the list
+        if (deviceToken) {
+          queryClient.setQueryData(pushTokensQueryKey, (old: typeof pushTokens) => [
+            ...(old ?? []),
+            { token: deviceToken, platform: getPlatform() },
+          ]);
+        }
+        return { previous };
       },
-      onError: error => {
-        setOptimistic(null);
+      onError: (error, _vars, context) => {
+        if (context?.previous) {
+          queryClient.setQueryData(pushTokensQueryKey, context.previous);
+        }
         toast.error(error.message);
       },
+      onSettled: invalidateAll,
     })
   );
 
   const unregisterToken = useMutation(
     trpc.user.unregisterPushToken.mutationOptions({
-      onSuccess: () => {
-        invalidateTokens();
+      onMutate: async () => {
+        await queryClient.cancelQueries({ queryKey: pushTokensQueryKey });
+        const previous = queryClient.getQueryData(pushTokensQueryKey);
+        // Optimistically remove the device token from the list
+        if (deviceToken) {
+          queryClient.setQueryData(pushTokensQueryKey, (old: typeof pushTokens) =>
+            (old ?? []).filter(t => t.token !== deviceToken)
+          );
+        }
+        return { previous };
       },
-      onError: error => {
-        setOptimistic(null);
+      onError: (error, _vars, context) => {
+        if (context?.previous) {
+          queryClient.setQueryData(pushTokensQueryKey, context.previous);
+        }
         toast.error(error.message);
       },
+      onSettled: invalidateAll,
     })
   );
 
-  // Check system permission on mount and foreground resume
-  const checkPermission = useCallback(async () => {
-    const status = await getNotificationPermissionStatus();
-    setPermissionGranted(status === 'granted');
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    void checkPermission();
-  }, [checkPermission]);
-
+  // Re-check permission on foreground resume
   const appState = useRef(AppState.currentState);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (/inactive|background/.exec(appState.current) && nextAppState === 'active') {
-        void checkPermission();
+        void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
       }
       appState.current = nextAppState;
     });
     return () => {
       subscription.remove();
     };
-  }, [checkPermission]);
+  }, [queryClient]);
 
-  const handleToggleNotifications = useCallback(async (value: boolean) => {
-    if (value) {
-      const currentStatus = await getNotificationPermissionStatus();
-      if (currentStatus === 'denied') {
-        // Already denied once — OS won't show the prompt again, must go to Settings
+  const handleToggleNotifications = useCallback(
+    async (value: boolean) => {
+      if (value) {
+        const currentStatus = await getNotificationPermissionStatus();
+        if (currentStatus === 'denied') {
+          Alert.alert(
+            'Notifications Disabled',
+            'To enable notifications, turn them on in your device settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+            ]
+          );
+          return;
+        }
+        await Notifications.requestPermissionsAsync();
+        void queryClient.invalidateQueries({ queryKey: permissionQueryKey });
+      } else {
         Alert.alert(
-          'Notifications Disabled',
-          'To enable notifications, turn them on in your device settings.',
+          'Disable Notifications',
+          'To disable notifications, turn them off in your device settings.',
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Open Settings', onPress: () => void Linking.openSettings() },
           ]
         );
-        return;
       }
-      // Undetermined — triggers the OS permission prompt
-      const result = await Notifications.requestPermissionsAsync();
-      setPermissionGranted(result.status === Notifications.PermissionStatus.GRANTED);
-    } else {
-      // Can't revoke permission programmatically — send user to Settings
-      Alert.alert(
-        'Disable Notifications',
-        'To disable notifications, turn them off in your device settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => void Linking.openSettings() },
-        ]
-      );
-    }
-  }, []);
+    },
+    [queryClient]
+  );
 
   const handleToggleChatMessages = useCallback(
     async (value: boolean) => {
-      setOptimistic(value);
       if (value) {
         const token = await registerForPushNotifications();
         if (token) {
           registerToken.mutate({ token, platform: getPlatform() });
-        } else {
-          setOptimistic(null);
         }
-      } else {
-        const token = await getDevicePushToken();
-        if (token) {
-          unregisterToken.mutate({ token });
-        } else {
-          setOptimistic(null);
-        }
+      } else if (deviceToken) {
+        unregisterToken.mutate({ token: deviceToken });
       }
     },
-    [registerToken, unregisterToken]
+    [registerToken, unregisterToken, deviceToken]
   );
 
   return (
@@ -168,7 +167,7 @@ export function NotificationsCard() {
       <View className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
         <Bell size={18} color={colors.secondaryForeground} />
         <Text className="flex-1 text-sm font-medium">Notifications</Text>
-        {loading ? (
+        {permissionLoading ? (
           <Skeleton className="h-8 w-12 rounded-full" />
         ) : (
           <Switch
@@ -184,11 +183,11 @@ export function NotificationsCard() {
       >
         <MessageSquare size={18} color={colors.secondaryForeground} />
         <Text className="flex-1 text-sm font-medium">Chat Messages</Text>
-        {loading ? (
+        {permissionLoading || tokensLoading || deviceTokenLoading ? (
           <Skeleton className="h-8 w-12 rounded-full" />
         ) : (
           <Switch
-            value={thisDeviceRegistered}
+            value={serverRegistered}
             disabled={!permissionGranted}
             onValueChange={value => {
               if (registerToken.isPending || unregisterToken.isPending) {

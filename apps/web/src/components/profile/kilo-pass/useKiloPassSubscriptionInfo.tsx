@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 
+import { KiloPassChurnkeyCancelFlowProvider } from './useKiloPassChurnkeyCancelFlow';
 import { deriveKiloPassSubscriptionInfoView } from './kiloPassSubscriptionInfoView';
 import type { KiloPassSubscriptionInfoView } from './kiloPassSubscriptionInfoView';
 import type { KiloPassSubscription } from './kiloPassSubscription';
@@ -155,7 +156,7 @@ export function KiloPassSubscriptionInfoProvider(props: {
 
   return (
     <KiloPassSubscriptionInfoContext.Provider value={value}>
-      {children}
+      <KiloPassChurnkeyCancelFlowProvider>{children}</KiloPassChurnkeyCancelFlowProvider>
     </KiloPassSubscriptionInfoContext.Provider>
   );
 }

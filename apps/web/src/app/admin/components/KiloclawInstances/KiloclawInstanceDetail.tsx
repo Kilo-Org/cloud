@@ -50,6 +50,7 @@ import {
   RotateCcw,
   RotateCw,
   ArrowUpCircle,
+  ArrowUpDown,
   RefreshCw,
   Pin,
   Stethoscope,
@@ -1176,6 +1177,13 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [doctorDialogOpen, setDoctorDialogOpen] = useState(false);
   const [restoreConfigDialogOpen, setRestoreConfigDialogOpen] = useState(false);
   const [destroyMachineDialogOpen, setDestroyMachineDialogOpen] = useState(false);
+  const [resizeMachineDialogOpen, setResizeMachineDialogOpen] = useState(false);
+  const [selectedMachineSize, setSelectedMachineSize] = useState<string>('performance-1x');
+  const [resizeConfirmText, setResizeConfirmText] = useState('');
+  const [resizePhase, setResizePhase] = useState<
+    'idle' | 'stopping' | 'resizing' | 'starting' | 'waiting' | 'done' | 'error'
+  >('idle');
+  const [resizeError, setResizeError] = useState<string | null>(null);
   const [awaitingRestartCompletion, setAwaitingRestartCompletion] = useState(false);
   const [restoreSnapshotDialogOpen, setRestoreSnapshotDialogOpen] = useState(false);
   const [restoreSnapshotId, setRestoreSnapshotId] = useState<string | null>(null);
@@ -1449,6 +1457,95 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
       },
     })
   );
+
+  const { mutateAsync: resizeMachineMutation } = useMutation(
+    trpc.admin.kiloclawInstances.resizeMachine.mutationOptions()
+  );
+
+  const isResizingMachine =
+    resizePhase !== 'idle' && resizePhase !== 'done' && resizePhase !== 'error';
+
+  // Poll status during resize phases
+  const resizePolling =
+    resizePhase === 'stopping' || resizePhase === 'starting' || resizePhase === 'waiting';
+  useQuery({
+    queryKey: ['machine-resize-poll', userId, instanceId, resizePolling],
+    queryFn: async () => {
+      invalidateMachineQueries();
+      return { ts: Date.now() };
+    },
+    enabled: resizePolling,
+    refetchInterval: resizePolling ? 3000 : false,
+  });
+
+  // Advance resize phase when machine reaches running
+  const currentStatus = data?.workerStatus?.status;
+  useEffect(() => {
+    if (resizePhase === 'waiting' && currentStatus === 'running') {
+      setResizePhase('done');
+    }
+  }, [resizePhase, currentStatus]);
+
+  const handleResize = async () => {
+    setResizeMachineDialogOpen(false);
+    setResizeConfirmText('');
+    setResizeError(null);
+
+    const sizeMap: Record<
+      string,
+      { cpus: number; memory_mb: number; cpu_kind: 'shared' | 'performance' }
+    > = {
+      'shared-cpu-2x': { cpus: 2, memory_mb: 3072, cpu_kind: 'shared' },
+      'shared-cpu-4x': { cpus: 4, memory_mb: 3072, cpu_kind: 'shared' },
+      'performance-1x': { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      'performance-2x': { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' },
+    };
+    const machineSize = sizeMap[selectedMachineSize];
+    if (!machineSize || !data || !userId) return;
+
+    try {
+      // Step 1: Stop if running — retry up to 3 times since Fly can be slow
+      if (currentStatus !== 'stopped') {
+        setResizePhase('stopping');
+        let stopped = false;
+        for (let attempt = 0; attempt < 3 && !stopped; attempt++) {
+          try {
+            await machineStop({ userId, instanceId });
+            stopped = true;
+          } catch {
+            // Stop timed out — wait and check if it actually stopped
+            await new Promise(resolve => setTimeout(resolve, 10_000));
+            // Re-fetch status to check
+            await queryClient.invalidateQueries({
+              queryKey: trpc.admin.kiloclawInstances.get.queryKey(),
+            });
+          }
+        }
+        if (!stopped) {
+          throw new Error(
+            'Failed to stop the machine after 3 attempts. Please try again or stop it manually first.'
+          );
+        }
+        // Final wait to let status propagate
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+
+      // Step 2: Update DO state
+      setResizePhase('resizing');
+      await resizeMachineMutation({ userId, instanceId: data.id, machineSize });
+
+      // Step 3: Start with new size
+      setResizePhase('starting');
+      await machineStart({ userId, instanceId });
+
+      // Step 4: Wait for running
+      setResizePhase('waiting');
+    } catch (err) {
+      setResizePhase('error');
+      setResizeError(err instanceof Error ? err.message : 'An unknown error occurred');
+      toast.error(`Resize failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
 
   // Reset the destroyed success state when the machine ID changes (e.g. new machine created)
   const flyMachineId = data?.workerStatus?.flyMachineId;
@@ -1901,6 +1998,23 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <Server className="text-muted-foreground h-4 w-4 shrink-0" />
+                  <DetailField label="Machine Size">
+                    {data.workerStatus.machineSize ? (
+                      <code className="text-sm">
+                        {data.workerStatus.machineSize.cpu_kind ?? 'shared'}-cpu-
+                        {data.workerStatus.machineSize.cpus}x,{' '}
+                        {data.workerStatus.machineSize.memory_mb}MB
+                      </code>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">
+                        default (performance-1x, 3072MB)
+                      </span>
+                    )}
+                  </DetailField>
+                </div>
+
+                <div className="flex items-center gap-2">
                   <HardDrive className="text-muted-foreground h-4 w-4 shrink-0" />
                   <DetailField label="Fly Volume ID">
                     <code className="text-sm">{data.workerStatus.flyVolumeId ?? '—'}</code>
@@ -2148,7 +2262,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <CardTitle>Machine Controls</CardTitle>
-                  <CardDescription>Start or stop the Fly machine</CardDescription>
+                  <CardDescription>Start, stop, resize, or destroy the Fly machine</CardDescription>
                 </div>
                 <StatusBadge status={data.workerStatus?.status ?? null} />
               </div>
@@ -2206,6 +2320,24 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     <ArrowUpCircle className="mr-1 h-4 w-4" />
                   )}
                   Upgrade to Latest
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={machineActionPending || isResizingMachine}
+                  onClick={() => {
+                    const ms = data?.workerStatus?.machineSize;
+                    const key = ms
+                      ? ms.cpu_kind === 'performance'
+                        ? `performance-${ms.cpus}x`
+                        : `shared-cpu-${ms.cpus}x`
+                      : 'performance-1x';
+                    setSelectedMachineSize(key);
+                    setResizeMachineDialogOpen(true);
+                  }}
+                >
+                  <ArrowUpDown className="mr-1 h-4 w-4" />
+                  Resize Machine
                 </Button>
                 <Button
                   size="sm"
@@ -2281,6 +2413,188 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               >
                 {isDestroyingFlyMachine && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
                 Destroy Machine
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Resize Machine Progress */}
+        {isResizingMachine && (
+          <Card className="border-orange-500/50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 rounded border p-4">
+                <Loader2 className="h-5 w-5 shrink-0 animate-spin text-orange-500" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">
+                    {resizePhase === 'stopping' && 'Stopping machine...'}
+                    {resizePhase === 'resizing' && 'Updating machine size...'}
+                    {resizePhase === 'starting' && 'Starting machine with new size...'}
+                    {resizePhase === 'waiting' && 'Waiting for machine to be ready...'}
+                  </p>
+                  <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                    {(['stopping', 'resizing', 'starting', 'waiting'] as const).map((step, i) => (
+                      <span key={step} className="flex items-center gap-1">
+                        {i > 0 && <span className="text-muted-foreground/50">&rarr;</span>}
+                        <span
+                          className={
+                            resizePhase === step
+                              ? 'font-medium text-orange-500'
+                              : (['stopping', 'resizing', 'starting', 'waiting'] as const).indexOf(
+                                    resizePhase as typeof step
+                                  ) > i
+                                ? 'text-foreground'
+                                : ''
+                          }
+                        >
+                          {step === 'stopping'
+                            ? 'Stop'
+                            : step === 'resizing'
+                              ? 'Resize'
+                              : step === 'starting'
+                                ? 'Start'
+                                : 'Health check'}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                  {currentStatus && (
+                    <p className="text-muted-foreground text-xs">
+                      Machine status: <StatusBadge status={currentStatus} />
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {resizePhase === 'done' && (
+          <Card className="border-green-500/50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 rounded border border-green-600/30 bg-green-600/5 p-4">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
+                <div>
+                  <p className="text-sm font-medium text-green-600">Machine resize complete</p>
+                  <p className="text-muted-foreground text-xs">
+                    Machine is running with the new size.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto"
+                  onClick={() => setResizePhase('idle')}
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {resizePhase === 'error' && (
+          <Card className="border-destructive/50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 rounded border border-red-600/30 bg-red-600/5 p-4">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+                <div>
+                  <p className="text-sm font-medium text-red-600">Machine resize failed</p>
+                  <p className="text-muted-foreground text-xs">{resizeError}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto"
+                  onClick={() => {
+                    setResizePhase('idle');
+                    setResizeError(null);
+                  }}
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Resize Machine Dialog */}
+        <Dialog
+          open={resizeMachineDialogOpen}
+          onOpenChange={open => {
+            if (isResizingMachine) return;
+            setResizeMachineDialogOpen(open);
+            if (!open) setResizeConfirmText('');
+          }}
+        >
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-orange-500">
+                <AlertTriangle className="h-5 w-5" />
+                Resize Machine
+              </DialogTitle>
+              <DialogDescription className="pt-3">
+                This will stop the machine, update its CPU/memory spec, and restart it. The user
+                will be disconnected during the restart.
+                <span className="text-foreground mt-2 block font-medium">
+                  User: {data?.user_email ?? data?.user_id}
+                </span>
+                {data?.workerStatus?.machineSize ? (
+                  <span className="mt-2 block text-sm">
+                    Current:{' '}
+                    <code className="text-xs">
+                      {data.workerStatus.machineSize.cpu_kind ?? 'shared'}-cpu-
+                      {data.workerStatus.machineSize.cpus}x,{' '}
+                      {data.workerStatus.machineSize.memory_mb}MB
+                    </code>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground mt-2 block text-sm">
+                    Current: default (performance-1x, 3072MB)
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="text-sm font-medium">New size</label>
+                <select
+                  className="bg-background border-input mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  value={selectedMachineSize}
+                  onChange={e => setSelectedMachineSize(e.target.value)}
+                  disabled={isResizingMachine}
+                >
+                  <option value="shared-cpu-2x">shared-cpu-2x, 3GB (~$20/mo)</option>
+                  <option value="shared-cpu-4x">shared-cpu-4x, 3GB (~$24/mo)</option>
+                  <option value="performance-1x">performance-1x, 3GB (~$47/mo)</option>
+                  <option value="performance-2x">performance-2x, 4GB (~$85/mo)</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">
+                  Type <code className="text-destructive text-xs">RESIZE</code> to confirm
+                </label>
+                <input
+                  type="text"
+                  className="bg-background border-input mt-1 w-full rounded-md border px-3 py-2 text-sm"
+                  value={resizeConfirmText}
+                  onChange={e => setResizeConfirmText(e.target.value)}
+                  placeholder="RESIZE"
+                  disabled={isResizingMachine}
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <DialogClose asChild>
+                <Button variant="secondary" disabled={isResizingMachine}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                variant="destructive"
+                disabled={isResizingMachine || resizeConfirmText !== 'RESIZE'}
+                onClick={() => void handleResize()}
+              >
+                Confirm Resize
               </Button>
             </DialogFooter>
           </DialogContent>

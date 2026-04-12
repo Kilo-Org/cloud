@@ -16,6 +16,7 @@ import {
   GoogleCredentialsSchema,
   SecretsPatchSchema,
   InstanceIdParam,
+  MachineSizeSchema,
 } from '../schemas/instance-config';
 import {
   ImageVersionEntrySchema,
@@ -332,6 +333,7 @@ const SAFE_ERROR_PREFIXES = [
   'Volume ', // reassociate: volume not found / bad state
   'Cannot restore: ', // snapshot restore: bad state
   'Cannot destroy: ', // destroy while restoring
+  'Cannot resize: ', // resize during destroying/restoring/recovering
   'Cannot retry recovery', // force-retry-recovery guard messages
   'Stream Chat sendMessage failed', // sendMessage HTTP errors
   'Stream Chat is not set up', // no Stream Chat on this instance
@@ -1989,6 +1991,35 @@ platform.post('/reassociate-volume', async c => {
     return c.json(response);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'reassociate-volume');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/resize-machine
+// Updates the machine size for an instance. Takes effect on next start/restart.
+const ResizeMachineSchema = z.object({
+  userId: z.string().min(1),
+  machineSize: MachineSizeSchema,
+});
+
+platform.post('/resize-machine', async c => {
+  const result = await parseBody(c, ResizeMachineSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      stub => stub.resizeMachine(result.data.machineSize),
+      'resizeMachine'
+    );
+    return c.json(response);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'resize-machine');
     return jsonError(message, status);
   }
 });

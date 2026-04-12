@@ -319,6 +319,12 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
     description: 'Custom credit grant for organization',
     is_idempotent: false,
   },
+  {
+    credit_category: 'contributor-champion-credits',
+    description: 'Contributor Champion monthly credits',
+    is_idempotent: false,
+    expiry_hours: 30 * 24,
+  },
 ];
 
 /**
@@ -331,6 +337,16 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
  * 2. Copy the encrypted value and use in encrypted_credit_category
  */
 const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCategoryConfig[] = [
+  {
+    encrypted_credit_category: 'CobZxuHxiuCy3AhW/ObaOQ==:oVLeCsiu4IDqCXzUqliNUg==:IxCjLOrL8EPkWRNw',
+    description: 'Friday promo',
+    expiry_hours: 60 * 24,
+    amount_usd: 5,
+    is_user_selfservicable: true,
+    total_redemptions_allowed: 5_000,
+    is_idempotent: true,
+    promotion_ends_at: new Date('2026-04-17T23:59:59Z'),
+  },
   {
     encrypted_credit_category: 'DMAB+J9SP5P7rxN19iajXg==:l+/sU/o65wg/imvGdNPCTg==:SlcbjsV0',
     description: 'GitHub incentive',

@@ -137,6 +137,22 @@ describe('generateBaseConfig', () => {
     expect(config.tools.profile).toBe('full');
   });
 
+  it('preserves existing web search provider on non-fresh boot', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'brave',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('brave');
+  });
+
   it('defaults tool profile to full when not previously set', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
@@ -213,8 +229,7 @@ describe('generateBaseConfig', () => {
       'org_abc123'
     );
     expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
-    // models key is deleted so OpenClaw uses the built-in provider's full catalog
-    expect(config.models.providers.kilocode.models).toBeUndefined();
+    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
   });
 
   it('still removes openrouter stale provider for org-scoped instances', () => {
@@ -303,8 +318,7 @@ describe('generateBaseConfig', () => {
     );
     // Explicit provider entries require a baseUrl per OpenClaw's strict schema
     expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
-    // No models key — lets the built-in kilocode provider's full catalog be used
-    expect(config.models.providers.kilocode.models).toBeUndefined();
+    expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
   it('does not set org header when KILOCODE_ORGANIZATION_ID is not set', () => {
@@ -336,8 +350,7 @@ describe('generateBaseConfig', () => {
     );
     expect(config.models.providers.kilocode.headers['X-Custom']).toBe('value');
     expect(config.models.providers.kilocode.baseUrl).toBe('https://tunnel.example.com/');
-    // models key is deleted so OpenClaw uses the built-in provider's full catalog
-    expect(config.models.providers.kilocode.models).toBeUndefined();
+    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
   });
 
   it('removes stale org header when KILOCODE_ORGANIZATION_ID is no longer set', () => {
@@ -942,6 +955,17 @@ describe('writeBaseConfig', () => {
 
     const config = JSON.parse(written[0].data);
     expect(config.tools.profile).toBe('full');
+  });
+
+  it('does not steer web search provider on config restore path', () => {
+    const { deps, written } = fakeDeps();
+    const env = minimalEnv();
+    delete env.KILOCLAW_FRESH_INSTALL;
+
+    writeBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    const config = JSON.parse(written[0].data);
+    expect(config.tools?.web?.search?.provider).toBeUndefined();
   });
 
   it('throws if KILOCODE_API_KEY is missing', () => {

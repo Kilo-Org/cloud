@@ -1,17 +1,21 @@
 import { KeyRound } from 'lucide-react-native';
 import { ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useLocalSearchParams } from 'expo-router';
 
 import { EmptyState } from '@/components/empty-state';
 import { SettingsCard } from '@/components/kiloclaw/settings-card';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useKiloClawMutations, useKiloClawSecretCatalog } from '@/lib/hooks/use-kiloclaw';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { useKiloClawMutations, useKiloClawSecretCatalog } from '@/lib/hooks/use-kiloclaw-queries';
 
 export default function SecretsScreen() {
-  const mutations = useKiloClawMutations();
-  const catalogQuery = useKiloClawSecretCatalog();
+  const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
+  const { organizationId } = useInstanceContext(instanceId);
+  const mutations = useKiloClawMutations(organizationId);
+  const catalogQuery = useKiloClawSecretCatalog(organizationId);
   const isLoading = catalogQuery.isPending;
 
   function renderContent() {

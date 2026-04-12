@@ -318,7 +318,7 @@ export function ProvisioningStepView({ totalSteps = 5 }: { totalSteps?: number }
       <div className="flex flex-col items-center gap-2 text-center">
         <h2 className="text-foreground text-2xl font-bold">Setting up your instance</h2>
         <p className="text-muted-foreground max-w-md text-sm leading-relaxed">
-          This usually takes a minute or two. Feel free to keep this tab open and step away &mdash;
+          This usually takes five minutes. Feel free to keep this tab open and step away &mdash;
           we&apos;ll play a sound as soon as it&apos;s ready.
         </p>
       </div>

@@ -46,4 +46,7 @@ function timeAgo(date: Date): string {
   return `${years}y ago`;
 }
 
-export { cn, parseTimestamp, timeAgo };
+// eslint-disable-next-line no-empty-function -- intentional no-op
+async function asyncNoop() {}
+
+export { asyncNoop, cn, parseTimestamp, timeAgo };

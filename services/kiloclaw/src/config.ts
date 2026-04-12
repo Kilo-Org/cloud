@@ -36,11 +36,11 @@ export const KILOCLAW_AUTH_COOKIE_MAX_AGE = 60 * 60 * 24;
 /** API key max age for gateway credentials minted by the worker */
 export const KILOCODE_API_KEY_EXPIRY_SECONDS = 30 * 24 * 60 * 60;
 
-/** Default Fly Machine guest spec (shared-cpu-2x, 3GB) */
+/** Default Fly Machine guest spec (performance-1x, 3GB) */
 export const DEFAULT_MACHINE_GUEST = {
-  cpus: 2,
+  cpus: 1,
   memory_mb: 3072,
-  cpu_kind: 'shared' as const,
+  cpu_kind: 'performance' as const,
 };
 
 /** Default Fly Volume size in GB */

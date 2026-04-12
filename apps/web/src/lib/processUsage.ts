@@ -613,7 +613,10 @@ export function processOpenRouterUsage(
   return {
     inputTokens: usage?.prompt_tokens ?? 0,
     cacheHitTokens: usage?.prompt_tokens_details?.cached_tokens ?? 0,
-    cacheWriteTokens: 0,
+    cacheWriteTokens:
+      usage?.prompt_tokens_details?.cache_write_tokens ??
+      usage?.prompt_tokens_details?.cache_creation_input_tokens ??
+      0,
     outputTokens: usage?.completion_tokens ?? 0,
     cost_mUsd,
     is_byok,

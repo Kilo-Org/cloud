@@ -1,6 +1,7 @@
 import { Newspaper } from 'lucide-react-native';
 import { ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useLocalSearchParams } from 'expo-router';
 
 import { EmptyState } from '@/components/empty-state';
 import { ChangelogList } from '@/components/kiloclaw/changelog-list';
@@ -8,10 +9,13 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useKiloClawChangelog } from '@/lib/hooks/use-kiloclaw';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { useKiloClawChangelog } from '@/lib/hooks/use-kiloclaw-queries';
 
 export default function ChangelogScreen() {
-  const changelogQuery = useKiloClawChangelog();
+  const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
+  const { organizationId } = useInstanceContext(instanceId);
+  const changelogQuery = useKiloClawChangelog(organizationId);
   const entries = changelogQuery.data;
 
   function renderContent() {

@@ -198,11 +198,23 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.config.restore',
   'kiloclaw.doctor.run',
   'kiloclaw.machine.destroy_fly',
+  'kiloclaw.machine.resize',
   'kiloclaw.subscription.bulk_trial_grant',
   'kiloclaw.subscription.admin_cancel',
 ]);
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
+
+// --- ContributorChampion enums ---
+
+export const ContributorChampionTier = {
+  Contributor: 'contributor',
+  Ambassador: 'ambassador',
+  Champion: 'champion',
+} as const;
+
+export type ContributorChampionTier =
+  (typeof ContributorChampionTier)[keyof typeof ContributorChampionTier];
 
 // =============================================================================
 // B. Type-Only Definitions (used in $type<T>())

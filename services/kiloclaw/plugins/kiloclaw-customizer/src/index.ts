@@ -1,4 +1,5 @@
 import { definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
+import { createKiloExaWebSearchProvider } from './kilo-exa-web-search-provider';
 
 const KILOCLAW_IDENTITY_LINE = [
   '## Identity Override',
@@ -13,6 +14,8 @@ export default definePluginEntry({
   name: 'KiloClawCustomizer',
   description: 'KiloClaw customization plugin for OpenClaw',
   register(api) {
+    api.registerWebSearchProvider(createKiloExaWebSearchProvider());
+
     api.on(
       'before_prompt_build',
       () => ({

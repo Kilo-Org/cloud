@@ -2,6 +2,9 @@
   "id": "kiloclaw-customizer",
   "name": "KiloClawCustomizer",
   "description": "KiloClaw customization plugin for OpenClaw",
+  "contracts": {
+    "webSearchProviders": ["kilo-exa"]
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

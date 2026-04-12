@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
-import { instance_badge_counts, kiloclaw_instances, user_push_tokens } from '@kilocode/db/schema';
+import { channel_badge_counts, kiloclaw_instances, user_push_tokens } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, sql, sum } from 'drizzle-orm';
 import type { Event } from 'stream-chat';
 
@@ -140,17 +140,17 @@ export class NotificationChannelDO extends DurableObject<Env> {
     // temporarily has no registered push tokens (e.g. between reinstalls).
     // Uses UPSERT so the row is created on first notification for this instance.
     await db
-      .insert(instance_badge_counts)
+      .insert(channel_badge_counts)
       .values({ user_id: instance.user_id, channel_id: sandboxId, badge_count: 1 })
       .onConflictDoUpdate({
-        target: [instance_badge_counts.user_id, instance_badge_counts.channel_id],
-        set: { badge_count: sql`${instance_badge_counts.badge_count} + 1` },
+        target: [channel_badge_counts.user_id, channel_badge_counts.channel_id],
+        set: { badge_count: sql`${channel_badge_counts.badge_count} + 1` },
       });
 
     const [totals] = await db
-      .select({ total: sum(instance_badge_counts.badge_count) })
-      .from(instance_badge_counts)
-      .where(eq(instance_badge_counts.user_id, instance.user_id));
+      .select({ total: sum(channel_badge_counts.badge_count) })
+      .from(channel_badge_counts)
+      .where(eq(channel_badge_counts.user_id, instance.user_id));
 
     const badgeCount = Number(totals?.total ?? 0);
 

@@ -1,5 +1,5 @@
 {
-  "id": "bd203e78-23ec-49eb-bc51-e5bc521059ce",
+  "id": "6e806f7d-2a53-44e6-8605-c901cdc6cb2a",
   "prevId": "fbecb630-8615-456e-96f2-373b06ced79f",
   "version": "7",
   "dialect": "postgresql",
@@ -2985,6 +2985,67 @@
           "value": "(\n        (\"byok_api_keys\".\"kilo_user_id\" IS NOT NULL AND \"byok_api_keys\".\"organization_id\" IS NULL) OR\n        (\"byok_api_keys\".\"kilo_user_id\" IS NULL AND \"byok_api_keys\".\"organization_id\" IS NOT NULL)\n      )"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.channel_badge_counts": {
+      "name": "channel_badge_counts",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "badge_count": {
+          "name": "badge_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "channel_badge_counts_user_id_kilocode_users_id_fk": {
+          "name": "channel_badge_counts_user_id_kilocode_users_id_fk",
+          "tableFrom": "channel_badge_counts",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "channel_badge_counts_user_id_channel_id_pk": {
+          "name": "channel_badge_counts_user_id_channel_id_pk",
+          "columns": [
+            "user_id",
+            "channel_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.cli_sessions": {
@@ -6898,67 +6959,6 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.instance_badge_counts": {
-      "name": "instance_badge_counts",
-      "schema": "",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "channel_id": {
-          "name": "channel_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "badge_count": {
-          "name": "badge_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "instance_badge_counts_user_id_kilocode_users_id_fk": {
-          "name": "instance_badge_counts_user_id_kilocode_users_id_fk",
-          "tableFrom": "instance_badge_counts",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "instance_badge_counts_user_id_channel_id_pk": {
-          "name": "instance_badge_counts_user_id_channel_id_pk",
-          "columns": [
-            "user_id",
-            "channel_id"
-          ]
-        }
-      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

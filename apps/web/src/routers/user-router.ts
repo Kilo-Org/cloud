@@ -20,7 +20,7 @@ import {
   kiloclaw_instances,
   kiloclaw_subscriptions,
   user_push_tokens,
-  instance_badge_counts,
+  channel_badge_counts,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, inArray, sql, gte, sum } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -725,19 +725,19 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ channelId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await db
-        .update(instance_badge_counts)
+        .update(channel_badge_counts)
         .set({ badge_count: 0 })
         .where(
           and(
-            eq(instance_badge_counts.user_id, ctx.user.id),
-            eq(instance_badge_counts.channel_id, input.channelId)
+            eq(channel_badge_counts.user_id, ctx.user.id),
+            eq(channel_badge_counts.channel_id, input.channelId)
           )
         );
 
       const [totals] = await db
-        .select({ total: sum(instance_badge_counts.badge_count) })
-        .from(instance_badge_counts)
-        .where(eq(instance_badge_counts.user_id, ctx.user.id));
+        .select({ total: sum(channel_badge_counts.badge_count) })
+        .from(channel_badge_counts)
+        .where(eq(channel_badge_counts.user_id, ctx.user.id));
 
       return { badgeCount: Number(totals?.total ?? 0) };
     }),

@@ -735,7 +735,7 @@ describe('kiloPassRouter', () => {
   });
 
   describe('isEligibleForFirstMonthPromo in getState', () => {
-    it('returns isEligibleForFirstMonthPromo based on promo cutoff when user has no subscriptions', async () => {
+    it('returns isEligibleForFirstMonthPromo=true when user has no subscriptions', async () => {
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-promo-eligible-no-sub@example.com',
       });

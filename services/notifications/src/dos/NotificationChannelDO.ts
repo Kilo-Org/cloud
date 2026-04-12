@@ -135,16 +135,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
       return;
     }
 
-    const tokens = await db
-      .select({ token: user_push_tokens.token })
-      .from(user_push_tokens)
-      .where(eq(user_push_tokens.user_id, instance.user_id));
-
-    if (tokens.length === 0) {
-      return;
-    }
-
     // Increment the badge count for this instance and return the new total across all instances.
+    // Done before the token guard so unread state is always persisted even if the user
+    // temporarily has no registered push tokens (e.g. between reinstalls).
     // Uses UPSERT so the row is created on first notification for this instance.
     await db
       .insert(instance_badge_counts)
@@ -160,6 +153,15 @@ export class NotificationChannelDO extends DurableObject<Env> {
       .where(eq(instance_badge_counts.user_id, instance.user_id));
 
     const badgeCount = Number(totals?.total ?? 0);
+
+    const tokens = await db
+      .select({ token: user_push_tokens.token })
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, instance.user_id));
+
+    if (tokens.length === 0) {
+      return;
+    }
 
     const truncatedMessage = msg.text.length > 100 ? msg.text.slice(0, 97) + '...' : msg.text;
 

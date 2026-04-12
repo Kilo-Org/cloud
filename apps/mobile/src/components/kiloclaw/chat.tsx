@@ -16,7 +16,7 @@ import { useBotOnlineStatus } from '@/components/kiloclaw/chat-hooks';
 import { NotificationPrompt } from '@/components/kiloclaw/notification-prompt';
 import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
 import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw-queries';
-import { setActiveChatInstance } from '@/lib/notifications';
+import { type NotificationData, setActiveChatInstance } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
 
 type KiloClawChatProps = {
@@ -50,8 +50,20 @@ export function KiloClawChat({
     useCallback(() => {
       setActiveChatInstance(instanceId);
       markChatRead({ instanceId });
+
+      // If a notification for this chat arrives while the screen is already open it is
+      // visually suppressed, but the DO still incremented the server-side count. Clear
+      // it immediately so the badge never drifts above 0 while the user is reading.
+      const subscription = Notifications.addNotificationReceivedListener(notification => {
+        const data = notification.request.content.data as NotificationData | undefined;
+        if (data?.type === 'chat' && data.instanceId === instanceId) {
+          markChatRead({ instanceId });
+        }
+      });
+
       return () => {
         setActiveChatInstance(null);
+        subscription.remove();
       };
     }, [instanceId, markChatRead])
   );

@@ -24,7 +24,7 @@ export function setActiveChatInstance(instanceId: string | null) {
 }
 
 // Keep in sync with data field in services/notifications/src/dos/NotificationChannelDO.ts
-type NotificationData = { type: 'chat'; instanceId: string };
+export type NotificationData = { type: 'chat'; instanceId: string };
 
 const shown = {
   shouldShowAlert: true,

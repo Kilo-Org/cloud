@@ -297,7 +297,8 @@ describe('kiloPassRouter', () => {
 
       expect(result).toEqual({
         subscription: null,
-        isEligibleForFirstMonthPromo: new Date() < KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toDate(),
+        isEligibleForFirstMonthPromo:
+          new Date() < KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toDate(),
       });
     });
 

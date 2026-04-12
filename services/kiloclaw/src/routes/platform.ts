@@ -2171,6 +2171,7 @@ platform.post('/publish-image-version', async c => {
 
 import { FLY_REGIONS_KV_KEY, parseRegions, ALL_VALID_REGIONS } from '../durable-objects/regions';
 import { DEFAULT_FLY_REGION } from '../config';
+import { FLY_API_BASE } from '../fly/client';
 
 const UpdateRegionsSchema = z.object({
   regions: z
@@ -2255,7 +2256,7 @@ platform.post('/destroy-fly-machine', async c => {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
   }
 
-  const url = `https://api.machines.dev/v1/apps/${appName}/machines/${machineId}?force=true`;
+  const url = `${FLY_API_BASE}/v1/apps/${appName}/machines/${machineId}?force=true`;
   try {
     const resp = await fetch(url, {
       method: 'DELETE',
@@ -2329,7 +2330,7 @@ platform.post('/extend-volume', async c => {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
   }
 
-  const url = `https://api.machines.dev/v1/apps/${appName}/volumes/${volumeId}/extend`;
+  const url = `${FLY_API_BASE}/v1/apps/${appName}/volumes/${volumeId}/extend`;
   try {
     const resp = await fetch(url, {
       method: 'PUT',

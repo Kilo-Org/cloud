@@ -729,3 +729,72 @@ describe('credit renewal sweep affiliate tracking', () => {
     ]);
   });
 });
+
+describe('complementary inference ended sweep', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetWorkerDb.mockReset();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  it('sends the required free model name template variable', async () => {
+    const { db, inserts } = createMockDb([
+      [
+        {
+          user_id: 'user-1',
+          email: 'user-1@example.com',
+          sandbox_id: 'ki_11111111111141118111111111111111',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    const fetch = vi.fn(
+      async (_request: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(JSON.stringify({ sent: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: 'abababab-abab-4bab-8bab-abababababab',
+        sweep: 'complementary_inference_ended',
+      },
+      1
+    );
+
+    expect(summary.complementary_inference_ended_emails).toBe(1);
+    expect(summary.emails_sent).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(inserts).toEqual([
+      {
+        user_id: 'user-1',
+        email_type: 'claw_complementary_inference_ended:ki_11111111111141118111111111111111',
+      },
+    ]);
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const firstFetchCall = fetch.mock.calls[0];
+    if (!firstFetchCall) throw new Error('Expected one side effect call');
+    const requestBody = firstFetchCall[1]?.body;
+    if (typeof requestBody !== 'string') throw new Error('Expected side effect request body');
+
+    const sideEffectCall: unknown = JSON.parse(requestBody);
+    expect(sideEffectCall).toEqual({
+      action: 'send_email',
+      input: {
+        to: 'user-1@example.com',
+        templateName: 'clawComplementaryInferenceEnded',
+        templateVars: {
+          claw_url: 'https://app.kilo.ai/claw',
+          free_model_name: 'Kilo Auto Free',
+        },
+      },
+    });
+  });
+});

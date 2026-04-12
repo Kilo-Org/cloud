@@ -109,7 +109,7 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
     case 'clawCreditRenewalFailed':
       return { claw_url: `${NEXTAUTH_URL}/claw` };
     case 'clawComplementaryInferenceEnded':
-      return { claw_url: `${NEXTAUTH_URL}/claw` };
+      return { claw_url: `${NEXTAUTH_URL}/claw`, free_model_name: 'Kilo Auto Free' };
     case 'accountDeletionRequest':
       return { email: 'user@example.com' };
   }

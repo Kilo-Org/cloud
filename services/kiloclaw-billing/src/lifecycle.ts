@@ -1779,6 +1779,7 @@ async function runEarlybirdWarningSweep(
 
 const COMPLEMENTARY_INFERENCE_WINDOW_MS = 6 * 60 * 60 * 1000;
 const COMPLEMENTARY_INFERENCE_INSTANCE_READY_CUTOFF_ISO = '2026-04-10T00:00:00.000Z';
+const COMPLEMENTARY_INFERENCE_FREE_MODEL_NAME = 'Kilo Auto Free';
 
 async function runComplementaryInferenceEndedSweep(
   database: WorkerDb,
@@ -1842,7 +1843,10 @@ async function runComplementaryInferenceEndedSweep(
         row.email,
         `claw_complementary_inference_ended:${row.sandbox_id}`,
         'clawComplementaryInferenceEnded',
-        { claw_url: clawUrl },
+        {
+          claw_url: clawUrl,
+          free_model_name: COMPLEMENTARY_INFERENCE_FREE_MODEL_NAME,
+        },
         summary
       );
 

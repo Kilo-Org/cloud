@@ -135,10 +135,10 @@ export class NotificationChannelDO extends DurableObject<Env> {
       return;
     }
 
-    // Increment the badge count for this instance and return the new total across all instances.
+    // Increment the badge count for this channel and return the new total across all channels.
     // Done before the token guard so unread state is always persisted even if the user
     // temporarily has no registered push tokens (e.g. between reinstalls).
-    // Uses UPSERT so the row is created on first notification for this instance.
+    // Uses UPSERT so the row is created on first notification for this channel.
     await db
       .insert(channel_badge_counts)
       .values({ user_id: instance.user_id, channel_id: sandboxId, badge_count: 1 })

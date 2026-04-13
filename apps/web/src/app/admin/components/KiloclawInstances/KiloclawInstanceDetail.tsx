@@ -58,6 +58,7 @@ import {
   XCircle,
   ShieldAlert,
   Activity,
+  Copy,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -191,6 +192,39 @@ function DetailField({ label, children }: { label: string; children: React.React
       <div className="text-muted-foreground text-xs">{label}</div>
       <div className="text-sm">{children}</div>
     </div>
+  );
+}
+
+function CopySshCommandButton({
+  flyAppName,
+  flyMachineId,
+}: {
+  flyAppName: string;
+  flyMachineId: string;
+}) {
+  const command = `fly ssh console --machine ${flyMachineId} -a ${flyAppName}`;
+
+  const copyCommand = async () => {
+    try {
+      await navigator.clipboard.writeText(command);
+      toast.success('SSH command copied to clipboard');
+    } catch {
+      toast.error('Failed to copy SSH command');
+    }
+  };
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="outline" size="sm" onClick={() => void copyCommand()}>
+          <Copy className="mr-1 h-3.5 w-3.5" />
+          Copy SSH
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <code>{command}</code>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -1978,15 +2012,21 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   <Server className="text-muted-foreground h-4 w-4 shrink-0" />
                   <DetailField label="Fly Machine ID">
                     {data.workerStatus.flyMachineId && data.workerStatus.flyAppName ? (
-                      <a
-                        href={`https://fly.io/apps/${data.workerStatus.flyAppName}/machines/${data.workerStatus.flyMachineId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-blue-600 hover:underline"
-                      >
-                        <code className="text-sm">{data.workerStatus.flyMachineId}</code>
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <a
+                          href={`https://fly.io/apps/${data.workerStatus.flyAppName}/machines/${data.workerStatus.flyMachineId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                        >
+                          <code className="text-sm">{data.workerStatus.flyMachineId}</code>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                        <CopySshCommandButton
+                          flyAppName={data.workerStatus.flyAppName}
+                          flyMachineId={data.workerStatus.flyMachineId}
+                        />
+                      </div>
                     ) : (
                       <code className="text-sm">{data.workerStatus.flyMachineId ?? '—'}</code>
                     )}

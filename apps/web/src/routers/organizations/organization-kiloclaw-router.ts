@@ -327,7 +327,9 @@ export const organizationKiloclawRouter = createTRPCRouter({
         });
       }
 
-      const instanceRow = await ensureActiveInstance(ctx.user.id, { orgId: input.organizationId });
+      const { instance: instanceRow } = await ensureActiveInstance(ctx.user.id, {
+        orgId: input.organizationId,
+      });
 
       const encryptedSecrets = input.secrets
         ? Object.fromEntries(
@@ -376,6 +378,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
         return result;
       } catch (error) {
+        // Org provision always creates a new row, so always clean up on failure.
         await markInstanceDestroyedById(instanceRow.id).catch(cleanupErr => {
           console.error(
             '[kiloclaw-org] Failed to clean up instance row after provision error:',

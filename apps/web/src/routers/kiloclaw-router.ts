@@ -194,9 +194,9 @@ async function getOrCreateInstanceForBilling(userId: string): Promise<ActiveKilo
     return active;
   }
 
-  const newInstance = await ensureActiveInstance(userId);
-  await adoptOrphanedSubscription(userId, newInstance.id);
-  return newInstance;
+  const { instance } = await ensureActiveInstance(userId);
+  await adoptOrphanedSubscription(userId, instance.id);
+  return instance;
 }
 
 type PersonalBillingInstanceRow = {
@@ -504,13 +504,14 @@ function sanitizeKiloCodeConfigResponse(
 async function provisionInstance(
   user: Parameters<typeof generateApiToken>[0],
   input: z.infer<typeof updateConfigSchema>,
-  /** Snapshot of the active row taken *before* ensureProvisionAccess, which may
-   *  itself create a row. Passing the snapshot in lets us correctly detect
-   *  whether the row was created as part of this provisioning attempt. */
-  preExistingRow: ActiveKiloClawInstance | null
+  /** Whether ensureProvisionAccess (or an earlier step in this request)
+   *  created the instance row. When true and the DO provision fails, the
+   *  row is cleaned up. This is authoritative — it comes from the
+   *  ensureActiveInstance call that actually inserted, not from a
+   *  before/after snapshot that races with concurrent requests. */
+  instanceCreatedByThisRequest: boolean
 ) {
-  const instanceRow = await ensureActiveInstance(user.id);
-  const rowIsNew = !preExistingRow || preExistingRow.id !== instanceRow.id;
+  const { instance: instanceRow } = await ensureActiveInstance(user.id);
 
   const encryptedSecrets = input.secrets
     ? Object.fromEntries(
@@ -548,9 +549,10 @@ async function provisionInstance(
       workerInstanceId(instanceRow) ? { instanceId: instanceRow.id } : undefined
     );
   } catch (error) {
-    // Only clean up the exact row this attempt created. Target by primary
-    // key so a concurrent request's row is never affected.
-    if (rowIsNew) {
+    // Only clean up the exact row this request created. The
+    // instanceCreatedByThisRequest flag comes from the ensureActiveInstance
+    // call that actually inserted — not a racy before/after snapshot.
+    if (instanceCreatedByThisRequest) {
       await markInstanceDestroyedById(instanceRow.id).catch(cleanupErr => {
         console.error(
           '[kiloclaw] Failed to clean up instance row after provision error:',
@@ -657,7 +659,10 @@ async function fetchKiloClawServiceDegraded(): Promise<boolean> {
  * Earlybird is checked first so earlybird purchasers never get an accidental
  * trial row, and expired earlybird users cannot regain access by provisioning.
  */
-async function ensureProvisionAccess(userId: string, userEmail: string): Promise<void> {
+async function ensureProvisionAccess(
+  userId: string,
+  userEmail: string
+): Promise<{ instanceCreated: boolean }> {
   // Check earlybird before anything else — active earlybird grants access,
   // expired earlybird must not fall through to the trial bootstrap.
   const [earlybird] = await db
@@ -666,7 +671,9 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
     .where(eq(kiloclaw_earlybird_purchases.user_id, userId))
     .limit(1);
   if (earlybird) {
-    if (new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > new Date()) return;
+    if (new Date(KILOCLAW_EARLYBIRD_EXPIRY_DATE) > new Date()) {
+      return { instanceCreated: false };
+    }
     // Expired earlybird — fall through to subscription check, but must not
     // auto-create a trial (spec: user must manually subscribe).
   }
@@ -674,7 +681,7 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
   // Ensure the instance row exists so we can check/link subscriptions.
   // ensureActiveInstance is idempotent; the subsequent call in provisionInstance
   // will be a no-op.
-  const instance = await ensureActiveInstance(userId);
+  const { instance, created: instanceCreated } = await ensureActiveInstance(userId);
 
   // Adopt any orphaned subscription (instance_id = NULL) onto this instance
   // before checking access.  This covers the case where a user destroyed their
@@ -745,7 +752,7 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
         });
       });
     }
-    return;
+    return { instanceCreated };
   }
 
   // Access check: check the subscription on this specific instance.
@@ -776,7 +783,7 @@ async function ensureProvisionAccess(userId: string, userEmail: string): Promise
         !!instanceSub.trial_ends_at &&
         new Date(instanceSub.trial_ends_at) > new Date());
 
-    if (hasAccess) return;
+    if (hasAccess) return { instanceCreated };
   }
 
   throw new TRPCError({
@@ -1739,12 +1746,11 @@ export const kiloclawRouter = createTRPCRouter({
 
   // Explicit lifecycle APIs
   provision: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
-    // Snapshot the active row *before* ensureProvisionAccess, which may create
-    // one. provisionInstance uses this to detect whether the row is new so it
-    // can clean up on failure.
-    const preExistingRow = await getActiveInstance(ctx.user.id);
-    await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
-    return provisionInstance(ctx.user, input, preExistingRow);
+    const { instanceCreated } = await ensureProvisionAccess(
+      ctx.user.id,
+      ctx.user.google_user_email
+    );
+    return provisionInstance(ctx.user, input, instanceCreated);
   }),
 
   patchConfig: clawAccessProcedure
@@ -1756,9 +1762,11 @@ export const kiloclawRouter = createTRPCRouter({
   // Backward-compatible alias — uses the same trial-bootstrap flow as provision
   // so first-time callers can create a trial row (clawAccessProcedure would reject them).
   updateConfig: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
-    const preExistingRow = await getActiveInstance(ctx.user.id);
-    await ensureProvisionAccess(ctx.user.id, ctx.user.google_user_email);
-    return provisionInstance(ctx.user, input, preExistingRow);
+    const { instanceCreated } = await ensureProvisionAccess(
+      ctx.user.id,
+      ctx.user.google_user_email
+    );
+    return provisionInstance(ctx.user, input, instanceCreated);
   }),
 
   updateKiloCodeConfig: clawAccessProcedure

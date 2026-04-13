@@ -510,8 +510,9 @@ async function provisionInstance(
    *  owns the row and should clean it up on failure. */
   instanceCreatedByAccessCheck: boolean
 ) {
-  const { instance: instanceRow, created: instanceCreatedHere } =
-    await ensureActiveInstance(user.id);
+  const { instance: instanceRow, created: instanceCreatedHere } = await ensureActiveInstance(
+    user.id
+  );
   // The row was created by this request if either ensureProvisionAccess
   // or the ensureActiveInstance call above inserted it. The earlybird
   // path skips ensureActiveInstance in the access check, so the row may

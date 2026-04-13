@@ -201,6 +201,8 @@ export async function upsertSecurityFinding(
           ${sql.identifier(security_findings.dependency_scope.name)} = EXCLUDED.${sql.identifier(security_findings.dependency_scope.name)},
           ${sql.identifier(security_findings.last_synced_at.name)} = now(),
           ${sql.identifier(security_findings.updated_at.name)} = now()
+        -- Avoid stale first-insert racers rewriting the concurrent winner.
+        WHERE EXISTS (SELECT 1 FROM existing_match)
         RETURNING
           ${security_findings.id} AS id,
           (xmax = 0) AS was_inserted,
@@ -224,7 +226,30 @@ export async function upsertSecurityFinding(
       LIMIT 1
     `);
 
-    const finding = rows[0];
+    let finding = rows[0];
+    if (!finding) {
+      const fallback = await db.execute<{
+        findingId: string;
+        wasInserted: boolean;
+        previousStatus: SecurityFindingStatus;
+        effectiveStatus: SecurityFindingStatus;
+        findingCreatedAt: string;
+      }>(sql`
+        SELECT
+          ${security_findings.id} AS "findingId",
+          false AS "wasInserted",
+          ${security_findings.status} AS "previousStatus",
+          ${security_findings.status} AS "effectiveStatus",
+          ${security_findings.created_at} AS "findingCreatedAt"
+        FROM ${security_findings}
+        WHERE ${security_findings.repo_full_name} = ${params.repoFullName}
+          AND ${security_findings.source} = ${params.source}
+          AND ${security_findings.source_id} = ${params.source_id}
+        LIMIT 1
+      `);
+      finding = fallback.rows[0];
+    }
+
     if (!finding) {
       throw new Error('Failed to upsert security finding');
     }

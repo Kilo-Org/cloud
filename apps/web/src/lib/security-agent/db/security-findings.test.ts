@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db, pool } from '@/lib/drizzle';
 import { security_findings, agent_configs } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -183,6 +183,72 @@ describe('upsertSecurityFinding', () => {
       );
 
     expect(rows).toHaveLength(1);
+  });
+
+  it('does not let a stale first-insert racer overwrite the winner', async () => {
+    const user = await insertTestUser();
+    const owner: SecurityReviewOwner = { userId: user.id };
+    const repo = 'test-org/stale-first-insert-race-repo';
+    const sourceId = '13';
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO security_findings (
+          owned_by_user_id,
+          repo_full_name,
+          source,
+          source_id,
+          severity,
+          package_name,
+          package_ecosystem,
+          title,
+          status,
+          fixed_at,
+          raw_data
+        ) VALUES ($1, $2, 'dependabot', $3, 'critical', 'lodash', 'npm', 'Prototype Pollution in lodash', 'fixed', $4, $5::jsonb)`,
+        [
+          user.id,
+          repo,
+          sourceId,
+          '2026-01-16T00:00:00.000Z',
+          JSON.stringify({ ...rawDependabotAlertFixture, state: 'fixed' }),
+        ]
+      );
+
+      const staleUpsert = upsertSecurityFinding({
+        ...makeFinding({ source_id: sourceId, status: 'open', severity: 'high' }),
+        owner,
+        repoFullName: repo,
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 50));
+      await client.query('COMMIT');
+
+      const result = await staleUpsert;
+
+      expect(result.wasInserted).toBe(false);
+      expect(result.previousStatus).toBe('fixed');
+      expect(result.effectiveStatus).toBe('fixed');
+
+      const [row] = await db
+        .select()
+        .from(security_findings)
+        .where(
+          and(
+            eq(security_findings.repo_full_name, repo),
+            eq(security_findings.source, 'dependabot'),
+            eq(security_findings.source_id, sourceId)
+          )
+        );
+
+      expect(row.status).toBe('fixed');
+      expect(row.severity).toBe('critical');
+    } finally {
+      await client.query('ROLLBACK').catch(() => undefined);
+      client.release();
+    }
   });
 
   it('preserves superseded status fields while refreshing sync metadata', async () => {

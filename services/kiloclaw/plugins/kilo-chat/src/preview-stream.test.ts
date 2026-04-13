@@ -123,12 +123,25 @@ describe('createPreviewStream', () => {
 
   it('abort after create issues a DELETE; abort before create is a no-op', async () => {
     const { client, createMessage, deleteMessage } = makeClientSpies();
-    const stream1 = createPreviewStream({ client, conversationId: 'c1', throttleMs: 100 });
+    const stream1 = createPreviewStream({
+      client,
+      conversationId: 'c1',
+      throttleMs: 100,
+      onWarn: () => {},
+    });
     await stream1.abort();
     expect(deleteMessage).not.toHaveBeenCalled();
 
-    const stream2 = createPreviewStream({ client, conversationId: 'c1', throttleMs: 100 });
-    await stream2.finalize('done');
+    const stream2 = createPreviewStream({
+      client,
+      conversationId: 'c1',
+      throttleMs: 100,
+      onWarn: () => {},
+    });
+    // Create a preview via update (first update fires POST immediately), then abort.
+    stream2.update('partial');
+    // Give the microtask queue a chance to complete the POST.
+    await new Promise(resolve => setImmediate(resolve));
     expect(createMessage).toHaveBeenCalledTimes(1);
     await stream2.abort();
     expect(deleteMessage).toHaveBeenCalledTimes(1);
@@ -138,9 +151,38 @@ describe('createPreviewStream', () => {
   it('abort swallows deleteMessage errors', async () => {
     const { client, deleteMessage } = makeClientSpies();
     deleteMessage.mockRejectedValueOnce(new Error('boom'));
-    const stream = createPreviewStream({ client, conversationId: 'c1', throttleMs: 100 });
-    await stream.finalize('done');
+    const stream = createPreviewStream({
+      client,
+      conversationId: 'c1',
+      throttleMs: 100,
+      onWarn: () => {},
+    });
+    stream.update('partial');
+    await new Promise(resolve => setImmediate(resolve));
     await expect(stream.abort()).resolves.toBeUndefined();
+  });
+
+  it('uses server-returned version to compute the next PATCH version', async () => {
+    vi.useFakeTimers();
+    try {
+      const { client, editMessage } = makeClientSpies();
+      // Simulate server reconciling to version 100 on the first edit.
+      editMessage.mockImplementationOnce(async p => ({ messageId: p.messageId, version: 100 }));
+      const stream = createPreviewStream({ client, conversationId: 'c1', throttleMs: 50 });
+      stream.update('a');
+      await vi.advanceTimersByTimeAsync(0);
+      stream.update('ab');
+      await vi.advanceTimersByTimeAsync(50);
+      // First PATCH sent version: 2 (client's nextVersion); server echoed 100.
+      expect(editMessage.mock.calls[0]![0].version).toBe(2);
+      // Second update triggers another PATCH.
+      stream.update('abc');
+      await vi.advanceTimersByTimeAsync(50);
+      // Second PATCH must start from server-returned 100 → 101.
+      expect(editMessage.mock.calls[1]![0].version).toBe(101);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('versions increase monotonically across many updates', async () => {

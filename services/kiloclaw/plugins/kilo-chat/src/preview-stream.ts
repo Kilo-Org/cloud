@@ -13,6 +13,8 @@ export type CreatePreviewStreamOptions = {
   conversationId: string;
   throttleMs: number;
   onWarn?: (message: string, err?: unknown) => void;
+  setTimer?: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>;
+  clearTimer?: (handle: ReturnType<typeof setTimeout>) => void;
 };
 
 /**
@@ -37,6 +39,8 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
       // eslint-disable-next-line no-console
       console.warn(`[kilo-chat preview] ${msg}`, err);
     });
+  const setTimer = opts.setTimer ?? setTimeout;
+  const clearTimer = opts.clearTimer ?? clearTimeout;
 
   let phase: Phase = 'idle';
   let messageId: string | undefined;
@@ -48,13 +52,17 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
 
   async function flushOnce(): Promise<void> {
     if (timer) {
-      clearTimeout(timer);
+      clearTimer(timer);
       timer = undefined;
     }
     if (phase === 'aborted' || phase === 'finalized') return;
     if (inFlight) {
       await inFlight;
-      return; // caller will reschedule if pendingText remains
+      // Do NOT re-enter: the caller (update-path post-flush check or timer-path
+      // post-flush check) is responsible for rescheduling if pendingText remains.
+      // Re-entering here would either duplicate in-flight slots or starve the
+      // caller's reschedule opportunity.
+      return;
     }
     const text = pendingText;
     if (text === undefined) return;
@@ -107,7 +115,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
 
   function scheduleFlush(): void {
     if (timer) return;
-    timer = setTimeout(() => {
+    timer = setTimer(() => {
       void (async () => {
         await flushOnce();
         if (pendingText !== undefined && phase === 'editing') scheduleFlush();
@@ -136,7 +144,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
       }
       // Flush any in-flight + pending edits, then drive final text.
       if (timer) {
-        clearTimeout(timer);
+        clearTimer(timer);
         timer = undefined;
       }
       if (inFlight) {
@@ -177,9 +185,9 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
       return { messageId };
     },
     async abort(): Promise<void> {
-      if (phase === 'aborted') return;
+      if (phase === 'aborted' || phase === 'finalized') return;
       if (timer) {
-        clearTimeout(timer);
+        clearTimer(timer);
         timer = undefined;
       }
       if (inFlight) {

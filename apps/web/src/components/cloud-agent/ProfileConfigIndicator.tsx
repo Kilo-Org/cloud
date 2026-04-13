@@ -23,6 +23,7 @@ export type BuildProfileConfigIndicatorStateInput = {
   hasSelectedProfileId: boolean;
   isProfilesLoading?: boolean;
   hasProfileError?: boolean;
+  hasRepoBindingError?: boolean;
 };
 
 export function buildProfileConfigIndicatorState({
@@ -33,6 +34,7 @@ export function buildProfileConfigIndicatorState({
   hasSelectedProfileId,
   isProfilesLoading = false,
   hasProfileError = false,
+  hasRepoBindingError = false,
 }: BuildProfileConfigIndicatorStateInput): ProfileConfigIndicatorState | null {
   const hasManualConfig = hasManualEnvVars || hasManualSetupCommands;
   const layers: ConfigLayer[] = [];
@@ -69,14 +71,15 @@ export function buildProfileConfigIndicatorState({
   const hasKnownProfileLayer = profileLayerCount > 0;
   const hasKnownProfileOrSelection = hasKnownProfileLayer || hasSelectedProfileId;
   const profileErrorNeedsAttention = hasProfileError && hasKnownProfileOrSelection;
+  const repoBindingNeedsAttention = hasRepoBindingError && !repoBoundProfileName;
+  const fallbackAttentionLayer: ConfigLayer = repoBindingNeedsAttention
+    ? { label: 'Repo profile', detail: 'Open Settings to review' }
+    : { label: 'Profile selection', detail: 'Open Settings to review' };
 
-  if (profileErrorNeedsAttention || selectedProfileNeedsAttention) {
+  if (profileErrorNeedsAttention || repoBindingNeedsAttention || selectedProfileNeedsAttention) {
     return {
       label: 'Config needs attention',
-      layers:
-        layers.length > 0
-          ? layers
-          : [{ label: 'Profile selection', detail: 'Open Settings to review' }],
+      layers: layers.length > 0 ? layers : [fallbackAttentionLayer],
       needsAttention: true,
     };
   }

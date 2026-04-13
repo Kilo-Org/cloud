@@ -255,11 +255,10 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     ? allProfiles.find(profile => profile.id === selectedProfileId)
     : undefined;
 
-  const {
-    data: repoBindings,
-    isLoading: isLoadingRepoBindings,
-    error: repoBindingsError,
-  } = useRepoBindings({ organizationId, enabled: !!selectedRepo });
+  const { data: repoBindings, error: repoBindingsError } = useRepoBindings({
+    organizationId,
+    enabled: !!selectedRepo,
+  });
 
   const repoBoundProfileName = useMemo(() => {
     if (!selectedRepo || !repoBindings) return null;
@@ -279,8 +278,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     hasManualEnvVars: Object.keys(manualEnvVars).length > 0,
     hasManualSetupCommands: manualSetupCommands.length > 0,
     hasSelectedProfileId: !!selectedProfileId,
-    isProfilesLoading: isProfilesLoading || isLoadingRepoBindings,
-    hasProfileError: !!profilesError || !!repoBindingsError,
+    isProfilesLoading,
+    hasProfileError: !!profilesError,
+    hasRepoBindingError: !!selectedRepo && !!repoBindingsError,
   });
 
   // Fetch selected profile data

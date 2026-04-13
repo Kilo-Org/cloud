@@ -58,6 +58,11 @@ export type KiloClawEnv = {
   KILOCLAW_CHECKIN_URL?: string;
   REQUIRE_PROXY_TOKEN?: string;
 
+  // KiloChat channel plugin
+  KILOCHAT_API_TOKEN?: string;
+  KILOCHAT_WEBHOOK_SECRET?: string;
+  KILOCHAT_BASE_URL?: string;
+
   // PostHog product telemetry
   NEXT_PUBLIC_POSTHOG_KEY?: string;
 

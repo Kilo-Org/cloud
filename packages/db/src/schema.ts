@@ -265,6 +265,7 @@ export const kilocode_users = pgTable(
     blocked_at: timestamp({ withTimezone: true, mode: 'string' }),
     blocked_by_kilo_user_id: text(),
     api_token_pepper: text(),
+    web_session_version: integer().default(0).notNull(),
     auto_top_up_enabled: boolean().default(false).notNull(),
     is_bot: boolean().default(false).notNull(),
 

@@ -943,11 +943,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
           </Popover>
 
           {/* Settings — bottom right */}
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-3">
             <ProfileConfigIndicator
               state={profileIndicatorState}
               onOpenSettings={() => setSettingsPopoverOpen(true)}
             />
+            {profileIndicatorState && <Separator orientation="vertical" className="h-4" />}
             <Popover open={settingsPopoverOpen} onOpenChange={setSettingsPopoverOpen}>
               <PopoverTrigger asChild>
                 <button

@@ -129,8 +129,9 @@ export function ProfileConfigIndicator({
           onClick={onOpenSettings}
           aria-label={accessibleLabel}
           className={cn(
-            'text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex items-center gap-1 rounded-md text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none',
-            state.needsAttention && 'text-amber-500 hover:text-amber-400',
+            'focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 text-sm text-foreground transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:outline-none',
+            state.needsAttention &&
+              'border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/15 hover:text-amber-300',
             className
           )}
         >

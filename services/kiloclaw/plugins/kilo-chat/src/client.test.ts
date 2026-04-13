@@ -98,3 +98,71 @@ describe('createKiloChatClient', () => {
     expect(result).toEqual({ messageId: 'm1', version: 1 });
   });
 });
+
+describe('editMessage', () => {
+  it('PATCHes /_kilo/kilo-chat/messages/:id with conversationId, text, version', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ messageId: 'm1', version: 3 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://127.0.0.1:18789',
+      gatewayToken: 'gwt',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    const result = await client.editMessage({
+      conversationId: 'c1',
+      messageId: 'm1',
+      text: 'Hel',
+      version: 3,
+    });
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe('http://127.0.0.1:18789/_kilo/kilo-chat/messages/m1');
+    const init2 = init as RequestInit;
+    expect(init2.method).toBe('PATCH');
+    const headers = new Headers(init2.headers);
+    expect(headers.get('authorization')).toBe('Bearer gwt');
+    expect(JSON.parse(init2.body as string)).toEqual({
+      conversationId: 'c1',
+      text: 'Hel',
+      version: 3,
+    });
+    expect(result).toEqual({ messageId: 'm1', version: 3 });
+  });
+
+  it('returns a dropped-edit sentinel on 409 without throwing', async () => {
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify({ error: 'stale version' }), {
+        status: 409,
+        headers: { 'content-type': 'application/json' },
+      })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://127.0.0.1:18789',
+      gatewayToken: 'gwt',
+      fetchImpl,
+    });
+    const result = await client.editMessage({
+      conversationId: 'c1',
+      messageId: 'm1',
+      text: 'x',
+      version: 1,
+    });
+    // version echoed back equals the requested version; caller treats as drop.
+    expect(result).toEqual({ messageId: 'm1', version: 1, dropped: true });
+  });
+
+  it('throws on other non-2xx responses', async () => {
+    const fetchImpl = (async () => new Response('boom', { status: 500 })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://127.0.0.1:18789',
+      gatewayToken: 'gwt',
+      fetchImpl,
+    });
+    await expect(
+      client.editMessage({ conversationId: 'c1', messageId: 'm1', text: 'x', version: 1 })
+    ).rejects.toThrow(/500/);
+  });
+});

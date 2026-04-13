@@ -5,7 +5,7 @@ export type KiloChatClientOptions = {
 };
 
 export type CreateMessageParams = { conversationId: string; text: string };
-export type CreateMessageResult = { messageId: string; version: number };
+export type CreateMessageResult = { messageId: string; version: number; dropped?: boolean };
 
 export type EditMessageParams = {
   conversationId: string;
@@ -63,10 +63,31 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     return parseCreateResult(await response.json());
   }
 
-  // editMessage and deleteMessage are added in later tasks.
-  async function editMessage(_params: EditMessageParams): Promise<CreateMessageResult> {
-    throw new Error('kilo-chat: editMessage not yet implemented');
+  async function editMessage(params: EditMessageParams): Promise<CreateMessageResult> {
+    const response = await fetchImpl(
+      `${base}/_kilo/kilo-chat/messages/${encodeURIComponent(params.messageId)}`,
+      {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          conversationId: params.conversationId,
+          text: params.text,
+          version: params.version,
+        }),
+      }
+    );
+    if (response.status === 409) {
+      // Stale version — benign drop.
+      return { messageId: params.messageId, version: params.version, dropped: true };
+    }
+    if (!response.ok) {
+      throw new Error(
+        `kilo-chat: controller PATCH responded ${response.status}: ${await response.text()}`
+      );
+    }
+    return parseCreateResult(await response.json());
   }
+  // deleteMessage is added in a later task.
   async function deleteMessage(_params: DeleteMessageParams): Promise<void> {
     throw new Error('kilo-chat: deleteMessage not yet implemented');
   }

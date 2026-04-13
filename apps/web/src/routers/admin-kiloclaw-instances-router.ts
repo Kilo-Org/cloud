@@ -940,6 +940,87 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
     }),
 
+  extendVolume: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid().optional(),
+        appName: z
+          .string()
+          .min(1)
+          .max(63)
+          .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Invalid Fly app name'),
+        volumeId: z
+          .string()
+          .min(1)
+          .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      console.log(
+        `[admin-kiloclaw] extendVolume triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) app=${input.appName} volume=${input.volumeId} size=15GB`
+      );
+      const instance = await resolveInstance(input.userId, input.instanceId);
+      const client = new KiloClawInternalClient();
+      const instanceId = workerInstanceId(instance);
+
+      let status: Awaited<ReturnType<KiloClawInternalClient['getDebugStatus']>>;
+      try {
+        status = await client.getDebugStatus(input.userId, instanceId);
+      } catch (err) {
+        throwKiloclawAdminError(err, 'Failed to verify volume state before extend');
+      }
+      const unsafeExtendStates: ReadonlyArray<string> = ['recovering', 'restoring', 'destroying'];
+      if (status.status && unsafeExtendStates.includes(status.status)) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: `Cannot extend volume while instance is ${status.status}`,
+        });
+      }
+      if (status.flyAppName !== input.appName || status.flyVolumeId !== input.volumeId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Fly resource mismatch: expected app=${status.flyAppName} volume=${status.flyVolumeId}, got app=${input.appName} volume=${input.volumeId}`,
+        });
+      }
+
+      const fallbackMessage = 'Failed to extend Fly volume';
+      try {
+        const result = await client.extendVolume(
+          input.userId,
+          input.appName,
+          input.volumeId,
+          instanceId
+        );
+
+        try {
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.volume.extend',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `Fly volume extended to 15GB: app=${input.appName} volume=${input.volumeId}`,
+            metadata: {
+              appName: input.appName,
+              volumeId: input.volumeId,
+              sizeGb: 15,
+            },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for extendVolume:', auditErr);
+        }
+
+        return result;
+      } catch (err) {
+        console.error(
+          `Failed to extend Fly volume app=${input.appName} volume=${input.volumeId}:`,
+          err
+        );
+        throwKiloclawAdminError(err, fallbackMessage);
+      }
+    }),
+
   destroy: adminProcedure.input(DestroyInstanceSchema).mutation(async ({ input, ctx }) => {
     const [instance] = await db
       .select({

@@ -35,9 +35,6 @@ export function DiscordIntegrationDetails({
     refetch,
   } = useQuery(trpc.discord.getInstallation.queryOptions(input));
 
-  // Get OAuth URL for installation
-  const { data: oauthUrlData } = useQuery(trpc.discord.getOAuthUrl.queryOptions(input));
-
   // Fetch models for the model selector
   const { data: openRouterModels, isLoading: isLoadingModels } =
     useModelSelectorList(organizationId);
@@ -97,12 +94,6 @@ export function DiscordIntegrationDetails({
       toast.error(`Connection failed: ${error}`);
     }
   }, [success, error]);
-
-  const handleInstall = () => {
-    if (oauthUrlData?.url) {
-      window.location.href = oauthUrlData.url;
-    }
-  };
 
   const handleModelChange = (modelSlug: string) => {
     const previousModel = selectedModel;
@@ -319,24 +310,13 @@ export function DiscordIntegrationDetails({
             </>
           ) : (
             <>
-              {/* Not Connected State */}
+              {/* Discord integration is no longer available for new installs */}
               <Alert>
                 <AlertDescription>
-                  Connect Discord to talk with Kilo directly from your server.
+                  The Discord integration is no longer available for new installations. Please use
+                  the Slack integration instead.
                 </AlertDescription>
               </Alert>
-
-              <div className="space-y-2 rounded-lg border p-4">
-                <h4 className="font-medium">What you&apos;ll get:</h4>
-                <ul className="text-muted-foreground space-y-1 text-sm">
-                  <li>&#10003; Message Kilo directly from Discord</li>
-                </ul>
-              </div>
-
-              <Button onClick={handleInstall} size="lg" className="w-full">
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Connect Discord
-              </Button>
             </>
           )}
         </CardContent>

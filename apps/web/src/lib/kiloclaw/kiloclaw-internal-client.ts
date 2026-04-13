@@ -758,6 +758,23 @@ export class KiloClawInternalClient {
     );
   }
 
+  async extendVolume(
+    userId: string,
+    appName: string,
+    volumeId: string,
+    instanceId?: string
+  ): Promise<{ ok: true; needsRestart: boolean }> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/extend-volume${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, appName, volumeId }),
+      },
+      { userId }
+    );
+  }
+
   async getRegions(): Promise<RegionsResponse> {
     return this.request('/api/platform/regions');
   }

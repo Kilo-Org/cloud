@@ -641,6 +641,33 @@ describe('generateBaseConfig', () => {
     }
   });
 
+  // ─── Kilo Chat ───────────────────────────────────────────────────────────
+
+  it('configures kilo-chat channel and plugin when KILOCHAT_API_TOKEN is set', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCHAT_API_TOKEN: 'tok',
+      KILOCHAT_WEBHOOK_SECRET: 'whk',
+      KILOCHAT_BASE_URL: 'https://chat.example.test',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.channels['kilo-chat'].enabled).toBe(true);
+    expect(config.channels['kilo-chat'].baseUrl).toBe('https://chat.example.test');
+    expect(config.channels['kilo-chat'].dmPolicy).toBe('open');
+    expect(config.channels['kilo-chat'].allowFrom).toEqual(['*']);
+    expect(config.plugins.load.paths).toContain('/usr/local/lib/node_modules/@kiloclaw/kilo-chat');
+    expect(config.plugins.entries['kilo-chat'].enabled).toBe(true);
+  });
+
+  it('leaves kilo-chat channel unconfigured when KILOCHAT_API_TOKEN is missing', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.channels?.['kilo-chat']).toBeUndefined();
+  });
+
   it('does not duplicate the plugin path on repeated generateBaseConfig calls', () => {
     const existing = JSON.stringify({
       channels: { streamchat: { apiKey: 'old-key', enabled: true } },

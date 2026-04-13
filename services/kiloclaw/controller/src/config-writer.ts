@@ -351,6 +351,33 @@ export function generateBaseConfig(
     config.plugins.entries[scEntry].enabled = true;
   }
 
+  // Kilo Chat (pre-provisioned channel — no setup wizard)
+  if (env.KILOCHAT_API_TOKEN) {
+    config.channels['kilo-chat'] = config.channels['kilo-chat'] ?? {};
+    config.channels['kilo-chat'].enabled = true;
+    config.channels['kilo-chat'].dmPolicy = 'open';
+    if (env.KILOCHAT_BASE_URL) {
+      config.channels['kilo-chat'].baseUrl = env.KILOCHAT_BASE_URL;
+    }
+    if (!('allowFrom' in config.channels['kilo-chat'])) {
+      config.channels['kilo-chat'].allowFrom = ['*'];
+    }
+
+    config.plugins = config.plugins ?? {};
+    config.plugins.load = config.plugins.load ?? {};
+    config.plugins.load.paths = Array.isArray(config.plugins.load.paths)
+      ? config.plugins.load.paths
+      : [];
+    const kiloChatPluginPath = '/usr/local/lib/node_modules/@kiloclaw/kilo-chat';
+    if (!(config.plugins.load.paths as string[]).includes(kiloChatPluginPath)) {
+      (config.plugins.load.paths as string[]).push(kiloChatPluginPath);
+    }
+
+    config.plugins.entries = config.plugins.entries ?? {};
+    config.plugins.entries['kilo-chat'] = config.plugins.entries['kilo-chat'] ?? {};
+    config.plugins.entries['kilo-chat'].enabled = true;
+  }
+
   // Webhook hooks configuration (required for Gmail push notifications via gog).
   // hooks.token authenticates incoming hook requests from gog's --hook-token.
   // The gmail preset maps gog's gmailHookPayload into OpenClaw's expected format.

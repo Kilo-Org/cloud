@@ -459,15 +459,19 @@ export const organizationKiloclawRouter = createTRPCRouter({
       throw error;
     }
 
-    await db
-      .update(kiloclaw_subscriptions)
-      .set({ destruction_deadline: null })
-      .where(
-        and(
-          eq(kiloclaw_subscriptions.user_id, ctx.user.id),
-          eq(kiloclaw_subscriptions.instance_id, instance.id)
-        )
-      );
+    try {
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ destruction_deadline: null })
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.user_id, ctx.user.id),
+            eq(kiloclaw_subscriptions.instance_id, instance.id)
+          )
+        );
+    } catch (cleanupError) {
+      console.error('[organization-kiloclaw] Post-destroy cleanup failed:', cleanupError);
+    }
 
     return result;
   }),

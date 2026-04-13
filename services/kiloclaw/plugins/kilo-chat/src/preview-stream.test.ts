@@ -18,7 +18,6 @@ function makeClientSpies() {
     createMessage,
     editMessage,
     deleteMessage,
-    sendText: async () => ({ messageId: 'm1' }),
   };
   return { client, createMessage, editMessage, deleteMessage };
 }

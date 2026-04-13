@@ -157,7 +157,6 @@ function fakeClient(calls: { type: string; args: unknown }[]): KiloChatClient {
     deleteMessage: async args => {
       calls.push({ type: 'delete', args });
     },
-    sendText: async () => ({ messageId: 'm1' }),
   };
 }
 

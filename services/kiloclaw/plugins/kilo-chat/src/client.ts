@@ -17,15 +17,10 @@ export type EditMessageParams = {
 
 export type DeleteMessageParams = { conversationId: string; messageId: string };
 
-export type SendTextParams = { conversationId: string; text: string };
-export type SendTextResult = { messageId: string };
-
 export type KiloChatClient = {
   createMessage(p: CreateMessageParams): Promise<CreateMessageResult>;
   editMessage(p: EditMessageParams): Promise<EditMessageResult>;
   deleteMessage(p: DeleteMessageParams): Promise<void>;
-  /** Back-compat alias for createMessage; returns only messageId. */
-  sendText(p: SendTextParams): Promise<SendTextResult>;
 };
 
 function authHeaders(token: string): HeadersInit {
@@ -109,9 +104,5 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     createMessage,
     editMessage,
     deleteMessage,
-    async sendText(params) {
-      const { messageId } = await createMessage(params);
-      return { messageId };
-    },
   };
 }

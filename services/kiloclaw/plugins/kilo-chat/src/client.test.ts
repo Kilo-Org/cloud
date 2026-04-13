@@ -16,7 +16,7 @@ describe('createKiloChatClient', () => {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
 
-    const result = await client.sendText({ conversationId: 'c1', text: 'hello' });
+    const result = await client.createMessage({ conversationId: 'c1', text: 'hello' });
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const [url, init] = fetchImpl.mock.calls[0]!;
@@ -42,7 +42,7 @@ describe('createKiloChatClient', () => {
       gatewayToken: 'gwt',
       fetchImpl,
     });
-    await expect(client.sendText({ conversationId: 'c1', text: 'hi' })).rejects.toThrow(
+    await expect(client.createMessage({ conversationId: 'c1', text: 'hi' })).rejects.toThrow(
       /missing messageId/
     );
   });
@@ -54,7 +54,7 @@ describe('createKiloChatClient', () => {
       gatewayToken: 'gwt',
       fetchImpl,
     });
-    await expect(client.sendText({ conversationId: 'c1', text: 'hi' })).rejects.toThrow(/500/);
+    await expect(client.createMessage({ conversationId: 'c1', text: 'hi' })).rejects.toThrow(/500/);
   });
 
   it('createMessage posts to /_kilo/kilo-chat/send and returns messageId + version', async () => {
@@ -83,7 +83,7 @@ describe('createKiloChatClient', () => {
     expect(result).toEqual({ messageId: 'm1', version: 1 });
   });
 
-  it('createMessage defaults version to 1 when server omits it (back-compat)', async () => {
+  it('createMessage defaults version to 1 when server omits it', async () => {
     const fetchImpl = (async () =>
       new Response(JSON.stringify({ messageId: 'm1' }), {
         status: 200,

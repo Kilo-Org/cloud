@@ -30,3 +30,6 @@ Outbound calls (all proxied through the controller):
   the server MAY reject with `409` on a stale version, which is treated as a
   benign drop.
 - `DELETE /v1/messages/:id` — preview cleanup on dispatch failure.
+- `POST   /v1/conversations/:conversationId/typing` — typing indicator. Server
+  holds the indicator for ~5s then auto-clears. The plugin re-pings every 3s
+  while the agent reply turn is in progress (openclaw SDK keepalive default).

@@ -17,6 +17,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
   'mistral',
   'novita',
   'seed',
+  'stepfun',
   'streamlake',
   'stealth',
   'z-ai',

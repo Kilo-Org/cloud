@@ -1775,17 +1775,6 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
     // Check if all beads done
     const allBeadsDone = closed_count >= total_count && total_count > 0 && !hasInFlightReviews;
 
-    // Fix 2 (#2260): If max landing MR attempts exceeded, fail the convoy
-    // and skip all further reconciliation for it.
-    if (allBeadsDone && landingMrAttempts >= MAX_LANDING_MR_ATTEMPTS) {
-      actions.push({
-        type: 'fail_convoy',
-        convoy_id: convoy.bead_id,
-        reason: `Landing MR creation failed after ${MAX_LANDING_MR_ATTEMPTS} attempts`,
-      });
-      continue;
-    }
-
     // Update progress if stale (skip if we're failing/closing the convoy this tick)
     if (closed_count !== convoy.closed_beads) {
       actions.push({
@@ -1840,6 +1829,18 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
           mr => mr.status === 'open' || mr.status === 'in_progress'
         );
         if (hasActiveLanding) continue;
+
+        // Fix 2 (#2260): If max landing MR attempts exceeded and no landing MR is
+        // active or merged, fail the convoy. Checked after landing MR status lookup
+        // so the final allowed attempt can still succeed.
+        if (landingMrAttempts >= MAX_LANDING_MR_ATTEMPTS) {
+          actions.push({
+            type: 'fail_convoy',
+            convoy_id: convoy.bead_id,
+            reason: `Landing MR creation failed after ${MAX_LANDING_MR_ATTEMPTS} attempts`,
+          });
+          continue;
+        }
 
         // Fix 2 (#2260): Apply exponential cooldown between landing MR attempts
         if (landingMrAttempts > 0 && lastLandingMrAttemptAt) {

@@ -70,43 +70,22 @@ export function parseInboundPayload(raw: unknown): KiloChatInboundPayload | null
 }
 
 // ---------------------------------------------------------------------------
-// Streaming config reader (Option B — avoids SDK type coupling)
-// ---------------------------------------------------------------------------
-
-function readStreamingConfig(cfg: unknown): {
-  streamingMode: 'off' | 'partial' | 'block';
-  throttleMs: number;
-} {
-  const channels = (cfg as { channels?: Record<string, unknown> }).channels;
-  const section = channels?.['kilo-chat'];
-  const streaming =
-    typeof section === 'object' && section !== null && 'streaming' in section
-      ? ((section as { streaming?: unknown }).streaming as Record<string, unknown> | undefined)
-      : undefined;
-  const modeRaw = streaming?.['mode'];
-  const streamingMode: 'off' | 'partial' | 'block' =
-    modeRaw === 'off' || modeRaw === 'block' ? modeRaw : 'partial';
-  const throttleRaw = streaming?.['throttleMs'];
-  const throttleMs =
-    typeof throttleRaw === 'number' &&
-    Number.isFinite(throttleRaw) &&
-    throttleRaw >= 100 &&
-    throttleRaw <= 5000
-      ? throttleRaw
-      : 500;
-  return { streamingMode, throttleMs };
-}
-
-// ---------------------------------------------------------------------------
 // Deliver wiring
 // ---------------------------------------------------------------------------
+
+/**
+ * Default coalescing window between outbound PATCH edits during streaming.
+ * Not user-configurable: the plugin always streams, and 500ms is the product
+ * default agreed with the external chat service.
+ */
+const STREAM_THROTTLE_MS = 500;
 
 export type DeliverPayload = { text?: string };
 
 export type DeliverWiring = {
   deliver: (payload: DeliverPayload) => Promise<void>;
-  replyOptions?: {
-    onPartialReply?: (payload: { text?: string }) => void | Promise<void>;
+  replyOptions: {
+    onPartialReply: (payload: { text?: string }) => void | Promise<void>;
   };
   /** Cleanup hook — call after dispatch completes or throws. Pass the error if any. */
   finalize: (err?: unknown) => Promise<void>;
@@ -115,28 +94,12 @@ export type DeliverWiring = {
 export function buildDeliverWiring(params: {
   client: KiloChatClient;
   conversationId: string;
-  streamingMode: 'off' | 'partial' | 'block';
-  throttleMs: number;
   warn: (msg: string, err?: unknown) => void;
 }): DeliverWiring {
-  // block is not yet implemented; treat as off to avoid misleading behavior.
-  if (params.streamingMode !== 'partial') {
-    return {
-      deliver: async payload => {
-        if (!payload.text) return;
-        await params.client.createMessage({
-          conversationId: params.conversationId,
-          text: payload.text,
-        });
-      },
-      finalize: async () => undefined,
-    };
-  }
-
   const stream = createPreviewStream({
     client: params.client,
     conversationId: params.conversationId,
-    throttleMs: params.throttleMs,
+    throttleMs: STREAM_THROTTLE_MS,
     onWarn: params.warn,
   });
   let firstDelivered = false;
@@ -231,8 +194,6 @@ async function dispatchInbound(
     OriginatingTo: `kilo-chat:${payload.conversationId}`,
   });
 
-  const { streamingMode, throttleMs } = readStreamingConfig(cfg);
-
   const client = createKiloChatClient({
     controllerBaseUrl: process.env.KILOCLAW_CONTROLLER_URL ?? 'http://127.0.0.1:18789',
     gatewayToken: process.env.OPENCLAW_GATEWAY_TOKEN ?? '',
@@ -241,8 +202,6 @@ async function dispatchInbound(
   const wiring = buildDeliverWiring({
     client,
     conversationId: payload.conversationId,
-    streamingMode,
-    throttleMs,
     warn: (msg, err) => console.error(`[kilo-chat] ${msg}:`, err),
   });
 

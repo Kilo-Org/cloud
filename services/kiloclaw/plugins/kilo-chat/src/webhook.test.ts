@@ -161,35 +161,18 @@ function fakeClient(calls: { type: string; args: unknown }[]): KiloChatClient {
 }
 
 describe('buildDeliverWiring', () => {
-  it('mode=off: deliver creates a message per block; no onPartialReply', async () => {
-    const calls: { type: string; args: unknown }[] = [];
-    const wiring = buildDeliverWiring({
-      client: fakeClient(calls),
-      conversationId: 'c1',
-      streamingMode: 'off',
-      throttleMs: 500,
-      warn: () => {},
-    });
-    expect(wiring.replyOptions).toBeUndefined();
-    await wiring.deliver({ text: 'hi' });
-    await wiring.finalize();
-    expect(calls).toEqual([{ type: 'create', args: { conversationId: 'c1', text: 'hi' } }]);
-  });
-
-  it('mode=partial: partial replies stream, first deliver finalizes preview', async () => {
+  it('partial replies stream, first deliver finalizes preview via PATCH', async () => {
     vi.useFakeTimers();
     try {
       const calls: { type: string; args: unknown }[] = [];
       const wiring = buildDeliverWiring({
         client: fakeClient(calls),
         conversationId: 'c1',
-        streamingMode: 'partial',
-        throttleMs: 10,
         warn: () => {},
       });
-      expect(wiring.replyOptions?.onPartialReply).toBeDefined();
+      expect(wiring.replyOptions.onPartialReply).toBeDefined();
       // First partial: fires an immediate POST. Drain microtasks so it resolves.
-      await wiring.replyOptions!.onPartialReply!({ text: 'H' });
+      await wiring.replyOptions.onPartialReply({ text: 'H' });
       await vi.advanceTimersByTimeAsync(0);
       // First deliver should now finalize the preview via PATCH (not POST).
       await wiring.deliver({ text: 'Hello!' });
@@ -206,18 +189,16 @@ describe('buildDeliverWiring', () => {
     }
   });
 
-  it('mode=partial: error during dispatch aborts preview and deletes message', async () => {
+  it('error during dispatch aborts preview and deletes message', async () => {
     vi.useFakeTimers();
     try {
       const calls: { type: string; args: unknown }[] = [];
       const wiring = buildDeliverWiring({
         client: fakeClient(calls),
         conversationId: 'c1',
-        streamingMode: 'partial',
-        throttleMs: 10,
         warn: () => {},
       });
-      await wiring.replyOptions!.onPartialReply!({ text: 'H' });
+      await wiring.replyOptions.onPartialReply({ text: 'H' });
       await vi.advanceTimersByTimeAsync(0);
       await wiring.finalize(new Error('downstream error'));
       expect(calls.some(c => c.type === 'delete')).toBe(true);
@@ -226,13 +207,11 @@ describe('buildDeliverWiring', () => {
     }
   });
 
-  it('mode=partial: subsequent blocks after the first call createMessage directly', async () => {
+  it('subsequent blocks after the first call createMessage directly', async () => {
     const calls: { type: string; args: unknown }[] = [];
     const wiring = buildDeliverWiring({
       client: fakeClient(calls),
       conversationId: 'c1',
-      streamingMode: 'partial',
-      throttleMs: 10,
       warn: () => {},
     });
     // First deliver finalizes the preview (or POSTs if never streamed).

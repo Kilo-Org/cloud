@@ -2781,7 +2781,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       if (this.s.provider !== 'fly') {
         if (this.s.status === 'destroying') {
           await this.retryNonFlyDestroy();
-          const finalized = await finalizeDestroyIfComplete(
+          await finalizeDestroyIfComplete(
             this.ctx,
             this.s,
             createReconcileContext(this.s, this.env, 'alarm_destroy'),

@@ -49,7 +49,9 @@ export function OrgClawNewClient({ organizationId }: { organizationId: string })
     );
   }
 
-  if (statusQuery.isLoading || !hasSettledStatus) {
+  const isFetchingEmptyStatus = statusQuery.isFetching && statusQuery.data?.status === null;
+
+  if (statusQuery.isLoading || !hasSettledStatus || isFetchingEmptyStatus) {
     return (
       <ClawOnboardingWithBoundary
         statusQuery={{ data: undefined, isLoading: true, error: null }}

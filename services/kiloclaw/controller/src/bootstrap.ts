@@ -285,12 +285,17 @@ export function writeBotIdentityFile(
     'mkdirSync' | 'writeFileSync' | 'renameSync' | 'unlinkSync' | 'existsSync'
   > = defaultDeps
 ): void {
-  deps.mkdirSync(path.dirname(IDENTITY_MD_DEST), { recursive: true });
-  atomicWrite(IDENTITY_MD_DEST, formatBotIdentityMarkdown(env), {
-    writeFileSync: deps.writeFileSync,
-    renameSync: deps.renameSync,
-    unlinkSync: deps.unlinkSync,
-  });
+  // Preserve user edits: only seed IDENTITY.md when it doesn't already exist.
+  // Without this guard, every redeploy would overwrite user changes with content
+  // regenerated from KILOCLAW_BOT_* env vars.
+  if (!deps.existsSync(IDENTITY_MD_DEST)) {
+    deps.mkdirSync(path.dirname(IDENTITY_MD_DEST), { recursive: true });
+    atomicWrite(IDENTITY_MD_DEST, formatBotIdentityMarkdown(env), {
+      writeFileSync: deps.writeFileSync,
+      renameSync: deps.renameSync,
+      unlinkSync: deps.unlinkSync,
+    });
+  }
 
   for (const legacyPath of LEGACY_BOT_IDENTITY_DESTS) {
     if (!deps.existsSync(legacyPath)) continue;

@@ -587,6 +587,25 @@ describe('writeBotIdentityFile', () => {
       ['/root/.openclaw/workspace/BOOTSTRAP.md'],
     ]);
   });
+
+  it('preserves existing IDENTITY.md across redeploys', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === '/root/.openclaw/workspace/IDENTITY.md'
+    );
+
+    writeBotIdentityFile(
+      { KILOCLAW_BOT_NAME: 'Milo', KILOCLAW_BOT_NATURE: 'Operator' },
+      harness.deps
+    );
+
+    expect(
+      harness.renameCalls.some(call => call.to === '/root/.openclaw/workspace/IDENTITY.md')
+    ).toBe(false);
+    expect(harness.writeCalls.some(call => call.path.includes('/workspace/IDENTITY.md'))).toBe(
+      false
+    );
+  });
 });
 
 // ---- runOnboardOrDoctor ----

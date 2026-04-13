@@ -37,9 +37,8 @@ import {
   findRepoRoot,
   startServiceInTmux,
   startInfra,
-  readEnvValue,
-  readEnvMtime,
-  waitForEnvValueChange,
+  prepareCaptureWaits,
+  partitionByCaptureGate,
   probePort,
   restartServiceInTmux,
 } from './runner';
@@ -155,32 +154,15 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   // --- Start each service in its own tmux window ---
   const SIDEBAR_WIDTH = 40;
 
-  // --- Start capture services first (tunnel, stripe) and wait for output ---
-  const captureServiceSet = new Set(['kiloclaw-tunnel', 'kiloclaw-stripe', 'app-builder-tunnel']);
-  const captureServices = serviceNames.filter(n => captureServiceSet.has(n));
-  const otherServices = serviceNames.filter(n => !captureServiceSet.has(n));
+  // --- Start capture services first and wait for output ---
+  const { captureServices, otherServices, waitForCaptures } = prepareCaptureWaits(
+    serviceNames,
+    repoRoot
+  );
   const startedServices: string[] = [];
-  let kiloclawTunnelCaptured = true;
+  const failedGatingCaptureServices = new Set<string>();
 
   if (captureServices.length > 0) {
-    const oldValues = new Map<string, string | undefined>();
-    const oldMtimes = new Map<string, number | undefined>();
-    if (captureServices.includes('kiloclaw-tunnel')) {
-      const tunnelEnvPath = path.join(repoRoot, 'services/kiloclaw/.dev.vars');
-      oldValues.set('tunnel', readEnvValue(tunnelEnvPath, 'KILOCODE_API_BASE_URL'));
-      oldMtimes.set('tunnel', readEnvMtime(tunnelEnvPath));
-    }
-    if (captureServices.includes('kiloclaw-stripe')) {
-      const stripeEnvPath = path.join(repoRoot, 'apps/web/.env.development.local');
-      oldValues.set('stripe', readEnvValue(stripeEnvPath, 'STRIPE_WEBHOOK_SECRET'));
-      oldMtimes.set('stripe', readEnvMtime(stripeEnvPath));
-    }
-    if (captureServices.includes('app-builder-tunnel')) {
-      const appBuilderEnvPath = path.join(repoRoot, 'services/app-builder/.dev.vars');
-      oldValues.set('app-builder-tunnel', readEnvValue(appBuilderEnvPath, 'BUILDER_HOSTNAME'));
-      oldMtimes.set('app-builder-tunnel', readEnvMtime(appBuilderEnvPath));
-    }
-
     for (const name of captureServices) {
       startServiceInTmux(sessionName, name);
       startedServices.push(name);
@@ -188,89 +170,34 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     }
 
     console.log(`${BOLD}Waiting for capture services...${RESET}`);
-    const waits: Promise<void>[] = [];
-
-    if (captureServices.includes('kiloclaw-tunnel')) {
-      waits.push(
-        waitForEnvValueChange(
-          path.join(repoRoot, 'services/kiloclaw/.dev.vars'),
-          'KILOCODE_API_BASE_URL',
-          oldValues.get('tunnel'),
-          CAPTURE_TIMEOUT_MS,
-          oldMtimes.get('tunnel')
-        ).then(ready => {
-          kiloclawTunnelCaptured = ready;
-          if (ready) {
-            console.log('  Tunnel URL captured');
-          } else {
-            console.warn(
-              '  Tunnel URL not captured after 30s - kiloclaw startup will wait for a retry'
-            );
-          }
-        })
-      );
+    const captureResults = await waitForCaptures(CAPTURE_TIMEOUT_MS);
+    for (const result of captureResults) {
+      if (result.captured) {
+        console.log(result.successMessage);
+      } else {
+        console.warn(result.timeoutMessage);
+        if (result.gatesDependents) {
+          failedGatingCaptureServices.add(result.serviceName);
+        }
+      }
     }
-
-    if (captureServices.includes('kiloclaw-stripe')) {
-      waits.push(
-        waitForEnvValueChange(
-          path.join(repoRoot, 'apps/web/.env.development.local'),
-          'STRIPE_WEBHOOK_SECRET',
-          oldValues.get('stripe'),
-          CAPTURE_TIMEOUT_MS,
-          oldMtimes.get('stripe')
-        ).then(ready => {
-          if (ready) {
-            console.log('  Stripe webhook secret captured');
-          } else {
-            console.warn('  Stripe secret not captured after 30s - check kiloclaw-stripe window');
-          }
-        })
-      );
-    }
-
-    if (captureServices.includes('app-builder-tunnel')) {
-      waits.push(
-        waitForEnvValueChange(
-          path.join(repoRoot, 'services/app-builder/.dev.vars'),
-          'BUILDER_HOSTNAME',
-          oldValues.get('app-builder-tunnel'),
-          CAPTURE_TIMEOUT_MS,
-          oldMtimes.get('app-builder-tunnel')
-        ).then(ready => {
-          if (ready) {
-            console.log('  App builder tunnel URL captured');
-          } else {
-            console.warn(
-              '  App builder tunnel URL not captured after 30s - check app-builder-tunnel window'
-            );
-          }
-        })
-      );
-    }
-
-    await Promise.all(waits);
     console.log();
   }
 
-  const skippedServices: string[] = [];
-  for (const name of otherServices) {
-    const dependsOnKiloclaw = getService(name).dependsOn.includes('kiloclaw');
-    if (!kiloclawTunnelCaptured && (name === 'kiloclaw' || dependsOnKiloclaw)) {
-      skippedServices.push(name);
-      continue;
-    }
+  const { immediate, gated } = partitionByCaptureGate(otherServices, failedGatingCaptureServices);
 
+  for (const name of immediate) {
     startServiceInTmux(sessionName, name);
     startedServices.push(name);
     await sleep(300);
   }
 
+  const skippedServices = [...gated.values()].flat();
   if (skippedServices.length > 0) {
     console.warn(
-      `Skipped startup for ${skippedServices.join(', ')} until KILOCODE_API_BASE_URL is captured.`
+      `Skipped startup for ${skippedServices.join(', ')} until capture services are ready.`
     );
-    console.warn('Start or restart these services after the tunnel URL is ready.');
+    console.warn('Start or restart these services after the required capture values are ready.');
   }
 
   // --- Set up split layout in window 0: left=sidebar, right=service terminal ---

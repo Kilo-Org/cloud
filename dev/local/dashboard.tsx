@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { render, Box, Text, useInput, useApp, useStdout } from 'ink';
 import { execSync } from 'node:child_process';
-import * as path from 'node:path';
 import {
   getService,
   getGroups,
@@ -20,9 +19,10 @@ import {
   restartServiceInTmux,
   showServiceInTmux,
   showGroupInTmux,
-  readEnvValue,
-  readEnvMtime,
-  waitForEnvValueChange,
+  prepareCaptureWaits,
+  getGatingCaptureDependencies,
+  isCaptureEnvValueReady,
+  partitionByCaptureGate,
 } from './runner';
 
 // ---------------------------------------------------------------------------
@@ -57,7 +57,6 @@ const CAPTURE_TIMEOUT_MS = 30_000;
 // Resolved once at module level
 const sessionName = getSessionName();
 const repoRoot = findRepoRoot();
-const kiloclawDevVarsPath = path.join(repoRoot, 'services/kiloclaw/.dev.vars');
 const alwaysOnGroupIds = new Set(getAlwaysOnGroupIds());
 const groupsById = new Map(getGroups().map(g => [g.id, g]));
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
@@ -383,26 +382,28 @@ function Dashboard({
           const allNeeded = resolveGroups(allGroupIds);
           const toStart = allNeeded.filter(name => !runningServices.has(name));
 
-          const gatedStarts: string[] = [];
-          const immediateStarts: string[] = [];
-          const shouldWaitForKiloclawTunnel =
-            toStart.includes('kiloclaw') && toStart.includes('kiloclaw-tunnel');
-
-          for (const name of toStart) {
-            const dependsOnKiloclaw = getService(name).dependsOn.includes('kiloclaw');
-            if (shouldWaitForKiloclawTunnel && (name === 'kiloclaw' || dependsOnKiloclaw)) {
-              gatedStarts.push(name);
-            } else {
-              immediateStarts.push(name);
-            }
-          }
-
-          const oldTunnelValue = shouldWaitForKiloclawTunnel
-            ? readEnvValue(kiloclawDevVarsPath, 'KILOCODE_API_BASE_URL')
-            : undefined;
-          const oldTunnelMtime = shouldWaitForKiloclawTunnel
-            ? readEnvMtime(kiloclawDevVarsPath)
-            : undefined;
+          const captureServicesToStart = prepareCaptureWaits(toStart, repoRoot).captureServices;
+          const captureServicesToStartSet = new Set(captureServicesToStart);
+          const gatingCaptureDependencies = getGatingCaptureDependencies(toStart);
+          const gatingCaptureWaitNames = [
+            ...new Set([...captureServicesToStart, ...gatingCaptureDependencies]),
+          ].filter(name => {
+            const capture = getService(name).capture;
+            return (
+              capture?.gatesDependents === true &&
+              (captureServicesToStartSet.has(name) || !isCaptureEnvValueReady(name, repoRoot))
+            );
+          });
+          const captureWaits = prepareCaptureWaits(gatingCaptureWaitNames, repoRoot);
+          const blockingCaptureServices = new Set(captureWaits.captureServices);
+          const nonCaptureToStart = toStart.filter(name => !captureServicesToStart.includes(name));
+          const { immediate: nonGatedStarts, gated } = partitionByCaptureGate(
+            nonCaptureToStart,
+            blockingCaptureServices
+          );
+          const immediateSet = new Set([...captureServicesToStart, ...nonGatedStarts]);
+          const immediateStarts = toStart.filter(name => immediateSet.has(name));
+          const gatedStarts = [...gated.values()].flat();
 
           const startedNow: string[] = [];
           for (const name of immediateStarts) {
@@ -448,22 +449,20 @@ function Dashboard({
           // Phase 1 is complete; keep UI responsive while tunnel gate runs in background.
           togglingRef.current = false;
 
-          if (!shouldWaitForKiloclawTunnel || gatedStarts.length === 0) {
+          if (captureWaits.captureServices.length === 0 || gatedStarts.length === 0) {
             return;
           }
 
-          const kiloclawTunnelCaptured = await waitForEnvValueChange(
-            kiloclawDevVarsPath,
-            'KILOCODE_API_BASE_URL',
-            oldTunnelValue,
-            CAPTURE_TIMEOUT_MS,
-            oldTunnelMtime
+          const captureResults = await captureWaits.waitForCaptures(CAPTURE_TIMEOUT_MS);
+          const failedGatingCaptures = captureResults.filter(
+            result => result.gatesDependents && !result.captured
           );
 
-          if (!kiloclawTunnelCaptured) {
-            console.warn(
-              'Tunnel URL not captured after 30s - kiloclaw services are waiting for tunnel readiness'
-            );
+          for (const result of failedGatingCaptures) {
+            console.warn(result.timeoutMessage);
+          }
+
+          if (failedGatingCaptures.length > 0) {
             return;
           }
 

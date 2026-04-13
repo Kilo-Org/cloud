@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
-import { getService } from './services';
+import { findGatingCaptureDependency, getCaptureSpec, getService } from './services';
 import {
   createWindow,
   sendKeys,
@@ -313,6 +313,12 @@ export function readEnvMtime(filePath: string): number | undefined {
   }
 }
 
+export function isCaptureEnvValueReady(serviceName: string, repoRoot: string): boolean {
+  const spec = getCaptureSpec(serviceName);
+  if (!spec) return false;
+  return readEnvValue(path.join(repoRoot, spec.envFile), spec.envKey) !== undefined;
+}
+
 export async function waitForEnvValueChange(
   filePath: string,
   key: string,
@@ -333,4 +339,130 @@ export async function waitForEnvValueChange(
     await sleep(500);
   }
   return false;
+}
+
+export type CaptureResult = {
+  serviceName: string;
+  captured: boolean;
+  envFilePath: string;
+  envKey: string;
+  successMessage: string;
+  timeoutMessage: string;
+  gatesDependents: boolean;
+};
+
+export type PreparedCaptureWaits = {
+  captureServices: string[];
+  otherServices: string[];
+  waitForCaptures: (timeoutMs: number) => Promise<CaptureResult[]>;
+};
+
+type PreparedCaptureService = {
+  serviceName: string;
+  envFilePath: string;
+  envKey: string;
+  previousValue: string | undefined;
+  previousMtimeMs: number | undefined;
+  successMessage: string | undefined;
+  timeoutMessage: string | undefined;
+  gatesDependents: boolean;
+};
+
+export function prepareCaptureWaits(
+  serviceNames: string[],
+  repoRoot: string
+): PreparedCaptureWaits {
+  const captureServices: string[] = [];
+  const otherServices: string[] = [];
+  const preparedCaptureServices: PreparedCaptureService[] = [];
+
+  for (const serviceName of serviceNames) {
+    const spec = getCaptureSpec(serviceName);
+    if (!spec) {
+      otherServices.push(serviceName);
+      continue;
+    }
+
+    const envFilePath = path.join(repoRoot, spec.envFile);
+    captureServices.push(serviceName);
+    preparedCaptureServices.push({
+      serviceName,
+      envFilePath,
+      envKey: spec.envKey,
+      previousValue: readEnvValue(envFilePath, spec.envKey),
+      previousMtimeMs: readEnvMtime(envFilePath),
+      successMessage: spec.successMessage,
+      timeoutMessage: spec.timeoutMessage,
+      gatesDependents: spec.gatesDependents,
+    });
+  }
+
+  return {
+    captureServices,
+    otherServices,
+    waitForCaptures: async (timeoutMs: number) => {
+      return Promise.all(
+        preparedCaptureServices.map(async prepared => {
+          const captured = await waitForEnvValueChange(
+            prepared.envFilePath,
+            prepared.envKey,
+            prepared.previousValue,
+            timeoutMs,
+            prepared.previousMtimeMs
+          );
+
+          return {
+            serviceName: prepared.serviceName,
+            captured,
+            envFilePath: prepared.envFilePath,
+            envKey: prepared.envKey,
+            successMessage: prepared.successMessage ?? `${prepared.serviceName} captured`,
+            timeoutMessage:
+              prepared.timeoutMessage ??
+              `${prepared.serviceName} not captured after ${timeoutMs / 1000}s`,
+            gatesDependents: prepared.gatesDependents,
+          };
+        })
+      );
+    },
+  };
+}
+
+export function getGatingCaptureDependencies(serviceNames: string[]): string[] {
+  const dependencies: string[] = [];
+  const seen = new Set<string>();
+
+  for (const serviceName of serviceNames) {
+    const dependency = findGatingCaptureDependency(serviceName);
+    if (dependency === undefined || seen.has(dependency)) continue;
+    dependencies.push(dependency);
+    seen.add(dependency);
+  }
+
+  return dependencies;
+}
+
+export function partitionByCaptureGate(
+  serviceNames: string[],
+  blockedCaptureServices: Set<string>
+): { immediate: string[]; gated: Map<string, string[]> } {
+  const immediate: string[] = [];
+  const gated = new Map<string, string[]>();
+
+  for (const serviceName of serviceNames) {
+    const dependency = findGatingCaptureDependency(serviceName);
+    if (dependency === undefined || !blockedCaptureServices.has(dependency)) {
+      immediate.push(serviceName);
+      continue;
+    }
+
+    const servicesForDependency = gated.get(dependency);
+    if (servicesForDependency === undefined) {
+      gated.set(dependency, [serviceName]);
+    } else {
+      servicesForDependency.push(serviceName);
+    }
+  }
+
+  return { immediate, gated };
 }

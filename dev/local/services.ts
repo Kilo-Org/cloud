@@ -33,6 +33,14 @@ const groups: ServiceGroup[] = [
   { id: 'storybook', label: 'Storybook', alwaysOn: false, sectionBreakBefore: true },
 ];
 
+type CaptureSpec = {
+  envFile: string;
+  envKey: string;
+  gatesDependents: boolean;
+  successMessage?: string;
+  timeoutMessage?: string;
+};
+
 type ServiceDef = {
   name: string;
   type: ServiceType;
@@ -42,6 +50,7 @@ type ServiceDef = {
   command: string[];
   group: string;
   useLanIp?: boolean;
+  capture?: CaptureSpec;
 };
 
 type ServiceMeta = {
@@ -49,6 +58,7 @@ type ServiceMeta = {
   dependsOn: string[];
   dir?: string;
   useLanIp?: boolean;
+  capture?: CaptureSpec;
 };
 
 const serviceMeta: Record<string, ServiceMeta> = {
@@ -74,7 +84,18 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/session-ingest',
   },
   // app-builder
-  'app-builder-tunnel': { group: 'app-builder', dependsOn: [] },
+  'app-builder-tunnel': {
+    group: 'app-builder',
+    dependsOn: [],
+    capture: {
+      envFile: 'services/app-builder/.dev.vars',
+      envKey: 'BUILDER_HOSTNAME',
+      gatesDependents: false,
+      successMessage: 'App builder tunnel URL captured',
+      timeoutMessage:
+        'App builder tunnel URL not captured after 30s - check app-builder-tunnel window',
+    },
+  },
   'cloudflare-app-builder': {
     group: 'app-builder',
     dependsOn: ['cloudflare-db-proxy', 'cloudflare-git-token-service', 'app-builder-tunnel'],
@@ -121,8 +142,28 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/deploy-infra/dispatcher',
   },
   // kiloclaw
-  'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
-  'kiloclaw-stripe': { group: 'kiloclaw', dependsOn: [] },
+  'kiloclaw-tunnel': {
+    group: 'kiloclaw',
+    dependsOn: [],
+    capture: {
+      envFile: 'services/kiloclaw/.dev.vars',
+      envKey: 'KILOCODE_API_BASE_URL',
+      gatesDependents: true,
+      successMessage: 'Tunnel URL captured',
+      timeoutMessage: 'Tunnel URL not captured after 30s - kiloclaw startup will wait for a retry',
+    },
+  },
+  'kiloclaw-stripe': {
+    group: 'kiloclaw',
+    dependsOn: [],
+    capture: {
+      envFile: 'apps/web/.env.development.local',
+      envKey: 'STRIPE_WEBHOOK_SECRET',
+      gatesDependents: false,
+      successMessage: 'Stripe webhook secret captured',
+      timeoutMessage: 'Stripe secret not captured after 30s - check kiloclaw-stripe window',
+    },
+  },
   kiloclaw: {
     group: 'kiloclaw',
     dependsOn: ['postgres', 'kiloclaw-tunnel'],
@@ -245,12 +286,17 @@ function readWranglerPort(dir: string): number {
 
 const INFRA_PORTS: Record<string, number> = { postgres: 5432, redis: 6379 };
 
+function serviceDefCapture(meta: ServiceMeta): Pick<ServiceDef, 'capture'> | Record<string, never> {
+  return meta.capture ? { capture: meta.capture } : {};
+}
+
 function buildServiceDefs(): ServiceDef[] {
   const repoRoot = path.resolve(import.meta.dirname, '../..');
   const defs: ServiceDef[] = [];
 
   for (const [name, meta] of Object.entries(serviceMeta)) {
     const dir = meta.dir ?? name;
+    const capture = serviceDefCapture(meta);
 
     if (name === 'nextjs') {
       defs.push({
@@ -261,6 +307,7 @@ function buildServiceDefs(): ServiceDef[] {
         dependsOn: meta.dependsOn,
         command: ['pnpm', 'run', 'dev'],
         group: meta.group,
+        ...capture,
       });
       continue;
     }
@@ -274,6 +321,7 @@ function buildServiceDefs(): ServiceDef[] {
         dependsOn: meta.dependsOn,
         command: ['pnpm', 'run', 'storybook', '--', '-p', String(6006 + portOffset)],
         group: meta.group,
+        ...capture,
       });
       continue;
     }
@@ -287,6 +335,7 @@ function buildServiceDefs(): ServiceDef[] {
         dependsOn: meta.dependsOn,
         command: dockerComposeUp(name),
         group: meta.group,
+        ...capture,
       });
       continue;
     }
@@ -301,6 +350,7 @@ function buildServiceDefs(): ServiceDef[] {
         dependsOn: meta.dependsOn,
         command: ['tsx', 'dev/local/scripts/start-tunnel.ts', String(nextjsPort)],
         group: meta.group,
+        ...capture,
       });
       continue;
     }
@@ -314,6 +364,7 @@ function buildServiceDefs(): ServiceDef[] {
         dependsOn: meta.dependsOn,
         command: ['tsx', 'dev/local/scripts/start-stripe.ts'],
         group: meta.group,
+        ...capture,
       });
       continue;
     }
@@ -329,6 +380,7 @@ function buildServiceDefs(): ServiceDef[] {
         dependsOn: meta.dependsOn,
         command: ['tsx', 'dev/local/scripts/start-app-builder-tunnel.ts', String(appBuilderPort)],
         group: meta.group,
+        ...capture,
       });
       continue;
     }
@@ -357,6 +409,7 @@ function buildServiceDefs(): ServiceDef[] {
       ],
       group: meta.group,
       ...(meta.useLanIp ? { useLanIp: true } : {}),
+      ...capture,
     });
   }
 
@@ -387,8 +440,8 @@ export function resolveTransitiveDeps(targets: string[]): string[] {
   const stack = [...targets];
 
   while (stack.length > 0) {
-    const name = stack.pop()!;
-    if (result.has(name)) continue;
+    const name = stack.pop();
+    if (name === undefined || result.has(name)) continue;
     const svc = services.get(name);
     if (!svc) throw new Error(`Unknown service: ${name}`);
     result.add(name);
@@ -418,7 +471,9 @@ export function topologicalSort(serviceNames: string[]): string[] {
     if (!svc) throw new Error(`Unknown service: ${name}`);
     for (const dep of svc.dependsOn) {
       if (!nameSet.has(dep)) continue;
-      adjacency.get(dep)!.push(name);
+      const dependents = adjacency.get(dep);
+      if (dependents === undefined) throw new Error(`Unknown service dependency: ${dep}`);
+      dependents.push(name);
       inDegree.set(name, (inDegree.get(name) ?? 0) + 1);
     }
   }
@@ -430,7 +485,8 @@ export function topologicalSort(serviceNames: string[]): string[] {
 
   const sorted: string[] = [];
   while (queue.length > 0) {
-    const current = queue.shift()!;
+    const current = queue.shift();
+    if (current === undefined) break;
     sorted.push(current);
     for (const neighbor of adjacency.get(current) ?? []) {
       const newDegree = (inDegree.get(neighbor) ?? 1) - 1;
@@ -452,11 +508,11 @@ export function resolveTargets(targets: string[]): string[] {
   const groupIdsToExpand: string[] = [];
   for (const target of targets) {
     if (target in shortcuts) {
-      groupIdsToExpand.push(...shortcuts[target].map(name => services.get(name)!.group));
+      groupIdsToExpand.push(...shortcuts[target].map(name => getService(name).group));
     } else if (groupIds.has(target)) {
       groupIdsToExpand.push(target);
     } else if (services.has(target)) {
-      groupIdsToExpand.push(services.get(target)!.group);
+      groupIdsToExpand.push(getService(target).group);
     } else {
       const validTargets = [...services.keys(), ...groupIds, ...Object.keys(shortcuts)].join(', ');
       throw new Error(`Unknown target: ${target}. Valid targets: ${validTargets}`);
@@ -471,6 +527,27 @@ export function getService(name: string): ServiceDef {
   const svc = services.get(name);
   if (!svc) throw new Error(`Unknown service: ${name}`);
   return svc;
+}
+
+export function getCaptureSpec(name: string): CaptureSpec | undefined {
+  return services.get(name)?.capture;
+}
+
+export function findGatingCaptureDependency(serviceName: string): string | undefined {
+  const visited = new Set<string>();
+  const stack = [...getService(serviceName).dependsOn];
+
+  while (stack.length > 0) {
+    const name = stack.pop();
+    if (name === undefined || visited.has(name)) continue;
+    visited.add(name);
+
+    const service = getService(name);
+    if (service.capture?.gatesDependents) return name;
+    stack.push(...service.dependsOn);
+  }
+
+  return undefined;
 }
 
 export function getPortMap(): Map<string, number> {
@@ -505,8 +582,8 @@ export function resolveGroupTransitiveDeps(groupIds: string[]): string[] {
   const result = new Set<string>();
   const stack = [...groupIds];
   while (stack.length > 0) {
-    const id = stack.pop()!;
-    if (result.has(id)) continue;
+    const id = stack.pop();
+    if (id === undefined || result.has(id)) continue;
     const group = groups.find(g => g.id === id);
     if (!group) throw new Error(`Unknown group: ${id}`);
     result.add(id);
@@ -517,4 +594,4 @@ export function resolveGroupTransitiveDeps(groupIds: string[]): string[] {
   return [...result];
 }
 
-export type { ServiceDef, ServiceType, ServiceGroup };
+export type { CaptureSpec, ServiceDef, ServiceType, ServiceGroup };

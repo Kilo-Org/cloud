@@ -476,6 +476,8 @@ export const dockerLocalProviderAdapter: InstanceProviderAdapter = {
       await createContainer(env, state, providerState, runtimeSpec);
       await startContainer(env, containerName);
     }
+    // If Docker and the DO both report running, leave the dev container intact.
+    // Restart/redeploy is the explicit path that reapplies image/env/config changes.
 
     return {
       providerState,

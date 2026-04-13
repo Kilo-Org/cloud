@@ -175,22 +175,6 @@ export function syncProviderStateForStorage(
 
   if (nextProvider !== 'fly') return patch;
 
-  if ('provider' in patch && patch.provider && patch.provider !== 'fly') {
-    s.provider = patch.provider;
-    s.providerState = null;
-    s.flyAppName = null;
-    s.flyMachineId = null;
-    s.flyVolumeId = null;
-    s.flyRegion = null;
-    return {
-      ...patch,
-      flyAppName: null,
-      flyMachineId: null,
-      flyVolumeId: null,
-      flyRegion: null,
-    };
-  }
-
   const touchesFlyLegacyFields =
     'flyAppName' in patch ||
     'flyMachineId' in patch ||

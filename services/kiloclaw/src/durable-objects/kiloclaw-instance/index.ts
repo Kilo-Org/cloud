@@ -337,7 +337,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       } else if (this.s.status === 'starting') {
         await this.markNonFlyRunningFromProvider('start');
       }
-      await this.scheduleAlarm();
       return;
     }
 
@@ -350,7 +349,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         this.emitProvisioningFailed('provider_runtime_not_running', message);
         return;
       }
-      await this.scheduleAlarm();
       return;
     }
 
@@ -363,7 +361,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         );
         return;
       }
-      await this.scheduleAlarm();
       return;
     }
 
@@ -2791,9 +2788,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
             (userId, sandboxId) =>
               markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
           );
-          if (!finalized.finalized) {
-            await this.scheduleAlarm();
-          }
         } else {
           await this.reconcileNonFlyRuntimeFromAlarm();
         }

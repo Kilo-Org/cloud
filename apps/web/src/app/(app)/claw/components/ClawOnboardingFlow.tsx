@@ -56,11 +56,13 @@ export function ClawOnboardingFlow({
   mode,
   organizationId,
   onCreateFlowStarted,
+  onCreateFlowFailed,
 }: {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
   organizationId?: string;
   onCreateFlowStarted?: () => void;
+  onCreateFlowFailed?: () => void;
 }) {
   return (
     <ClawContextProvider organizationId={organizationId}>
@@ -68,6 +70,7 @@ export function ClawOnboardingFlow({
         status={status}
         mode={mode}
         onCreateFlowStarted={onCreateFlowStarted}
+        onCreateFlowFailed={onCreateFlowFailed}
       />
     </ClawContextProvider>
   );
@@ -77,10 +80,12 @@ function ClawOnboardingFlowInner({
   status,
   mode,
   onCreateFlowStarted,
+  onCreateFlowFailed,
 }: {
   status: KiloClawDashboardStatus | undefined;
   mode: ClawOnboardingMode;
   onCreateFlowStarted?: () => void;
+  onCreateFlowFailed?: () => void;
 }) {
   const { organizationId } = useClawContext();
 
@@ -149,7 +154,8 @@ function ClawOnboardingFlowInner({
     setCreateSetupStarted(false);
     hasCapturedIdentityView.current = false;
     resetWizardSelections();
-  }, [resetWizardSelections]);
+    onCreateFlowFailed?.();
+  }, [onCreateFlowFailed, resetWizardSelections]);
 
   const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
 

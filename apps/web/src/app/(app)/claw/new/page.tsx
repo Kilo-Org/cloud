@@ -27,19 +27,29 @@ function LoadingState() {
 
 function ClawNewLoader({
   mode,
+  createFlowStartedAt,
   onCreateFlowStarted,
+  onCreateFlowFailed,
 }: {
   mode: ClawOnboardingMode;
+  createFlowStartedAt: number | null;
   onCreateFlowStarted: () => void;
+  onCreateFlowFailed: () => void;
 }) {
   const statusQuery = useKiloClawStatus();
 
   if (mode === 'create-first') {
+    const status =
+      createFlowStartedAt !== null && statusQuery.dataUpdatedAt >= createFlowStartedAt
+        ? statusQuery.data
+        : undefined;
+
     return (
       <ClawOnboardingFlow
-        status={statusQuery.data}
+        status={status}
         mode={mode}
         onCreateFlowStarted={onCreateFlowStarted}
+        onCreateFlowFailed={onCreateFlowFailed}
       />
     );
   }
@@ -56,8 +66,9 @@ function ClawNewLoader({
 export default function ClawNewPage() {
   const trpc = useTRPC();
   const billingQuery = useQuery(trpc.kiloclaw.getBillingStatus.queryOptions());
-  const [createFlowStarted, setCreateFlowStarted] = useState(false);
-  const onCreateFlowStarted = useCallback(() => setCreateFlowStarted(true), []);
+  const [createFlowStartedAt, setCreateFlowStartedAt] = useState<number | null>(null);
+  const onCreateFlowStarted = useCallback(() => setCreateFlowStartedAt(Date.now()), []);
+  const onCreateFlowFailed = useCallback(() => setCreateFlowStartedAt(null), []);
 
   if (billingQuery.isLoading) {
     return <LoadingState />;
@@ -95,7 +106,14 @@ export default function ClawNewPage() {
   const hasActiveInstance =
     billing?.instance?.exists === true && billing.instance.destroyed === false;
   const mode: ClawOnboardingMode =
-    createFlowStarted || !hasActiveInstance ? 'create-first' : 'post-provisioning';
+    createFlowStartedAt !== null || !hasActiveInstance ? 'create-first' : 'post-provisioning';
 
-  return <ClawNewLoader mode={mode} onCreateFlowStarted={onCreateFlowStarted} />;
+  return (
+    <ClawNewLoader
+      mode={mode}
+      createFlowStartedAt={createFlowStartedAt}
+      onCreateFlowStarted={onCreateFlowStarted}
+      onCreateFlowFailed={onCreateFlowFailed}
+    />
+  );
 }

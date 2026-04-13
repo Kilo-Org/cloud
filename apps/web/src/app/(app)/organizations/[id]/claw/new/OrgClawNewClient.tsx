@@ -12,24 +12,31 @@ const ClawOnboardingWithBoundary = withStatusQueryBoundary(ClawOnboardingFlow);
 
 export function OrgClawNewClient({ organizationId }: { organizationId: string }) {
   const statusQuery = useOrgKiloClawStatus(organizationId);
-  const [createFlowStarted, setCreateFlowStarted] = useState(false);
-  const onCreateFlowStarted = useCallback(() => setCreateFlowStarted(true), []);
+  const [createFlowStartedAt, setCreateFlowStartedAt] = useState<number | null>(null);
+  const onCreateFlowStarted = useCallback(() => setCreateFlowStartedAt(Date.now()), []);
+  const onCreateFlowFailed = useCallback(() => setCreateFlowStartedAt(null), []);
 
   const status = statusQuery.data;
   const hasInstance = status !== undefined && status.status !== null;
   const mode: ClawOnboardingMode =
-    createFlowStarted || !hasInstance ? 'create-first' : 'post-provisioning';
+    createFlowStartedAt !== null || !hasInstance ? 'create-first' : 'post-provisioning';
 
   if (
     mode === 'create-first' &&
-    (createFlowStarted || (!statusQuery.isLoading && !statusQuery.error))
+    (createFlowStartedAt !== null || (!statusQuery.isLoading && !statusQuery.error))
   ) {
+    const createStatus =
+      createFlowStartedAt !== null && statusQuery.dataUpdatedAt >= createFlowStartedAt
+        ? statusQuery.data
+        : undefined;
+
     return (
       <ClawOnboardingFlow
-        status={statusQuery.data}
+        status={createStatus}
         mode={mode}
         organizationId={organizationId}
         onCreateFlowStarted={onCreateFlowStarted}
+        onCreateFlowFailed={onCreateFlowFailed}
       />
     );
   }

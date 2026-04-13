@@ -1,6 +1,7 @@
-// Extend the Window interface to include dataLayer
+export {};
+
 declare global {
   interface Window {
-    datalayer: object[];
+    dataLayer?: Array<Record<string, unknown>>;
   }
 }

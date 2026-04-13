@@ -61,9 +61,20 @@ export function KiloClawChat({
         }
       });
 
+      // Also clear when the app returns to the foreground while this chat is focused.
+      // Notifications received in the background do not fire the listener above, and
+      // useFocusEffect does not re-run on app resume (focus is a navigation concept,
+      // not an app-state one), so without this the badge stays stuck after backgrounding.
+      const appStateSubscription = AppState.addEventListener('change', nextAppState => {
+        if (nextAppState === 'active') {
+          markChatRead({ channelId: instanceId });
+        }
+      });
+
       return () => {
         setActiveChatInstance(null);
         subscription.remove();
+        appStateSubscription.remove();
       };
     }, [instanceId, markChatRead])
   );

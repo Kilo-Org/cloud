@@ -132,6 +132,12 @@ const CloseConvoy = z.object({
   convoy_id: z.string(),
 });
 
+const FailConvoy = z.object({
+  type: z.literal('fail_convoy'),
+  convoy_id: z.string(),
+  reason: z.string(),
+});
+
 // ── Side effects (deferred) ─────────────────────────────────────────
 
 const DispatchAgent = z.object({
@@ -206,6 +212,7 @@ export const Action = z.discriminatedUnion('type', [
   UpdateConvoyProgress,
   SetConvoyReadyToLand,
   CloseConvoy,
+  FailConvoy,
   // Side effects
   DispatchAgent,
   StopAgent,
@@ -239,6 +246,7 @@ export type DeleteAgent = z.infer<typeof DeleteAgent>;
 export type UpdateConvoyProgress = z.infer<typeof UpdateConvoyProgress>;
 export type SetConvoyReadyToLand = z.infer<typeof SetConvoyReadyToLand>;
 export type CloseConvoy = z.infer<typeof CloseConvoy>;
+export type FailConvoy = z.infer<typeof FailConvoy>;
 export type DispatchAgent = z.infer<typeof DispatchAgent>;
 export type StopAgent = z.infer<typeof StopAgent>;
 export type PollPr = z.infer<typeof PollPr>;
@@ -397,7 +405,22 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     }
 
     case 'create_landing_mr': {
-      // Create an MR bead for the landing merge (feature branch → main)
+      const timestamp = now();
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.metadata} = json_set(
+            COALESCE(${beads.columns.metadata}, '{}'),
+            '$.landing_mr_attempts',
+            COALESCE(json_extract(${beads.columns.metadata}, '$.landing_mr_attempts'), 0) + 1,
+            '$.last_landing_mr_attempt_at', ?
+          ),
+          ${beads.columns.updated_at} = ?
+          WHERE ${beads.bead_id} = ?
+        `,
+        [timestamp, timestamp, action.convoy_id]
+      );
       reviewQueue.submitToReviewQueue(sql, {
         agent_id: 'system',
         bead_id: action.convoy_id,
@@ -592,7 +615,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     }
 
     case 'close_convoy': {
-      // Use updateBeadStatus for terminal state guard + bead event logging
       beadOps.updateBeadStatus(sql, action.convoy_id, 'closed', 'system');
       query(
         sql,
@@ -602,6 +624,25 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
           WHERE ${convoy_metadata.columns.bead_id} = ?
         `,
         [now(), action.convoy_id]
+      );
+      return null;
+    }
+
+    case 'fail_convoy': {
+      beadOps.updateBeadStatus(sql, action.convoy_id, 'failed', 'system');
+      query(
+        sql,
+        /* sql */ `
+          UPDATE ${beads}
+          SET ${beads.columns.metadata} = json_set(
+            COALESCE(${beads.columns.metadata}, '{}'),
+            '$.failureReason', 'landing_mr_exhausted',
+            '$.failureMessage', ?
+          ),
+          ${beads.columns.updated_at} = ?
+          WHERE ${beads.bead_id} = ?
+        `,
+        [action.reason, now(), action.convoy_id]
       );
       return null;
     }

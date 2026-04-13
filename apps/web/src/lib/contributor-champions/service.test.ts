@@ -16,6 +16,7 @@ const mockedFetchWithBackoff = jest.fn() as jest.MockedFunction<typeof fetchWith
 const mockedGrantCredit = jest.fn() as jest.MockedFunction<typeof grantCreditForCategoryType>;
 
 jest.mock('@/lib/config.server', () => ({
+  CONTRIBUTOR_CHAMPION_TEAM_EMAILS: '',
   GITHUB_ADMIN_STATS_TOKEN: 'test-github-token',
 }));
 

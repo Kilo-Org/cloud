@@ -825,6 +825,7 @@ export class TownDO extends DurableObject<Env> {
     const newCustomKeySet = new Set(newCustomKeys);
 
     for (const key of prevCustomKeys) {
+      if (RESERVED_ENV_KEYS.has(key)) continue;
       if (!newCustomKeySet.has(key)) {
         try {
           await container.deleteEnvVar(key);

@@ -1,5 +1,3 @@
-export const CSP_NONCE_HEADER = 'x-nonce';
-
 type CspDirective =
   | 'script-src'
   | 'connect-src'
@@ -11,7 +9,6 @@ type CspDirective =
   | 'media-src';
 
 export type ContentSecurityPolicyOptions = {
-  nonce: string;
   isDevelopment?: boolean;
   connectSrcUrls?: Array<string | undefined>;
   env?: Record<string, string | undefined>;
@@ -71,15 +68,14 @@ export function getConfiguredConnectSrcOrigins(
 }
 
 export function buildContentSecurityPolicy({
-  nonce,
   isDevelopment = false,
   connectSrcUrls,
   env = process.env,
-}: ContentSecurityPolicyOptions): string {
+}: ContentSecurityPolicyOptions = {}): string {
   const configuredConnectSrcUrls = connectSrcUrls ?? getConfiguredConnectSrcOrigins(env);
   const scriptSrc = compactUnique([
     "'self'",
-    `'nonce-${nonce}'`,
+    "'unsafe-inline'",
     "'wasm-unsafe-eval'",
     isDevelopment ? "'unsafe-eval'" : null,
     'https://www.googletagmanager.com',
@@ -106,6 +102,7 @@ export function buildContentSecurityPolicy({
     'https://challenges.cloudflare.com',
     'https://cdn.jsdelivr.net',
     'https://unpkg.com',
+    'https://*.d.kiloapps.io',
     isDevelopment ? 'http://localhost:*' : null,
     isDevelopment ? 'ws://localhost:*' : null,
     ...configuredConnectSrcUrls.map(originFromUrl),
@@ -141,6 +138,8 @@ export function buildContentSecurityPolicy({
       'https://hooks.stripe.com',
       'https://checkout.stripe.com',
       'https://challenges.cloudflare.com',
+      'https://www.youtube.com',
+      'https://*.d.kiloapps.io',
       ...getAdditionalCspSources('frame-src', env),
     ],
     'worker-src': ["'self'", 'blob:', ...getAdditionalCspSources('worker-src', env)],
@@ -151,10 +150,4 @@ export function buildContentSecurityPolicy({
   return Object.entries(directives)
     .map(([directive, sources]) => `${directive} ${sources.join(' ')}`)
     .join('; ');
-}
-
-export function createCspNonce(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return btoa(String.fromCharCode(...bytes));
 }

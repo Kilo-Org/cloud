@@ -2,16 +2,19 @@ import { buildGoogleTagManagerScript, buildImpactUttScript } from '@/lib/marketi
 
 describe('marketing tag scripts', () => {
   it('escapes GTM IDs embedded into bootstrap JavaScript', () => {
-    const script = buildGoogleTagManagerScript(`GTM-TEST';alert(1);//`);
+    const script = buildGoogleTagManagerScript('GTM-TEST</script><script>alert(1)</script>');
 
-    expect(script).toContain(JSON.stringify(`GTM-TEST';alert(1);//`));
-    expect(script).not.toContain(`GTM-TEST';alert(1);//');`);
+    expect(script).toContain('GTM-TEST\\u003C\\u002Fscript\\u003E');
+    expect(script).not.toContain('</script>');
+    expect(script).not.toContain('<script>');
   });
 
   it('escapes Impact IDs embedded into bootstrap JavaScript', () => {
-    const script = buildImpactUttScript(`impact';alert(1);//`);
+    const script = buildImpactUttScript('impact</script><script>alert(1)</script>');
 
-    expect(script).toContain(JSON.stringify(`https://utt.impactcdn.com/impact';alert(1);//.js`));
-    expect(script).not.toContain(`impact';alert(1);//.js','script'`);
+    expect(script).toContain('https:\\u002F\\u002Futt.impactcdn.com\\u002Fimpact');
+    expect(script).toContain('\\u003C\\u002Fscript\\u003E');
+    expect(script).not.toContain('</script>');
+    expect(script).not.toContain('<script>');
   });
 });

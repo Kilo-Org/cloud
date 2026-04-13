@@ -1,14 +1,13 @@
 import { buildContentSecurityPolicy, getConfiguredConnectSrcOrigins } from '@/lib/security-headers';
 
 describe('security headers', () => {
-  it('builds CSP with nonce and required third-party sources', () => {
+  it('builds CSP with required third-party sources', () => {
     const policy = buildContentSecurityPolicy({
-      nonce: 'test-nonce',
       connectSrcUrls: ['wss://cloud-agent.example.com/socket'],
     });
 
     expect(policy).toContain("default-src 'self'");
-    expect(policy).toContain("script-src 'self' 'nonce-test-nonce'");
+    expect(policy).toContain("script-src 'self' 'unsafe-inline'");
     expect(policy).toContain('https://js.stripe.com');
     expect(policy).toContain('https://*.js.stripe.com');
     expect(policy).toContain('https://api.stripe.com');
@@ -20,13 +19,15 @@ describe('security headers', () => {
     expect(policy).toContain('https://challenges.cloudflare.com');
     expect(policy).toContain('https://cdn.jsdelivr.net');
     expect(policy).toContain('https://unpkg.com');
+    expect(policy).toContain('https://*.d.kiloapps.io');
+    expect(policy).toContain('https://www.youtube.com');
     expect(policy).toContain("'wasm-unsafe-eval'");
     expect(policy).toContain('wss://cloud-agent.example.com');
   });
 
   it('adds development-only sources only in development mode', () => {
-    const productionPolicy = buildContentSecurityPolicy({ nonce: 'n', isDevelopment: false });
-    const developmentPolicy = buildContentSecurityPolicy({ nonce: 'n', isDevelopment: true });
+    const productionPolicy = buildContentSecurityPolicy({ isDevelopment: false });
+    const developmentPolicy = buildContentSecurityPolicy({ isDevelopment: true });
 
     expect(productionPolicy).not.toContain("'unsafe-eval'");
     expect(productionPolicy).not.toContain('ws://localhost:*');
@@ -52,7 +53,6 @@ describe('security headers', () => {
 
   it('allows extra CSP sources through directive-specific env vars', () => {
     const policy = buildContentSecurityPolicy({
-      nonce: 'n',
       env: {
         CSP_ADDITIONAL_SCRIPT_SRC: 'https://tag.example.com, https://cdn.example.com',
         CSP_ADDITIONAL_CONNECT_SRC: 'https://api.example.com',
@@ -71,7 +71,6 @@ describe('security headers', () => {
 
   it('ignores additional CSP sources that would inject directives', () => {
     const policy = buildContentSecurityPolicy({
-      nonce: 'n',
       env: {
         CSP_ADDITIONAL_SCRIPT_SRC: 'https://good.example.com; object-src *',
       },

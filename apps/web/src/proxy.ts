@@ -3,18 +3,11 @@ import { NextResponse } from 'next/server';
 import { withAuthenticatedAdminApiRoutes } from './middleware/withAuthenticatedAdminApiRoutes';
 import { withBlockedClients } from './middleware/withBlockedClients';
 import { withKiloEditorCookie } from './middleware/withKiloEditorCookie';
-import {
-  buildContentSecurityPolicy,
-  createCspNonce,
-  CSP_NONCE_HEADER,
-  getConfiguredConnectSrcOrigins,
-} from '@/lib/security-headers';
+import { buildContentSecurityPolicy, getConfiguredConnectSrcOrigins } from '@/lib/security-headers';
 
 function baseProxy(request: NextRequestWithAuth) {
-  const nonce = createCspNonce();
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-pathname', request.nextUrl.pathname);
-  requestHeaders.set(CSP_NONCE_HEADER, nonce);
 
   const response = NextResponse.next({
     request: {
@@ -30,7 +23,6 @@ function baseProxy(request: NextRequestWithAuth) {
   response.headers.set(
     'Content-Security-Policy',
     buildContentSecurityPolicy({
-      nonce,
       isDevelopment: process.env.NODE_ENV === 'development',
       connectSrcUrls: getConfiguredConnectSrcOrigins(),
     })

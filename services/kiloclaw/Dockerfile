@@ -134,6 +134,19 @@ RUN cd /tmp/kiloclaw-customizer \
     && cd / \
     && rm -rf /tmp/kiloclaw-customizer /root/.npm
 
+# ── Builder stage: package kilo-chat plugin ────────────────────────────
+# Build the vendored plugin tarball in an isolated stage so dev-time
+# dependencies do not inflate the runtime image layers.
+FROM runtime AS kilo-chat-builder
+
+COPY plugins/kilo-chat/ /tmp/kilo-chat/
+RUN cd /tmp/kilo-chat \
+    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
+    && PKG_TGZ="$(npm pack --silent)" \
+    && mv "${PKG_TGZ}" /tmp/kilo-chat.tgz \
+    && cd / \
+    && rm -rf /tmp/kilo-chat /root/.npm
+
 # ── Builder stage: compile the controller with Bun ────────────────────
 # Bun is only needed to bundle the controller TypeScript into a single JS
 # file. By building in a separate stage, Bun (~100MB) stays out of the
@@ -168,6 +181,12 @@ RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz \
     && rm -f /tmp/kiloclaw-customizer.tgz \
     && rm -rf /root/.npm
 
+# Install prebuilt kilo-chat plugin package from builder stage.
+COPY --from=kilo-chat-builder /tmp/kilo-chat.tgz /tmp/kilo-chat.tgz
+RUN npm install -g --legacy-peer-deps /tmp/kilo-chat.tgz \
+    && rm -f /tmp/kilo-chat.tgz \
+    && rm -rf /root/.npm
+
 # Copy the compiled controller from the builder stage
 COPY --from=controller-builder /usr/local/bin/kiloclaw-controller.js /usr/local/bin/kiloclaw-controller.js
 
@@ -178,8 +197,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-03-17-v65-remove-startup-script
-RUN echo "11"
+# Build cache bust: 2026-04-13-v66-add-kilo-chat-plugin
+RUN echo "12"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

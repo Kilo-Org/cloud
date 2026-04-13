@@ -29,6 +29,7 @@ const mockUser: User = {
   has_validation_novel_card_with_hold: false,
   blocked_reason: null,
   api_token_pepper: 'test-pepper-456',
+  web_session_version: 0,
   auto_top_up_enabled: false,
   default_model: null,
   is_bot: false,

@@ -20,7 +20,11 @@ type SidebarUserFooterProps = {
 
 export default function SidebarUserFooter({ user, isLoading }: SidebarUserFooterProps) {
   const handleLogout = async () => {
-    await signOut({ callbackUrl: '/' });
+    try {
+      await fetch('/api/auth/revoke-web-session', { method: 'POST' });
+    } finally {
+      await signOut({ callbackUrl: '/' });
+    }
   };
 
   // Get user initials for avatar fallback

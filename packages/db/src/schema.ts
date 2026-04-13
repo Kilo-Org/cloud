@@ -213,6 +213,7 @@ export const kilocode_users = pgTable(
     has_validation_novel_card_with_hold: boolean().default(false).notNull(),
     blocked_reason: text(),
     api_token_pepper: text(),
+    web_session_version: integer().default(0).notNull(),
     auto_top_up_enabled: boolean().default(false).notNull(),
     is_bot: boolean().default(false).notNull(),
 

@@ -82,6 +82,7 @@ function createMockUser(overrides: Partial<User> = {}): User {
     is_admin: false,
     blocked_reason: null,
     api_token_pepper: 'test-pepper',
+    web_session_version: 0,
     auto_top_up_enabled: false,
     stripe_customer_id: 'cus_test123',
     microdollars_used: 0,

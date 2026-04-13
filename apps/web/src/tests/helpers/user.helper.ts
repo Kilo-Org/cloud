@@ -24,6 +24,7 @@ export function defineTestUser(userData: Partial<User> = {}): User {
     has_validation_novel_card_with_hold: false,
     has_validation_stytch: false,
     api_token_pepper: null,
+    web_session_version: 0,
     auto_top_up_enabled: false,
     default_model: null,
     is_bot: false,

@@ -187,7 +187,7 @@ export async function sendMagicLinkEmail(
     templateVars: {
       magic_link_url: getMagicLinkUrl(magicLink, callbackUrl),
       email: magicLink.email,
-      expires_in: '24 hours',
+      expires_in: '30 minutes',
       expires_at: new Date(magicLink.expires_at).toISOString(),
       app_url: NEXTAUTH_URL,
     },

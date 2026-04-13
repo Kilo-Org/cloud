@@ -5,6 +5,7 @@ import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react';
 import { useSession } from 'next-auth/react';
 import { Suspense, useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { sanitizeAnalyticsUrl } from '@/lib/sanitize-analytics-url';
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -69,11 +70,7 @@ function PostHogPageView() {
 
   useEffect(() => {
     if (pathname && posthog) {
-      let url = window.origin + pathname;
-      const search = searchParams.toString();
-      if (search) {
-        url += '?' + search;
-      }
+      const url = sanitizeAnalyticsUrl(window.origin, pathname, searchParams.toString());
       posthog.capture('$pageview', { $current_url: url });
     }
   }, [pathname, searchParams, posthog]);

@@ -521,24 +521,23 @@ const authOptions: NextAuthOptions = {
       id: 'email',
       name: 'Email',
       credentials: {
-        email: { label: 'Email', type: 'email' },
         token: { label: 'Token', type: 'text' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.token) {
+        if (!credentials?.token) {
           return null;
         }
 
         const tokenData = await verifyAndConsumeMagicLinkToken(credentials.token);
 
-        if (!tokenData || tokenData.email !== credentials.email) {
+        if (!tokenData) {
           return null;
         }
 
         return {
-          id: `email-${credentials.email}`,
-          email: credentials.email,
-          name: credentials.email.split('@')[0],
+          id: `email-${tokenData.email}`,
+          email: tokenData.email,
+          name: tokenData.email.split('@')[0],
           image: '',
         };
       },

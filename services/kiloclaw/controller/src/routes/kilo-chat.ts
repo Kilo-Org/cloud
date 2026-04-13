@@ -10,9 +10,6 @@ export type KiloChatRouteOptions = {
   fetchImpl?: typeof fetch;
 };
 
-// Back-compat alias:
-export type KiloChatSendRouteOptions = KiloChatRouteOptions;
-
 const KILO_CHAT_SEND_PATH = '/_kilo/kilo-chat/send';
 
 export function registerKiloChatSendRoute(app: Hono, options: KiloChatRouteOptions): void {

@@ -15,6 +15,12 @@ describe('web session revocation', () => {
     expect(isWebSessionCurrent(undefined, { web_session_version: 3 })).toBe(false);
   });
 
+  it('treats legacy sessions without a version as version 0', () => {
+    expect(isWebSessionCurrent(undefined, { web_session_version: 0 })).toBe(true);
+    expect(isWebSessionCurrent(null, { web_session_version: 0 })).toBe(true);
+    expect(isWebSessionCurrent(undefined, { web_session_version: 1 })).toBe(false);
+  });
+
   it('increments web_session_version without rotating api_token_pepper', async () => {
     const user = await insertTestUser({ api_token_pepper: 'pepper', web_session_version: 4 });
 

@@ -6,7 +6,8 @@ export function isWebSessionCurrent(
   sessionVersion: number | null | undefined,
   user: Pick<User, 'web_session_version'>
 ): boolean {
-  return typeof sessionVersion === 'number' && sessionVersion === user.web_session_version;
+  const effectiveSessionVersion = sessionVersion ?? 0;
+  return effectiveSessionVersion === user.web_session_version;
 }
 
 export async function revokeWebSession(kiloUserId: User['id'], fromDb: typeof db = db) {

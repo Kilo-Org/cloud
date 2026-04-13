@@ -59,6 +59,64 @@ describe('kilo-chat outbound.sendText', () => {
   });
 });
 
+describe('kilo-chat outbound.editText', () => {
+  it('calls the controller PATCH endpoint', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ messageId: 'm1', version: 4 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    ) as unknown as typeof fetch;
+
+    const originalEnv = { ...process.env };
+    process.env.OPENCLAW_GATEWAY_TOKEN = 'gwt';
+    process.env.KILOCLAW_CONTROLLER_URL = 'http://127.0.0.1:18789';
+    __pluginInternals.fetchImpl = fetchImpl;
+    try {
+      const edit = kiloChatPlugin.outbound!.attachedResults!.editText;
+      expect(edit).toBeDefined();
+      const result = await edit!({
+        cfg: {} as never,
+        to: 'conv-1',
+        messageId: 'm1',
+        text: 'updated',
+        version: 4,
+      } as never);
+      expect(result).toEqual({ messageId: 'm1', version: 4 });
+      expect(fetchImpl).toHaveBeenCalled();
+    } finally {
+      __pluginInternals.fetchImpl = undefined;
+      process.env = originalEnv;
+    }
+  });
+});
+
+describe('kilo-chat outbound.deleteMessage', () => {
+  it('calls the controller DELETE endpoint', async () => {
+    const fetchImpl = vi.fn(
+      async () => new Response(null, { status: 204 })
+    ) as unknown as typeof fetch;
+    const originalEnv = { ...process.env };
+    process.env.OPENCLAW_GATEWAY_TOKEN = 'gwt';
+    process.env.KILOCLAW_CONTROLLER_URL = 'http://127.0.0.1:18789';
+    __pluginInternals.fetchImpl = fetchImpl;
+    try {
+      const del = kiloChatPlugin.outbound!.attachedResults!.deleteMessage;
+      expect(del).toBeDefined();
+      await del!({
+        cfg: {} as never,
+        to: 'conv-1',
+        messageId: 'm1',
+      } as never);
+      expect(fetchImpl).toHaveBeenCalled();
+    } finally {
+      __pluginInternals.fetchImpl = undefined;
+      process.env = originalEnv;
+    }
+  });
+});
+
 describe('kilo-chat streaming config resolution', () => {
   it('defaults streamingMode to "partial" and throttleMs to 500', () => {
     const cfg = { channels: { 'kilo-chat': { enabled: true } } } as never;

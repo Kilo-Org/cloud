@@ -90,7 +90,47 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
   }),
   threading: { topLevelReplyToMode: 'reply' },
   outbound: {
-    base: { deliveryMode: 'direct' },
+    base: {
+      deliveryMode: 'direct',
+      // editText and deleteMessage are placed on base so they survive the SDK's
+      // resolveChatChannelOutbound spread onto the flat ChannelOutboundAdapter.
+      // The SDK only promotes sendText/sendMedia/sendPoll from attachedResults;
+      // these two actions are dispatched by OpenClaw at runtime by key name from
+      // the flat outbound object (via the attachedResults sub-object here).
+      attachedResults: {
+        channel: CHANNEL_ID,
+        editText: async (params: {
+          to: string;
+          messageId: string;
+          text: string;
+          version: number;
+        }) => {
+          const client = createKiloChatClient({
+            controllerBaseUrl: resolveControllerUrl(),
+            gatewayToken: resolveGatewayToken(),
+            fetchImpl: __pluginInternals.fetchImpl,
+          });
+          const result = await client.editMessage({
+            conversationId: params.to,
+            messageId: params.messageId,
+            text: params.text,
+            version: params.version,
+          });
+          return { messageId: result.messageId, version: result.version };
+        },
+        deleteMessage: async (params: { to: string; messageId: string }) => {
+          const client = createKiloChatClient({
+            controllerBaseUrl: resolveControllerUrl(),
+            gatewayToken: resolveGatewayToken(),
+            fetchImpl: __pluginInternals.fetchImpl,
+          });
+          await client.deleteMessage({
+            conversationId: params.to,
+            messageId: params.messageId,
+          });
+        },
+      },
+    } as never, // TODO(openclaw sdk): ChannelOutboundAdapter base type lacks editText/deleteMessage; cast needed to attach extra action methods.
     attachedResults: {
       channel: CHANNEL_ID,
       sendText: async params => {

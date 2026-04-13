@@ -197,10 +197,11 @@ describe('Secret Catalog', () => {
   describe('getEntriesByCategory', () => {
     it('returns all channel entries sorted by order', () => {
       const channels = getEntriesByCategory('channel');
-      expect(channels.length).toBe(3);
+      expect(channels.length).toBe(4);
       expect(channels[0].id).toBe('telegram');
       expect(channels[1].id).toBe('discord');
       expect(channels[2].id).toBe('slack');
+      expect(channels[3].id).toBe('kilo-chat');
     });
 
     it('returns all tool entries sorted by order', () => {
@@ -226,7 +227,9 @@ describe('Secret Catalog', () => {
       expect(keys).toContain('discordBotToken');
       expect(keys).toContain('slackBotToken');
       expect(keys).toContain('slackAppToken');
-      expect(keys.size).toBe(4);
+      expect(keys).toContain('kiloChatApiToken');
+      expect(keys).toContain('kiloChatWebhookSecret');
+      expect(keys.size).toBe(6);
     });
 
     it('returns all tool field keys', () => {

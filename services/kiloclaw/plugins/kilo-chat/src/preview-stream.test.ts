@@ -204,4 +204,64 @@ describe('createPreviewStream', () => {
       vi.useRealTimers();
     }
   });
+
+  it('does not claim text was applied when a streaming PATCH is dropped (409)', async () => {
+    vi.useFakeTimers();
+    try {
+      const { client, editMessage } = makeClientSpies();
+      // First edit (v=2) reports dropped; finalize with the same text must still re-send.
+      editMessage.mockImplementationOnce(async p => ({
+        messageId: p.messageId,
+        version: p.version,
+        dropped: true,
+      }));
+      const stream = createPreviewStream({
+        client,
+        conversationId: 'c1',
+        throttleMs: 100,
+        onWarn: () => {},
+      });
+      stream.update('H');
+      await vi.advanceTimersByTimeAsync(0);
+      stream.update('Hello');
+      await vi.advanceTimersByTimeAsync(100);
+      expect(editMessage).toHaveBeenCalledTimes(1);
+
+      // Finalize with the same text that the dropped PATCH carried: must PATCH again,
+      // because the remote preview never actually shows that text.
+      await stream.finalize('Hello');
+      expect(editMessage).toHaveBeenCalledTimes(2);
+      expect(editMessage.mock.calls[1]![0]).toEqual(
+        expect.objectContaining({ text: 'Hello', version: 3 })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries once when the final PATCH is dropped (409)', async () => {
+    const { client, editMessage } = makeClientSpies();
+    editMessage.mockImplementationOnce(async p => ({
+      messageId: p.messageId,
+      version: p.version,
+      dropped: true,
+    }));
+    const stream = createPreviewStream({
+      client,
+      conversationId: 'c1',
+      throttleMs: 100,
+      onWarn: () => {},
+    });
+    // Prime with a POST so finalize takes the PATCH path.
+    stream.update('H');
+    await Promise.resolve();
+    await stream.finalize('Final');
+    expect(editMessage).toHaveBeenCalledTimes(2);
+    expect(editMessage.mock.calls[0]![0]).toEqual(
+      expect.objectContaining({ text: 'Final', version: 2 })
+    );
+    expect(editMessage.mock.calls[1]![0]).toEqual(
+      expect.objectContaining({ text: 'Final', version: 3 })
+    );
+  });
 });

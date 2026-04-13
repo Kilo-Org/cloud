@@ -101,7 +101,14 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
       })
       .then(res => {
         version = res.version;
-        lastSentText = text;
+        if (res.dropped) {
+          // Server rejected our version (409). Do NOT record `lastSentText`:
+          // the remote preview still shows older text, and a subsequent flush
+          // or finalize must re-send to catch the user up.
+          warn('editMessage dropped (stale version) during stream');
+        } else {
+          lastSentText = text;
+        }
       })
       .catch(err => {
         warn('editMessage failed during stream', err);
@@ -166,16 +173,33 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
         return { messageId };
       }
       if (finalText !== lastSentText) {
-        const nextVersion = version + 1;
+        let nextVersion = version + 1;
         try {
-          const res = await opts.client.editMessage({
+          let res = await opts.client.editMessage({
             conversationId: opts.conversationId,
             messageId,
             text: finalText,
             version: nextVersion,
           });
+          // On final edit, a 409 drop would leave the user-visible message
+          // stuck on older text. Retry once with a freshly-bumped version.
+          if (res.dropped) {
+            warn('editMessage dropped (stale version) during finalize; retrying');
+            version = res.version;
+            nextVersion = version + 1;
+            res = await opts.client.editMessage({
+              conversationId: opts.conversationId,
+              messageId,
+              text: finalText,
+              version: nextVersion,
+            });
+          }
           version = res.version;
-          lastSentText = finalText;
+          if (!res.dropped) {
+            lastSentText = finalText;
+          } else {
+            warn('editMessage dropped twice during finalize; remote preview may be stale');
+          }
         } catch (err) {
           warn('editMessage failed during finalize', err);
           throw err;

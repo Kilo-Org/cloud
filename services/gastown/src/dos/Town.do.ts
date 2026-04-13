@@ -799,10 +799,29 @@ export class TownDO extends DurableObject<Env> {
 
     // Persist custom env_vars to DO storage so they survive container restarts.
     // Compare against the previously-persisted set of keys to clear removed ones.
+    // Reserved infra keys are never overwritten or deleted — infra values always win.
+    const RESERVED_ENV_KEYS = new Set([
+      'KILOCODE_TOKEN',
+      'GIT_TOKEN',
+      'GITHUB_TOKEN',
+      'GITLAB_TOKEN',
+      'GITLAB_INSTANCE_URL',
+      'GITHUB_CLI_PAT',
+      'GH_TOKEN',
+      'GASTOWN_GIT_AUTHOR_NAME',
+      'GASTOWN_GIT_AUTHOR_EMAIL',
+      'GASTOWN_DISABLE_AI_COAUTHOR',
+      'GASTOWN_ORGANIZATION_ID',
+      'GASTOWN_CONTAINER_TOKEN',
+      'GASTOWN_SESSION_TOKEN',
+      'GASTOWN_API_URL',
+    ]);
     const CUSTOM_ENV_KEYS_STORAGE_KEY = 'container:custom_env_var_keys';
     const prevCustomKeys: string[] =
       (await this.ctx.storage.get<string[]>(CUSTOM_ENV_KEYS_STORAGE_KEY)) ?? [];
-    const newCustomKeys = Object.keys(townConfig.env_vars);
+    const newCustomKeys = Object.keys(townConfig.env_vars).filter(
+      key => !RESERVED_ENV_KEYS.has(key)
+    );
     const newCustomKeySet = new Set(newCustomKeys);
 
     for (const key of prevCustomKeys) {
@@ -815,6 +834,7 @@ export class TownDO extends DurableObject<Env> {
       }
     }
     for (const [key, value] of Object.entries(townConfig.env_vars)) {
+      if (RESERVED_ENV_KEYS.has(key)) continue;
       try {
         await container.setEnvVar(key, value);
       } catch (err) {

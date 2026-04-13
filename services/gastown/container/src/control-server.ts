@@ -46,9 +46,34 @@ let lastKnownTownConfig: Record<string, unknown> | null = null;
 // Track which custom env var keys were applied last sync so removed keys can be cleared.
 let lastAppliedEnvVarKeys = new Set<string>();
 
+// Env keys managed by the control plane that custom env_vars must never override.
+// If a custom key collides with a reserved key, the infra value wins and the
+// custom value is silently ignored — matching the !(key in env) guard in buildAgentEnv.
+const RESERVED_ENV_KEYS = new Set([
+  'KILOCODE_TOKEN',
+  'GIT_TOKEN',
+  'GITHUB_TOKEN',
+  'GITLAB_TOKEN',
+  'GITLAB_INSTANCE_URL',
+  'GITHUB_CLI_PAT',
+  'GH_TOKEN',
+  'GASTOWN_GIT_AUTHOR_NAME',
+  'GASTOWN_GIT_AUTHOR_EMAIL',
+  'GASTOWN_DISABLE_AI_COAUTHOR',
+  'GASTOWN_ORGANIZATION_ID',
+  'GASTOWN_CONTAINER_TOKEN',
+  'GASTOWN_SESSION_TOKEN',
+  'GASTOWN_API_URL',
+]);
+
 /** Get the latest town config delivered via X-Town-Config header. */
 export function getCurrentTownConfig(): Record<string, unknown> | null {
   return lastKnownTownConfig;
+}
+
+/** Get the set of custom env var keys applied in the last sync. */
+export function getLastAppliedEnvVarKeys(): Set<string> {
+  return lastAppliedEnvVarKeys;
 }
 
 /**
@@ -106,8 +131,9 @@ function syncTownConfigToProcessEnv(): void {
     delete process.env.GASTOWN_ORGANIZATION_ID;
   }
 
-  // Apply custom env_vars from the town config. Infra keys above always take
-  // precedence — custom keys are applied after so they cannot override them.
+  // Apply custom env_vars from the town config. Reserved infra keys are
+  // skipped so the control-plane values always take precedence — matching the
+  // !(key in env) guard in buildAgentEnv.
   const rawEnvVars = cfg.env_vars;
   const customEnvVars: Record<string, string> =
     rawEnvVars !== null && typeof rawEnvVars === 'object' && !Array.isArray(rawEnvVars)
@@ -115,11 +141,13 @@ function syncTownConfigToProcessEnv(): void {
       : {};
   const newCustomKeys = new Set(Object.keys(customEnvVars));
   // Remove keys that were present in the previous sync but are gone now.
+  // Skip reserved keys — deleting those would wipe a control-plane value.
   for (const key of lastAppliedEnvVarKeys) {
-    if (!newCustomKeys.has(key)) delete process.env[key];
+    if (!newCustomKeys.has(key) && !RESERVED_ENV_KEYS.has(key)) delete process.env[key];
   }
-  // Apply current custom env vars.
+  // Apply current custom env vars, skipping reserved keys.
   for (const [key, value] of Object.entries(customEnvVars)) {
+    if (RESERVED_ENV_KEYS.has(key)) continue;
     process.env[key] = String(value);
   }
   lastAppliedEnvVarKeys = newCustomKeys;

@@ -12,7 +12,7 @@ import * as fs from 'node:fs/promises';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
 import { buildKiloConfigContent } from './agent-runner';
-import { getCurrentTownConfig } from './control-server';
+import { getCurrentTownConfig, getLastAppliedEnvVarKeys } from './control-server';
 import { log } from './logger';
 
 const MANAGER_LOG = '[process-manager]';
@@ -1271,14 +1271,24 @@ export async function updateAgentModel(
   // populated from process.env above), so custom vars cannot override.
   const freshConfig = getCurrentTownConfig();
   const freshEnvVars = freshConfig?.env_vars;
+  const freshCustomKeySet = new Set<string>();
   if (freshEnvVars !== null && typeof freshEnvVars === 'object' && !Array.isArray(freshEnvVars)) {
     for (const [key, value] of Object.entries(freshEnvVars as Record<string, unknown>)) {
       if (LIVE_ENV_KEYS.has(key)) continue;
+      freshCustomKeySet.add(key);
       if (value !== undefined && value !== null) {
         hotSwapEnv[key] = String(value);
       } else {
         delete hotSwapEnv[key];
       }
+    }
+  }
+  // Remove stale custom env vars — keys that were applied in a previous
+  // sync but are no longer in the town config. Without this, startupEnv
+  // keeps carrying deleted custom keys through every hot-swap.
+  for (const key of getLastAppliedEnvVarKeys()) {
+    if (!freshCustomKeySet.has(key) && !LIVE_ENV_KEYS.has(key)) {
+      delete hotSwapEnv[key];
     }
   }
 

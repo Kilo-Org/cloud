@@ -523,8 +523,50 @@
     {
       "idx": 74,
       "version": "7",
-      "when": 1775507266705,
-      "tag": "0074_wild_starbolt",
+      "when": 1775557119417,
+      "tag": "0074_rapid_praxagora",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1775572032347,
+      "tag": "0075_account-deletion-requested-at",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1775596598812,
+      "tag": "0076_bizarre_katie_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1775642090552,
+      "tag": "0077_puzzling_gabe_jones",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1775670564287,
+      "tag": "0078_light_jocasta",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1775672091143,
+      "tag": "0079_cynical_lady_ursula",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1775675341896,
+      "tag": "0080_burly_maverick",
       "breakpoints": true
     },
     {
@@ -558,8 +600,8 @@
     {
       "idx": 85,
       "version": "7",
-      "when": 1775862443149,
-      "tag": "0085_big_the_captain",
+      "when": 1776045754364,
+      "tag": "0085_past_darkhawk",
       "breakpoints": true
     }
   ]

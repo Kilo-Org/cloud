@@ -31,8 +31,11 @@ docker run -it ghcr.io/kilo-org/google-setup \
   --token="YOUR_SESSION_JWT" \
   --client-id="ADMIN_PROVIDED_CLIENT_ID" \
   --client-secret="ADMIN_PROVIDED_CLIENT_SECRET" \
-  --project-id="ADMIN_PROVIDED_PROJECT_ID"
+  --project-id="ADMIN_PROVIDED_PROJECT_ID" \
+  --instance-id="ORG_INSTANCE_ID"
 ```
+
+`--instance-id` is the KiloClaw instance ID of the organization (visible in the Kilo web app). Without it, credentials upload to the member's personal instance instead of the org instance.
 
 ## Additional flags
 

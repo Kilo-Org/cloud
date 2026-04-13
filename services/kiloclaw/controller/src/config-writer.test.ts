@@ -153,6 +153,33 @@ describe('generateBaseConfig', () => {
     expect(config.tools.web.search.provider).toBe('brave');
   });
 
+  it('auto-assigns kilo-exa when provider is missing and mode is unset', () => {
+    const existing = JSON.stringify({ tools: { web: { search: {} } } });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('kilo-exa');
+    expect(config.tools.web.search.enabled).toBe(true);
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
+  });
+
+  it('preserves explicit kilo-exa provider when mode is unset', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'kilo-exa',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('kilo-exa');
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
+  });
+
   it('selects kilo-exa provider when KILO_EXA_SEARCH_MODE=kilo-proxy', () => {
     const { deps } = fakeDeps();
     const env = { ...minimalEnv(), KILO_EXA_SEARCH_MODE: 'kilo-proxy' };
@@ -1038,7 +1065,7 @@ describe('writeBaseConfig', () => {
     expect(config.tools.profile).toBe('full');
   });
 
-  it('does not steer web search provider on config restore path', () => {
+  it('auto-assigns Exa web search provider on restore path when provider is missing', () => {
     const { deps, written } = fakeDeps();
     const env = minimalEnv();
     delete env.KILOCLAW_FRESH_INSTALL;
@@ -1046,7 +1073,8 @@ describe('writeBaseConfig', () => {
     writeBaseConfig(env, '/tmp/openclaw.json', deps);
 
     const config = JSON.parse(written[0].data);
-    expect(config.tools?.web?.search?.provider).toBeUndefined();
+    expect(config.tools?.web?.search?.provider).toBe('kilo-exa');
+    expect(config.tools?.web?.search?.enabled).toBe(true);
   });
 
   it('throws if KILOCODE_API_KEY is missing', () => {

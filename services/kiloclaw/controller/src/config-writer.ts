@@ -61,13 +61,18 @@ const KILO_EXA_PROVIDER_ID = 'kilo-exa';
 
 type KiloExaSearchMode = 'kilo-proxy' | 'disabled';
 
-function resolveKiloExaSearchMode(value: string | undefined): KiloExaSearchMode {
+type KiloExaSearchModeState = KiloExaSearchMode | 'unset';
+
+function resolveKiloExaSearchMode(value: string | undefined): KiloExaSearchModeState {
   const normalized = value?.trim().toLowerCase();
   if (normalized === 'kilo-proxy') {
     return 'kilo-proxy';
   }
-  if (normalized === 'disabled' || normalized === undefined || normalized === '') {
+  if (normalized === 'disabled') {
     return 'disabled';
+  }
+  if (normalized === undefined || normalized === '') {
+    return 'unset';
   }
   console.warn(`Unknown KILO_EXA_SEARCH_MODE value "${value}"; treating as "disabled"`);
   return 'disabled';
@@ -300,6 +305,9 @@ export function generateBaseConfig(
 
   const customizerPluginConfig = config.plugins.entries[KILOCLAW_CUSTOMIZER_PLUGIN_ID].config ?? {};
   const customizerWebSearchConfig = customizerPluginConfig.webSearch ?? {};
+  const searchProvider = config.tools?.web?.search?.provider;
+  const hasExplicitSearchProvider =
+    typeof searchProvider === 'string' && searchProvider.trim().length > 0;
 
   const kiloExaSearchMode = resolveKiloExaSearchMode(env.KILO_EXA_SEARCH_MODE);
   if (kiloExaSearchMode === 'kilo-proxy') {
@@ -309,7 +317,7 @@ export function generateBaseConfig(
     config.tools.web.search = config.tools.web.search ?? {};
     config.tools.web.search.enabled = true;
     config.tools.web.search.provider = KILO_EXA_PROVIDER_ID;
-  } else {
+  } else if (kiloExaSearchMode === 'disabled') {
     customizerWebSearchConfig.enabled = false;
 
     const braveConfigured = Boolean(env.BRAVE_API_KEY?.trim());
@@ -322,6 +330,16 @@ export function generateBaseConfig(
     } else if (config.tools?.web?.search?.provider === KILO_EXA_PROVIDER_ID) {
       delete config.tools.web.search.provider;
     }
+  } else if (hasExplicitSearchProvider) {
+    customizerWebSearchConfig.enabled = config.tools?.web?.search?.provider === KILO_EXA_PROVIDER_ID;
+  } else {
+    customizerWebSearchConfig.enabled = true;
+    config.tools = config.tools ?? {};
+    config.tools.web = config.tools.web ?? {};
+    config.tools.web.search = config.tools.web.search ?? {};
+    config.tools.web.search.enabled = true;
+    config.tools.web.search.provider = KILO_EXA_PROVIDER_ID;
+    console.log('[config-writer] Auto-assigned web search provider to kilo-exa (mode=unset)');
   }
 
   customizerPluginConfig.webSearch = customizerWebSearchConfig;

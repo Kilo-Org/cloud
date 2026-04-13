@@ -97,13 +97,14 @@ function ensureDockerLocalConfigured(env: KiloClawEnv): string {
 
 async function dockerFetch(env: KiloClawEnv, path: string, init?: RequestInit): Promise<Response> {
   const base = ensureDockerLocalConfigured(env);
+  const url = `${base.replace(/\/+$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
   const headers = new Headers(init?.headers);
   if (init?.body && !headers.has('content-type')) {
     headers.set('content-type', 'application/json');
   }
 
   try {
-    return await fetch(new URL(path, `${base}/`).toString(), {
+    return await fetch(url, {
       ...init,
       headers,
     });

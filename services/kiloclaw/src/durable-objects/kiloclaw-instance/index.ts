@@ -1636,6 +1636,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           })
         );
       } catch (err) {
+        // Non-Fly adapters own provider-specific "already gone" handling; this
+        // guard is for Fly APIs that can surface a machine 404 during stop.
         if (!fly.isFlyNotFound(err)) {
           throw err;
         }
@@ -2794,6 +2796,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           }
         } else {
           await this.reconcileNonFlyRuntimeFromAlarm();
+        }
+        if (this.s.status) {
+          await this.scheduleAlarm();
         }
         return;
       }

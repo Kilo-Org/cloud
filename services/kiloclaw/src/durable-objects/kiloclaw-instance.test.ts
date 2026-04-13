@@ -5484,6 +5484,22 @@ describe('non-Fly runtime reconciliation via alarm', () => {
 
     expect(storage._store.get('status')).toBe('stopped');
     expect(storage._store.get('lastStoppedAt')).toBeGreaterThan(0);
+    expect(storage._getAlarm()).not.toBeNull();
+  });
+
+  it('keeps the alarm chain alive for idle docker-local statuses', async () => {
+    const env = { ...createFakeEnv(), DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750' };
+    const { instance, storage } = createInstance(undefined, env);
+    await seedDockerInstance(storage, {
+      status: 'stopped',
+      lastStoppedAt: Date.now(),
+    });
+
+    await instance.alarm();
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(storage._getAlarm()).not.toBeNull();
   });
 });
 

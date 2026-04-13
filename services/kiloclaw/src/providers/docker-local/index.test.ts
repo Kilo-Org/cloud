@@ -91,6 +91,25 @@ describe('dockerLocalProviderAdapter', () => {
     });
   });
 
+  it('preserves a versioned Docker API base path', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response('OK', { status: 200 }));
+
+    await dockerLocalProviderAdapter.ensureProvisioningResources({
+      env: {
+        WORKER_ENV: 'development',
+        DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750/v1.44',
+        DOCKER_LOCAL_IMAGE: 'kiloclaw:local',
+        DOCKER_LOCAL_PORT_RANGE: '45000-45010',
+      } as never,
+      state: runtimeState(),
+      orgId: null,
+      machineSize: null,
+    });
+
+    expect(fetchInputUrl(fetchMock.mock.calls[0][0])).toBe('http://127.0.0.1:23750/v1.44/_ping');
+  });
+
   it('creates the Docker volume when storage is missing', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValueOnce(new Response('', { status: 404 })).mockResolvedValueOnce(

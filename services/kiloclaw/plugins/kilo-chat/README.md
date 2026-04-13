@@ -19,23 +19,14 @@ Build output is written to `dist/` during `pnpm build` and `npm pack` (`prepack`
 
 ## Streaming
 
-Agent replies can be streamed to the external service Telegram-style — a single message
-is created on the first token and then edited in place as more tokens arrive.
+Agent replies stream to the external service Telegram-style: a single message is
+created on the first token and edited in place as more tokens arrive. Subsequent
+reply blocks become separate messages.
 
-Configure under `channels.kilo-chat.streaming`:
+Outbound calls (all proxied through the controller):
 
-- `mode`: `off | partial | block`. Default `partial`.
-  - `partial` — live edit-in-place for the primary reply block; subsequent blocks create
-    separate messages.
-  - `off` — no streaming; each reply block becomes a new message on completion.
-  - `block` — accepted but currently behaves as `off` (reserved for future block-level
-    streaming semantics).
-- `throttleMs`: integer in `[100, 5000]`. Default `500`. Minimum gap between outbound
-  `PATCH` edits while streaming.
-
-The plugin issues:
-
-- `POST   /v1/messages` to create the initial preview (`version: 1`).
-- `PATCH  /v1/messages/:id` with `{conversationId, text, version}` for each edit; the
-  server MAY reject `409` on stale versions, which is treated as a benign drop.
-- `DELETE /v1/messages/:id` for preview cleanup on dispatch failure.
+- `POST   /v1/messages` — create the initial preview (`version: 1`).
+- `PATCH  /v1/messages/:id` with `{conversationId, text, version}` — each edit;
+  the server MAY reject with `409` on a stale version, which is treated as a
+  benign drop.
+- `DELETE /v1/messages/:id` — preview cleanup on dispatch failure.

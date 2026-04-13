@@ -23,6 +23,7 @@ import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
   isFreeModel,
   isDeadFreeModel,
+  isExcludedForFeature,
   isKiloExclusiveFreeModel,
   isKiloStealthModel,
 } from '@/lib/models';
@@ -32,6 +33,7 @@ import {
   checkOrganizationModelRestrictions,
   dataCollectionRequiredResponse,
   extractFraudAndProjectHeaders,
+  featureExclusiveModelResponse,
   invalidPathResponse,
   invalidRequestResponse,
   makeErrorReadable,
@@ -381,6 +383,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   ) {
     console.warn(`User requested forbidden free model ${originalModelIdLowerCased}; rejecting.`);
     return forbiddenFreeModelResponse(fraudHeaders, feature);
+  }
+
+  if (isExcludedForFeature(originalModelIdLowerCased, feature)) {
+    console.warn(
+      `Model ${originalModelIdLowerCased} is not available for feature ${feature}; rejecting.`
+    );
+    return featureExclusiveModelResponse();
   }
 
   // Extract properties for usage context

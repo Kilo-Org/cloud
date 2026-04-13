@@ -263,6 +263,11 @@ export function modelDoesNotExistResponse() {
   );
 }
 
+export function featureExclusiveModelResponse() {
+  const error = `This model is only available in KiloClaw and OpenClaw. Use ${KILO_AUTO_FREE_MODEL.id} as a free alternative.`;
+  return NextResponse.json({ error, message: error }, { status: 403 });
+}
+
 export function storeAndPreviousResponseIdIsNotSupported() {
   const error = 'The store and previous_response_id fields are not supported.';
   return NextResponse.json({ error, message: error }, { status: 400 });

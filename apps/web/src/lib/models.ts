@@ -2,6 +2,7 @@
  * Utility functions for working with AI models
  */
 
+import type { FeatureValue } from '@/lib/feature-detection';
 import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_FREE_MODEL,
@@ -90,4 +91,17 @@ export function isDeadFreeModel(model: string): boolean {
 
 export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {
   return kiloExclusiveModels.find(m => m.public_id === model && m.status !== 'disabled') ?? null;
+}
+
+/**
+ * Returns true if the model should be excluded from results for the given feature.
+ * A model is excluded when it has an `exclusive_to` restriction, the feature is known,
+ * and the feature is not in `exclusive_to`.
+ * When feature is null (no header sent), the model is always included.
+ */
+export function isExcludedForFeature(modelId: string, feature: FeatureValue | null): boolean {
+  const model = kiloExclusiveModels.find(m => m.public_id === modelId);
+  if (!model?.exclusive_to?.length) return false;
+  if (!feature) return false;
+  return !model.exclusive_to.includes(feature);
 }

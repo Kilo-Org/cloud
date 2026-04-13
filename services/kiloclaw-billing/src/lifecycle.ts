@@ -105,6 +105,8 @@ type EmailActionInput = {
   templateName: TemplateName;
   templateVars: Record<string, string>;
   subjectOverride?: string;
+  userId?: string;
+  instanceId?: string;
 };
 
 type UserForAutoTopUp = {
@@ -255,6 +257,22 @@ function getKiloClawAffiliateItemSku(env: BillingWorkerEnv, plan: 'commit' | 'st
 
 function formatDateForEmail(date: Date): string {
   return format(date, 'MMMM d, yyyy');
+}
+
+function shortInstanceId(instanceId: string): string {
+  return instanceId.slice(0, 8);
+}
+
+function formatInstanceLabel(params: {
+  instanceName: string | null;
+  instanceId: string;
+  plan: KiloClawPlan;
+}): string {
+  const trimmedName = params.instanceName?.trim();
+  if (trimmedName) return trimmedName;
+
+  const shortId = shortInstanceId(params.instanceId);
+  return shortId || params.plan;
 }
 
 function workerInstanceId(
@@ -578,7 +596,8 @@ async function trySendEmail(
   templateName: TemplateName,
   templateVars: Record<string, string>,
   summary: BillingSummary,
-  subjectOverride?: string
+  subjectOverride?: string,
+  entityFields: BillingEntityFields = {}
 ): Promise<boolean> {
   const result = await database
     .insert(kiloclaw_email_log)
@@ -591,6 +610,7 @@ async function trySendEmail(
   }
 
   try {
+    const emailEntityFields = { ...entityFields, userId };
     const emailResult = await callBillingSideEffect(
       env,
       context,
@@ -601,9 +621,11 @@ async function trySendEmail(
           templateName,
           templateVars,
           subjectOverride,
+          userId: emailEntityFields.userId,
+          instanceId: emailEntityFields.instanceId,
         },
       },
-      { userId }
+      emailEntityFields
     );
 
     if (!emailResult.sent) {
@@ -1585,20 +1607,27 @@ async function runDestructionWarningSweep(
       user_id: kiloclaw_subscriptions.user_id,
       email: kilocode_users.google_user_email,
       destruction_deadline: kiloclaw_subscriptions.destruction_deadline,
+      instance_id: kiloclaw_instances.id,
+      instance_name: kiloclaw_instances.name,
+      instance_destroyed_at: kiloclaw_instances.destroyed_at,
+      plan: kiloclaw_subscriptions.plan,
     })
     .from(kiloclaw_subscriptions)
     .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
     .where(
       and(
         gte(kiloclaw_subscriptions.destruction_deadline, advisoryNow),
         lte(kiloclaw_subscriptions.destruction_deadline, twoDaysFromNow),
-        isNotNull(kiloclaw_subscriptions.suspended_at)
+        isNotNull(kiloclaw_subscriptions.suspended_at),
+        isNull(kiloclaw_instances.destroyed_at)
       )
     );
 
   for (const row of destructionWarningRows) {
     try {
-      if (!row.destruction_deadline) continue;
+      if (!row.destruction_deadline || row.instance_destroyed_at) continue;
+      const instanceIdShort = shortInstanceId(row.instance_id);
       const sent = await trySendEmail(
         database,
         env,
@@ -1610,8 +1639,16 @@ async function runDestructionWarningSweep(
         {
           destruction_date: formatDateForEmail(new Date(row.destruction_deadline)),
           claw_url: clawUrl,
+          instance_label: formatInstanceLabel({
+            instanceName: row.instance_name,
+            instanceId: row.instance_id,
+            plan: row.plan,
+          }),
+          instance_id_short: instanceIdShort,
         },
-        summary
+        summary,
+        undefined,
+        { instanceId: row.instance_id }
       );
       if (sent) summary.destruction_warnings++;
     } catch (error) {

@@ -40,6 +40,7 @@ type BillingSideEffectLogFields = BillingCorrelationContext & {
   action?: string;
   durationMs?: number;
   userId?: string;
+  instanceId?: string;
   stripeSubscriptionId?: string;
   templateName?: (typeof billingTemplateNames)[number];
   statusCode?: number;
@@ -88,6 +89,8 @@ const BodySchema = z.discriminatedUnion('action', [
       templateName: z.enum(billingTemplateNames),
       templateVars: z.record(z.string(), z.string()),
       subjectOverride: z.string().min(1).optional(),
+      userId: z.string().min(1).optional(),
+      instanceId: z.string().min(1).optional(),
     }),
   }),
   z.object({
@@ -146,12 +149,17 @@ const BodySchema = z.discriminatedUnion('action', [
 
 function getActionLogFields(body: z.infer<typeof BodySchema>): {
   userId?: string;
+  instanceId?: string;
   stripeSubscriptionId?: string;
   templateName?: (typeof billingTemplateNames)[number];
 } {
   switch (body.action) {
     case 'send_email':
-      return { templateName: body.input.templateName };
+      return {
+        userId: body.input.userId,
+        instanceId: body.input.instanceId,
+        templateName: body.input.templateName,
+      };
     case 'trigger_user_auto_top_up':
       return { userId: body.input.user.id };
     case 'ensure_auto_intro_schedule':

@@ -1059,6 +1059,16 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     // Post-destroy cleanup: best-effort DB tidying that must not report
     // failure after a successful destroy.
     try {
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ destruction_deadline: null })
+        .where(
+          and(
+            eq(kiloclaw_subscriptions.user_id, instance.user_id),
+            eq(kiloclaw_subscriptions.instance_id, instance.id)
+          )
+        );
+
       // Clear lifecycle emails so they can fire again if the user re-provisions.
       const resettableEmailTypes = [
         'claw_suspended_trial',

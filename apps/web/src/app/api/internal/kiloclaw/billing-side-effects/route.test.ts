@@ -95,6 +95,8 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
             templateVars: {
               claw_url: 'https://app.kilo.ai/claw',
             },
+            userId: 'user-123',
+            instanceId: 'instance-456',
           },
         },
         {
@@ -118,6 +120,8 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
         event: 'downstream_action',
         outcome: 'started',
         action: 'send_email',
+        userId: 'user-123',
+        instanceId: 'instance-456',
         templateName: 'clawCreditRenewalFailed',
       })
     );
@@ -129,6 +133,8 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
         event: 'downstream_action',
         outcome: 'completed',
         action: 'send_email',
+        userId: 'user-123',
+        instanceId: 'instance-456',
         templateName: 'clawCreditRenewalFailed',
         statusCode: 200,
       })

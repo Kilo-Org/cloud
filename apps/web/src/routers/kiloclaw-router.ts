@@ -403,6 +403,10 @@ const updateKiloCodeConfigSchema = z.object({
   kilocodeDefaultModel: kilocodeDefaultModelSchema.nullable().optional(),
 });
 
+const patchWebSearchConfigSchema = z.object({
+  exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
+});
+
 const patchChannelsSchema = z.object({
   telegramBotToken: z.string().nullable().optional(),
   discordBotToken: z.string().nullable().optional(),
@@ -1800,6 +1804,14 @@ export const kiloclawRouter = createTRPCRouter({
       const instance = await getActiveInstance(ctx.user.id);
       const client = new KiloClawInternalClient();
       return client.patchExecPreset(ctx.user.id, input, workerInstanceId(instance));
+    }),
+
+  patchWebSearchConfig: clawAccessProcedure
+    .input(patchWebSearchConfigSchema)
+    .mutation(async ({ ctx, input }) => {
+      const instance = await getActiveInstance(ctx.user.id);
+      const client = new KiloClawInternalClient();
+      return client.patchWebSearchConfig(ctx.user.id, input, workerInstanceId(instance));
     }),
 
   patchBotIdentity: clawAccessProcedure

@@ -518,6 +518,7 @@ describe('Secret Catalog', () => {
       expect(isValidCustomSecretKey('DISCORD_BOT_TOKEN')).toBe(false);
       expect(isValidCustomSecretKey('GITHUB_TOKEN')).toBe(false);
       expect(isValidCustomSecretKey('BRAVE_API_KEY')).toBe(false);
+      expect(isValidCustomSecretKey('KILO_EXA_SEARCH_MODE')).toBe(false);
     });
 
     it('rejects reserved prefixes', () => {
@@ -567,6 +568,10 @@ describe('Secret Catalog', () => {
 
     it('returns false for internal sensitive env vars', () => {
       expect(isCustomSecretEnvVar('KILOCLAW_GOG_CONFIG_TARBALL')).toBe(false);
+    });
+
+    it('returns false for internal non-secret reserved env vars', () => {
+      expect(isCustomSecretEnvVar('KILO_EXA_SEARCH_MODE')).toBe(false);
     });
   });
 

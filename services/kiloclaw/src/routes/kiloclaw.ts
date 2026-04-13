@@ -15,6 +15,7 @@ const CHANNEL_ENV_VARS = new Set(
 
 /** Channel field keys — used to check legacy `channels` storage for backward compat. */
 const CHANNEL_FIELD_KEYS = getFieldKeysByCategory('channel');
+const NON_SECRET_ENCRYPTED_ENV_VARS = new Set(['KILO_EXA_SEARCH_MODE']);
 
 /**
  * User-facing KiloClaw routes (JWT auth via authMiddleware).
@@ -50,12 +51,15 @@ kiloclaw.get('/config', c =>
     return c.json({
       envVarKeys: config.envVars ? Object.keys(config.envVars) : [],
       secretCount: config.encryptedSecrets
-        ? Object.keys(config.encryptedSecrets).filter(k => !CHANNEL_ENV_VARS.has(k)).length
+        ? Object.keys(config.encryptedSecrets).filter(
+            k => !CHANNEL_ENV_VARS.has(k) && !NON_SECRET_ENCRYPTED_ENV_VARS.has(k)
+          ).length
         : 0,
       kilocodeDefaultModel: config.kilocodeDefaultModel ?? null,
       hasKiloCodeApiKey: !!config.kilocodeApiKey,
       kilocodeApiKeyExpiresAt: config.kilocodeApiKeyExpiresAt ?? null,
       configuredSecrets: buildConfiguredSecrets(config),
+      kiloExaSearchMode: config.webSearch?.exaMode ?? null,
       customSecretKeys: config.encryptedSecrets
         ? Object.keys(config.encryptedSecrets).filter(isCustomSecretEnvVar)
         : [],
@@ -127,7 +131,9 @@ function buildConfiguredSecrets(config: {
   const result: Record<string, boolean> = {};
 
   for (const entry of SECRET_CATALOG) {
-    result[entry.id] = entry.fields.every(field => {
+    const requiredFields = entry.fields.filter(field => field.requiredForConfigured !== false);
+    const fieldsToCheck = requiredFields.length > 0 ? requiredFields : entry.fields;
+    result[entry.id] = fieldsToCheck.every(field => {
       // Check new encryptedSecrets storage (keyed by env var name)
       if (config.encryptedSecrets?.[field.envVar] != null) return true;
       // Fall back to legacy channels storage (keyed by field key)

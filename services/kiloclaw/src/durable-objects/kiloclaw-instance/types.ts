@@ -61,6 +61,7 @@ export type InstanceMutableState = {
   kilocodeApiKey: PersistedState['kilocodeApiKey'];
   kilocodeApiKeyExpiresAt: PersistedState['kilocodeApiKeyExpiresAt'];
   kilocodeDefaultModel: PersistedState['kilocodeDefaultModel'];
+  kiloExaSearchMode: PersistedState['kiloExaSearchMode'];
   channels: PersistedState['channels'];
   googleCredentials: GoogleCredentials | null;
   provisionedAt: number | null;

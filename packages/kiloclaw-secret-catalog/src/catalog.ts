@@ -348,6 +348,7 @@ const DENIED_ENV_VAR_NAMES: ReadonlySet<string> = new Set([
   'AUTO_APPROVE_DEVICES',
   'REQUIRE_PROXY_TOKEN',
   'INVOCATION_ID',
+  'KILO_EXA_SEARCH_MODE',
   'TELEGRAM_DM_POLICY',
   'DISCORD_DM_POLICY',
 ]);
@@ -379,7 +380,11 @@ export function isValidCustomSecretKey(key: string): boolean {
  * list out of the full encryptedSecrets record.
  */
 export function isCustomSecretEnvVar(envVarName: string): boolean {
-  return !ALL_SECRET_ENV_VARS.has(envVarName) && !INTERNAL_SENSITIVE_ENV_VARS.has(envVarName);
+  return (
+    !ALL_SECRET_ENV_VARS.has(envVarName) &&
+    !INTERNAL_SENSITIVE_ENV_VARS.has(envVarName) &&
+    !DENIED_ENV_VAR_NAMES.has(envVarName)
+  );
 }
 
 // --- Config path helpers ---

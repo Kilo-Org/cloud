@@ -57,6 +57,11 @@ const KiloCodeConfigPatchSchema = z.object({
     .optional(),
 });
 
+const WebSearchConfigPatchSchema = z.object({
+  userId: z.string().min(1),
+  exaMode: z.enum(['kilo-proxy', 'disabled']).nullable().optional(),
+});
+
 const platform = new Hono<AppEnv>();
 type KiloClawInstanceStub = ReturnType<AppEnv['Bindings']['KILOCLAW_INSTANCE']['get']>;
 
@@ -564,6 +569,31 @@ platform.patch('/kilocode-config', async c => {
     return c.json(updated, 200);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'kilocode-config patch');
+    return jsonError(message, status);
+  }
+});
+
+// PATCH /api/platform/web-search-config
+platform.patch('/web-search-config', async c => {
+  const result = await parseBody(c, WebSearchConfigPatchSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, exaMode } = result.data;
+
+  try {
+    const updated = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.updateWebSearchConfig({ exaMode }),
+      'updateWebSearchConfig'
+    );
+    return c.json(updated, 200);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'web-search-config patch');
     return jsonError(message, status);
   }
 });

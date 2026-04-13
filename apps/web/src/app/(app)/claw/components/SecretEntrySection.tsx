@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { ChannelTokenInput } from './ChannelTokenInput';
+import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { getDescription, getIcon } from './secret-ui-adapter';
 
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
@@ -27,9 +28,11 @@ export function SecretEntrySection({
   onSecretsChanged,
   isDirty,
   actionRowExtra,
+  actionRowInlineExtra,
   defaultOpen,
   onRedeploy,
   redeployLabel = 'Redeploy',
+  saveConfirmation,
 }: {
   entry: SecretCatalogEntry;
   configured: boolean;
@@ -37,15 +40,24 @@ export function SecretEntrySection({
   onSecretsChanged?: (entryId: string) => void;
   isDirty: boolean;
   actionRowExtra?: React.ReactNode;
+  actionRowInlineExtra?: React.ReactNode;
   defaultOpen?: boolean;
   onRedeploy?: () => void;
   /** Label for the toast action button. Defaults to "Redeploy". */
   redeployLabel?: string;
+  saveConfirmation?: {
+    title: string;
+    description: string;
+    confirmLabel: string;
+    pendingLabel?: string;
+  };
 }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   const [tokens, setTokens] = useState<Record<string, string>>({});
   const [formatError, setFormatError] = useState<string | null>(null);
-  const isSaving = mutations.patchSecrets.isPending;
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  const [pendingSecrets, setPendingSecrets] = useState<Record<string, string> | null>(null);
   const Icon = getIcon(entry.icon);
   const description = getDescription(entry.id);
 
@@ -58,14 +70,14 @@ export function SecretEntrySection({
     return entry.fields.every(f => tokens[f.key]?.trim());
   }
 
-  function handleSave() {
+  function buildValidatedSecrets(): Record<string, string> | null {
     if (!hasAllTokensFilled()) {
       if (entry.fields.length > 1) {
         toast.error(`All token fields are required for ${entry.label}.`);
       } else {
         toast.error('Enter a token or use Remove to clear it.');
       }
-      return;
+      return null;
     }
 
     for (const field of entry.fields) {
@@ -74,7 +86,7 @@ export function SecretEntrySection({
         const msg = field.validationMessage ?? 'Invalid token format.';
         setFormatError(msg);
         toast.error(msg);
-        return;
+        return null;
       }
     }
 
@@ -83,6 +95,11 @@ export function SecretEntrySection({
       secrets[field.key] = (tokens[field.key] ?? '').trim();
     }
 
+    return secrets;
+  }
+
+  function saveSecrets(secrets: Record<string, string>) {
+    setIsSaving(true);
     mutations.patchSecrets.mutate(
       { secrets },
       {
@@ -97,11 +114,32 @@ export function SecretEntrySection({
             }
           );
           setTokens({});
+          setPendingSecrets(null);
+          setShowSaveConfirm(false);
           onSecretsChanged?.(entry.id);
         },
-        onError: err => toast.error(`Failed to save: ${err.message}`),
+        onError: err => {
+          setShowSaveConfirm(false);
+          toast.error(`Failed to save: ${err.message}`);
+        },
+        onSettled: () => setIsSaving(false),
       }
     );
+  }
+
+  function handleSave() {
+    const secrets = buildValidatedSecrets();
+    if (!secrets) {
+      return;
+    }
+
+    if (saveConfirmation) {
+      setPendingSecrets(secrets);
+      setShowSaveConfirm(true);
+      return;
+    }
+
+    saveSecrets(secrets);
   }
 
   function handleRemove() {
@@ -110,6 +148,7 @@ export function SecretEntrySection({
       secrets[field.key] = null;
     }
 
+    setIsSaving(true);
     mutations.patchSecrets.mutate(
       { secrets },
       {
@@ -127,13 +166,15 @@ export function SecretEntrySection({
           onSecretsChanged?.(entry.id);
         },
         onError: err => toast.error(`Failed to remove: ${err.message}`),
+        onSettled: () => setIsSaving(false),
       }
     );
   }
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="rounded-lg border">
+    <>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <div className="rounded-lg border">
         <CollapsibleTrigger asChild>
           <button
             type="button"
@@ -235,11 +276,37 @@ export function SecretEntrySection({
                   Remove
                 </Button>
               )}
+              {actionRowInlineExtra}
             </div>
             {actionRowExtra && <div>{actionRowExtra}</div>}
           </div>
         </CollapsibleContent>
-      </div>
-    </Collapsible>
+        </div>
+      </Collapsible>
+
+      {saveConfirmation && (
+        <ConfirmActionDialog
+          open={showSaveConfirm}
+          onOpenChange={open => {
+            setShowSaveConfirm(open);
+            if (!open) {
+              setPendingSecrets(null);
+            }
+          }}
+          title={saveConfirmation.title}
+          description={saveConfirmation.description}
+          confirmLabel={saveConfirmation.confirmLabel}
+          isPending={isSaving}
+          pendingLabel={saveConfirmation.pendingLabel ?? 'Saving'}
+          onConfirm={() => {
+            if (!pendingSecrets) {
+              setShowSaveConfirm(false);
+              return;
+            }
+            saveSecrets(pendingSecrets);
+          }}
+        />
+      )}
+    </>
   );
 }

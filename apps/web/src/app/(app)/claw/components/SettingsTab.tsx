@@ -51,6 +51,7 @@ import { DetailTile } from './DetailTile';
 
 import { getEntriesByCategory } from '@kilocode/kiloclaw-secret-catalog';
 import { SecretEntrySection } from './SecretEntrySection';
+import { ExaSearchEntrySection } from './ExaSearchEntrySection';
 import { AnimatedDots } from './AnimatedDots';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PairingSection } from './PairingSection';
@@ -760,6 +761,8 @@ export function SettingsTab({
   );
 
   const configuredSecrets = config?.configuredSecrets ?? {};
+  const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
+  const braveSearchEnabled = (configuredSecrets['brave-search'] ?? false) && kiloExaSearchMode !== 'kilo-proxy';
   const toolEntries = getEntriesByCategory('tool');
 
   function handleSave() {
@@ -982,12 +985,58 @@ export function SettingsTab({
                 <SecretEntrySection
                   key={entry.id}
                   entry={entry}
-                  configured={configuredSecrets[entry.id] ?? false}
+                  configured={braveSearchEnabled}
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
+                  actionRowInlineExtra={
+                    configuredSecrets['brave-search'] && kiloExaSearchMode === 'kilo-proxy' ? (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-8 px-1 text-xs"
+                        disabled={mutations.patchWebSearchConfig.isPending}
+                        onClick={() => {
+                          mutations.patchWebSearchConfig.mutate(
+                            { exaMode: 'disabled' },
+                            {
+                              onSuccess: () => {
+                                toast.success('Brave Search re-enabled. Redeploy to apply.', {
+                                  duration: 8000,
+                                });
+                                onSecretsChanged?.('brave-search');
+                              },
+                              onError: err => {
+                                toast.error(`Failed to re-enable Brave Search: ${err.message}`);
+                              },
+                            }
+                          );
+                        }}
+                      >
+                        Re-enable Brave Search
+                      </Button>
+                    ) : undefined
+                  }
+                  saveConfirmation={
+                    kiloExaSearchMode === 'kilo-proxy'
+                      ? {
+                          title: 'Enable Brave Search?',
+                          description:
+                            'Exa Search is currently configured. Enabling Brave will disable Exa on the next redeploy.',
+                          confirmLabel: 'Enable Brave and disable Exa',
+                        }
+                      : undefined
+                  }
                 />
               ))}
+            <ExaSearchEntrySection
+              mode={kiloExaSearchMode}
+              configured={kiloExaSearchMode === 'kilo-proxy'}
+              braveConfigured={configuredSecrets['brave-search'] ?? false}
+              mutations={mutations}
+              onSecretsChanged={onSecretsChanged}
+              isDirty={dirtySecrets.has('kilo-exa-search')}
+            />
           </div>
         </div>
       )}

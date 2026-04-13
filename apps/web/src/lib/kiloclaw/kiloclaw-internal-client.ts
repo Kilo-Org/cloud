@@ -9,6 +9,8 @@ import type {
   RegistryEntriesResponse,
   KiloCodeConfigPatchInput,
   KiloCodeConfigResponse,
+  WebSearchConfigPatchInput,
+  WebSearchConfigPatchResponse,
   BotIdentityPatchInput,
   BotIdentityPatchResponse,
   ChannelsPatchInput,
@@ -255,6 +257,22 @@ export class KiloClawInternalClient {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/kilocode-config${params}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ userId, ...patch }),
+      },
+      { userId }
+    );
+  }
+
+  async patchWebSearchConfig(
+    userId: string,
+    patch: WebSearchConfigPatchInput,
+    instanceId?: string
+  ): Promise<WebSearchConfigPatchResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/web-search-config${params}`,
       {
         method: 'PATCH',
         body: JSON.stringify({ userId, ...patch }),

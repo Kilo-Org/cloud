@@ -2679,6 +2679,17 @@ describe('updateSecrets', () => {
     expect(secrets.DISCORD_BOT_TOKEN).toEqual(discordEnvelope);
   });
 
+  it('saving Brave API key disables Exa mode', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      kiloExaSearchMode: 'kilo-proxy',
+    });
+
+    await instance.updateSecrets({ braveSearchApiKey: fakeEnvelope });
+
+    expect(storage._store.get('kiloExaSearchMode')).toBe('disabled');
+  });
+
   it('reads from legacy channels field when encryptedSecrets is empty', async () => {
     const { instance, storage } = createInstance();
     // Simulate legacy state: only channels field, no encryptedSecrets

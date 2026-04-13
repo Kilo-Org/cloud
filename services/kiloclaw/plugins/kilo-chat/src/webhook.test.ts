@@ -3,10 +3,12 @@ import { IncomingMessage, ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
 import { describe, expect, it } from 'vitest';
 import {
+  buildDeliverWiring,
   createKiloChatWebhookHandler,
   parseInboundPayload,
   verifyWebhookSignature,
 } from './webhook.js';
+import type { KiloChatClient } from './client.js';
 
 const SECRET = 'whk';
 
@@ -136,5 +138,97 @@ describe('createKiloChatWebhookHandler', () => {
     const { res, getStatus } = makeRes();
     await handler(makeReq(body, sign(body)), res);
     expect(getStatus()).toBe(400);
+  });
+});
+
+function fakeClient(calls: { type: string; args: unknown }[]): KiloChatClient {
+  return {
+    createMessage: async args => {
+      calls.push({ type: 'create', args });
+      return { messageId: 'm1', version: 1 };
+    },
+    editMessage: async args => {
+      calls.push({ type: 'edit', args });
+      return {
+        messageId: (args as { messageId: string }).messageId,
+        version: (args as { version: number }).version,
+      };
+    },
+    deleteMessage: async args => {
+      calls.push({ type: 'delete', args });
+    },
+    sendText: async () => ({ messageId: 'm1' }),
+  };
+}
+
+describe('buildDeliverWiring', () => {
+  it('mode=off: deliver creates a message per block; no onPartialReply', async () => {
+    const calls: { type: string; args: unknown }[] = [];
+    const wiring = buildDeliverWiring({
+      client: fakeClient(calls),
+      conversationId: 'c1',
+      streamingMode: 'off',
+      throttleMs: 500,
+      warn: () => {},
+    });
+    expect(wiring.replyOptions).toBeUndefined();
+    await wiring.deliver({ text: 'hi' });
+    await wiring.finalize();
+    expect(calls).toEqual([{ type: 'create', args: { conversationId: 'c1', text: 'hi' } }]);
+  });
+
+  it('mode=partial: partial replies stream, first deliver finalizes preview', async () => {
+    const calls: { type: string; args: unknown }[] = [];
+    const wiring = buildDeliverWiring({
+      client: fakeClient(calls),
+      conversationId: 'c1',
+      streamingMode: 'partial',
+      throttleMs: 10,
+      warn: () => {},
+    });
+    expect(wiring.replyOptions?.onPartialReply).toBeDefined();
+    await wiring.replyOptions!.onPartialReply!({ text: 'H' });
+    // Wait for the immediate first-POST microtask.
+    await new Promise(r => setTimeout(r, 5));
+    await wiring.deliver({ text: 'Hello!' });
+    await wiring.finalize();
+    const types = calls.map(c => c.type);
+    expect(types[0]).toBe('create');
+    expect(types.at(-1)).toBe('edit');
+  });
+
+  it('mode=partial: error during dispatch aborts preview and deletes message', async () => {
+    const calls: { type: string; args: unknown }[] = [];
+    const wiring = buildDeliverWiring({
+      client: fakeClient(calls),
+      conversationId: 'c1',
+      streamingMode: 'partial',
+      throttleMs: 10,
+      warn: () => {},
+    });
+    await wiring.replyOptions!.onPartialReply!({ text: 'H' });
+    await new Promise(r => setTimeout(r, 5));
+    await wiring.finalize(new Error('downstream error'));
+    expect(calls.some(c => c.type === 'delete')).toBe(true);
+  });
+
+  it('mode=partial: subsequent blocks after the first call createMessage directly', async () => {
+    const calls: { type: string; args: unknown }[] = [];
+    const wiring = buildDeliverWiring({
+      client: fakeClient(calls),
+      conversationId: 'c1',
+      streamingMode: 'partial',
+      throttleMs: 10,
+      warn: () => {},
+    });
+    // First deliver finalizes the preview (or POSTs if never streamed).
+    await wiring.deliver({ text: 'primary' });
+    // Second deliver should create a separate message.
+    await wiring.deliver({ text: 'second block' });
+    await wiring.finalize();
+    const createCalls = calls.filter(c => c.type === 'create');
+    expect(createCalls.length).toBeGreaterThanOrEqual(2);
+    const texts = createCalls.map(c => (c.args as { text: string }).text);
+    expect(texts).toContain('second block');
   });
 });

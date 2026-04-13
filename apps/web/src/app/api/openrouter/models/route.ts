@@ -50,7 +50,9 @@ export async function GET(
       return NextResponse.json(data);
     }
     const byokModels = auth?.user ? await getDirectByokModels(auth.user.id) : [];
-    const allModels = data.data.concat(byokModels).filter(m => !isExcludedForFeature(m.id, feature));
+    const allModels = data.data
+      .concat(byokModels)
+      .filter(m => !isExcludedForFeature(m.id, feature));
     return NextResponse.json({ data: allModels });
   } catch (error) {
     captureException(error, {

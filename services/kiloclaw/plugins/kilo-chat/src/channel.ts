@@ -1,11 +1,25 @@
-import {
-  createChannelPluginBase,
-  createChatChannelPlugin,
-} from 'openclaw/plugin-sdk/channel-core';
+import { createChannelPluginBase, createChatChannelPlugin } from 'openclaw/plugin-sdk/channel-core';
 import type { OpenClawConfig } from 'openclaw/plugin-sdk/channel-core';
+import { createKiloChatClient } from './client';
 
 const CHANNEL_ID = 'kilo-chat';
 const DEFAULT_BASE_URL = 'http://127.0.0.1:18789';
+const DEFAULT_CONTROLLER_URL = 'http://127.0.0.1:18789';
+
+function resolveControllerUrl(): string {
+  return process.env.KILOCLAW_CONTROLLER_URL || DEFAULT_CONTROLLER_URL;
+}
+
+function resolveGatewayToken(): string {
+  const token = process.env.OPENCLAW_GATEWAY_TOKEN;
+  if (!token) throw new Error('kilo-chat: OPENCLAW_GATEWAY_TOKEN is required');
+  return token;
+}
+
+// Test seam — allows tests to inject a fake fetch without mocking global fetch.
+export const __pluginInternals = {
+  fetchImpl: undefined as typeof fetch | undefined,
+};
 
 export type ResolvedKiloChatAccount = {
   accountId: string | null;
@@ -22,10 +36,7 @@ function readChannelSection(cfg: OpenClawConfig): Record<string, unknown> | unde
     : undefined;
 }
 
-function resolveAccount(
-  cfg: OpenClawConfig,
-  accountId?: string | null,
-): ResolvedKiloChatAccount {
+function resolveAccount(cfg: OpenClawConfig, accountId?: string | null): ResolvedKiloChatAccount {
   const section = readChannelSection(cfg) ?? {};
   const baseUrl =
     typeof section.baseUrl === 'string' && section.baseUrl.length > 0
@@ -40,7 +51,7 @@ function resolveAccount(
 
 function inspectAccount(
   cfg: OpenClawConfig,
-  _accountId?: string | null,
+  _accountId?: string | null
 ): { enabled: boolean; configured: boolean } {
   const section = readChannelSection(cfg);
   const enabled = section?.enabled === true;
@@ -60,5 +71,22 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
     },
   }),
   threading: { topLevelReplyToMode: 'reply' },
-  // outbound + security + inbound added in later tasks
+  outbound: {
+    base: { deliveryMode: 'direct' },
+    attachedResults: {
+      channel: CHANNEL_ID,
+      sendText: async params => {
+        const client = createKiloChatClient({
+          controllerBaseUrl: resolveControllerUrl(),
+          gatewayToken: resolveGatewayToken(),
+          fetchImpl: __pluginInternals.fetchImpl,
+        });
+        const result = await client.sendText({
+          conversationId: params.to,
+          text: params.text,
+        });
+        return { messageId: result.messageId };
+      },
+    },
+  },
 });

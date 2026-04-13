@@ -14,6 +14,15 @@ const getDirectByokModels = unstable_cache(
   { revalidate: 60 }
 );
 
+async function tryGetUserFromAuth() {
+  try {
+    return await getUserFromAuth({ adminOnly: false });
+  } catch (e) {
+    console.error('[tryGetUserFromAuth] failed to get user from auth', e);
+    return { user: null, organizationId: null };
+  }
+}
+
 /**
  * Test using:
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
@@ -21,7 +30,7 @@ const getDirectByokModels = unstable_cache(
 export async function GET(
   _request: NextRequest
 ): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
-  const auth = await getUserFromAuth({ adminOnly: false });
+  const auth = await tryGetUserFromAuth();
   try {
     const result = auth?.organizationId
       ? await getAvailableModelsForOrganization(auth.organizationId)

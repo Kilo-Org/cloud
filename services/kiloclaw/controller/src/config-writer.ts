@@ -321,7 +321,10 @@ export function generateBaseConfig(
     customizerWebSearchConfig.enabled = false;
 
     const braveConfigured = Boolean(env.BRAVE_API_KEY?.trim());
-    if (braveConfigured) {
+    if (
+      braveConfigured &&
+      (!hasExplicitSearchProvider || config.tools?.web?.search?.provider === KILO_EXA_PROVIDER_ID)
+    ) {
       config.tools = config.tools ?? {};
       config.tools.web = config.tools.web ?? {};
       config.tools.web.search = config.tools.web.search ?? {};

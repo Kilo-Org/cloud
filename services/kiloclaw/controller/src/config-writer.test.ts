@@ -213,6 +213,28 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(false);
   });
 
+  it('preserves explicit non-Exa provider when Exa is disabled and BRAVE_API_KEY is configured', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'perplexity',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      KILO_EXA_SEARCH_MODE: 'disabled',
+      BRAVE_API_KEY: 'BSA' + 'A'.repeat(20),
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('perplexity');
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(false);
+  });
+
   it('clears kilo-exa provider when Exa is disabled and Brave is not configured', () => {
     const existing = JSON.stringify({
       tools: {

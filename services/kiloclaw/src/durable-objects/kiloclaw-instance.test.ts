@@ -4379,6 +4379,32 @@ describe('controller-first pairing', () => {
     fetchSpy.mockRestore();
   });
 
+  it('channel list via controller works for docker-local without flyMachineId', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          requests: [{ code: 'DOCKER1', id: 'r-docker', channel: 'telegram' }],
+          lastUpdated: '2026-04-13T00:00:00Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const result = await instance.listPairingRequests(true);
+
+    expect(result).toEqual({
+      requests: [{ code: 'DOCKER1', id: 'r-docker', channel: 'telegram' }],
+    });
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'http://127.0.0.1:45001/_kilo/pairing/channels?refresh=true'
+    );
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
   it('channel list fallback on 404 — runs fly exec', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { flyAppName: 'acct-test' });
@@ -4546,6 +4572,48 @@ describe('controller-first pairing', () => {
     fetchSpy.mockRestore();
   });
 
+  it('channel approve via controller works for docker-local without flyMachineId', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true, message: 'Pairing approved' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.approvePairingRequest('telegram', 'ABC123');
+
+    expect(result).toEqual({ success: true, message: 'Pairing approved' });
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'http://127.0.0.1:45001/_kilo/pairing/channels/approve'
+    );
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('channel approve returns redeploy-required when non-Fly controller route is unavailable', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.approvePairingRequest('telegram', 'ABC123');
+
+    expect(result).toEqual({
+      success: false,
+      message: 'Controller pairing route unavailable; redeploy required',
+    });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
   it('channel approve 400 with { error } body — returns failure without throwing', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { flyAppName: 'acct-test' });
@@ -4623,6 +4691,32 @@ describe('controller-first pairing', () => {
     );
 
     expect(result).toEqual({ success: true, message: 'Device pairing approved' });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('device list via controller works for docker-local without flyMachineId', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          requests: [{ requestId: 'req-docker', deviceId: 'dev-docker', role: 'operator' }],
+          lastUpdated: '2026-04-13T00:00:00Z',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const result = await instance.listDevicePairingRequests(true);
+
+    expect(result).toEqual({
+      requests: [{ requestId: 'req-docker', deviceId: 'dev-docker', role: 'operator' }],
+    });
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe(
+      'http://127.0.0.1:45001/_kilo/pairing/devices?refresh=true'
+    );
     expect(flyClient.execCommand).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
@@ -5048,6 +5142,78 @@ describe('controller-first pairing', () => {
     expect(fetchSpy.mock.calls[0]?.[0]).toBe(
       'https://acct-test.fly.dev/_kilo/pairing/devices?refresh=true'
     );
+    fetchSpy.mockRestore();
+  });
+});
+
+// ============================================================================
+// Kilo CLI run controller routing
+// ============================================================================
+
+describe('kilo CLI run routing', () => {
+  it('starts a Kilo CLI run for docker-local via controller without flyMachineId', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true, startedAt: '2026-04-13T18:45:00.000Z' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.startKiloCliRun('fix the thing');
+
+    expect(result).toEqual({ ok: true, startedAt: '2026-04-13T18:45:00.000Z' });
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://127.0.0.1:45001/_kilo/cli-run/start');
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('gets Kilo CLI run status for docker-local via controller without flyMachineId', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const controllerStatus = {
+      hasRun: true,
+      status: 'running',
+      output: 'working',
+      exitCode: null,
+      startedAt: '2026-04-13T18:45:00.000Z',
+      completedAt: null,
+      prompt: 'fix the thing',
+    };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(controllerStatus), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.getKiloCliRunStatus();
+
+    expect(result).toEqual(controllerStatus);
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://127.0.0.1:45001/_kilo/cli-run/status');
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('cancels a Kilo CLI run for docker-local via controller without flyMachineId', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.cancelKiloCliRun();
+
+    expect(result).toEqual({ ok: true });
+    expect(fetchSpy.mock.calls[0]?.[0]).toBe('http://127.0.0.1:45001/_kilo/cli-run/cancel');
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
 });

@@ -63,6 +63,9 @@ import { WebhookIntegrationSection } from './WebhookIntegrationSection';
 import { type ExecPreset, configToExecPreset, execPresetToConfig } from './claw.types';
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
+// TODO: Replace with the controller calver from the Docker-image PR deploy.
+const EXA_SEARCH_UI_MIN_CONTROLLER_VERSION = '9999.99.99';
+
 // ---------------------------------------------------------------------------
 // 1Password setup guide dialog
 // ---------------------------------------------------------------------------
@@ -759,6 +762,10 @@ export function SettingsTab({
     cleanVersion(controllerVersion?.version),
     '2026.2.26'
   );
+  const supportsExaSearchUi = calverAtLeast(
+    cleanVersion(controllerVersion?.version),
+    EXA_SEARCH_UI_MIN_CONTROLLER_VERSION
+  );
 
   const configuredSecrets = config?.configuredSecrets ?? {};
   const kiloExaSearchMode = config?.kiloExaSearchMode ?? null;
@@ -990,7 +997,9 @@ export function SettingsTab({
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
                   actionRowInlineExtra={
-                    configuredSecrets['brave-search'] && kiloExaSearchMode === 'kilo-proxy' ? (
+                    supportsExaSearchUi &&
+                    configuredSecrets['brave-search'] &&
+                    kiloExaSearchMode === 'kilo-proxy' ? (
                       <Button
                         variant="link"
                         size="sm"
@@ -1018,7 +1027,7 @@ export function SettingsTab({
                     ) : undefined
                   }
                   saveConfirmation={
-                    kiloExaSearchMode === 'kilo-proxy'
+                    supportsExaSearchUi && kiloExaSearchMode === 'kilo-proxy'
                       ? {
                           title: 'Enable Brave Search?',
                           description:
@@ -1029,14 +1038,16 @@ export function SettingsTab({
                   }
                 />
               ))}
-            <ExaSearchEntrySection
-              mode={kiloExaSearchMode}
-              configured={kiloExaSearchMode === 'kilo-proxy'}
-              braveConfigured={configuredSecrets['brave-search'] ?? false}
-              mutations={mutations}
-              onSecretsChanged={onSecretsChanged}
-              isDirty={dirtySecrets.has('kilo-exa-search')}
-            />
+            {supportsExaSearchUi && (
+              <ExaSearchEntrySection
+                mode={kiloExaSearchMode}
+                configured={kiloExaSearchMode === 'kilo-proxy'}
+                braveConfigured={configuredSecrets['brave-search'] ?? false}
+                mutations={mutations}
+                onSecretsChanged={onSecretsChanged}
+                isDirty={dirtySecrets.has('kilo-exa-search')}
+              />
+            )}
           </div>
         </div>
       )}

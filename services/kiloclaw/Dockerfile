@@ -95,7 +95,7 @@ RUN npm install -g @steipete/summarize@0.12.0
 RUN npm install -g @kilocode/cli@7.1.13
 
 # Install Go (available at runtime for users to `go install` additional tools)
-ENV GO_VERSION=1.26.0
+ENV GO_VERSION=1.25.8
 RUN ARCH="$(dpkg --print-architecture)" \
     && curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz -o /tmp/go.tar.gz \
     && EXPECTED_SHA256="$(curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz.sha256)" \

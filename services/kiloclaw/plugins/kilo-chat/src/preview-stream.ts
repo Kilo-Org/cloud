@@ -13,8 +13,6 @@ export type CreatePreviewStreamOptions = {
   conversationId: string;
   throttleMs: number;
   onWarn?: (message: string, err?: unknown) => void;
-  setTimer?: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>;
-  clearTimer?: (handle: ReturnType<typeof setTimeout>) => void;
 };
 
 /**
@@ -39,8 +37,6 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
       // eslint-disable-next-line no-console
       console.warn(`[kilo-chat preview] ${msg}`, err);
     });
-  const setTimer = opts.setTimer ?? setTimeout;
-  const clearTimer = opts.clearTimer ?? clearTimeout;
 
   let phase: Phase = 'idle';
   let messageId: string | undefined;
@@ -52,7 +48,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
 
   async function flushOnce(): Promise<void> {
     if (timer) {
-      clearTimer(timer);
+      clearTimeout(timer);
       timer = undefined;
     }
     if (phase === 'aborted' || phase === 'finalized') return;
@@ -122,7 +118,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
 
   function scheduleFlush(): void {
     if (timer) return;
-    timer = setTimer(() => {
+    timer = setTimeout(() => {
       void (async () => {
         await flushOnce();
         if (pendingText !== undefined && phase === 'editing') scheduleFlush();
@@ -151,7 +147,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
       }
       // Flush any in-flight + pending edits, then drive final text.
       if (timer) {
-        clearTimer(timer);
+        clearTimeout(timer);
         timer = undefined;
       }
       if (inFlight) {
@@ -211,7 +207,7 @@ export function createPreviewStream(opts: CreatePreviewStreamOptions): PreviewSt
     async abort(): Promise<void> {
       if (phase === 'aborted' || phase === 'finalized') return;
       if (timer) {
-        clearTimer(timer);
+        clearTimeout(timer);
         timer = undefined;
       }
       if (inFlight) {

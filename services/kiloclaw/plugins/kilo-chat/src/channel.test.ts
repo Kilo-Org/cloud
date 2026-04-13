@@ -2,18 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { __pluginInternals, kiloChatPlugin } from './channel';
 
 describe('kilo-chat plugin', () => {
-  it('resolves account from env-backed config', () => {
-    const cfg = {
-      channels: {
-        'kilo-chat': {
-          enabled: true,
-          baseUrl: 'https://example.test',
-        },
-      },
-    } as never;
-    const account = kiloChatPlugin.config.resolveAccount(cfg, undefined);
-    expect(account.accountId).toBeNull();
-    expect(account.baseUrl).toBe('https://example.test');
+  it('resolveAccount returns the provided accountId (null for single-account plugin)', () => {
+    const cfg = { channels: { 'kilo-chat': { enabled: true } } } as never;
+    expect(kiloChatPlugin.config.resolveAccount(cfg, undefined).accountId).toBeNull();
+    expect(kiloChatPlugin.config.resolveAccount(cfg, 'abc').accountId).toBe('abc');
   });
 
   it('inspectAccount reports enabled when config has enabled=true', () => {

@@ -137,6 +137,95 @@ describe('upsertSecurityFinding', () => {
     expect(row.severity).toBe('critical');
   });
 
+  it('returns the same row for concurrent first upserts on the same source key', async () => {
+    const user = await insertTestUser();
+    const owner: SecurityReviewOwner = { userId: user.id };
+    const repo = 'test-org/concurrent-upsert-repo';
+
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        upsertSecurityFinding({
+          ...makeFinding({ source_id: '11' }),
+          owner,
+          repoFullName: repo,
+        })
+      )
+    );
+
+    const insertedResults = results.filter(result => result.wasInserted);
+    const updatedResults = results.filter(result => !result.wasInserted);
+
+    expect(new Set(results.map(result => result.findingId)).size).toBe(1);
+    expect(insertedResults).toHaveLength(1);
+    expect(insertedResults[0]?.previousStatus).toBeNull();
+    expect(updatedResults.map(result => result.previousStatus)).toEqual([
+      'open',
+      'open',
+      'open',
+      'open',
+    ]);
+    expect(updatedResults.map(result => result.effectiveStatus)).toEqual([
+      'open',
+      'open',
+      'open',
+      'open',
+    ]);
+
+    const rows = await db
+      .select()
+      .from(security_findings)
+      .where(
+        and(
+          eq(security_findings.repo_full_name, repo),
+          eq(security_findings.source, 'dependabot'),
+          eq(security_findings.source_id, '11')
+        )
+      );
+
+    expect(rows).toHaveLength(1);
+  });
+
+  it('preserves superseded status fields while refreshing sync metadata', async () => {
+    const user = await insertTestUser();
+    const owner: SecurityReviewOwner = { userId: user.id };
+    const repo = 'test-org/superseded-preserve-repo';
+
+    const first = await upsertSecurityFinding({
+      ...makeFinding({ source_id: '12' }),
+      owner,
+      repoFullName: repo,
+    });
+
+    await db
+      .update(security_findings)
+      .set({
+        status: 'ignored',
+        ignored_reason: `superseded:${first.findingId}`,
+        ignored_by: 'system',
+      })
+      .where(eq(security_findings.id, first.findingId));
+
+    const second = await upsertSecurityFinding({
+      ...makeFinding({ source_id: '12', status: 'open', severity: 'critical' }),
+      owner,
+      repoFullName: repo,
+    });
+
+    expect(second.wasInserted).toBe(false);
+    expect(second.previousStatus).toBe('ignored');
+    expect(second.effectiveStatus).toBe('ignored');
+
+    const [row] = await db
+      .select()
+      .from(security_findings)
+      .where(eq(security_findings.id, first.findingId));
+
+    expect(row.status).toBe('ignored');
+    expect(row.ignored_reason).toBe(`superseded:${first.findingId}`);
+    expect(row.ignored_by).toBe('system');
+    expect(row.severity).toBe('critical');
+  });
+
   it('uses repo_full_name + source + source_id as the unique key', async () => {
     const user = await insertTestUser();
     const owner: SecurityReviewOwner = { userId: user.id };

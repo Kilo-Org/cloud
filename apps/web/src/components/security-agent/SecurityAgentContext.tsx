@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useRef } from 'react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -121,6 +121,7 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
 
   const [startingAnalysisIds, setStartingAnalysisIds] = useState<Set<string>>(new Set());
   const [gitHubError, setGitHubError] = useState<string | null>(null);
+  const toggleEnabledInFlightRef = useRef(false);
 
   // Permission status query
   const { data: permissionData, isLoading: isLoadingPermission } = useQuery(
@@ -216,6 +217,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       },
       onError: error => {
         toast.error('Failed to toggle Security Agent', { description: error.message });
+      },
+      onSettled: () => {
+        toggleEnabledInFlightRef.current = false;
       },
     })
   );
@@ -329,6 +333,9 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
       },
       onError: error => {
         toast.error('Failed to toggle Security Agent', { description: error.message });
+      },
+      onSettled: () => {
+        toggleEnabledInFlightRef.current = false;
       },
     })
   );
@@ -472,10 +479,15 @@ export function SecurityAgentProvider({ organizationId, children }: SecurityAgen
         selectedRepositoryIds: number[];
       }
     ) => {
+      if (toggleEnabledInFlightRef.current) return;
+      toggleEnabledInFlightRef.current = true;
+
       if (isOrg && organizationId) {
         orgSetEnabledMutate({ organizationId, isEnabled: enabled, ...repositorySelection });
-      } else {
+      } else if (!isOrg) {
         personalSetEnabledMutate({ isEnabled: enabled, ...repositorySelection });
+      } else {
+        toggleEnabledInFlightRef.current = false;
       }
     },
     [isOrg, organizationId, orgSetEnabledMutate, personalSetEnabledMutate]

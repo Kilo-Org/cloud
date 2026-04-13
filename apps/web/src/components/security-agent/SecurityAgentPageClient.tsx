@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -56,6 +56,7 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
   const [dismissDialogOpen, setDismissDialogOpen] = useState(false);
   const [startingAnalysisIds, setStartingAnalysisIds] = useState<Set<string>>(new Set());
   const [gitHubError, setGitHubError] = useState<string | null>(null);
+  const toggleEnabledInFlightRef = useRef(false);
   const [sortBy, setSortBy] = useState<'severity_desc' | 'severity_asc' | 'sla_due_at_asc'>(
     'severity_desc'
   );
@@ -223,6 +224,9 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
       onError: error => {
         toast.error('Failed to toggle Security Agent', { description: error.message });
       },
+      onSettled: () => {
+        toggleEnabledInFlightRef.current = false;
+      },
     })
   );
 
@@ -291,6 +295,9 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
       },
       onError: error => {
         toast.error('Failed to toggle Security Agent', { description: error.message });
+      },
+      onSettled: () => {
+        toggleEnabledInFlightRef.current = false;
       },
     })
   );
@@ -525,6 +532,9 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
         selectedRepositoryIds: number[];
       }
     ) => {
+      if (toggleEnabledInFlightRef.current) return;
+      toggleEnabledInFlightRef.current = true;
+
       if (isOrg && organizationId) {
         orgSetEnabledMutate({
           organizationId,
@@ -538,6 +548,8 @@ export function SecurityAgentPageClient({ organizationId }: SecurityAgentPageCli
           repositorySelectionMode: repositorySelection.repositorySelectionMode,
           selectedRepositoryIds: repositorySelection.selectedRepositoryIds,
         });
+      } else {
+        toggleEnabledInFlightRef.current = false;
       }
     },
     [isOrg, organizationId, orgSetEnabledMutate, personalSetEnabledMutate]

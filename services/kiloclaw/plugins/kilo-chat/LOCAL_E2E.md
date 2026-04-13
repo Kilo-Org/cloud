@@ -70,7 +70,9 @@ createServer(async (req, res) => {
   const auth = req.headers['authorization'];
   const sandbox = req.headers['x-kilo-sandbox-id'];
   const body = await readBody(req);
-  console.log(`[upstream] ${req.method} ${url.pathname} sandbox=${sandbox} auth=${auth} body=${body}`);
+  console.log(
+    `[upstream] ${req.method} ${url.pathname} sandbox=${sandbox} auth=${auth} body=${body}`
+  );
 
   if (auth !== `Bearer ${EXPECTED_BEARER}`) return j(res, 401, { error: 'bad token' });
 
@@ -132,16 +134,16 @@ docker run -d --rm --name kiloclaw-test \
 
 Required env, summarised:
 
-| var | purpose |
-|---|---|
-| `OPENCLAW_GATEWAY_TOKEN` | auth for controller `/_kilo/*` routes |
-| `KILOCODE_API_KEY` | onboarded into kilocode auth profile; model calls use it |
-| `KILOCLAW_FRESH_INSTALL=true` | forces onboard even if `/root` is non-empty |
-| `KILOCODE_DEFAULT_MODEL` | default model; `kilocode/kilo-auto/free` is free-tier |
-| `REQUIRE_PROXY_TOKEN=false` | skip `x-kiloclaw-proxy-token` on the catch-all proxy so webhook curls don't need it |
-| `KILOCHAT_API_TOKEN` | controller → upstream Bearer |
-| `KILOCHAT_WEBHOOK_SECRET` | HMAC-SHA256 key for inbound webhooks |
-| `KILOCHAT_BASE_URL` | upstream for the controller's PATCH/POST/DELETE routes |
+| var                           | purpose                                                                             |
+| ----------------------------- | ----------------------------------------------------------------------------------- |
+| `OPENCLAW_GATEWAY_TOKEN`      | auth for controller `/_kilo/*` routes                                               |
+| `KILOCODE_API_KEY`            | onboarded into kilocode auth profile; model calls use it                            |
+| `KILOCLAW_FRESH_INSTALL=true` | forces onboard even if `/root` is non-empty                                         |
+| `KILOCODE_DEFAULT_MODEL`      | default model; `kilocode/kilo-auto/free` is free-tier                               |
+| `REQUIRE_PROXY_TOKEN=false`   | skip `x-kiloclaw-proxy-token` on the catch-all proxy so webhook curls don't need it |
+| `KILOCHAT_API_TOKEN`          | controller → upstream Bearer                                                        |
+| `KILOCHAT_WEBHOOK_SECRET`     | HMAC-SHA256 key for inbound webhooks                                                |
+| `KILOCHAT_BASE_URL`           | upstream for the controller's PATCH/POST/DELETE routes                              |
 
 Controller comes up in ~3s; the openclaw gateway inside the container can take
 another ~5–10s to finish plugin load. Poll until the webhook route is live (any

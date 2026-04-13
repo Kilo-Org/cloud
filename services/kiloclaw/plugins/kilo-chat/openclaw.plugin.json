@@ -15,7 +15,8 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "enabled": { "type": "boolean" }
+          "enabled": { "type": "boolean" },
+          "baseUrl": { "type": "string" }
         }
       }
     }

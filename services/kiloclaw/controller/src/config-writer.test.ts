@@ -654,6 +654,10 @@ describe('generateBaseConfig', () => {
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
     expect(config.channels['kilo-chat'].enabled).toBe(true);
+    // baseUrl is required for OpenClaw's hasMeaningfulChannelConfig gate — see
+    // comment in config-writer.ts. Without a non-`enabled` key, registerFull
+    // (which registers the /plugins/kilo-chat/webhook route) is skipped.
+    expect(config.channels['kilo-chat'].baseUrl).toBe('https://chat.example.test');
     expect(config.plugins.load.paths).toContain('/usr/local/lib/node_modules/@kiloclaw/kilo-chat');
     expect(config.plugins.entries['kilo-chat'].enabled).toBe(true);
   });

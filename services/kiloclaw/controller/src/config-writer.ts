@@ -355,11 +355,17 @@ export function generateBaseConfig(
   // Require BOTH vars: KILOCHAT_BASE_URL is also required by the outbound route
   // registered in the controller (index.ts). Without it the channel would be
   // enabled in config but the route wouldn't exist, producing silent 404s.
-  // The plugin passes no `security` adapter, so dmPolicy/allowFrom/baseUrl on
-  // the config section are never consumed; only `enabled` is meaningful.
+  //
+  // baseUrl is set here (and declared in the plugin's configSchema) even
+  // though the plugin never reads it: OpenClaw's isChannelConfigured gate uses
+  // hasMeaningfulChannelConfig, which only returns true when the channel
+  // section has a key other than `enabled`. Without that, the plugin loads in
+  // `setup-runtime` mode instead of `full`, and registerFull (which registers
+  // the webhook HTTP route) is never called.
   if (env.KILOCHAT_API_TOKEN && env.KILOCHAT_BASE_URL) {
     config.channels['kilo-chat'] = config.channels['kilo-chat'] ?? {};
     config.channels['kilo-chat'].enabled = true;
+    config.channels['kilo-chat'].baseUrl = env.KILOCHAT_BASE_URL;
 
     config.plugins = config.plugins ?? {};
     config.plugins.load = config.plugins.load ?? {};

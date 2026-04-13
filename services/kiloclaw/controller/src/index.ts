@@ -18,7 +18,11 @@ import { registerPairingRoutes } from './routes/pairing';
 import { createPairingCache } from './pairing-cache';
 import { registerEnvRoutes } from './routes/env';
 import { registerGmailPushRoute } from './routes/gmail-push';
-import { registerKiloChatSendRoute } from './routes/kilo-chat';
+import {
+  registerKiloChatSendRoute,
+  registerKiloChatEditRoute,
+  registerKiloChatDeleteRoute,
+} from './routes/kilo-chat';
 import { registerFileRoutes } from './routes/files';
 import { registerKiloCliRunRoutes } from './routes/kilo-cli-run';
 import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
@@ -351,12 +355,15 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   registerEnvRoutes(honoApp, supervisor, config.expectedToken);
   registerGmailPushRoute(honoApp, gmailWatchSupervisor ?? null, config.expectedToken);
   if (env.KILOCHAT_API_TOKEN && env.KILOCHAT_BASE_URL) {
-    registerKiloChatSendRoute(honoApp, {
+    const kiloChatOpts = {
       expectedToken: config.expectedToken,
       sandboxId: env.KILOCLAW_SANDBOX_ID ?? '',
       apiToken: env.KILOCHAT_API_TOKEN,
       baseUrl: env.KILOCHAT_BASE_URL,
-    });
+    };
+    registerKiloChatSendRoute(honoApp, kiloChatOpts);
+    registerKiloChatEditRoute(honoApp, kiloChatOpts);
+    registerKiloChatDeleteRoute(honoApp, kiloChatOpts);
   }
   registerFileRoutes(honoApp, config.expectedToken, '/root/.openclaw');
   registerKiloCliRunRoutes(honoApp, config.expectedToken);

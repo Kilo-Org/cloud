@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useOrgKiloClawStatus } from '@/hooks/useOrgKiloClaw';
 import {
   ClawOnboardingFlow,
@@ -13,8 +13,15 @@ const ClawOnboardingWithBoundary = withStatusQueryBoundary(ClawOnboardingFlow);
 export function OrgClawNewClient({ organizationId }: { organizationId: string }) {
   const statusQuery = useOrgKiloClawStatus(organizationId);
   const [createFlowStartedAt, setCreateFlowStartedAt] = useState<number | null>(null);
+  const [hasSettledStatus, setHasSettledStatus] = useState(false);
   const onCreateFlowStarted = useCallback(() => setCreateFlowStartedAt(Date.now()), []);
   const onCreateFlowFailed = useCallback(() => setCreateFlowStartedAt(null), []);
+
+  useEffect(() => {
+    if (!statusQuery.isFetching && (statusQuery.data !== undefined || statusQuery.error)) {
+      setHasSettledStatus(true);
+    }
+  }, [statusQuery.data, statusQuery.error, statusQuery.isFetching]);
 
   if (createFlowStartedAt !== null) {
     const createStatus =
@@ -31,20 +38,6 @@ export function OrgClawNewClient({ organizationId }: { organizationId: string })
     );
   }
 
-  const hasStalePopulatedStatus =
-    statusQuery.data !== undefined && statusQuery.data.status !== null && statusQuery.isFetching;
-
-  if (statusQuery.isLoading || hasStalePopulatedStatus) {
-    return (
-      <ClawOnboardingWithBoundary
-        statusQuery={{ data: undefined, isLoading: true, error: null }}
-        mode="post-provisioning"
-        organizationId={organizationId}
-        onCreateFlowStarted={onCreateFlowStarted}
-      />
-    );
-  }
-
   if (statusQuery.error) {
     return (
       <ClawOnboardingWithBoundary
@@ -56,12 +49,24 @@ export function OrgClawNewClient({ organizationId }: { organizationId: string })
     );
   }
 
-  const hasFreshInstance = statusQuery.data !== undefined && statusQuery.data.status !== null;
-  const mode: ClawOnboardingMode = hasFreshInstance ? 'post-provisioning' : 'create-first';
+  if (statusQuery.isLoading || !hasSettledStatus) {
+    return (
+      <ClawOnboardingWithBoundary
+        statusQuery={{ data: undefined, isLoading: true, error: null }}
+        mode="post-provisioning"
+        organizationId={organizationId}
+        onCreateFlowStarted={onCreateFlowStarted}
+      />
+    );
+  }
+
+  const settledStatus = hasSettledStatus ? statusQuery.data : undefined;
+  const hasSettledInstance = settledStatus !== undefined && settledStatus.status !== null;
+  const mode: ClawOnboardingMode = hasSettledInstance ? 'post-provisioning' : 'create-first';
 
   return (
     <ClawOnboardingWithBoundary
-      statusQuery={statusQuery}
+      statusQuery={{ ...statusQuery, data: settledStatus }}
       mode={mode}
       organizationId={organizationId}
       onCreateFlowStarted={onCreateFlowStarted}

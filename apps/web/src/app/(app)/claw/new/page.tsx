@@ -98,6 +98,10 @@ export default function ClawNewPage() {
     );
   }
 
+  if (createFlowStartedAt === null && billingQuery.isFetching) {
+    return <LoadingState />;
+  }
+
   const billing = billingQuery.data;
   const isNewUser =
     billing &&
@@ -116,15 +120,8 @@ export default function ClawNewPage() {
 
   const hasActiveInstance =
     billing?.instance?.exists === true && billing.instance.destroyed === false;
-
-  const hasFreshActiveInstance = hasActiveInstance && !billingQuery.isFetching;
-
-  if (createFlowStartedAt === null && hasActiveInstance && !hasFreshActiveInstance) {
-    return <LoadingState />;
-  }
-
   const mode: ClawOnboardingMode =
-    createFlowStartedAt !== null || !hasFreshActiveInstance ? 'create-first' : 'post-provisioning';
+    createFlowStartedAt !== null || !hasActiveInstance ? 'create-first' : 'post-provisioning';
 
   return (
     <ClawNewLoader

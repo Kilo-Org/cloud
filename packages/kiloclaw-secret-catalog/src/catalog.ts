@@ -96,32 +96,6 @@ const SECRET_CATALOG_RAW = [
     guideUrl: 'https://docs.kilo.ai/docs/kiloclaw/chat-platforms/slack',
   },
   {
-    id: 'kilo-chat',
-    label: 'Kilo Chat',
-    category: 'channel',
-    icon: 'key',
-    order: 4,
-    allFieldsRequired: true,
-    fields: [
-      {
-        key: 'kiloChatApiToken',
-        label: 'API Token',
-        placeholder: 'tok_...',
-        placeholderConfigured: 'Enter new token to replace',
-        envVar: 'KILOCHAT_API_TOKEN',
-        maxLength: 500,
-      },
-      {
-        key: 'kiloChatWebhookSecret',
-        label: 'Webhook Secret',
-        placeholder: 'whk_...',
-        placeholderConfigured: 'Enter new secret to replace',
-        envVar: 'KILOCHAT_WEBHOOK_SECRET',
-        maxLength: 500,
-      },
-    ],
-  },
-  {
     id: 'github',
     label: 'GitHub',
     category: 'tool',
@@ -306,6 +280,11 @@ export const ALL_SECRET_ENV_VARS: ReadonlySet<string> = new Set(
  */
 export const INTERNAL_SENSITIVE_ENV_VARS: ReadonlySet<string> = new Set([
   'KILOCLAW_GOG_CONFIG_TARBALL',
+  // Kilo Chat — operator-provisioned, not user-configurable. Pushed from
+  // worker env via buildEnvVars; the KILOCHAT_ prefix is reserved in
+  // DENIED_ENV_VAR_PREFIXES to keep users from shadowing them.
+  'KILOCHAT_API_TOKEN',
+  'KILOCHAT_WEBHOOK_SECRET',
 ]);
 
 /**
@@ -351,6 +330,7 @@ const DENIED_ENV_VAR_PREFIXES: readonly string[] = [
   'NEXTAUTH_',
   'NODE_',
   'STREAM_CHAT_',
+  'KILOCHAT_',
 ];
 
 /**

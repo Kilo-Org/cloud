@@ -197,11 +197,10 @@ describe('Secret Catalog', () => {
   describe('getEntriesByCategory', () => {
     it('returns all channel entries sorted by order', () => {
       const channels = getEntriesByCategory('channel');
-      expect(channels.length).toBe(4);
+      expect(channels.length).toBe(3);
       expect(channels[0].id).toBe('telegram');
       expect(channels[1].id).toBe('discord');
       expect(channels[2].id).toBe('slack');
-      expect(channels[3].id).toBe('kilo-chat');
     });
 
     it('returns all tool entries sorted by order', () => {
@@ -227,9 +226,7 @@ describe('Secret Catalog', () => {
       expect(keys).toContain('discordBotToken');
       expect(keys).toContain('slackBotToken');
       expect(keys).toContain('slackAppToken');
-      expect(keys).toContain('kiloChatApiToken');
-      expect(keys).toContain('kiloChatWebhookSecret');
-      expect(keys.size).toBe(6);
+      expect(keys.size).toBe(4);
     });
 
     it('returns all tool field keys', () => {
@@ -472,6 +469,11 @@ describe('Secret Catalog', () => {
       expect(INTERNAL_SENSITIVE_ENV_VARS.has('KILOCLAW_GOG_CONFIG_TARBALL')).toBe(true);
     });
 
+    it('contains Kilo Chat operator-provisioned tokens', () => {
+      expect(INTERNAL_SENSITIVE_ENV_VARS.has('KILOCHAT_API_TOKEN')).toBe(true);
+      expect(INTERNAL_SENSITIVE_ENV_VARS.has('KILOCHAT_WEBHOOK_SECRET')).toBe(true);
+    });
+
     it('does not overlap with catalog-derived ALL_SECRET_ENV_VARS', () => {
       for (const envVar of INTERNAL_SENSITIVE_ENV_VARS) {
         expect(ALL_SECRET_ENV_VARS.has(envVar)).toBe(false);
@@ -532,6 +534,8 @@ describe('Secret Catalog', () => {
       expect(isValidCustomSecretKey('NEXTAUTH_SECRET')).toBe(false);
       expect(isValidCustomSecretKey('NODE_OPTIONS')).toBe(false);
       expect(isValidCustomSecretKey('STREAM_CHAT_API_KEY')).toBe(false);
+      expect(isValidCustomSecretKey('KILOCHAT_API_TOKEN')).toBe(false);
+      expect(isValidCustomSecretKey('KILOCHAT_ANYTHING')).toBe(false);
     });
 
     it('rejects denied exact env var names', () => {

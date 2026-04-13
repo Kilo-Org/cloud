@@ -81,7 +81,36 @@ export function registerKiloChatEditRoute(app: Hono, options: KiloChatRouteOptio
   });
 }
 
-// Placeholder — implemented in Task 5
-export function registerKiloChatDeleteRoute(_app: Hono, _options: KiloChatRouteOptions): void {
-  throw new Error('registerKiloChatDeleteRoute not yet implemented');
+export function registerKiloChatDeleteRoute(app: Hono, options: KiloChatRouteOptions): void {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  app.delete(KILO_CHAT_EDIT_PATH, async c => {
+    const token = getBearerToken(c.req.header('authorization'));
+    if (!token || !timingSafeTokenEqual(token, options.expectedToken)) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const messageId = c.req.param('messageId');
+    const rawBody = await c.req.text();
+
+    const upstream = await fetchImpl(
+      `${options.baseUrl}/v1/messages/${encodeURIComponent(messageId)}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'content-type': c.req.header('content-type') ?? 'application/json',
+          authorization: `Bearer ${options.apiToken}`,
+          'x-kilo-sandbox-id': options.sandboxId,
+        },
+        body: rawBody || undefined,
+      }
+    );
+
+    // DELETE commonly returns 204 no content; still pass through body if any.
+    const responseBody = await upstream.text();
+    return new Response(responseBody || null, {
+      status: upstream.status,
+      headers: {
+        'content-type': upstream.headers.get('content-type') ?? 'application/json',
+      },
+    });
+  });
 }

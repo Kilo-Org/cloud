@@ -178,3 +178,52 @@ describe('PATCH /_kilo/kilo-chat/messages/:id', () => {
     expect(res.status).toBe(409);
   });
 });
+
+function makeDeleteApp(fetchImpl: typeof fetch) {
+  const app = new Hono();
+  registerKiloChatDeleteRoute(app, {
+    expectedToken: TOKEN,
+    sandboxId: SANDBOX_ID,
+    apiToken: 'api_token',
+    baseUrl: 'https://chat.example.test',
+    fetchImpl,
+  });
+  return app;
+}
+
+describe('DELETE /_kilo/kilo-chat/messages/:id', () => {
+  it('rejects without bearer', async () => {
+    const app = makeDeleteApp(async () => new Response(null, { status: 204 }));
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/messages/m1', { method: 'DELETE' })
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('forwards DELETE upstream with rewritten auth', async () => {
+    let capturedUrl = '';
+    let capturedInit: RequestInit | undefined;
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      capturedUrl = typeof url === 'string' ? url : url.toString();
+      capturedInit = init;
+      return new Response(null, { status: 204 });
+    }) as typeof fetch;
+    const app = makeDeleteApp(fetchImpl);
+    const res = await app.fetch(
+      new Request('http://x/_kilo/kilo-chat/messages/m1', {
+        method: 'DELETE',
+        body: JSON.stringify({ conversationId: 'c1' }),
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${TOKEN}`,
+        },
+      })
+    );
+    expect(res.status).toBe(204);
+    expect(capturedUrl).toBe('https://chat.example.test/v1/messages/m1');
+    expect(capturedInit?.method).toBe('DELETE');
+    const headers = new Headers(capturedInit?.headers);
+    expect(headers.get('authorization')).toBe('Bearer api_token');
+    expect(headers.get('x-kilo-sandbox-id')).toBe(SANDBOX_ID);
+  });
+});

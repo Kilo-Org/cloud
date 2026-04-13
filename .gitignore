@@ -76,7 +76,7 @@ yarn-error.log*
 
 # platform-specific
 .vercel
-.wrangler/
+.wrangler
 /.superset
 supabase/.temp
 

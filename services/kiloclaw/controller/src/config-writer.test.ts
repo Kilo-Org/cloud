@@ -153,6 +153,60 @@ describe('generateBaseConfig', () => {
     expect(config.tools.web.search.provider).toBe('brave');
   });
 
+  it('selects kilo-exa provider when KILO_EXA_SEARCH_MODE=kilo-proxy', () => {
+    const { deps } = fakeDeps();
+    const env = { ...minimalEnv(), KILO_EXA_SEARCH_MODE: 'kilo-proxy' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('kilo-exa');
+    expect(config.tools.web.search.enabled).toBe(true);
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(true);
+  });
+
+  it('switches to brave when Exa is disabled and BRAVE_API_KEY is configured', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'kilo-exa',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      KILO_EXA_SEARCH_MODE: 'disabled',
+      BRAVE_API_KEY: 'BSA' + 'A'.repeat(20),
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBe('brave');
+    expect(config.tools.web.search.enabled).toBe(true);
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(false);
+  });
+
+  it('clears kilo-exa provider when Exa is disabled and Brave is not configured', () => {
+    const existing = JSON.stringify({
+      tools: {
+        web: {
+          search: {
+            provider: 'kilo-exa',
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = {
+      ...minimalEnv(),
+      KILO_EXA_SEARCH_MODE: 'disabled',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.tools.web.search.provider).toBeUndefined();
+    expect(config.plugins.entries['kiloclaw-customizer'].config.webSearch.enabled).toBe(false);
+  });
+
   it('defaults tool profile to full when not previously set', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);

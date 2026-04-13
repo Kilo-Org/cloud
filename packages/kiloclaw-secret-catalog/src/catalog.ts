@@ -32,6 +32,8 @@ const SECRET_CATALOG_RAW = [
     ],
     helpText: 'Get a token from @BotFather on Telegram.',
     helpUrl: 'https://t.me/BotFather',
+    guideText: 'Step by Step Guide',
+    guideUrl: 'https://docs.kilo.ai/docs/kiloclaw/chat-platforms/telegram',
   },
   {
     id: 'discord',
@@ -56,6 +58,8 @@ const SECRET_CATALOG_RAW = [
     ],
     helpText: 'Get a token from the Discord Developer Portal.',
     helpUrl: 'https://discord.com/developers/applications',
+    guideText: 'Step by Step Guide',
+    guideUrl: 'https://docs.kilo.ai/docs/kiloclaw/chat-platforms/discord',
   },
   {
     id: 'slack',
@@ -88,6 +92,8 @@ const SECRET_CATALOG_RAW = [
     ],
     helpText: 'Get tokens from Slack App Management. Both Bot Token and App Token are required.',
     helpUrl: 'https://api.slack.com/apps',
+    guideText: 'Step by Step Guide',
+    guideUrl: 'https://docs.kilo.ai/docs/kiloclaw/chat-platforms/slack',
   },
   {
     id: 'github',

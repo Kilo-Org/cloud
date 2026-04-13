@@ -25,13 +25,16 @@ import {
   Webhook,
   Settings,
   MessageSquare,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import OrganizationSwitcher from './OrganizationSwitcher';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import HeaderLogo from '@/components/HeaderLogo';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
+import { useOrgKiloClawStatus } from '@/hooks/useOrgKiloClaw';
 import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
@@ -50,6 +53,7 @@ export default function OrganizationAppSidebar({
   const { assumedRole, setAssumedRole, setOriginalRole } = useRoleTesting();
   // Fetch full organization data to access settings
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
+  const kiloClawStatusQuery = useOrgKiloClawStatus(organizationId);
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
@@ -287,9 +291,67 @@ export default function OrganizationAppSidebar({
       : []),
   ];
 
-  const allUrls = [...dashboardItems, ...kiloClawItems, ...cloudItems, ...accountItems].map(
-    item => item.url
+  const kiloClawBaseUrl = `/organizations/${organizationId}/claw`;
+  const kiloClawInstanceState = kiloClawStatusQuery.isSuccess
+    ? kiloClawStatusQuery.data.status === null
+      ? 'absent'
+      : 'present'
+    : 'unknown';
+  const hasKiloClawInstance = kiloClawInstanceState === 'present';
+  const isKiloClawPath = pathname === kiloClawBaseUrl || pathname.startsWith(kiloClawBaseUrl + '/');
+  const [sidebarMenu, setSidebarMenu] = useState<'main' | 'kiloClaw'>(
+    isKiloClawPath && hasKiloClawInstance ? 'kiloClaw' : 'main'
   );
+
+  useEffect(() => {
+    setSidebarMenu(isKiloClawPath && hasKiloClawInstance ? 'kiloClaw' : 'main');
+  }, [hasKiloClawInstance, isKiloClawPath]);
+
+  const kiloClawEntryItems: Array<{
+    title: string;
+    icon: React.ElementType;
+    url?: string;
+    onClick?: () => void;
+    isActive: boolean;
+    suffixIcon?: React.ElementType;
+  }> = hasKiloClawInstance
+    ? [
+        {
+          title: 'KiloClaw',
+          icon: MessageSquare,
+          onClick: () => setSidebarMenu('kiloClaw'),
+          isActive: isKiloClawPath,
+          suffixIcon: ChevronRight,
+        },
+      ]
+    : [
+        {
+          title: 'KiloClaw',
+          icon: MessageSquare,
+          url: kiloClawInstanceState === 'absent' ? `${kiloClawBaseUrl}/new` : kiloClawBaseUrl,
+          isActive: isKiloClawPath,
+        },
+      ];
+
+  const backItems: Array<{
+    title: string;
+    icon: React.ElementType;
+    onClick: () => void;
+  }> = [
+    {
+      title: 'Back',
+      icon: ChevronLeft,
+      onClick: () => setSidebarMenu('main'),
+    },
+  ];
+
+  const allUrls = [
+    kiloClawBaseUrl,
+    ...dashboardItems,
+    ...kiloClawItems,
+    ...cloudItems,
+    ...accountItems,
+  ].map(item => (typeof item === 'string' ? item : item.url));
 
   // Determine if we should show the OrganizationSwitcher
   // Hide it when an admin user is viewing an organization they're not a member of
@@ -311,13 +373,22 @@ export default function OrganizationAppSidebar({
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarMenuList label="Dashboard" items={dashboardItems} allUrls={allUrls} />
-        <SidebarMenuList label="KiloClaw" items={kiloClawItems} allUrls={allUrls} />
-        {cloudItems.length > 0 && (
-          <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
-        )}
-        {accountItems.length > 0 && (
-          <SidebarMenuList label="Account" items={accountItems} allUrls={allUrls} />
+        {sidebarMenu === 'kiloClaw' ? (
+          <>
+            <SidebarMenuList label={null} items={backItems} />
+            <SidebarMenuList label="KiloClaw" items={kiloClawItems} allUrls={allUrls} />
+          </>
+        ) : (
+          <>
+            <SidebarMenuList label="Dashboard" items={dashboardItems} allUrls={allUrls} />
+            <SidebarMenuList label={null} items={kiloClawEntryItems} allUrls={allUrls} />
+            {cloudItems.length > 0 && (
+              <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
+            )}
+            {accountItems.length > 0 && (
+              <SidebarMenuList label="Account" items={accountItems} allUrls={allUrls} />
+            )}
+          </>
         )}
       </SidebarContent>
 

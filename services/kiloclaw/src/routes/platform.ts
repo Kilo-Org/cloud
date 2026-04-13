@@ -25,7 +25,7 @@ import {
 } from '../schemas/image-version';
 import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/image-version';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
-import { z } from 'zod';
+import { flattenError, z } from 'zod';
 import { withDORetry } from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import { deriveGatewayToken } from '../auth/gateway-token';
@@ -2292,6 +2292,76 @@ platform.post('/destroy-fly-machine', async c => {
     return c.json({ ok: true });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'destroy-fly-machine');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/extend-volume
+// Temporary workaround: extend a Fly volume to exactly 15 GB.
+const EXTEND_VOLUME_TARGET_SIZE_GB = 15;
+const ExtendVolumeSchema = z.object({
+  userId: z.string().min(1),
+  appName: z
+    .string()
+    .min(1)
+    .max(63)
+    .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/, 'Invalid Fly app name'),
+  volumeId: z
+    .string()
+    .min(1)
+    .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
+});
+
+const FlyExtendVolumeResponseSchema = z.object({
+  needs_restart: z.boolean().optional(),
+});
+
+platform.post('/extend-volume', async c => {
+  const result = await parseBody(c, ExtendVolumeSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { appName, volumeId } = result.data;
+  const apiToken = c.env.FLY_API_TOKEN;
+  if (!apiToken) {
+    return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
+  }
+
+  const url = `https://api.machines.dev/v1/apps/${appName}/volumes/${volumeId}/extend`;
+  try {
+    const resp = await fetch(url, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ size_gb: EXTEND_VOLUME_TARGET_SIZE_GB }),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text();
+      console.error(
+        `[platform] extend-volume failed (${resp.status}) volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}:`,
+        body
+      );
+      return jsonError(`Fly API error (${resp.status}): ${body}`, resp.status);
+    }
+
+    const extendParsed = FlyExtendVolumeResponseSchema.safeParse(await resp.json());
+    if (!extendParsed.success) {
+      console.error(
+        `[platform] extend-volume unexpected response shape volume=${volumeId}:`,
+        flattenError(extendParsed.error)
+      );
+      return jsonError('Unexpected Fly extend-volume response', 502);
+    }
+    // Default to true so the admin always sees the redeploy warning when Fly omits the flag
+    const needsRestart = extendParsed.data.needs_restart ?? true;
+    console.log(
+      `[platform] extend-volume ok: volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}GB (target total) needsRestart=${needsRestart}`
+    );
+    return c.json({ ok: true as const, needsRestart });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'extend-volume');
     return jsonError(message, status);
   }
 });

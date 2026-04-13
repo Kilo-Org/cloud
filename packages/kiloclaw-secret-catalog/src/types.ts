@@ -55,6 +55,8 @@ export const SecretCatalogEntrySchema = z
     fields: z.array(SecretFieldDefinitionSchema).readonly(),
     helpText: z.string().optional(),
     helpUrl: z.url().optional(),
+    guideText: z.string().optional(),
+    guideUrl: z.url().optional(),
     allFieldsRequired: z.boolean().optional(), // e.g. Slack needs both bot + app tokens
     order: z.number().int().optional(), // sort within category (undefined sorts last)
     injectionMethod: InjectionMethodSchema.optional(), // omit = use DEFAULT_INJECTION_METHOD

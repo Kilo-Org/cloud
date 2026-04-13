@@ -42,6 +42,7 @@ import {
   addCacheBreakpoints,
   injectReasoningIntoContent,
 } from '@/lib/providers/openrouter/request-helpers';
+import { isStepFunModel } from '@/lib/providers/stepfun';
 
 function inferSupportedChatApis(
   aiSdkProvider: CustomLlmProvider | undefined,
@@ -256,6 +257,9 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
   }
   if (isMoonshotModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.moonshotai];
+  }
+  if (isStepFunModel(requestedModel)) {
+    return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
   }
   if (isZaiModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum['z-ai']];

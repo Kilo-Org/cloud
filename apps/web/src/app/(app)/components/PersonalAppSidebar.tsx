@@ -2,7 +2,8 @@
 
 import { Sidebar, SidebarContent, SidebarHeader } from '@/components/ui/sidebar';
 import { useUser } from '@/hooks/useUser';
-import { useMemo } from 'react';
+import { useKiloClawStatus } from '@/hooks/useKiloClaw';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Code,
   Coins,
@@ -29,6 +30,8 @@ import {
   CreditCard,
   MessageSquare,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
@@ -37,9 +40,12 @@ import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { usePathname } from 'next/navigation';
 
 export default function PersonalAppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { data: user, isLoading } = useUser();
+  const kiloClawStatusQuery = useKiloClawStatus();
+  const pathname = usePathname();
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
@@ -235,12 +241,71 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     },
   ];
 
+  const kiloClawBaseUrl = '/claw';
+  const kiloClawInstanceState = kiloClawStatusQuery.isSuccess
+    ? kiloClawStatusQuery.data.status === null
+      ? 'absent'
+      : 'present'
+    : 'unknown';
+  const hasKiloClawInstance = kiloClawInstanceState === 'present';
+  const isKiloClawPath = pathname === kiloClawBaseUrl || pathname.startsWith(kiloClawBaseUrl + '/');
+  const [sidebarMenu, setSidebarMenu] = useState<'main' | 'kiloClaw'>(
+    isKiloClawPath && hasKiloClawInstance ? 'kiloClaw' : 'main'
+  );
+
+  useEffect(() => {
+    setSidebarMenu(isKiloClawPath && hasKiloClawInstance ? 'kiloClaw' : 'main');
+  }, [hasKiloClawInstance, isKiloClawPath]);
+
+  const kiloClawEntryItems: Array<{
+    title: string;
+    icon: React.ElementType;
+    url?: string;
+    onClick?: () => void;
+    isActive: boolean;
+    suffixIcon?: React.ElementType;
+  }> = hasKiloClawInstance
+    ? [
+        {
+          title: 'KiloClaw',
+          icon: MessageSquare,
+          onClick: () => setSidebarMenu('kiloClaw'),
+          isActive: isKiloClawPath,
+          suffixIcon: ChevronRight,
+        },
+      ]
+    : [
+        {
+          title: 'KiloClaw',
+          icon: MessageSquare,
+          url: kiloClawInstanceState === 'absent' ? `${kiloClawBaseUrl}/new` : kiloClawBaseUrl,
+          isActive: isKiloClawPath,
+        },
+      ];
+
+  const backItems: Array<{
+    title: string;
+    icon: React.ElementType;
+    onClick: () => void;
+  }> = [
+    {
+      title: 'Back',
+      icon: ChevronLeft,
+      onClick: () => setSidebarMenu('main'),
+    },
+  ];
+
   const allUrls = useMemo(
     () =>
-      [...dashboardItems, ...kiloClawItems, ...cloudItems, ...accountItems, ...startItems].map(
-        i => i.url
-      ),
-    [dashboardItems, kiloClawItems, cloudItems, accountItems, startItems]
+      [
+        kiloClawBaseUrl,
+        ...dashboardItems,
+        ...kiloClawItems,
+        ...cloudItems,
+        ...accountItems,
+        ...startItems,
+      ].map(i => (typeof i === 'string' ? i : i.url)),
+    [kiloClawBaseUrl, dashboardItems, kiloClawItems, cloudItems, accountItems, startItems]
   );
 
   return (
@@ -257,13 +322,22 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarMenuList label="Dashboard" items={dashboardItems} allUrls={allUrls} />
-        <SidebarMenuList label="KiloClaw" items={kiloClawItems} allUrls={allUrls} />
-        {cloudItems.length > 0 && (
-          <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
+        {sidebarMenu === 'kiloClaw' ? (
+          <>
+            <SidebarMenuList label={null} items={backItems} />
+            <SidebarMenuList label="KiloClaw" items={kiloClawItems} allUrls={allUrls} />
+          </>
+        ) : (
+          <>
+            <SidebarMenuList label="Dashboard" items={dashboardItems} allUrls={allUrls} />
+            <SidebarMenuList label={null} items={kiloClawEntryItems} allUrls={allUrls} />
+            {cloudItems.length > 0 && (
+              <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
+            )}
+            <SidebarMenuList label="Account" items={accountItems} allUrls={allUrls} />
+            <SidebarMenuList label="Start" items={startItems} allUrls={allUrls} />
+          </>
         )}
-        <SidebarMenuList label="Account" items={accountItems} allUrls={allUrls} />
-        <SidebarMenuList label="Start" items={startItems} allUrls={allUrls} />
       </SidebarContent>
 
       <SidebarUserFooter user={user} isLoading={isLoading} />

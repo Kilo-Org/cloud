@@ -64,6 +64,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { AdminFileEditor } from './AdminFileEditor';
+import { BumpVolumeTo15GbButton } from './BumpVolumeTo15GbDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useKiloclawInstanceEvents,
@@ -2772,27 +2773,41 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         {snapshotsEnabled && (
           <Card>
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <Camera className="text-muted-foreground h-5 w-5" />
-                <div>
-                  <CardTitle>Volume Snapshots</CardTitle>
-                  <CardDescription>
-                    Fly automatic backups for volume{' '}
-                    {data.workerStatus?.flyAppName ? (
-                      <a
-                        href={`https://fly.io/apps/${data.workerStatus.flyAppName}/volumes/${volumeId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-blue-600 hover:underline"
-                      >
-                        {volumeId}
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : (
-                      volumeId
-                    )}
-                  </CardDescription>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Camera className="text-muted-foreground h-5 w-5" />
+                  <div>
+                    <CardTitle>Volume Snapshots</CardTitle>
+                    <CardDescription>
+                      Fly automatic backups for volume{' '}
+                      {data.workerStatus?.flyAppName ? (
+                        <a
+                          href={`https://fly.io/apps/${data.workerStatus.flyAppName}/volumes/${volumeId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-blue-600 hover:underline"
+                        >
+                          {volumeId}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        volumeId
+                      )}
+                    </CardDescription>
+                  </div>
                 </div>
+                <BumpVolumeTo15GbButton
+                  userId={data.user_id}
+                  instanceId={data.id}
+                  appName={data.workerStatus?.flyAppName}
+                  volumeId={volumeId}
+                  userLabel={data.user_email ?? data.user_id}
+                  disabled={
+                    data.workerStatus?.status === 'recovering' ||
+                    data.workerStatus?.status === 'restoring' ||
+                    data.workerStatus?.status === 'destroying'
+                  }
+                />
               </div>
             </CardHeader>
             <CardContent>

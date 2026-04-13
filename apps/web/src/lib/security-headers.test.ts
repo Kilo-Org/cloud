@@ -1,7 +1,4 @@
-import {
-  buildContentSecurityPolicy,
-  getConfiguredConnectSrcOrigins,
-} from '@/lib/security-headers';
+import { buildContentSecurityPolicy, getConfiguredConnectSrcOrigins } from '@/lib/security-headers';
 
 describe('security headers', () => {
   it('builds CSP with nonce and required third-party sources', () => {

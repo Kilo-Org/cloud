@@ -58,3 +58,28 @@ describe('kilo-chat outbound.sendText', () => {
     }
   });
 });
+
+describe('kilo-chat streaming config resolution', () => {
+  it('defaults streamingMode to "partial" and throttleMs to 500', () => {
+    const cfg = { channels: { 'kilo-chat': { enabled: true } } } as never;
+    const account = kiloChatPlugin.config.resolveAccount(cfg, undefined);
+    expect(account.streamingMode).toBe('partial');
+    expect(account.throttleMs).toBe(500);
+  });
+
+  it('reads streaming.mode=off', () => {
+    const cfg = {
+      channels: { 'kilo-chat': { enabled: true, streaming: { mode: 'off' } } },
+    } as never;
+    const account = kiloChatPlugin.config.resolveAccount(cfg, undefined);
+    expect(account.streamingMode).toBe('off');
+  });
+
+  it('reads streaming.throttleMs override', () => {
+    const cfg = {
+      channels: { 'kilo-chat': { enabled: true, streaming: { throttleMs: 250 } } },
+    } as never;
+    const account = kiloChatPlugin.config.resolveAccount(cfg, undefined);
+    expect(account.throttleMs).toBe(250);
+  });
+});

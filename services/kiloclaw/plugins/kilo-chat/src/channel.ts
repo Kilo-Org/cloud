@@ -1,5 +1,6 @@
 import { createChannelPluginBase, createChatChannelPlugin } from 'openclaw/plugin-sdk/core';
 import type { OpenClawConfig } from 'openclaw/plugin-sdk/core';
+import { resolveChannelPreviewStreamMode } from 'openclaw/plugin-sdk/channel-streaming';
 import { createKiloChatClient } from './client';
 
 const CHANNEL_ID = 'kilo-chat';
@@ -26,6 +27,8 @@ export type ResolvedKiloChatAccount = {
   baseUrl: string;
   dmPolicy: string | undefined;
   allowFrom: string[];
+  streamingMode: 'off' | 'partial' | 'block';
+  throttleMs: number;
 };
 
 function readChannelSection(cfg: OpenClawConfig): Record<string, unknown> | undefined {
@@ -46,7 +49,22 @@ function resolveAccount(cfg: OpenClawConfig, accountId?: string | null): Resolve
   const allowFrom = Array.isArray(section.allowFrom)
     ? section.allowFrom.filter((v): v is string => typeof v === 'string')
     : [];
-  return { accountId: accountId ?? null, baseUrl, dmPolicy, allowFrom };
+
+  const streamingSection =
+    typeof section.streaming === 'object' && section.streaming !== null
+      ? (section.streaming as Record<string, unknown>)
+      : {};
+  const streamingMode = resolveChannelPreviewStreamMode({ streaming: streamingSection }, 'partial');
+  const throttleMsRaw = streamingSection['throttleMs'];
+  const throttleMs =
+    typeof throttleMsRaw === 'number' &&
+    Number.isFinite(throttleMsRaw) &&
+    throttleMsRaw >= 100 &&
+    throttleMsRaw <= 5000
+      ? throttleMsRaw
+      : 500;
+
+  return { accountId: accountId ?? null, baseUrl, dmPolicy, allowFrom, streamingMode, throttleMs };
 }
 
 function inspectAccount(

@@ -18,7 +18,15 @@
           "enabled": { "type": "boolean" },
           "baseUrl": { "type": "string" },
           "dmPolicy": { "type": "string" },
-          "allowFrom": { "type": "array", "items": { "type": "string" } }
+          "allowFrom": { "type": "array", "items": { "type": "string" } },
+          "streaming": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mode": { "type": "string", "enum": ["off", "partial", "block"] },
+              "throttleMs": { "type": "integer", "minimum": 100, "maximum": 5000 }
+            }
+          }
         }
       }
     }

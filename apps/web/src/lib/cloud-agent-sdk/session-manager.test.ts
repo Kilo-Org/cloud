@@ -779,6 +779,118 @@ describe('createSessionManager', () => {
       expect(sc?.variant).toBe('high');
     });
 
+    it('updates mode from agent when assistant message mode is empty', async () => {
+      const config = createMockConfig({
+        fetchSession: jest.fn().mockResolvedValue({
+          ...defaultFetchedSession,
+          mode: null,
+          model: null,
+          variant: null,
+        } satisfies FetchedSessionData),
+      });
+      const mgr = createSessionManager(config);
+
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sessionConfig = mockedCreate.mock.calls[0][0];
+
+      const assistantInfo = {
+        id: 'msg-1',
+        sessionID: 'ses-1',
+        role: 'assistant',
+        modelID: 'claude-3-5-sonnet',
+        providerID: 'test',
+        mode: '',
+        time: { created: 1 },
+        agent: 'architect',
+        cost: 0,
+        parentID: '',
+        path: { cwd: '', root: '' },
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      } satisfies AssistantMessage;
+
+      sessionConfig.onEvent?.({
+        type: 'message.updated',
+        info: assistantInfo,
+      });
+
+      const sc = atomValue<{ mode: string; model: string }>(config.store, mgr.atoms.sessionConfig);
+      expect(sc?.mode).toBe('architect');
+      expect(sc?.model).toBe('claude-3-5-sonnet');
+    });
+
+    it('updates variant from assistant message reasoningVariant when variant is absent', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sessionConfig = mockedCreate.mock.calls[0][0];
+
+      const assistantInfo = {
+        id: 'msg-1',
+        sessionID: 'ses-1',
+        role: 'assistant',
+        modelID: 'claude-3-5-sonnet',
+        providerID: 'test',
+        mode: 'code',
+        reasoningVariant: 'medium',
+        time: { created: 1 },
+        agent: 'test',
+        cost: 0,
+        parentID: '',
+        path: { cwd: '', root: '' },
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      } satisfies AssistantMessage & { reasoningVariant: string };
+
+      sessionConfig.onEvent?.({
+        type: 'message.updated',
+        info: assistantInfo,
+      });
+
+      const sc = atomValue<{ variant?: string | null }>(config.store, mgr.atoms.sessionConfig);
+      expect(sc?.variant).toBe('medium');
+    });
+
+    it('updates variant from assistant message reasoning_variant when variant is absent', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sessionConfig = mockedCreate.mock.calls[0][0];
+
+      const assistantInfo = {
+        id: 'msg-1',
+        sessionID: 'ses-1',
+        role: 'assistant',
+        modelID: 'claude-3-5-sonnet',
+        providerID: 'test',
+        mode: 'code',
+        reasoning_variant: 'low',
+        time: { created: 1 },
+        agent: 'test',
+        cost: 0,
+        parentID: '',
+        path: { cwd: '', root: '' },
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      } satisfies AssistantMessage & { reasoning_variant: string };
+
+      sessionConfig.onEvent?.({
+        type: 'message.updated',
+        info: assistantInfo,
+      });
+
+      const sc = atomValue<{ variant?: string | null }>(config.store, mgr.atoms.sessionConfig);
+      expect(sc?.variant).toBe('low');
+    });
+
     it('sets variant to null when assistant message has no variant', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

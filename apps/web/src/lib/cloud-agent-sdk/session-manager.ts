@@ -24,6 +24,7 @@ import type {
 import type { QuestionInfo } from '@/types/opencode.gen';
 import { splitByContiguousPrefix } from '@/lib/utils/splitByContiguousPrefix';
 import { generateMessageId } from './message-id';
+import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -69,6 +70,34 @@ type FetchedSessionData = {
   prompt: string | null;
   initialMessageId: string | null;
 };
+
+type AssistantMessageConfig = {
+  model: string;
+  mode: string;
+  variant: string | null;
+};
+
+const assistantMessageConfigSchema = z.object({
+  modelID: z.string(),
+  mode: z.string().optional(),
+  agent: z.string().optional(),
+  variant: z.string().nullish(),
+  reasoningVariant: z.string().nullish(),
+  reasoning_variant: z.string().nullish(),
+});
+
+function normalizeAssistantMessageConfig(info: MessageInfo): AssistantMessageConfig | null {
+  if (info.role !== 'assistant') return null;
+
+  const parsed = assistantMessageConfigSchema.safeParse(info);
+  if (!parsed.success) return null;
+
+  return {
+    model: parsed.data.modelID,
+    mode: parsed.data.mode || parsed.data.agent || '',
+    variant: parsed.data.variant ?? parsed.data.reasoningVariant ?? parsed.data.reasoning_variant ?? null,
+  };
+}
 
 type PrepareInput = {
   prompt: string;
@@ -542,19 +571,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onError: message => store.set(errorAtom, message),
       onEvent: event => {
-        if (event.type === 'message.updated' && event.info.role === 'assistant') {
+        if (event.type === 'message.updated') {
           const currentConfig = store.get(sessionConfigAtom);
+          const assistantConfig = normalizeAssistantMessageConfig(event.info);
           if (
             currentConfig &&
-            (currentConfig.model !== event.info.modelID ||
-              currentConfig.mode !== event.info.mode ||
-              currentConfig.variant !== (event.info.variant ?? null))
+            assistantConfig &&
+            (currentConfig.model !== assistantConfig.model ||
+              currentConfig.mode !== assistantConfig.mode ||
+              currentConfig.variant !== assistantConfig.variant)
           ) {
             store.set(sessionConfigAtom, {
               ...currentConfig,
-              model: event.info.modelID,
-              mode: event.info.mode,
-              variant: event.info.variant ?? null,
+              ...assistantConfig,
             });
           }
         }

@@ -313,10 +313,35 @@ export function readEnvMtime(filePath: string): number | undefined {
   }
 }
 
-export function isCaptureEnvValueReady(serviceName: string, repoRoot: string): boolean {
+export function isCaptureEnvValueReadySinceMtime(
+  serviceName: string,
+  repoRoot: string,
+  baselineMtimeMs: number | undefined
+): boolean {
   const spec = getCaptureSpec(serviceName);
   if (!spec) return false;
-  return readEnvValue(path.join(repoRoot, spec.envFile), spec.envKey) !== undefined;
+
+  const envFilePath = path.join(repoRoot, spec.envFile);
+  const current = readEnvValue(envFilePath, spec.envKey);
+  if (current === undefined) return false;
+
+  const currentMtimeMs = readEnvMtime(envFilePath);
+  if (currentMtimeMs === undefined) return false;
+  return baselineMtimeMs === undefined || currentMtimeMs > baselineMtimeMs;
+}
+
+export async function waitForCaptureEnvValueSinceMtime(
+  serviceName: string,
+  repoRoot: string,
+  baselineMtimeMs: number | undefined,
+  timeoutMs: number
+): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (isCaptureEnvValueReadySinceMtime(serviceName, repoRoot, baselineMtimeMs)) return true;
+    await sleep(500);
+  }
+  return false;
 }
 
 export async function waitForEnvValueChange(
@@ -351,9 +376,21 @@ export type CaptureResult = {
   gatesDependents: boolean;
 };
 
+export type CaptureSnapshot = {
+  serviceName: string;
+  previousMtimeMs: number | undefined;
+};
+
+export type CaptureAttemptState = {
+  serviceName: string;
+  baselineMtimeMs: number | undefined;
+  captured: boolean;
+};
+
 export type PreparedCaptureWaits = {
   captureServices: string[];
   otherServices: string[];
+  captureSnapshots: CaptureSnapshot[];
   waitForCaptures: (timeoutMs: number) => Promise<CaptureResult[]>;
 };
 
@@ -374,6 +411,7 @@ export function prepareCaptureWaits(
 ): PreparedCaptureWaits {
   const captureServices: string[] = [];
   const otherServices: string[] = [];
+  const captureSnapshots: CaptureSnapshot[] = [];
   const preparedCaptureServices: PreparedCaptureService[] = [];
 
   for (const serviceName of serviceNames) {
@@ -384,13 +422,16 @@ export function prepareCaptureWaits(
     }
 
     const envFilePath = path.join(repoRoot, spec.envFile);
+    const previousValue = readEnvValue(envFilePath, spec.envKey);
+    const previousMtimeMs = readEnvMtime(envFilePath);
     captureServices.push(serviceName);
+    captureSnapshots.push({ serviceName, previousMtimeMs });
     preparedCaptureServices.push({
       serviceName,
       envFilePath,
       envKey: spec.envKey,
-      previousValue: readEnvValue(envFilePath, spec.envKey),
-      previousMtimeMs: readEnvMtime(envFilePath),
+      previousValue,
+      previousMtimeMs,
       successMessage: spec.successMessage,
       timeoutMessage: spec.timeoutMessage,
       gatesDependents: spec.gatesDependents,
@@ -400,6 +441,7 @@ export function prepareCaptureWaits(
   return {
     captureServices,
     otherServices,
+    captureSnapshots,
     waitForCaptures: async (timeoutMs: number) => {
       return Promise.all(
         preparedCaptureServices.map(async prepared => {

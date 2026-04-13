@@ -21,8 +21,11 @@ import {
   showGroupInTmux,
   prepareCaptureWaits,
   getGatingCaptureDependencies,
-  isCaptureEnvValueReady,
+  isCaptureEnvValueReadySinceMtime,
   partitionByCaptureGate,
+  waitForCaptureEnvValueSinceMtime,
+  type CaptureAttemptState,
+  type CaptureSnapshot,
 } from './runner';
 
 // ---------------------------------------------------------------------------
@@ -60,6 +63,47 @@ const repoRoot = findRepoRoot();
 const alwaysOnGroupIds = new Set(getAlwaysOnGroupIds());
 const groupsById = new Map(getGroups().map(g => [g.id, g]));
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+function recordCaptureSnapshots(
+  captureAttempts: Map<string, CaptureAttemptState>,
+  snapshots: CaptureSnapshot[]
+): void {
+  for (const snapshot of snapshots) {
+    captureAttempts.set(snapshot.serviceName, {
+      serviceName: snapshot.serviceName,
+      baselineMtimeMs: snapshot.previousMtimeMs,
+      captured: false,
+    });
+  }
+}
+
+function markCaptureAttempt(
+  captureAttempts: Map<string, CaptureAttemptState>,
+  serviceName: string,
+  captured: boolean
+): void {
+  const current = captureAttempts.get(serviceName);
+  captureAttempts.set(serviceName, {
+    serviceName,
+    baselineMtimeMs: current?.baselineMtimeMs,
+    captured,
+  });
+}
+
+function isCaptureAttemptReady(
+  captureAttempts: Map<string, CaptureAttemptState>,
+  serviceName: string
+): boolean {
+  const attempt = captureAttempts.get(serviceName);
+  if (attempt === undefined) return false;
+  if (attempt.captured) return true;
+
+  const captured = isCaptureEnvValueReadySinceMtime(serviceName, repoRoot, attempt.baselineMtimeMs);
+  if (captured) {
+    markCaptureAttempt(captureAttempts, serviceName, true);
+  }
+  return captured;
+}
 
 // ---------------------------------------------------------------------------
 // Sidebar item list builder
@@ -280,10 +324,12 @@ function Dashboard({
   serviceNames: initialServiceNames,
   initialViewed,
   initialEnabledGroupIds,
+  initialCaptureAttempts,
 }: {
   serviceNames: string[];
   initialViewed: string;
   initialEnabledGroupIds: string[];
+  initialCaptureAttempts: CaptureAttemptState[];
 }) {
   const { exit } = useApp();
   const { stdout } = useStdout();
@@ -307,6 +353,9 @@ function Dashboard({
   const scrollRef = useRef(0);
   const startTimeRef = useRef(Date.now());
   const togglingRef = useRef(false);
+  const captureAttemptsRef = useRef(
+    new Map(initialCaptureAttempts.map(attempt => [attempt.serviceName, attempt]))
+  );
 
   // --- Mouse refs (read current values in the stable stdin listener) ---
   const mouseStateRef = useRef({
@@ -382,20 +431,35 @@ function Dashboard({
           const allNeeded = resolveGroups(allGroupIds);
           const toStart = allNeeded.filter(name => !runningServices.has(name));
 
-          const captureServicesToStart = prepareCaptureWaits(toStart, repoRoot).captureServices;
+          const captureServicesToStart = toStart.filter(
+            name => getService(name).capture !== undefined
+          );
           const captureServicesToStartSet = new Set(captureServicesToStart);
           const gatingCaptureDependencies = getGatingCaptureDependencies(toStart);
-          const gatingCaptureWaitNames = [
-            ...new Set([...captureServicesToStart, ...gatingCaptureDependencies]),
-          ].filter(name => {
+          const gatingCaptureServicesToStart = captureServicesToStart.filter(
+            name => getService(name).capture?.gatesDependents === true
+          );
+          const blockedRunningGatingCaptureServices = gatingCaptureDependencies.filter(name => {
             const capture = getService(name).capture;
             return (
               capture?.gatesDependents === true &&
-              (captureServicesToStartSet.has(name) || !isCaptureEnvValueReady(name, repoRoot))
+              !captureServicesToStartSet.has(name) &&
+              !isCaptureAttemptReady(captureAttemptsRef.current, name)
             );
           });
-          const captureWaits = prepareCaptureWaits(gatingCaptureWaitNames, repoRoot);
-          const blockingCaptureServices = new Set(captureWaits.captureServices);
+          const captureWaits = prepareCaptureWaits(gatingCaptureServicesToStart, repoRoot);
+          recordCaptureSnapshots(captureAttemptsRef.current, captureWaits.captureSnapshots);
+
+          for (const name of blockedRunningGatingCaptureServices) {
+            if (captureAttemptsRef.current.has(name)) continue;
+            const { captureSnapshots } = prepareCaptureWaits([name], repoRoot);
+            recordCaptureSnapshots(captureAttemptsRef.current, captureSnapshots);
+          }
+
+          const blockingCaptureServices = new Set([
+            ...captureWaits.captureServices,
+            ...blockedRunningGatingCaptureServices,
+          ]);
           const nonCaptureToStart = toStart.filter(name => !captureServicesToStart.includes(name));
           const { immediate: nonGatedStarts, gated } = partitionByCaptureGate(
             nonCaptureToStart,
@@ -449,11 +513,39 @@ function Dashboard({
           // Phase 1 is complete; keep UI responsive while tunnel gate runs in background.
           togglingRef.current = false;
 
-          if (captureWaits.captureServices.length === 0 || gatedStarts.length === 0) {
+          if (blockingCaptureServices.size === 0 || gatedStarts.length === 0) {
             return;
           }
 
-          const captureResults = await captureWaits.waitForCaptures(CAPTURE_TIMEOUT_MS);
+          const [startedCaptureResults, runningCaptureResults] = await Promise.all([
+            captureWaits.waitForCaptures(CAPTURE_TIMEOUT_MS),
+            Promise.all(
+              blockedRunningGatingCaptureServices.map(async serviceName => {
+                const attempt = captureAttemptsRef.current.get(serviceName);
+                const captured = await waitForCaptureEnvValueSinceMtime(
+                  serviceName,
+                  repoRoot,
+                  attempt?.baselineMtimeMs,
+                  CAPTURE_TIMEOUT_MS
+                );
+                const capture = getService(serviceName).capture;
+                return {
+                  serviceName,
+                  captured,
+                  timeoutMessage:
+                    capture?.timeoutMessage ??
+                    `${serviceName} not captured after ${CAPTURE_TIMEOUT_MS / 1000}s`,
+                  gatesDependents: capture?.gatesDependents === true,
+                };
+              })
+            ),
+          ]);
+          const captureResults = [...startedCaptureResults, ...runningCaptureResults];
+
+          for (const result of captureResults) {
+            markCaptureAttempt(captureAttemptsRef.current, result.serviceName, result.captured);
+          }
+
           const failedGatingCaptures = captureResults.filter(
             result => result.gatesDependents && !result.captured
           );
@@ -666,6 +758,10 @@ function Dashboard({
       const item = sidebarItems[selectedIdx];
       if (!item || item.kind !== 'service') return;
       if (!runningServices.has(item.name)) return;
+      if (getService(item.name).capture !== undefined) {
+        const { captureSnapshots } = prepareCaptureWaits([item.name], repoRoot);
+        recordCaptureSnapshots(captureAttemptsRef.current, captureSnapshots);
+      }
       restartServiceInTmux(sessionName, item.name);
       return;
     }
@@ -829,10 +925,11 @@ function Dashboard({
 const serviceNames: string[] = JSON.parse(process.argv[2] ?? '[]');
 const initialViewed = process.argv[3] ?? '';
 const initialEnabledGroupIds: string[] = JSON.parse(process.argv[4] ?? '[]');
+const initialCaptureAttempts: CaptureAttemptState[] = JSON.parse(process.argv[5] ?? '[]');
 
 if (serviceNames.length === 0) {
   console.error(
-    "Usage: dashboard.tsx '<json-service-names>' [initial-service] '<json-enabled-groups>'"
+    "Usage: dashboard.tsx '<json-service-names>' [initial-service] '<json-enabled-groups>' '<json-capture-attempts>'"
   );
   process.exit(1);
 }
@@ -882,6 +979,7 @@ const { waitUntilExit } = render(
     serviceNames={serviceNames}
     initialViewed={initialViewed}
     initialEnabledGroupIds={initialEnabledGroupIds}
+    initialCaptureAttempts={initialCaptureAttempts}
   />
 );
 

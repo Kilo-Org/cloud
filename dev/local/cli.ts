@@ -41,6 +41,7 @@ import {
   partitionByCaptureGate,
   probePort,
   restartServiceInTmux,
+  type CaptureAttemptState,
 } from './runner';
 
 // ---------------------------------------------------------------------------
@@ -155,11 +156,21 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   const SIDEBAR_WIDTH = 40;
 
   // --- Start capture services first and wait for output ---
-  const { captureServices, otherServices, waitForCaptures } = prepareCaptureWaits(
+  const { captureServices, otherServices, captureSnapshots, waitForCaptures } = prepareCaptureWaits(
     serviceNames,
     repoRoot
   );
   const startedServices: string[] = [];
+  const captureAttempts = new Map<string, CaptureAttemptState>(
+    captureSnapshots.map(snapshot => [
+      snapshot.serviceName,
+      {
+        serviceName: snapshot.serviceName,
+        baselineMtimeMs: snapshot.previousMtimeMs,
+        captured: false,
+      },
+    ])
+  );
   const failedGatingCaptureServices = new Set<string>();
 
   if (captureServices.length > 0) {
@@ -172,6 +183,11 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     console.log(`${BOLD}Waiting for capture services...${RESET}`);
     const captureResults = await waitForCaptures(CAPTURE_TIMEOUT_MS);
     for (const result of captureResults) {
+      const attempt = captureAttempts.get(result.serviceName);
+      if (attempt !== undefined) {
+        captureAttempts.set(result.serviceName, { ...attempt, captured: result.captured });
+      }
+
       if (result.captured) {
         console.log(result.successMessage);
       } else {
@@ -232,6 +248,7 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     JSON.stringify(startedServices),
     initialViewedService,
     JSON.stringify(enabledGroupIds),
+    JSON.stringify([...captureAttempts.values()]),
   ];
   const dashboardCmd = `tsx dev/local/dashboard.tsx ${dashboardArgs.map(a => JSON.stringify(a)).join(' ')}`;
   sendKeys(sessionName, 0, dashboardCmd, 0);

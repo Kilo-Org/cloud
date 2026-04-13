@@ -229,6 +229,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const originalModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
 
+  // Reject early (before rate limiting) if the model is exclusive to other features.
+  if (isExcludedForFeature(originalModelIdLowerCased, feature)) {
+    console.warn(
+      `Model ${originalModelIdLowerCased} is not available for feature ${feature}; rejecting.`
+    );
+    return featureExclusiveModelResponse();
+  }
+
   // Extract IP for all requests (needed for free model rate limiting)
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   if (!ipAddress) {
@@ -383,13 +391,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   ) {
     console.warn(`User requested forbidden free model ${originalModelIdLowerCased}; rejecting.`);
     return forbiddenFreeModelResponse(fraudHeaders, feature);
-  }
-
-  if (isExcludedForFeature(originalModelIdLowerCased, feature)) {
-    console.warn(
-      `Model ${originalModelIdLowerCased} is not available for feature ${feature}; rejecting.`
-    );
-    return featureExclusiveModelResponse();
   }
 
   // Extract properties for usage context

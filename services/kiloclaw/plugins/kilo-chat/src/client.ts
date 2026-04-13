@@ -38,7 +38,10 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         );
       }
       const data = (await response.json()) as { messageId?: string };
-      return { messageId: data.messageId ?? '' };
+      if (typeof data.messageId !== 'string' || data.messageId.length === 0) {
+        throw new Error('kilo-chat: controller /send response missing messageId');
+      }
+      return { messageId: data.messageId };
     },
   };
 }

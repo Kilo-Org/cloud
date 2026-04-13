@@ -31,6 +31,22 @@ describe('createKiloChatClient', () => {
     expect(result.messageId).toBe('m1');
   });
 
+  it('throws when the controller returns 2xx without a messageId', async () => {
+    const fetchImpl = (async () =>
+      new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://127.0.0.1:18789',
+      gatewayToken: 'gwt',
+      fetchImpl,
+    });
+    await expect(client.sendText({ conversationId: 'c1', text: 'hi' })).rejects.toThrow(
+      /missing messageId/
+    );
+  });
+
   it('throws when the controller returns non-2xx', async () => {
     const fetchImpl = (async () => new Response('boom', { status: 500 })) as typeof fetch;
     const client = createKiloChatClient({

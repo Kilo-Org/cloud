@@ -17,10 +17,13 @@ export type EditMessageParams = {
 
 export type DeleteMessageParams = { conversationId: string; messageId: string };
 
+export type SendTypingParams = { conversationId: string };
+
 export type KiloChatClient = {
   createMessage(p: CreateMessageParams): Promise<CreateMessageResult>;
   editMessage(p: EditMessageParams): Promise<EditMessageResult>;
   deleteMessage(p: DeleteMessageParams): Promise<void>;
+  sendTyping(p: SendTypingParams): Promise<void>;
 };
 
 function authHeaders(token: string): HeadersInit {
@@ -100,9 +103,24 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     }
   }
 
+  async function sendTyping(params: SendTypingParams): Promise<void> {
+    const response = await fetchImpl(`${base}/_kilo/kilo-chat/typing`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ conversationId: params.conversationId }),
+    });
+    if (!response.ok) {
+      throw new Error(
+        `kilo-chat: controller /typing responded ${response.status}: ${await response.text()}`
+      );
+    }
+    void response.body?.cancel();
+  }
+
   return {
     createMessage,
     editMessage,
     deleteMessage,
+    sendTyping,
   };
 }

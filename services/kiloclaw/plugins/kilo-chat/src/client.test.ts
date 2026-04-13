@@ -195,3 +195,33 @@ describe('deleteMessage', () => {
     );
   });
 });
+
+describe('sendTyping', () => {
+  it('POSTs to /_kilo/kilo-chat/typing with conversationId in body and gateway token', async () => {
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 204 }));
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://127.0.0.1:18789',
+      gatewayToken: 'gwt',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    await client.sendTyping({ conversationId: 'c1' });
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe('http://127.0.0.1:18789/_kilo/kilo-chat/typing');
+    const init2 = init as RequestInit;
+    expect(init2.method).toBe('POST');
+    const headers = new Headers(init2.headers);
+    expect(headers.get('authorization')).toBe('Bearer gwt');
+    expect(headers.get('content-type')).toBe('application/json');
+    expect(JSON.parse(init2.body as string)).toEqual({ conversationId: 'c1' });
+  });
+
+  it('throws on non-2xx so the SDK typing guard can count failures', async () => {
+    const fetchImpl = (async () => new Response('boom', { status: 500 })) as typeof fetch;
+    const client = createKiloChatClient({
+      controllerBaseUrl: 'http://127.0.0.1:18789',
+      gatewayToken: 'gwt',
+      fetchImpl,
+    });
+    await expect(client.sendTyping({ conversationId: 'c1' })).rejects.toThrow(/500/);
+  });
+});
